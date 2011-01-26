@@ -140,7 +140,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
     int tempTableMemory = 0;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &tempTableMemory);
-    deserialized->loadTuplesFrom(false,  serialize_in, NULL);
+    deserialized->loadTuplesFrom(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
     for (int i = 0; i < colnum; ++i) {
@@ -184,7 +184,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     int tempTableMemory = 0;
     schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &tempTableMemory);
-    deserialized->loadTuplesFrom(false,  serialize_in, NULL);
+    deserialized->loadTuplesFrom(serialize_in, NULL);
 
     EXPECT_EQ(1, deserialized->activeTupleCount());
     EXPECT_EQ(1, table_->activeTupleCount());

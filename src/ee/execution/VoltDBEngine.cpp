@@ -682,9 +682,9 @@ VoltDBEngine::updateCatalog(const string &catalogPayload, int catalogVersion)
 }
 
 bool
-VoltDBEngine::loadTable(bool allowExport, int32_t tableId,
-                             ReferenceSerializeInput &serializeIn,
-                             int64_t txnId, int64_t lastCommittedTxnId)
+VoltDBEngine::loadTable(int32_t tableId,
+                        ReferenceSerializeInput &serializeIn,
+                        int64_t txnId, int64_t lastCommittedTxnId)
 {
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,
@@ -706,7 +706,7 @@ VoltDBEngine::loadTable(bool allowExport, int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(allowExport, serializeIn);
+        table->loadTuplesFrom(serializeIn);
     } catch (SerializableEEException e) {
         throwFatalException("%s", e.message().c_str());
     }
@@ -1267,7 +1267,7 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
                 "Attempted to process recovery message for tableId %d but the table could not be found", tableId);
     }
     PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-    table->processRecoveryMessage( message, NULL, false);
+    table->processRecoveryMessage(message, NULL);
 }
 
 int64_t

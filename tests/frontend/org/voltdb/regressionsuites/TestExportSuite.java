@@ -30,9 +30,6 @@ import java.io.UnsupportedEncodingException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NullCallback;
@@ -40,9 +37,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportTestClient;
-import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Delete;
+import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
@@ -197,23 +193,6 @@ public class TestExportSuite extends RegressionSuite {
     public void testExportSafeStartup() throws Exception
     {
         final Client client = getClient();
-        quiesceAndVerify(client, m_tester);
-    }
-
-    /**
-     * Sends ten tuples to an Export enabled VoltServer and verifies the receipt
-     * of those tuples after a quiesce (shutdown). Base case.
-     */
-    public void testExportRoundTripPersistentTable() throws Exception
-    {
-        final Client client = getClient();
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
-
-            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
         quiesceAndVerify(client, m_tester);
     }
 
@@ -376,66 +355,6 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
-    private VoltTable createLoadTableTable(boolean addToVerifier, ExportTestClient tester) {
-
-        final VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[0], TestSQLTypesSuite.m_types[0]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[1], TestSQLTypesSuite.m_types[1]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[2], TestSQLTypesSuite.m_types[2]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[3], TestSQLTypesSuite.m_types[3]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[4], TestSQLTypesSuite.m_types[4]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[5], TestSQLTypesSuite.m_types[5]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[6], TestSQLTypesSuite.m_types[6]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[7], TestSQLTypesSuite.m_types[7]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[8], TestSQLTypesSuite.m_types[8]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[9], TestSQLTypesSuite.m_types[9]),
-          new ColumnInfo(TestSQLTypesSuite.m_columnNames[10], TestSQLTypesSuite.m_types[10]));
-
-        for (int i=0; i < 100; i++) {
-            if (addToVerifier) {
-                tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', TestSQLTypesSuite.m_midValues));
-            }
-            loadTable.addRow(convertValsToLoaderRow(i, TestSQLTypesSuite.m_midValues));
-        }
-        return loadTable;
-    }
-
-    /*
-     * Verify that allowExport = no is obeyed for @LoadMultipartitionTable
-     */
-    public void testLoadMultiPartitionTableExportOff() throws Exception
-    {
-        // allow Export is off. no rows added to the verifier
-        final VoltTable loadTable = createLoadTableTable(false, m_tester);
-        final Client client = getClient();
-        client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 0);
-        quiesceAndVerify(client, m_tester);
-    }
-
-    /*
-     * Verify that allowExport = yes is obeyed for @LoadMultipartitionTable
-     */
-    public void testLoadMultiPartitionTableExportOn() throws Exception
-    {
-        // allow Export is on. rows added to the verifier
-        final VoltTable loadTable = createLoadTableTable(true, m_tester);
-        final Client client = getClient();
-        client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 1);
-        quiesceAndVerify(client, m_tester);
-    }
-
-    /*
-     * Verify that allowExport = yes is obeyed for @LoadMultipartitionTable
-     */
-    public void testLoadMultiPartitionTableExportOn2() throws Exception
-    {
-        // allow Export is on but table is not opted in to Export.
-        final VoltTable loadTable = createLoadTableTable(false, m_tester);
-        final Client client = getClient();
-        client.callProcedure("@LoadMultipartitionTable", "WITH_DEFAULTS", loadTable, 1);
-        quiesceAndVerify(client, m_tester);
-    }
-
     /*
      * Verify that planner rejects updates to append-only tables
      */
@@ -485,75 +404,6 @@ public class TestExportSuite extends RegressionSuite {
             }
         }
         assertTrue(passed);
-    }
-
-    /**
-     * Verify round trips of updates to a persistent table.
-     */
-    public void testExportDeletes() throws Exception
-    {
-        final Client client = getClient();
-
-        // insert
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
-
-        for (int i=0; i < 10; i++) {
-            // add the full 'D' row
-            final Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
-
-            // perform the delete
-            client.callProcedure("Delete", "ALLOW_NULLS", i);
-        }
-        quiesceAndVerify(client, m_tester);
-    }
-
-    /**
-     * Verify round trips of updates to a persistent table.
-     */
-    public void testExportUpdates() throws Exception
-    {
-        final Client client = getClient();
-
-        // insert
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
-
-        // update
-        for (int i=0; i < 10; i++) {
-            // add the 'D' row
-            final Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
-
-            // calculate the update and add that to the m_tester
-            final Object[] rowdata_i = TestSQLTypesSuite.m_defaultValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata_i));
-
-            // perform the update
-            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata_i);
-            client.callProcedure("Update_Export", params);
-        }
-
-        // delete
-        for (int i=0; i < 10; i++) {
-            // add the full 'D' row
-            final Object[] rowdata_d = TestSQLTypesSuite.m_defaultValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
-
-            // perform the delete
-            client.callProcedure("Delete", "ALLOW_NULLS", i);
-        }
-
-        quiesceAndVerify(client, m_tester);
     }
 
     /**
@@ -632,8 +482,7 @@ public class TestExportSuite extends RegressionSuite {
         Insert.class,
         InsertBase.class,
         RollbackInsert.class,
-        Update_Export.class,
-        Delete.class
+        Update_Export.class
     };
 
     static final Class<?>[] PROCEDURES2 = {
@@ -666,8 +515,8 @@ public class TestExportSuite extends RegressionSuite {
                        true  /*enabled*/,
                        null  /* authGroups (off) */);
         // "WITH_DEFAULTS" is a non-exported persistent table
-        project.addExportTable("ALLOW_NULLS", false);   // persistent table
-        project.addExportTable("NO_NULLS", true);       // streamed table
+        project.setTableAsExportOnly("ALLOW_NULLS");
+        project.setTableAsExportOnly("NO_NULLS");
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
         project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
@@ -705,10 +554,10 @@ public class TestExportSuite extends RegressionSuite {
         project = new VoltProjectBuilder();
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
-                       true  /*enabled*/,
-                       null  /* authGroups (off) */);
+                       true,  //enabled
+                       null); // authGroups (off)
         // "WITH_DEFAULTS" is a non-exported persistent table
-        project.addExportTable("ALLOW_NULLS", false);   // persistent table
+        project.setTableAsExportOnly("ALLOW_NULLS");
 
         // and then project builder as normal
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
@@ -736,9 +585,9 @@ public class TestExportSuite extends RegressionSuite {
                        true  /*enabled*/,
                        null  /* authGroups (off) */);
         // "WITH_DEFAULTS" is a non-exported persistent table
-        project.addExportTable("ALLOW_NULLS", false);   // persistent table
-        project.addExportTable("ADDED_TABLE", false);   // persistent table
-        project.addExportTable("NO_NULLS", true);       // streamed table
+        project.setTableAsExportOnly("ALLOW_NULLS");   // persistent table
+        project.setTableAsExportOnly("ADDED_TABLE");   // persistent table
+        project.setTableAsExportOnly("NO_NULLS");      // streamed table
 
         // and then project builder as normal
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");

@@ -390,7 +390,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
     jbyteArray serialized_table, jlong txnId, jlong lastCommittedTxnId,
-    jlong undoToken, jboolean allowExport)
+    jlong undoToken)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -403,9 +403,6 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     engine->setUndoToken(undoToken);
     VOLT_DEBUG("loading table %d in C++...", table_id);
 
-    // convert jboolean to bool
-    bool bAllowExport = (allowExport == JNI_FALSE ? false : true);
-
     // deserialize dependency.
     jsize length = env->GetArrayLength(serialized_table);
     VOLT_DEBUG("deserializing %d bytes ...", (int) length);
@@ -413,7 +410,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     ReferenceSerializeInput serialize_in(bytes, length);
     try {
         try {
-            bool success = engine->loadTable(bAllowExport, table_id, serialize_in,
+            bool success = engine->loadTable(table_id, serialize_in,
                                              txnId, lastCommittedTxnId);
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");

@@ -1769,8 +1769,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             String clusterName,
             String databaseName,
             String tableName,
-            VoltTable data,
-            int allowExport)
+            VoltTable data)
     throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
@@ -1790,8 +1789,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         ee.loadTable(table.getRelativeIndex(), data,
                      txnId,
                      lastCommittedTxnId,
-                     undo_token,
-                     allowExport != 0);
+                     undo_token);
         ee.releaseUndoToken(undo_token);
         getNextUndoToken();
     }

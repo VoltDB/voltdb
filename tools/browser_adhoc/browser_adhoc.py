@@ -192,14 +192,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     self.wfile.write(snapshot_path)
                     self.wfile.write(' with nonce ')
                     self.wfile.write(snapshot_nonce)
-                    # The third parameter is actually 'allowExport', maybe we
-                    # should change the condition here
-                    if blocking_snapshot:
-                        response = client.execute('snapshotrestore %s %s %d' %
-                                                  (snapshot_path, snapshot_nonce, 1));
-                    else:
-                        response = client.execute('snapshotrestore %s %s %d' %
-                                                  (snapshot_path, snapshot_nonce, 0));
+                    response = client.execute('snapshotrestore %s %s' %
+                                              (snapshot_path, snapshot_nonce));
                 elif (button_clicked == "SNAPSHOT STATUS"):
                     self.wfile.write("Retrieving snapshot status")
                     response = client.execute('snapshotstatus')

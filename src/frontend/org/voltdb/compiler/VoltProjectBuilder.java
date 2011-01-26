@@ -174,16 +174,7 @@ public class VoltProjectBuilder {
         }
     }
 
-    /** An export/tables/table entry */
-    public static final class ExportTableInfo {
-        final public String m_tablename;
-        final public boolean m_export_only;
-        ExportTableInfo(String tablename, boolean append) {
-            m_tablename = tablename;
-            m_export_only = append;
-        }
-    }
-    final ArrayList<ExportTableInfo> m_exportTables = new ArrayList<ExportTableInfo>();
+    final ArrayList<String> m_exportTables = new ArrayList<String>();
 
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
     final LinkedHashSet<GroupInfo> m_groups = new LinkedHashSet<GroupInfo>();
@@ -390,9 +381,9 @@ public class VoltProjectBuilder {
         m_elAuthGroups = groups;
     }
 
-    public void addExportTable(String name, boolean exportonly) {
-        ExportTableInfo info = new ExportTableInfo(name, exportonly);
-        m_exportTables.add(info);
+    public void setTableAsExportOnly(String name) {
+        assert(name != null);
+        m_exportTables.add(name);
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -718,10 +709,11 @@ public class VoltProjectBuilder {
                 final Element tables = doc.createElement("tables");
                 conn.appendChild(tables);
 
-                for (ExportTableInfo info : m_exportTables) {
+                for (String exportTableName : m_exportTables) {
                     final Element table = doc.createElement("table");
-                    table.setAttribute("name", info.m_tablename);
-                    table.setAttribute("exportonly", info.m_export_only ? "true" : "false");
+                    table.setAttribute("name", exportTableName);
+                    // as of v1.3, all export tables are export only
+                    table.setAttribute("exportonly", "true");
                     tables.appendChild(table);
                 }
             }

@@ -26,9 +26,7 @@ package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 import java.math.BigDecimal;
 
 import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
 
 /**
@@ -42,10 +40,7 @@ import org.voltdb.types.TimestampType;
 )
 public class Update_Export extends VoltProcedure {
 
-    public final SQLStmt u_allow_nulls = new SQLStmt
-    ("UPDATE ALLOW_NULLS SET A_TINYINT = ?, A_SMALLINT = ?, A_INTEGER = ?, A_BIGINT = ?, A_FLOAT = ?, A_TIMESTAMP = ?, A_INLINE_S1 = ?, A_INLINE_S2 = ?, A_POOL_S = ?, A_POOL_MAX_S = ?, A_DECIMAL = ? WHERE PKEY = ?;");
-
-    public VoltTable[] run(
+    public long run(
             String tablename,
             int pkey,
             long a_tinyint,
@@ -61,22 +56,6 @@ public class Update_Export extends VoltProcedure {
             BigDecimal a_decimal
             )
     {
-
-        // these types are converted to instances of Long when processed
-        // from the wire protocol serialization to the stored procedure
-        // run prototype arguments. Convert them back to the underlying
-        // java mappings of the SQL types here to test EE handling of non-long
-        // values.
-
-        byte v_tinyint = new Long(a_tinyint).byteValue();
-        short v_smallint = new Long(a_smallint).shortValue();
-        int v_integer = new Long(a_integer).intValue();
-
-        if (tablename.equals("ALLOW_NULLS")) {
-            voltQueueSQL(u_allow_nulls, v_tinyint, v_smallint, v_integer,
-                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal, pkey);
-        }
-        return voltExecuteSQL();
+        return 0;
     }
 }

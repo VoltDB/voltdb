@@ -18,21 +18,21 @@
 package org.voltdb.export;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.ArrayDeque;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.nio.ByteOrder;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Iterator;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.export.processors.RawProcessor;
+import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -336,10 +336,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_tableName;
     }
 
-    public byte getIsReplicated() {
-        return m_isReplicated;
-    }
-
     public long getTableId() {
         return m_tableId;
     }
@@ -353,7 +349,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void writeAdvertisementTo(FastSerializer fs) throws IOException {
-        fs.writeByte(getIsReplicated());
         fs.writeInt(getPartitionId());
         fs.writeLong(getTableId());
         fs.writeString(getTableName());

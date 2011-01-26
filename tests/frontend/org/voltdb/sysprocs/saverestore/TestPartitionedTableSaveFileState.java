@@ -46,7 +46,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
     @Override
     public void setUp()
     {
-        m_state = new PartitionedTableSaveFileState(TABLE_NAME, m_allowExport);
+        m_state = new PartitionedTableSaveFileState(TABLE_NAME);
         m_siteInput =
             ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
         m_voltDB = new MockVoltDB();
@@ -426,5 +426,4 @@ public class TestPartitionedTableSaveFileState extends TestCase
     private PartitionedTableSaveFileState m_state;
     private VoltTable m_siteInput;
     private MockVoltDB m_voltDB;
-    private int m_allowExport = 0;
 }

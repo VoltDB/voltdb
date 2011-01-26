@@ -185,7 +185,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         * Load table data into a persistent table specified by the tableId parameter.
         * This must be called at most only once before any data is loaded in to the table.
         */
-        bool loadTable(bool allowExport, int32_t tableId,
+        bool loadTable(int32_t tableId,
                        ReferenceSerializeInput &serializeIn,
                        int64_t txnId, int64_t lastCommittedTxnId);
 

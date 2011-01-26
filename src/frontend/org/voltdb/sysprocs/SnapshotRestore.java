@@ -278,10 +278,8 @@ public class SnapshotRestore extends VoltSystemProcedure
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
-            assert(params.toArray()[2] != null);
             String table_name = (String) params.toArray()[0];
             int dependency_id = (Integer) params.toArray()[1];
-            int allowExport = (Integer) params.toArray()[2];
             TRACE_LOG.trace("Loading replicated table: " + table_name);
             String result_str = "SUCCESS";
             String error_msg = "";
@@ -342,7 +340,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 {
                     super.voltLoadTable(context.getCluster().getTypeName(),
                                         context.getDatabase().getTypeName(),
-                                        table_name, table, allowExport);
+                                        table_name, table);
                 }
                 catch (VoltAbortException e)
                 {
@@ -375,10 +373,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             String table_name = (String) params.toArray()[0];
             int site_id = (Integer) params.toArray()[1];
             int dependency_id = (Integer) params.toArray()[2];
-            int allowExport = (Integer) params.toArray()[3];
             TRACE_LOG.trace("Distributing replicated table: " + table_name +
                             " to: " + site_id);
-            VoltTable result = performDistributeReplicatedTable(table_name, site_id, allowExport);
+            VoltTable result = performDistributeReplicatedTable(table_name, site_id);
             return new DependencyPair(dependency_id, result);
         }
         else if (fragmentId ==
@@ -391,7 +388,6 @@ public class SnapshotRestore extends VoltSystemProcedure
             String table_name = (String) params.toArray()[0];
             int dependency_id = (Integer) params.toArray()[1];
             VoltTable table = (VoltTable) params.toArray()[2];
-            int allowExport = (Integer) params.toArray()[3];
             TRACE_LOG.trace("Received replicated table: " + table_name);
             String result_str = "SUCCESS";
             String error_msg = "";
@@ -399,7 +395,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             {
                 super.voltLoadTable(context.getCluster().getTypeName(),
                                     context.getDatabase().getTypeName(),
-                                    table_name, table, allowExport);
+                                    table_name, table);
             }
             catch (VoltAbortException e)
             {
@@ -465,7 +461,6 @@ public class SnapshotRestore extends VoltSystemProcedure
             int originalHosts[] = (int[]) paramsA[1];
             int relevantPartitions[]  = (int[]) paramsA[2];
             int dependency_id = (Integer) paramsA[3];
-            int allowExport = (Integer) paramsA[4];
 
             for (int partition_id : relevantPartitions) {
                 TRACE_LOG.trace("Distributing partitioned table: " + table_name +
@@ -474,7 +469,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
             VoltTable result =
                 performDistributePartitionedTable(table_name, originalHosts,
-                                                  relevantPartitions, allowExport);
+                                                  relevantPartitions);
             return new DependencyPair( dependency_id, result);
         }
         else if (fragmentId ==
@@ -504,12 +499,10 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
             assert(params.toArray()[3] != null);
-            assert(params.toArray()[4] != null);
             String table_name = (String) params.toArray()[0];
             int partition_id = (Integer) params.toArray()[1];
             int dependency_id = (Integer) params.toArray()[2];
             VoltTable table = (VoltTable) params.toArray()[3];
-            int allowExport = (Integer) params.toArray()[4];
             TRACE_LOG.trace("Received partitioned table: " + table_name);
             String result_str = "SUCCESS";
             String error_msg = "";
@@ -517,7 +510,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             {
                 super.voltLoadTable(context.getCluster().getTypeName(),
                                     context.getDatabase().getTypeName(),
-                                    table_name, table, allowExport);
+                                    table_name, table);
             }
             catch (VoltAbortException e)
             {
@@ -557,7 +550,7 @@ public class SnapshotRestore extends VoltSystemProcedure
    // private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String path, String nonce, int allowExport) throws VoltAbortException
+            String path, String nonce) throws VoltAbortException
     {
       //  m_sampler.start();
         final long startTime = System.currentTimeMillis();
@@ -570,7 +563,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         ClusterSaveFileState savefile_state = null;
         try
         {
-            savefile_state = new ClusterSaveFileState(savefile_data[0], allowExport);
+            savefile_state = new ClusterSaveFileState(savefile_data[0]);
         }
         catch (IOException e)
         {
@@ -823,8 +816,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     // there's not a good way to add a unit test for this at the moment,
     // so the emma coverage is weak.
     private VoltTable performDistributeReplicatedTable(String tableName,
-                                                       int siteId,
-                                                       int allowExport)
+                                                       int siteId)
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
         TableSaveFile savefile = null;
@@ -903,7 +895,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             pfs[0].inputDepIds = new int[] {};
             pfs[0].multipartition = false;
             ParameterSet params = new ParameterSet();
-            params.setParameters(tableName, result_dependency_id, table, allowExport);
+            params.setParameters(tableName, result_dependency_id, table);
             pfs[0].parameters = params;
 
             int final_dependency_id = TableSaveFileState.getNextDependencyId();
@@ -926,8 +918,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
     private VoltTable performDistributePartitionedTable(String tableName,
                                                         int originalHostIds[],
-                                                        int relevantPartitionIds[],
-                                                        int allowExport)
+                                                        int relevantPartitionIds[])
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
         // XXX This is all very similar to the splitting code in
@@ -1036,8 +1027,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 ParameterSet params = new ParameterSet();
                 params.setParameters(tableName, partition_id,
                                      dependencyIds[pfs_index],
-                                     partitioned_tables[partition_id],
-                                     allowExport);
+                                     partitioned_tables[partition_id]);
                 pfs[pfs_index].parameters = params;
                 ++pfs_index;
             }

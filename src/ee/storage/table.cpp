@@ -393,9 +393,8 @@ std::vector<std::string> Table::getColumnNames() {
     return columnNames;
 }
 
-void Table::loadTuplesFromNoHeader(bool allowExport,
-                            SerializeInput &serialize_io,
-                            Pool *stringPool) {
+void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
+                                   Pool *stringPool) {
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
@@ -407,16 +406,15 @@ void Table::loadTuplesFromNoHeader(bool allowExport,
         m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
         m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
 
-        processLoadedTuple( allowExport, m_tmpTarget1);
+        processLoadedTuple(m_tmpTarget1);
     }
 
     m_tupleCount += tupleCount;
     m_usedTupleCount += tupleCount;
 }
 
-void Table::loadTuplesFrom(bool allowExport,
-                            SerializeInput &serialize_io,
-                            Pool *stringPool) {
+void Table::loadTuplesFrom(SerializeInput &serialize_io,
+                           Pool *stringPool) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -473,7 +471,7 @@ void Table::loadTuplesFrom(bool allowExport,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader( allowExport, serialize_io, stringPool);
+    loadTuplesFromNoHeader(serialize_io, stringPool);
 }
 
 }

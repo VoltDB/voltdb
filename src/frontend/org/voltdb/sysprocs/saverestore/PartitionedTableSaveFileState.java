@@ -42,9 +42,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 {
     private static final VoltLogger LOG = new VoltLogger(PartitionedTableSaveFileState.class.getName());
 
-    public PartitionedTableSaveFileState(String tableName, int allowExport)
+    public PartitionedTableSaveFileState(String tableName)
     {
-        super(tableName, allowExport);
+        super(tableName);
     }
 
     @Override
@@ -209,8 +209,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         params.setParameters(getTableName(),
                              originalHostsArray,
                              uncoveredPartitionsAtHost,
-                             result_dependency_id,
-                             m_allowExport);
+                             result_dependency_id);
         plan_fragment.parameters = params;
         return plan_fragment;
     }

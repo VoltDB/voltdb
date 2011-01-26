@@ -24,8 +24,9 @@
 package org.voltdb.export;
 
 import java.net.UnknownHostException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicReference;
+
 import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
@@ -56,7 +57,7 @@ public class TestExportDataSource extends TestCase {
         m_mockVoltDB.addTable("TableName", false);
         m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
-        m_mockVoltDB.addTable("RepTableName", true);
+        m_mockVoltDB.addTable("RepTableName", false);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
     }
@@ -77,7 +78,6 @@ public class TestExportDataSource extends TestCase {
 
             assertEquals("database", s.getDatabase());
             assertEquals(table_name, s.getTableName());
-            assertEquals((table_name.equals("RepTableName") ? 1 : 0), s.getIsReplicated());
             assertEquals(m_part, s.getPartitionId());
             assertEquals(m_site, s.getSiteId());
             assertEquals(table.getRelativeIndex(), s.getTableId());

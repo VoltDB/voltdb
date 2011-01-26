@@ -756,14 +756,14 @@ void PersistentTable::onSetColumns() {
  * to do additional processing for views and Export and non-inline
  * memory tracking
  */
-void PersistentTable::processLoadedTuple(bool allowExport, TableTuple &tuple) {
+void PersistentTable::processLoadedTuple(TableTuple &tuple) {
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(m_tmpTarget1);
     }
 
     // if EL is enabled, append the tuple to the buffer
-    if (allowExport && m_exportEnabled) {
+    if (m_exportEnabled) {
         appendToELBuffer(m_tmpTarget1, m_tsSeqNo++,
                          TupleStreamWrapper::INSERT);
     }
@@ -888,7 +888,7 @@ void PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
 /**
  * Process the updates from a recovery message
  */
-void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowExport) {
+void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool) {
     switch (message->msgType()) {
     case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
         if (activeTupleCount() == 0) {
@@ -897,7 +897,7 @@ void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *po
                 m_indexes[i]->ensureCapacity(tupleCount);
             }
         }
-        loadTuplesFromNoHeader( allowExport, *message->stream(), pool);
+        loadTuplesFromNoHeader(*message->stream(), pool);
         break;
     }
     default:

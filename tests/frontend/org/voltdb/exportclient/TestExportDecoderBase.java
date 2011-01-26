@@ -25,11 +25,11 @@ package org.voltdb.exportclient;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import junit.framework.TestCase;
+
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
-
-import junit.framework.TestCase;
 
 public class TestExportDecoderBase extends TestCase
 {
@@ -66,7 +66,7 @@ public class TestExportDecoderBase extends TestCase
             col_types.add(COLUMN_TYPES[i]);
         }
         AdvertisedDataSource source =
-            new AdvertisedDataSource((byte)0, 0, 0, "yankeelover",
+            new AdvertisedDataSource(0, 0, "yankeelover",
                                      col_names, col_types);
         return source;
     }

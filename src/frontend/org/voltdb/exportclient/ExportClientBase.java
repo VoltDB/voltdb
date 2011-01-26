@@ -36,7 +36,7 @@ public abstract class ExportClientBase implements Runnable {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     private List<InetSocketAddress> m_servers = null;
-    protected HashMap<String, ExportConnection> m_exportConnections;
+    protected final HashMap<String, ExportConnection> m_exportConnections;
 
     // First hash by table, second by partition
     private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
@@ -52,8 +52,7 @@ public abstract class ExportClientBase implements Runnable {
      * Provide the ExportClient with a list of servers to which to connect
      * @param servers
      */
-    public void setServerInfo(List<InetSocketAddress> servers)
-    {
+    public void setServerInfo(List<InetSocketAddress> servers) {
         m_servers = servers;
     }
 

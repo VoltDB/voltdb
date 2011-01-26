@@ -44,7 +44,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
     @Override
     public void setUp()
     {
-        m_state = new ReplicatedTableSaveFileState(TABLE_NAME, m_allowExport);
+        m_state = new ReplicatedTableSaveFileState(TABLE_NAME);
         m_siteInput =
             ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
     }
@@ -274,5 +274,4 @@ public class TestReplicatedTableSaveFileState extends TestCase
 
     private ReplicatedTableSaveFileState m_state;
     private VoltTable m_siteInput;
-    private int m_allowExport = 0;
 }

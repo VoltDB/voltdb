@@ -23,16 +23,16 @@ import java.util.Set;
 
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
+import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
-    ReplicatedTableSaveFileState(String tableName, int allowExport)
+    ReplicatedTableSaveFileState(String tableName)
     {
-        super(tableName, allowExport);
+        super(tableName);
     }
 
     @Override
@@ -150,7 +150,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
         ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), result_dependency_id, m_allowExport);
+        params.setParameters(getTableName(), result_dependency_id);
         plan_fragment.parameters = params;
         return plan_fragment;
     }
@@ -170,7 +170,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         addPlanDependencyId(result_dependency_id);
         ParameterSet params = new ParameterSet();
         params.setParameters(getTableName(), destinationSiteId,
-                             result_dependency_id, m_allowExport);
+                             result_dependency_id);
         plan_fragment.parameters = params;
         return plan_fragment;
     }

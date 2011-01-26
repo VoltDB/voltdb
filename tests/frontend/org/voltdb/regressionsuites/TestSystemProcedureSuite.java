@@ -33,7 +33,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.client.*;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
 
@@ -273,9 +275,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         try {
             client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
-                                 partitioned_table, 1);
+                                 partitioned_table);
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
-                                 replicated_table, 1);
+                                 replicated_table);
             VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
 
             int foundItem = 0;

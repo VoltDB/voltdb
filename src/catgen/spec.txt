@@ -45,7 +45,7 @@ end
 
 begin ConnectorTableInfo      "Per-export connector table configuration"
   Table? table                "Reference to the table being ammended"
-  bool appendOnly             "True if this table is an append-only table for export."
+  bool appendOnly             "DEPRICATED: True if this table is an append-only table for export."
 end
 
 begin Connector                      "Export connector"

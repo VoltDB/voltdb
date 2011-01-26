@@ -236,7 +236,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     /**
      * Process the updates from a recovery message
      */
-    void processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowExport);
+    void processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool);
 
     /**
      * Attempt to serialize more tuples from the table to the provided
@@ -338,7 +338,7 @@ protected:
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(bool allowExport, TableTuple &tuple);
+    virtual void processLoadedTuple(TableTuple &tuple);
 
     TBPtr allocateNextBlock();
 

@@ -249,19 +249,15 @@ class Table {
     /**
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
-     * @param allowExport if false, export enabled is overriden for this load.
      */
-    void loadTuplesFromNoHeader(bool allowExport,
-                                SerializeInput &serialize_in,
+    void loadTuplesFromNoHeader(SerializeInput &serialize_in,
                                 Pool *stringPool = NULL);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
-     * @param allowExport if false, export enabled is overriden for this load.
      */
-    void loadTuplesFrom(bool allowExport,
-                        SerializeInput &serialize_in,
+    void loadTuplesFrom(SerializeInput &serialize_in,
                         Pool *stringPool = NULL);
 
 
@@ -311,7 +307,7 @@ protected:
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(bool allowExport, TableTuple &tuple) {
+    virtual void processLoadedTuple(TableTuple &tuple) {
     };
 
     virtual void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {

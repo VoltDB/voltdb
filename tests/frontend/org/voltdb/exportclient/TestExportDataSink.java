@@ -60,11 +60,10 @@ public class TestExportDataSink extends TestCase {
         String CONN_NAME = "ryanlovestheyankees";
         ExportDataSink dut =
             new ExportDataSink(PARTITION_ID, TABLE_ID, "coffeetable",
-                           new TestExportDecoder(new AdvertisedDataSource((byte)0,
-                                                                       PARTITION_ID,
-                                                                       TABLE_ID,
-                                                                       "coffeetable",
-                                                                       null, null)));
+                           new TestExportDecoder(new AdvertisedDataSource(PARTITION_ID,
+                                                                          TABLE_ID,
+                                                                          "coffeetable",
+                                                                          null, null)));
         dut.addExportConnection(CONN_NAME);
         assertNull(dut.getTxQueue(CONN_NAME).peek());
         dut.work();

@@ -118,21 +118,23 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     }
 
     public void addDefaultExport() {
-        addExport("org.voltdb.export.connectors.VerticaConnector", true, null);
+        addExport("org.voltdb.export.processors.RawProcessor", true, null);
 
         /* Fixed after the loader completes. */
-        // addExportTable("WAREHOUSE", false);
-        // addExportTable("DISTRICT", false);
-        // addExportTable("ITEM", false);
-        // addExportTable("CUSTOMER", false);
-        // addExportTable("CUSTOMER_NAME", false);
-        // addExportTable("STOCK", false);
+        // setTableAsExportOnly("WAREHOUSE");
+        // setTableAsExportOnly("DISTRICT");
+        // setTableAsExportOnly("ITEM");
+        // setTableAsExportOnly("CUSTOMER");
+        // setTableAsExportOnly("CUSTOMER_NAME");
+        // setTableAsExportOnly("STOCK");
 
         /* Modified by actual benchmark: approx 6.58 ins/del per txn. */
-        // addExportTable("HISTORY", false);     // 1 insert per payment (43%)
-        // addExportTable("ORDERS", false);      // 1 insert per new order (45%)
-        // addExportTable("NEW_ORDER", false);   // 1 insert per new order; 10 deletes per delivery (4%)
-        addExportTable("ORDER_LINE", false);     // 10 inserts per new order
+        // setTableAsExportOnly("HISTORY");       // 1 insert per payment (43%)
+        // setTableAsExportOnly("ORDERS");        // 1 insert per new order (45%)
+        // setTableAsExportOnly("NEW_ORDER");     // 1 insert per new order; 10 deletes per delivery (4%)
+        // setTableAsExportOnly("ORDER_LINE");    // 10 inserts per new order */
+
+        setTableAsExportOnly("HISTORY");
     }
 
     @Override

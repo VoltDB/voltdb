@@ -30,6 +30,7 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.utils.Pair;
 
 /**
  * Manage the connection to a single server's export port
@@ -100,7 +101,9 @@ public class ExportConnection {
             ExportProtoMessage m = nextMessage();
             if (m != null && m.isOpenResponse())
             {
-                dataSources.addAll(m.getAdvertisedDataSources());
+                Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>> advertisement;
+                advertisement = m.getAdvertisedDataSourcesAndNodes();
+                dataSources.addAll(advertisement.getFirst());
                 m_state = CONNECTED;
             }
         }

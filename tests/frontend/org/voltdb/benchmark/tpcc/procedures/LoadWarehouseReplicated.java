@@ -41,7 +41,6 @@ public class LoadWarehouseReplicated extends VoltProcedure {
 
     public VoltTable[] run(short w_id, VoltTable items, VoltTable customerNames)
     throws VoltAbortException {
-        int allowExport = 0;
         if (items != null) {
             // check if we've already set up this partition
             voltQueueSQL(checkItemExists);
@@ -50,9 +49,9 @@ public class LoadWarehouseReplicated extends VoltProcedure {
                 return null;
 
             // now we know the partition is not loaded yet
-            voltLoadTable("cluster", "database", "ITEM", items, allowExport);
+            voltLoadTable("cluster", "database", "ITEM", items);
         }
-        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames, allowExport);
+        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames);
         return null;
     }
 

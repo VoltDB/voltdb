@@ -69,7 +69,7 @@ public class TestClusterSaveFileState extends TestCase
         ClusterSaveFileState state = null;
         try
         {
-            state = new ClusterSaveFileState(m_siteInput, m_allowExport);
+            state = new ClusterSaveFileState(m_siteInput);
         }
         catch (IOException e)
         {
@@ -95,7 +95,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput, m_allowExport);
+                new ClusterSaveFileState(m_siteInput);
         }
         catch (IOException e)
         {
@@ -113,7 +113,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput, m_allowExport);
+                new ClusterSaveFileState(m_siteInput);
         }
         catch (IOException e)
         {
@@ -131,7 +131,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput, m_allowExport);
+                new ClusterSaveFileState(m_siteInput);
         }
         catch (IOException e)
         {
@@ -149,7 +149,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput, m_allowExport);
+                new ClusterSaveFileState(m_siteInput);
         }
         catch (IOException e)
         {
@@ -165,7 +165,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput, m_allowExport);
+                new ClusterSaveFileState(m_siteInput);
         }
         catch (IOException e)
         {
@@ -228,5 +228,4 @@ public class TestClusterSaveFileState extends TestCase
     }
 
     private VoltTable m_siteInput;
-    final private int m_allowExport = 0;
 }

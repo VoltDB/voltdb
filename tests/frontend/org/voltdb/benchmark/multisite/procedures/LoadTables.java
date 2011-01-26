@@ -32,10 +32,10 @@ import org.voltdb.VoltTable;
 )
 public class LoadTables extends VoltProcedure {
 
-    public VoltTable[] run(String tablename, VoltTable table, int allowExport)
+    public VoltTable[] run(String tablename, VoltTable table)
         throws VoltAbortException
     {
-        voltLoadTable("cluster", "database", tablename, table, allowExport);
+        voltLoadTable("cluster", "database", tablename, table);
         return null;
     }
 }

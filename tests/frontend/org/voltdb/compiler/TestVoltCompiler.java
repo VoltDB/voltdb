@@ -258,8 +258,8 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addExport("org.voltdb.export.processors.RawProcessor", false, null);
-        project.addExportTable("ALLOW_NULLS", false);   // persistent table
-        project.addExportTable("WITH_DEFAULTS", true);  // streamed table
+        project.setTableAsExportOnly("ALLOW_NULLS");   // persistent table
+        project.setTableAsExportOnly("WITH_DEFAULTS");  // streamed table
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
@@ -289,10 +289,10 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("e", "e_id");
         project.addPartitionInfo("f", "f_id");
         project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
-        project.addExportTable("A", true); // uppercase DDL, uppercase export
-        project.addExportTable("b", true); // uppercase DDL, lowercase export
-        project.addExportTable("E", true); // lowercase DDL, uppercase export
-        project.addExportTable("f", true); // lowercase DDL, lowercase export
+        project.setTableAsExportOnly("A"); // uppercase DDL, uppercase export
+        project.setTableAsExportOnly("b"); // uppercase DDL, lowercase export
+        project.setTableAsExportOnly("E"); // lowercase DDL, uppercase export
+        project.setTableAsExportOnly("f"); // lowercase DDL, lowercase export
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
@@ -319,7 +319,7 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
         project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
-        project.addExportTable("table1r_el_only", true);
+        project.setTableAsExportOnly("table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -335,7 +335,7 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from table1r_el_only");
         project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
-        project.addExportTable("v_table1r_el_only", true);
+        project.setTableAsExportOnly("v_table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }

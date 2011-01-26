@@ -57,7 +57,7 @@ class StreamedTable : public Table {
     virtual bool insertTuple(TableTuple &source);
     virtual bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings);
-    virtual void loadTuplesFrom(bool allowExport, SerializeInput &serialize_in, Pool *stringPool = NULL);
+    virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual void setDelegateId(int64_t delegateId);
 

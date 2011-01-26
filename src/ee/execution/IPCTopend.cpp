@@ -38,7 +38,7 @@ int IPCTopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
 
     if (dependencySz > 0) {
         ReferenceSerializeInput serialize_in(buf, dependencySz);
-        destination->loadTuplesFrom(true, serialize_in, stringPool);
+        destination->loadTuplesFrom(serialize_in, stringPool);
         delete [] origBuf;
         return 1;
     }

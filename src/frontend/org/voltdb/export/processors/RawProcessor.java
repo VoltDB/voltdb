@@ -22,16 +22,20 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
@@ -180,13 +184,34 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
                 }
                 m_state = RawProcessor.CONNECTED;
 
-                // Respond by advertising the full data source set.
+                // Respond by advertising the full data source set and
+                //  the set of up nodes that are up
                 FastSerializer fs = new FastSerializer();
                 try {
-                    // serialize an array of DataSources
+
+                    // serialize an array of DataSources that are locally available
                     fs.writeInt(m_sourcesArray.size());
                     for (ExportDataSource src : m_sourcesArray) {
                         src.writeAdvertisementTo(fs);
+                    }
+
+                    // serialize the makup of the cluster
+                    //  - the catalog context knows which hosts are up
+                    //  - the hostmessenger knows the hostnames of hosts
+                    CatalogContext cx = VoltDB.instance().getCatalogContext();
+                    HostMessenger hm = VoltDB.instance().getHostMessenger();
+
+                    if (cx != null) {
+                        Set<Integer> liveHosts = cx.siteTracker.getAllLiveHosts();
+                        fs.writeInt(liveHosts.size());
+                        for (int hostId : liveHosts) {
+                            String hostname = hm.getHostnameForHostID(hostId);
+                            fs.writeString(hostname);
+                        }
+                    }
+                    else {
+                        // for test code
+                        fs.writeInt(0);
                     }
                 }
                 catch (IOException e) {

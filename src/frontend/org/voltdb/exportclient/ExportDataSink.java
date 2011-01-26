@@ -34,6 +34,7 @@ import org.voltdb.logging.VoltLogger;
 public class ExportDataSink {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
+    boolean m_active = true;
     final long tableId;
     final int partitionId;
     final String m_tableName;
