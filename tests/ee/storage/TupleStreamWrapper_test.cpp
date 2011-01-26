@@ -202,6 +202,10 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     EXPECT_EQ(results->offset(), 0);
     EXPECT_EQ(results->unreleasedSize(), 0);
 
+    // verify the block count statistic.
+    size_t allocatedBlockCount = m_wrapper->allocatedBlockCount();
+    EXPECT_TRUE(allocatedBlockCount == 0);
+
     for (int i = 1; i < 10; i++)
     {
         appendTuple(i-1, i);
@@ -213,6 +217,9 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
         appendTuple(i-1, i);
     }
     m_wrapper->periodicFlush(-1, 0, 19, 19);
+
+    allocatedBlockCount = m_wrapper->allocatedBlockCount();
+    EXPECT_TRUE(allocatedBlockCount == 2);
 
     // get the first buffer flushed
     results = m_wrapper->getCommittedExportBytes();
@@ -234,6 +241,11 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 19));
     EXPECT_EQ(results->offset(), 0);
     EXPECT_EQ(results->unreleasedSize(), 0);
+
+    // ack all of the data and re-verify block count
+    m_wrapper->releaseExportBytes(results->uso());
+    allocatedBlockCount = m_wrapper->allocatedBlockCount();
+    EXPECT_TRUE(allocatedBlockCount == 0);
 }
 
 /**
