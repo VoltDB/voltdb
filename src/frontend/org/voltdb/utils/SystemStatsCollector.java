@@ -192,7 +192,7 @@ public class SystemStatsCollector {
          */
         @Override
         public String toString() {
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
             sb.append(String.format("%dms:\n", timestamp));
             sb.append(String.format("  SYS: %dM RSS, %dM Total\n",
                     rss / 1024 /1024,

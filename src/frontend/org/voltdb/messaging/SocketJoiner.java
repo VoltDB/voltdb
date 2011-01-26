@@ -28,8 +28,10 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltdb.VoltDB;
@@ -70,9 +72,9 @@ public class SocketJoiner extends Thread {
     static final int PING = 333;
     InetAddress m_coordIp = null;
     int m_localHostId = 0;
-    Hashtable<Integer, SocketChannel> m_sockets = new Hashtable<Integer, SocketChannel>();
-    Hashtable<Integer, DataInputStream> m_inputs = new Hashtable<Integer, DataInputStream>();
-    Hashtable<Integer, DataOutputStream> m_outputs = new Hashtable<Integer, DataOutputStream>();
+    Map<Integer, SocketChannel> m_sockets = new HashMap<Integer, SocketChannel>();
+    Map<Integer, DataInputStream> m_inputs = new HashMap<Integer, DataInputStream>();
+    Map<Integer, DataOutputStream> m_outputs = new HashMap<Integer, DataOutputStream>();
     ServerSocketChannel m_listenerSocket = null;
     int m_expectedHosts;
     VoltLogger m_hostLog;
@@ -797,15 +799,15 @@ public class SocketJoiner extends Thread {
         return m_discoveredCatalogVersion;
     }
 
-    Hashtable<Integer, SocketChannel> getHostsAndSockets() {
+    Map<Integer, SocketChannel> getHostsAndSockets() {
         return m_sockets;
     }
 
-    Hashtable<Integer, DataOutputStream> getHostsAndOutputs() {
+    Map<Integer, DataOutputStream> getHostsAndOutputs() {
         return m_outputs;
     }
 
-    Hashtable<Integer, DataInputStream> getHostsAndInputs() {
+    Map<Integer, DataInputStream> getHostsAndInputs() {
         return m_inputs;
     }
 }

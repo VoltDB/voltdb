@@ -245,7 +245,7 @@ public final class DBBPool {
 
             @Override
             public String toString() {
-                StringBuffer sb = new StringBuffer(1024);
+                StringBuilder sb = new StringBuilder(1024);
                 sb.append("DBB ").append(this.hashCode()).append(" Last used ").append(lastUsed);
                 sb.append(" Num slices ").append(m_numSlices);
                 sb.append(" Available slices ").append(m_availableSlices);
@@ -385,7 +385,7 @@ public final class DBBPool {
 
         @Override
         public String toString() {
-            final StringBuffer sb = new StringBuffer(2048);
+            final StringBuilder sb = new StringBuilder(2048);
             sb.append("\tArena ").append(m_allocationSize).append(" has ").append(m_allDBBs.size());
             sb.append(" DBBs total ").append(" with ");
             sb.append(m_availableDBBs.size()).append(" available\n");
@@ -718,7 +718,7 @@ public final class DBBPool {
 
     @Override
     public String toString() {
-        final StringBuffer sb = new StringBuffer(4096);
+        final StringBuilder sb = new StringBuilder(4096);
         sb.append("\nDBBPool: ").append(this.hashCode()).append(" -- ");
         sb.append(" bytes allocated locally ").append(bytesAllocatedLocally);
         sb.append(" bytes allocated globally ").append(bytesAllocatedGlobally);

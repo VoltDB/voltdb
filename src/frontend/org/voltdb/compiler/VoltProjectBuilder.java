@@ -849,7 +849,7 @@ public class VoltProjectBuilder {
 
         // <httpd>
         final Element httpd = doc.createElement("httpd");
-        httpd.setAttribute("port", new Integer(m_httpdPortNo).toString());
+        httpd.setAttribute("port", Integer.valueOf(m_httpdPortNo).toString());
         final Element jsonapi = doc.createElement("jsonapi");
         jsonapi.setAttribute("enabled", new Boolean(m_jsonApiEnabled).toString());
         httpd.appendChild(jsonapi);

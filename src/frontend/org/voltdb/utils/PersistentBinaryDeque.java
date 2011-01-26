@@ -440,7 +440,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
         DequeSegment segment = m_finishedSegments.get(m_currentPollSegmentIndex);
         if (segment == null) {
-            assert(m_writeSegment.m_index == m_currentPollSegmentIndex);
+            assert(m_writeSegment.m_index.equals(m_currentPollSegmentIndex));
             //See if we can steal the write segment, otherwise return null
             if (m_writeSegment.getNumEntries() > 0) {
                 openNewWriteSegment();

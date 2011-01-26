@@ -74,10 +74,10 @@ public class ClusterMonitor {
             " numTimedInvocations, avgExecutionTime, minExecutionTime, maxExecutionTime, numAborts, numFailures )" +
             " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
-    private static final String insertTableStatsStatement = new String("insert into " + tablestatsTable +
+    private static final String insertTableStatsStatement = "insert into " + tablestatsTable +
             " (instanceId, tsEvent, hostId, hostName, siteId, partitionId, " +
             " tableName, tableType, numActiveTuples, numAllocatedTuples, numDeletedTuples )" +
-            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
     private final Thread m_loadThread = new Thread(new Loader(), "Client stats loader");
 

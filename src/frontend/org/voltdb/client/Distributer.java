@@ -695,7 +695,7 @@ class Distributer {
         ci[5] = new ColumnInfo( "SERVER_CONNECTION_ID", VoltType.BIGINT);
         ci[6] = new ColumnInfo( "PROCEDURE_NAME", VoltType.STRING);
         for (int i=0; i < ProcedureStats.m_numberOfBuckets; i++) {
-            String colName = (new Integer((i+1)*10)).toString() + "MS";
+            String colName = (Integer.valueOf((i+1)*10)).toString() + "MS";
             ci[i+7] = new ColumnInfo(colName, VoltType.INTEGER);
         }
         return ci;

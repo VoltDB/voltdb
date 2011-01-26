@@ -305,7 +305,7 @@ import org.voltdb.types.VoltDecimalHelper;
 
     @Override
     public String toString() {
-        StringBuffer b = new StringBuffer();
+        StringBuilder b = new StringBuilder();
         b.append("ParameterSet:");
         if (m_params == null) {
             b.append("NULL");

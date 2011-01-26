@@ -121,7 +121,7 @@ public class InitiatorStats extends SiteStatsSource {
             StoredProcedureInvocation invocation,
             int delta,
             byte status) {
-        final StringBuffer key = new StringBuffer(2048);
+        final StringBuilder key = new StringBuilder(2048);
         key.append(invocation.getProcName()).append('$').append(connectionId);
         final String keyString = key.toString();
         InvocationInfo info = m_connectionStats.get(keyString);

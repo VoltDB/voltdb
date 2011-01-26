@@ -320,7 +320,7 @@ public class VoltCompiler {
             return false;
         }
 
-        StringBuffer buildinfo = new StringBuffer();
+        StringBuilder buildinfo = new StringBuilder();
         String info[] = RealVoltDB.extractBuildInfo();
         buildinfo.append(info[0]).append('\n');
         buildinfo.append(info[1]).append('\n');

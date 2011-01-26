@@ -80,18 +80,18 @@ public class SSHTools {
     }
 
     public String createUrl(String hostname, String path) {
-        String url = new String();
+        StringBuilder sb = new StringBuilder();
         if (m_username != null)
-            url = url.concat(m_username + "@");
+            sb.append(m_username + "@");
 
         if (hostname != null)
-           url = url.concat(hostname);
+           sb.append(hostname);
 
-        url = url.concat(":");
+        sb.append(":");
         if (path != null)
-            url = url.concat(path);
+            sb.append(path);
 
-        return url;
+        return sb.toString();
     }
 
     public boolean copyFromLocal(File src, String hostNameTo, String pathTo) {

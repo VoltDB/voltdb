@@ -63,7 +63,7 @@ public class ExecutorContext extends VoltThreadContext implements Serializable, 
         public int compareTo(ExecutorTxnState o) {
             if (o == null)
                 return -1;
-            return (new Long(txnId)).compareTo(new Long(o.txnId));
+            return (Long.valueOf(txnId)).compareTo(Long.valueOf(o.txnId));
         }
     }
 

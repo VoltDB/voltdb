@@ -31,7 +31,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         EXECUTE_LIST;
     }
 
-    protected List<AbstractPlanNode> m_list = new Vector<AbstractPlanNode>();
+    protected List<AbstractPlanNode> m_list = new ArrayList<AbstractPlanNode>();
 
     public PlanNodeList() {
         super();
@@ -65,7 +65,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         // Create a counter for each node based on the # of children that it has
         // If any node has no children, put it in the execute list
         //
-        Vector<AbstractPlanNode> execute_list = new Vector<AbstractPlanNode>();
+        List<AbstractPlanNode> execute_list = Collections.synchronizedList(new ArrayList<AbstractPlanNode>());
         Map<AbstractPlanNode, Integer> child_cnts = new HashMap<AbstractPlanNode, Integer>();
         for (AbstractPlanNode node : m_planNodes) {
             int num_of_children = node.getChildCount();

@@ -42,7 +42,7 @@ public abstract class SiteStatsSource extends StatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = new Integer(m_siteId);
+        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = Integer.valueOf(m_siteId);
         super.updateStatsRow(rowKey, rowValues);
     }
 }

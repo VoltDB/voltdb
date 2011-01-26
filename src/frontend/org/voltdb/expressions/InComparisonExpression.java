@@ -36,7 +36,7 @@ public class InComparisonExpression extends ComparisonExpression {
         VALUES;
     }
 
-    protected List<AbstractExpression> m_values = new Vector<AbstractExpression>();
+    protected List<AbstractExpression> m_values = new ArrayList<AbstractExpression>();
 
     public InComparisonExpression() {
         super(ExpressionType.COMPARE_IN);

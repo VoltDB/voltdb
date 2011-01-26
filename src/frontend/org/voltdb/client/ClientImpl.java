@@ -119,7 +119,7 @@ final class ClientImpl implements Client {
                 return true;
             }
             else {
-                if (m_createConnectionUsername != username) return false;
+                if (!m_createConnectionUsername.equals(username)) return false;
                 if (hashedPassword == null)
                     return m_hashedPassword == null;
                 else

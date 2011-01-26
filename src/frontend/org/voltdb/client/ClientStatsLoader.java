@@ -39,22 +39,22 @@ public class ClientStatsLoader {
     private static final String connectionStatsTable = tablePrefix + "clientConnectionStats";
     private static final String procedureStatsTable = tablePrefix + "clientProcedureStats";
 
-    private static final String createInstanceStatement = new String("insert into " + instancesTable +
+    private static final String createInstanceStatement = "insert into " + instancesTable +
             " ( clusterStartTime, clusterLeaderAddress, applicationName, subApplicationName) " +
-            "values ( ?, ?, ?, ? );");
+            "values ( ?, ?, ?, ? );";
 
-    private static final String insertConnectionStatsStatement = new String("insert into " + connectionStatsTable +
+    private static final String insertConnectionStatsStatement = "insert into " + connectionStatsTable +
             " ( instanceId, tsEvent, hostname, connectionId, serverHostId, serverHostname, " +
             " serverConnectionId, numInvocations, numAborts, numFailures, numBytesRead, " +
             " numMessagesRead, numBytesWritten, numMessagesWritten) " +
-            "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );");
+            "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );";
 
-    private static final String insertProcedureStatsStatement = new String("insert into " + procedureStatsTable +
+    private static final String insertProcedureStatsStatement = "insert into " + procedureStatsTable +
             " ( instanceId, tsEvent, hostname, connectionId, serverHostId, serverHostname, " +
             " serverConnectionId, procedureName, roundtripAvg, roundtripMin, roundtripMax, " +
             " clusterRoundtripAvg, clusterRoundtripMin, clusterRoundtripMax, " +
             " numInvocations, numAborts, numFailures) " +
-            "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );");
+            "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );";
 
     private PreparedStatement insertConnectionStatsStmt;
     private PreparedStatement insertProcedureStatsStmt;

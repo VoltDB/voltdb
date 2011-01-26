@@ -18,8 +18,8 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Vector;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
@@ -37,12 +37,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
         SORT_DIRECTION;
     }
 
-    protected List<AbstractExpression> m_sortExpressions =
-        new Vector<AbstractExpression>();
+    protected List<AbstractExpression> m_sortExpressions = new ArrayList<AbstractExpression>();
     /**
      * Sort Directions
      */
-    protected List<SortDirectionType> m_sortDirections = new Vector<SortDirectionType>();
+    protected List<SortDirectionType> m_sortDirections = new ArrayList<SortDirectionType>();
 
     public OrderByPlanNode() {
         super();

@@ -40,7 +40,7 @@ public class PartitionCountStats extends StatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get(COLUMN_NAME)] = new Integer(m_partitionCount);
+        rowValues[columnNameToIndex.get(COLUMN_NAME)] = Integer.valueOf(m_partitionCount);
         super.updateStatsRow(rowKey, rowValues);
     }
 

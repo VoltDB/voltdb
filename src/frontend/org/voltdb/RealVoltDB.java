@@ -36,7 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
@@ -243,10 +243,10 @@ public class RealVoltDB implements VoltDBInterface
     private HostMessenger m_messenger = null;
     private final ArrayList<ClientInterface> m_clientInterfaces =
         new ArrayList<ClientInterface>();
-    private Hashtable<Integer, ExecutionSite> m_localSites;
+    private Map<Integer, ExecutionSite> m_localSites;
     private VoltNetwork m_network = null;
     private HTTPAdminListener m_adminListener;
-    private Hashtable<Integer, Thread> m_siteThreads;
+    private Map<Integer, Thread> m_siteThreads;
     private ArrayList<ExecutionSiteRunner> m_runners;
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
@@ -487,8 +487,8 @@ public class RealVoltDB implements VoltDBInterface
             }
 
             // set up site structure
-            m_localSites = new Hashtable<Integer, ExecutionSite>();
-            m_siteThreads = new Hashtable<Integer, Thread>();
+            m_localSites = Collections.synchronizedMap(new HashMap<Integer, ExecutionSite>());
+            m_siteThreads = Collections.synchronizedMap(new HashMap<Integer, Thread>());
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
             if (config.m_backend.isIPC) {
@@ -1208,7 +1208,7 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Hashtable<Integer, ExecutionSite> getLocalSites() {
+    public Map<Integer, ExecutionSite> getLocalSites() {
         return m_localSites;
     }
 

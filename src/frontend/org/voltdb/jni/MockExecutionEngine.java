@@ -89,7 +89,7 @@ public class MockExecutionEngine extends ExecutionEngine {
         vt = new VoltTable(new VoltTable.ColumnInfo[] {
                   new VoltTable.ColumnInfo("foo", VoltType.INTEGER)
         });
-        vt.addRow(new Integer(1));
+        vt.addRow(Integer.valueOf(1));
         return new DependencyPair(outputDepId, vt);
     }
 

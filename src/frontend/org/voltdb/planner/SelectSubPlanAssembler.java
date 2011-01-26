@@ -70,7 +70,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             for (String table : parsedStmt.joinOrder.split(",")) {
                 tableNames.add(table.trim());
                 if (!dupCheck.add(table.trim())) {
-                    StringBuffer sb = new StringBuffer();
+                    StringBuilder sb = new StringBuilder();
                     sb.append("The specified join order \"");
                     sb.append(parsedStmt.joinOrder).append("\" contains duplicate tables. ");
                     sb.append("Self-joins are not supported yet.");
@@ -79,7 +79,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
 
             if (parsedStmt.tableList.size() != tableNames.size()) {
-                StringBuffer sb = new StringBuffer();
+                StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"");
                 sb.append(parsedStmt.joinOrder).append("\" does not contain the correct number of tables\n");
                 sb.append("Expected ").append(parsedStmt.tableList.size());
@@ -101,7 +101,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     }
                 }
                 if (!foundMatch) {
-                    StringBuffer sb = new StringBuffer();
+                    StringBuilder sb = new StringBuilder();
                     sb.append("The specified join order \"");
                     sb.append(parsedStmt.joinOrder).append("\" contains ").append(name);
                     sb.append(" which doesn't exist in the FROM clause");
@@ -109,7 +109,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 }
             }
             if (zz != tableNames.size()) {
-                StringBuffer sb = new StringBuffer();
+                StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"");
                 sb.append(parsedStmt.joinOrder).append("\" doesn't contain enough tables ");
                 throw new RuntimeException(sb.toString());

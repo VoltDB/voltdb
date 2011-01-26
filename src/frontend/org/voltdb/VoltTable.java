@@ -862,7 +862,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     @Override
     public String toString() {
         assert(verifyTableInvariants());
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder buffer = new StringBuilder();
 
         // commented out code to print byte by byte content
         /*for (int i = 0; i < m_buffer.limit(); i++) {

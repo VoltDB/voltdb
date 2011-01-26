@@ -26,7 +26,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -173,9 +173,10 @@ public class HostMessenger implements Messenger {
             }
 
             m_localHostId = m_joiner.getLocalHostId();
-            Hashtable<Integer, SocketChannel> sockets = m_joiner.getHostsAndSockets();
-            for (Integer hostId : sockets.keySet()) {
-                SocketChannel socket = sockets.get(hostId);
+            Map<Integer, SocketChannel> sockets = m_joiner.getHostsAndSockets();
+            for (Entry<Integer,SocketChannel> entry: sockets.entrySet()) {
+                Integer hostId = entry.getKey();
+                SocketChannel socket = entry.getValue();
                 try {
                     socket.socket().setSendBufferSize(1024*1024*2);
                     socket.socket().setReceiveBufferSize(1024*1024*2);

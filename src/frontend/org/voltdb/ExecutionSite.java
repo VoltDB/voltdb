@@ -1551,7 +1551,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             failedHosts.add(m_context.siteTracker.getHostForSite(siteId));
         }
 
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         for (Integer hostId : failedHosts) {
             sb.append(hostId).append(' ');
         }

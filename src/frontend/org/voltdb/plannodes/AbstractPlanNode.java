@@ -25,7 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Vector;
+import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
@@ -77,9 +77,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     protected int m_id = -1;
-    protected List<AbstractPlanNode> m_children = new Vector<AbstractPlanNode>();
-    protected List<AbstractPlanNode> m_parents = new Vector<AbstractPlanNode>();
-    protected HashSet<AbstractPlanNode> m_dominators = new HashSet<AbstractPlanNode>();
+    protected List<AbstractPlanNode> m_children = new ArrayList<AbstractPlanNode>();
+    protected List<AbstractPlanNode> m_parents = new ArrayList<AbstractPlanNode>();
+    protected Set<AbstractPlanNode> m_dominators = new HashSet<AbstractPlanNode>();
 
     // TODO: planner accesses this data directly. Should be protected.
     protected List<ScalarValueHints> m_outputColumnHints = new ArrayList<ScalarValueHints>();
@@ -378,7 +378,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     /**
      * @return the dominator list for a node
      */
-    public HashSet<AbstractPlanNode> getDominators() {
+    public Set<AbstractPlanNode> getDominators() {
         return m_dominators;
     }
 

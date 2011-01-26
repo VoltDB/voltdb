@@ -36,7 +36,7 @@ public class SnapshotRegistry {
 
                 @Override
                 public int compare(Snapshot o1, Snapshot o2) {
-                    return new Long(o1.timeStarted).compareTo(o2.timeStarted);
+                    return Long.valueOf(o1.timeStarted).compareTo(o2.timeStarted);
                 }
 
             });

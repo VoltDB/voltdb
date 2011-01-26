@@ -59,7 +59,7 @@ public class CSVEscaperUtil
             if (!contains(s, m_csvEscapeChars)) {
                 return s;
             }
-            StringBuffer sb = new StringBuffer(s.length() + (int)(s.length() * .10));
+            StringBuilder sb = new StringBuilder(s.length() + (int)(s.length() * .10));
             sb.append('"');
             for (int ii = 0; ii < s.length(); ii++) {
                 char c = s.charAt(ii);
@@ -89,7 +89,7 @@ public class CSVEscaperUtil
             if (!contains( s, m_tsvEscapeChars)) {
                 return s;
             }
-            StringBuffer sb = new StringBuffer(s.length() + (int)(s.length() * .10));
+            StringBuilder sb = new StringBuilder(s.length() + (int)(s.length() * .10));
             for (int ii = 0; ii < s.length(); ii++) {
                 char c = s.charAt(ii);
                 if (c == '\\') {
