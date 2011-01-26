@@ -343,7 +343,7 @@ public class LocalCluster implements VoltServerConfig {
             return true;
         }
         m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
-                                     "/tmp/vdb", true, ppdPath, ppdPrefix);
+                                     null, true, ppdPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
     }

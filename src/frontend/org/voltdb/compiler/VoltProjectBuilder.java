@@ -443,7 +443,7 @@ public class VoltProjectBuilder {
             throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
         }
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                    voltRootPath, false, null, "none");
+                    null, false, null, "none");
     }
 
     public boolean compile(
@@ -458,12 +458,35 @@ public class VoltProjectBuilder {
 
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
                            final int hostCount, final int replication, final String leaderAddress,
-                           final String voltRoot, final boolean ppdEnabled,
+                           String voltRoot, final boolean ppdEnabled,
                            final String ppdPath, final String ppdPrefix) {
         assert(jarPath != null);
         assert(sitesPerHost >= 1);
         assert(hostCount >= 1);
         assert(leaderAddress != null);
+
+        if (voltRoot == null) {
+            String voltRootPath = "/tmp/" + System.getProperty("user.name");
+            java.io.File voltRootFile = new java.io.File(voltRootPath);
+            if (!voltRootFile.exists()) {
+                if (!voltRootFile.mkdir()) {
+                    throw new RuntimeException("Unable to create voltroot \"" + voltRootPath + "\" for test");
+                }
+            }
+            if (!voltRootFile.isDirectory()) {
+                throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not a directory");
+            }
+            if (!voltRootFile.canRead()) {
+                throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not readable");
+            }
+            if (!voltRootFile.canWrite()) {
+                throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
+            }
+            if (!voltRootFile.canExecute()) {
+                throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
+            }
+            voltRoot = voltRootPath;
+        }
 
         // this stuff could all be converted to org.voltdb.compiler.projectfile.*
         // jaxb objects and (WE ARE!) marshaled to XML. Just needs some elbow grease.

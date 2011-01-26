@@ -92,7 +92,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
             return true;
         }
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, "localhost",
-                                     "/tmp/vdb", true, ppdPath, ppdPrefix);
+                                     null, true, ppdPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
     }
