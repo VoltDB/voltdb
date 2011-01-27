@@ -37,6 +37,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
@@ -245,6 +246,61 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         cluster.startUp();
         Thread.sleep(100);
+
+        cluster.shutDown();
+    }
+
+    public void testRejoinInlineStringBug() throws Exception {
+        VoltProjectBuilder builder = getBuilderForTest();
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+        ClientResponse response;
+        Client client;
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost");
+
+        ProcedureCallback callback = new ProcedureCallback() {
+
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    System.out.println(clientResponse.getStatusString());
+                }
+            }
+        };
+
+        StringBuffer shortBuffer = new StringBuffer();
+        for (int ii = 0; ii < 33; ii++) {
+            shortBuffer.append('a');
+        }
+        String shortString = shortBuffer.toString();
+
+        StringBuffer longBuffer = new StringBuffer();
+        for (int ii = 0; ii < 17700; ii++) {
+            longBuffer.append('a');
+        }
+        String longString = longBuffer.toString();
+
+        for (int ii = 0; ii < 119; ii++) {
+            client.callProcedure( callback, "InsertInlinedString", ii, shortString, longString);
+        }
+
+        shortBuffer.append("aaa");
+        client.callProcedure( callback, "InsertInlinedString", 120, shortBuffer.toString(), longString);
+
+        client.drain();
+        client.close();
+
+        cluster.shutDownSingleHost(0);
+        cluster.recoverOne( 0, 1, "localhost");
 
         cluster.shutDown();
     }

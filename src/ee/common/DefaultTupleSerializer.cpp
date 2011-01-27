@@ -36,6 +36,8 @@ int DefaultTupleSerializer::getMaxSerializedTupleSize(const TupleSchema *schema)
         if (!schema->columnIsInlined(ii)) {
             size -= sizeof(void*);
             size += 4 + schema->columnLength(ii);
+        } else if (schema->columnType(ii) == VALUE_TYPE_VARCHAR) {
+            size += 3;//Serialization always uses a 4-byte length prefix
         }
     }
     return static_cast<int>(size);

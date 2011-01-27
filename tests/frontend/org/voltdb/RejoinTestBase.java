@@ -78,6 +78,11 @@ public class RejoinTestBase extends TestCase {
             "pkey bigint default 0 not null, " +
             "value bigint default 0 not null, " +
             "data VARCHAR(512) default null," +
+            "PRIMARY KEY(pkey));" +
+            "create table TEST_INLINED_STRING (" +
+            "pkey integer default 0 not null, " +
+            "value VARCHAR(36) default 0 not null, " +
+            "value1 VARCHAR(17700) default 0 not null, " +
             "PRIMARY KEY(pkey));";
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
@@ -89,6 +94,7 @@ public class RejoinTestBase extends TestCase {
         builder.addPartitionInfo("blah", "ival");
         builder.addPartitionInfo("PARTITIONED", "pkey");
         builder.addPartitionInfo("PARTITIONED_LARGE", "pkey");
+        builder.addPartitionInfo("TEST_INLINED_STRING", "pkey");
 
         GroupInfo gi = new GroupInfo("foo", true, true);
         builder.addGroups(new GroupInfo[] { gi } );
@@ -96,6 +102,7 @@ public class RejoinTestBase extends TestCase {
         builder.addUsers(new UserInfo[] { ui } );
 
         ProcedureInfo[] pi = new ProcedureInfo[] {
+            new ProcedureInfo(new String[] { "foo" }, "InsertInlinedString", "insert into TEST_INLINED_STRING values (?, ?, ?);", "TEST_INLINED_STRING.pkey:0"),
             new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into blah values (?);", null),
             new ProcedureInfo(new String[] { "foo" }, "InsertSinglePartition", "insert into blah values (?);", "blah.ival:0"),
             new ProcedureInfo(new String[] { "foo" }, "InsertReplicated", "insert into blah_replicated values (?);", null),
