@@ -434,7 +434,7 @@ public class VoltProjectBuilder {
             throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
         }
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                    null, false, null, "none");
+                       null, false, null, "none", false, 0, false);
     }
 
     public boolean compile(
@@ -444,13 +444,25 @@ public class VoltProjectBuilder {
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                       voltRoot, ppdEnabled, ppdPath, ppdPrefix);
+                       voltRoot, ppdEnabled, ppdPath, ppdPrefix, false, 0, false);
+    }
+
+    public boolean compile(final String jarPath, final int sitesPerHost,
+            final int hostCount, final int replication, final String leaderAddress,
+            final int adminPort, final boolean adminOnStartup)
+    {
+        VoltCompiler compiler = new VoltCompiler();
+        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
+                       null, false, null, "none", true, adminPort, adminOnStartup);
     }
 
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
                            final int hostCount, final int replication, final String leaderAddress,
                            String voltRoot, final boolean ppdEnabled,
-                           final String ppdPath, final String ppdPrefix) {
+                           final String ppdPath, final String ppdPrefix,
+                           final boolean adminEnabled, final int adminPort,
+                           final boolean adminOnStartup)
+    {
         assert(jarPath != null);
         assert(sitesPerHost >= 1);
         assert(hostCount >= 1);
@@ -543,7 +555,7 @@ public class VoltProjectBuilder {
         m_pathToDeployment = writeDeploymentFile(
                 hostCount, sitesPerHost, leaderAddress,
                 replication, voltRoot, ppdEnabled,
-                ppdPath, ppdPrefix);
+                ppdPath, ppdPrefix, adminEnabled, adminPort, adminOnStartup);
 
         return success;
     }
@@ -758,7 +770,9 @@ public class VoltProjectBuilder {
      */
     private String writeDeploymentFile(
             int hostCount, int sitesPerHost, String leader, int kFactor, String voltRoot,
-            boolean ppdEnabled, String ppdPath, String ppdPrefix) {
+            boolean ppdEnabled, String ppdPath, String ppdPrefix,
+            boolean adminEnabled, int adminPort, boolean adminOnStartup)
+    {
         DocumentBuilderFactory docFactory;
         DocumentBuilder docBuilder;
         Document doc;
@@ -820,6 +834,17 @@ public class VoltProjectBuilder {
             final Element ss = doc.createElement("snapshot");
             ss.setAttribute("prefix", ppdPrefix);
             ppd.appendChild(ss);
+        }
+
+        if (adminEnabled)
+        {
+            final Element admin = doc.createElement("admin-mode");
+            cluster.appendChild(admin);
+            admin.setAttribute("port", new Integer(adminPort).toString());
+            if (adminOnStartup)
+            {
+                admin.setAttribute("adminstartup", "true");
+            }
         }
 
         // <users>

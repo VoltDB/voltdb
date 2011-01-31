@@ -63,7 +63,7 @@ public class NIOReadStream {
     }
 
     /** @returns the number of bytes available to be read. */
-    int dataAvailable() {
+    public int dataAvailable() {
         return m_totalAvailable;
     }
 

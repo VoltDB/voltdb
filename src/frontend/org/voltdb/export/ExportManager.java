@@ -237,10 +237,11 @@ public class ExportManager
      * Factory for input handlers
      * @return InputHandler for new client connection
      */
-    public InputHandler createInputHandler(String service) {
+    public InputHandler createInputHandler(String service, boolean isAdminPort)
+    {
         InputHandler handler = null;
         for (ExportDataProcessor p : m_processors) {
-            handler = p.createInputHandler(service);
+            handler = p.createInputHandler(service, isAdminPort);
             if (handler != null) {
                 return handler;
             }

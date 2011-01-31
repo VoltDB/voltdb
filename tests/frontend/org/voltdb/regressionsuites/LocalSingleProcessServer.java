@@ -97,6 +97,22 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         return m_compiled;
     }
 
+    public boolean compileWithAdminMode(VoltProjectBuilder builder,
+                                        int adminPort, boolean adminOnStartup)
+    {
+        int hostCount = 1;
+        int replication = 0;
+
+        if (m_compiled) {
+            return true;
+        }
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, "localhost",
+                                     adminPort, adminOnStartup);
+        m_pathToDeployment = builder.getPathToDeployment();
+        return m_compiled;
+
+    }
+
     @Override
     public List<String> getListenerAddresses() {
         // return just "localhost"

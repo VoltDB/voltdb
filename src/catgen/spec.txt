@@ -15,6 +15,9 @@ begin Cluster           "A set of connected hosts running one or more database a
   bool networkpartition "Is network partition detection enabled?"
   string voltRoot "Directory tree where snapshots, ppd snapshots, export data etc. will be output to"
   SnapshotSchedule* faultSnapshots "Configuration for snapshots generated in response to faults."
+  bool adminenabled     "Is admin mode enabled?"
+  int adminport         "The port number of the admin port"
+  bool adminstartup     "Does the server start in admin mode?"
 end
 
 begin Host      "A single host participating in the cluster"

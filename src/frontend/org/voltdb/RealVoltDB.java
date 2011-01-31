@@ -281,6 +281,8 @@ public class RealVoltDB implements VoltDBInterface
 
     private CommitLog m_commitLog;
 
+    private volatile boolean m_inAdminMode = false;
+
     // methods accessed via the singleton
     @Override
     public void startSampler() {
@@ -388,6 +390,15 @@ public class RealVoltDB implements VoltDBInterface
             serializedCatalog = catalog.serialize();
 
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
+
+            // See if we should bring the server up in admin mode
+            m_inAdminMode = false;
+            if (m_catalogContext.cluster.getAdminenabled() &&
+                m_catalogContext.cluster.getAdminstartup())
+            {
+                m_inAdminMode = true;
+            }
+
             // requires a catalog context.
             m_faultManager = new FaultDistributor(this);
             // Install a handler for NODE_FAILURE faults to update the catalog
@@ -1303,5 +1314,17 @@ public class RealVoltDB implements VoltDBInterface
     @Override
     public CommitLog getCommitLog() {
         return m_commitLog;
+    }
+
+    @Override
+    public boolean inAdminMode()
+    {
+        return m_inAdminMode;
+    }
+
+    @Override
+    public void setAdminMode(boolean inAdminMode)
+    {
+        m_inAdminMode = inAdminMode;
     }
 }

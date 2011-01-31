@@ -840,6 +840,8 @@ public class VoltCompiler {
         {
          // package.classname                                readonly    everysite
          {"org.voltdb.sysprocs.AdHoc",                        "false",    "false"},
+         {"org.voltdb.sysprocs.AdminModeEnter",               "false",    "true"},
+         {"org.voltdb.sysprocs.AdminModeExit",                "false",    "true"},
          {"org.voltdb.sysprocs.LoadMultipartitionTable",      "false",    "false"},
          {"org.voltdb.sysprocs.Quiesce",                      "false",    "false"},
          {"org.voltdb.sysprocs.Rejoin",                       "false",    "false"},

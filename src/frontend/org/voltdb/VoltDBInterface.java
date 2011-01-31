@@ -140,4 +140,15 @@ public interface VoltDBInterface
      * Notify RealVoltDB that recovery is complete
      */
     void onRecoveryCompletion(long transferred);
+
+    /**
+     * Set the admin mode status of this server.
+     * @param inAdminMode true to enter admin mode, false to exit admin mode
+     */
+    public void setAdminMode(boolean inAdminMode);
+
+    /**
+     * @return whether or not this server is in admin mode
+     */
+    public boolean inAdminMode();
 }

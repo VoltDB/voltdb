@@ -210,8 +210,10 @@ public class NIOWriteStreamTest extends TestCase {
         tmp.flip();
         assertTrue(wstream.enqueue(tmp));
         assertTrue(port.checkWriteSet());
+        assertEquals(1, wstream.getOutstandingMessageCount());
         assertEquals(2, wstream.drainTo(channel, wstream.swapAndSerializeQueuedWrites(pool)));
         assertTrue(wstream.isEmpty());
+        assertEquals(0, wstream.getOutstandingMessageCount());
         wstream.shutdown();
         port.toString();
     }
@@ -230,13 +232,16 @@ public class NIOWriteStreamTest extends TestCase {
         tmp.flip();
         assertTrue(wstream.enqueue(tmp));
         assertTrue(port.checkWriteSet());
+        assertEquals(1, wstream.getOutstandingMessageCount());
         assertEquals(0, wstream.drainTo(channel, wstream.swapAndSerializeQueuedWrites(pool)));
         assertFalse(wstream.isEmpty());
+        assertEquals(1, wstream.getOutstandingMessageCount());
 
         channel.m_behavior = MockChannel.SINK;
         int wrote = wstream.drainTo(channel, wstream.swapAndSerializeQueuedWrites(pool));
         assertEquals(4, wrote);
         assertTrue(wstream.isEmpty());
+        assertEquals(0, wstream.getOutstandingMessageCount());
         wstream.shutdown();
     }
 

@@ -106,8 +106,9 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
      * easier to think about concurrency.
      */
     class ProtoStateBlock {
-        ProtoStateBlock(Connection c) {
+        ProtoStateBlock(Connection c, boolean isAdmin) {
             m_c = c;
+            m_isAdmin = isAdmin;
             m_state = RawProcessor.CLOSED;
         }
 
@@ -170,6 +171,12 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
 
             else if (m.isOpenResponse()) {
                 protocolError(m, "Server must not receive open response message.");
+                return;
+            }
+
+            else if (VoltDB.instance().inAdminMode() && !m_isAdmin)
+            {
+                protocolError(m, "Server currently unavailable for export connections on this port");
                 return;
             }
 
@@ -286,6 +293,7 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
         }
 
         final Connection m_c;
+        final boolean m_isAdmin;
         int m_state;
     }
 
@@ -328,13 +336,19 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
      */
     private class ExportInputHandler extends VoltProtocolHandler
     {
+        private boolean m_isAdminPort;
+
+        public ExportInputHandler(boolean isAdminPort)
+        {
+            m_isAdminPort = isAdminPort;
+        }
         /**
          * Called by VoltNetwork after the connection object is constructed
          * and before the channel is registered to the selector.
          */
         @Override
         public void starting(Connection c) {
-            m_sb = new ProtoStateBlock(c);
+            m_sb = new ProtoStateBlock(c, m_isAdminPort);
         }
 
         /**
@@ -466,9 +480,10 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
     }
 
     @Override
-    public InputHandler createInputHandler(String service) {
+    public InputHandler createInputHandler(String service, boolean isAdminPort)
+    {
         if (service.equalsIgnoreCase("export")) {
-            return new ExportInputHandler();
+            return new ExportInputHandler(isAdminPort);
         }
         return null;
     }

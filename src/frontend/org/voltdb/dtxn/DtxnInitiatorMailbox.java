@@ -281,4 +281,20 @@ public class DtxnInitiatorMailbox implements Mailbox
     public int getSiteId() {
         return m_siteId;
     }
+
+    Map<Long, long[]> getOutstandingTxnStats()
+    {
+        HashMap<Long, long[]> retval = new HashMap<Long, long[]>();
+        for (InFlightTxnState state : m_pendingTxns.values())
+        {
+            if (!retval.containsKey(state.connectionId))
+            {
+                // Default new entries to not admin/no outstanding txns
+                retval.put(state.connectionId, new long[]{0, 0});
+            }
+            retval.get(state.connectionId)[0] = (state.isAdmin ? 1 : 0);
+            retval.get(state.connectionId)[1]++;
+        }
+        return retval;
+    }
 }

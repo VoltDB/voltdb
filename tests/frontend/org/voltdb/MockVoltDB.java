@@ -53,6 +53,7 @@ public class MockVoltDB implements VoltDBInterface
     int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = null;
+    private boolean m_adminMode = false;
 
     public MockVoltDB()
     {
@@ -395,4 +396,15 @@ public class MockVoltDB implements VoltDBInterface
         return false;
     }
 
+    @Override
+    public boolean inAdminMode()
+    {
+        return m_adminMode;
+    }
+
+    @Override
+    public void setAdminMode(boolean inAdminMode)
+    {
+        m_adminMode = inAdminMode;
+    }
 }

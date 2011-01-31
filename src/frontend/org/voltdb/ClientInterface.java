@@ -24,6 +24,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -77,6 +80,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private final ClientAcceptor m_acceptor;
+    private ClientAcceptor m_adminAcceptor;
     private final TransactionInitiator m_initiator;
     private final AsyncCompilerWorkThread m_asyncCompilerWorkThread;
     private final ArrayList<Connection> m_connections = new ArrayList<Connection>();
@@ -180,6 +184,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         private final VoltNetwork m_network;
         private volatile boolean m_running = true;
         private Thread m_thread = null;
+        private boolean m_isAdmin;
 
         /**
          * Limit on maximum number of connections. This should be set by inspecting ulimit -n, but
@@ -201,9 +206,11 @@ public class ClientInterface implements DumpManager.Dumpable {
             }
         });
 
-        ClientAcceptor(int port, VoltNetwork network) {
+        ClientAcceptor(int port, VoltNetwork network, boolean isAdmin)
+        {
             m_network = network;
             m_port = port;
+            m_isAdmin = isAdmin;
             ServerSocketChannel socket;
             try {
                 socket = ServerSocketChannel.open();
@@ -479,7 +486,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                 handler =
                     new ClientInputHandler(
                             username,
-                            socket.socket().getInetAddress().getHostName());
+                            socket.socket().getInetAddress().getHostName(),
+                            m_isAdmin);
             }
             else {
                 // If no processor can handle this service, null is returned.
@@ -503,7 +511,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                     return null;
                 }
 
-                handler = ExportManager.instance().createInputHandler(service);
+                handler = ExportManager.instance().createInputHandler(service,
+                                                                      m_isAdmin);
             }
 
             if (handler != null) {
@@ -543,6 +552,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         private Connection m_connection;
         private final String m_hostname;
+        private boolean m_isAdmin;
 
         /**
          * Must use username to do a lookup via the auth system
@@ -551,9 +561,17 @@ public class ClientInterface implements DumpManager.Dumpable {
          */
         private final String m_username;
 
-        public ClientInputHandler(String username, String hostname) {
+        public ClientInputHandler(String username, String hostname,
+                                  boolean isAdmin)
+        {
             m_username = username.intern();
             m_hostname = hostname;
+            m_isAdmin = isAdmin;
+        }
+
+        public boolean isAdmin()
+        {
+            return m_isAdmin;
         }
 
         @Override
@@ -767,7 +785,14 @@ public class ClientInterface implements DumpManager.Dumpable {
         m_dumpId = "Initiator." + String.valueOf(siteId);
         DumpManager.register(m_dumpId, this);
 
-        m_acceptor = new ClientAcceptor(port, network);
+        m_acceptor = new ClientAcceptor(port, network, false);
+
+        m_adminAcceptor = null;
+        if (context.cluster.getAdminenabled())
+        {
+            m_adminAcceptor = new ClientAcceptor(context.cluster.getAdminport(),
+                                                 network, true);
+        }
 
         if (!recovering)
         {
@@ -812,9 +837,20 @@ public class ClientInterface implements DumpManager.Dumpable {
     private final void handleRead(ByteBuffer buf, ClientInputHandler handler, Connection c) throws IOException {
         final long now = EstTime.currentTimeMillis();
         final FastDeserializer fds = new FastDeserializer(buf);
+        final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
+
+        // Check for admin mode restrictions before proceeding any further
+        if (VoltDB.instance().inAdminMode() && !handler.isAdmin())
+        {
+            final ClientResponseImpl errorResponse =
+                new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                                       new VoltTable[0], "Server is currently unavailable; try again later",
+                                       task.clientHandle);
+            c.writeStream().enqueue(errorResponse);
+            return;
+        }
 
         // Deserialize the client's request and map to a catalog stored procedure
-        final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
         final CatalogContext catalogContext = m_catalogContext.get();
         final Procedure catProc = catalogContext.procedures.get(task.procName);
         AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
@@ -872,6 +908,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                                                   task.clientHandle,
                                                   handler.connectionId(),
                                                   handler.m_hostname,
+                                                  handler.isAdmin(),
                                                   c);
                 return;
             }
@@ -916,9 +953,27 @@ public class ClientInterface implements DumpManager.Dumpable {
                                                                task.clientHandle,
                                                                handler.connectionId(),
                                                                handler.m_hostname,
+                                                               handler.isAdmin(),
                                                                handler.sequenceId(),
                                                                c);
                 return;
+            }
+
+            // Verify that admin mode sysprocs are called from a client on the
+            // admin port, otherwise return a failure
+            if (task.procName.equals("@AdminModeEnter") ||
+                task.procName.equals("@AdminModeExit"))
+            {
+                if (!handler.isAdmin())
+                {
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                               new VoltTable[0],
+                                               "" + task.procName + " is not available to this client",
+                                               task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
             }
         } else if (!user.hasPermission(catProc)) {
             authLog.l7dlog(Level.INFO,
@@ -964,7 +1019,9 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             if (involvedPartitions != null) {
                 // initiate the transaction
-                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname, task,
+                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                                              handler.isAdmin(),
+                                              task,
                                               catProc.getReadonly(),
                                               catProc.getSinglepartition(),
                                               catProc.getEverysite(),
@@ -1002,6 +1059,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                                                           plannedStmt.clientHandle,
                                                           plannedStmt.connectionId,
                                                           plannedStmt.hostname,
+                                                          plannedStmt.adminConnection,
                                                           plannedStmt.clientData);
                     }
                     else {
@@ -1017,6 +1075,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
                         // initiate the transaction
                         m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
+                                                      plannedStmt.adminConnection,
                                                       task, false, false, false, m_allPartitions,
                                                       m_allPartitions.length, plannedStmt.clientData,
                                                       0, EstTime.currentTimeMillis());
@@ -1038,6 +1097,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     // initiate the transaction. These hard-coded values from catalog
                     // procedure are horrible, horrible, horrible.
                     m_initiator.createTransaction(changeResult.connectionId, changeResult.hostname,
+                                                  changeResult.adminConnection,
                                                   task, false, true, true, m_allPartitions,
                                                   m_allPartitions.length, changeResult.clientData, 0,
                                                   EstTime.currentTimeMillis());
@@ -1132,6 +1192,10 @@ public class ClientInterface implements DumpManager.Dumpable {
         if (m_acceptor != null) {
             m_acceptor.shutdown();
         }
+        if (m_adminAcceptor != null)
+        {
+            m_adminAcceptor.shutdown();
+        }
         if (m_asyncCompilerWorkThread != null) {
             m_asyncCompilerWorkThread.shutdown();
             m_asyncCompilerWorkThread.join();
@@ -1140,6 +1204,10 @@ public class ClientInterface implements DumpManager.Dumpable {
 
     public void startAcceptingConnections() throws IOException {
         m_acceptor.start();
+        if (m_adminAcceptor != null)
+        {
+            m_adminAcceptor.start();
+        }
     }
 
     /**
@@ -1186,10 +1254,12 @@ public class ClientInterface implements DumpManager.Dumpable {
            spi.procName = invocation.getFirst();
            spi.params = new ParameterSet();
            spi.params.setParameters(invocation.getSecond());
-            // initiate the transaction
-           m_initiator.createTransaction(-1, "SnapshotDaemon", spi, catProc.getReadonly(),
+           // initiate the transaction
+           m_initiator.createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
+                                         spi, catProc.getReadonly(),
                                          catProc.getSinglepartition(), catProc.getEverysite(),
-                                         m_allPartitions, m_allPartitions.length, m_snapshotDaemonAdapter,
+                                         m_allPartitions, m_allPartitions.length,
+                                         m_snapshotDaemonAdapter,
                                          0, EstTime.currentTimeMillis());
        }
     }
@@ -1278,5 +1348,57 @@ public class ClientInterface implements DumpManager.Dumpable {
         public void unregister() {
         }
 
+        @Override
+        public long connectionId()
+        {
+            return -1;
+        }
+
+        @Override
+        public int getOutstandingMessageCount()
+        {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    public Map<Long, Pair<String, long[]>> getLiveClientStats()
+    {
+        Map<Long, Pair<String, long[]>> client_stats =
+            new HashMap<Long, Pair<String, long[]>>();
+
+        Connection connections[];
+        synchronized (m_connections) {
+            connections = m_connections.toArray(new Connection[m_connections.size()]);
+        }
+        Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
+
+        // put all the live connections in the stats map, then fill in admin and
+        // outstanding txn info from the inflight stats
+
+        for (Connection c : connections)
+        {
+            if (!client_stats.containsKey(c.connectionId()))
+            {
+                client_stats.put(
+                    c.connectionId(),
+                    new Pair<String, long[]>(c.getHostname(),
+                            new long[]{0,
+                                       c.readStream().dataAvailable(),
+                                       c.writeStream().getOutstandingMessageCount(),
+                                       0})
+                                 );
+            }
+        }
+
+        for (Entry<Long, long[]> stat : inflight_txn_stats.entrySet())
+        {
+            if (client_stats.containsKey(stat.getKey()))
+            {
+                client_stats.get(stat.getKey()).getSecond()[0] = stat.getValue()[0];
+                client_stats.get(stat.getKey()).getSecond()[3] = stat.getValue()[1];
+            }
+        }
+
+        return client_stats;
     }
 }

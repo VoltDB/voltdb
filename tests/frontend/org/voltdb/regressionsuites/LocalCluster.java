@@ -349,6 +349,19 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     @Override
+    public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
+                                        boolean adminOnStartup)
+    {
+        if (m_compiled) {
+            return true;
+        }
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
+                                     adminPort, adminOnStartup);
+        m_pathToDeployment = builder.getPathToDeployment();
+        return m_compiled;
+    }
+
+    @Override
     public void startUp() {
         assert (!m_running);
         if (m_running) {

@@ -42,10 +42,12 @@ public class SysProcFragmentId
     public static final long PF_partitionCount = 17;
     public static final long PF_ioData = 18;
     public static final long PF_ioDataAggregator = 19;
+    public static final long PF_liveClientData = 20;
+    public static final long PF_liveClientDataAggregator = 21;
 
     // @Shutdown
-    public static final long PF_shutdownCommand = 21;
-    public static final long PF_procedureDone = 22;
+    public static final long PF_shutdownCommand = 28;
+    public static final long PF_procedureDone = 29;
 
     // @AdHoc
     public static final long PF_runAdHocFragment = 31;

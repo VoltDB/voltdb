@@ -24,6 +24,7 @@ package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Map;
 
 import junit.framework.TestCase;
 
@@ -122,6 +123,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
         {
             return false;
         }
+
+        @Override
+        public int getOutstandingMessageCount()
+        {
+            // TODO Auto-generated method stub
+            return 0;
+        }
     }
 
     private final HostMessenger m_mockMessenger = new HostMessenger() {
@@ -177,6 +185,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
         }
 
+        @Override
+        public long connectionId()
+        {
+            // TODO Auto-generated method stub
+            return -1;
+        }
+
     }
 
     class MockInitiator extends TransactionInitiator
@@ -193,6 +208,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         @Override
         public void createTransaction(long connectionId,
                                       String connectionHostname,
+                                      boolean adminConnection,
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
@@ -233,6 +249,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
         }
 
+        @Override
+        public Map<Long, long[]> getOutstandingTxnStats()
+        {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
     }
 
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,
@@ -241,7 +264,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         InFlightTxnState retval = new InFlightTxnState(
                 txnId, coordIds[0], new int[]{}, readOnly,
                 isSinglePart, new StoredProcedureInvocation(),
-                m_testConnect, MESSAGE_SIZE, 0, 0, "");
+                m_testConnect, MESSAGE_SIZE, 0, 0, "", false);
         if (coordIds.length > 1) {
             for (int i = 1; i < coordIds.length; i++)
                 retval.addCoordinator(coordIds[i]);

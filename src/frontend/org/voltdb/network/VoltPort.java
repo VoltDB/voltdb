@@ -377,6 +377,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
         return m_remoteHost;
     }
 
+    @Override
     public long connectionId() {
         return m_handler.connectionId();
     }

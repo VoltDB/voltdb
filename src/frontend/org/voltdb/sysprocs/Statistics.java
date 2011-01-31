@@ -26,7 +26,9 @@ import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.ClientInterface;
 import org.voltdb.HsqlBackend;
+import org.voltdb.LiveClientStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SiteProcedureConnection;
@@ -89,6 +91,11 @@ public class Statistics extends VoltSystemProcedure {
     static final int DEP_starvationDataAggregator = (int)
         SysProcFragmentId.PF_starvationDataAggregator;
 
+    static final int DEP_liveClientData = (int)
+        SysProcFragmentId.PF_liveClientData | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    static final int DEP_liveClientDataAggregator = (int)
+        SysProcFragmentId.PF_liveClientDataAggregator;
+
     static final int DEP_partitionCount = (int)
         SysProcFragmentId.PF_partitionCount;
 //    static final int DEP_initiatorAggregator = (int)
@@ -115,6 +122,8 @@ public class Statistics extends VoltSystemProcedure {
         site.registerPlanFragment(SysProcFragmentId.PF_ioDataAggregator, this);
         site.registerPlanFragment(SysProcFragmentId.PF_starvationData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_starvationDataAggregator, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_liveClientData, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_liveClientDataAggregator, this);
     }
 
     @Override
@@ -329,6 +338,47 @@ public class Statistics extends VoltSystemProcedure {
             }
             return new DependencyPair(DEP_ioDataAggregator, result);
         }
+        else if (fragmentId == SysProcFragmentId.PF_liveClientData) {
+            // Choose the lowest site ID on this host to do the scan
+            // All other sites should just return empty results tables.
+            int hostId = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowestSiteId =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(hostId);
+            VoltTable result = new VoltTable(LiveClientStats.liveClientColumnInfo);
+            if (context.getExecutionSite().getSiteId() == lowestSiteId) {
+                assert(params.toArray().length == 2);
+                final Long now = (Long)params.toArray()[1];
+                Map<Long, Pair<String,long[]>> stats =
+                    new HashMap<Long, Pair<String, long[]>>();
+                for (ClientInterface ci : VoltDB.instance().getClientInterfaces())
+                {
+                    stats.putAll(ci.getLiveClientStats());
+                }
+
+                final String hostname = VoltDB.instance().getHostMessenger().getHostname();
+                for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {
+                    final Long connectionId = e.getKey();
+                    final String remoteHostname = e.getValue().getFirst();
+                    final long counters[] = e.getValue().getSecond();
+                    result.addRow(
+                                  now,
+                                  hostId,
+                                  hostname,
+                                  connectionId,
+                                  remoteHostname,
+                                  counters[0],
+                                  counters[1],
+                                  counters[2],
+                                  counters[3]);
+                }
+            }
+            return new DependencyPair(DEP_liveClientData, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_liveClientDataAggregator) {
+            VoltTable result = unionTables(dependencies.get(DEP_liveClientData));
+            return new DependencyPair(DEP_liveClientDataAggregator, result);
+        }
         assert (false);
         return null;
     }
@@ -386,6 +436,9 @@ public class Statistics extends VoltSystemProcedure {
         }
         else if (selector.toUpperCase().equals(SysProcSelector.STARVATION.name())) {
             results = getStarvationData(interval, now);
+        }
+        else if (selector.toUpperCase().equals(SysProcSelector.LIVECLIENTS.name())) {
+            results = getLiveClientData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.MANAGEMENT.name())) {
             VoltTable[] memoryResults = getMemoryData();
@@ -625,4 +678,31 @@ public class Statistics extends VoltSystemProcedure {
         return results;
     }
 
+    private VoltTable[] getLiveClientData(long interval, final long now) {
+        VoltTable[] results;
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+        // create a work fragment to gather live client data from each of the nodes
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_liveClientData;
+        pfs[1].outputDepId = DEP_liveClientData;
+        pfs[1].inputDepIds = new int[]{};
+        pfs[1].multipartition = true;
+        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters.setParameters((byte)interval, now);
+
+        // create a work fragment to aggregate the results.
+        // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_liveClientDataAggregator;
+        pfs[0].outputDepId = DEP_liveClientDataAggregator;
+        pfs[0].inputDepIds = new int[]{DEP_liveClientData};
+        pfs[0].multipartition = false;
+        pfs[0].parameters = new ParameterSet();
+
+        // distribute and execute these fragments providing pfs and id of the
+        // aggregator's output dependency table.
+        results =
+            executeSysProcPlanFragments(pfs, DEP_liveClientDataAggregator);
+        return results;
+    }
 }

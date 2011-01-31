@@ -46,6 +46,7 @@ package org.voltdb.dtxn;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.StoredProcedureInvocation;
@@ -125,6 +126,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public synchronized void createTransaction(
                                   final long connectionId,
                                   final String connectionHostname,
+                                  final boolean adminConnection,
                                   final StoredProcedureInvocation invocation,
                                   final boolean isReadOnly,
                                   final boolean isSinglePartition,
@@ -141,7 +143,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
         if (isSinglePartition || isEveryPartition)
         {
-            createSinglePartitionTxn(connectionId, connectionHostname, invocation, isReadOnly,
+            createSinglePartitionTxn(connectionId, connectionHostname, adminConnection,
+                                     invocation, isReadOnly,
                                      partitions, clientData, messageSize, now);
             return;
         }
@@ -182,7 +185,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         messageSize,
                                                         now,
                                                         connectionId,
-                                                        connectionHostname);
+                                                        connectionHostname,
+                                                        adminConnection);
             dispatchMultiPartitionTxn(txn);
         }
     }
@@ -231,6 +235,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private void
     createSinglePartitionTxn(long connectionId,
                              final String connectionHostname,
+                             boolean adminConnection,
                              StoredProcedureInvocation invocation,
                              boolean isReadOnly,
                              int[] partitions,
@@ -271,7 +276,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                  messageSize,
                                  now,
                                  connectionId,
-                                 connectionHostname);
+                                 connectionHostname,
+                                 adminConnection);
 
         for (int siteId : siteIds) {
             state.addCoordinator(siteId);
@@ -400,5 +406,11 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         {
             context.inFlightTxns[i] = inFlightTxnList.get(i);
         }
+    }
+
+    @Override
+    public synchronized Map<Long, long[]> getOutstandingTxnStats()
+    {
+        return m_mailbox.getOutstandingTxnStats();
     }
 }

@@ -88,4 +88,9 @@ public interface WriteStream {
      * @return true if the stream has no data to write.
      */
     boolean isEmpty();
+
+    /**
+     * Return the number of messages waiting to be written to the network
+     */
+    int getOutstandingMessageCount();
 }

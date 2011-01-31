@@ -169,6 +169,13 @@ public class SimpleDtxnInitiatorTest extends TestCase {
 
         }
 
+        @Override
+        public long connectionId()
+        {
+            // TODO Auto-generated method stub
+            return -1;
+        }
+
     }
 
     private final class DummyWriteStream implements WriteStream {
@@ -221,6 +228,13 @@ public class SimpleDtxnInitiatorTest extends TestCase {
         @Override
         public boolean isEmpty() {
             throw new RuntimeException("Not implemented.");
+        }
+
+        @Override
+        public int getOutstandingMessageCount()
+        {
+            // TODO Auto-generated method stub
+            return 0;
         }
 
     }

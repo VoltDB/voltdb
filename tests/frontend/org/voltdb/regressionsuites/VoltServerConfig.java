@@ -90,4 +90,7 @@ public interface VoltServerConfig {
     boolean compileWithPartitiondDetection(VoltProjectBuilder builder,
             String ppdPath,
             String ppdPrefix);
+
+    boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
+                                 boolean adminOnStartup);
 }

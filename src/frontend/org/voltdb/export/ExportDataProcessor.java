@@ -61,9 +61,10 @@ public interface ExportDataProcessor  {
     /**
      * A client has connected. Create an InputHandler for it.
      * @param service The service requested.
+     * @param isAdminPort Whether or not the client is connecting on the admin port
      * @returns InputHandler or null if unable to create an input handler for the service.
      */
-    public InputHandler createInputHandler(String service);
+    public InputHandler createInputHandler(String service, boolean isAdminPort);
 
     /**
      * The system is terminating. Cleanup and exit the processor.

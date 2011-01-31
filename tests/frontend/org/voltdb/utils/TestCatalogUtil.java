@@ -137,7 +137,19 @@ public class TestCatalogUtil extends TestCase {
         final String dep3 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
                             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2' />" +
-                            "<paths><voltroot path=\"/tmp\" /></paths>" +
+                            "   <paths><voltroot path=\"/tmp\" /></paths>" +
+                            "   <httpd port='0' >" +
+                            "       <jsonapi enabled='true'/>" +
+                            "   </httpd>" +
+                            "</deployment>";
+
+        // admin-mode section actually impacts CRC, dupe above and add it
+        final String dep4 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                            "<deployment>" +
+                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
+                            "      <admin-mode port='32323' adminstartup='true'/>" +
+                            "   </cluster>" +
+                            "   <paths><voltroot path=\"/tmp\" /></paths>" +
                             "   <httpd port='0' >" +
                             "       <jsonapi enabled='true'/>" +
                             "   </httpd>" +
@@ -146,16 +158,20 @@ public class TestCatalogUtil extends TestCase {
         final File tmpDep1 = VoltProjectBuilder.writeStringToTempFile(dep1);
         final File tmpDep2 = VoltProjectBuilder.writeStringToTempFile(dep2);
         final File tmpDep3 = VoltProjectBuilder.writeStringToTempFile(dep3);
+        final File tmpDep4 = VoltProjectBuilder.writeStringToTempFile(dep4);
 
         final long crcDep1 = CatalogUtil.getDeploymentCRC(tmpDep1.getPath());
         final long crcDep2 = CatalogUtil.getDeploymentCRC(tmpDep2.getPath());
         final long crcDep3 = CatalogUtil.getDeploymentCRC(tmpDep3.getPath());
+        final long crcDep4 = CatalogUtil.getDeploymentCRC(tmpDep4.getPath());
 
         assertTrue(crcDep1 > 0);
         assertTrue(crcDep2 > 0);
         assertTrue(crcDep3 > 0);
+        assertTrue(crcDep4 > 0);
 
         assertTrue(crcDep1 != crcDep2);
         assertTrue(crcDep1 == crcDep3);
+        assertTrue(crcDep3 != crcDep4);
     }
 }

@@ -54,6 +54,13 @@ public interface ClientResponse {
     public static final byte CONNECTION_LOST = -4;
 
     /**
+     * Status code indicating that the server is currently unavailable for stored procedure invocations.
+     * The invocation for which this is a response was never executed.
+     */
+    public static final byte SERVER_UNAVAILABLE = -5;
+
+
+    /**
      * Retrieve the status code returned by the server
      * @return Status code
      */

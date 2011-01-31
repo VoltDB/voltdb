@@ -127,6 +127,15 @@ public class NIOWriteStream implements WriteStream {
 
     }
 
+    /*
+     * Return the number of messages waiting to be written to the network
+     */
+    @Override
+    synchronized public int getOutstandingMessageCount()
+    {
+        return m_queuedWrites.size() + m_queuedBuffers.size();
+    }
+
     synchronized public boolean isEmpty()
     {
         return m_queuedBuffers.isEmpty() && m_queuedWrites.isEmpty();

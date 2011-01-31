@@ -62,6 +62,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
@@ -487,6 +488,14 @@ public abstract class CatalogUtil {
             sb.append(st.getPrefix()).append(",");
         }
 
+        sb.append(" ADMINMODE ");
+        AdminModeType amt = ct.getAdminMode();
+        if (amt != null)
+        {
+            sb.append(amt.getPort()).append(",");
+            sb.append(amt.isAdminstartup()).append("\n");
+        }
+
         sb.append(" USERS ");
         UsersType ut = deployment.getUsers();
         if (ut != null) {
@@ -665,7 +674,17 @@ public abstract class CatalogUtil {
             else {
                 catCluster.setNetworkpartition(false);
             }
-
+            // copy admin mode configuration from xml to catalog
+            if (cluster.getAdminMode() != null)
+            {
+                catCluster.setAdminenabled(true);
+                catCluster.setAdminport(cluster.getAdminMode().getPort());
+                catCluster.setAdminstartup(cluster.getAdminMode().isAdminstartup());
+            }
+            else
+            {
+                catCluster.setAdminenabled(false);
+            }
         }
     }
 

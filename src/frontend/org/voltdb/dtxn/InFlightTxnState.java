@@ -43,7 +43,9 @@ public class InFlightTxnState implements Serializable {
             int messageSize,
             long initiateTime,
             long connectionId,
-            String connectionHostname) {
+            String connectionHostname,
+            boolean isAdmin)
+    {
         this.txnId = txnId;
         this.firstCoordinatorId = firstCoordinatorId;
         this.invocation = invocation;
@@ -55,6 +57,7 @@ public class InFlightTxnState implements Serializable {
         this.initiateTime = initiateTime;
         this.connectionId = connectionId;
         this.connectionHostname = connectionHostname;
+        this.isAdmin = isAdmin;
 
         outstandingResponses = 1;
 
@@ -222,6 +225,7 @@ public class InFlightTxnState implements Serializable {
     public final long initiateTime;
     public final long connectionId;
     public final String connectionHostname;
+    public final boolean isAdmin;
 
     // in multipartition txns, the coord id goes here
     // in single partition txns:

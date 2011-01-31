@@ -118,6 +118,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
      * @param clientHandle Handle provided by the client application (not ClientInterface)
      * @param connectionId
      * @param hostname Hostname of the other end of the connection
+     * @param adminConnection Did this invocation arrive on an admin port?
      * @param clientData Data supplied by ClientInterface (typically a VoltPort) that will be in the PlannedStmt produced later.
      */
     public void planSQL(
@@ -125,6 +126,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             long clientHandle,
             long connectionId,
             String hostname,
+            boolean adminConnection,
             Object clientData) {
 
         AdHocPlannerWork work = new AdHocPlannerWork();
@@ -132,6 +134,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         work.sql = sql;
         work.connectionId = connectionId;
         work.hostname = hostname;
+        work.adminConnection = adminConnection;
         work.clientData = clientData;
         m_work.add(work);
     }
@@ -142,12 +145,14 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             long clientHandle,
             long connectionId,
             String hostname,
+            boolean adminConnection,
             int sequenceNumber,
             Object clientData) {
         CatalogChangeWork work = new CatalogChangeWork();
         work.clientHandle = clientHandle;
         work.connectionId = connectionId;
         work.hostname = hostname;
+        work.adminConnection = adminConnection;
         work.clientData = clientData;
         work.catalogURL = catalogURL;
         work.deploymentURL = deploymentURL;
@@ -256,6 +261,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         plannedStmt.clientHandle = work.clientHandle;
         plannedStmt.connectionId = work.connectionId;
         plannedStmt.hostname = work.hostname;
+        plannedStmt.adminConnection = work.adminConnection;
         plannedStmt.clientData = work.clientData;
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
@@ -286,6 +292,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         retval.clientData = work.clientData;
         retval.clientHandle = work.clientHandle;
         retval.connectionId = work.connectionId;
+        retval.adminConnection = work.adminConnection;
         retval.hostname = work.hostname;
 
         // catalog change specific boiler plate

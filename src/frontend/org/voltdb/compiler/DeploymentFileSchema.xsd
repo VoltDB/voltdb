@@ -22,8 +22,8 @@
 
     For more information about jaxb, see:
     http://java.sun.com/developer/technicalArticles/WebServices/jaxb/
-    
-    
+
+
     ALSO, if you change this, consider updating:
         CatalogUtil.getDeploymentCRC()
 
@@ -48,6 +48,7 @@
   <xs:complexType name="clusterType">
     <xs:all>
         <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
+        <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
     </xs:all>
     <xs:attribute name="hostcount" type="xs:int" use="required"/>
     <xs:attribute name="sitesperhost" type="xs:int" use="required"/>
@@ -67,6 +68,11 @@
       <xs:attribute name="enabled" type="xs:boolean" default="false"/>
    </xs:complexType>
 
+  <!-- <admin-mode> -->
+  <xs:complexType name="adminModeType">
+    <xs:attribute name="port" type="xs:int" use="required"/>
+    <xs:attribute name="adminstartup" type="xs:boolean" use="optional" default="true"/>
+  </xs:complexType>
 
   <!-- <users> -->
   <xs:complexType name="usersType">

@@ -30,6 +30,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportProtoMessage;
@@ -101,6 +102,12 @@ public class TestRawProcessor extends TestCase {
         public boolean isEmpty() {
             return false;
         }
+
+        @Override
+        public int getOutstandingMessageCount()
+        {
+            return writequeue.size();
+        }
     }
 
     static class MockConnection implements Connection {
@@ -142,6 +149,13 @@ public class TestRawProcessor extends TestCase {
             // TODO Auto-generated method stub
 
         }
+
+        @Override
+        public long connectionId()
+        {
+            // TODO Auto-generated method stub
+            return -1;
+        }
     }
 
     static class MockExportDataSource extends ExportDataSource {
@@ -163,6 +177,7 @@ public class TestRawProcessor extends TestCase {
             m_mockVoltDB.addTable("TableName", false);
             m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
             m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
+            VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         }
 
         public MockExportDataSource(String db, String tableName, boolean isReplicated,
@@ -192,7 +207,7 @@ public class TestRawProcessor extends TestCase {
     MockConnection c;
     MockExportDataSource ds;
     ProtoStateBlock sb;
-    ExportProtoMessage m, bad_m1, bad_m2;
+    ExportProtoMessage m, bad_m1, bad_m2, m_postadmin;
 
     @Override
     public void setUp() {
@@ -201,8 +216,9 @@ public class TestRawProcessor extends TestCase {
         rp.addDataSource(ds);
 
         c = new MockConnection();
-        sb = rp.new ProtoStateBlock(c);
+        sb = rp.new ProtoStateBlock(c, false);
         m = new ExportProtoMessage(1, 2);
+        m_postadmin = new ExportProtoMessage(1, 2);
 
         // partition, site do not align match datasource
         bad_m1 = new ExportProtoMessage(10, 2);
@@ -290,5 +306,26 @@ public class TestRawProcessor extends TestCase {
         assertTrue(r.isPollResponse());
     }
 
-
+    // ProtoStateBlock created is non-admin, so swapping and trying
+    // to use it in admin mode should result in error.  Should be re-openable
+    // when admin mode switches off
+    public void testFSM_adminmode()
+    {
+        MockExportDataSource.m_mockVoltDB.setAdminMode(true);
+        sb.m_state = RawProcessor.CONNECTED;
+        sb.event(m.poll().ack(1000));
+        assertErrResponse();
+        assertEquals(RawProcessor.CLOSED, sb.m_state);
+        sb.event(m_postadmin.open());
+        assertErrResponse();
+        MockExportDataSource.m_mockVoltDB.setAdminMode(false);
+        sb.event(m_postadmin.open());
+        ExportProtoMessage r = pollWriteStream();
+        assertTrue(r.isOpenResponse());
+        assertEquals(RawProcessor.CONNECTED, sb.m_state);
+        sb.event(m.poll().ack(1000));
+        r = pollDataSource();
+        assertEquals(RawProcessor.CONNECTED, sb.m_state);
+        assertTrue(r.isPollResponse());
+    }
 }

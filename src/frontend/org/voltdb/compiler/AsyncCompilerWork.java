@@ -27,6 +27,7 @@ public class AsyncCompilerWork implements Serializable {
     long clientHandle = -1;
     long connectionId = -1;
     String hostname = "";
+    boolean adminConnection = false;
     transient public Object clientData = null;
 
     @Override

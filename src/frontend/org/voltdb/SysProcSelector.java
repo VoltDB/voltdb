@@ -25,6 +25,7 @@ public enum SysProcSelector {
     PARTITIONCOUNT,
     IOSTATS,
     MEMORY,           // info about node's memory usage
+    LIVECLIENTS,      // info about the currently connected clients
     MANAGEMENT,       //Returns pretty much everything
 
     SNAPSHOTSTATUS;

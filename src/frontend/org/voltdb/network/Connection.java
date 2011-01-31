@@ -33,6 +33,7 @@ public interface Connection {
     void disableReadSelection();
     void enableReadSelection();
     String getHostname();
+    long connectionId();
 
     /**
      * Schedule an action to be invoked in a network thread

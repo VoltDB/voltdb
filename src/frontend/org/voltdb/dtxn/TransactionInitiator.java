@@ -19,6 +19,7 @@ package org.voltdb.dtxn;
 
 import org.voltdb.StoredProcedureInvocation;
 import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * <p>A <code>TransactionInitiator</code> is the center of the distributed
@@ -54,6 +55,7 @@ public abstract class TransactionInitiator {
     public abstract void createTransaction(
             long connectionId,
             final String connectionHostname,
+            boolean adminConnection,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
             boolean isSinglePartition,
@@ -93,5 +95,7 @@ public abstract class TransactionInitiator {
      * @param executorSiteIds The ids of the sites that joined.
      */
     public abstract void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds);
+
+    public abstract Map<Long, long[]> getOutstandingTxnStats();
 
 }
