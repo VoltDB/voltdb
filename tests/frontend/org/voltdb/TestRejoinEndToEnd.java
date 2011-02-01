@@ -27,6 +27,8 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
@@ -53,6 +55,31 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     final int FAIL_TIMEOUT_ON_SOCKET = 1;
     final int FAIL_SKEW = 2;
     final int DONT_FAIL = 3;
+
+    private static final String TMPDIR = "/tmp";
+    private static final String TESTNONCE = "testnonce";
+
+    private void deleteTestFiles()
+    {
+        FilenameFilter cleaner = new FilenameFilter()
+        {
+            public boolean accept(File dir, String file)
+            {
+                return file.startsWith(TESTNONCE) ||
+                file.endsWith(".vpt") ||
+                file.endsWith(".digest") ||
+                file.endsWith(".tsv") ||
+                file.endsWith(".csv");
+            }
+        };
+
+        File tmp_dir = new File(TMPDIR);
+        File[] tmp_files = tmp_dir.listFiles(cleaner);
+        for (File tmp_file : tmp_files)
+        {
+            tmp_file.delete();
+        }
+    }
 
     boolean failNext(int failType) throws Exception {
         Context context = getServerReadyToReceiveNewNode();
@@ -140,6 +167,62 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         return failType != DONT_FAIL;
     }
 
+    public void testRestoreThenRejoinPropagatesRestore() throws Exception {
+        System.out.println("testRestoreThenRejoinThenRestore");
+        VoltProjectBuilder builder = getBuilderForTest();
+        builder.setSecurityEnabled(true);
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+
+        ClientResponse response;
+        Client client;
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost");
+
+        response = client.callProcedure("InsertSinglePartition", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        deleteTestFiles();
+
+        client.callProcedure("@SnapshotSave", TMPDIR,
+                TESTNONCE, (byte)1).getResults();
+
+        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+
+        cluster.shutDownSingleHost(0);
+        Thread.sleep(1000);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
+        ServerThread localServer = new ServerThread(config);
+
+        localServer.start();
+        localServer.waitForInitialization();
+
+        Thread.sleep(2000);
+
+        client.close();
+
+        try {
+            assertTrue(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore);
+        } finally {
+            localServer.shutdown();
+            cluster.shutDown();
+        }
+    }
 
     public void testCatalogUpdateAfterRejoin() throws Exception {
         System.out.println("testCatalogUpdateAfterRejoin");
@@ -633,4 +716,5 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         localServer.shutdown();
         cluster.shutDown();
     }
+
 }
