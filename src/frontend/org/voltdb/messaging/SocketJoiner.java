@@ -66,6 +66,7 @@ public class SocketJoiner extends Thread {
     static final int HOSTID_FAILURE = 4;
     static final int CATVER_FAILURE = 8;
     static final int DEPCRC_FAILURE = 16;
+    static final int HAVE_DONE_RESTORE_FAILURE = 32;
 
     static final int PING = 333;
     InetAddress m_coordIp = null;
@@ -484,6 +485,7 @@ public class SocketJoiner extends Thread {
             out.writeLong(m_catalogCRC);
             // write the local deployment crc
             out.writeLong(m_deploymentCRC);
+            out.writeByte(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore ? 1 : 0);
             out.flush();
             long maxDiffMS = in.readLong();
             if (m_hostLog != null)
@@ -568,6 +570,7 @@ public class SocketJoiner extends Thread {
             long othercrcs[] = new long[m_expectedHosts - 1];
             long otherdepcrcs[] = new long[m_expectedHosts - 1];
             int catalogVersions[] = new int[m_expectedHosts - 1];
+            boolean haveDoneRestore[] = new boolean[m_expectedHosts - 1];
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
 
@@ -585,6 +588,7 @@ public class SocketJoiner extends Thread {
                 long timestamp = in.readLong();
                 difftimes[i] = System.currentTimeMillis() - timestamp;
                 catalogVersions[i] = in.readInt();
+                haveDoneRestore[i] = in.readByte() == 0 ? false : true;
                 i++;
             }
 
@@ -634,6 +638,13 @@ public class SocketJoiner extends Thread {
                 }
             }
 
+            boolean b_haveDoneRestore = haveDoneRestore[0];
+            for (boolean b__haveDoneRestore : haveDoneRestore) {
+                if (b_haveDoneRestore != b__haveDoneRestore) {
+                    errors |= HAVE_DONE_RESTORE_FAILURE;
+                }
+            }
+
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
                 out.writeLong(maxDiffMS);
@@ -674,6 +685,13 @@ public class SocketJoiner extends Thread {
                 if (m_hostLog != null)
                     m_hostLog.error("Deployment file checksums do not match across cluster");
             }
+            if ((errors & HAVE_DONE_RESTORE_FAILURE) != 0) {
+                if (m_hostLog != null)
+                    m_hostLog.error("Cluster does not agree on whether a restore has been performed");
+            } else {
+                org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore = b_haveDoneRestore;
+            }
+
             if (errors != 0) {
                 VoltDB.crashVoltDB();
             }
@@ -746,6 +764,9 @@ public class SocketJoiner extends Thread {
 
             // write catalog version number
             out.writeInt(catalogVersionNumber);
+
+            //Write whether a restore of the cluster has already been done
+            out.writeByte(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore ? 1 : 0);
 
             // flush these 3 writes
             out.flush();

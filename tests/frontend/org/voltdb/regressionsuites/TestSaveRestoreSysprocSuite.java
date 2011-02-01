@@ -968,6 +968,24 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
 
+        boolean threwException = false;
+        try
+        {
+            results = client.callProcedure("@SnapshotRestore", TMPDIR,
+                                           TESTNONCE).getResults();
+
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    fail(results[0].getString("ERR_MSG"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            threwException = true;
+        }
+        assertTrue(threwException);
+
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
 

@@ -130,6 +130,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
 
     @Override
     public void shutDown() throws InterruptedException {
+        org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore = false;
         m_server.shutdown();
         for (EEProcess proc : m_siteProcesses) {
             proc.waitForShutdown();

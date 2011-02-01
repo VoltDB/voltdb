@@ -81,6 +81,8 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static HashSet<String>  m_initializedTableSaveFiles = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
 
+    public static volatile boolean m_haveDoneRestore = false;
+
     private static synchronized void initializeTableSaveFiles(
             String filePath,
             String fileNonce,
@@ -276,6 +278,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreLoadReplicatedTable)
         {
+            m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
@@ -365,6 +368,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         else if (fragmentId ==
             SysProcFragmentId.PF_restoreDistributeReplicatedTable)
         {
+            m_haveDoneRestore = true;
             // XXX I tested this with a hack that cannot be replicated
             // in a unit test since it requires hacks to this sysproc that
             // effectively break it
@@ -384,6 +388,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         else if (fragmentId ==
             SysProcFragmentId.PF_restoreSendReplicatedTable)
         {
+            m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
@@ -414,6 +419,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         else if (fragmentId ==
             SysProcFragmentId.PF_restoreSendReplicatedTableResults)
         {
+            m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
             int dependency_id = (Integer) params.toArray()[0];
             TRACE_LOG.trace("Received confirmmation of successful replicated table load");
@@ -434,6 +440,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         else if (fragmentId ==
             SysProcFragmentId.PF_restoreLoadReplicatedTableResults)
         {
+            m_haveDoneRestore = true;
             TRACE_LOG.trace("Aggregating replicated table restore results");
             assert(params.toArray()[0] != null);
             int dependency_id = (Integer) params.toArray()[0];
@@ -455,6 +462,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         else if (fragmentId ==
             SysProcFragmentId.PF_restoreDistributePartitionedTable)
         {
+            m_haveDoneRestore = true;
             Object paramsA[] = params.toArray();
             assert(paramsA[0] != null);
             assert(paramsA[1] != null);
@@ -480,6 +488,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         else if (fragmentId ==
             SysProcFragmentId.PF_restoreDistributePartitionedTableResults)
         {
+            m_haveDoneRestore = true;
             TRACE_LOG.trace("Aggregating partitioned table restore results");
             assert(params.toArray()[0] != null);
             int dependency_id = (Integer) params.toArray()[0];
@@ -500,6 +509,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         else if (fragmentId ==
             SysProcFragmentId.PF_restoreSendPartitionedTable)
         {
+            m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
@@ -532,6 +542,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         else if (fragmentId ==
             SysProcFragmentId.PF_restoreSendPartitionedTableResults)
         {
+            m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
             int dependency_id = (Integer) params.toArray()[0];
             TRACE_LOG.trace("Received confirmation of successful partitioned table load");
@@ -559,6 +570,10 @@ public class SnapshotRestore extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String path, String nonce, int allowExport) throws VoltAbortException
     {
+        if (m_haveDoneRestore) {
+            throw new VoltAbortException("Cluster has already been restored or has failed a restore." +
+                    " Restart the cluster before doing another restore.");
+        }
       //  m_sampler.start();
         final long startTime = System.currentTimeMillis();
         HOST_LOG.info("Restoring from path: " + path + ", with ID: " + nonce + " at " + startTime);
