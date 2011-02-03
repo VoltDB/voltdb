@@ -63,13 +63,13 @@
 <!-- Some examples override srccompileImpl to add additional srcs or dependencies -->
 <target name="srccompile">
     <mkdir dir='${build.dir}' />
-    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
+    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true' includeAntRuntime='true'>
         <classpath refid="project.classpath" />
     </javac>
 </target>
 
 <target name="proccompile" if="procedures.dir">
-    <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true'>
+    <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true' includeAntRuntime='true'>
         <classpath refid="project.classpath" />
     </javac>
 </target>
