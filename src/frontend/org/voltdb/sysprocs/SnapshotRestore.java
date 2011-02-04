@@ -89,16 +89,37 @@ public class SnapshotRestore extends VoltSystemProcedure
             String tableName,
             int originalHostIds[],
             int relevantPartitionIds[]) throws IOException {
+        // This check ensures that only one site per host attempts to
+        // distribute this table.
         if (!m_initializedTableSaveFiles.add(tableName)) {
             return;
         }
+
+        HashSet<Integer> relevantPartitionSet =
+            new HashSet<Integer>();
+        for (int part_id : relevantPartitionIds)
+        {
+            relevantPartitionSet.add(part_id);
+        }
+
         for (int originalHostId : originalHostIds) {
-            final File f = getSaveFileForPartitionedTable( filePath, fileNonce, tableName, originalHostId);
-            m_saveFiles.offer(
-                    getTableSaveFile(
+            final File f = getSaveFileForPartitionedTable(filePath, fileNonce,
+                                                          tableName,
+                                                          originalHostId);
+            TableSaveFile savefile = getTableSaveFile(
                             f,
                             org.voltdb.VoltDB.instance().getLocalSites().size() * 4,
-                            relevantPartitionIds));
+                            relevantPartitionSet.toArray(new Integer[relevantPartitionSet.size()]));
+
+            m_saveFiles.offer(savefile);
+            for (int part_id : savefile.getPartitionIds())
+            {
+                relevantPartitionSet.remove(part_id);
+            }
+            if (relevantPartitionSet.isEmpty())
+            {
+                break;
+            }
             assert(m_saveFiles.peekLast().getCompleted());
         }
     }
@@ -708,7 +729,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static TableSaveFile getTableSaveFile(
             File saveFile,
             int readAheadChunks,
-            int relevantPartitionIds[]) throws IOException
+            Integer relevantPartitionIds[]) throws IOException
     {
         FileInputStream savefile_input = new FileInputStream(saveFile);
         TableSaveFile savefile =

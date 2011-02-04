@@ -269,9 +269,9 @@ public class SnapshotConverter {
             for (Map.Entry<File, Set<Integer>> e2 : partitionsFromFile.entrySet()) {
                 File infile = e2.getKey();
                 Set<Integer> partitionSet = e2.getValue();
-                int partitions[] = null;
+                Integer partitions[] = null;
                 if (partitionSet != null) {
-                    partitions = new int[partitionSet.size()];
+                    partitions = new Integer[partitionSet.size()];
                     int ii = 0;
                     for (Integer partition : partitionSet) {
                         partitions[ii++] = partition;
