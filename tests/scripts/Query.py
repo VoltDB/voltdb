@@ -76,8 +76,7 @@ class VoltQueryClient(cmd.Cmd):
                                              FastSerializer.VOLTTYPE_STRING])
         self.snapshotrestore = VoltProcedure(self.fs, "@SnapshotRestore",
                                              [FastSerializer.VOLTTYPE_STRING,
-                                              FastSerializer.VOLTTYPE_STRING,
-                                              FastSerializer.VOLTTYPE_TINYINT])
+                                              FastSerializer.VOLTTYPE_STRING])
         self.snapshotstatus = VoltProcedure(self.fs, "@SnapshotStatus")
 
         self.systeminformation = VoltProcedure(self.fs, "@SystemInformation")
@@ -266,12 +265,12 @@ class VoltQueryClient(cmd.Cmd):
             return self.help_snapshotrestore()
 
         args = command.split()
-        if len(args) != 3:
+        if len(args) != 2:
             return self.help_snapshotrestore()
 
         self.safe_print("Restoring snapshot")
         self.response = self.__safe_call(self.snapshotrestore,
-                                         [args[0], args[1], int(args[2])],
+                                         [args[0], args[1]],
                                          timeout = self.__timeout)
         self.safe_print(self.response)
 
