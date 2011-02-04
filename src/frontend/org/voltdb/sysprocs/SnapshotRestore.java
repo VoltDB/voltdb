@@ -78,7 +78,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static final int DEP_restoreScanResults = (int)
         SysProcFragmentId.PF_restoreScanResults;
 
-    private static HashSet<String>  m_initializedTableSaveFiles = new HashSet<String>();
+    private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
 
     public static volatile boolean m_haveDoneRestore = false;
@@ -90,11 +90,23 @@ public class SnapshotRestore extends VoltSystemProcedure
             int originalHostIds[],
             int relevantPartitionIds[]) throws IOException {
         // This check ensures that only one site per host attempts to
-        // distribute this table.
-        if (!m_initializedTableSaveFiles.add(tableName)) {
+        // distribute this table.  @SnapshotRestore sends plan fragments
+        // to every site on this host with the tables and partition ID that
+        // this host is going to distribute to the cluster.  The first
+        // execution site to get into this synchronized method is going to
+        // 'win', add the table it's doing to this set, and then do the rest
+        // of the work.  Subsequent sites will just return here.
+        if (!m_initializedTableSaveFileNames.add(tableName)) {
             return;
         }
 
+        // To avoid pulling duplicate rows when we have multiple files
+        // that contain the data for a partition, we're going to assign
+        // all of the partition IDs that were passed in to one and only one
+        // TableSaveFile.  We'll pull them out of this set as we find
+        // files for them, and then once the set is empty we can bail out of
+        // this loop.  The restore planner called in @SnapshotRestore should
+        // ensure that we can, in fact, find files for all these partitions.
         HashSet<Integer> relevantPartitionSet =
             new HashSet<Integer>();
         for (int part_id : relevantPartitionIds)
@@ -220,7 +232,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
-                m_initializedTableSaveFiles.clear();
+                // implicitly synchronized by the way restore operates.
+                // this scan must complete on every site and return results
+                // to the coordinator for aggregation before it will send out
+                // distribution fragments, so two sites on the same node
+                // can't be attempting to set and clear this HashSet simultaneously
+                m_initializedTableSaveFileNames.clear();
                 m_filePath = (String) params.toArray()[0];
                 m_fileNonce = (String) params.toArray()[1];
                 TRACE_LOG.trace("Checking saved table state for restore of: "
