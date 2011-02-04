@@ -170,6 +170,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        ServerThread localServer = null;
+        try {
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -182,13 +184,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         client = ClientFactory.createClient(m_cconfig);
         client.createConnection("localhost");
-
-        response = client.callProcedure("InsertSinglePartition", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         deleteTestFiles();
 
@@ -204,7 +199,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
-        ServerThread localServer = new ServerThread(config);
+        localServer = new ServerThread(config);
 
         localServer.start();
         localServer.waitForInitialization();
@@ -213,11 +208,29 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         client.close();
 
-        try {
+        assertTrue(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore);
+
+client = ClientFactory.createClient(m_cconfig);
+            client.createConnection("localhost");
+
+            /*
+             * Also make sure a catalog update doesn't reset m_haveDoneRestore
+             */
+            String newCatalogURL = Configuration.getPathToCatalogForTest("rejoin.jar");
+            String deploymentURL = Configuration.getPathToCatalogForTest("rejoin.xml");
+
+            VoltTable[] results =
+                client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+
+            client.close();
+
             assertTrue(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore);
         } finally {
-            localServer.shutdown();
             cluster.shutDown();
+            if (localServer != null) {
+                localServer.shutdown();
+            }
         }
     }
 
