@@ -238,7 +238,7 @@ public class RealVoltDB implements VoltDBInterface
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     private CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "1.2.1.04";
+    private static final String m_defaultVersionString = "1.2.1.05";
     private String m_versionString = m_defaultVersionString;
     // fields accessed via the singleton
     private HostMessenger m_messenger = null;
