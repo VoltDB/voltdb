@@ -1160,6 +1160,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             assertNotNull(results);
             deleteTestFiles();
             releaseClient(client);
+
+            // Kill and restart all the execution sites.
+            m_config.shutDown();
+            m_config.startUp();
         }
     }
 
@@ -1199,6 +1203,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             assertNotNull(results);
             deleteTestFiles();
             releaseClient(client);
+
+            // Kill and restart all the execution sites.
+            m_config.shutDown();
+            m_config.startUp();
         }
     }
 

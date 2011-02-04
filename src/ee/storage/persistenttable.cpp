@@ -757,6 +757,18 @@ void PersistentTable::onSetColumns() {
  * memory tracking
  */
 void PersistentTable::processLoadedTuple(TableTuple &tuple) {
+
+    // not null checks at first
+    FAIL_IF(!checkNulls(tuple)) {
+        throw ConstraintFailureException(this, tuple, TableTuple(),
+                                         CONSTRAINT_TYPE_NOT_NULL);
+    }
+
+    if (!tryInsertOnAllIndexes(&tuple)) {
+        throw ConstraintFailureException(this, tuple, TableTuple(),
+                                         CONSTRAINT_TYPE_UNIQUE);
+    }
+
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(m_tmpTarget1);
@@ -772,12 +784,6 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple) {
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
         m_nonInlinedMemorySize += tuple.getNonInlinedMemorySize();
-    }
-
-    // populate indexes. walk the contiguous memory in the inner loop.
-    for (int i = m_indexCount - 1; i >= 0;--i) {
-        TableIndex *index = m_indexes[i];
-        index->addEntry(&tuple);
     }
 }
 

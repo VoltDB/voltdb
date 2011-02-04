@@ -572,7 +572,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
     // setup
     VoltDBEngine *engine = castToEngine(engine_ptr);
     assert(engine);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
 
     //JNIEnv pointer can change between calls, must be updated
     updateJNILogProxy(engine);
@@ -590,10 +590,13 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
 
     // execute
     engine->setUsedParamcnt(0);
-    retval = engine->executePlanFragment(cppplan, outputDependencyId,
-                                         inputDependencyId, txnId,
-                                         lastCommittedTxnId);
-
+    try {
+        retval = engine->executePlanFragment(cppplan, outputDependencyId,
+                                             inputDependencyId, txnId,
+                                             lastCommittedTxnId);
+    } catch (FatalException e) {
+        topend->crashVoltDB(e);
+    }
     // cleanup
     stringPool->purge();
 
