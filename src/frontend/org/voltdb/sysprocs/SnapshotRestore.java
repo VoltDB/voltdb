@@ -850,7 +850,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             return result;
         }
 
-        VoltTable[] results = null;
+        VoltTable[] results = new VoltTable[] { constructResultsTable() };
+        results[0].addRow(m_hostId, hostname, m_siteId, tableName, -1,
+                "NO DATA TO DISTRIBUTE", "");
         final Table new_catalog_table = getCatalogTable(tableName);
         Boolean needsConversion = null;
         while (savefile.hasMoreChunks())
