@@ -79,7 +79,7 @@ public class TableSaveFile
     public TableSaveFile(
             FileChannel dataIn,
             int readAheadChunks,
-            int relevantPartitionIds[]) throws IOException {
+            Integer[] relevantPartitionIds) throws IOException {
         this(dataIn, readAheadChunks, relevantPartitionIds, false);
     }
 
@@ -87,7 +87,7 @@ public class TableSaveFile
     public TableSaveFile(
             FileChannel dataIn,
             int readAheadChunks,
-            int relevantPartitionIds[],
+            Integer[] relevantPartitionIds,
             boolean continueOnCorruptedChunk) throws IOException
     {
         try {

@@ -51,7 +51,7 @@ public class CSVTableSaveFile {
     private final char m_delimeter;
     private final Escaper m_escaper;
 
-    public CSVTableSaveFile(File saveFile, char delimeter, Escaper escaper, int partitions[]) throws IOException {
+    public CSVTableSaveFile(File saveFile, char delimeter, Escaper escaper, Integer partitions[]) throws IOException {
         m_delimeter = delimeter;
         m_escaper = escaper;
         final FileInputStream fis = new FileInputStream(saveFile);
@@ -209,14 +209,14 @@ public class CSVTableSaveFile {
 
         Escaper escaper = null;
         char delimeter = '0';
-        int partitions[] = null;
+        Integer partitions[] = null;
         if (args[0].equals("--partitions")) {
             if (args.length < 2) {
                 System.err.println("Not enough args");
                 System.exit(-1);
             }
             String partitionStrings[] = args[1].split(",");
-            partitions = new int[partitionStrings.length];
+            partitions = new Integer[partitionStrings.length];
             int ii = 0;
             for (String partitionString : partitionStrings) {
                 partitions[ii++] = Integer.valueOf(partitionString);
@@ -258,7 +258,7 @@ public class CSVTableSaveFile {
     }
 
     public static void convertTableSaveFile(Escaper escaper, char delimeter,
-            int[] partitions, final File outfile, final File infile)
+            Integer[] partitions, final File outfile, final File infile)
             throws FileNotFoundException, IOException, InterruptedException,
             SyncFailedException {
         final FileOutputStream fos = new FileOutputStream(outfile, true);
