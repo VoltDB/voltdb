@@ -13,7 +13,15 @@ mv pdfs/enterprise_releasenotes.pdf ~/releases/`cat ../eng/version.txt`/`cat ../
 zip ~/releases/`cat ../eng/version.txt`/`cat ../eng/version.txt`-docs_pdf.zip pdfs/*.pdf
 cp ~/releases/`cat ../eng/version.txt`/`cat ../eng/version.txt`-enterprise_releasenotes.pdf pdfs/enterprise_releasenotes.pdf
 cd ../eng
-cksum ~/releases/`cat version.txt`/*.* > ~/releases/`cat version.txt`/checksums.txt
+echo "CRC checksums:" > ~/releases/`cat version.txt`/checksums.txt
+echo "" >> ~/releases/`cat version.txt`/checksums.txt
+cksum ~/releases/`cat version.txt`/*.gz >> ~/releases/`cat version.txt`/checksums.txt
+echo "MD5 checksums:" >> ~/releases/`cat version.txt`/checksums.txt
+echo "" >> ~/releases/`cat version.txt`/checksums.txt
+md5sum ~/releases/`cat version.txt`/*.gz >> ~/releases/`cat version.txt`/checksums.txt
+echo "SHA1 checksums:" >> ~/releases/`cat version.txt`/checksums.txt
+echo "" >> ~/releases/`cat version.txt`/checksums.txt
+sha1sum ~/releases/`cat version.txt`/*.gz >> ~/releases/`cat version.txt`/checksums.txt
 scp -r ~/releases/`cat version.txt` root@community.voltdb.com:/var/www/drupal/sites/default/files/archive
 mkdir -p ~/releases/`cat version.txt`/other
 cp obj/release/voltdb-`cat version.txt`.sym ~/releases/`cat version.txt`/other/
