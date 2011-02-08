@@ -23,8 +23,11 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Map;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
@@ -54,6 +57,8 @@ public class MockVoltDB implements VoltDBInterface
     FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = null;
     private boolean m_adminMode = false;
+    private volatile String m_localMetadata = "0.0.0.0:0:0:0";
+    private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
     public MockVoltDB()
     {
@@ -406,5 +411,15 @@ public class MockVoltDB implements VoltDBInterface
     public void setAdminMode(boolean inAdminMode)
     {
         m_adminMode = inAdminMode;
+    }
+
+    @Override
+    public String getLocalMetadata() {
+        return m_localMetadata;
+    }
+
+    @Override
+    public Map<Integer, String> getClusterMetadataMap() {
+        return m_clusterMetadata;
     }
 }

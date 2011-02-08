@@ -58,6 +58,7 @@ public class ExportConnection {
     private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
 
     public final ArrayList<AdvertisedDataSource> dataSources;
+    public final ArrayList<String> hosts;
 
     private long m_lastAckOffset;
 
@@ -72,6 +73,7 @@ public class ExportConnection {
         this.serverAddr = serverAddr;
         name = serverAddr.toString();
         dataSources = new ArrayList<AdvertisedDataSource>();
+        hosts = new ArrayList<String>();
     }
 
     /**
@@ -104,14 +106,21 @@ public class ExportConnection {
                 Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>> advertisement;
                 advertisement = m.getAdvertisedDataSourcesAndNodes();
                 dataSources.addAll(advertisement.getFirst());
+                hosts.addAll(advertisement.getSecond());
                 m_state = CONNECTED;
             }
         }
     }
 
-    public void closeExportConnection() throws IOException {
+    public void closeExportConnection() {
+        if (m_socket != null) {;
         if (m_socket.isConnected()) {
+                try {
             m_socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         // seems hard to argue with...
         m_state = CLOSED;

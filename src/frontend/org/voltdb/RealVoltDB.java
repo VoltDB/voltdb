@@ -283,6 +283,11 @@ public class RealVoltDB implements VoltDBInterface
 
     private volatile boolean m_inAdminMode = false;
 
+    // metadata is currently of the format:
+    // IP:CIENTPORT:ADMINPORT:HTTPPORT
+    private volatile String m_localMetadata = "0.0.0.0:0:0:0";
+    private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
+
     // methods accessed via the singleton
     @Override
     public void startSampler() {
@@ -355,7 +360,6 @@ public class RealVoltDB implements VoltDBInterface
             VLog.log("\n### RealVoltDB.initialize() for port %d ###", config.m_port);
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-
 
             // start the dumper thread
             if (config.listenForDumpRequests)
@@ -443,6 +447,23 @@ public class RealVoltDB implements VoltDBInterface
                 }
             }
 
+            // create the string that describes the public interface
+            // format "XXX.XXX.XXX.XXX:clientport:adminport:httpport"
+            InetAddress addr = null;
+            try {
+                addr = InetAddress.getLocalHost();
+            } catch (UnknownHostException e1) {
+                hostLog.fatal("Unable to discover local IP address. Usually a java permissions failure.");
+                VoltDB.crashVoltDB();
+            }
+            assert(addr.isLoopbackAddress() == false);
+            String localMetadata = addr.getHostAddress();
+            localMetadata += ":" + Integer.valueOf(config.m_port);
+            localMetadata += ":" + Integer.valueOf(m_catalogContext.cluster.getAdminport());
+            localMetadata += ":" + Integer.valueOf(port); // json
+            // possibly atomic swap from null to realz
+            m_localMetadata = localMetadata;
+
             // Prepare the network socket manager for work
             m_network = new VoltNetwork();
             final HashSet<Integer> downHosts = new HashSet<Integer>();
@@ -488,6 +509,10 @@ public class RealVoltDB implements VoltDBInterface
 
             // Use the host messenger's hostId.
             int myHostId = m_messenger.getHostId();
+
+            // make sure the local entry for metadata is current
+            // it's possible it could get overwritten in a rejoin scenario
+            m_clusterMetadata.put(myHostId, m_localMetadata);
 
             // Let the Export system read its configuration from the catalog.
             try {
@@ -1326,5 +1351,27 @@ public class RealVoltDB implements VoltDBInterface
     public void setAdminMode(boolean inAdminMode)
     {
         m_inAdminMode = inAdminMode;
+    }
+
+    /**
+     * Get the metadata map for the wholes cluster.
+     * Note: this may include failed nodes so check for live ones
+     *  and filter this if needed.
+     *
+     * Metadata is currently of the format:
+     * IP:CIENTPORT:ADMINPORT:HTTPPORT]
+     */
+    @Override
+    public Map<Integer, String> getClusterMetadataMap() {
+        return m_clusterMetadata;
+    }
+
+    /**
+     * Metadata is currently of the format:
+     * IP:CIENTPORT:ADMINPORT:HTTPPORT]
+     */
+    @Override
+    public String getLocalMetadata() {
+        return m_localMetadata;
     }
 }

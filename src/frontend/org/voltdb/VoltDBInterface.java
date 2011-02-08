@@ -72,6 +72,8 @@ public interface VoltDBInterface
     public StatsAgent getStatsAgent();
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
+    public String getLocalMetadata();
+    public Map<Integer, String> getClusterMetadataMap();
 
     /**
      * Open a connection to a rejoining node and create a foreign host for it.

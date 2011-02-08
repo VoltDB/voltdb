@@ -24,7 +24,6 @@ package org.voltdb.export;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.voltdb.TheHashinator;
@@ -42,13 +41,7 @@ public class ExportTestClient extends ExportClientBase
 
     public ExportTestClient(int nodeCount)
     {
-        ArrayList<InetSocketAddress> servers =
-            new ArrayList<InetSocketAddress>();
-        for (int i = 0; i < nodeCount; i++)
-        {
-            servers.add(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT + i));
-        }
-        super.setServerInfo(servers);
+        super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
     }
 
     @Override
@@ -192,7 +185,7 @@ public class ExportTestClient extends ExportClientBase
     }
 
     @Override
-    public int work()
+    public int work() throws IOException
     {
         while (!done())
         {

@@ -207,13 +207,20 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
                     //  - the hostmessenger knows the hostnames of hosts
                     CatalogContext cx = VoltDB.instance().getCatalogContext();
                     HostMessenger hm = VoltDB.instance().getHostMessenger();
+                    int myHostId = -1;
+                    if (hm != null) myHostId = hm.getHostId();
 
+                    // skip the current host... obviously the recipient of the message
+                    // knows about the current host
                     if (cx != null) {
                         Set<Integer> liveHosts = cx.siteTracker.getAllLiveHosts();
-                        fs.writeInt(liveHosts.size());
+                        fs.writeInt(liveHosts.size() - 1);
                         for (int hostId : liveHosts) {
-                            String hostname = hm.getHostnameForHostID(hostId);
-                            fs.writeString(hostname);
+                            if (hostId == myHostId) continue;
+                            String metadata = VoltDB.instance().getClusterMetadataMap().get(hostId);
+                            System.out.printf("hostid %d, metadata: %s", hostId, metadata);
+                            assert(metadata.contains(":"));
+                            fs.writeString(metadata);
                         }
                     }
                     else {

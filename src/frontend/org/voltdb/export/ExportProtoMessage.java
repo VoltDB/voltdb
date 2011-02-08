@@ -250,7 +250,8 @@ public class ExportProtoMessage
 
         ArrayList<AdvertisedDataSource> sources = new ArrayList<AdvertisedDataSource>();
         ArrayList<String> nodes = new ArrayList<String>();
-        Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>> retval = new Pair(sources, nodes);
+        Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>> retval =
+            new Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>>(sources, nodes);
 
         FastDeserializer fds = new FastDeserializer(m_data);
 

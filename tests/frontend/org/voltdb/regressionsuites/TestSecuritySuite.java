@@ -226,8 +226,9 @@ public class TestSecuritySuite extends RegressionSuite {
     public void testAllowedExportConnectorPermissions() throws IOException {
         // user1 can connect (in groups list)
         ExportTestClient eclient = new ExportTestClient(1);
-        eclient.connectToExportServers("user1", "password");
-        eclient.disconnectFromExportServers();
+        eclient.addCredentials("user1", "password");
+        eclient.connect();
+        eclient.disconnect();
 
         // Expected to throw an exception on failure
         assertTrue(true);
@@ -238,18 +239,15 @@ public class TestSecuritySuite extends RegressionSuite {
         ExportTestClient eclient = new ExportTestClient(1);
         try {
             // bad group
-            eclient.connectToExportServers("user2", "password");
+            eclient.addCredentials("user2", "password");
+            eclient.connect();
         }
         catch (IOException e) {
             caught = true;
         }
         assertTrue(caught);
 
-        try {
-            eclient.disconnectFromExportServers();
-        }
-        catch (IOException ignored){
-        }
+        eclient.disconnect();
     }
 
     /**

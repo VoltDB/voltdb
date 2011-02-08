@@ -120,16 +120,17 @@ public class TestExportSuite extends RegressionSuite {
         callbackSucceded = true;
         m_tester = new ExportTestClient(getServerConfig().getNodeCount());
         try {
-            m_tester.connectToExportServers(null, null);
-        }
-        catch (final IOException e){
-            throw new RuntimeException(e);
+            m_tester.connect();
+        } catch (IOException e) {
+            e.printStackTrace();
+            assertTrue(false);
         }
     }
 
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
+        m_tester.disconnect();
         assertTrue(callbackSucceded);
     }
 
@@ -147,9 +148,9 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // make a new tester and see if it gets the new advertisement!
-        m_tester.disconnectFromExportServers();
+        m_tester.disconnect();
         m_tester = new ExportTestClient(getServerConfig().getNodeCount());
-        m_tester.connectToExportServers(null, null);
+        m_tester.connect();
 
         // verify that it exports
         for (int i=0; i < 10; i++) {

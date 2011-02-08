@@ -194,9 +194,10 @@ public class TestAdminMode extends RegressionSuite
             results = adminclient.callProcedure("@Statistics",
                                                 "LIVECLIENTS",
                                                 0).getResults();
-            assertEquals(1, results[0].getRowCount());
+            // Izzy told me to comment out the two below assertions
+            //assertEquals(1, results[0].getRowCount());
             results[0].advanceRow();
-            assertEquals(1, results[0].getLong("ADMIN"));
+            //assertEquals(1, results[0].getLong("ADMIN"));
             System.out.println(results[0].toString());
         }
         finally {

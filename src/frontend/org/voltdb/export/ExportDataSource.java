@@ -107,7 +107,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final String m_database;
     private final String m_tableName;
-    private final byte m_isReplicated;
     private final long m_tableId;
     private final int m_siteId;
     private final int m_partitionId;
@@ -133,11 +132,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     {
         m_database = db;
         m_tableName = tableName;
-
-        /*
-         * coerce true == 1, false == 0 for wire format
-         */
-        m_isReplicated = (byte)(isReplicated ? 1 : 0);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates

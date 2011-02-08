@@ -27,8 +27,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -70,18 +68,16 @@ public class ExportToHDFSClient extends ExportClientBase {
         }
         hdfs.mkdirs(path);
 
-        List<InetSocketAddress> serversList = new LinkedList<InetSocketAddress>();
         for (String server : servers.split(",")) {
-            serversList.add(new InetSocketAddress(server, VoltDB.DEFAULT_PORT));
+            addServerInfo(new InetSocketAddress(server, VoltDB.DEFAULT_PORT));
         }
-        setServerInfo(serversList);
 
         this.hdfs = hdfs;
         this.uri = uri;
         this.decoders = new HashMap<String, ExportToHDFSDecoder>();
 
         try {
-            connectToExportServers("", "");
+            connect();
         } catch (IOException e) {
             LOG.fatal("Unable to connect to VoltDB servers for export");
             System.exit(1);

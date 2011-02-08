@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.voltdb.VoltDB;
@@ -188,15 +187,12 @@ public class ExportToFileClient extends ExportClientBase
 
     public void setVoltServers(String[] voltServers)
     {
-        ArrayList<InetSocketAddress> servers =
-            new ArrayList<InetSocketAddress>();
         for (int i = 0; i < voltServers.length; i++)
         {
             InetSocketAddress server =
                 new InetSocketAddress(voltServers[i], VoltDB.DEFAULT_PORT);
-            servers.add(server);
+            addServerInfo(server);
         }
-        setServerInfo(servers);
     }
 
     public ExportToFileClient(Escaper escaper, String nonce, File outdir)
@@ -382,13 +378,11 @@ public class ExportToFileClient extends ExportClientBase
         ExportToFileClient client =
             new ExportToFileClient(escaper, nonce, outdir);
         client.setVoltServers(volt_servers);
+        client.addCredentials(user, password);
         try {
-            client.connectToExportServers(user, password);
-        }
-        catch (IOException e) {
-            m_logger.fatal("Unable to connect to VoltDB servers for export");
-            System.exit(-1);
-        }
         client.run();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

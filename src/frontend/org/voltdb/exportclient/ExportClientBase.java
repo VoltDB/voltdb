@@ -19,9 +19,10 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
@@ -32,28 +33,39 @@ import org.voltdb.logging.VoltLogger;
  * the partitions and tables that are actively being exported.
  */
 
-public abstract class ExportClientBase implements Runnable {
+public abstract class ExportClientBase {
+
+    protected AtomicBoolean m_connected = new AtomicBoolean(false);
+
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
-    private List<InetSocketAddress> m_servers = null;
-    protected final HashMap<String, ExportConnection> m_exportConnections;
+    private final List<InetSocketAddress> m_servers;
+    protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections;
 
     // First hash by table, second by partition
     private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
 
+    // credentials
+    private String m_username = "", m_password = "";
+
     public ExportClientBase()
     {
         m_sinks = new HashMap<Long, HashMap<Integer, ExportDataSink>>();
-        m_exportConnections = new HashMap<String, ExportConnection>();
-        m_servers = null;
+        m_exportConnections = new HashMap<InetSocketAddress, ExportConnection>();
+        m_servers = new ArrayList<InetSocketAddress>();
     }
 
     /**
      * Provide the ExportClient with a list of servers to which to connect
      * @param servers
      */
-    public void setServerInfo(List<InetSocketAddress> servers) {
-        m_servers = servers;
+    public void addServerInfo(InetSocketAddress server) {
+        m_servers.add(server);
+    }
+
+    public void addCredentials(String username, String password) {
+        m_username = username;
+        m_password = password;
     }
 
     /**
@@ -93,46 +105,44 @@ public abstract class ExportClientBase implements Runnable {
         }
     }
 
-    /**
-     * Connect to all the specified servers.  This will open the sockets,
-     * advance the Export protocol to the open state to each server, retrieve
-     * each AdvertisedDataSource list, and create data sinks for every
-     * table/partition pair.
-     * @throws IOException
-     */
-    public void connectToExportServers(String username, String password) throws IOException {
-        if (m_servers == null || m_servers.size() == 0) {
-            m_logger.fatal("No servers provided for Export, exiting...");
-            throw new RuntimeException("No servers provided for Export connection");
+    private ExportConnection connectToServer(InetSocketAddress addr) {
+        ExportConnection retval = null;
+        try {
+            retval = new ExportConnection(m_username, m_password, addr, m_sinks);
+            retval.openExportConnection();
+
+            for (String hostname : retval.hosts) {
+                assert(hostname.contains(":"));
+                /*String[] parts = hostname.split(":");
+                InetSocketAddress addr2 = new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
+                assert(m_servers.contains(addr2));*/
         }
 
-        for (InetSocketAddress server_addr : m_servers) {
-            ExportConnection exportConnection =
-                new ExportConnection(username, password, server_addr, m_sinks);
-            exportConnection.openExportConnection();
-            constructExportDataSinks(exportConnection);
-            m_exportConnections.put(exportConnection.name, exportConnection);
+            constructExportDataSinks(retval);
         }
+        catch (IOException e) {}
+
+        return retval;
     }
 
     /**
      * Disconnect from any connected servers.
      * @throws IOException
      */
-    public void disconnectFromExportServers() throws IOException {
-        Set<String> keySet = m_exportConnections.keySet();
-        for (String key : keySet) {
-            ExportConnection exportConnection = m_exportConnections.get(key);
-            exportConnection.closeExportConnection();
+    public void disconnect() {
+        for (ExportConnection connection : m_exportConnections.values()) {
+            connection.closeExportConnection();
         }
+        m_exportConnections.clear();
+        m_connected.set(false);
     }
 
     boolean checkConnections()
     {
         boolean retval = true;
-        for (String el_connection : m_exportConnections.keySet()) {
-            if (!m_exportConnections.get(el_connection).isConnected()) {
-                m_logger.error("Lost connection: " + el_connection +
+        for (ExportConnection connection : m_exportConnections.values()) {
+            if (!connection.isConnected()) {
+                m_logger.error("Lost connection: " + connection.name +
                                ", Closing...");
                 retval = false;
             }
@@ -140,67 +150,179 @@ public abstract class ExportClientBase implements Runnable {
         return retval;
     }
 
+    public boolean connect() throws IOException {
+        if (m_connected.get()) {
+            m_logger.error("Export client already connected.");
+            throw new IOException("Export client already connected.");
+        }
+        if (m_servers.size() == 0) {
+            m_logger.error("No servers provided for export client.");
+            throw new IOException("No servers provided for export client.");
+        }
+
+        // Connect to one of the specified servers.  This will open the sockets,
+        // advance the Export protocol to the open state to each server, retrieve
+        // each AdvertisedDataSource list, and create data sinks for every
+        // table/partition pair.
+        for (InetSocketAddress serverAddr : m_servers) {
+            ExportConnection exportConnection = null;
+            try {
+                exportConnection = new ExportConnection(m_username, m_password, serverAddr, m_sinks);
+                exportConnection.openExportConnection();
+
+                constructExportDataSinks(exportConnection);
+
+                // successfully connected to one server, now rebuild the set of servers in the world
+                m_servers.clear();
+                // add this server as we know it's valid
+                m_servers.add(serverAddr);
+
+                for (String hostname : exportConnection.hosts) {
+                    assert(hostname.contains(":"));
+                    String[] parts = hostname.split(":");
+                    InetSocketAddress addr = new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
+                    m_servers.add(addr);
+                }
+
+                // add this one fully formed connection
+                m_exportConnections.put(serverAddr, exportConnection);
+
+                // exit out of the loop
+                break;
+            }
+            catch (IOException e) {
+                if (exportConnection != null)
+                    exportConnection.closeExportConnection();
+                m_sinks.clear();
+                m_exportConnections.clear();
+                if (e.getMessage().contains("Authentication")) {
+                    throw e;
+                }
+            }
+        }
+
+        if (m_exportConnections.size() == 0) {
+            return false;
+        }
+        assert (m_exportConnections.size() == 1);
+
+        // connect to the rest of the servers
+        // try three rounds with a pause in the middle of each
+        for (int tryCount = 0; tryCount < 3; tryCount++) {
+            for (InetSocketAddress addr : m_servers) {
+                if (m_exportConnections.containsKey(addr)) continue;
+                ExportConnection connection = connectToServer(addr);
+                if (connection != null)
+                    m_exportConnections.put(addr, connection);
+            }
+
+            // check for successful connection to all servers
+            if (m_servers.size() != m_exportConnections.size())
+                break;
+
+            // sleep for 1/4 second
+            try { Thread.sleep(250); } catch (InterruptedException e) {}
+        }
+
+        // check for non-complete connection and roll back if so
+        if (m_servers.size() != m_exportConnections.size()) {
+            m_sinks.clear();
+            for (ExportConnection ec : m_exportConnections.values())
+                ec.closeExportConnection();
+            m_exportConnections.clear();
+            return false;
+        }
+
+        m_connected.set(true);
+        return true;
+    }
+
     /**
      * Perform one iteration of Export Client work.
+     * Connect if not connected.
      * Override if the specific client has strange workflow/termination conditions.
      * Largely for Export clients used for test.
      */
-    public int work()
+    protected int work() throws IOException
     {
-        int offered_msgs = 0;
+        int offeredMsgs = 0;
+
+        if (!m_connected.get()) {
+            if (!connect())
+                return 0;
+        }
 
         // work all the ExportDataSinks.
         // process incoming data and generate outgoing ack/polls
-        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values()) {
-            for (ExportDataSink work_sink : part_map.values()) {
-                work_sink.work();
+        for (HashMap<Integer, ExportDataSink> partMap : m_sinks.values()) {
+            for (ExportDataSink sink : partMap.values()) {
+                sink.work();
             }
         }
 
         // drain all the received connection messages into the
         // RX queues for the ExportDataSinks and push all acks/polls
         // to the network.
-        for (ExportConnection el_connection : m_exportConnections.values()) {
-            offered_msgs += el_connection.work();
+        for (ExportConnection connection : m_exportConnections.values()) {
+            offeredMsgs += connection.work();
         }
 
-        return offered_msgs;
+        // make sure still connected
+        if (!checkConnections()) {
+            disconnect();
+            throw new IOException("Disconnected from one or more export servers");
+        }
+
+        return offeredMsgs;
     }
 
-    @Override
-    public void run() {
-        boolean connected = true;
+    protected long getNextPollDuration(long currentDuration, boolean isIdle) {
+        // milliseconds to increment wait time when idle
+        final long pollBackOffAddend = 100;
+        // factor by which poll_wait_time should be reduced when not idle.
+        final long pollAccelerateFactor = 2;
+        // maximum value of poll_wait_time
+        final long maxPollWaitTime = 2000;
+
+        if (!isIdle) {
+            return currentDuration / pollAccelerateFactor;
+        }
+        else {
+            if (currentDuration < maxPollWaitTime) {
+                return currentDuration + pollBackOffAddend;
+            }
+            return maxPollWaitTime;
+        }
+            }
+
+    public void run() throws IOException {
+        run(0);
+            }
+
+    public void run(long timeout) throws IOException {
 
         // current wait time between polls
-        int poll_wait_time = 0;
+        long pollTimeMS = 0;
 
-        // maximum value of poll_wait_time
-        final int max_poll_wait_time = 2000;
+        long now = System.currentTimeMillis();
 
-        // milliseconds to increment wait time when idle
-        final int poll_back_off_addend = 100;
+        while ((System.currentTimeMillis() - now) < timeout) {
 
-        // factor by which poll_wait_time should be reduced when not idle.
-        final int poll_accelerate_factor = 2;
-
-        while (connected) {
-            int offered_msgs = work();
-            connected = checkConnections();
-
-            // adjust idle loop wait time.
-            if (offered_msgs > 0) {
-                poll_wait_time = (int) Math.floor(poll_wait_time / poll_accelerate_factor);
-            }
-            else if (poll_wait_time < max_poll_wait_time) {
-                poll_wait_time += poll_back_off_addend;
-            }
-            if (poll_wait_time > 0) {
+            // suck down some export data (if available)
+            int offeredMsgs = 0;
                 try {
-                    Thread.sleep(poll_wait_time);
+                offeredMsgs = work();
                 }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            // pause for the right amount of time
+            pollTimeMS = getNextPollDuration(pollTimeMS, offeredMsgs == 0);
+            if (pollTimeMS > 0) {
+                try { Thread.sleep(pollTimeMS); }
                 catch (InterruptedException e) {}
             }
-
         }
     }
 }

@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -358,7 +357,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.setHasLocalServer(false);
 
         cluster.startUp();
-        ClientResponse response;
         Client client;
 
         client = ClientFactory.createClient(m_cconfig);
@@ -490,10 +488,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
 
         public TrivialExportClient() throws IOException {
-            ArrayList<InetSocketAddress> servers = new ArrayList<InetSocketAddress>();
-            servers.add(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
-            super.setServerInfo(servers);
-            connectToExportServers(null, null);
+            super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+            super.addCredentials(null, null);
+            super.connect();
         }
 
         @Override
@@ -502,7 +499,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
 
         @Override
-        public int work() {
+        public int work() throws IOException {
             super.work();
             for (ExportConnection ec : m_exportConnections.values()) {
                 System.out.printf("Export Conn Offset: %d\n", ec.getLastAckOffset());
