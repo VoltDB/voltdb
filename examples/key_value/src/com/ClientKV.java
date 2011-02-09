@@ -58,6 +58,11 @@ public class ClientKV {
     public static long get_value_compressed_bytes = 0;
     public static long get_value_uncompressed_bytes = 0;
 
+    public static long cycle_min_execution_milliseconds = 999999999l;
+    public static long cycle_max_execution_milliseconds = -1l;
+    public static long cycle_tot_execution_milliseconds = 0;
+    public static long cycle_tot_executions_latency = 0;
+
     public static boolean checkLatency = false;
 
     public static final VoltLogger m_logger = new VoltLogger(ClientKV.class.getName());
@@ -126,14 +131,25 @@ public class ClientKV {
             long execution_time = clientRoundtrip;
 
             tot_executions_latency++;
+            cycle_tot_executions_latency++;
+
             tot_execution_milliseconds += execution_time;
+            cycle_tot_execution_milliseconds += execution_time;
 
             if (execution_time < min_execution_milliseconds) {
                 min_execution_milliseconds = execution_time;
             }
 
+            if (execution_time < cycle_min_execution_milliseconds) {
+                cycle_min_execution_milliseconds = execution_time;
+            }
+
             if (execution_time > max_execution_milliseconds) {
                 max_execution_milliseconds = execution_time;
+            }
+
+            if (execution_time > cycle_max_execution_milliseconds) {
+                cycle_max_execution_milliseconds = execution_time;
             }
 
             // change latency to bucket
@@ -146,7 +162,8 @@ public class ClientKV {
     }
 
     public static void main(String args[]) {
-        long transactions_per_second = Long.valueOf(args[0]);
+        long transactions_per_second_requested = Long.valueOf(args[0]);
+        long transactions_per_second = transactions_per_second_requested;
         long transactions_per_milli = transactions_per_second / 1000l;
         long client_feedback_interval_secs = Long.valueOf(args[1]);
         long test_duration_secs = Long.valueOf(args[2]);
@@ -160,12 +177,26 @@ public class ClientKV {
         int percent_gets = Integer.valueOf(args[9]);
         final int behavior_type = Integer.valueOf(args[10]);
 
+        boolean use_auto_tuning = Boolean.valueOf(args[11]) && (transactions_per_second > 1000);
+        double auto_tuning_target_latency_millis = Double.valueOf(args[12]);
+        double auto_tuning_adjustment_rate = Double.valueOf(args[13]);
+        if (auto_tuning_adjustment_rate > 1.0) {
+            auto_tuning_adjustment_rate = auto_tuning_adjustment_rate / 100.0;
+        }
+        long auto_tuning_interval_secs = Long.valueOf(args[14]);
+
         long thisOutstanding = 0;
         long lastOutstanding = 0;
         long put_value_compressed_bytes = 0;
         long put_value_uncompressed_bytes = 0;
 
         m_logger.info(String.format("Submitting %,d SP Calls/sec",transactions_per_second));
+        if (use_auto_tuning) {
+            m_logger.info(String.format("Auto-Tuning = ON"));
+            m_logger.info(String.format(" - Tuning interval = %,d second(s)", auto_tuning_interval_secs));
+            m_logger.info(String.format(" - Target latency = %.2f ms", auto_tuning_target_latency_millis));
+            m_logger.info(String.format(" - Adjustment rate = %.2f%%", auto_tuning_adjustment_rate * 100.0));
+        }
         m_logger.info(String.format("Feedback interval = %,d second(s)",client_feedback_interval_secs));
         m_logger.info(String.format("Running for %,d second(s)",test_duration_secs));
         m_logger.info(String.format("Latency not recorded for %d second(s)",lag_latency_seconds));
@@ -212,7 +243,9 @@ public class ClientKV {
         long endTime = startTime + (1000l * test_duration_secs);
         long currentTime = startTime;
         long lastFeedbackTime = startTime;
+        long lastAutoTuningTime = startTime;
         long num_sp_calls = 0;
+        long cycle_num_sp_calls = 0;
         long startRecordingLatency = startTime + lag_latency_millis;
 
         long num_gets = 0;
@@ -421,6 +454,11 @@ public class ClientKV {
         latency_counter = new long[] {0,0,0,0,0,0,0,0,0};
         checkLatency = false;
 
+        cycle_min_execution_milliseconds = 999999999l;
+        cycle_max_execution_milliseconds = -1l;
+        cycle_tot_execution_milliseconds = 0;
+        cycle_tot_executions_latency = 0;
+
         transactions_this_second = 0;
         last_millisecond = System.currentTimeMillis();
         this_millisecond = System.currentTimeMillis();
@@ -429,7 +467,9 @@ public class ClientKV {
         endTime = startTime + (1000l * test_duration_secs);
         currentTime = startTime;
         lastFeedbackTime = startTime;
+        lastAutoTuningTime = startTime;
         num_sp_calls = 0;
+        cycle_num_sp_calls = 0;
         startRecordingLatency = startTime + lag_latency_millis;
 
         num_gets = 0;
@@ -440,6 +480,7 @@ public class ClientKV {
         m_logger.info(String.format("******************************************************************************************************************************"));
         while (currentTime < endTime) {
             num_sp_calls++;
+            cycle_num_sp_calls++;
 
             // determine if this is a get or a put
             int getTest = rand.nextInt(99)+1;
@@ -506,12 +547,54 @@ public class ClientKV {
                 checkLatency = true;
             }
 
+            if (use_auto_tuning && (currentTime >= (lastAutoTuningTime + (auto_tuning_interval_secs * 1000)))) {
+                synchronized(lockObject) {
+
+                    long cycle_elapsedTimeMillis2 = System.currentTimeMillis()-lastAutoTuningTime;
+                    float cycle_elapsedTimeSec2 = cycle_elapsedTimeMillis2/1000F;
+
+                    lastAutoTuningTime = currentTime;
+
+                    // Only adjust if both the cycle and total was below request - avoid *some* random spike from downgrading the system too much
+                    if ((((double) cycle_tot_execution_milliseconds / (double) cycle_tot_executions_latency) > auto_tuning_target_latency_millis) && (((double) tot_execution_milliseconds / (double) tot_executions_latency) > auto_tuning_target_latency_millis))
+                    {
+                        long new_transactions_per_second = (((long)(Math.min(cycle_num_sp_calls / cycle_elapsedTimeSec2,transactions_per_second) * auto_tuning_adjustment_rate))/1000l)*1000l;
+                        String last_tuning_warning = "";
+                        if ((new_transactions_per_second <= 1000) || (new_transactions_per_second == transactions_per_second)) {
+                            use_auto_tuning = false;
+                            last_tuning_warning = " | WARNING: Minimum load boundary reached.  Auto-Tuning De-activated";
+                        }
+
+                        m_logger.info(String.format("[%s] Auto-Tuning | Observed: %,.2f SPC/sec | Latency: min = %d | max = %d | avg = %.2f | Adjusting to %,d SPC/s%s"
+                                                   , new Date().toString()
+                                                   , (cycle_num_sp_calls / cycle_elapsedTimeSec2)
+                                                   , cycle_min_execution_milliseconds
+                                                   , cycle_max_execution_milliseconds
+                                                   , ((double) cycle_tot_execution_milliseconds / (double) cycle_tot_executions_latency)
+                                                   , new_transactions_per_second
+                                                   , last_tuning_warning
+                                                   )
+                                     );
+                        transactions_per_second = new_transactions_per_second;
+                        transactions_per_milli = transactions_per_second/1000l;
+                    }
+
+                    cycle_num_sp_calls = 0;
+
+                    cycle_min_execution_milliseconds = 999999999l;
+                    cycle_max_execution_milliseconds = -1l;
+                    cycle_tot_execution_milliseconds = 0;
+                    cycle_tot_executions_latency = 0;
+                }
+            }
             if (currentTime >= (lastFeedbackTime + (client_feedback_interval_secs * 1000))) {
                 synchronized(lockObject) {
+
                     lastFeedbackTime = currentTime;
 
                     long elapsedTimeMillis2 = System.currentTimeMillis()-startTime;
                     float elapsedTimeSec2 = elapsedTimeMillis2/1000F;
+
 
                     if (tot_executions_latency == 0) {
                         tot_executions_latency = 1;
@@ -544,9 +627,22 @@ public class ClientKV {
                     }
 
                     String currentDate = new Date().toString();
-                    m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency), readMBPerSecond, writeMBPerSecond));
-
+                    m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f"
+                                               , currentDate
+                                               , percentComplete
+                                               , num_sp_calls
+                                               , (num_sp_calls / elapsedTimeSec2)
+                                               , thisOutstanding
+                                               , (thisOutstanding - lastOutstanding)
+                                               , min_execution_milliseconds
+                                               , max_execution_milliseconds
+                                               , ((double) tot_execution_milliseconds / (double) tot_executions_latency)
+                                               , readMBPerSecond
+                                               , writeMBPerSecond
+                                               )
+                                 );
                     lastOutstanding = thisOutstanding;
+
                 }
             }
         }
@@ -591,7 +687,12 @@ public class ClientKV {
         m_logger.info(String.format(" -   Latency 150ms - 175ms = %,d",latency_counter[6]));
         m_logger.info(String.format(" -   Latency 175ms - 200ms = %,d",latency_counter[7]));
         m_logger.info(String.format(" -   Latency 200ms+        = %,d",latency_counter[8]));
-
+        if (transactions_per_second < transactions_per_second_requested) {
+            m_logger.info(String.format("*************************************************************************"));
+            m_logger.info(String.format("Auto-Tuning Results"));
+            m_logger.info(String.format("*************************************************************************"));
+            m_logger.info(String.format(" - Optimal Load: %,d SPC/s to match/approach desired %.2f ms Latency", transactions_per_second, auto_tuning_target_latency_millis));
+        }
         try {
             voltclient.close();
         } catch (Exception e) {
