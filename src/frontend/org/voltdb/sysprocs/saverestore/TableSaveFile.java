@@ -211,7 +211,7 @@ public class TableSaveFile
             for (int ii = 0; ii < 4; ii++) {
                 m_versionNum[ii] = fd.readInt();
             }
-            m_createTime = fd.readLong();
+            m_txnId = fd.readLong();
             m_hostId = fd.readInt();
             m_hostname = fd.readString();
             m_clusterName = fd.readString();
@@ -293,8 +293,8 @@ public class TableSaveFile
         return m_completed;
     }
 
-    public long getCreateTime() {
-        return m_createTime;
+    public long getTxnId() {
+        return m_txnId;
     }
 
     public void close() throws IOException {
@@ -405,7 +405,7 @@ public class TableSaveFile
     private final boolean m_isReplicated;
     private final int m_partitionIds[];
     private final int m_totalPartitions;
-    private final long m_createTime;
+    private final long m_txnId;
     private boolean m_hasMoreChunks = true;
     private static ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
     private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();

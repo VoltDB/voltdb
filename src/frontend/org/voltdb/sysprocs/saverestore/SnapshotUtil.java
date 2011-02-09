@@ -62,7 +62,7 @@ public class SnapshotUtil {
      */
     public static void
         recordSnapshotTableList(
-            long snapshotTime,
+            long txnId,
             String path,
             String nonce,
             List<Table> tables) throws IOException {
@@ -74,7 +74,7 @@ public class SnapshotUtil {
         }
         FileOutputStream fos = new FileOutputStream(f);
         StringWriter sw = new StringWriter();
-        sw.append(Long.toString(snapshotTime));
+        sw.append(Long.toString(txnId));
         if (!tables.isEmpty()) {
             sw.append(',');
         }
@@ -307,11 +307,11 @@ public class SnapshotUtil {
                         System.err.println("Error: Unable to process digest " + f.getPath());
                         continue;
                     }
-                    Long snapshotTime = result.getFirst();
-                    Snapshot s = snapshots.get(snapshotTime);
+                    Long snapshotTxnId = result.getFirst();
+                    Snapshot s = snapshots.get(snapshotTxnId);
                     if (s == null) {
                         s = new Snapshot();
-                        snapshots.put(snapshotTime, s);
+                        snapshots.put(snapshotTxnId, s);
                     }
                     TreeSet<String> tableSet = new TreeSet<String>();
                     tableSet.addAll(result.getSecond());
@@ -333,10 +333,10 @@ public class SnapshotUtil {
                             }
                         }
                         partitionIds.removeAll(saveFile.getCorruptedPartitionIds());
-                        Snapshot s = snapshots.get(saveFile.getCreateTime());
+                        Snapshot s = snapshots.get(saveFile.getTxnId());
                         if (s == null) {
                             s = new Snapshot();
-                            snapshots.put(saveFile.getCreateTime(), s);
+                            snapshots.put(saveFile.getTxnId(), s);
                         }
 
                         TableFiles tableFiles = s.m_tableFiles.get(saveFile.getTableName());
@@ -372,12 +372,15 @@ public class SnapshotUtil {
      * @param snapshotTime
      * @param snapshot
      */
-    public static Pair<Boolean, String> generateSnapshotReport(Long snapshotTime, Snapshot snapshot) {
+    public static Pair<Boolean, String> generateSnapshotReport(Long snapshotTxnId, Snapshot snapshot) {
         CharArrayWriter caw = new CharArrayWriter();
         PrintWriter pw = new PrintWriter(caw);
         boolean snapshotConsistent = true;
         String indentString = "";
-        pw.println(indentString + "Date: " + new Date(snapshotTime));
+        pw.println(indentString + "TxnId: " + snapshotTxnId);
+        pw.println(indentString + "Date: " +
+                new Date(
+                        org.voltdb.TransactionIdManager.getTimestampFromTransactionId(snapshotTxnId)));
         pw.println(indentString + "Digests:");
         indentString = "\t";
         TreeSet<String> digestTablesSeen = new TreeSet<String>();

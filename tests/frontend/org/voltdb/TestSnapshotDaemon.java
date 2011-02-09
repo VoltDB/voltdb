@@ -228,6 +228,7 @@ public class TestSnapshotDaemon {
                 resultTable.addRow(
                         "/tmp",
                         "woobie_",
+                        0,
                         1,
                         0,
                         "",
@@ -284,6 +285,7 @@ public class TestSnapshotDaemon {
                 resultTable.addRow(
                         "/tmp",
                         "woobie_2",
+                        0,
                         2,
                         0,
                         "",
@@ -293,6 +295,7 @@ public class TestSnapshotDaemon {
                 resultTable.addRow(
                         "/tmp",
                         "woobie_5",
+                        0,
                         5,
                         0,
                         "",
@@ -302,6 +305,7 @@ public class TestSnapshotDaemon {
                 resultTable.addRow(
                         "/tmp",
                         "woobie_3",
+                        0,
                         3,
                         0,
                         "",

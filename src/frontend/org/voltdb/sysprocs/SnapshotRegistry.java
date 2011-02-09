@@ -36,13 +36,13 @@ public class SnapshotRegistry {
 
                 @Override
                 public int compare(Snapshot o1, Snapshot o2) {
-                    return Long.valueOf(o1.timeStarted).compareTo(o2.timeStarted);
+                    return Long.valueOf(o1.txnId).compareTo(o2.txnId);
                 }
 
             });
 
     public static class Snapshot {
-        public final long timeStarted;
+        public final long txnId;
         public final long timeFinished;
 
         public final String path;
@@ -53,9 +53,9 @@ public class SnapshotRegistry {
 
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
-        private Snapshot(long startTime, int hostId, String path, String nonce,
+        private Snapshot(long txnId, int hostId, String path, String nonce,
                          org.voltdb.catalog.Table tables[]) {
-            timeStarted = startTime;
+            this.txnId = txnId;
             this.path = path;
             this.nonce = nonce;
             timeFinished = 0;
@@ -73,7 +73,7 @@ public class SnapshotRegistry {
         }
 
         private Snapshot(Snapshot incomplete, long timeFinished) {
-            timeStarted = incomplete.timeStarted;
+            txnId = incomplete.txnId;
             path = incomplete.path;
             nonce = incomplete.nonce;
             this.timeFinished = timeFinished;
@@ -137,8 +137,8 @@ public class SnapshotRegistry {
         }
     }
 
-    public static synchronized Snapshot startSnapshot(long startTime, int hostId, String path, String nonce, org.voltdb.catalog.Table tables[]) {
-        final Snapshot s = new Snapshot(startTime, hostId, path, nonce, tables);
+    public static synchronized Snapshot startSnapshot(long txnId, int hostId, String path, String nonce, org.voltdb.catalog.Table tables[]) {
+        final Snapshot s = new Snapshot(txnId, hostId, path, nonce, tables);
 
         m_snapshots.add(s);
         if (m_snapshots.size() > m_maxStatusHistory) {

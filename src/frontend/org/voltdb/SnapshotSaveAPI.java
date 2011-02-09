@@ -58,7 +58,7 @@ public class SnapshotSaveAPI
      * @return VoltTable describing the results of the snapshot attempt
      */
     public VoltTable startSnapshotting(String file_path, String file_nonce, byte block,
-            long startTime, SystemProcedureExecutionContext context, String hostname)
+            long txnId, SystemProcedureExecutionContext context, String hostname)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
@@ -86,7 +86,7 @@ public class SnapshotSaveAPI
             }
 
             if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                createSetup(file_path, file_nonce, startTime, context, hostname, result);
+                createSetup(file_path, file_nonce, txnId, context, hostname, result);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -147,7 +147,7 @@ public class SnapshotSaveAPI
 
 
     private void createSetup(String file_path, String file_nonce,
-            long startTime, SystemProcedureExecutionContext context,
+            long txnId, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
@@ -166,14 +166,14 @@ public class SnapshotSaveAPI
                 final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
 
                 SnapshotUtil.recordSnapshotTableList(
-                        startTime,
+                        txnId,
                         file_path,
                         file_nonce,
                         tables);
                 final AtomicInteger numTables = new AtomicInteger(tables.size());
                 final SnapshotRegistry.Snapshot snapshotRecord =
                     SnapshotRegistry.startSnapshot(
-                            startTime,
+                            txnId,
                             context.getExecutionSite().getCorrespondingHostId(),
                             file_path,
                             file_nonce,
@@ -194,7 +194,7 @@ public class SnapshotSaveAPI
                                     table,
                                     context.getSite().getHost(),
                                     context.getCluster().getPartitions().size(),
-                                    startTime);
+                                    txnId);
                         targets.add(sdt);
                         final SnapshotDataTarget sdtFinal = sdt;
                         final Runnable onClose = new Runnable() {
@@ -216,7 +216,7 @@ public class SnapshotSaveAPI
                                     final SnapshotRegistry.Snapshot completed =
                                         SnapshotRegistry.finishSnapshot(snapshotRecord);
                                     final double duration =
-                                        (completed.timeFinished - completed.timeStarted) / 1000.0;
+                                        (completed.timeFinished - org.voltdb.TransactionIdManager.getTimestampFromTransactionId(completed.txnId)) / 1000.0;
                                     HOST_LOG.info(
                                             "Snapshot " + snapshotRecord.nonce + " finished at " +
                                              completed.timeFinished + " and took " + duration
@@ -346,7 +346,7 @@ public class SnapshotSaveAPI
             Table table,
             Host h,
             int numPartitions,
-            long createTime)
+            long txnId)
     throws IOException
     {
         return new DefaultSnapshotDataTarget(f,
@@ -358,7 +358,7 @@ public class SnapshotSaveAPI
                                              table.getIsreplicated(),
                                              SnapshotUtil.getPartitionsOnHost(context, h),
                                              CatalogUtil.getVoltTable(table),
-                                             createTime);
+                                             txnId);
     }
 
 }

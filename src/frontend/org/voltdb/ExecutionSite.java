@@ -146,6 +146,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
     private final RestrictedPriorityQueue m_transactionQueue;
 
+    private TransactionState m_currentTransactionState;
+
     // The time in ms since epoch of the last call to tick()
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
@@ -567,6 +569,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         public Site getSite();
         public ExecutionEngine getExecutionEngine();
         public long getLastCommittedTxnId();
+        public long getCurrentTxnId();
         public long getNextUndo();
         public ExecutionSite getExecutionSite();
     }
@@ -582,6 +585,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         public ExecutionEngine getExecutionEngine() { return ee; }
         @Override
         public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
+        @Override
+        public long getCurrentTxnId()         { return m_currentTransactionState.txnId; }
         @Override
         public long getNextUndo()                   { return getNextUndoToken(); }
         @Override
@@ -894,6 +899,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 }
 
                 TransactionState currentTxnState = m_transactionQueue.poll();
+                m_currentTransactionState = currentTxnState;
                 if (currentTxnState == null) {
                     // poll the messaging layer for a while as this site has nothing to do
                     // this will likely have a message/several messages immediately in a heavy workload

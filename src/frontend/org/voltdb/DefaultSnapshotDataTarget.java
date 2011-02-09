@@ -113,7 +113,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final boolean isReplicated,
             final int partitionIds[],
             final VoltTable schemaTable,
-            final long createTime) throws IOException {
+            final long txnId) throws IOException {
             this(
                 file,
                 hostId,
@@ -124,7 +124,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 isReplicated,
                 partitionIds,
                 schemaTable,
-                createTime,
+                txnId,
                 new int[] { 0, 0, 0, 0 });
     }
 
@@ -138,7 +138,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final boolean isReplicated,
             final int partitionIds[],
             final VoltTable schemaTable,
-            final long createTime,
+            final long txnId,
             int version[]
             ) throws IOException {
         String hostname = ConnectionUtil.getHostnameOrAddress();
@@ -153,7 +153,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         for (int ii = 0; ii < 4; ii++) {
             fs.writeInt(version[ii]);//version
         }
-        fs.writeLong(createTime);
+        fs.writeLong(txnId);
         fs.writeInt(hostId);
         fs.writeString(hostname);
         fs.writeString(clusterName);

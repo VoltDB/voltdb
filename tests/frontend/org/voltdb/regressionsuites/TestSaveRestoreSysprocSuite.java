@@ -499,7 +499,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
         assertNotNull(statusResults);
         assertEquals( 1, statusResults.length);
-        assertEquals( 13, statusResults[0].getColumnCount());
+        assertEquals( 14, statusResults[0].getColumnCount());
         assertTrue(statusResults[0].advanceRow());
         assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
         assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
@@ -523,7 +523,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         scanResults = client.callProcedure("@SnapshotScan", TMPDIR).getResults();
         assertNotNull(scanResults);
         assertEquals( 3, scanResults.length);
-        assertEquals( 8, scanResults[0].getColumnCount());
+        assertEquals( 9, scanResults[0].getColumnCount());
         assertTrue(scanResults[0].getRowCount() >= 1);
         assertTrue(scanResults[0].advanceRow());
         /*
@@ -558,7 +558,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         scanResults = client.callProcedure("@SnapshotScan", TMPDIR).getResults();
         assertNotNull(scanResults);
         assertEquals( 3, scanResults.length);
-        assertEquals( 8, scanResults[0].getColumnCount());
+        assertEquals( 9, scanResults[0].getColumnCount());
         assertTrue(scanResults[0].getRowCount() >= 1);
         assertTrue(scanResults[0].advanceRow());
         count = 0;
@@ -746,7 +746,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
         assertNotNull(statusResults);
         assertEquals( 1, statusResults.length);
-        assertEquals( 13, statusResults[0].getColumnCount());
+        assertEquals( 14, statusResults[0].getColumnCount());
         assertEquals( 7, statusResults[0].getRowCount());
         assertTrue(statusResults[0].advanceRow());
         assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));

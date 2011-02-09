@@ -46,7 +46,7 @@ import org.voltdb.utils.DBBPool.BBContainer;
 public class TestTableSaveFile extends TestCase {
     private static int[] VERSION = { 0, 1, 2, 3 };
     private static int HOST_ID = 3;
-    private static long CREATE_TIME = 2315243;
+    private static long TXN_ID = org.voltdb.TransactionIdManager.makeIdFromComponents(24, 32, 96);
     private static String CLUSTER_NAME = "TEST_CLUSTER";
     private static String DATABASE_NAME = "TEST_DATABASE";
     private static String TABLE_NAME = "TEST_TABLE";
@@ -113,7 +113,7 @@ public class TestTableSaveFile extends TestCase {
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
                 TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, table,
-                CREATE_TIME, VERSION);
+                TXN_ID, VERSION);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
                 columnInfo.length);
@@ -141,7 +141,7 @@ public class TestTableSaveFile extends TestCase {
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
                 TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, vt,
-                CREATE_TIME, VERSION);
+                TXN_ID, VERSION);
         dsdt.close();
 
         FileInputStream fis = new FileInputStream(f);
@@ -169,7 +169,7 @@ public class TestTableSaveFile extends TestCase {
         for (int i = 0; i < 4; i++) {
             assertEquals(VERSION[i], savefile.getVersionNumber()[i]);
         }
-        assertEquals(CREATE_TIME, savefile.getCreateTime());
+        assertEquals(TXN_ID, savefile.getTxnId());
         assertEquals(HOST_ID, savefile.getHostId());
         assertEquals(CLUSTER_NAME, savefile.getClusterName());
         assertEquals(DATABASE_NAME, savefile.getDatabaseName());

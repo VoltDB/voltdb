@@ -119,10 +119,10 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[3] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
-            final long startTime = (Long)params.toArray()[2];
+            final long txnId = (Long)params.toArray()[2];
             byte block = (Byte)params.toArray()[3];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
-            VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce, block, startTime, context, hostname);
+            VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce, block, txnId, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -328,7 +328,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
         performQuiesce();
 
-        results = performSnapshotCreationWork( path, nonce, startTime, (byte)block);
+        results = performSnapshotCreationWork( path, nonce, ctx.getCurrentTxnId(), (byte)block);
 
         final long finishTime = System.currentTimeMillis();
         final long duration = finishTime - startTime;
@@ -367,7 +367,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
     private final VoltTable[] performSnapshotCreationWork(String filePath,
             String fileNonce,
-            long startTime,
+            long txnId,
             byte block)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
@@ -380,7 +380,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, startTime, block);
+        params.setParameters(filePath, fileNonce, txnId, block);
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files

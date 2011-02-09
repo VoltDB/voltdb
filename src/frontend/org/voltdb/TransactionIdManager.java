@@ -186,7 +186,7 @@ public class TransactionIdManager {
         return lastTxnId;
     }
 
-    static long makeIdFromComponents(long ts, long seqNo, long initiatorId) {
+    public static long makeIdFromComponents(long ts, long seqNo, long initiatorId) {
         // compute the time in millis since VOLT_EPOCH
         long txnId = ts - VOLT_EPOCH;
         // verify all fields are the right size

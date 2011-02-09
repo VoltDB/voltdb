@@ -115,6 +115,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                                    "",
                                    "",
                                    0,
+                                   0,
                                    "",
                                    "FALSE",
                                    0,
@@ -153,7 +154,9 @@ public class SnapshotScan extends VoltSystemProcedure {
                                                    hostname,
                                                    f.getParent(),
                                                    f.getName(),
-                                                   savefile.getCreateTime(),
+                                                   savefile.getTxnId(),
+                                                   org.voltdb.TransactionIdManager.getTimestampFromTransactionId(
+                                                           savefile.getTxnId()),
                                                    savefile.getTableName(),
                                                    savefile.getCompleted() ? "TRUE" : "FALSE",
                                                                            f.length(),
@@ -178,6 +181,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                                            hostname,
                                            f.getParent(),
                                            f.getName(),
+                                           0L,
                                            f.lastModified(),
                                            "",
                                            "FALSE",
@@ -339,12 +343,13 @@ public class SnapshotScan extends VoltSystemProcedure {
     }
 
     private VoltTable constructFragmentResultsTable() {
-        ColumnInfo[] result_columns = new ColumnInfo[14];
+        ColumnInfo[] result_columns = new ColumnInfo[15];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo(CNAME_HOST_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("TXNID", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("CREATED", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("COMPLETED", VoltType.STRING);
@@ -375,6 +380,7 @@ public class SnapshotScan extends VoltSystemProcedure {
     public static final ColumnInfo clientColumnInfo[] = new ColumnInfo[] {
             new ColumnInfo("PATH", VoltType.STRING),
             new ColumnInfo("NONCE", VoltType.STRING),
+            new ColumnInfo("TXNID", VoltType.BIGINT),
             new ColumnInfo("CREATED", VoltType.BIGINT),
             new ColumnInfo("SIZE", VoltType.BIGINT),
             new ColumnInfo("TABLES_REQUIRED", VoltType.STRING),
@@ -442,6 +448,7 @@ public class SnapshotScan extends VoltSystemProcedure {
     }
 
     private static class Snapshot {
+        private final long m_txnId;
         private final long m_createTime;
         private final String m_path;
         private final String m_nonce;
@@ -452,6 +459,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             assert(r.getString("RESULT").equals("SUCCESS"));
             assert("TRUE".equals(r.getString("READABLE")));
             assert("TRUE".equals(r.getString("COMPLETED")));
+            m_txnId = r.getLong("TXNID");
             m_createTime = r.getLong("CREATED");
             Table t = new Table(r);
             m_tables.put( t.m_name, t);
@@ -545,10 +553,11 @@ public class SnapshotScan extends VoltSystemProcedure {
         }
 
         private Object[] asRow() {
-            Object row[] = new Object[8];
+            Object row[] = new Object[9];
             int ii = 0;
             row[ii++] = m_path;
             row[ii++] = m_nonce;
+            row[ii++] = m_txnId;
             row[ii++] = m_createTime;
             row[ii++] = size();
             row[ii++] = tablesRequired();

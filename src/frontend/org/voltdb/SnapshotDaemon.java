@@ -159,17 +159,17 @@ class SnapshotDaemon {
     private class Snapshot implements Comparable<Snapshot> {
         private final String path;
         private final String nonce;
-        private final Long created;
+        private final Long txnId;
 
-        private Snapshot (String path, String nonce, Long created) {
+        private Snapshot (String path, String nonce, Long txnId) {
             this.path = path;
             this.nonce = nonce;
-            this.created = created;
+            this.txnId = txnId;
         }
 
         @Override
         public int compareTo(Snapshot o) {
-            return created.compareTo(o.created);
+            return txnId.compareTo(o.txnId);
         }
     }
 
@@ -397,7 +397,7 @@ class SnapshotDaemon {
         assert(results.length == 3);
 
         final VoltTable snapshots = results[0];
-        assert(snapshots.getColumnCount() == 8);
+        assert(snapshots.getColumnCount() == 9);
 
         final File myPath = new File(m_path);
         while (snapshots.advanceRow()) {
@@ -406,8 +406,8 @@ class SnapshotDaemon {
             if (pathFile.equals(myPath)) {
                 final String nonce = snapshots.getString("NONCE");
                 if (nonce.startsWith(m_prefixAndSeparator)) {
-                    final Long created = snapshots.getLong("CREATED");
-                    m_snapshots.add(new Snapshot(path, nonce, created));
+                    final Long txnId = snapshots.getLong("TXNID");
+                    m_snapshots.add(new Snapshot(path, nonce, txnId));
                 }
             }
         }

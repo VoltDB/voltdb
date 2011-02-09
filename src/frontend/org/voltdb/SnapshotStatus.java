@@ -82,6 +82,7 @@ public class SnapshotStatus extends StatsSource {
         columns.add(new ColumnInfo("PATH", VoltType.STRING));
         columns.add(new ColumnInfo("FILENAME", VoltType.STRING));
         columns.add(new ColumnInfo("NONCE", VoltType.STRING));
+        columns.add(new ColumnInfo("TXNID", VoltType.BIGINT));
         columns.add(new ColumnInfo("START_TIME", VoltType.BIGINT));
         columns.add(new ColumnInfo("END_TIME", VoltType.BIGINT));
         columns.add(new ColumnInfo("SIZE", VoltType.BIGINT));
@@ -98,8 +99,10 @@ public class SnapshotStatus extends StatsSource {
         Table t = p.getSecond();
         double duration = 0;
         double throughput = 0;
+        long timeStarted = org.voltdb.TransactionIdManager.getTimestampFromTransactionId(s.txnId);
         if (s.timeFinished != 0) {
-            duration = (s.timeFinished - s.timeStarted) / 1000.0;
+            duration =
+                (s.timeFinished - timeStarted) / 1000.0;
             throughput = (s.bytesWritten / (1024.0 * 1024.0)) / duration;
         }
 
@@ -107,7 +110,8 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("PATH")] = s.path;
         rowValues[columnNameToIndex.get("FILENAME")] = t.filename;
         rowValues[columnNameToIndex.get("NONCE")] = s.nonce;
-        rowValues[columnNameToIndex.get("START_TIME")] = s.timeStarted;
+        rowValues[columnNameToIndex.get("TXNID")] = s.txnId;
+        rowValues[columnNameToIndex.get("START_TIME")] = timeStarted;
         rowValues[columnNameToIndex.get("END_TIME")] = s.timeFinished;
         rowValues[columnNameToIndex.get("SIZE")] = t.size;
         rowValues[columnNameToIndex.get("DURATION")] = duration;
