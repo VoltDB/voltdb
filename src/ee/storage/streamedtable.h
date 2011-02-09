@@ -68,12 +68,15 @@ class StreamedTable : public Table {
     // undo interface particular to streamed table.
     void undo(size_t mark);
 
+    //Override and say how many bytes are in Java and C++
+    int64_t allocatedTupleMemory() const;
+
   protected:
     // Stats
     voltdb::StreamedTableStats stats_;
     voltdb::TableStats *getTableStats();
 
-    // Used for table stats. Could give a real answer here with some work..
+    // Just say 0
     size_t allocatedBlockCount() const;
 
     TBPtr allocateNextBlock();

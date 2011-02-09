@@ -23,6 +23,7 @@
 
 package org.voltdb.export.processors;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -180,11 +181,12 @@ public class TestRawProcessor extends TestCase {
             VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         }
 
-        public MockExportDataSource(String db, String tableName, boolean isReplicated,
-                                 int partitionId, int siteId, int tableId)
+        public MockExportDataSource(String db, String tableName,
+                                 int partitionId, int siteId, int tableId) throws Exception
         {
-            super(db, tableName, isReplicated, partitionId, siteId, tableId,
-                  m_mockVoltDB.getCatalogContext().database.getTables().get("TableName").getColumns());
+            super(db, tableName, partitionId, siteId, tableId,
+                  m_mockVoltDB.getCatalogContext().database.getTables().get("TableName").getColumns(),
+                  "/tmp");
         }
 
         @Override
@@ -210,9 +212,17 @@ public class TestRawProcessor extends TestCase {
     ExportProtoMessage m, bad_m1, bad_m2, m_postadmin;
 
     @Override
-    public void setUp() {
+    public void setUp() throws Exception {
+
+        File directory = new File("/tmp");
+        for (File f : directory.listFiles()) {
+            if (f.getName().endsWith(".pbd") || f.getName().endsWith(".ad")) {
+                f.delete();
+            }
+        }
+
         rp = new RawProcessor();
-        ds = new MockExportDataSource("db", "table", false, 1, 3, 2);
+        ds = new MockExportDataSource("db", "table", 1, 3, 2);
         rp.addDataSource(ds);
 
         c = new MockConnection();

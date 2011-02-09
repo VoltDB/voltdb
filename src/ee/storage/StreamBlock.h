@@ -31,7 +31,7 @@ namespace voltdb
     class StreamBlock {
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
-            : m_data(data), m_capacity(capacity), m_offset(sizeof(int32_t)),
+            : m_data(data), m_capacity(capacity), m_offset(0),
               m_uso(uso)
         {
         }
@@ -65,10 +65,6 @@ namespace voltdb
             return m_uso;
         }
 
-        void setLengthPrefix() {
-            *reinterpret_cast<int32_t*>(m_data) = static_cast<int32_t>(offset());
-        }
-
         /**
          * Returns the additional offset from uso() to count all the
          * octets in this block.  uso() + offset() will compute the
@@ -76,7 +72,7 @@ namespace voltdb
          * the length prefix.
          */
         const size_t offset() const {
-            return m_offset - 4;
+            return m_offset;
         }
 
         /**
@@ -99,7 +95,7 @@ namespace voltdb
         void truncateTo(size_t mark) {
             // just move offset. pretty easy.
             if (((m_uso + offset()) >= mark ) && (m_uso <= mark)) {
-                m_offset = mark - m_uso + sizeof(int32_t);
+                m_offset = mark - m_uso;
             }
             else {
                 throwFatalException("Attempted Export block truncation past start of block."

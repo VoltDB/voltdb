@@ -299,6 +299,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
+            CatalogUtil.compileDeploymentAndGetCRC( cat, project.getPathToDeployment());
             Connector connector = cat.getClusters().get("cluster").getDatabases().
                 get("database").getConnectors().get("0");
             assertTrue(connector.getEnabled());

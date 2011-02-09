@@ -402,6 +402,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     }
 
     public void testRejoin() throws Exception {
+        //Reset the VoltFile prefix that may have been set by previous tests in this suite
+        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
 

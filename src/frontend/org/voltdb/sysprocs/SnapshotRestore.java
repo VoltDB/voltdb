@@ -63,6 +63,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.sysprocs.saverestore.TableSaveFileState;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.VoltFile;
 
 @ProcInfo (
     singlePartition = false
@@ -700,7 +701,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
         };
 
-        File save_dir = new File(filePath);
+        File save_dir = new VoltFile(filePath);
         File[] save_files = save_dir.listFiles(has_nonce);
         return save_files;
     }
@@ -725,7 +726,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         filename_builder.append("-");
         filename_builder.append(tableName);
         filename_builder.append(".vpt");
-        return new File(m_filePath, new String(filename_builder));
+        return new VoltFile(m_filePath, new String(filename_builder));
     }
 
     private static File getSaveFileForPartitionedTable(
@@ -740,7 +741,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         filename_builder.append("-host_");
         filename_builder.append(originalHostId);
         filename_builder.append(".vpt");
-        return new File(filePath, new String(filename_builder));
+        return new VoltFile(filePath, new String(filename_builder));
     }
 
     private static TableSaveFile getTableSaveFile(

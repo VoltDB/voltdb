@@ -44,6 +44,10 @@ public class SnapshotSave extends VoltSystemProcedure
         SysProcFragmentId.PF_createSnapshotTargets | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_createSnapshotTargetsResults = (int)
         SysProcFragmentId.PF_createSnapshotTargetsResults;
+    private static final int DEP_snapshotSaveQuiesce = (int)
+        SysProcFragmentId.PF_snapshotSaveQuiesce | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    private static final int DEP_snapshotSaveQuiesceResults = (int)
+        SysProcFragmentId.PF_snapshotSaveQuiesceResults;
 
     public static final ColumnInfo nodeResultsColumns[] =
         new ColumnInfo[] {
@@ -83,6 +87,8 @@ public class SnapshotSave extends VoltSystemProcedure
         site.registerPlanFragment(SysProcFragmentId.PF_saveTestResults, this);
         site.registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargets, this);
         site.registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargetsResults, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_snapshotSaveQuiesce, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_snapshotSaveQuiesceResults, this);
     }
 
     @Override
@@ -122,6 +128,17 @@ public class SnapshotSave extends VoltSystemProcedure
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
         {
             return createSnapshotTargetsResults(dependencies);
+        } else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesce) {
+            // tell each site to quiesce
+            context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
+            VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.INTEGER));
+            results.addRow(Integer.parseInt(context.getSite().getTypeName()));
+            return new DependencyPair(DEP_snapshotSaveQuiesce, results);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesceResults) {
+            VoltTable dummy = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+            dummy.addRow(VoltSystemProcedure.STATUS_OK);
+            return new DependencyPair(DEP_snapshotSaveQuiesceResults, dummy);
         }
         assert (false);
         return null;
@@ -309,6 +326,8 @@ public class SnapshotSave extends VoltSystemProcedure
             }
         }
 
+        performQuiesce();
+
         results = performSnapshotCreationWork( path, nonce, startTime, (byte)block);
 
         final long finishTime = System.currentTimeMillis();
@@ -353,8 +372,8 @@ public class SnapshotSave extends VoltSystemProcedure
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
-        // This fragment causes each execution site to confirm the likely
-        // success of writing tables to disk
+        // This fragment causes each execution node to create the files
+        // that will be written to during the snapshot
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_createSnapshotTargets;
         pfs[0].outputDepId = DEP_createSnapshotTargets;
@@ -364,7 +383,7 @@ public class SnapshotSave extends VoltSystemProcedure
         params.setParameters(filePath, fileNonce, startTime, block);
         pfs[0].parameters = params;
 
-        // This fragment aggregates the save-to-disk sanity check results
+        // This fragment aggregates the results of creating those files
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_createSnapshotTargetsResults;
         pfs[1].outputDepId = DEP_createSnapshotTargetsResults;
@@ -374,6 +393,32 @@ public class SnapshotSave extends VoltSystemProcedure
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_createSnapshotTargetsResults);
+        return results;
+    }
+
+    private final VoltTable[] performQuiesce()
+    {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+
+        // This fragment causes each execution site flush export
+        // data to disk with a sync
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_snapshotSaveQuiesce;
+        pfs[0].outputDepId = DEP_snapshotSaveQuiesce;
+        pfs[0].inputDepIds = new int[] {};
+        pfs[0].multipartition = true;
+        pfs[0].parameters = new ParameterSet();
+
+        // This fragment aggregates the quiesce results
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_snapshotSaveQuiesceResults;
+        pfs[1].outputDepId = DEP_snapshotSaveQuiesceResults;
+        pfs[1].inputDepIds = new int[] { DEP_snapshotSaveQuiesce };
+        pfs[1].multipartition = false;
+        pfs[1].parameters = new ParameterSet();
+
+        VoltTable[] results;
+        results = executeSysProcPlanFragments(pfs, DEP_snapshotSaveQuiesceResults);
         return results;
     }
 }

@@ -22,9 +22,12 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.HashMap;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.io.File;
 
 import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
@@ -37,6 +40,7 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -52,6 +56,7 @@ import org.voltdb.utils.LogKeys;
  */
 public class ExportManager
 {
+
     /**
      * Processors also log using this facility.
      */
@@ -147,6 +152,7 @@ public class ExportManager
             final Class<?> loaderClass = Class.forName(elloader);
             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
             newProcessor.addLogger(exportLog);
+            addDiskBasedTableInfos(catalogContext, conn, newProcessor);
             addTableInfos(catalogContext, conn, newProcessor);
             newProcessor.readyForData();
             m_processors.add(newProcessor);
@@ -157,6 +163,45 @@ public class ExportManager
         }
         catch (final Exception e) {
             throw new ExportManager.SetupException(e.getMessage());
+        }
+    }
+
+    private void addDiskBasedTableInfos(CatalogContext catalogContext,
+            final Connector conn, ExportDataProcessor processor) {
+        /*
+         * First check for old export data that is persisted to disk
+         */
+        String overflowPath = catalogContext.cluster.getExportoverflow();
+        File overflowPathFile = new VoltFile(overflowPath);
+
+        /*
+         * Find all the advertisements. Once one is found, extract the nonce
+         * and check for any data files related to the advertisement. If no data files
+         * exist ignore the advertisement.
+         */
+        for (File f : overflowPathFile.listFiles()) {
+            if (f.getName().endsWith(".ad")) {
+                boolean haveDataFiles = false;
+                String nonce = f.getName().substring(0, f.getName().length() - 3);
+                for (File dataFile : overflowPathFile.listFiles()) {
+                    if (dataFile.getName().startsWith(nonce) && !dataFile.getName().equals(f.getName())) {
+                        haveDataFiles = true;
+                        break;
+                    }
+                }
+
+                if (haveDataFiles) {
+                    try {
+                        addDataSource( processor, overflowPath, f);
+                    } catch (IOException e) {
+                        exportLog.fatal(e);
+                        VoltDB.crashVoltDB();
+                    }
+                } else {
+                    //Delete ads that have no data
+                    f.delete();
+                }
+            }
         }
     }
 
@@ -174,14 +219,35 @@ public class ExportManager
     private void addTableInfos(CatalogContext catalogContext,
             final Connector conn, ExportDataProcessor processor)
     {
+        /*
+         * Now create datasources based on the catalog
+         */
         Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
         while (tableInfoIt.hasNext()) {
             ConnectorTableInfo next = tableInfoIt.next();
             Table table = next.getTable();
             addDataSources(processor, table, m_hostId, catalogContext);
         }
+
     }
 
+    /*
+     * Create a datasource based on an ad file
+     */
+    private void addDataSource(
+            ExportDataProcessor newProcessor,
+            String overflowPath,
+            File adFile) throws IOException {
+        ExportDataSource source = new ExportDataSource( overflowPath, adFile);
+        TreeMap<Long, ExportDataSource> dataSourcesForPartition =
+            m_dataSourcesByPartition.get(source.getPartitionId());
+        if (dataSourcesForPartition == null) {
+            dataSourcesForPartition = new TreeMap<Long, ExportDataSource>();
+            m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
+        }
+        dataSourcesForPartition.put( source.getTableId(), source);
+        newProcessor.addDataSource(source);
+    }
 
     // silly helper to add datasources for a table catalog object
     private void addDataSources(ExportDataProcessor newProcessor,
@@ -195,23 +261,37 @@ public class ExportManager
         long tmp = (long)(catalogContext.catalogVersion) << 32L;
         final long delegateId = tmp + table.getRelativeIndex();
 
+        String overflowPath = catalogContext.cluster.getExportoverflow();
         for (Integer site : sites) {
             Integer partition = siteTracker.getPartitionForSite(site);
-            ExportDataSource exportDataSource = new ExportDataSource("database",
-                              table.getTypeName(),
-                              table.getIsreplicated(),
-                              partition,
-                              site,
-                              delegateId,
-                              table.getColumns());
-            TreeMap<Long, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-            if (dataSourcesForPartition == null) {
-                dataSourcesForPartition = new TreeMap<Long, ExportDataSource>();
-                m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
-            }
-            if (!dataSourcesForPartition.containsKey(delegateId)) {
+            /*
+             * IOException can occur if there is a problem
+             * with the persistent aspects of the datasource storage
+             */
+            try {
+                TreeMap<Long, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+                if (dataSourcesForPartition == null) {
+                    dataSourcesForPartition = new TreeMap<Long, ExportDataSource>();
+                    m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
+                }
+                //A catalog update might mean the table already exists.
+                //Old export data might have been on disk resulting the datasource already being created.
+                if (dataSourcesForPartition.containsKey(delegateId)) {
+                    continue;
+                }
+                ExportDataSource exportDataSource = new ExportDataSource("database",
+                                  table.getTypeName(),
+                                  partition,
+                                  site,
+                                  delegateId,
+                                  table.getColumns(),
+                                  overflowPath);
                 dataSourcesForPartition.put(delegateId, exportDataSource);
                 newProcessor.addDataSource(exportDataSource);
+
+            } catch (IOException e) {
+                exportLog.fatal(e);
+                VoltDB.crashVoltDB();
             }
         }
     }
@@ -264,7 +344,39 @@ public class ExportManager
         return null;
     }
 
-    public static void pushExportBuffer(int partitionId, long delegateId, long uso, long bufferPtr, ByteBuffer buffer) {
+    public static long getQueuedExportBytes(int partitionId, long delegateId) {
+        ExportManager instance = instance();
+        assert(instance.m_dataSourcesByPartition.containsKey(partitionId));
+        assert(instance.m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
+        TreeMap<Long, ExportDataSource> sources = instance.m_dataSourcesByPartition.get(partitionId);
+
+        if (sources == null) {
+            exportLog.error("Could not find export data sources for partition "
+                    + partitionId);
+            return 0;
+        }
+
+        ExportDataSource source = sources.get(delegateId);
+        if (source == null) {
+            exportLog.error("Could not find export data source for partition " + partitionId +
+                    " delegate id " + delegateId);
+            return 0;
+        }
+        return source.sizeInBytes();
+    }
+
+    /*
+     * This method pulls double duty as a means of pushing export buffers
+     * and "syncing" export data to disk. Syncing doesn't imply fsync, it just means
+     * writing the data to a file instead of keeping it all in memory.
+     */
+    public static void pushExportBuffer(
+            int partitionId,
+            long delegateId,
+            long uso,
+            long bufferPtr,
+            ByteBuffer buffer,
+            boolean sync) {
         ExportManager instance = instance();
         assert(instance.m_dataSourcesByPartition.containsKey(partitionId));
         assert(instance.m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
@@ -285,6 +397,6 @@ public class ExportManager
             return;
         }
 
-        source.pushExportBuffer(uso, bufferPtr, buffer);
+        source.pushExportBuffer(uso, bufferPtr, buffer, sync);
     }
 }

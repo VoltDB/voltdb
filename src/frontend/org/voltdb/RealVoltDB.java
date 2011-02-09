@@ -456,7 +456,6 @@ public class RealVoltDB implements VoltDBInterface
                 hostLog.fatal("Unable to discover local IP address. Usually a java permissions failure.");
                 VoltDB.crashVoltDB();
             }
-            assert(addr.isLoopbackAddress() == false);
             String localMetadata = addr.getHostAddress();
             localMetadata += ":" + Integer.valueOf(config.m_port);
             localMetadata += ":" + Integer.valueOf(m_catalogContext.cluster.getAdminport());

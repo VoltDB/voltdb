@@ -91,7 +91,7 @@ void TupleStreamWrapper::cleanupManagedBuffers()
  * This is the only function that should modify m_openTransactionId,
  * m_openTransactionUso.
  */
-void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId)
+void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId, bool sync)
 {
     if (currentTxnId < m_openTransactionId)
     {
@@ -102,6 +102,13 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     if ((currentTxnId == m_openTransactionId) &&
         (lastCommittedTxnId == m_committedTransactionId))
     {
+        if (sync) {
+            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                    m_partitionId,
+                    m_delegateId,
+                    NULL,
+                    true );
+        }
         return;
     }
 
@@ -133,8 +140,11 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
-            block->setLengthPrefix();
-            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer( m_partitionId, m_delegateId, block);
+            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                    m_partitionId,
+                    m_delegateId,
+                    block,
+                    false);
             delete block;
             m_pendingBlocks.pop_front();
         }
@@ -142,6 +152,14 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
         {
             break;
         }
+    }
+
+    if (sync) {
+        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                m_partitionId,
+                m_delegateId,
+                NULL,
+                true );
     }
 }
 
@@ -209,8 +227,8 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
             {
                 //The block is handed off to the topend which is responsible for releasing the
                 //memory associated with the block data. The metadata is deleted here.
-                m_currBlock->setLengthPrefix();
-                ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer( m_partitionId, m_delegateId, m_currBlock);
+                ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                        m_partitionId, m_delegateId, m_currBlock, false);
                 delete m_currBlock;
             } else {
                 m_pendingBlocks.push_back(m_currBlock);
@@ -251,7 +269,7 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
         }
 
         extendBufferChain(0);
-        commit(lastCommittedTxnId, currentTxnId);
+        commit(lastCommittedTxnId, currentTxnId, timeInMillis < 0 ? true : false);
     }
 }
 

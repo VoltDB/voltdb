@@ -71,10 +71,12 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.ExportsType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
+import org.voltdb.utils.VoltFile;
 import org.xml.sax.SAXException;
 
 /**
@@ -447,6 +449,9 @@ public abstract class CatalogUtil {
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
 
+
+        setExportInfo( catalog, deployment.getExports());
+
         return getDeploymentCRC(deployment);
     }
 
@@ -712,6 +717,31 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Set deployment time settings for export
+     * @param catalog The catalog to be updated.
+     * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     */
+    private static void setExportInfo(Catalog catalog, ExportsType exportsType) {
+        if (exportsType == null) {
+            return;
+        }
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+
+        // Catalog Connector
+        // Relying on schema's enforcement of at most 1 connector
+        org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
+        // Figure out if the connector is enabled or disabled
+        // Export will be disabled if there is no destination.
+        boolean adminstate = exportsType.getConnector().isEnabled();
+
+        if (!adminstate) {
+            hostLog.info("Export configuration is present and is " +
+                             "configured to be disabled. Export will be disabled.");
+        }
+        catconn.setEnabled(adminstate);
+    }
+
+    /**
      * Set the auto-snapshot settings in the catalog from the deployment file
      * @param catalog The catalog to be updated.
      * @param snapshot A reference to the <snapshot> element of the deployment.xml file.
@@ -782,26 +812,26 @@ public abstract class CatalogUtil {
     private static void setPathsInfo(Catalog catalog, PathsType paths) {
         assert(paths != null);
 
-        File voltRoot = new File(paths.getVoltroot().getPath());
+        File voltRoot = new VoltFile(paths.getVoltroot().getPath());
         validateDirectory("volt root", voltRoot);
 
         File snapshotPath;
         if (paths.getSnapshots() == null) {
-            snapshotPath = new File(voltRoot, "snapshots");
+            snapshotPath = new VoltFile(voltRoot, "snapshots");
             if (!snapshotPath.exists()) {
                 if (!snapshotPath.mkdir()) {
                     hostLog.fatal("Failed to create snapshot directory \"" + snapshotPath + "\"");
                 }
             }
         } else {
-            snapshotPath = new File(paths.getSnapshots().getPath());
+            snapshotPath = new VoltFile(paths.getSnapshots().getPath());
         }
 
         validateDirectory("snapshot path", snapshotPath);
 
         File ppdSnapshotPath;
         if (paths.getPartitiondetectionsnapshot() == null) {
-            ppdSnapshotPath = new File(voltRoot, "partition_detection_snapshot");
+            ppdSnapshotPath = new VoltFile(voltRoot, "partition_detection_snapshot");
             if (!ppdSnapshotPath.exists()) {
                 if (!ppdSnapshotPath.mkdir()) {
                     hostLog.fatal("Failed to create partition detection snapshot directory \""
@@ -809,14 +839,14 @@ public abstract class CatalogUtil {
                 }
             }
         } else {
-            ppdSnapshotPath = new File(paths.getPartitiondetectionsnapshot().getPath());
+            ppdSnapshotPath = new VoltFile(paths.getPartitiondetectionsnapshot().getPath());
         }
 
         validateDirectory("partition detection snapshot path", ppdSnapshotPath);
 
         File exportOverflowPath;
         if (paths.getExportoverflow() == null) {
-            exportOverflowPath = new File(voltRoot, "export_overflow");
+            exportOverflowPath = new VoltFile(voltRoot, "export_overflow");
             if (!exportOverflowPath.exists()) {
                 if (!exportOverflowPath.mkdir()) {
                     hostLog.fatal("Failed to create export overflow directory \""
@@ -824,7 +854,7 @@ public abstract class CatalogUtil {
                 }
             }
         } else {
-            exportOverflowPath = new File(paths.getExportoverflow().getPath());
+            exportOverflowPath = new VoltFile(paths.getExportoverflow().getPath());
         }
 
         validateDirectory("export overflow", exportOverflowPath);
@@ -839,14 +869,17 @@ public abstract class CatalogUtil {
             schedule.setPath(snapshotPath.getPath());
         }
 
-        //Now update the path in the schedule for ppd
+        //Update the path in the schedule for ppd
         schedule = catalog.getClusters().get("cluster").getFaultsnapshots().get("CLUSTER_PARTITION");
         if (schedule != null) {
             schedule.setPath(ppdSnapshotPath.getPath());
         }
 
-        //No set the volt root
+        //Set the volt root
         catalog.getClusters().get("cluster").setVoltroot(voltRoot.getPath());
+
+        //Also set the export overflow directory
+        catalog.getClusters().get("cluster").setExportoverflow(exportOverflowPath.getPath());
     }
 
     /**

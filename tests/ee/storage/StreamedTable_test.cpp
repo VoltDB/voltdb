@@ -56,12 +56,19 @@ class MockTopend : public Topend {
     MockTopend() {
     }
 
-    void pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock* block) {
+    void pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock* block, bool sync) {
+        if (sync) {
+            return;
+        }
         partitionIds.push(partitionId);
         delegateIds.push(delegateId);
         blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(shared_ptr<char>(block->rawPtr()));
         receivedExportBuffer = true;
+    }
+
+    int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
+        return 0;
     }
 
     virtual int loadNextDependency(

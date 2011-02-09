@@ -40,6 +40,7 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.VoltFile;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotDelete extends VoltSystemProcedure {
@@ -212,7 +213,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
     }
 
     private final List<File> retrieveRelevantFiles(String filePath, String nonce) {
-        final File path = new File(filePath);
+        final File path = new VoltFile(filePath);
 
         if (!path.exists()) {
             errorString = "Provided search path does not exist: " + filePath;

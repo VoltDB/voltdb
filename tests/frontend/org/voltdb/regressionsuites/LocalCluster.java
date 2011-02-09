@@ -41,6 +41,7 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -77,6 +78,8 @@ public class LocalCluster implements VoltServerConfig {
     boolean m_compiled = false;
     boolean m_running = false;
     ArrayList<Process> m_cluster = new ArrayList<Process>();
+    //Dedicated paths in the filesystem to be used as a root for each process
+    ArrayList<File> m_subRoots = new ArrayList<File>();
     ArrayList<PipeToFile> m_pipes = null;
     ServerThread m_localServer = null;
 
@@ -89,8 +92,11 @@ public class LocalCluster implements VoltServerConfig {
     private int m_ipcPortOffset2;
     private int m_ipcPortOffset3;
 
+    private int m_voltFilePrefixOffset;
+
     private int m_timestampSaltOffset;
 
+    private File m_pathToVoltRoot = null;
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
 
     private final boolean m_debug;
@@ -284,12 +290,16 @@ public class LocalCluster implements VoltServerConfig {
                                            "-1");
 
         // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = m_procBuilder.command().size() - 14;
-        m_debugOffset2 = m_procBuilder.command().size() - 13;
+        m_debugOffset1 = m_procBuilder.command().size() - 15;
+        m_debugOffset2 = m_procBuilder.command().size() - 14;
         if (m_debug) {
             m_procBuilder.command().add(m_debugOffset1, "");
             m_procBuilder.command().add(m_debugOffset1, "");
         }
+
+        m_voltFilePrefixOffset = m_procBuilder.command().size() - 13;
+        m_procBuilder.command().add(m_voltFilePrefixOffset, "");
+
         m_portOffset = m_procBuilder.command().size() - 3;
         m_pathToDeploymentOffset = m_procBuilder.command().size() - 5;
         m_rejoinOffset = m_procBuilder.command().size() - 1;
@@ -333,6 +343,7 @@ public class LocalCluster implements VoltServerConfig {
 
         m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost");
         m_pathToDeployment = builder.getPathToDeployment();
+        m_pathToVoltRoot = builder.getPathToVoltRoot();
 
         return m_compiled;
     }
@@ -345,6 +356,8 @@ public class LocalCluster implements VoltServerConfig {
         m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
                                      null, true, ppdPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
+        m_pathToVoltRoot = builder.getPathToVoltRoot();
+
         return m_compiled;
     }
 
@@ -358,14 +371,31 @@ public class LocalCluster implements VoltServerConfig {
         m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
                                      adminPort, adminOnStartup);
         m_pathToDeployment = builder.getPathToDeployment();
+        m_pathToVoltRoot = builder.getPathToVoltRoot();
+
         return m_compiled;
     }
 
     @Override
     public void startUp() {
+        startUp(true);
+    }
+
+    @Override
+    public void startUp(boolean clearLocalDataDirectories) {
         assert (!m_running);
         if (m_running) {
             return;
+        }
+
+        if (clearLocalDataDirectories) {
+            try {
+                m_subRoots.clear();
+                VoltFile.deleteAllSubRoots();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
         }
 
         // set to true to spew startup timing data
@@ -389,8 +419,18 @@ public class LocalCluster implements VoltServerConfig {
 
         m_pipes.clear();
         m_cluster.clear();
+
         // create the in-process server
         if (m_hasLocalServer) {
+            //If the local directories are being cleared, generate a new root for the
+            //in process server
+            if (clearLocalDataDirectories) {
+                try {
+                    m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             m_cluster.add(null);
             m_pipes.add(null);
             Configuration config = new Configuration();
@@ -413,7 +453,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i);
+            startOne(i, clearLocalDataDirectories);
         }
 
         // spin until all the pipes see the magic "Server completed.." string.
@@ -484,7 +524,7 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    private void startOne(int hostId) {
+    private void startOne(int hostId, boolean clearLocalDataDirectories) {
         try {
             m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
@@ -510,6 +550,19 @@ public class LocalCluster implements VoltServerConfig {
                 m_procBuilder.command().set(m_ipcPortOffset2, portString);
                 m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
             }
+
+            //If local directories are being cleared
+            //Generate a new subroot, otherwise reuse the existing directory
+            File subroot = null;
+            if (clearLocalDataDirectories) {
+                subroot = VoltFile.getNewSubroot();
+                m_subRoots.add(subroot);
+            } else {
+                subroot = m_subRoots.get(hostId);
+            }
+            m_procBuilder.command().set(
+                    m_voltFilePrefixOffset,
+                    "-DVoltFilePrefix=" + subroot.getPath());
 
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
@@ -591,6 +644,11 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_ipcPortOffset2, portString);
             m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
         }
+
+        //When recovering reuse the root from the original
+        m_procBuilder.command().set(
+                m_voltFilePrefixOffset,
+                "-DVoltFilePrefix=" + m_subRoots.get(hostId).getPath());
 
         PipeToFile ptf = null;
         long start = 0;
@@ -679,7 +737,9 @@ public class LocalCluster implements VoltServerConfig {
         // break the cluster somehow.  Or ... just old fashioned kill?
 
         try {
-            if (m_localServer != null) m_localServer.shutdown();
+            if (m_localServer != null) {
+                m_localServer.shutdown();
+            }
         } finally {
             m_running = false;
         }
@@ -859,6 +919,36 @@ public class LocalCluster implements VoltServerConfig {
         // shift that range so it goes from -3 to 3 inclusive
         retval -= TIMESTAMP_SALT_VARIANCE;
         return retval;
+    }
+
+    @Override
+    public void createDirectory(File path) throws IOException {
+        for (File root : m_subRoots) {
+            File actualPath = new File(root, path.getPath());
+            if (!actualPath.mkdirs()) {
+                throw new IOException();
+            }
+        }
+    }
+
+    @Override
+    public void deleteDirectory(File path) throws IOException {
+        for (File root : m_subRoots) {
+            File actualPath = new File(root, path.getPath());
+            VoltFile.recursivelyDelete(actualPath);
+        }
+    }
+
+    @Override
+    public ArrayList<File> listFiles(File path) throws IOException {
+        ArrayList<File> files = new ArrayList<File>();
+        for (File root : m_subRoots) {
+            File actualPath = new File(root, path.getPath());
+            for (File f : actualPath.listFiles()) {
+                files.add(f);
+            }
+        }
+        return files;
     }
 
 }

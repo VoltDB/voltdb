@@ -1071,14 +1071,43 @@ void VoltDBIPC::threadLocalPoolAllocations() {
     writeOrDie(m_fd, (unsigned char*)response, 9);
 }
 
-void VoltDBIPC::pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock *block) {
+int64_t VoltDBIPC::getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
+    m_reusedResultBuffer[0] = kErrorCode_getQueuedExportBytes;
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(partitionId);
+    *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[5]) = htonll(delegateId);
+    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 13);
+
+    int64_t netval;
+    ssize_t bytes = read(m_fd, &netval, sizeof(int64_t));
+    if (bytes != sizeof(int64_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int64_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    int64_t retval = ntohll(netval);
+    return retval;
+}
+
+void VoltDBIPC::pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock *block, bool sync) {
     m_reusedResultBuffer[0] = kErrorCode_pushExportBuffer;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(partitionId);
     *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[5]) = htonll(delegateId);
-    *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[13]) = htonll(block->uso());
-    ::memcpy( &m_reusedResultBuffer[21], block->rawPtr(), block->rawLength());
-    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 21);
-    writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
+    if (block != NULL) {
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[13]) = htonll(block->uso());
+    } else {
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[13]) = 0;
+    }
+    *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[21]) = sync ? 1 : 0;
+    if (block != NULL) {
+        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[22]) = htonl(block->rawLength());
+        writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 26);
+        writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
+    } else {
+        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[22]) = htonl(0);
+        writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 26);
+    }
     delete [] block->rawPtr();
 }
 

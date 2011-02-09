@@ -38,7 +38,8 @@ class Topend {
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;
 
-    virtual void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block) = 0;
+    virtual int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId) = 0;
+    virtual void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block, bool sync) = 0;
 
     virtual ~Topend()
     {

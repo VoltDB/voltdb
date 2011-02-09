@@ -24,6 +24,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <queue>
+#include <deque>
 #include "harness.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
@@ -69,18 +70,28 @@ public:
     void crashVoltDB(voltdb::FatalException e) {
     }
 
+    int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
+        int64_t bytes = 0;
+        for (int ii = 0; ii < blocks.size(); ii++) {
+            bytes += blocks[ii]->rawLength();
+        }
+        return bytes;
+    }
 
-    virtual void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block) {
+    virtual void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block, bool sync) {
+        if (sync) {
+            return;
+        }
         partitionIds.push(partitionId);
         delegateIds.push(delegateId);
-        blocks.push(shared_ptr<StreamBlock>(new StreamBlock(block)));
+        blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(shared_ptr<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
 
     queue<int32_t> partitionIds;
     queue<int64_t> delegateIds;
-    queue<shared_ptr<StreamBlock> > blocks;
+    deque<shared_ptr<StreamBlock> > blocks;
     vector<shared_ptr<char> > data;
     bool receivedExportBuffer;
 
@@ -230,8 +241,8 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
 {
 
     // verify the block count statistic.
-    size_t allocatedBlockCount = m_wrapper->allocatedBlockCount();
-    EXPECT_TRUE(allocatedBlockCount == 0);
+    size_t allocatedByteCount = m_wrapper->allocatedByteCount();
+    EXPECT_TRUE(allocatedByteCount == 0);
 
     for (int i = 1; i < 10; i++)
     {
@@ -245,20 +256,25 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     }
     m_wrapper->periodicFlush(-1, 0, 19, 19);
 
+    EXPECT_EQ( 1786, m_wrapper->allocatedByteCount());
+
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
 
     // now get the second
     ASSERT_FALSE(m_topend.blocks.empty());
     results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
-    allocatedBlockCount = m_wrapper->allocatedBlockCount();
+
+    // ack all of the data and re-verify block count
+    allocatedByteCount = m_wrapper->allocatedByteCount();
+    EXPECT_TRUE(allocatedByteCount == 0);
 }
 
 /**
@@ -281,14 +297,14 @@ TEST_F(TupleStreamWrapperTest, FarFutureFlush)
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
 
     // now get the second
     ASSERT_FALSE(m_topend.blocks.empty());
     results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
 }
@@ -313,7 +329,7 @@ TEST_F(TupleStreamWrapperTest, Fill) {
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
@@ -346,7 +362,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndAppend) {
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
@@ -380,12 +396,12 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndFlush) {
     // should be able to get 2 buffers, one full and one with one tuple
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 
     results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
 }
@@ -418,7 +434,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
     m_wrapper->periodicFlush(-1, 0, 1, 2);
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
@@ -458,7 +474,7 @@ TEST_F(TupleStreamWrapperTest, RollbackFirstTuple)
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
 }
@@ -485,7 +501,7 @@ TEST_F(TupleStreamWrapperTest, RollbackMiddleTuple)
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
 }
@@ -514,7 +530,7 @@ TEST_F(TupleStreamWrapperTest, RollbackWholeBuffer)
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
 }

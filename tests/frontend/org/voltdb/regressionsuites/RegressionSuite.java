@@ -66,7 +66,7 @@ public class RegressionSuite extends TestCase {
      */
     @Override
     public void setUp() {
-        m_config.startUp();
+        m_config.startUp(true);
     }
 
     /**

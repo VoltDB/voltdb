@@ -188,6 +188,39 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
+    /*
+     *  Test Export of a DROPPED table.  Queues some data to a table.
+     *  Then drops the table and verifies that Export can successfully
+     *  drain the dropped table. IE, drop table doesn't lose Export data.
+     */
+    public void testExportAndDroppedTableThenShutdown() throws Exception {
+        Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        // now drop the no-nulls table
+        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
+        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
+        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
+                deploymentURL);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        m_config.shutDown();
+        m_config.startUp();
+
+        client = getClient();
+
+        //Reinit the tester since the server was restarted
+        m_tester = new ExportTestClient(getServerConfig().getNodeCount());
+
+        // must still be able to verify the export data.
+        quiesceAndVerify(client, m_tester);
+    }
+
     /**
      * Verify safe startup (we can connect clients and poll empty tables)
      */

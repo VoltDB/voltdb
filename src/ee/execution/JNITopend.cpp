@@ -113,19 +113,30 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(IJJJLjava/nio/ByteBuffer;)V");
+            "(IJJJLjava/nio/ByteBuffer;Z)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
         throw std::exception();
     }
 
+    m_getQueuedExportBytesMID = m_jniEnv->GetStaticMethodID(
+            m_exportManagerClass,
+            "getQueuedExportBytes",
+            "(IJ)J");
+    if (m_getQueuedExportBytesMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_getQueuedExportBytesMID != NULL);
+        throw std::exception();
+    }
+
     if (m_nextDependencyMID == 0 ||
         m_crashVoltDBMID == 0 ||
         m_pushExportBufferMID == 0 ||
+        m_getQueuedExportBytesMID == 0 ||
         m_exportManagerClass == 0)
     {
-
+        throw std::exception();
     }
 }
 
@@ -209,21 +220,46 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
 }
 
-void JNITopend::pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block) {
-    jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
-    if (buffer == NULL) {
+int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
+    return m_jniEnv->CallStaticLongMethod(
+            m_exportManagerClass,
+            m_getQueuedExportBytesMID,
+            partitionId,
+            delegateId);
+}
+
+void JNITopend::pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block, bool sync) {
+    if (block != NULL) {
+        jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
+        if (buffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        m_jniEnv->CallStaticVoidMethod(
+                m_exportManagerClass,
+                m_pushExportBufferMID,
+                partitionId,
+                delegateId,
+                block->uso(),
+                reinterpret_cast<jlong>(block->rawPtr()),
+                buffer,
+                sync ? JNI_TRUE : JNI_FALSE);
+        m_jniEnv->DeleteLocalRef(buffer);
+    } else {
+        m_jniEnv->CallStaticVoidMethod(
+                        m_exportManagerClass,
+                        m_pushExportBufferMID,
+                        partitionId,
+                        delegateId,
+                        static_cast<int64_t>(0),
+                        NULL,
+                        NULL,
+                        sync ? JNI_TRUE : JNI_FALSE);
+    }
+    if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
         throw std::exception();
     }
-    m_jniEnv->CallStaticVoidMethod(
-            m_exportManagerClass,
-            m_pushExportBufferMID,
-            partitionId,
-            delegateId,
-            block->uso(),
-            reinterpret_cast<jlong>(block->rawPtr()),
-            buffer);
-    m_jniEnv->DeleteLocalRef(buffer);
 }
 
 }

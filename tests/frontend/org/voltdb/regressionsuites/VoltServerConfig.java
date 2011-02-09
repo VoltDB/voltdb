@@ -25,6 +25,8 @@ package org.voltdb.regressionsuites;
 
 import java.util.List;
 import org.voltdb.compiler.VoltProjectBuilder;
+import java.io.File;
+import java.io.IOException;
 
 /**
  * Interface allowing for the use of a particular configuration/topology
@@ -49,6 +51,12 @@ public interface VoltServerConfig {
      * Start the instance of VoltDB.
      */
     public void startUp();
+
+    /**
+     * Start the instance of VoltDB and optionally clear the
+     * data directories first
+     */
+    public void startUp(boolean clearDataDirectories);
 
     /**
      * Shutdown the instance of VoltDB.
@@ -93,4 +101,29 @@ public interface VoltServerConfig {
 
     boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
                                  boolean adminOnStartup);
+
+    /**
+     * Create a directory so it is accessible
+     * to all voltdb instances represented by this config from within each instances
+     * subroot. All necessary intervening directories will
+     * be created.
+     * @param path
+     * @throws IOException
+     */
+    public void createDirectory(File path) throws IOException;
+
+    /**
+     * Delete the directory as seen by all instances represented by this config.
+     * This will go into the subroot for each instance and delete the directory and its contents
+     * @param path
+     * @throws IOException
+     */
+    public void deleteDirectory(File path) throws IOException;
+
+    /**
+     * List the files contained in the specified path as seen by all instances represented
+     * by this config. It will go into the specified path in the subroot for each instance,
+     * aggregate the list of files, and then return them.
+     */
+    public List<File> listFiles(File path) throws IOException;
 }

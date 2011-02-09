@@ -69,6 +69,14 @@ public class SysProcFragmentId
      * Confirm the targets were successfully created
      */
     public static final long PF_createSnapshotTargetsResults = 43;
+    /*
+     * Quiesce the export data as part of the snapshot
+     */
+    public static final long PF_snapshotSaveQuiesce = 44;
+    /*
+     * Aggregate the results of snapshot quiesce
+     */
+    public static final long PF_snapshotSaveQuiesceResults = 45;
 
     // @LoadMultipartitionTable
     public static final long PF_distribute = 50;

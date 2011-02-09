@@ -121,6 +121,53 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
+    /**
+     * Start with snapshots disabled. Enable them to one directory, check that the snapshot files are created
+     * with the correct prefix. Update the catalog to do the snapshots in a different directory with a
+     * different prefix and check to make sure they start going to the right place. Update the catalog
+     * to disable them and then make sure no snapshots appear.
+     * @throws Exception
+     */
+    public void testEnableModifyDisableSnapshot() throws Exception {
+        m_config.deleteDirectory(new File("/tmp/snapshotdir1"));
+        m_config.deleteDirectory(new File("/tmp/snapshotdir2"));
+        try {
+            m_config.createDirectory(new File("/tmp/snapshotdir1"));
+            m_config.createDirectory(new File("/tmp/snapshotdir2"));
+            Client client = getClient();
+            String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
+            String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
+            VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            Thread.sleep(5000);
+            for (File f : m_config.listFiles(new File("/tmp/snapshotdir1"))) {
+                assertTrue(f.getName().startsWith("foo1"));
+            }
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            Thread.sleep(5000);
+            for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
+                assertTrue(f.getName().startsWith("foo2"));
+            }
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            m_config.deleteDirectory(new File("/tmp/snapshotdir1"));
+            m_config.deleteDirectory(new File("/tmp/snapshotdir2"));
+            m_config.createDirectory(new File("/tmp/snapshotdir1"));
+            m_config.createDirectory(new File("/tmp/snapshotdir2"));
+            Thread.sleep(5000);
+            assertTrue(m_config.listFiles(new File("/tmp/snapshotdir1")).isEmpty());
+            assertTrue(m_config.listFiles(new File("/tmp/snapshotdir2")).isEmpty());
+        } finally {
+            deleteDirectory(new File("/tmp/snapshotdir1"));
+            deleteDirectory(new File("/tmp/snapshotdir2"));
+        }
+    }
+
     public void testUpdate() throws Exception {
         Client client = getClient();
         String newCatalogURL;
@@ -448,53 +495,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             assertTrue(f.delete());
         }
         assertTrue(dir.delete());
-    }
-
-    /**
-     * Start with snapshots disabled. Enable them to one directory, check that the snapshot files are created
-     * with the correct prefix. Update the catalog to do the snapshots in a different directory with a
-     * different prefix and check to make sure they start going to the right place. Update the catalog
-     * to disable them and then make sure no snapshots appear.
-     * @throws Exception
-     */
-    public void testEnableModifyDisableSnapshot() throws Exception {
-        deleteDirectory(new File("/tmp/snapshotdir1"));
-        deleteDirectory(new File("/tmp/snapshotdir2"));
-        try {
-            assertTrue(new File("/tmp/snapshotdir1").mkdir());
-            assertTrue(new File("/tmp/snapshotdir2").mkdir());
-            Client client = getClient();
-            String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
-            String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
-            VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
-            assertTrue(results.length == 1);
-            Thread.sleep(5000);
-            for (File f : new File("/tmp/snapshotdir1").listFiles()) {
-                assertTrue(f.getName().startsWith("foo1"));
-            }
-            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.jar");
-            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml");
-            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
-            assertTrue(results.length == 1);
-            Thread.sleep(5000);
-            for (File f : new File("/tmp/snapshotdir2").listFiles()) {
-                assertTrue(f.getName().startsWith("foo2"));
-            }
-            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
-            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
-            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
-            assertTrue(results.length == 1);
-            deleteDirectory(new File("/tmp/snapshotdir1"));
-            deleteDirectory(new File("/tmp/snapshotdir2"));
-            assertTrue(new File("/tmp/snapshotdir1").mkdir());
-            assertTrue(new File("/tmp/snapshotdir2").mkdir());
-            Thread.sleep(5000);
-            assertTrue(new File("/tmp/snapshotdir1").listFiles().length == 0);
-            assertTrue(new File("/tmp/snapshotdir2").listFiles().length == 0);
-        } finally {
-            deleteDirectory(new File("/tmp/snapshotdir1"));
-            deleteDirectory(new File("/tmp/snapshotdir2"));
-        }
     }
 
     /**

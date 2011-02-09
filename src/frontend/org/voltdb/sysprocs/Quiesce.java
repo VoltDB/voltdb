@@ -34,6 +34,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.logging.VoltLogger;
 
 /**
  * Forces a flush of committed Export data to the connector queues.
@@ -48,6 +49,7 @@ public class Quiesce extends VoltSystemProcedure {
 
     static final int DEP_SITES = (int) SysProcFragmentId.PF_quiesce_sites | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_PROCESSED_SITES = (int) SysProcFragmentId.PF_quiesce_processed_sites;
+    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     @Override
     public void init(int numberOfPartitions, SiteProcedureConnection site,
@@ -66,6 +68,14 @@ public class Quiesce extends VoltSystemProcedure {
             if (fragmentId == SysProcFragmentId.PF_quiesce_sites) {
                 // tell each site to quiesce
                 context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
+                try {
+                    int result = Runtime.getRuntime().exec("sync").waitFor();
+                    if (result != 0) {
+                        HOST_LOG.error("Quiesce sync invocation returned " + result);
+                    }
+                } catch (Exception e) {
+                    HOST_LOG.error(e);
+                }
                 VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.INTEGER));
                 results.addRow(Integer.parseInt(context.getSite().getTypeName()));
                 return new DependencyPair(DEP_SITES, results);

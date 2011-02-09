@@ -47,6 +47,7 @@ import org.voltdb.catalog.*;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.VoltFile;
 
 public class SnapshotUtil {
 
@@ -65,7 +66,7 @@ public class SnapshotUtil {
             String path,
             String nonce,
             List<Table> tables) throws IOException {
-        final File f = new File(path, constructDigestFilenameForNonce(nonce));
+        final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce));
         if (f.exists()) {
             if (!f.delete()) {
                 throw new IOException("Unable to write table list file " + f);
@@ -100,7 +101,7 @@ public class SnapshotUtil {
 
     public static List<String> retrieveRelevantTableNames(String path,
             String nonce) throws Exception {
-        return retrieveRelevantTableNamesAndTime(new File(path, constructDigestFilenameForNonce(nonce))).getSecond();
+        return retrieveRelevantTableNamesAndTime(new VoltFile(path, constructDigestFilenameForNonce(nonce))).getSecond();
     }
 
     /**
@@ -621,7 +622,7 @@ public class SnapshotUtil {
             String fileNonce,
             String hostId)
     {
-        return new File(filePath, SnapshotUtil.constructFilenameForTable(
+        return new VoltFile(filePath, SnapshotUtil.constructFilenameForTable(
             table, fileNonce, hostId));
     }
 

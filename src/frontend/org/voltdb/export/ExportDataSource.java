@@ -19,91 +19,35 @@ package org.voltdb.export;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileInputStream;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.VoltFile;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
  */
 public class ExportDataSource implements Comparable<ExportDataSource> {
 
-    private final class StreamBlock {
-
-        private StreamBlock(ByteBuffer buffer, long uso, long bufferPtr) {
-            m_buffer = buffer;
-            m_uso = uso;
-            m_bufferPtr = bufferPtr;
-            m_totalUso = m_buffer.capacity() - 4;
-        }
-
-        private void deleteContent() {
-            DBBPool.deleteCharArrayMemory(m_bufferPtr);
-            m_bufferPtr = 0;
-            m_buffer = null;
-        }
-
-        /**
-         * Returns the USO of the first unreleased octet in this block
-         */
-        private long unreleasedUso()
-        {
-            return m_uso + m_releaseOffset;
-        }
-
-        /**
-         * Returns the total amount of data in the USO stream, this excludes the length prefix in the buffer
-         * @return
-         */
-        private long totalUso() {
-            return m_totalUso;
-        }
-
-        /**
-         * Returns the size of the unreleased data in this block.
-         * -4 due to the length prefix that isn't part of the USO
-         */
-        private long unreleasedSize()
-        {
-            return totalUso() - m_releaseOffset;
-        }
-
-        // The USO for octets up to which are being released
-        private void releaseUso(long releaseUso)
-        {
-            assert(releaseUso >= m_uso);
-            m_releaseOffset = releaseUso - m_uso;
-            assert(m_releaseOffset <= totalUso());
-        }
-
-        private final long m_uso;
-        private final long m_totalUso;
-        private ByteBuffer m_buffer;
-        private long m_releaseOffset;
-        private long m_bufferPtr;
-
-        public ByteBuffer unreleasedBuffer() {
-            ByteBuffer responseBuffer = ByteBuffer.allocate((int)(4 + unreleasedSize()));
-            responseBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            responseBuffer.putInt((int)unreleasedSize());
-            responseBuffer.order(ByteOrder.BIG_ENDIAN);
-            m_buffer.position(4 + (int)m_releaseOffset);
-            responseBuffer.put(m_buffer);
-            responseBuffer.flip();
-            return responseBuffer;
-        }
-    }
+    /**
+     * Processors also log using this facility.
+     */
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     private final String m_database;
     private final String m_tableName;
@@ -113,7 +57,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
     private long m_firstUnpolledUso = 0;
-    private final ArrayDeque<StreamBlock> m_committedBuffers = new ArrayDeque<StreamBlock>();
+    private final StreamBlockQueue m_committedBuffers;
 
     /**
      * Create a new data source.
@@ -126,12 +70,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param catalogMap
      */
     public ExportDataSource(String db, String tableName,
-                         boolean isReplicated,
                          int partitionId, int siteId, long tableId,
-                         CatalogMap<Column> catalogMap)
+                         CatalogMap<Column> catalogMap,
+                         String overflowPath) throws IOException
     {
         m_database = db;
         m_tableName = tableName;
+
+        String nonce = tableName + "_" + tableId + "_" + siteId + "_" + partitionId;
+
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -166,84 +114,74 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_columnNames.add(c.getName());
             m_columnTypes.add(c.getType());
         }
+
+
+        File adFile = new VoltFile(overflowPath, nonce + ".ad");
+        assert(!adFile.exists());
+        FastSerializer fs = new FastSerializer();
+        fs.writeInt(m_siteId);
+        fs.writeString(m_database);
+        writeAdvertisementTo(fs);
+        FileOutputStream fos = new FileOutputStream(adFile);
+        fos.write(fs.getBytes());
+        fos.getFD().sync();
+        fos.close();
     }
 
-    private void resetPollMarker() {
+    public ExportDataSource(String overflowPath, File adFile) throws IOException {
+        FileInputStream fis = new FileInputStream(adFile);
+        byte data[] = new byte[(int)adFile.length()];
+        int read = fis.read(data);
+        if (read != data.length) {
+            throw new IOException("Failed to read ad file " + adFile);
+        }
+        FastDeserializer fds = new FastDeserializer(data);
+
+        m_siteId = fds.readInt();
+        m_database = fds.readString();
+
+        m_partitionId = fds.readInt();
+        m_tableId = fds.readLong();
+        m_tableName = fds.readString();
+        int numColumns = fds.readInt();
+        for (int ii=0; ii < numColumns; ++ii) {
+            m_columnNames.add(fds.readString());
+            m_columnTypes.add(fds.readInt());
+        }
+
+        String nonce = m_tableName + "_" + m_tableId + "_" + m_siteId + "_" + m_partitionId;
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
+    }
+
+    private void resetPollMarker() throws IOException {
         if (!m_committedBuffers.isEmpty()) {
             StreamBlock oldestBlock = m_committedBuffers.peek();
             m_firstUnpolledUso = oldestBlock.unreleasedUso();
         }
     }
 
-    private boolean releaseExportBytes(long releaseOffset, ArrayList<StreamBlock> blocksToDelete) {
+    private void releaseExportBytes(long releaseOffset, ArrayList<StreamBlock> blocksToDelete) throws IOException {
         // if released offset is in an already-released past, just return success
-        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().m_uso)
+        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso())
         {
-            return true;
+            return;
         }
 
-        // if released offset is in the uncommitted bytes, then set up
-        // to release everything that is committed
-        long committedUso = 0;
-        if (m_committedBuffers.isEmpty()) {
-            if (m_firstUnpolledUso < releaseOffset)
-            {
-                m_firstUnpolledUso = releaseOffset;
-            }
-            return true;
-        } else {
-            committedUso = m_committedBuffers.peekLast().m_uso + m_committedBuffers.peekLast().totalUso();
-        }
-
-        if (releaseOffset > committedUso)
-        {
-            releaseOffset = committedUso;
-        }
-
-        boolean retval = false;
-        StreamBlock lastBlock = m_committedBuffers.peekLast();
-        if (releaseOffset >= lastBlock.m_uso)
-        {
-            while (m_committedBuffers.size() > 1) {
-                StreamBlock sb = m_committedBuffers.poll();
-                blocksToDelete.add(sb);
-            }
-            assert(lastBlock.unreleasedSize() > 0);
-            lastBlock.releaseUso(releaseOffset);
-            if (lastBlock.unreleasedSize() == 0) {
-                blocksToDelete.add(lastBlock);
-                m_committedBuffers.poll();
-            }
-            retval = true;
-        }
-        else
-        {
+        long lastUso = m_firstUnpolledUso;
+        while (!m_committedBuffers.isEmpty() &&
+                releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
-            while (!m_committedBuffers.isEmpty() && !retval)
-            {
-                if (releaseOffset >= sb.m_uso + sb.totalUso())
-                {
-                    m_committedBuffers.pop();
-                    blocksToDelete.add(sb);
-                    sb = m_committedBuffers.peek();
-                }
-                else
-                {
-                    sb.releaseUso(releaseOffset);
-                    retval = true;
-                }
+            if (releaseOffset >= sb.uso() + sb.totalUso()) {
+                m_committedBuffers.pop();
+                blocksToDelete.add(sb);
+                lastUso = sb.uso() + sb.totalUso();
+            } else if (releaseOffset >= sb.uso()) {
+                sb.releaseUso(releaseOffset);
+                lastUso = releaseOffset;
+                break;
             }
         }
-
-        if (retval)
-        {
-            if (m_firstUnpolledUso < releaseOffset)
-            {
-                m_firstUnpolledUso = releaseOffset;
-            }
-        }
-
-        return retval;
+        m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
     }
 
     /**
@@ -266,7 +204,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             synchronized (m_committedBuffers) {
                 //Process the ack if any and add blocks to the delete list or move the released USO pointer
                 if (message.isAck() && message.getAckOffset() > 0) {
-                    if (!releaseExportBytes(message.getAckOffset(), blocksToDelete)) {
+                    try {
+                        releaseExportBytes(message.getAckOffset(), blocksToDelete);
+                    } catch (IOException e) {
+                        exportLog.error(e);
                         result.error();
                         ExportManager.instance().queueMessage(mbp);
                         return;
@@ -276,30 +217,44 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //Reset the first unpolled uso so that blocks that have already been polled will
                 //be served up to the next connection
                 if (message.isClose()) {
-                    resetPollMarker();
+                    try {
+                        resetPollMarker();
+                    } catch (IOException e) {
+                        exportLog.error(e);
+                    }
                 }
 
                 //Inside this critical section do the work to find out
                 //what block should be returned by the next poll.
                 //Copying and sending the data will take place outside the critical section
-                if (message.isPoll()) {
-                    Iterator<StreamBlock> iter = m_committedBuffers.iterator();
-                    while (iter.hasNext()) {
-                        StreamBlock block = iter.next();
-                        // find the first block that has unpolled data
-                        if (m_firstUnpolledUso < block.m_uso + block.totalUso()) {
-                            first_unpolled_block = block;
-                            m_firstUnpolledUso = block.m_uso + block.totalUso();
-                            break;
-                        } else {
-                            blocksToDelete.add(block);
-                            iter.remove();
+                try {
+                    if (message.isPoll()) {
+                        Iterator<StreamBlock> iter = m_committedBuffers.iterator();
+                        while (iter.hasNext()) {
+                            StreamBlock block = iter.next();
+                            // find the first block that has unpolled data
+                            if (m_firstUnpolledUso < block.uso() + block.totalUso()) {
+                                first_unpolled_block = block;
+                                m_firstUnpolledUso = block.uso() + block.totalUso();
+                                break;
+                            } else {
+                                blocksToDelete.add(block);
+                                iter.remove();
+                            }
                         }
+                    }
+                } catch (RuntimeException e) {
+                    if (e.getCause() instanceof IOException) {
+                        exportLog.error(e);
+                        result.error();
+                        ExportManager.instance().queueMessage(mbp);
+                    } else {
+                        throw e;
                     }
                 }
             }
         } finally {
-            //Try hard not to accidentally leak memory
+            //Try hard not to leak memory
             for (StreamBlock sb : blocksToDelete) {
                 sb.deleteContent();
             }
@@ -315,7 +270,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //Otherwise return the block with the USO for the end of the block
                 //since the entire remainder of the block is being sent.
                 result.pollResponse(
-                        first_unpolled_block.m_uso + first_unpolled_block.totalUso(),
+                        first_unpolled_block.uso() + first_unpolled_block.totalUso(),
                         first_unpolled_block.unreleasedBuffer());
             }
             ExportManager.instance().queueMessage(mbp);
@@ -399,9 +354,39 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return compareTo((ExportDataSource)o) == 0;
     }
 
-    public void pushExportBuffer(long uso, long bufferPtr, ByteBuffer buffer) {
+    public long sizeInBytes() {
+        return m_committedBuffers.sizeInBytes();
+    }
+
+    public void pushExportBuffer(long uso, final long bufferPtr, ByteBuffer buffer, boolean sync) {
+        final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         synchronized (m_committedBuffers) {
-            m_committedBuffers.offer(new StreamBlock(buffer, uso, bufferPtr));
+            if (buffer != null) {
+                try {
+                    m_committedBuffers.offer(new StreamBlock(
+                            new BBContainer(buffer, bufferPtr) {
+                                @Override
+                                public void discard() {
+                                    DBBPool.deleteCharArrayMemory(address);
+                                    deleted.set(true);
+                                }
+                            }, uso, false));
+                } catch (IOException e) {
+                    exportLog.error(e);
+                    if (!deleted.get()) {
+                        DBBPool.deleteCharArrayMemory(bufferPtr);
+                    }
+                }
+            }
+            if (sync) {
+                try {
+                    //Don't do a real sync, just write the in memory buffers
+                    //to a file. @Quiesce or blocking snapshot will do the sync
+                    m_committedBuffers.sync(true);
+                } catch (IOException e) {
+                    exportLog.error(e);
+                }
+            }
         }
     }
 

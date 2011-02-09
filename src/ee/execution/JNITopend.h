@@ -32,7 +32,8 @@ public:
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
     void crashVoltDB(FatalException e);
-    void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block);
+    int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId);
+    void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block, bool sync);
 
 private:
     JNIEnv *m_jniEnv;
@@ -45,6 +46,7 @@ private:
     jmethodID m_nextDependencyMID;
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
+    jmethodID m_getQueuedExportBytesMID;
     jclass m_exportManagerClass;
 };
 

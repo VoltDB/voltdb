@@ -47,6 +47,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
+import org.voltdb.utils.VoltFile;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotScan extends VoltSystemProcedure {
@@ -289,7 +290,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                 assert(params.toArray()[0] != null);
                 assert(params.toArray()[0] instanceof String);
                 final String path = (String)params.toArray()[0];
-                File dir = new File(path);
+                File dir = new VoltFile(path);
 
                 if (dir.isDirectory()) {
                     final long free = dir.getUsableSpace();
@@ -633,7 +634,7 @@ public class SnapshotScan extends VoltSystemProcedure {
     }
 
     private final List<File> retrieveRelevantFiles(String filePath) {
-        final File path = new File(filePath);
+        final File path = new VoltFile(filePath);
 
         if (!path.exists()) {
             errorString = "Provided search path does not exist: " + filePath;

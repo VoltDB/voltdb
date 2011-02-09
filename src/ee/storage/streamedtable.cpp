@@ -24,7 +24,7 @@
 using namespace voltdb;
 
 StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
-    : Table(voltdb::EL_BUFFER_SIZE), stats_(this), m_executorContext(ctx), m_wrapper(NULL),
+    : Table(1), stats_(this), m_executorContext(ctx), m_wrapper(NULL),
       m_sequenceNo(0)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
@@ -171,9 +171,12 @@ TableStats *StreamedTable::getTableStats() {
 }
 
 size_t StreamedTable::allocatedBlockCount() const {
-    if (m_wrapper)
-    {
-        return m_wrapper->allocatedBlockCount();
+    return 0;
+}
+
+int64_t StreamedTable::allocatedTupleMemory() const {
+    if (m_wrapper) {
+        m_wrapper->allocatedByteCount();
     }
     return 0;
 }

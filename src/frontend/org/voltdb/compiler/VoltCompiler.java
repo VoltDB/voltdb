@@ -760,19 +760,9 @@ public class VoltCompiler {
             return;
         }
 
-        // Figure out if the connector is enabled or disabled
-        // Export will be disabled if there is no destination.
-        boolean adminstate = conn.isEnabled();
-
-        if (!conn.isEnabled()) {
-            compilerLog.info("Export configuration is present and is " +
-                             "configured to be disabled. Export will be disabled.");
-        }
-
         // Catalog Connector
         // Relying on schema's enforcement of at most 1 connector
         org.voltdb.catalog.Connector catconn = catdb.getConnectors().add("0");
-        catconn.setEnabled(adminstate);
         catconn.setLoaderclass(conn.getClazz());
 
         // add authorized users and groups

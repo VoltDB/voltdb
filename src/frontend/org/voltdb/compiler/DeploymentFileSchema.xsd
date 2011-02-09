@@ -41,6 +41,7 @@
       <xs:element name="paths" minOccurs="1" maxOccurs="1" type="pathsType" />
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
+      <xs:element name="exports" minOccurs="0" maxOccurs="1" type="exportsType"/>
     </xs:all>
   </xs:complexType>
 
@@ -131,4 +132,19 @@
     <xs:attribute name="retain" type="xs:integer" use="required" />
     <xs:attribute name="prefix" type="xs:string" use="required" />
   </xs:complexType>
+
+  <!-- <exports> -->
+  <xs:complexType name="exportsType">
+    <xs:sequence>
+      <!-- <connector> -->
+      <xs:element name="connector" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+      <!-- connector attributes -->
+          <xs:attribute name="class" type="xs:string" use="required"/>
+          <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
 </xs:schema>

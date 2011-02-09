@@ -199,6 +199,7 @@ public class VoltProjectBuilder {
     private String m_snapshotPrefix = null;
     private String m_snapshotFrequency = null;
     private String m_pathToDeployment = null;
+    private String m_voltRootPath = null;
 
 
     /**
@@ -414,25 +415,6 @@ public class VoltProjectBuilder {
     public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount, final int replication,
                            final String leaderAddress) {
         VoltCompiler compiler = new VoltCompiler();
-        String voltRootPath = "/tmp/" + System.getProperty("user.name");
-        java.io.File voltRootFile = new java.io.File(voltRootPath);
-        if (!voltRootFile.exists()) {
-            if (!voltRootFile.mkdir()) {
-                throw new RuntimeException("Unable to create voltroot \"" + voltRootPath + "\" for test");
-            }
-        }
-        if (!voltRootFile.isDirectory()) {
-            throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not a directory");
-        }
-        if (!voltRootFile.canRead()) {
-            throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not readable");
-        }
-        if (!voltRootFile.canWrite()) {
-            throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
-        }
-        if (!voltRootFile.canExecute()) {
-            throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
-        }
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
                        null, false, null, "none", false, 0, false);
     }
@@ -490,6 +472,7 @@ public class VoltProjectBuilder {
             }
             voltRoot = voltRootPath;
         }
+        m_voltRootPath = voltRoot;
 
         // this stuff could all be converted to org.voltdb.compiler.projectfile.*
         // jaxb objects and (WE ARE!) marshaled to XML. Just needs some elbow grease.
@@ -699,7 +682,6 @@ public class VoltProjectBuilder {
 
             final Element conn = doc.createElement("connector");
             conn.setAttribute("class", m_elloader);
-            conn.setAttribute("enabled", m_elenabled ? "true" : "false");
 
             // turn list into stupid comma separated attribute list
             String groupsattr = "";
@@ -880,6 +862,18 @@ public class VoltProjectBuilder {
         httpd.appendChild(jsonapi);
         deployment.appendChild(httpd);
 
+        // <exports>
+        if (m_elloader != null) {
+            final Element exports = doc.createElement("exports");
+            deployment.appendChild(exports);
+
+            final Element conn = doc.createElement("connector");
+            conn.setAttribute("class", m_elloader);
+            conn.setAttribute("enabled", m_elenabled ? "true" : "false");
+
+            exports.appendChild(conn);
+        }
+
         // boilerplate to write this DOM object to file.
         StreamResult result;
         try {
@@ -910,6 +904,11 @@ public class VoltProjectBuilder {
         final String deploymentPath = deploymentFile.getPath();
 
         return deploymentPath;
+    }
+
+
+    public File getPathToVoltRoot() {
+        return new File(m_voltRootPath);
     }
 
 }

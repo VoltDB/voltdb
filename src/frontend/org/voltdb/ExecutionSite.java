@@ -1192,6 +1192,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
             hostLog.info("Executing local snapshot. Creating new snapshot.");
 
+            //Flush export data to the disk before the partition detection snapshot
+            ee.quiesce(lastCommittedTxnId);
+
             // then initiate the local snapshot
             SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();

@@ -14,6 +14,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   bool jsonapi          "Is the http/json interface enabled?"
   bool networkpartition "Is network partition detection enabled?"
   string voltRoot "Directory tree where snapshots, ppd snapshots, export data etc. will be output to"
+  string exportOverflow "Directory where export data should overflow to"
   SnapshotSchedule* faultSnapshots "Configuration for snapshots generated in response to faults."
   bool adminenabled     "Is admin mode enabled?"
   int adminport         "The port number of the admin port"

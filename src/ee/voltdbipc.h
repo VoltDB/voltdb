@@ -42,7 +42,8 @@ public:
         kErrorCode_DependencyFound = 101,    //Response to 100
         kErrorCode_DependencyNotFound = 102, //Also response to 100
         kErrorCode_pushExportBuffer = 103, //Indication that el buffer is next
-        kErrorCode_CrashVoltDB = 104 //Crash with reason string
+        kErrorCode_CrashVoltDB = 104, //Crash with reason string
+        kErrorCode_getQueuedExportBytes = 105 //Retrieve value for stats
     };
 
     VoltDBIPC(int fd);
@@ -80,7 +81,8 @@ public:
      */
     void terminate();
 
-    void pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock *block);
+    int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId);
+    void pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock *block, bool sync);
 private:
     voltdb::VoltDBEngine *m_engine;
     long int m_counter;

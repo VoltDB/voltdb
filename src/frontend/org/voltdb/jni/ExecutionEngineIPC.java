@@ -23,7 +23,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -237,6 +236,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         static final int kErrorCode_CrashVoltDB = 104;
 
         /**
+         * Retrieve value from Java for stats
+         */
+        static final int kErrorCode_getQueuedExportBytes = 105;
+
+        /**
          * Read a single byte indicating a return code. This method has evolved
          * to include providing dependency tables necessary for the completion of previous
          * request. The method loops ready status bytes instead of recursing to avoid
@@ -308,7 +312,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ExecutionEngine.crashVoltDB(message, traces, filename, lineno);
                 }
                 if (status == kErrorCode_pushExportBuffer) {
-                    ByteBuffer header = ByteBuffer.allocate(20);
+                    ByteBuffer header = ByteBuffer.allocate(21);
                     while (header.hasRemaining()) {
                         final int read = m_socket.getChannel().read(header);
                         if (read == -1) {
@@ -320,12 +324,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     int partitionId = header.getInt();
                     long delegateId = header.getLong();
                     long uso = header.getLong();
-                    header.order(ByteOrder.LITTLE_ENDIAN);
+                    boolean sync = header.get() == 1 ? true : false;
                     int length = header.getInt();
-                    ByteBuffer exportBuffer = ByteBuffer.allocateDirect(length + 4);
-                    exportBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                    exportBuffer.putInt(length);
-                    exportBuffer.order(ByteOrder.BIG_ENDIAN);
+                    ByteBuffer exportBuffer = ByteBuffer.allocateDirect(length);
                     while (exportBuffer.hasRemaining()) {
                         final int read = m_socket.getChannel().read(exportBuffer);
                         if (read == -1) {
@@ -333,7 +334,30 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                         }
                     }
                     exportBuffer.flip();
-                    ExportManager.pushExportBuffer( partitionId, delegateId, uso, 0, exportBuffer);
+                    ExportManager.pushExportBuffer(
+                            partitionId, delegateId, uso, 0, length == 0 ? null : exportBuffer, sync);
+                    continue;
+                }
+                if (status == kErrorCode_getQueuedExportBytes) {
+                    ByteBuffer header = ByteBuffer.allocate(12);
+                    while (header.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(header);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    header.flip();
+
+                    int partitionId = header.getInt();
+                    long delegateId = header.getLong();
+
+                    long retval = ExportManager.getQueuedExportBytes(partitionId, delegateId);
+                    ByteBuffer buf = ByteBuffer.allocate(8);
+                    buf.putLong(retval).flip();
+
+                    while (buf.hasRemaining()) {
+                        m_socketChannel.write(buf);
+                    }
                     continue;
                 }
 

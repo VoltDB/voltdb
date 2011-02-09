@@ -489,6 +489,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
          */
         while (recoveryAckReader.isAlive() && System.currentTimeMillis() - startTime < 5000) {
             checkMailbox(false);
+            Thread.yield();
         }
         if (recoveryAckReader.isAlive()) {
             recoveryLog.fatal("Timed out waiting to read recovery initiate ack message");

@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.voltdb.BackendTarget;
@@ -45,6 +47,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     ServerThread m_server = null;
     boolean m_compiled = false;
     protected String m_pathToDeployment;
+    private File m_pathToVoltRoot = null;
     private final ArrayList<EEProcess> m_siteProcesses = new ArrayList<EEProcess>();
 
     public LocalSingleProcessServer(String jarFileName, int siteCount,
@@ -77,6 +80,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
 
         m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0, "localhost");
         m_pathToDeployment = builder.getPathToDeployment();
+        m_pathToVoltRoot = builder.getPathToVoltRoot();
 
         return m_compiled;
     }
@@ -94,6 +98,8 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, "localhost",
                                      null, true, ppdPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
+        m_pathToVoltRoot = builder.getPathToVoltRoot();
+
         return m_compiled;
     }
 
@@ -164,7 +170,19 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     }
 
     @Override
-    public void startUp() {
+    public void startUp(boolean clearLocalDataDirectories) {
+        if (clearLocalDataDirectories) {
+            File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
+            if (exportOverflow.exists()) {
+                assert(exportOverflow.isDirectory());
+                for (File f : exportOverflow.listFiles()) {
+                    if (f.isFile() && f.getName().endsWith(".pbd") || f.getName().endsWith(".ad")) {
+                        f.delete();
+                    }
+                }
+            }
+        }
+
         Configuration config = new Configuration();
         config.m_backend = m_target;
         config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
@@ -194,5 +212,21 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public boolean isValgrind() {
         return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
+    }
+    @Override
+    public void startUp() {
+        startUp(true);
+    }
+    @Override
+    public void createDirectory(File path) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+    @Override
+    public void deleteDirectory(File path) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+    @Override
+    public List<File> listFiles(File path) throws IOException {
+        throw new UnsupportedOperationException();
     }
 }

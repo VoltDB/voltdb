@@ -49,10 +49,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     private final File m_path;
     private final String m_nonce;
+    private java.util.concurrent.atomic.AtomicLong m_sizeInBytes =
+        new java.util.concurrent.atomic.AtomicLong(0);
 
     /**
      * Objects placed in the deque are stored in file segments that are up to 64 megabytes.
-     * Segments only support appending objects. A segment will throw an IOException of an attempt
+     * Segments only support appending objects. A segment will throw an IOException if an attempt
      * to insert an object that exceeds the remaining space is made. A segment can be used
      * for reading and writing, but not both at the same time.
      *
@@ -84,6 +86,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         private final ByteBuffer m_bufferForNumEntries = ByteBuffer.allocateDirect(4);
 
         private int getNumEntries() throws IOException {
+            if (m_fc == null) {
+                open();
+            }
             if (m_fc.size() > 0) {
                 m_bufferForNumEntries.clear();
                 while (m_bufferForNumEntries.hasRemaining()) {
@@ -159,6 +164,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         private void closeAndDelete() throws IOException {
             close();
+            m_sizeInBytes.addAndGet(-sizeInBytes());
             m_file.delete();
         }
 
@@ -283,8 +289,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     }
                 }
             }
-
+            m_sizeInBytes.addAndGet(4 + length);
             incrementNumEntries();
+        }
+
+        //A white lie, don't include the object count prefix
+        //so that the size is 0 when there is no user data
+        private long sizeInBytes() {
+            return m_file.length() - 4;
         }
     }
 
@@ -309,6 +321,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
         m_path = path;
         m_nonce = nonce;
 
+        if (!path.exists() || !path.canRead() || !path.canWrite() || !path.canExecute() || !path.isDirectory()) {
+            throw new IOException(path + " is not usable ( !exists || !readable " +
+                    "|| !writable || !executable || !directory)");
+        }
+
         //Parse the files in the directory by name to find files
         //that are part of this deque
         path.listFiles(new FileFilter() {
@@ -318,13 +335,28 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 String name = pathname.getName();
                 if (name.startsWith(nonce) && name.endsWith(".pbd")) {
                     Long index = Long.valueOf(name.substring( nonce.length() + 1, name.length() - 4));
-                    m_finishedSegments.put( index, new DequeSegment( index, pathname));
+                    DequeSegment ds = new DequeSegment( index, pathname);
+                    m_finishedSegments.put( index, ds);
+                    m_sizeInBytes.addAndGet(ds.sizeInBytes());
                 }
                 return false;
             }
 
         });
 
+        Long lastKey = null;
+        for (Long key : m_finishedSegments.keySet()) {
+            if (lastKey == null) {
+                lastKey = key;
+            } else {
+                if (lastKey + 1 != key) {
+                    throw new IOException("Missing " + nonce +
+                            " pbd segments between " + lastKey + " and " + key + " in directory " + path +
+                            ". The data files found in the export overflow directory were inconsistent.");
+                }
+                lastKey = key;
+            }
+        }
         //Find the first and last segment for polling and writing (after)
         Long writeSegmentIndex = 0L;
         try {
@@ -335,8 +367,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         m_writeSegment =
             new DequeSegment(
                     writeSegmentIndex,
-                    new File(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
+                    new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
         m_writeSegment.open();
+        m_writeSegment.initNumEntries();
     }
 
     @Override
@@ -363,7 +396,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (m_writeSegment == null) {
             throw new IOException("Closed");
         }
-        assert(m_finishedSegments.firstKey() == m_currentPollSegmentIndex);
+        if (!m_finishedSegments.isEmpty()) {
+            assert(m_finishedSegments.firstKey() == m_currentPollSegmentIndex);
+        }
         ArrayDeque<ArrayDeque<BBContainer[]>> segments = new ArrayDeque<ArrayDeque<BBContainer[]>>();
         ArrayDeque<BBContainer[]> currentSegment = new ArrayDeque<BBContainer[]>();
 
@@ -403,7 +438,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             DequeSegment writeSegment =
                 new DequeSegment(
                         nextIndex,
-                        new File(m_path, m_nonce + "." + nextIndex + ".pbd"));
+                        new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
             m_currentPollSegmentIndex = nextIndex;
             writeSegment.open();
             writeSegment.initNumEntries();
@@ -428,7 +463,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         m_writeSegment =
             new DequeSegment(
                     nextIndex,
-                    new File(m_path, m_nonce + "." + nextIndex + ".pbd"));
+                    new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
         m_writeSegment.open();
         m_writeSegment.initNumEntries();
     }
@@ -475,4 +510,25 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
     }
 
+    @Override
+    public synchronized boolean isEmpty() throws IOException {
+        if (m_writeSegment == null) {
+            throw new IOException("Closed");
+        }
+        DequeSegment segment = m_finishedSegments.get(m_currentPollSegmentIndex);
+        if (segment == null) {
+            assert(m_writeSegment.m_index.equals(m_currentPollSegmentIndex));
+            //See if we can steal the write segment, otherwise return null
+            if (m_writeSegment.getNumEntries() > 0) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+        return segment.m_objectReadIndex >= segment.getNumEntries();
+    }
+
+    public long sizeInBytes() {
+        return m_sizeInBytes.get();
+    }
 }

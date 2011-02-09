@@ -175,7 +175,7 @@ class Table {
         return m_usedTupleCount;
     }
 
-    int64_t allocatedTupleMemory() const {
+    virtual int64_t allocatedTupleMemory() const {
         return allocatedBlockCount() * m_tableAllocationSize;
     }
 
