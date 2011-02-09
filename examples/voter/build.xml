@@ -8,11 +8,17 @@
     <invoke-java  classname="com.ClientVoter">
         <arg value="6"/>                                <!-- total number of contestants (maximum 12) -->
         <arg value="2"/>                                <!-- number of votes allowed per phone number -->
-        <arg value="100000"/>                           <!-- maximum number of votes per second this client can generate -->
+        <arg value="1000000"/>                          <!-- maximum number of votes per second this client can generate (used as starting point only when auto-tuning is on) NOTE: Rounded to thousands -->
         <arg value="5"/>                                <!-- client application feedback interval (seconds) -->
         <arg value="120"/>                              <!-- client application duration (seconds) -->
         <arg value="3"/>                                <!-- number of seconds to wait before recording latency information -->
         <arg value="localhost"/>                        <!-- comma separated list of servers to connect to -->
+
+        <arg value="true" />                            <!-- whether auto-tuning should be turned on, allowing the benchmark to determine optimal parameters for a given target latency -->
+        <arg value="5.0" />                             <!-- auto-tuning target average latency (no-compression single node: 3ms, no compression multi-node: 10ms) -->
+        <arg value="0.99" />                            <!-- auto-tuning adjustment rate: the tuning process will decrease requested SPC/s to FACTOR*observed-SPC/s until the target latency is reached -->
+        <arg value="2" />                               <!-- auto-tuning interval (in seconds) -->
+
     </invoke-java>
 </target>
 

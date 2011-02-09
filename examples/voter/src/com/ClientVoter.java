@@ -48,6 +48,11 @@ public class ClientVoter {
     public static long tot_executions_latency = 0;
     public static long[] latency_counter = new long[] {0,0,0,0,0,0,0,0,0};
 
+    public static long cycle_min_execution_milliseconds = 999999999l;
+    public static long cycle_max_execution_milliseconds = -1l;
+    public static long cycle_tot_execution_milliseconds = 0;
+    public static long cycle_tot_executions_latency = 0;
+
     public static long[] vote_result_counter = new long[] {0,0,0};
 
     public static boolean checkLatency = false;
@@ -77,12 +82,21 @@ public class ClientVoter {
                         tot_executions_latency++;
                         tot_execution_milliseconds += execution_time;
 
+                        cycle_tot_executions_latency++;
+                        cycle_tot_execution_milliseconds += execution_time;
+
                         if (execution_time < min_execution_milliseconds) {
                             min_execution_milliseconds = execution_time;
+                        }
+                        if (execution_time < cycle_min_execution_milliseconds) {
+                            cycle_min_execution_milliseconds = execution_time;
                         }
 
                         if (execution_time > max_execution_milliseconds) {
                             max_execution_milliseconds = execution_time;
+                        }
+                        if (execution_time > cycle_max_execution_milliseconds) {
+                            cycle_max_execution_milliseconds = execution_time;
                         }
 
                         // change latency to bucket
@@ -101,10 +115,10 @@ public class ClientVoter {
 
 
     public static void main(String args[]) {
-        if (args.length != 7) {
+        if (args.length != 11) {
             System.err.println("ClientVoter [number of contestants] [votes per phone number] " +
                     "[transactions per second] [client feedback interval (seconds)] " +
-                    "[test duration (seconds)] [lag record delay (seconds)] [server list (comma separated)]");
+                    "[test duration (seconds)] [lag record delay (seconds)] [server list (comma separated)] [auto-tuning] [target latency ms] [adjustment rate] [adjustment interval]");
             System.exit(1);
         }
 
@@ -115,7 +129,8 @@ public class ClientVoter {
         }
 
         long maxVotesPerPhoneNumber = Long.valueOf(args[1]);
-        long transactions_per_second = Long.valueOf(args[2]);
+        long transactions_per_second_requested = Long.valueOf(args[2]);
+        long transactions_per_second = transactions_per_second_requested;
         long transactions_per_milli = transactions_per_second / 1000l;
         long client_feedback_interval_secs = Long.valueOf(args[3]);
         long test_duration_secs = Long.valueOf(args[4]);
@@ -124,6 +139,14 @@ public class ClientVoter {
         long lag_latency_millis = lag_latency_seconds * 1000l;
         long thisOutstanding = 0;
         long lastOutstanding = 0;
+
+        boolean use_auto_tuning = Boolean.valueOf(args[7]) && (transactions_per_second > 1000);
+        double auto_tuning_target_latency_millis = Double.valueOf(args[8]);
+        double auto_tuning_adjustment_rate = Double.valueOf(args[9]);
+        if (auto_tuning_adjustment_rate > 1.0) {
+            auto_tuning_adjustment_rate = auto_tuning_adjustment_rate / 100.0;
+        }
+        long auto_tuning_interval_secs = Long.valueOf(args[10]);
 
         String[] contestantNames = {"Edwina Burnam",
                                     "Tabatha Gehling",
@@ -143,6 +166,12 @@ public class ClientVoter {
         System.out.printf("Feedback interval = %,d second(s)\n",client_feedback_interval_secs);
         System.out.printf("Running for %,d second(s)\n",test_duration_secs);
         System.out.printf("Latency not recorded for %d second(s)\n",lag_latency_seconds);
+        if (use_auto_tuning) {
+            System.out.println("Auto-Tuning = ON");
+            System.out.printf(" - Tuning interval = %,d second(s)\n", auto_tuning_interval_secs);
+            System.out.printf(" - Target latency = %.2f ms\n", auto_tuning_target_latency_millis);
+            System.out.printf(" - Adjustment rate = %.2f%%\n", auto_tuning_adjustment_rate * 100.0);
+        }
 
         long phoneNumber;
         byte contestantNumber;
@@ -196,13 +225,16 @@ public class ClientVoter {
         long endTime = startTime + (1000l * test_duration_secs);
         long currentTime = startTime;
         long lastFeedbackTime = startTime;
+        long lastAutoTuningTime = startTime;
         long num_sp_calls = 0;
+        long cycle_num_sp_calls = 0;
         long startRecordingLatency = startTime + lag_latency_millis;
 
         AsyncCallback callBack = new AsyncCallback();
 
         while (endTime > currentTime) {
             num_sp_calls++;
+            cycle_num_sp_calls++;
 
             // produce phone numbers between 2xx-xxx-xxxx and 9xx-xxx-xxxx
             phoneNumber = 2000000000l + (Math.abs(rand.nextLong()) % 8000000000l);
@@ -239,6 +271,46 @@ public class ClientVoter {
                 checkLatency = true;
             }
 
+            if (use_auto_tuning && (currentTime >= (lastAutoTuningTime + (auto_tuning_interval_secs * 1000)))) {
+
+                long cycle_elapsedTimeMillis2 = System.currentTimeMillis()-lastAutoTuningTime;
+                float cycle_elapsedTimeSec2 = cycle_elapsedTimeMillis2/1000F;
+                lastAutoTuningTime = currentTime;
+
+                counterLock.lock();
+                try {
+                    // Only adjust if both the cycle and total was below request - avoid *some* random spike from downgrading the system too much
+                    if ((((double) cycle_tot_execution_milliseconds / (double) cycle_tot_executions_latency) > auto_tuning_target_latency_millis) && (((double) tot_execution_milliseconds / (double) tot_executions_latency) > auto_tuning_target_latency_millis))
+                    {
+                        long new_transactions_per_second = (((long)(Math.min(cycle_num_sp_calls / cycle_elapsedTimeSec2,transactions_per_second) * auto_tuning_adjustment_rate))/1000l)*1000l;
+                        String last_tuning_warning = "";
+                        if ((new_transactions_per_second <= 1000) || (new_transactions_per_second == transactions_per_second)) {
+                            use_auto_tuning = false;
+                            last_tuning_warning = " | WARNING: Minimum load boundary reached.  Auto-Tuning De-activated";
+                        }
+
+                        System.out.printf("Auto-Tuning | Observed: %,.2f SPC/sec | Latency: min = %d | max = %d | avg = %.2f | Adjusting to %,d SPC/s%s\n"
+                                         , (cycle_num_sp_calls / cycle_elapsedTimeSec2)
+                                         , cycle_min_execution_milliseconds
+                                         , cycle_max_execution_milliseconds
+                                         , ((double) cycle_tot_execution_milliseconds / (double) cycle_tot_executions_latency)
+                                         , new_transactions_per_second
+                                         , last_tuning_warning
+                                         );
+                        transactions_per_second = new_transactions_per_second;
+                        transactions_per_milli = transactions_per_second/1000l;
+                    }
+
+                    cycle_num_sp_calls = 0;
+
+                    cycle_min_execution_milliseconds = 999999999l;
+                    cycle_max_execution_milliseconds = -1l;
+                    cycle_tot_execution_milliseconds = 0;
+                    cycle_tot_executions_latency = 0;
+                } finally {
+                    counterLock.unlock();
+                }
+            }
             if (currentTime >= (lastFeedbackTime + (client_feedback_interval_secs * 1000))) {
                 final long elapsedTimeMillis2 = System.currentTimeMillis()-startTime;
                 lastFeedbackTime = currentTime;
@@ -335,6 +407,12 @@ public class ClientVoter {
         System.out.printf(" -   Latency 150ms - 175ms = %,d\n",latency_counter[6]);
         System.out.printf(" -   Latency 175ms - 200ms = %,d\n",latency_counter[7]);
         System.out.printf(" -   Latency 200ms+        = %,d\n",latency_counter[8]);
+        if (transactions_per_second < transactions_per_second_requested) {
+            System.out.println("*************************************************************************");
+            System.out.println("Auto-Tuning Results");
+            System.out.println("*************************************************************************");
+            System.out.printf(" - Optimal Load: %,d SPC/s to match/approach desired %.2f ms Latency\n", transactions_per_second, auto_tuning_target_latency_millis);
+        }
 
         try {
             voltclient.close();
