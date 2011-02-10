@@ -61,7 +61,7 @@
       <xsd:element name="procedures" type="proceduresType"/>
       <xsd:element name="partitions" type="partitionsType" minOccurs="0"/>
       <xsd:element name="classdependencies" type="classdependenciesType" minOccurs="0"/>
-      <xsd:element name="exports" type="exportsType" minOccurs="0"/>
+      <xsd:element name="export" type="exportType" minOccurs="0"/>
     </xsd:all>
     <xsd:attribute name="name" type="xsd:string" use="optional" default="database"/>
   </xsd:complexType>
@@ -139,33 +139,23 @@
   </xsd:complexType>
 
   <!-- <exports> -->
-  <xsd:complexType name="exportsType">
+  <xsd:complexType name="exportType">
     <xsd:sequence>
-      <!-- <connector> -->
-      <xsd:element name="connector" minOccurs="0" maxOccurs="1">
-	<xsd:complexType>
-          <xsd:all>
-            <!-- <tables> -->
-            <xsd:element name="tables" minOccurs="0">
+      <!-- <tables> -->
+      <xsd:element name="tables" minOccurs="0" maxOccurs="1">
+        <xsd:complexType>
+          <xsd:sequence>
+            <!-- <table> -->
+            <xsd:element name="table" minOccurs="0" maxOccurs="unbounded">
               <xsd:complexType>
-		<xsd:sequence>
-		  <!-- <table> -->
-		  <xsd:element name="table" minOccurs="0" maxOccurs="unbounded">
-		    <xsd:complexType>
-                      <xsd:attribute name="name" type="xsd:string" use="required"/>
-                      <xsd:attribute name="exportonly" type="xsd:boolean" default="false"/>
-		    </xsd:complexType>
-		  </xsd:element>
-		</xsd:sequence>
+                <xsd:attribute name="name" type="xsd:string" use="required"/>
               </xsd:complexType>
             </xsd:element>
-	  </xsd:all>
-	  <!-- connector attributes -->
-          <xsd:attribute name="class" type="xsd:string" use="required"/>
-          <xsd:attribute name="groups" type="xsd:string"/>
-	</xsd:complexType>
+          </xsd:sequence>
+        </xsd:complexType>
       </xsd:element>
     </xsd:sequence>
+    <xsd:attribute name="groups" type="xsd:string"/>
   </xsd:complexType>
 
 </xsd:schema>

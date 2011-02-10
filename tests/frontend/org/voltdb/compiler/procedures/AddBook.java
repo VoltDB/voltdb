@@ -26,7 +26,8 @@ package org.voltdb.compiler.procedures;
 import org.voltdb.*;
 
 @ProcInfo (
-    singlePartition = false
+    partitionInfo = "books.cash: 0",
+    singlePartition = true
 )
 public class AddBook extends VoltProcedure {
     class ExtraClass {

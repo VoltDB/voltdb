@@ -71,7 +71,7 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
-import org.voltdb.compiler.deploymentfile.ExportsType;
+import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
@@ -450,7 +450,7 @@ public abstract class CatalogUtil {
         setHTTPDInfo(catalog, deployment.getHttpd());
 
 
-        setExportInfo( catalog, deployment.getExports());
+        setExportInfo( catalog, deployment.getExport());
 
         return getDeploymentCRC(deployment);
     }
@@ -721,8 +721,8 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
      */
-    private static void setExportInfo(Catalog catalog, ExportsType exportsType) {
-        if (exportsType == null) {
+    private static void setExportInfo(Catalog catalog, ExportType exportType) {
+        if (exportType == null) {
             return;
         }
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -730,9 +730,10 @@ public abstract class CatalogUtil {
         // Catalog Connector
         // Relying on schema's enforcement of at most 1 connector
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
+        catconn.setLoaderclass(exportType.getClazz());
         // Figure out if the connector is enabled or disabled
         // Export will be disabled if there is no destination.
-        boolean adminstate = exportsType.getConnector().isEnabled();
+        boolean adminstate = exportType.isEnabled();
 
         if (!adminstate) {
             hostLog.info("Export configuration is present and is " +

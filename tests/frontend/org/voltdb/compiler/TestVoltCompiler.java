@@ -451,10 +451,10 @@ public class TestVoltCompiler extends TestCase {
 
     public void testXMLFileWithDDL() throws IOException {
         final String simpleSchema1 =
-            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash));";
         // newline inserted to test catalog friendliness
         final String simpleSchema2 =
-            "create table books2\n (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books2\n (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
         final String schemaPath1 = schemaFile1.getPath();
@@ -481,6 +481,7 @@ public class TestVoltCompiler extends TestCase {
             "<sql>select * from books;</sql>" +
             "</procedure>" +
             "</procedures>" +
+            "  <partitions><partition table='books' column='cash'/></partitions> " +
             "<!-- xml comment check -->" +
             "</database>" +
             "<!-- xml comment check -->" +
@@ -766,7 +767,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testXMLFileWithELEnabled() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -775,12 +776,12 @@ public class TestVoltCompiler extends TestCase {
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             " <database name='database'>" +
+            "  <partitions><partition table='books' column='cash'/></partitions> " +
             "  <schemas><schema path='" + schemaPath + "' /></schemas>" +
             "  <procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "  <exports><connector class='org.voltdb.VerticaLoader'> " +
-            "             <tables><table name='books' exportonly='true'/></tables>" +
-            "           </connector>" +
-            "  </exports>" +
+            "  <export>" +
+            "    <tables><table name='books'/></tables>" +
+            "  </export>" +
             " </database>" +
             "</project>";
 
@@ -900,7 +901,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testMaterializedView() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
+            "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
             "create view matt (title, num, foo) as select title, count(*), sum(cash) from books group by title;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
@@ -911,6 +912,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<partitions><partition table='books' column='cash'/></partitions> " +
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "</database>" +
             "</project>";

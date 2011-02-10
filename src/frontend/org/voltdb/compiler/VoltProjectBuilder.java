@@ -675,13 +675,10 @@ public class VoltProjectBuilder {
             classdeps.appendChild(supp);
         }
 
-        // project/database/exports
+        // project/database/export
         if (m_elloader != null) {
-            final Element exports = doc.createElement("exports");
-            database.appendChild(exports);
-
-            final Element conn = doc.createElement("connector");
-            conn.setAttribute("class", m_elloader);
+            final Element export = doc.createElement("export");
+            database.appendChild(export);
 
             // turn list into stupid comma separated attribute list
             String groupsattr = "";
@@ -694,20 +691,16 @@ public class VoltProjectBuilder {
                         groupsattr += "," + s;
                     }
                 }
-                conn.setAttribute("groups", groupsattr);
+                export.setAttribute("groups", groupsattr);
             }
-
-            exports.appendChild(conn);
 
             if (m_exportTables.size() > 0) {
                 final Element tables = doc.createElement("tables");
-                conn.appendChild(tables);
+                export.appendChild(tables);
 
                 for (String exportTableName : m_exportTables) {
                     final Element table = doc.createElement("table");
                     table.setAttribute("name", exportTableName);
-                    // as of v1.3, all export tables are export only
-                    table.setAttribute("exportonly", "true");
                     tables.appendChild(table);
                 }
             }
@@ -862,16 +855,12 @@ public class VoltProjectBuilder {
         httpd.appendChild(jsonapi);
         deployment.appendChild(httpd);
 
-        // <exports>
+        // <export>
         if (m_elloader != null) {
-            final Element exports = doc.createElement("exports");
-            deployment.appendChild(exports);
-
-            final Element conn = doc.createElement("connector");
-            conn.setAttribute("class", m_elloader);
-            conn.setAttribute("enabled", m_elenabled ? "true" : "false");
-
-            exports.appendChild(conn);
+            final Element export = doc.createElement("export");
+            deployment.appendChild(export);
+            export.setAttribute("class", m_elloader);
+            export.setAttribute("enabled", m_elenabled ? "true" : "false");
         }
 
         // boilerplate to write this DOM object to file.
