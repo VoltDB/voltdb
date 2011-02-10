@@ -1099,7 +1099,9 @@ void VoltDBIPC::pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb
     } else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[13]) = 0;
     }
-    *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[21]) = sync ? 1 : 0;
+    *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[21]) = 
+        sync ?
+            static_cast<int8_t>(1) : static_cast<int8_t>(0);
     if (block != NULL) {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[22]) = htonl(block->rawLength());
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 26);
