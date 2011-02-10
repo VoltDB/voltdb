@@ -1,3 +1,12 @@
+if [ $# != 1 ]; then
+    echo "usage: $0 <tag>"
+    exit 1
+fi
+
+svn co https://svn.voltdb.com/doc/tags/$1 doc
+svn co https://svn.voltdb.com/eng/tags/$1 eng
+svn co https://svn.voltdb.com/pro/tags/$1 pro
+
 mkdir -p ~/releases/`cat eng/version.txt`
 cd eng
 svn status
