@@ -14,9 +14,14 @@ Many attributes of the application are customizable through arguments passed to 
   - Percentage of transactions that are "Gets" (out of 100%, the rest are "Puts")
   - Store the "Value" as is (text), Base64 encode the "Value" (uncompressible binary), or Compress/Base64 encode the "Value" (compressible binary)
 
-
 These attributes can be adjusted by modifying the arguments to the "client" and "client-threaded" targets in the Ant build script.
 
+Additional arguments allow the client to automatically "tune" itself for optimal performance ("client" target only).
+
+  - Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
+  - Target average transaction call latency (in milliseconds)
+  - Adjustment rate: the tuning process decreases the number of requested transactions per second to FACTOR*<observed-TPS> until the target latency is reached
+  - Auto-tuning interval (in seconds)
 
 While this example application demonstrates how to implement a Key-Value system using VoltDB, it also implements the following:
 
@@ -35,9 +40,21 @@ This application supports logging using log4j and is delivered with log4j config
 Interpreting the Results
 ------------------------
 
-Increasing the total number of servers or number of partitions on a server may not improve the performance of your VoltDB cluster for this application.
-Keep an eye on your client bandwidth to see if you are using all your available network bandwidth.
+The default client configuration will allow the system to automatically tune itself for optimal performance, regardless of your underlying hardware and cluster deployment.
 
+The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion transactions per second, or 1B TPS).  Within 5 seconds, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency within 10 ms.
+
+You can also turn Auto-Tuning off to experiment with different loads and better understand why proper tuning is key to getting the most of your specific VoltDB deployment.
+
+Rate-limiting your clients (or adding cluster nodes) is essential to preventing "fire-hosing" your server (cluster) and will ensure you get proper application responsiveness (latency) while maximizing througput (TPS) for your hardware configuration.
+
+While the "Key-Value" application is designed with benchmarking in mind, it is essentially a network-bound application: you will generally find that you max-out your network bandwidth long before you reach "impressive" pure database throughput (TPS) numbers.
+
+For a better feel for the type of performance VoltDB is capable of on your hardware, check out the "Voter" application sample.
+
+For more on benchmarking and tips on application tuning, make sure you visit the VoltDB blog:
+ - http://voltdb.com/search/node/benchmark
+ - http://voltdb.com/search/node/tuning
 
 Multi-Threaded Client
 ------------------------

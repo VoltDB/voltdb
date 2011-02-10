@@ -14,6 +14,12 @@ Many attributes of the application are customizable through arguments passed to 
 
 These attributes can be adjusted by modifying the arguments to the "client" target in the Ant build script.
 
+Additional arguments allow the client to automatically "tune" itself for optimal performance
+
+  - Target average SP Call latency (in ms)
+  - Adjustment rate: the tuning process will decrease requested SPC/s to FACTOR*observed-SPC/s until the target latency is reached
+  - auto-tuning interval (in seconds)
+
 Measuring Performance
 ---------------------
 
@@ -32,12 +38,19 @@ To test the example on a different configuration, simply edit the Ant build.xml,
 
 Interpreting the Results
 ------------------------
-Running the Voter example on a single node, the client process is likely to submit transactions faster than the server process can execute them. As a result, although the throughput is substantially higher than traditional database products, the latency figures may be high.
+The default client configuration will allow the system to automatically tune itself for optimal performance, regardless of your underlying hardware and cluster deployment.
 
-If the latency is high, it is likely that the clients are "firehosing" the server. Try rate-limiting the client process or adding one or more server nodes to increase performance capacity.
+The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion SP Calls per secon - 1B SPC/s).  Within 5 second, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency within 10 ms.
 
-By using a cluster of server nodes, you can get both exemplary throughput (TPS) and competitive latency figures. Using a mixture of rate-limiting the clients and different client/server configurations, the voter application can give you a good feel for the type of performance VoltDB is capable of on your hardware.
+You can also turn Auto-Tuning off to experiment with different loads and better understand why proper tuning is key to getting the most of your specific VoltDB deployment.
 
+Rate-limiting your clients (or adding cluster nodes) is essential to preventing "fire-hosing" your server (cluster) and will ensure you get proper application responsiveness (latency) while maximizing througput (TPS) for your hardware configuration.
+
+The "Voter" application is specifically designed for benchmarking to give you a good feel for the type of performance VoltDB is capable of on your hardware.
+
+For more on benchmarking and tips on application tuning, make sure you visit the VoltDB blog:
+ - http://voltdb.com/search/node/benchmark
+ - http://voltdb.com/search/node/tuning
 
 ant targets
 -----------

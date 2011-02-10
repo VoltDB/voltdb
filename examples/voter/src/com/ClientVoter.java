@@ -162,7 +162,7 @@ public class ClientVoter {
                                     "Tania Mattioli"};
 
         System.out.printf("Allowing %d votes per phone number\n",maxVotesPerPhoneNumber);
-        System.out.printf("Submitting %,d SP Calls/sec\n",transactions_per_second);
+        System.out.printf("Submitting %,d Transactions/sec (TPS)\n",transactions_per_second);
         System.out.printf("Feedback interval = %,d second(s)\n",client_feedback_interval_secs);
         System.out.printf("Running for %,d second(s)\n",test_duration_secs);
         System.out.printf("Latency not recorded for %d second(s)\n",lag_latency_seconds);
@@ -289,7 +289,7 @@ public class ClientVoter {
                             last_tuning_warning = " | WARNING: Minimum load boundary reached.  Auto-Tuning De-activated";
                         }
 
-                        System.out.printf("Auto-Tuning | Observed: %,.2f SPC/sec | Latency: min = %d | max = %d | avg = %.2f | Adjusting to %,d SPC/s%s\n"
+                        System.out.printf("Auto-Tuning | Observed: %,.2f TPS | Latency: min = %d | max = %d | avg = %.2f | Adjusting to %,d TPS%s\n"
                                          , (cycle_num_sp_calls / cycle_elapsedTimeSec2)
                                          , cycle_min_execution_milliseconds
                                          , cycle_max_execution_milliseconds
@@ -333,7 +333,7 @@ public class ClientVoter {
 
                     double avgLatency = (double) tot_execution_milliseconds / (double) tot_executions_latency;
 
-                    System.out.printf("%.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, avgLatency);
+                    System.out.printf("%.3f%% Complete | Transactions: %,d at %,.2f TPS | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, avgLatency);
 
                     lastOutstanding = thisOutstanding;
                 } finally {
@@ -411,7 +411,7 @@ public class ClientVoter {
             System.out.println("*************************************************************************");
             System.out.println("Auto-Tuning Results");
             System.out.println("*************************************************************************");
-            System.out.printf(" - Optimal Load: %,d SPC/s to match/approach desired %.2f ms Latency\n", transactions_per_second, auto_tuning_target_latency_millis);
+            System.out.printf(" - Optimal Load: %,d TPS to match/approach desired %.2f ms Latency\n", transactions_per_second, auto_tuning_target_latency_millis);
         }
 
         try {

@@ -20,10 +20,10 @@
         <arg value="75"/>                                          <!-- percentage of gets (vs. puts) once populated -->
         <arg value="1"/>                                           <!-- 1 = store payload (text), 2 = base64 encode payload (binary), 3 = base64 encode and compress payload -->
 
-        <arg value="true" />                                       <!-- whether auto-tuning should be turned on, allowing the benchmark to determine optimal parameters for a given target latency -->
-        <arg value="3.0" />                                        <!-- auto-tuning target average latency (no-compression single node: 3ms, no compression multi-node: 10ms) -->
-        <arg value="0.95" />                                       <!-- auto-tuning adjustment rate: the tuning process will decrease requested SPC/s to FACTOR*observed-SPC/s until the target latency is reached -->
-        <arg value="1" />                                          <!-- auto-tuning interval (in seconds) -->
+        <arg value="true" />                                       <!-- Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency -->
+        <arg value="10.0" />                                       <!-- Target average transaction call latency (in milliseconds) -->
+        <arg value="0.95" />                                       <!-- Adjustment rate: the tuning process decreases the number of requested transactions per second to FACTOR*<observed-TPS> until the target latency is reached -->
+        <arg value="1" />                                          <!-- Auto-tuning interval (in seconds) -->
 
      </invoke-java>
 </target>

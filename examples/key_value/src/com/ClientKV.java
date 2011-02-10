@@ -190,7 +190,7 @@ public class ClientKV {
         long put_value_compressed_bytes = 0;
         long put_value_uncompressed_bytes = 0;
 
-        m_logger.info(String.format("Submitting %,d SP Calls/sec",transactions_per_second));
+        m_logger.info(String.format("Submitting %,d Transactions/sec (TPS)",transactions_per_second));
         if (use_auto_tuning) {
             m_logger.info(String.format("Auto-Tuning = ON"));
             m_logger.info(String.format(" - Tuning interval = %,d second(s)", auto_tuning_interval_secs));
@@ -385,7 +385,7 @@ public class ClientKV {
                         }
 
                         String currentDate = new Date().toString();
-                        m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_puts, (num_puts / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency),readMBPerSecond,writeMBPerSecond));
+                        m_logger.info(String.format("[%s] %.3f%% Complete | Transactions: %,d at %,.2f TPS | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_puts, (num_puts / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency),readMBPerSecond,writeMBPerSecond));
 
                         lastOutstanding = thisOutstanding;
                     }
@@ -416,10 +416,10 @@ public class ClientKV {
             m_logger.info(String.format("Checking Results - Populating Initial Data"));
             m_logger.info(String.format("*************************************************************************"));
             m_logger.info(String.format(" - System ran for %12.4f seconds",elapsedTimeSec));
-            m_logger.info(String.format(" - SP Calls / GETS / PUTS   = %,d / %,d / %,d",num_gets + num_puts, num_gets, num_puts));
-            m_logger.info(String.format(" - SP calls per second = %,.2f",num_puts / elapsedTimeSec));
-            m_logger.info(String.format(" -     GETS per second = %,.2f",num_gets / elapsedTimeSec));
-            m_logger.info(String.format(" -     PUTS per second = %,.2f",num_puts / elapsedTimeSec));
+            m_logger.info(String.format(" - Transactions / GETS / PUTS   = %,d / %,d / %,d",num_gets + num_puts, num_gets, num_puts));
+            m_logger.info(String.format(" - Transactions per second = %,.2f",num_puts / elapsedTimeSec));
+            m_logger.info(String.format(" -         GETS per second = %,.2f",num_gets / elapsedTimeSec));
+            m_logger.info(String.format(" -         PUTS per second = %,.2f",num_puts / elapsedTimeSec));
             m_logger.info(String.format(" - PUTS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",put_value_uncompressed_bytes,put_value_compressed_bytes,((double) put_value_compressed_bytes / (double) put_value_uncompressed_bytes) * 100.0, (double) put_value_uncompressed_bytes / (double) num_puts));
             m_logger.info(String.format(" - GETS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",get_value_uncompressed_bytes,get_value_compressed_bytes,((double) get_value_compressed_bytes / (double) get_value_uncompressed_bytes) * 100.0, (double) get_value_uncompressed_bytes / (double) num_gets));
             m_logger.info(String.format(" - Average Latency = %.2f ms",((double) tot_execution_milliseconds / (double) tot_executions_latency)));
@@ -565,7 +565,7 @@ public class ClientKV {
                             last_tuning_warning = " | WARNING: Minimum load boundary reached.  Auto-Tuning De-activated";
                         }
 
-                        m_logger.info(String.format("[%s] Auto-Tuning | Observed: %,.2f SPC/sec | Latency: min = %d | max = %d | avg = %.2f | Adjusting to %,d SPC/s%s"
+                        m_logger.info(String.format("[%s] Auto-Tuning | Observed: %,.2f TPS | Latency: min = %d | max = %d | avg = %.2f | Adjusting to %,d TPS%s"
                                                    , new Date().toString()
                                                    , (cycle_num_sp_calls / cycle_elapsedTimeSec2)
                                                    , cycle_min_execution_milliseconds
@@ -627,7 +627,7 @@ public class ClientKV {
                     }
 
                     String currentDate = new Date().toString();
-                    m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f"
+                    m_logger.info(String.format("[%s] %.3f%% Complete | Transactions: %,d at %,.2f TPS | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f"
                                                , currentDate
                                                , percentComplete
                                                , num_sp_calls
@@ -671,10 +671,10 @@ public class ClientKV {
         m_logger.info(String.format("Checking Results - Get/Put Benchmark"));
         m_logger.info(String.format("*************************************************************************"));
         m_logger.info(String.format(" - System ran for %12.4f seconds",elapsedTimeSec));
-        m_logger.info(String.format(" - SP Calls / GETS / PUTS   = %,d / %,d / %,d",num_sp_calls, num_gets, num_puts));
-        m_logger.info(String.format(" - SP calls per second = %,.2f",num_sp_calls / elapsedTimeSec));
-        m_logger.info(String.format(" -     GETS per second = %,.2f",num_gets / elapsedTimeSec));
-        m_logger.info(String.format(" -     PUTS per second = %,.2f",num_puts / elapsedTimeSec));
+        m_logger.info(String.format(" - Transactions / GETS / PUTS   = %,d / %,d / %,d",num_sp_calls, num_gets, num_puts));
+        m_logger.info(String.format(" - Transactions per second = %,.2f",num_sp_calls / elapsedTimeSec));
+        m_logger.info(String.format(" -         GETS per second = %,.2f",num_gets / elapsedTimeSec));
+        m_logger.info(String.format(" -         PUTS per second = %,.2f",num_puts / elapsedTimeSec));
         m_logger.info(String.format(" - PUTS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",put_value_uncompressed_bytes,put_value_compressed_bytes,((double) put_value_compressed_bytes / (double) put_value_uncompressed_bytes) * 100.0, (double) put_value_uncompressed_bytes / (double) num_puts));
         m_logger.info(String.format(" - GETS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",get_value_uncompressed_bytes,get_value_compressed_bytes,((double) get_value_compressed_bytes / (double) get_value_uncompressed_bytes) * 100.0, (double) get_value_uncompressed_bytes / (double) num_gets));
         m_logger.info(String.format(" - Average Latency = %.2f ms",((double) tot_execution_milliseconds / (double) tot_executions_latency)));
@@ -691,7 +691,7 @@ public class ClientKV {
             m_logger.info(String.format("*************************************************************************"));
             m_logger.info(String.format("Auto-Tuning Results"));
             m_logger.info(String.format("*************************************************************************"));
-            m_logger.info(String.format(" - Optimal Load: %,d SPC/s to match/approach desired %.2f ms Latency", transactions_per_second, auto_tuning_target_latency_millis));
+            m_logger.info(String.format(" - Optimal Load: %,d TPS to match/approach desired %.2f ms Latency", transactions_per_second, auto_tuning_target_latency_millis));
         }
         try {
             voltclient.close();

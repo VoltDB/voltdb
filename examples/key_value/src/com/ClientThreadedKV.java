@@ -304,7 +304,7 @@ public class ClientThreadedKV {
         final int percent_gets = Integer.valueOf(args[9]);
         final int behavior_type = Integer.valueOf(args[10]);
 
-        m_logger.info(String.format("Submitting %,d SP Calls/sec",transactions_per_second));
+        m_logger.info(String.format("Submitting %,d Transactions/sec (TPS)",transactions_per_second));
         m_logger.info(String.format("Feedback interval = %,d second(s)",client_feedback_interval_secs));
         m_logger.info(String.format("Running for %,d second(s)",test_duration_secs));
         m_logger.info(String.format("Latency not recorded for %d second(s)",lag_latency_seconds));
@@ -492,7 +492,7 @@ public class ClientThreadedKV {
                         }
 
                         String currentDate = new Date().toString();
-                        m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_puts, (num_puts / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency),readMBPerSecond,writeMBPerSecond));
+                        m_logger.info(String.format("[%s] %.3f%% Complete | Transactions: %,d at %,.2f TPS | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_puts, (num_puts / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency),readMBPerSecond,writeMBPerSecond));
 
                         lastOutstanding = thisOutstanding;
                     }
@@ -523,10 +523,10 @@ public class ClientThreadedKV {
             m_logger.info(String.format("Checking Results - Populating Initial Data"));
             m_logger.info(String.format("*************************************************************************"));
             m_logger.info(String.format(" - System ran for %12.4f seconds",elapsedTimeSec));
-            m_logger.info(String.format(" - SP Calls / GETS / PUTS   = %,d / %,d / %,d",num_gets + num_puts, num_gets, num_puts));
-            m_logger.info(String.format(" - SP calls per second = %,.2f",num_puts / elapsedTimeSec));
-            m_logger.info(String.format(" -     GETS per second = %,.2f",num_gets / elapsedTimeSec));
-            m_logger.info(String.format(" -     PUTS per second = %,.2f",num_puts / elapsedTimeSec));
+            m_logger.info(String.format(" - Transactions / GETS / PUTS   = %,d / %,d / %,d",num_gets + num_puts, num_gets, num_puts));
+            m_logger.info(String.format(" - Transactions per second = %,.2f",num_puts / elapsedTimeSec));
+            m_logger.info(String.format(" -         GETS per second = %,.2f",num_gets / elapsedTimeSec));
+            m_logger.info(String.format(" -         PUTS per second = %,.2f",num_puts / elapsedTimeSec));
             m_logger.info(String.format(" - PUTS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",put_value_uncompressed_bytes,put_value_compressed_bytes,((double) put_value_compressed_bytes / (double) put_value_uncompressed_bytes) * 100.0, (double) put_value_uncompressed_bytes / (double) num_puts));
             m_logger.info(String.format(" - GETS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",get_value_uncompressed_bytes.get(),get_value_compressed_bytes,(get_value_compressed_bytes / (double) get_value_uncompressed_bytes.get()) * 100.0, (double) get_value_uncompressed_bytes.get() / num_gets));
             m_logger.info(String.format(" - Average Latency = %.2f ms",((double) tot_execution_milliseconds / (double) tot_executions_latency)));
@@ -641,7 +641,7 @@ public class ClientThreadedKV {
                     }
 
                     String currentDate = new Date().toString();
-                    m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency), readMBPerSecond, writeMBPerSecond));
+                    m_logger.info(String.format("[%s] %.3f%% Complete | Transactions: %,d at %,.2f TPS | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency), readMBPerSecond, writeMBPerSecond));
 
                     lastOutstanding = thisOutstanding;
                 }
@@ -696,10 +696,10 @@ public class ClientThreadedKV {
         m_logger.info(String.format("Checking Results - Get/Put Benchmark"));
         m_logger.info(String.format("*************************************************************************"));
         m_logger.info(String.format(" - System ran for %12.4f seconds",elapsedTimeSec));
-        m_logger.info(String.format(" - SP Calls / GETS / PUTS   = %,d / %,d / %,d",num_sp_calls, num_gets, num_puts));
-        m_logger.info(String.format(" - SP calls per second = %,.2f",num_sp_calls / elapsedTimeSec));
-        m_logger.info(String.format(" -     GETS per second = %,.2f",num_gets / elapsedTimeSec));
-        m_logger.info(String.format(" -     PUTS per second = %,.2f",num_puts / elapsedTimeSec));
+        m_logger.info(String.format(" - Transactions / GETS / PUTS   = %,d / %,d / %,d",num_sp_calls, num_gets, num_puts));
+        m_logger.info(String.format(" - Transactions per second = %,.2f",num_sp_calls / elapsedTimeSec));
+        m_logger.info(String.format(" -         GETS per second = %,.2f",num_gets / elapsedTimeSec));
+        m_logger.info(String.format(" -         PUTS per second = %,.2f",num_puts / elapsedTimeSec));
         m_logger.info(String.format(" - PUTS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",put_value_uncompressed_bytes,put_value_compressed_bytes,((double) put_value_compressed_bytes / put_value_uncompressed_bytes) * 100.0, (double) put_value_uncompressed_bytes / num_puts));
         m_logger.info(String.format(" - GETS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",get_value_uncompressed_bytes.get(),get_value_compressed_bytes,(get_value_compressed_bytes / (double) get_value_uncompressed_bytes.get()) * 100.0, (double) get_value_uncompressed_bytes.get() / num_gets));
         m_logger.info(String.format(" - Average Latency = %.2f ms",((double) tot_execution_milliseconds / (double) tot_executions_latency)));
