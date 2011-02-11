@@ -67,6 +67,8 @@ public class MockVoltDB implements VoltDBInterface
         m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
                           m_databaseName);
         Cluster cluster = m_catalog.getClusters().get(m_clusterName);
+        // Set a sane default for TestMessaging (at least)
+        cluster.setHeartbeattimeout(10000);
         assert(cluster != null);
 
         /*Host host = cluster.getHosts().add("0");
