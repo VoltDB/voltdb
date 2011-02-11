@@ -3,6 +3,8 @@ if [ $# != 1 ]; then
     exit 1
 fi
 
+OS=`uname -s | tr [a-z] [A-Z] | sed 's/DARWIN/MAC/'`
+
 svn co https://svn.voltdb.com/doc/tags/$1 doc
 svn co https://svn.voltdb.com/eng/tags/$1 eng
 svn co https://svn.voltdb.com/pro/tags/$1 pro
@@ -11,7 +13,7 @@ mkdir -p ~/releases/`cat eng/version.txt`
 cd eng
 svn status
 ant clean default dist voltbin
-cp obj/release/voltdb-`cat version.txt`.tar.gz ~/releases/`cat version.txt`/LINUX-voltdb-`cat version.txt`.tar.gz
+cp obj/release/voltdb-`cat version.txt`.tar.gz ~/releases/`cat version.txt`/${OS}-voltdb-`cat version.txt`.tar.gz
 cd ../pro
 svn status
 ant -f mmt.xml clean
