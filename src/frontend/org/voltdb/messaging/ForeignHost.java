@@ -41,10 +41,6 @@ import org.voltdb.utils.EstTime;
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    // The amount of time we allow between messages from a host
-    // before deciding that it must be dead.  In millis.
-    static final int DEAD_HOST_TIMEOUT_THRESHOLD = 10000;
-
     private final Connection m_connection;
     final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
@@ -59,6 +55,8 @@ public class ForeignHost {
     // hold onto the socket so we can kill it
     private final Socket m_socket;
 
+    // Set the default here for TestMessaging, which currently has no VoltDB instance
+    private long m_deadHostTimeout = 10000;
     private long m_lastMessageMillis;
 
     private class FHFaultHandler implements FaultHandler
@@ -159,6 +157,10 @@ public class ForeignHost {
                             new FHFaultHandler(),
                             org.voltdb.fault.VoltFault.FaultType.NODE_FAILURE);
             }
+            m_deadHostTimeout = VoltDB.instance().getCatalogContext().
+                                cluster.getHeartbeattimeout() * 1000; // convert to millis
+            hostLog.info("Heartbeat timeout to host: " + m_ipAddress + " is " +
+                         m_deadHostTimeout + " milliseconds");
         }
     }
 
@@ -258,12 +260,13 @@ public class ForeignHost {
         // set m_isUp to false, so use both that and m_closing to
         // avoid repeat reports of a single node failure
         if ((!m_closing && m_isUp) &&
-            (current_delta > DEAD_HOST_TIMEOUT_THRESHOLD))
+            (current_delta > m_deadHostTimeout))
         {
             hostLog.error("DEAD HOST DETECTED, hostname: " + m_remoteHostname);
             hostLog.info("\tcurrent time: " + current_time);
             hostLog.info("\tlast message: " + m_lastMessageMillis);
-            hostLog.info("\tdelta: " + current_delta);
+            hostLog.info("\tdelta (millis): " + current_delta);
+            hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
             VoltDB.instance().getFaultDistributor().
             reportFault(new NodeFailureFault(m_hostId, m_remoteHostname));
         }

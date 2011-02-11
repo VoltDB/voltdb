@@ -19,6 +19,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   bool adminenabled     "Is admin mode enabled?"
   int adminport         "The port number of the admin port"
   bool adminstartup     "Does the server start in admin mode?"
+  int heartbeatTimeout  "How long to wait, in seconds, between messages before deciding a host is dead"
 end
 
 begin Host      "A single host participating in the cluster"

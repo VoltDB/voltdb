@@ -155,23 +155,81 @@ public class TestCatalogUtil extends TestCase {
                             "   </httpd>" +
                             "</deployment>";
 
+        // hearbeat-config section actually impacts CRC, dupe above and add it
+        final String dep5 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                            "<deployment>" +
+                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
+                            "      <admin-mode port='32323' adminstartup='true'/>" +
+                            "      <heartbeat-config timeoutvalue='30'/>" +
+                            "   </cluster>" +
+                            "   <paths><voltroot path=\"/tmp\" /></paths>" +
+                            "   <httpd port='0' >" +
+                            "       <jsonapi enabled='true'/>" +
+                            "   </httpd>" +
+                            "</deployment>";
+
         final File tmpDep1 = VoltProjectBuilder.writeStringToTempFile(dep1);
         final File tmpDep2 = VoltProjectBuilder.writeStringToTempFile(dep2);
         final File tmpDep3 = VoltProjectBuilder.writeStringToTempFile(dep3);
         final File tmpDep4 = VoltProjectBuilder.writeStringToTempFile(dep4);
+        final File tmpDep5 = VoltProjectBuilder.writeStringToTempFile(dep5);
 
         final long crcDep1 = CatalogUtil.getDeploymentCRC(tmpDep1.getPath());
         final long crcDep2 = CatalogUtil.getDeploymentCRC(tmpDep2.getPath());
         final long crcDep3 = CatalogUtil.getDeploymentCRC(tmpDep3.getPath());
         final long crcDep4 = CatalogUtil.getDeploymentCRC(tmpDep4.getPath());
+        final long crcDep5 = CatalogUtil.getDeploymentCRC(tmpDep5.getPath());
 
         assertTrue(crcDep1 > 0);
         assertTrue(crcDep2 > 0);
         assertTrue(crcDep3 > 0);
         assertTrue(crcDep4 > 0);
+        assertTrue(crcDep5 > 0);
 
         assertTrue(crcDep1 != crcDep2);
         assertTrue(crcDep1 == crcDep3);
         assertTrue(crcDep3 != crcDep4);
+        assertTrue(crcDep4 != crcDep5);
+    }
+
+    public void testDeploymentHeartbeatConfig()
+    {
+        final String dep =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
+            "      <admin-mode port='32323' adminstartup='true'/>" +
+            "      <heartbeat-config timeoutvalue='30'/>" +
+            "   </cluster>" +
+            "   <paths><voltroot path=\"/tmp\" /></paths>" +
+            "   <httpd port='0' >" +
+            "       <jsonapi enabled='true'/>" +
+            "   </httpd>" +
+            "</deployment>";
+
+        // make sure someone can't give us 0 for timeout value
+        final String boom =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
+            "      <admin-mode port='32323' adminstartup='true'/>" +
+            "      <heartbeat-config timeoutvalue='0'/>" +
+            "   </cluster>" +
+            "   <paths><voltroot path=\"/tmp\" /></paths>" +
+            "   <httpd port='0' >" +
+            "       <jsonapi enabled='true'/>" +
+            "   </httpd>" +
+            "</deployment>";
+
+        final File tmpDep = VoltProjectBuilder.writeStringToTempFile(dep);
+        final File tmpBoom = VoltProjectBuilder.writeStringToTempFile(boom);
+
+        long crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDep.getPath());
+
+        assertEquals(30, catalog.getClusters().get("cluster").getHeartbeattimeout());
+
+        // This returns -1 on schema violation
+        crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpBoom.getPath());
+        assertEquals(-1, crcDep);
     }
 }
