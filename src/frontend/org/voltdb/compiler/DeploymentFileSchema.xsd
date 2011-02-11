@@ -22,8 +22,8 @@
 
     For more information about jaxb, see:
     http://java.sun.com/developer/technicalArticles/WebServices/jaxb/
-    
-    
+
+
     ALSO, if you change this, consider updating:
         CatalogUtil.getDeploymentCRC()
 
@@ -46,6 +46,7 @@
   <xs:complexType name="clusterType">
     <xs:all>
         <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
+        <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
     </xs:all>
     <xs:attribute name="hostcount" type="xs:int" use="required"/>
     <xs:attribute name="sitesperhost" type="xs:int" use="required"/>
@@ -66,6 +67,17 @@
       <xs:attribute name="enabled" type="xs:boolean" default="false"/>
    </xs:complexType>
 
+
+  <!-- <heartbeat-config> -->
+  <xs:complexType name="heartbeatType">
+    <xs:attribute name="timeout" type="timeoutType" use="required"/>
+  </xs:complexType>
+
+  <xs:simpleType name="timeoutType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <!-- <users> -->
   <xs:complexType name="usersType">

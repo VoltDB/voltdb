@@ -14,6 +14,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   bool jsonapi          "Is the http/json interface enabled?"
   bool networkpartition "Is network partition detection enabled?"
   SnapshotSchedule* faultSnapshots "Configuration for snapshots generated in response to faults."
+  int heartbeatTimeout  "How long to wait, in seconds, between messages before deciding a host is dead"
 end
 
 begin Host      "A single host participating in the cluster"

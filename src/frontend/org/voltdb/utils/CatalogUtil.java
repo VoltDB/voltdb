@@ -63,6 +63,7 @@ import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -480,6 +481,13 @@ public abstract class CatalogUtil {
             sb.append(st.getPath()).append("\n");
         }
 
+        sb.append(" HEARTBEATCONFIG ");
+        HeartbeatType hbt = ct.getHeartbeat();
+        if (hbt != null)
+        {
+            sb.append(hbt.getTimeout()).append("\n");
+        }
+
         sb.append(" USERS ");
         UsersType ut = deployment.getUsers();
         if (ut != null) {
@@ -660,6 +668,15 @@ public abstract class CatalogUtil {
                 catCluster.setNetworkpartition(false);
             }
 
+            if (cluster.getHeartbeat() != null)
+            {
+                catCluster.setHeartbeattimeout(cluster.getHeartbeat().getTimeout());
+            }
+            else
+            {
+                // default to 10 seconds
+                catCluster.setHeartbeattimeout(10);
+            }
         }
     }
 
