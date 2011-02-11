@@ -160,7 +160,7 @@ public class TestCatalogUtil extends TestCase {
                             "<deployment>" +
                             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
                             "      <admin-mode port='32323' adminstartup='true'/>" +
-                            "      <heartbeat-config timeoutvalue='30'/>" +
+                            "      <heartbeat timeout='30'/>" +
                             "   </cluster>" +
                             "   <paths><voltroot path=\"/tmp\" /></paths>" +
                             "   <httpd port='0' >" +
@@ -199,7 +199,7 @@ public class TestCatalogUtil extends TestCase {
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
             "      <admin-mode port='32323' adminstartup='true'/>" +
-            "      <heartbeat-config timeoutvalue='30'/>" +
+            "      <heartbeat timeout='30'/>" +
             "   </cluster>" +
             "   <paths><voltroot path=\"/tmp\" /></paths>" +
             "   <httpd port='0' >" +
@@ -213,7 +213,7 @@ public class TestCatalogUtil extends TestCase {
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
             "      <admin-mode port='32323' adminstartup='true'/>" +
-            "      <heartbeat-config timeoutvalue='0'/>" +
+            "      <heartbeat timeout='0'/>" +
             "   </cluster>" +
             "   <paths><voltroot path=\"/tmp\" /></paths>" +
             "   <httpd port='0' >" +

@@ -50,7 +50,7 @@
     <xs:all>
         <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
         <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
-        <xs:element name="heartbeat-config" minOccurs="0" maxOccurs="1" type="heartbeatConfigType"/>
+        <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
     </xs:all>
     <xs:attribute name="hostcount" type="xs:int" use="required"/>
     <xs:attribute name="sitesperhost" type="xs:int" use="required"/>
@@ -77,11 +77,11 @@
   </xs:complexType>
 
   <!-- <heartbeat-config> -->
-  <xs:complexType name="heartbeatConfigType">
-    <xs:attribute name="timeoutvalue" type="timeoutValueType" use="required"/>
+  <xs:complexType name="heartbeatType">
+    <xs:attribute name="timeout" type="timeoutType" use="required"/>
   </xs:complexType>
 
-  <xs:simpleType name="timeoutValueType">
+  <xs:simpleType name="timeoutType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
