@@ -8,4 +8,4 @@ ps -ef | grep "jvm.*java" | grep -v grep | grep -v hudson.war | sed 's/test *//g
 # echo date of current build
 ls -ltr ../builds | tail -1 | awk "{print \$8}"
 # check state of cluster machines
-for i in 1 2 3a 3b 3c 3d 3e 3f 3g 3h 3i 3j 3k 3l 4a 4b 4c; do ssh volt$i tools/check-machine.sh || exit 1; done
+for i in 1 2 3a 3b 3c 3d 3e 3f 3g 3h 3i 3j 3k 3l 4a 4b 4c 5a 5b 5c 5d 5e 5f 6a 6b; do ssh volt$i tools/check-machine.sh || exit 1; done
