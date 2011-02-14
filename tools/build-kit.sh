@@ -5,6 +5,8 @@ fi
 
 OS=`uname -s | tr [a-z] [A-Z] | sed 's/DARWIN/MAC/'`
 
+rm -rf doc eng pro
+
 svn co https://svn.voltdb.com/doc/tags/$1 doc
 svn co https://svn.voltdb.com/eng/tags/$1 eng
 svn co https://svn.voltdb.com/pro/tags/$1 pro
@@ -27,9 +29,11 @@ cd ../eng
 echo "CRC checksums:" > ~/releases/`cat version.txt`/checksums.txt
 echo "" >> ~/releases/`cat version.txt`/checksums.txt
 cksum ~/releases/`cat version.txt`/*.gz >> ~/releases/`cat version.txt`/checksums.txt
+echo "" >> ~/releases/`cat version.txt`/checksums.txt
 echo "MD5 checksums:" >> ~/releases/`cat version.txt`/checksums.txt
 echo "" >> ~/releases/`cat version.txt`/checksums.txt
 md5sum ~/releases/`cat version.txt`/*.gz >> ~/releases/`cat version.txt`/checksums.txt
+echo "" >> ~/releases/`cat version.txt`/checksums.txt
 echo "SHA1 checksums:" >> ~/releases/`cat version.txt`/checksums.txt
 echo "" >> ~/releases/`cat version.txt`/checksums.txt
 sha1sum ~/releases/`cat version.txt`/*.gz >> ~/releases/`cat version.txt`/checksums.txt
