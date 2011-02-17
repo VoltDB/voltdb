@@ -347,7 +347,7 @@ public class ConnectionUtil {
             public Long call() throws Exception {
                 final long handle = m_handle.getAndIncrement();
                 final ProcedureInvocation invocation =
-                    new ProcedureInvocation(handle, procName, -1, parameters);
+                    new ProcedureInvocation(handle, procName, parameters);
 
                 final FastSerializer fs = new FastSerializer();
                 final BBContainer c = fs.writeObjectForMessaging(invocation);

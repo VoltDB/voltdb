@@ -62,7 +62,7 @@ public class GoSleep extends VoltProcedure {
         }
         returnString = tempString;
     }
-    public VoltTable[] run(long sleepTime, int returnData, byte junkData[])
+    public VoltTable[] run(short sleepTime, int returnData, byte junkData[])
     {
         try {
             Thread.sleep(sleepTime);
