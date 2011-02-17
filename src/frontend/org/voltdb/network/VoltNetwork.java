@@ -397,6 +397,7 @@ import org.voltdb.utils.Pair;
                 } catch (Exception ex) {
                     m_logger.error(null, ex);
                 }
+                assert(m_useExecutorService || (m_useExecutorService && m_tasks.isEmpty()));
             }
         } finally {
             p_shutdown();
@@ -485,9 +486,14 @@ import org.voltdb.utils.Pair;
                         port.lockForHandlingWork();
                         port.getKey().interestOps(0);
                     m_selector.selectedKeys().remove(port.getKey());
-                    synchronized (m_tasks) {
-                        m_tasks.offer(getPortCallRunnable(port));
-                        m_tasks.notify();
+                    Runnable r = getPortCallRunnable(port);
+                    if (m_useExecutorService) {
+                        synchronized (m_tasks) {
+                            m_tasks.offer(getPortCallRunnable(port));
+                            m_tasks.notify();
+                        }
+                    } else {
+                        r.run();
                     }
                 } else {
                     resumeSelection(port);
