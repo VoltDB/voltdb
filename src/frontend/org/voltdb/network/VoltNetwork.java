@@ -397,7 +397,7 @@ import org.voltdb.utils.Pair;
                 } catch (Exception ex) {
                     m_logger.error(null, ex);
                 }
-                assert(m_useExecutorService || (m_useExecutorService && m_tasks.isEmpty()));
+                assert(m_useExecutorService || (!m_useExecutorService && m_tasks.isEmpty()));
             }
         } finally {
             p_shutdown();
