@@ -99,7 +99,8 @@ public class VoltPort implements Callable<VoltPort>, Connection
     void setKey (SelectionKey key) {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
-        m_toString = super.toString() + ":" + m_channel.socket().getRemoteSocketAddress().toString();
+        java.net.SocketAddress remoteAddress = m_channel.socket().getRemoteSocketAddress();
+        m_toString = super.toString() + ":" + (remoteAddress == null ? "null" : remoteAddress.toString());
         m_readStream = new NIOReadStream();
         m_writeStream = new NIOWriteStream(
                 this,
