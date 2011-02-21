@@ -57,6 +57,7 @@ public class ExpressionValue extends Expression {
         valueData = o;
     }
 
+    @Override
     public String getSQL() {
 
         switch (opType) {
@@ -73,6 +74,7 @@ public class ExpressionValue extends Expression {
         }
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -96,6 +98,7 @@ public class ExpressionValue extends Expression {
         }
     }
 
+    @Override
     public Object getValue(Session session) {
         return valueData;
     }
@@ -111,6 +114,7 @@ public class ExpressionValue extends Expression {
      * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      */
+    @Override
     String voltGetXML(Session session, String indent) throws HSQLParseException
     {
         StringBuffer sb = new StringBuffer();
@@ -122,38 +126,44 @@ public class ExpressionValue extends Expression {
 
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
-            sb.append(indent).append("<value ").append(include);
-            sb.append("type=\"").append(Types.getTypeName(dataType.typeCode)).append("\" ");
-
-            if (isParam) {
-                sb.append("isparam=\"true\" ");
-            } else {
-                String value = "NULL";
-                if (valueData != null)
-                {
-                    if (valueData instanceof TimestampData)
-                    {
-                        // When we get the default from the DDL,
-                        // it gets jammed into a TimestampData object.  If we
-                        // don't do this, we get a Java class/reference
-                        // string in the output schema for the DDL.
-                        // EL HACKO: I'm just adding in the timezone seconds
-                        // at the moment, hope this is right --izzy
-                        TimestampData time = (TimestampData) valueData;
-                        value =
-                            Long.toString(Math.round((time.getSeconds() +
-                                                      time.getZone()) * 1e6) +
-                                                     time.getNanos() / 1000);
-                    }
-                    else
-                    {
-                        value = valueData.toString();
-                    }
-                }
-                sb.append("value=\"").append(value).append("\" ");
+            if (dataType == null) {
+                sb.append(indent).append("<value type=\"NULL\" ");
+                sb.append(include).append("value=\"NULL\"/>");
             }
+            else {
+                sb.append(indent).append("<value ").append(include);
+                sb.append("type=\"").append(Types.getTypeName(dataType.typeCode)).append("\" ");
 
-            sb.append("/>");
+                if (isParam) {
+                    sb.append("isparam=\"true\" ");
+                } else {
+                    String value = "NULL";
+                    if (valueData != null)
+                    {
+                        if (valueData instanceof TimestampData)
+                        {
+                            // When we get the default from the DDL,
+                            // it gets jammed into a TimestampData object.  If we
+                            // don't do this, we get a Java class/reference
+                            // string in the output schema for the DDL.
+                            // EL HACKO: I'm just adding in the timezone seconds
+                            // at the moment, hope this is right --izzy
+                            TimestampData time = (TimestampData) valueData;
+                            value =
+                                Long.toString(Math.round((time.getSeconds() +
+                                                          time.getZone()) * 1e6) +
+                                                         time.getNanos() / 1000);
+                        }
+                        else
+                        {
+                            value = valueData.toString();
+                        }
+                    }
+                    sb.append("value=\"").append(value).append("\" ");
+                }
+
+                sb.append("/>");
+            }
         }
         else if (getType() == OpTypes.COLUMN) {
             // XXX Should we throw HSQLParseException here?

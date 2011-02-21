@@ -228,21 +228,29 @@ constantValueFactory(json_spirit::Object &obj,
 {
     // read before ctor - can then instantiate fully init'd obj.
     NValue newvalue;
+    json_spirit::Value isNullValue = json_spirit::find_value( obj, "ISNULL");
+    if (isNullValue == json_spirit::Value::null) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "constantValueFactory: Could not find"
+                                      " ISNULL value");
+    }
+    if (isNullValue.type() != json_spirit::bool_type) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "constantValueFactory: ISNULL value"
+                                      " is not a boolean.");
+    }
+    bool isNull = isNullValue.get_bool();
+    if (isNull)
+    {
+        newvalue = NValue::getNullValue(vt);
+        return constantValueFactory(newvalue);
+    }
+
     json_spirit::Value valueValue = json_spirit::find_value( obj, "VALUE");
     if (valueValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "constantValueFactory: Could not find"
                                       " VALUE value");
-    }
-
-    if (valueValue.type() == json_spirit::str_type)
-    {
-        std::string nullcheck = valueValue.get_str();
-        if (nullcheck == "NULL")
-        {
-            newvalue = NValue::getNullValue(vt);
-            return constantValueFactory(newvalue);
-        }
     }
 
     switch (vt) {

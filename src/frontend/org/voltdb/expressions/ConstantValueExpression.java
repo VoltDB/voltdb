@@ -22,7 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 /**
  *
@@ -30,7 +30,8 @@ import org.voltdb.types.*;
 public class ConstantValueExpression extends AbstractValueExpression {
 
     public enum Members {
-        VALUE;
+        VALUE,
+        ISNULL;
     }
 
     protected String m_value = null;
@@ -82,7 +83,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
     public void setValue(String value) {
         m_value = value;
         m_isNull = false;
-        if (m_value == null || m_value.equals("NULL"))
+        if (m_value == null)
         {
             m_isNull = true;
         }
@@ -113,6 +114,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
+        stringer.key(Members.ISNULL.name());
+        stringer.value(m_isNull);
         stringer.key(Members.VALUE.name());
         if (m_isNull)
         {
@@ -125,7 +128,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             case INVALID:
                 throw new JSONException("ConstantValueExpression.toJSONString(): value_type should never be VoltType.INVALID");
             case NULL:
-                throw new JSONException("ConstantValueExpression.toJSONString(): And they should be never be this either! VoltType.NULL");
+                stringer.value("null");
+                break;
             case TINYINT:
                 stringer.value(Long.valueOf(m_value));
                 break;
@@ -158,8 +162,15 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
     @Override
     public void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
+        m_isNull = false;
         if (!obj.isNull(Members.VALUE.name())) {
             m_value = obj.getString(Members.VALUE.name());
+        }
+        else {
+            m_isNull = true;
+        }
+        if (!obj.isNull(Members.ISNULL.name())) {
+            m_isNull = obj.getBoolean(Members.ISNULL.name());
         }
     }
 }

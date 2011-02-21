@@ -193,6 +193,9 @@ public enum VoltType {
      * @return One of the valid enum values for VoltType
      */
     public static VoltType typeFromString(String str) {
+        if (str.compareToIgnoreCase("null") == 0)
+            return NULL;
+
         for (VoltType type: values()) {
             if (type.matchesString(str)) {
                 return type;
@@ -415,6 +418,18 @@ public enum VoltType {
         case INTEGER:
         case BIGINT:
         case DECIMAL:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    public boolean isInteger() {
+        switch(this)  {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
             return true;
         default:
             return false;

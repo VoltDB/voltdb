@@ -17,13 +17,16 @@
 
 package org.voltdb.expressions;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
 
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.VoltTypeUtil;
 import org.voltdb.utils.NotImplementedException;
 import org.voltdb.utils.Pair;
+import org.voltdb.utils.VoltTypeUtil;
 
 /**
  *
@@ -68,9 +71,21 @@ public abstract class ExpressionUtil {
             (exp.m_valueType == VoltType.NUMERIC))
         {
             assert(columnType != VoltType.INVALID);
-            exp.m_valueType = columnType;
-            exp.m_valueSize = columnType.getLengthInBytesForFixedTypes();
-            return;
+
+            if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL)) {
+                exp.m_valueType = columnType;
+                exp.m_valueSize = columnType.getLengthInBytesForFixedTypes();
+                return;
+            }
+            else if (columnType.isInteger()) {
+                ConstantValueExpression cve = (ConstantValueExpression) exp;
+                long val = Long.parseLong(cve.getValue());
+                exp.m_valueType = columnType;
+                exp.m_valueSize = columnType.getLengthInBytesForFixedTypes();
+            }
+            else {
+                throw new NumberFormatException("NUMERIC constant value type must match a FLOAT or DECIMAL column");
+            }
         }
         assignLiteralConstantTypes_recurse(exp);
     }
@@ -402,5 +417,159 @@ public abstract class ExpressionUtil {
         tves.addAll(getTupleValueExpressions(input.m_left));
         tves.addAll(getTupleValueExpressions(input.m_right));
         return tves;
+    }
+
+    static void checkConstantValueTypeSafety(ConstantValueExpression expr) {
+        if (expr.getValueType().isInteger()) {
+            Long.parseLong(expr.getValue());
+        }
+        if ((expr.getValueType() == VoltType.DECIMAL) ||
+            (expr.getValueType() == VoltType.DECIMAL)) {
+            Double.parseDouble(expr.getValue());
+        }
+    }
+
+    static void castIntegerValueDownSafely(ConstantValueExpression expr, VoltType integerType) {
+        if (expr.m_isNull) {
+            expr.setValueType(integerType);
+            return;
+        }
+
+        long value = Long.parseLong(expr.getValue());
+
+        if (integerType == VoltType.BIGINT) {
+            if (value == VoltType.NULL_BIGINT)
+                throw new NumberFormatException("Constant value underflows BIGINT type.");
+        }
+        if (integerType == VoltType.INTEGER) {
+            if ((value > Integer.MAX_VALUE) || (value <= VoltType.NULL_INTEGER))
+                throw new NumberFormatException("Constant value overflows/underflows INTEGER type.");
+        }
+        if (integerType == VoltType.SMALLINT) {
+            if ((value > Short.MAX_VALUE) || (value <= VoltType.NULL_SMALLINT))
+                throw new NumberFormatException("Constant value overflows/underflows SMALLINT type.");
+        }
+        if (integerType == VoltType.TINYINT) {
+            if ((value > Byte.MAX_VALUE) || (value <= VoltType.NULL_TINYINT))
+                throw new NumberFormatException("Constant value overflows/underflows TINYINT type.");
+        }
+        expr.setValueType(integerType);
+        expr.setValueSize(integerType.getLengthInBytesForFixedTypes());
+    }
+
+    static void setOutputTypeForInsertExpressionRecursively(
+            AbstractExpression input, VoltType parentType, int parentSize, Map<Integer, VoltType> paramTypeOverrideMap) {
+        // stopping condiditon
+        if (input == null) return;
+
+        // make sure parameters jive with their parent types
+        if (input.getExpressionType() == ExpressionType.VALUE_PARAMETER) {
+            ParameterValueExpression pve = (ParameterValueExpression) input;
+            switch (parentType) {
+                case BIGINT:
+                case INTEGER:
+                case SMALLINT:
+                case TINYINT:
+                    paramTypeOverrideMap.put(pve.m_paramIndex, VoltType.BIGINT);
+                    input.setValueType(VoltType.BIGINT);
+                    input.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+                    break;
+                case DECIMAL:
+                    paramTypeOverrideMap.put(pve.m_paramIndex, VoltType.DECIMAL);
+                    input.setValueType(VoltType.DECIMAL);
+                    input.setValueSize(VoltType.DECIMAL.getLengthInBytesForFixedTypes());
+                    break;
+                case FLOAT:
+                    paramTypeOverrideMap.put(pve.m_paramIndex, VoltType.FLOAT);
+                    input.setValueType(VoltType.FLOAT);
+                    input.setValueSize(VoltType.FLOAT.getLengthInBytesForFixedTypes());
+                    break;
+            }
+        }
+
+        // this is probably unnecessary
+        if (input.getExpressionType() == ExpressionType.VALUE_CONSTANT) {
+            checkConstantValueTypeSafety((ConstantValueExpression) input);
+        }
+
+        // recursive step
+        setOutputTypeForInsertExpressionRecursively(input.getLeft(), parentType, parentSize, paramTypeOverrideMap);
+        setOutputTypeForInsertExpressionRecursively(input.getRight(), parentType, parentSize, paramTypeOverrideMap);
+    }
+
+    public static void setOutputTypeForInsertExpression(
+            AbstractExpression input,
+            VoltType neededType,
+            int neededSize,
+            Map<Integer, VoltType> paramTypeOverrideMap)
+            throws Exception
+        {
+
+        if (input.getExpressionType() == ExpressionType.VALUE_PARAMETER) {
+            ParameterValueExpression pve = (ParameterValueExpression) input;
+            paramTypeOverrideMap.put(pve.m_paramIndex, neededType);
+            input.setValueType(neededType);
+            input.setValueSize(neededSize);
+        }
+        else if (input.getExpressionType() == ExpressionType.VALUE_CONSTANT) {
+            ConstantValueExpression cve = (ConstantValueExpression) input;
+
+            if (cve.m_isNull) {
+                cve.setValueType(neededType);
+                cve.setValueSize(neededSize);
+                return;
+            }
+
+            // handle the simple case where the constant is the type we want
+            if (cve.getValueType() == neededType) {
+
+                // only worry about strings being too long (someday blobs)
+                if (cve.getValueType() == VoltType.STRING) {
+                    if (cve.getValue().length() > neededSize)
+                        throw new StringIndexOutOfBoundsException("Constant VARCHAR value too long for column.");
+                }
+                cve.setValueSize(neededSize);
+                checkConstantValueTypeSafety(cve);
+                return;
+            }
+
+            // handle downcasting integers
+            if (neededType.isInteger()) {
+                if (cve.getValueType().isInteger()) {
+                    castIntegerValueDownSafely(cve, neededType);
+                    checkConstantValueTypeSafety(cve);
+                    return;
+                }
+            }
+
+            // handle the types that can be converted to float
+            if (neededType == VoltType.FLOAT) {
+                if (cve.getValueType().isExactNumeric()) {
+                    cve.setValueType(neededType);
+                    cve.setValueSize(neededSize);
+                    checkConstantValueTypeSafety(cve);
+                    return;
+                }
+
+            }
+
+            // handle the types that can be converted to decimal
+            if (neededType == VoltType.DECIMAL) {
+                if ((cve.getValueType().isExactNumeric()) || (cve.getValueType() == VoltType.FLOAT)) {
+                    cve.setValueType(neededType);
+                    cve.setValueSize(neededSize);
+                    checkConstantValueTypeSafety(cve);
+                    return;
+                }
+            }
+
+            throw new Exception("Constant value cannot be converted to column type.");
+        }
+        else {
+            input.setValueType(neededType);
+            input.setValueSize(neededSize);
+            setOutputTypeForInsertExpressionRecursively(input.getLeft(), neededType, neededSize, paramTypeOverrideMap);
+            setOutputTypeForInsertExpressionRecursively(input.getRight(), neededType, neededSize, paramTypeOverrideMap);
+        }
     }
 }

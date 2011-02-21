@@ -413,6 +413,10 @@ public class PlannerTool {
                 }
                 continue;
             }
+            if (plan.parameters.size() > 0) {
+                System.out.println("ERROR: PARAMETERIZATION IN AD HOC QUERY\n");
+                continue;
+            }
 
             log("finished planning stmt");
 

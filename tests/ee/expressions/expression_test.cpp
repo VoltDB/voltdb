@@ -162,6 +162,7 @@ class CV : public AE {
             json.push_back(json_spirit::Pair("VALUE", json_spirit::Value(m_intValue)));
         else if (m_jsontype == 2)
             json.push_back(json_spirit::Pair("VALUE", json_spirit::Value(m_doubleValue)));
+        json.push_back(json_spirit::Pair("ISNULL", json_spirit::Value(false)));
     }
 
     int m_jsontype;  // 0 = string, 1 = int64_t, 2 = double

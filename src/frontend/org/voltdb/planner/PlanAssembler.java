@@ -17,10 +17,12 @@
 
 package org.voltdb.planner;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -35,6 +37,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
@@ -101,6 +104,12 @@ public class PlanAssembler {
      * Counter for the number of plans generated to date for a single statement.
      */
     int plansGenerated = 0;
+
+    /**
+     * Whenever a parameter has its type changed during compilation, the new type is stored
+     * here, indexed by parameter index.
+     */
+    Map<Integer, VoltType> m_paramTypeOverrideMap = new HashMap<Integer, VoltType>();
 
     /**
      *
@@ -329,7 +338,14 @@ public class PlanAssembler {
         for (ParameterInfo param : stmt.paramList) {
             outParam = new ParameterInfo();
             outParam.index = param.index;
-            outParam.type = param.type;
+
+            VoltType override = m_paramTypeOverrideMap.get(param.index);
+            if (override != null) {
+                outParam.type = override;
+            }
+            else {
+                outParam.type = param.type;
+            }
             plan.parameters.add(outParam);
         }
     }
@@ -630,8 +646,7 @@ public class PlanAssembler {
         // get the ordered list of columns for the targettable using a helper
         // function they're not guaranteed to be in order in the catalog
         List<Column> columns =
-            CatalogUtil
-                    .getSortedCatalogItems(targetTable.getColumns(), "index");
+            CatalogUtil.getSortedCatalogItems(targetTable.getColumns(), "index");
 
         // for each column in the table in order...
         for (Column column : columns) {
@@ -654,21 +669,26 @@ public class PlanAssembler {
                 if (column.getDefaulttype() != 0)
                 {
                     const_expr.setValue(column.getDefaultvalue());
+                    const_expr.setValueType(VoltType.get((byte) column.getDefaulttype()));
                 }
                 else
                 {
-                    const_expr.setValue("NULL");
+                    const_expr.setValue(null);
                 }
             }
+
+            if (expr.getValueType() == VoltType.NULL) {
+                ConstantValueExpression const_expr =
+                    new ConstantValueExpression();
+                const_expr.setValue("NULL");
+            }
+
             // set the expression type to match the corresponding Column.
-            // in reality, the expression will cast its resulting NValue to
-            // the intermediate table's tuple; but, that tuple takes its
-            // type from these expression types (for now). The tempTuple is
-            // eventually tableTuple::copy()'d into the persistent table
-            // and must match the persistent table's column type and size.
-            // A little round-about, I know. Will get better.
-            expr.setValueSize(column.getSize());
-            expr.setValueType(VoltType.get((byte)column.getType()));
+            try {
+                ExpressionUtil.setOutputTypeForInsertExpression(expr, VoltType.get((byte)column.getType()), column.getSize(), m_paramTypeOverrideMap);
+            } catch (Exception e) {
+                throw new PlanningErrorException(e.getMessage());
+            }
 
             // add column to the materialize node.
             // This table name is magic.

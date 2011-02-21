@@ -75,6 +75,8 @@ class TheHashinator {
         }
         default:
             // XXX-IZZY MAYBE THIS SHOULD BE NON-FATAL?
+            // XXX-HUGG This is fatal because if you get here, there's a bug in
+            //  VoltDB.
             throwFatalException("Attempted to hashinate an unsupported type: %s",
                                 getTypeName(val_type).c_str());
         }

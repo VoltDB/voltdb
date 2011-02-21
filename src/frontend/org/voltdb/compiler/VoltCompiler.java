@@ -47,6 +47,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -55,7 +56,6 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
@@ -605,6 +605,21 @@ public class VoltCompiler {
                     "Partition columns must be constrained \"NOT NULL\".";
                 throw new VoltCompilerException(msg);
             }
+            // verify that the partition column is a supported type
+            VoltType pcolType = VoltType.get((byte) c.getType());
+            switch (pcolType) {
+                case TINYINT:
+                case SMALLINT:
+                case INTEGER:
+                case BIGINT:
+                case STRING:
+                    break;
+                default:
+                    msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
+                    "Partition columns must be an integer or varchar type.";
+                    throw new VoltCompilerException(msg);
+            }
+
             t.setPartitioncolumn(c);
             t.setIsreplicated(false);
 

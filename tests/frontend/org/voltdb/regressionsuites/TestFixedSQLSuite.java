@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
@@ -481,19 +482,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // values.  If this test breaks for you, don't blow it off.
         String query = "insert into COUNT_NULL values (10, 0, 100)";
         client.callProcedure("@AdHoc", query);
-        if (isHSQL()) {
-            query = "insert into COUNT_NULL values (" + Byte.MIN_VALUE + ", 1, 200)";
-        } else {
-            query = "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)";
-        }
+        query = "insert into COUNT_NULL values (NULL, 1, 200)";
         client.callProcedure("@AdHoc", query);
         query = "insert into COUNT_NULL values (10, 2, 300)";
         client.callProcedure("@AdHoc", query);
-        if (isHSQL()) {
-            query = "insert into COUNT_NULL values (" + Byte.MIN_VALUE + ", 3, 400)";
-        } else {
-            query = "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 3, 400)";
-        }
+        query = "insert into COUNT_NULL values (NULL, 3, 400)";
         client.callProcedure("@AdHoc", query);
         query = "select count(*) from COUNT_NULL";
         VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
@@ -528,30 +521,29 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertEquals(6, results[0].getRowCount());
         }
     }
-    /*
-    public void testTicket205() throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1", "P2", "R2"};
-        Client client = getClient();
-        for (String table : tables)
-        {
-            client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
-            client.callProcedure("Insert", table, 2, "desc", 200, 14.5);
-            client.callProcedure("Insert", table, 3, "desc", 300, 14.5);
-            client.callProcedure("Insert", table, 6, "desc", 400, 14.5);
-            client.callProcedure("Insert", table, 7, "desc", 500, 14.5);
-            client.callProcedure("Insert", table, 8, "desc", 600, 14.5);
-            String query = String.format("select sum(%s.NUM + 1) from %s",
-                                         table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
-            assertEquals(1, results[0].getRowCount());
-            query = String.format("select sum(%s.NUM + %s.ID) from %s",
-                                         table, table);
-            results = client.callProcedure("@AdHoc", query);
-            assertEquals(1, results[0].getRowCount());
-        }
-    }
-     */
+
+    //public void testTicket205() throws IOException, ProcCallException
+    //{
+    //    String[] tables = {"P1", "R1", "P2", "R2"};
+    //    Client client = getClient();
+    //    for (String table : tables)
+    //    {
+    //        client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
+    //        client.callProcedure("Insert", table, 2, "desc", 200, 14.5);
+    //        client.callProcedure("Insert", table, 3, "desc", 300, 14.5);
+    //        client.callProcedure("Insert", table, 6, "desc", 400, 14.5);
+    //        client.callProcedure("Insert", table, 7, "desc", 500, 14.5);
+    //        client.callProcedure("Insert", table, 8, "desc", 600, 14.5);
+    //        String query = String.format("select sum(%s.NUM + 1) from %s",
+    //                                     table, table);
+    //        VoltTable[] results = client.callProcedure("@AdHoc", query);
+    //        assertEquals(1, results[0].getRowCount());
+    //        query = String.format("select sum(%s.NUM + %s.ID) from %s",
+    //                                     table, table);
+    //        results = client.callProcedure("@AdHoc", query);
+    //        assertEquals(1, results[0].getRowCount());
+    //    }
+    //}
 
     public void testTicket216() throws IOException, ProcCallException
     {
@@ -922,17 +914,43 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
     // RE-ENABLE ONCE ENG-490 IS FIXED
-    /*public void testTicketEng490() throws IOException, ProcCallException {
+    //public void testTicketEng490() throws IOException, ProcCallException {
+    //    Client client = getClient();
+    //
+    //    VoltTable[] results = client.callProcedure("Eng490Select");
+    //    assertEquals(1, results.length);
+    //
+    //    String query = "SELECT  A.ASSET_ID,  A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID " +
+    //        "FROM   ASSET A,  OBJECT_DETAIL OD WHERE   A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID";
+    //    results = client.callProcedure("@AdHoc", query);
+    //    assertEquals(1, results.length);
+    //}
+
+    public void testTicketEng993() throws IOException, ProcCallException
+    {
         Client client = getClient();
-
-        VoltTable[] results = client.callProcedure("Eng490Select");
-        assertEquals(1, results.length);
-
-        String query = "SELECT  A.ASSET_ID,  A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID " +
-            "FROM   ASSET A,  OBJECT_DETAIL OD WHERE   A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID";
-        results = client.callProcedure("@AdHoc", query);
-        assertEquals(1, results.length);
-    }*/
+        // this tests some other mumbo jumbo as well like ENG-999 and ENG-1001
+        ClientResponse response = client.callProcedure("Eng993Insert", 5, 5.5);
+        assertTrue(response.getStatus() == ClientResponse.SUCCESS);
+        // this is the actual bug
+        try {
+            client.callProcedure("@AdHoc", "insert into P1 (ID,DESC,NUM,RATIO) VALUES('?',?,?,?);");
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().contains("Constant value cannot"));
+        }
+        // test that parameters don't work (ENG-1000)
+        try {
+            client.callProcedure("@AdHoc", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(?,?,?,?);");
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().contains("PARAMETERIZATION"));
+        }
+        //VoltTable results = client.callProcedure("@AdHoc", "select * from P1;").getResults()[0];
+        //System.out.println(results.toJSONString());
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -946,6 +964,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestFixedSQLSuite.class);
+        boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
@@ -955,10 +974,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addPartitionInfo("OBJECT_DETAIL", "OBJECT_DETAIL_ID");
         project.addPartitionInfo("STRINGPART", "NAME");
         project.addProcedures(PROCEDURES);
+
+        project.addStmtProcedure("Crap", "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)");
+
         project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
         //project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");
         project.addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",
                                  "STRINGPART.NAME: 0");
+        project.addStmtProcedure("Eng993Insert", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(1+?,'NULL',NULL,1+?);");
 
         // CONFIG #1: Local Site/Partitions running on IPC backend
         // config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
@@ -967,20 +990,24 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // JNI
         config = new LocalSingleProcessServer("fixedsql-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
 
         // CONFIG #2: HSQL
         config = new LocalSingleProcessServer("fixedsql-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        config.compile(project);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         // CLUSTER?
-        config = new LocalCluster("fixedsql-cluster.jar", 2, 2,
+        // not sure the cluster test adds much for the time it takes here
+        /*config = new LocalCluster("fixedsql-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);*/
 
         return builder;
     }

@@ -261,7 +261,8 @@ public class TestVoltCompiler extends TestCase {
         project.setTableAsExportOnly("ALLOW_NULLS");   // persistent table
         project.setTableAsExportOnly("WITH_DEFAULTS");  // streamed table
         try {
-            assertTrue(project.compile("/tmp/exportsettingstest.jar"));
+            boolean success = project.compile("/tmp/exportsettingstest.jar");
+            assertTrue(success);
             final String catalogContents =
                 VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
@@ -933,15 +934,15 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    /*
-     * There are DDL tests a number of places. TestDDLCompiler seems more about
-     * verifying HSQL behaviour. Additionally, there are users of PlannerAideDeCamp
-     * that verify plans for various DDL/SQL combinations.
-     *
-     * I'm going to add some DDL parsing validation tests here, as they seem to have
-     * more to do with compiling a catalog.. and there are some related tests already
-     * in this file.
-     */
+    //
+    // There are DDL tests a number of places. TestDDLCompiler seems more about
+    // verifying HSQL behaviour. Additionally, there are users of PlannerAideDeCamp
+    // that verify plans for various DDL/SQL combinations.
+    //
+    // I'm going to add some DDL parsing validation tests here, as they seem to have
+    // more to do with compiling a catalog.. and there are some related tests already
+    // in this file.
+    //
 
     private VoltCompiler compileForDDLTest(String schemaPath, boolean expectSuccess) {
         final String simpleProject =
@@ -1269,80 +1270,28 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    /*public void testForeignKeys() {
-        String schemaPath = "";
-        try {
-            final URL url = TPCCClient.class.getResource("tpcc-ddl-fkeys.sql");
-            schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
-        } catch (final UnsupportedEncodingException e) {
-            e.printStackTrace();
-            System.exit(-1);
-        }
+    public void testPartitionOnBadType() {
+        final String simpleSchema =
+            "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
 
         final String simpleProject =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
-            "<database name='database'>" +
+            "<database>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
+            "<partitions><partition table='books' column='cash'/></partitions> " +
+            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "</database>" +
             "</project>";
-
-        //System.out.println(simpleProject);
 
         final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
-
-        final Catalog catalog = compiler.compileCatalog(projectPath, cluster_config);
-        assertNotNull(catalog);
-
-        // Now check that CUSTOMER correctly references DISTRICT
-        //  (1) Make sure CUSTOMER has a fkey constraint
-        //  (2) Make sure that each source column in CUSTOMER points to the constraint
-        //  (3) Make sure that the fkey constraint points to DISTRICT
-        final Database catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        assertNotNull(catalog_db);
-
-        final Table cust_table = catalog_db.getTables().get("CUSTOMER");
-        assertNotNull(cust_table);
-        final Table dist_table = catalog_db.getTables().get("DISTRICT");
-        assertNotNull(dist_table);
-
-        // In the code below, we will refer to the column that is pointed to by another column
-        // in the dependency as the parent, and the column with the fkey constraint as the child
-        boolean found = false;
-        for (final Constraint catalog_const : cust_table.getConstraints()) {
-            final ConstraintType const_type = ConstraintType.get(catalog_const.getType());
-            if (const_type == ConstraintType.FOREIGN_KEY) {
-                found = true;
-                assertEquals(dist_table, catalog_const.getForeignkeytable());
-                assertEquals(catalog_const.getForeignkeycols().size(), 2);
-
-                for (final ColumnRef catalog_parent_colref : catalog_const.getForeignkeycols()) {
-
-                    // We store the name of the child column in the name of the ColumnRef catalog
-                    // object to the parent
-                    final Column catalog_child_col = cust_table.getColumns().get(catalog_parent_colref.getTypeName());
-                    assertNotNull(catalog_child_col);
-                    // Lame
-                    boolean found_const_for_child = false;
-                    for (final ConstraintRef catalog_constref : catalog_child_col.getConstraints()) {
-                        if (catalog_constref.getConstraint().equals(catalog_const)) {
-                            found_const_for_child = true;
-                            break;
-                        }
-                    }
-                    assertTrue(found_const_for_child);
-
-                    final Column catalog_parent_col = catalog_parent_colref.getColumn();
-                    assertEquals(dist_table, catalog_parent_col.getParent());
-                }
-                break;
-            }
-        }
-        assertTrue(found);
-    }*/
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
+        assertFalse(success);
+    }
 }

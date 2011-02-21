@@ -263,8 +263,10 @@ public abstract class AbstractParsedStmt {
         VoltType vt = VoltType.typeFromString(type);
         int size = VoltType.MAX_VALUE_LENGTH;
         assert(vt != VoltType.VOLTTABLE);
+
         if (vt != VoltType.STRING) {
-            size = vt.getLengthInBytesForFixedTypes();
+            if (vt == VoltType.NULL) size = 0;
+            else size = vt.getLengthInBytesForFixedTypes();
         }
         if ((isParam != null) && (isParam.getNodeValue().equalsIgnoreCase("true"))) {
             ParameterValueExpression expr = new ParameterValueExpression();
@@ -281,7 +283,10 @@ public abstract class AbstractParsedStmt {
             ConstantValueExpression expr = new ConstantValueExpression();
             expr.setValueType(vt);
             expr.setValueSize(size);
-            expr.setValue(attrs.getNamedItem("value").getNodeValue());
+            if (vt == VoltType.NULL)
+                expr.setValue(null);
+            else
+                expr.setValue(attrs.getNamedItem("value").getNodeValue());
             return expr;
         }
     }
