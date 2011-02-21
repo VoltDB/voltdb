@@ -72,7 +72,8 @@ public class HTTPAdminListener {
 
             // kick over to the HTTP/JSON interface
             if (baseRequest.getRequestURI().contains("/api/1.0/")) {
-                response.setContentType("text/plain;charset=utf-8");
+                // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
+                response.setContentType("application/json;charset=utf-8");
                 if (m_jsonEnabled) {
                     httpClientInterface.process(baseRequest, response);
 
