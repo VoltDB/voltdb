@@ -1,5 +1,6 @@
 #!/bin/bash
 # check that puppet is running and start it if it's not
+hostname
 EXIT=0
 if ! ps -ef | grep pup*et; then
   echo "puppet is not running on $HOSTNAME -- restarting"
@@ -11,6 +12,6 @@ if ! ps -ef | grep pup*et; then
   fi
 fi
 
-cd /tmp && ls -tr | grep volt_snapshot | head -n-10 | xargs rm
+cd /tmp && ls -tr | grep volt_snapshot | head -n-10 | xargs rm -f
 
 exit $EXIT
