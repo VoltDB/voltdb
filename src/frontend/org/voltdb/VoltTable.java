@@ -1080,7 +1080,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         }
         long checksum1 = cheesyCheckSum();
         long checksum2 = other.cheesyCheckSum();
-        boolean checksum = (cheesyCheckSum() == other.cheesyCheckSum());
+        boolean checksum = (checksum1 == checksum2);
         assert(verifyTableInvariants());
         return checksum;
     }

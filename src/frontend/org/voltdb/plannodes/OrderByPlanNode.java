@@ -18,7 +18,6 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;

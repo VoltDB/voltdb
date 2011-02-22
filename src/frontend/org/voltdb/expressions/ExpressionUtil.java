@@ -79,7 +79,7 @@ public abstract class ExpressionUtil {
             }
             else if (columnType.isInteger()) {
                 ConstantValueExpression cve = (ConstantValueExpression) exp;
-                long val = Long.parseLong(cve.getValue());
+                Long.parseLong(cve.getValue());
                 exp.m_valueType = columnType;
                 exp.m_valueSize = columnType.getLengthInBytesForFixedTypes();
             }
@@ -432,10 +432,16 @@ public abstract class ExpressionUtil {
     static void castIntegerValueDownSafely(ConstantValueExpression expr, VoltType integerType) {
         if (expr.m_isNull) {
             expr.setValueType(integerType);
+            expr.setValueSize(integerType.getLengthInBytesForFixedTypes());
             return;
         }
 
         long value = Long.parseLong(expr.getValue());
+
+        // Note that while Long.MIN_VALUE is used to represent NULL in VoltDB, we have decided that
+        // pass in the literal for Long.MIN_VALUE makes very little sense when you have the option
+        // to use the literal NULL. Thus the NULL values for each of the 4 integer types are considered
+        // an underflow exception for the type.
 
         if (integerType == VoltType.BIGINT) {
             if (value == VoltType.NULL_BIGINT)

@@ -77,10 +77,9 @@ public class TestFailuresSuite extends RegressionSuite {
         Client client = getClient();
 
         boolean threw = false;
-        VoltTable[] results = null;
         try
         {
-            results = client.callProcedure("BadVarcharCompare", 1).getResults();
+            client.callProcedure("BadVarcharCompare", 1).getResults();
         }
         catch (ProcCallException e)
         {
@@ -111,10 +110,9 @@ public class TestFailuresSuite extends RegressionSuite {
         Client client = getClient();
 
         boolean threw = false;
-        VoltTable[] results = null;
         try
         {
-            results = client.callProcedure("BadFloatToVarcharCompare", 1).getResults();
+            client.callProcedure("BadFloatToVarcharCompare", 1).getResults();
         }
         catch (ProcCallException e)
         {
@@ -145,10 +143,9 @@ public class TestFailuresSuite extends RegressionSuite {
         Client client = getClient();
 
         boolean threw = false;
-        VoltTable[] results = null;
         try
         {
-            results = client.callProcedure("BadDecimalToVarcharCompare", 1).getResults();
+            client.callProcedure("BadDecimalToVarcharCompare", 1).getResults();
         }
         catch (ProcCallException e)
         {

@@ -183,7 +183,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
             cluster.startUp();
 
-            ClientResponse response;
             Client client;
 
             client = ClientFactory.createClient(m_cconfig);

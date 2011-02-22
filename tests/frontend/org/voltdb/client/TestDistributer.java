@@ -423,7 +423,8 @@ public class TestDistributer extends TestCase {
             final long finish = System.currentTimeMillis();
             assert(finish - start >= 300);
             assert(counter.get() == 5);
-            loadThread.stop();
+            loadThread.interrupt();
+            loadThread.join();
         }
         finally {
             volt0.shutdown();

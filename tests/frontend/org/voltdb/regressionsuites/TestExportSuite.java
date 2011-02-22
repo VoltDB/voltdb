@@ -81,6 +81,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     /** Push pkey into expected row data */
+    @SuppressWarnings("unused")
     private Object[] convertValsToLoaderRow(final int i, final Object[] rowdata) {
         final Object[] row = new Object[rowdata.length + 1];
         row[0] = i;

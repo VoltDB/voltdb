@@ -96,6 +96,7 @@ public class LocalCluster implements VoltServerConfig {
 
     private int m_timestampSaltOffset;
 
+    @SuppressWarnings("unused")
     private File m_pathToVoltRoot = null;
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
 

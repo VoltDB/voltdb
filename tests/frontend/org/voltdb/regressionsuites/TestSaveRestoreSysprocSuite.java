@@ -250,7 +250,6 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   VoltTable table)
     {
         VoltTable[] results = null;
-        int allowExport = 0;
         try
         {
             client.callProcedure("@LoadMultipartitionTable", tableName,

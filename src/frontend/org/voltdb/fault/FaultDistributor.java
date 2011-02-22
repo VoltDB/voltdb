@@ -16,9 +16,15 @@
  */
 package org.voltdb.fault;
 
-import java.util.*;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -352,7 +358,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             // Remove the (FaultType, VoltFault) pairs from m_knownFaults
             HashSet<VoltFault> faults = entry.getValue();
             for (VoltFault fault : faults) {
-                boolean remove = m_knownFaults.get(fault.getFaultType()).remove(fault);
+                m_knownFaults.get(fault.getFaultType()).remove(fault);
             }
 
             // Clear the fault from each registered handler

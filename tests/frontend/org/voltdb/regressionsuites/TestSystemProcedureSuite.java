@@ -369,6 +369,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testProfCtlInvalidCommand() throws Exception {
         Client client = getClient();
         ClientResponse resp = client.callProcedure("@ProfCtl", "MakeAPony");
+        @SuppressWarnings("unused")
         VoltTable vt = resp.getResults()[0];
         assertTrue(true);
     }
