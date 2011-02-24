@@ -102,4 +102,6 @@ public abstract class RecoverySiteProcessor {
             m_buffers.offer(buffer);
         }
     }
+
+    abstract public void notifyBlockedOnMultiPartTxn(long currentTxnId);
 }

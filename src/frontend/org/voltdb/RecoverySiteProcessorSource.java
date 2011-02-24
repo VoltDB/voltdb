@@ -124,6 +124,14 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     private boolean m_sentInitiateResponse = false;
 
     /**
+     * If blocked on a multi-part txn, send a message to the destination
+     * telling it to continue txn execution until it has executed past the multi-part
+     * this source is blocked. This boolean ensures that the message is only sent once per txn
+     * and is reset every time a new txn is pulled from the priority queue (see ExecutionSite.run())
+     */
+    private boolean m_sentSkipPastMultipartMsg = false;
+
+    /**
      * Transaction to stop before and do the sync. Once doRecoveryWork is passed a txnId
      * that is >= this txnId it will stop and do the recovery
      */
@@ -436,6 +444,34 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     }
 
     /**
+     * Notify the destination that this site is blocked on a multi-part txn.
+     * The destination should continue execution until it has finished the multi-part
+     * and then block waiting for the initiate message that will contain the txnid
+     * to stop at.
+     * @param currentTxnId
+     */
+    @Override
+    public void notifyBlockedOnMultiPartTxn(long currentTxnId) {
+        if (!m_sentSkipPastMultipartMsg && !m_sentInitiateResponse) {
+            m_sentSkipPastMultipartMsg = true;
+            recoveryLog.info(
+                    "Sending blocked on multi-part notification from " + m_siteId +
+                    " at txnId " + currentTxnId + " to site " + m_destinationSiteId);
+            ByteBuffer buf = ByteBuffer.allocate(17);
+            BBContainer cont = DBBPool.wrapBB(buf);
+            buf.putInt(13);
+            buf.putInt(m_siteId);
+            buf.put(kEXECUTE_PAST_TXN);
+            buf.putLong(currentTxnId);
+            buf.flip();
+            m_outgoing.offer(cont);
+        }
+    }
+
+    private static final byte kSTOP_AT_TXN = 0;
+    private static final byte kEXECUTE_PAST_TXN = 1;
+
+    /**
      * Stream out recovery messages from tables until all tables have been completely streamed.
      * This mechanism is a little delicate because it is the only place in the system
      * where VoltMessage's are backed by pooled direct byte buffers. Because of this it is necessary
@@ -445,6 +481,15 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      */
     @Override
     public void doRecoveryWork(long nextTxnId) {
+
+        /*
+         * Re-enable sending the skip past multi-part message. If the site passes
+         * through this loop for a new txn it might be a multi-part that will
+         * block if the destination doesn't skip past it re-enable informing
+         * the destinatino.
+         */
+        m_sentSkipPastMultipartMsg = false;
+
         /*
          * Send an initiate response to the recovering partition with txnid it should stop at
          * before receiving the recovery data. Pick a txn id that is >= the next txn that
@@ -453,15 +498,16 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
          * the priority queue is empty.
          */
         if (!m_sentInitiateResponse) {
-            recoveryLog.trace(
+            recoveryLog.info(
                     "Sending recovery initiate response from " + m_siteId +
                     " before txnId " + nextTxnId + " to site " + m_destinationSiteId);
             m_sentInitiateResponse = true;
             m_stopBeforeTxnId = Math.max(nextTxnId, m_destinationStoppedBeforeTxnId);
-            ByteBuffer buf = ByteBuffer.allocate(16);
+            ByteBuffer buf = ByteBuffer.allocate(17);
             BBContainer cont = DBBPool.wrapBB(buf);
-            buf.putInt(12);
+            buf.putInt(13);
             buf.putInt(m_siteId);
+            buf.put(kSTOP_AT_TXN);
             buf.putLong(m_stopBeforeTxnId);
             buf.flip();
             m_outgoing.offer(cont);

@@ -125,7 +125,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * The permit is only acquired by recovering partitions and not the source
      * partitions.
      */
-    private static final Semaphore m_recoveryPermit = new Semaphore(Integer.MAX_VALUE);
+    private static final Semaphore m_recoveryPermit = new Semaphore(1);
 
     private boolean m_recovering = false;
     private boolean m_haveRecoveryPermit = false;
@@ -1881,6 +1881,18 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 tick();
                 if (message != null) {
                     handleMailboxMessage(message);
+                }
+
+                /**
+                 * If this site is the source for a recovering partition the recovering
+                 * partition might be blocked waiting for the txn to sync at from here.
+                 * Since this site is blocked on the multi-part waiting for the destination to respond
+                 * to a plan fragment it is a deadlock.
+                 * Poke the destination so that it will execute past the current
+                 * multi-part txn.
+                 */
+                if (m_recoveryProcessor != null) {
+                    m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
                 }
             }
         } while (true);

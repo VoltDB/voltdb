@@ -38,6 +38,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -166,14 +167,180 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         return failType != DONT_FAIL;
     }
 
+    public void testRejoinWithMultipartLoad() throws Exception {
+        System.out.println("testRejoinWithMultipartLoad");
+        VoltProjectBuilder builder = getBuilderForTest();
+        builder.setSecurityEnabled(true);
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true);
+        boolean success = cluster.compile(builder);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+
+        ClientResponse response;
+        Client client;
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", 21213);
+
+        response = client.callProcedure("InsertSinglePartition", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        cluster.shutDownSingleHost(0);
+        Thread.sleep(1000);
+
+        final Client clientForLoadThread = client;
+        final java.util.concurrent.atomic.AtomicBoolean shouldContinue =
+            new java.util.concurrent.atomic.AtomicBoolean(true);
+        Thread loadThread = new Thread("Load Thread") {
+            @Override
+            public void run() {
+                try {
+                    final long startTime = System.currentTimeMillis();
+                    while (shouldContinue.get()) {
+                        try {
+                            clientForLoadThread.callProcedure(new org.voltdb.client.ProcedureCallback(){
+
+                                @Override
+                                public void clientCallback(
+                                        ClientResponse clientResponse)
+                                        throws Exception {
+                                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                                        System.err.println(clientResponse.getStatusString());
+                                    }
+                                }
+
+                            }, "@Statistics", "MANAGEMENT", 1);
+                            //clientForLoadThread.callProcedure("@Statistics", );
+                            Thread.sleep(1);
+                            final long now = System.currentTimeMillis();
+                            if (now - startTime > 1000 * 10) {
+                                break;
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            break;
+                        }
+                    }
+                } finally {
+                    try {
+                        clientForLoadThread.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        };
+        loadThread.start();
+
+        Thread.sleep(2000);
+
+        ServerThread localServer = null;
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+            config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
+            localServer = new ServerThread(config);
+
+            localServer.start();
+            localServer.waitForInitialization();
+
+            Thread.sleep(2000);
+
+            client = ClientFactory.createClient(m_cconfig);
+            client.createConnection("localhost", 21213);
+
+            //
+            // Check that the recovery data transferred
+            //
+            response = client.callProcedure("SelectBlahSinglePartition", 0);
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
+            assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
+
+        } finally {
+            shouldContinue.set(false);
+        }
+
+        response = client.callProcedure("SelectBlah", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+
+        response = client.callProcedure("SelectBlahReplicated", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
+
+        //
+        //  Try to insert new data
+        //
+        response = client.callProcedure("InsertSinglePartition", 2);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        //
+        // See that it was inserted
+        //
+        response = client.callProcedure("SelectBlahSinglePartition", 2);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2
+                );
+        response = client.callProcedure("SelectBlah", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
+
+        response = client.callProcedure("SelectBlahReplicated", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+
+        //
+        // Kill one of the old ones (not the recovered partition)
+        //
+        cluster.shutDownSingleHost(1);
+        Thread.sleep(1000);
+
+        client.close();
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", 21212);
+
+        //
+        // See that the cluster is available and the data is still there.
+        //
+        response = client.callProcedure("SelectBlahSinglePartition", 2);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2);
+
+        response = client.callProcedure("SelectBlah", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
+
+        response = client.callProcedure("SelectBlahReplicated", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+
+        client.close();
+
+        localServer.shutdown();
+        cluster.shutDown();
+    }
+
     public void testRestoreThenRejoinPropagatesRestore() throws Exception {
         System.out.println("testRestoreThenRejoinThenRestore");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster(
-                "rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI,
-                LocalCluster.FailureState.ALL_RUNNING, true);
+                "rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         ServerThread localServer = null;
         try {
             boolean success = cluster.compile(builder);
