@@ -776,7 +776,7 @@ public class RealVoltDB implements VoltDBInterface
             VoltDB.crashVoltDB();
         }
 
-        Object retval[] = m_messenger.waitForGroupJoin(3000);
+        Object retval[] = m_messenger.waitForGroupJoin(60 * 1000);
 
         m_catalogContext = new CatalogContext(
                 m_catalogContext.catalog,

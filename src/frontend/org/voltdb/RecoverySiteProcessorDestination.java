@@ -93,7 +93,14 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
     /**
      * Transaction to stop before and do the sync
      */
-    private long m_stopBeforeTxnId;
+    private long m_stopBeforeTxnId = Long.MAX_VALUE;
+
+    /**
+     * Transaction the source partition has requested that this destination
+     * execute past. This allwos the source partition to finish any pending
+     * multi-partition txns.
+     */
+    private Long m_skipPastTxnId = null;
 
     private final Semaphore m_toggleProfiling = new Semaphore(0);
 
@@ -119,6 +126,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
 
         private final SocketChannel m_sc;
         private volatile boolean closed = false;
+        private volatile Exception m_lastException = null;
         private final Thread m_inThread = new Thread() {
             @Override
             public void run() {
@@ -157,6 +165,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                         }
                     }
                 } catch (IOException e) {
+                    m_lastException = e;
                     /*
                      * Wait until the last message is delivered
                      * and then wait some more so it can be processed
@@ -301,6 +310,26 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             }
         }
 
+        /**
+         * If the source partition provided a txnid this partition must execute past
+         * (because it is multi-part) then return control here so it can be executed
+         * past. If it has been executed past, go read the next message from the source.
+         * This will be another txnid to skip past or the txnid to sync at.
+         */
+        if (m_skipPastTxnId != null) {
+            if (m_skipPastTxnId >= txnId) {
+                return;
+            } else {
+                m_skipPastTxnId = null;
+                try {
+                    processNextInitiateResponse();
+                } catch (IOException e) {
+                    recoveryLog.fatal("Error process a second initiate response", e);
+                    VoltDB.crashVoltDB();
+                }
+            }
+        }
+
         if (txnId < m_stopBeforeTxnId) {
             return;
         }
@@ -334,11 +363,13 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 return;
             }
 
-            checkMailbox(true);
+            if (container == null && !checkMailbox(false)) {
+                Thread.yield();
+            }
         }
     }
 
-    private void checkMailbox(boolean block) {
+    private boolean checkMailbox(boolean block) {
         VoltMessage message = null;
         if (block) {
             message = m_mailbox.recvBlocking();
@@ -356,6 +387,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 m_messageHandler.handleMessage(message);
             }
         }
+        return message != null;
     }
 
     /**
@@ -437,75 +469,56 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             VoltDB.crashVoltDB();
         }
         ssc.close();
+        m_sc.configureBlocking(true);
+        m_sc.socket().setTcpNoDelay(true);
 
-        /*
-         * Run the reads in a separate thread and do blocking IO.
-         * Couldn't get setSoTimeout to work.
-         */
-        final AtomicBoolean recoveryAckReaderSuccess = new AtomicBoolean(false);
-        final Thread recoveryAckReader = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    m_sc.configureBlocking(true);
-                    m_sc.socket().setTcpNoDelay(true);
+        m_iodaemon = new IODaemon(m_sc);
 
-                    ByteBuffer messageLength = ByteBuffer.allocate(4);
-                    while (messageLength.hasRemaining()) {
-                        final int read = m_sc.read(messageLength);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    messageLength.flip();
+        processNextInitiateResponse();
 
-                    ByteBuffer response = ByteBuffer.allocate(messageLength.getInt());
-                    while (response.hasRemaining()) {
-                        int read = m_sc.read(response);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    response.flip();
+        return;
+    }
 
-                    final int sourceSite = response.getInt();
-                    m_stopBeforeTxnId = response.getLong();
-                    recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
-                            sourceSite + " will sync after txnId " + m_stopBeforeTxnId);
-                    m_iodaemon = new IODaemon(m_sc);
-                    recoveryAckReaderSuccess.set(true);
-                } catch (Exception e) {
-                    recoveryLog.fatal("Failure while attempting to read recovery initiate ack message", e);
-                    VoltDB.crashVoltDB();
-                }
-            }
-        };
-        recoveryAckReader.start();
-
+    /**
+     * Get the next initiate response. There might be a few to work the system passed
+     * multi-part transactions.
+     * @throws IOException
+     */
+    private void processNextInitiateResponse() throws IOException {
+        final long startTime = System.currentTimeMillis();
         /*
          * Poll the mailbox so that heartbeat and txns messages are received. It is necessary
          * to participate in that process so the source site can unblock its priority queue if it
          * is blocked on safety or ordering.
          */
-        while (recoveryAckReader.isAlive() && System.currentTimeMillis() - startTime < 5000) {
+        while (m_incoming.peek() == null && System.currentTimeMillis() - startTime < 5000) {
             checkMailbox(false);
+            Thread.yield();
         }
-        if (recoveryAckReader.isAlive()) {
+        if (m_incoming.peek() == null) {
             recoveryLog.fatal("Timed out waiting to read recovery initiate ack message");
             VoltDB.crashVoltDB();
         }
-        if (recoveryAckReaderSuccess.get() == false) {
-            recoveryLog.fatal("There was an error while reading the recovery initiate ack message");
+        if (m_iodaemon.m_lastException != null) {
+            recoveryLog.fatal(
+                    "There was an error while reading the recovery initiate ack message", m_iodaemon.m_lastException);
             VoltDB.crashVoltDB();
         }
-        //ensure memory visibility?
-        try {
-            recoveryAckReader.join();
-        } catch (InterruptedException e) {
-            throw new java.io.InterruptedIOException("Interrupted while joining on recovery initiate ack reader");
-        }
 
-        return;
+        BBContainer ackMessageContainer = m_incoming.poll();
+        ByteBuffer ackMessage = ackMessageContainer.b;
+        final int sourceSite = ackMessage.getInt();
+        final boolean stopBeforeOrSkipPast = ackMessage.get() == 0 ? true : false;
+        if (stopBeforeOrSkipPast) {
+            m_stopBeforeTxnId = ackMessage.getLong();
+            recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
+                    sourceSite + " will sync after txnId " + m_stopBeforeTxnId);
+        } else {
+            m_skipPastTxnId = ackMessage.getLong();
+            recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
+                    sourceSite + " will delay sync until after executing txnId " + m_stopBeforeTxnId);
+        }
+        ackMessageContainer.discard();
     }
 
     /*
@@ -569,5 +582,10 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
     @Override
     public long bytesTransferred() {
         return m_bytesReceived;
+    }
+
+    @Override
+    public void notifyBlockedOnMultiPartTxn(long currentTxnId) {
+        //Don't need to do anything at the destination
     }
 }
