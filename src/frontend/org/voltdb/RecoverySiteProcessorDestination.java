@@ -363,7 +363,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 return;
             }
 
-            if (container == null && !checkMailbox(false)) {
+            if (!checkMailbox(false)) {
                 Thread.yield();
             }
         }
@@ -508,6 +508,9 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         BBContainer ackMessageContainer = m_incoming.poll();
         ByteBuffer ackMessage = ackMessageContainer.b;
         final int sourceSite = ackMessage.getInt();
+        //True if the txn Id should be stopped before
+        //False if the txn id should executed past. After executing past wait for new instructions
+        //      in processNextInitiateResponse
         final boolean stopBeforeOrSkipPast = ackMessage.get() == 0 ? true : false;
         if (stopBeforeOrSkipPast) {
             m_stopBeforeTxnId = ackMessage.getLong();

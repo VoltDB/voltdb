@@ -459,7 +459,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     " at txnId " + currentTxnId + " to site " + m_destinationSiteId);
             ByteBuffer buf = ByteBuffer.allocate(17);
             BBContainer cont = DBBPool.wrapBB(buf);
-            buf.putInt(13);
+            buf.putInt(13);//Length prefix
             buf.putInt(m_siteId);
             buf.put(kEXECUTE_PAST_TXN);
             buf.putLong(currentTxnId);

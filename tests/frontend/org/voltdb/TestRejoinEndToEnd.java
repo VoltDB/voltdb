@@ -186,11 +186,11 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client = ClientFactory.createClient(m_cconfig);
         client.createConnection("localhost", 21213);
 
-        response = client.callProcedure("InsertSinglePartition", 0);
+        response = client.callProcedure("InsertSinglePartition", 33);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 1);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 0);
+        response = client.callProcedure("InsertReplicated", 34);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         cluster.shutDownSingleHost(0);
@@ -261,9 +261,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             //
             // Check that the recovery data transferred
             //
-            response = client.callProcedure("SelectBlahSinglePartition", 0);
+            response = client.callProcedure("SelectBlahSinglePartition", 33);
             assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
+            assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 33);
 
         } finally {
             shouldContinue.set(false);
@@ -273,9 +273,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
 
-        response = client.callProcedure("SelectBlahReplicated", 0);
+        response = client.callProcedure("SelectBlahReplicated", 34);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 34);
 
         //
         //  Try to insert new data
