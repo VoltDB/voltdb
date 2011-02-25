@@ -20,15 +20,15 @@ package org.voltdb.exportclient;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Map.Entry;
 
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 
 /**
- * Represents the export connection to a single export table
- * in the database for a single partition.
+ * Represents the export connection to a single export table in the database for
+ * a single partition.
  *
  */
 public class ExportDataSink {
@@ -46,8 +46,8 @@ public class ExportDataSink {
 
     boolean m_started = false;
 
-    public ExportDataSink(int partitionId, long tableId,
-                      String tableName, ExportDecoderBase decoder) {
+    public ExportDataSink(int partitionId, long tableId, String tableName,
+            ExportDecoderBase decoder) {
         this.tableId = tableId;
         this.partitionId = partitionId;
         m_tableName = tableName;
@@ -72,13 +72,13 @@ public class ExportDataSink {
         return m_txQueues.get(connectionName);
     }
 
-    public void work()
-    {
+    public void work() {
         if (!m_started) {
             poll();
             m_started = true;
         }
-        for (Entry<String, LinkedList<ExportProtoMessage>> rx_conn : m_rxQueues.entrySet()) {
+        for (Entry<String, LinkedList<ExportProtoMessage>> rx_conn : m_rxQueues
+                .entrySet()) {
             ExportProtoMessage m = rx_conn.getValue().poll();
             if (m != null && m.isPollResponse()) {
                 m_activeConnection = rx_conn.getKey();
@@ -88,8 +88,8 @@ public class ExportDataSink {
     }
 
     private void poll() {
-        m_logger.trace("Polling table " + m_tableName +
-                       ", partition " + partitionId + " for new data.");
+        m_logger.trace("Polling table " + m_tableName + ", partition "
+                + partitionId + " for new data.");
 
         ExportProtoMessage m = new ExportProtoMessage(partitionId, tableId);
         m.poll();
@@ -97,8 +97,8 @@ public class ExportDataSink {
     }
 
     private void pollAndAck(ExportProtoMessage prev) {
-        m_logger.debug("Poller, table " + m_tableName + ": pollAndAck " +
-                       prev.getAckOffset());
+        m_logger.debug("Poller, table " + m_tableName + ": pollAndAck "
+                + prev.getAckOffset());
         ExportProtoMessage next = new ExportProtoMessage(partitionId, tableId);
         next.poll().ack(prev.getAckOffset());
         ExportProtoMessage ack = new ExportProtoMessage(partitionId, tableId);
@@ -106,13 +106,12 @@ public class ExportDataSink {
 
         for (String connectionName : m_txQueues.keySet()) {
             if (connectionName.equals(m_activeConnection)) {
-                m_logger.debug("POLLANDACK: " + connectionName + ", offset: " +
-                               prev.getAckOffset());
+                m_logger.debug("POLLANDACK: " + connectionName + ", offset: "
+                        + prev.getAckOffset());
                 m_txQueues.get(m_activeConnection).offer(next);
-            }
-            else {
-                m_logger.debug("ACK: " + connectionName + ", offset: " +
-                               prev.getAckOffset());
+            } else {
+                m_logger.debug("ACK: " + connectionName + ", offset: "
+                        + prev.getAckOffset());
                 m_txQueues.get(connectionName).offer(ack);
             }
         }
@@ -131,9 +130,8 @@ public class ExportDataSink {
 
             // read the streamblock length prefix.
             int ttllength = m.getData().getInt();
-            m_logger.trace("Poller: table: " + m_tableName +
-                           ", partition: " + partitionId +
-                           " : data payload bytes: " + ttllength);
+            m_logger.trace("Poller: table: " + m_tableName + ", partition: "
+                    + partitionId + " : data payload bytes: " + ttllength);
 
             // a stream block prefix of 0 also means empty queue.
             if (ttllength == 0) {
@@ -150,10 +148,12 @@ public class ExportDataSink {
                 m_decoder.processRow(length, rowdata);
             }
 
+            // Perform completion work on the decoder
+            m_decoder.onBlockCompletion();
+
             // ack the old block and poll the next
             pollAndAck(m);
-        }
-        finally {
+        } finally {
             m.getData().order(ByteOrder.BIG_ENDIAN);
         }
     }

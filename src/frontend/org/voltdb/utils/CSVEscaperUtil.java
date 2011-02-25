@@ -16,6 +16,7 @@
  */
 package org.voltdb.utils;
 
+@Deprecated
 public class CSVEscaperUtil
 {
     private static final char[] m_tsvEscapeChars = new char[] { '\t', '\n', '\r', '\\' };
