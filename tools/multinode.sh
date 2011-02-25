@@ -14,6 +14,7 @@ if [ $COUNT -eq 1 ]; then
   sleep 60
   echo at time: `date`, cleaning up
   # kill calling console's tail -f process
+  cp $OUTPUTFILE ${OUTPUTFILE}.bak
   rm $OUTPUTFILE
   exit $RET
 else
