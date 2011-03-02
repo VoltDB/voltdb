@@ -22,6 +22,7 @@ public enum SysProcSelector {
     PROCEDURE,        // invoked as @stat procedure
     STARVATION,
     INITIATOR,        // invoked as @stat initiator
+    LATENCY,          // invoked as @stat latency
     PARTITIONCOUNT,
     IOSTATS,
     MEMORY,           // info about node's memory usage

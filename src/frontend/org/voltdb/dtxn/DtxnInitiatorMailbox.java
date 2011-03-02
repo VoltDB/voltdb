@@ -86,6 +86,10 @@ public class DtxnInitiatorMailbox implements Mailbox
      * Storage for initiator statistics
      */
     final InitiatorStats m_stats;
+    /**
+     * Latency distribution, stored in buckets.
+     */
+    final LatencyStats m_latencies;
 
     /**
      * Construct a new DtxnInitiatorQueue
@@ -99,6 +103,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         m_siteId = siteId;
         m_safetyState = safetyState;
         m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
+        m_latencies = new LatencyStats("Initiator " + siteId + " latency distribution", siteId);
         //m_txnIdResults =
         //    new HashMap<Long, VoltTable[]>();
         //m_txnIdResponses = new HashMap<Long, InitiateResponseMessage>();
@@ -168,6 +173,7 @@ public class DtxnInitiatorMailbox implements Mailbox
                 state.invocation,
                 delta,
                 response.getStatus());
+        m_latencies.logTransactionCompleted(delta);
         c.writeStream().enqueue(response);
     }
 
