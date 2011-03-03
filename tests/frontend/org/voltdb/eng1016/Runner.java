@@ -39,8 +39,13 @@ public class Runner extends TestCase {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addLiteralSchema("create table items (id bigint not null, created bigint not null, primary key (id));");
         project.addLiteralSchema("create index idx_item_tree on items (created, id);");
-        project.addProcedures(GetItems.class);
+
         project.addStmtProcedure("CreateItem", "insert into items (id, created) values (?,?);");
+        project.addStmtProcedure("GetItems", "select id, created from items " +
+                                              "where created <= ? and id < ? " +
+                                              "order by created desc, id desc " +
+                                              "limit ?;");
+
         project.addPartitionInfo("items", "id");
         boolean success = project.compile(Configuration.getPathToCatalogForTest("poc.jar"));
         if (!success) {
@@ -58,21 +63,15 @@ public class Runner extends TestCase {
         voltclient.createConnection("localhost");
 
         // create initial items
-        long numItems = 20;
-        for (long questionid = 0; questionid < numItems; questionid++) {
-            voltclient.callProcedure("CreateItem", questionid, System.currentTimeMillis());
-        }
-        System.out.printf("Created %,d items\n",numItems);
+        voltclient.callProcedure("CreateItem", 0, 10);
+        voltclient.callProcedure("CreateItem", 1, 11);
+        voltclient.callProcedure("CreateItem", 2, 12);
 
         // check that the query does the right thing
-        VoltTable result;
-        result = voltclient.callProcedure("GetItems",0,System.currentTimeMillis(),20,1).getResults()[0];
-        if (result.asScalarLong() != 20) {
-            System.err.printf("First call failed with %d rows\n", result.asScalarLong());
-        }
-        result = voltclient.callProcedure("GetItems",0,System.currentTimeMillis(),10,2).getResults()[0];
-        if (result.asScalarLong() != 20) {
-            System.err.printf("REPRODUCED with %d rows\n", result.asScalarLong());
+        VoltTable result = voltclient.callProcedure("GetItems",11,1,1).getResults()[0];
+        System.out.println(result.toJSONString());
+        if (result.getRowCount() != 1) {
+            System.err.printf("Call failed with %d rows\n", result.getRowCount());
         }
 
         // clean up / shutdown
