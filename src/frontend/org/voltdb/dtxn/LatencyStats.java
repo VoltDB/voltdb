@@ -69,6 +69,7 @@ public class LatencyStats extends SiteStatsSource {
      * bucket covers invocations with latencies larger than 50ms.
      */
     private final long[] m_latencyBuckets = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l};
+    private long m_max = (m_latencyBuckets.length - 1) * BUCKET_RANGE;
     private static final long BUCKET_RANGE = 5; // 25ms
 
     public LatencyStats(String name, int siteId) {
@@ -82,6 +83,7 @@ public class LatencyStats extends SiteStatsSource {
      */
     public synchronized void logTransactionCompleted(int delta) {
         int bucketIndex = Math.min((int) (delta / BUCKET_RANGE), m_latencyBuckets.length - 1);
+        m_max = Math.max(delta, m_max);
         m_latencyBuckets[bucketIndex]++;
     }
 
@@ -106,8 +108,8 @@ public class LatencyStats extends SiteStatsSource {
         if (bucket < m_latencyBuckets.length - 1) {
             rowValues[columnNameToIndex.get("BUCKET_MAX")] = (bucket + 1) * BUCKET_RANGE;
         } else {
-            // last bucket has no ceiling
-            rowValues[columnNameToIndex.get("BUCKET_MAX")] = null;
+            // max for the last bucket is the max of the largest latency
+            rowValues[columnNameToIndex.get("BUCKET_MAX")] = m_max;
         }
         rowValues[columnNameToIndex.get("INVOCATIONS")] = m_latencyBuckets[bucket];
         super.updateStatsRow(rowKey, rowValues);
