@@ -582,8 +582,16 @@ public abstract class SubPlanAssembler {
         scanNode.setTargetTableName(table.getTypeName());
         scanNode.setTargetTableAlias(table.getTypeName());
         scanNode.setTargetIndexName(index.getTypeName());
-        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
-        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        if (path.sortDirection == SortDirectionType.ASC) {
+            scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+            scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
+        }
+        else {
+            List<AbstractExpression> predicate = new ArrayList<AbstractExpression>();
+            predicate.addAll(path.endExprs);
+            predicate.addAll(path.otherExprs);
+            scanNode.setPredicate(ExpressionUtil.combine(predicate));
+        }
         return scanNode;
     }
 }
