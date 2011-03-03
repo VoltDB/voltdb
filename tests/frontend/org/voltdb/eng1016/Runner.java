@@ -40,11 +40,15 @@ public class Runner extends TestCase {
         project.addLiteralSchema("create table items (id bigint not null, created bigint not null, primary key (id));");
         project.addLiteralSchema("create index idx_item_tree on items (created, id);");
 
-        project.addStmtProcedure("CreateItem", "insert into items (id, created) values (?,?);");
-        project.addStmtProcedure("GetItems", "select id, created from items " +
-                                              "where created <= ? and id < ? " +
-                                              "order by created desc, id desc " +
-                                              "limit ?;");
+        project.addStmtProcedure("CreateItem",
+                                 "insert into items (id, created) values (?,?);",
+                                 "items.id:0");
+        project.addStmtProcedure("GetItems",
+                                 "select id, created from items " +
+                                 "where created <= ? and id < ? " +
+                                 "order by created desc, id desc " +
+                                 "limit ?;",
+                                 "items.id:1");
 
         project.addPartitionInfo("items", "id");
         boolean success = project.compile(Configuration.getPathToCatalogForTest("poc.jar"));
