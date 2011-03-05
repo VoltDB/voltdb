@@ -46,6 +46,7 @@ import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
+import org.voltdb.utils.EstTime;
 
 public class TestDtxnInitiatorMailbox extends TestCase
 {
@@ -261,10 +262,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,
                                     boolean isSinglePart)
     {
+        long now = EstTime.currentTimeMillis();
         InFlightTxnState retval = new InFlightTxnState(
                 txnId, coordIds[0], new int[]{}, readOnly,
                 isSinglePart, new StoredProcedureInvocation(),
-                m_testConnect, MESSAGE_SIZE, 0, 0, "", false);
+                m_testConnect, MESSAGE_SIZE, now, 0, "", false);
         if (coordIds.length > 1) {
             for (int i = 1; i < coordIds.length; i++)
                 retval.addCoordinator(coordIds[i]);
