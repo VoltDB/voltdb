@@ -582,7 +582,7 @@ public abstract class SubPlanAssembler {
         scanNode.setTargetTableName(table.getTypeName());
         scanNode.setTargetTableAlias(table.getTypeName());
         scanNode.setTargetIndexName(index.getTypeName());
-        if (path.sortDirection == SortDirectionType.ASC) {
+        if (path.sortDirection != SortDirectionType.DESC) {
             scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
             scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         }
