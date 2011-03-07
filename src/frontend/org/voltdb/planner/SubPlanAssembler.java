@@ -275,7 +275,6 @@ public abstract class SubPlanAssembler {
                 if (ltColumns.containsKey(col) && (ltColumns.get(col).size() >= 0)) {
                     AbstractExpression expr = ltColumns.get(col).remove(0);
                     retval.endExprs.add(expr);
-                    retval.use = IndexUseType.INDEX_SCAN;
                 }
 
                 // if we didn't find an equality match, we can stop looking
@@ -287,16 +286,6 @@ public abstract class SubPlanAssembler {
         // index not relevant to expression
         if (retval.indexExprs.size() == 0 && retval.sortDirection == SortDirectionType.INVALID)
             return null;
-
-        if ((indexScannable == false)) {
-            // partial coverage
-            if (retval.indexExprs.size() < index.getColumns().size())
-                return null;
-
-            // non-equality
-            if ((retval.use == IndexUseType.INDEX_SCAN))
-                return null;
-        }
 
         // If IndexUseType is the default of COVERING_UNIQUE_EQUALITY, and not
         // all columns are covered (but some are with equality)
@@ -311,6 +300,16 @@ public abstract class SubPlanAssembler {
         {
             retval.use = IndexUseType.INDEX_SCAN;
             retval.lookupType = IndexLookupType.GT;
+        }
+
+        if ((indexScannable == false)) {
+            // partial coverage
+            if (retval.indexExprs.size() < index.getColumns().size())
+                return null;
+
+            // non-equality
+            if ((retval.use == IndexUseType.INDEX_SCAN))
+                return null;
         }
 
         // add all unused expressions to the retval's other list

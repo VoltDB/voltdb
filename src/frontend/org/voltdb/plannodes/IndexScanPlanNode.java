@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -236,8 +237,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
      */
     // Please don't use me to add search key expressions.  Use
     // addSearchKeyExpression() so that the expression gets cloned
-    List<AbstractExpression> getSearchKeyExpressions() {
-        return m_searchkeyExpressions;
+    public List<AbstractExpression> getSearchKeyExpressions() {
+        return Collections.unmodifiableList(m_searchkeyExpressions);
     }
 
     @Override
