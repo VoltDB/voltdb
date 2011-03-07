@@ -251,11 +251,6 @@ public class ClientKV {
         long num_gets = 0;
         long num_puts = 0;
 
-        StringBuffer sb = new StringBuffer(key_size);
-        for (int i=0; i < sb.capacity(); i++) {
-            sb.append('x');
-        }
-
         String this_key;
 
         byte[] baGenericValue = new byte[max_value_size];
@@ -278,7 +273,7 @@ public class ClientKV {
         int initialize_data = 0;
 
         try {
-            String init_key = String.format("%d",initial_size) + "0123456789012345678901234567890123456789";
+            String init_key = String.format("K%1$#" + (key_size-1) + "s", initial_size);
             VoltTable[] vtInit = voltclient.callProcedure("Get", init_key).getResults();
             if (vtInit[0].getRowCount() == 0) {
                 // database is not fully initialized, do initialization
@@ -304,7 +299,7 @@ public class ClientKV {
             while (num_puts < initial_size) {
                 num_puts++;
 
-                this_key = String.format("%d",num_puts) + "0123456789012345678901234567890123456789";
+                this_key = String.format("K%1$#" + (key_size-1) + "s", num_puts);
                 byte[] baThisValue = Arrays.copyOfRange(baGenericValue,0,min_value_size+rand.nextInt(max_value_size-min_value_size+1));
                 byte[] this_value = null;
 
@@ -485,12 +480,11 @@ public class ClientKV {
             // determine if this is a get or a put
             int getTest = rand.nextInt(99)+1;
 
-            long current_key = (long) ((rand.nextDouble() * initial_size) + 1);
+            this_key = String.format("K%1$#" + (key_size-1) + "s", (long) ((rand.nextDouble() * initial_size) + 1));
 
             if (getTest <= percent_gets) {
                 // do a get
                 num_gets++;
-                this_key = String.format("%d",current_key) + "0123456789012345678901234567890123456789";
 
                 try {
                     voltclient.callProcedure(new AsyncCallback(spName.GET, this_key), "Get", this_key);
@@ -501,7 +495,6 @@ public class ClientKV {
             } else {
                 // do a put
                 num_puts++;
-                this_key = String.format("%d",current_key) + "0123456789012345678901234567890123456789";
                 byte[] baThisValuePut = Arrays.copyOfRange(baGenericValue,0,min_value_size+rand.nextInt(max_value_size-min_value_size+1));
                 byte[] this_value = null;
 

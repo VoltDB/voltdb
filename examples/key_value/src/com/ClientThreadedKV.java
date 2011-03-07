@@ -185,13 +185,15 @@ public class ClientThreadedKV {
         private final int max_value_size;
         private long put_value_uncompressed_bytes = 0;
         private long put_value_compressed_bytes = 0;
+        private int key_size;
 
-        public Worker( double percent_gets, long initial_size, byte baGenericValue[], int min_value_size, int max_value_size) {
+        public Worker( double percent_gets, long initial_size, byte baGenericValue[], int min_value_size, int max_value_size,int key_size) {
             this.percent_gets = percent_gets;
             this.initial_size = initial_size;
             this.baGenericValue = baGenericValue;
             this.min_value_size = min_value_size;
             this.max_value_size = max_value_size;
+            this.key_size = key_size;
         }
 
         public Counters getCounters() {
@@ -234,12 +236,11 @@ public class ClientThreadedKV {
                 // determine if this is a get or a put
                 int getTest = rand.nextInt(99)+1;
 
-                long current_key = (long) ((rand.nextDouble() * initial_size) + 1);
+                String this_key = String.format("K%1$#" + (key_size-1) + "s", (long) ((rand.nextDouble() * initial_size) + 1));
 
                 if (getTest <= percent_gets) {
                     // do a get
                     num_gets++;
-                    String this_key = String.format("%d",current_key) + "0123456789012345678901234567890123456789";
 
                     try {
                         voltclient.callProcedure(new AsyncCallback(spName.GET, this_key), "Get", this_key);
@@ -253,7 +254,6 @@ public class ClientThreadedKV {
                 } else {
                     // do a put
                     num_puts++;
-                    String this_key = String.format("%d",current_key) + "0123456789012345678901234567890123456789";
                     byte[] baThisValuePut = Arrays.copyOfRange(baGenericValue,0,min_value_size+rand.nextInt(max_value_size-min_value_size+1));
                     byte this_value[] = null;
 
@@ -350,11 +350,6 @@ public class ClientThreadedKV {
         long lastFeedbackTime = startTime;
         startRecordingLatency = startTime + lag_latency_millis;
 
-        StringBuffer sb = new StringBuffer(key_size);
-        for (int i=0; i < sb.capacity(); i++) {
-            sb.append('x');
-        }
-
         String this_key;
         byte[] this_value;
 
@@ -378,7 +373,7 @@ public class ClientThreadedKV {
         int initialize_data = 0;
 
         try {
-            String init_key = String.format("%d",initial_size) + "0123456789012345678901234567890123456789";
+            String init_key = String.format("K%1$#" + (key_size-1) + "s", initial_size);
             VoltTable[] vtInit = voltclient.callProcedure("Get", init_key).getResults();
             if (vtInit[0].getRowCount() == 0) {
                 // database is not fully initialized, do initialization
@@ -411,7 +406,7 @@ public class ClientThreadedKV {
             while (num_puts < initial_size) {
                 num_puts++;
 
-                this_key = String.format("%d",num_puts) + "0123456789012345678901234567890123456789";
+                this_key = String.format("K%1$#" + (key_size-1) + "s",num_puts);
                 byte[] baThisValue = Arrays.copyOfRange(baGenericValue,0,min_value_size+rand.nextInt(max_value_size-min_value_size+1));
                 this_value = null;
                 if (behavior == Behavior.NONE) {
@@ -574,7 +569,7 @@ public class ClientThreadedKV {
         ArrayList<Thread> workerThreads = new ArrayList<Thread>();
         for (int ii = 0; ii < Runtime.getRuntime().availableProcessors(); ii++) {
             m_logger.info(String.format("Creating Worker Thread %d",ii+1));
-            final Worker worker = new Worker(percent_gets, initial_size, baGenericValue, min_value_size, max_value_size);
+            final Worker worker = new Worker(percent_gets, initial_size, baGenericValue, min_value_size, max_value_size, key_size);
             workers.add(worker);
             final Thread workerThread = new Thread(worker);
             workerThreads.add(workerThread);
