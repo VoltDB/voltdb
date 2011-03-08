@@ -73,7 +73,7 @@
   <!-- <admin-mode> -->
   <xs:complexType name="adminModeType">
     <xs:attribute name="port" type="xs:int" use="required"/>
-    <xs:attribute name="adminstartup" type="xs:boolean" use="optional" default="true"/>
+    <xs:attribute name="adminstartup" type="xs:boolean" use="optional" default="false"/>
   </xs:complexType>
 
   <!-- <heartbeat-config> -->

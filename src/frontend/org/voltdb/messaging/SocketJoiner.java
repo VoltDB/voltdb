@@ -571,6 +571,8 @@ public class SocketJoiner extends Thread {
                     recoveryLog.fatal("Inconsistent live host set during rejoin");
                     VoltDB.crashVoltDB();
                 }
+                // set the admin mode here, not in the local deployment file for rejoining nodes
+                VoltDB.instance().setAdminMode(in.readBoolean());
                 readClusterPublicMetadata(in);
                 m_sockets.put(hostId, socket);
                 recoveryLog.info("Have " + m_sockets.size() + " of " + (m_expectedHosts - 1) + " with hostId " + hostId);
@@ -757,6 +759,8 @@ public class SocketJoiner extends Thread {
             for (Integer site : liveHosts) {
                 out.writeInt(site);
             }
+            // send the admin mode here, don't use local deployment file for rejoining nodes
+            out.writeBoolean(VoltDB.instance().inAdminMode());
             writeClusterPublicMetadata(out);
             out.flush();
 

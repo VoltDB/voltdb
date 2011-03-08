@@ -38,7 +38,6 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -63,6 +62,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     {
         FilenameFilter cleaner = new FilenameFilter()
         {
+            @Override
             public boolean accept(File dir, String file)
             {
                 return file.startsWith(TESTNONCE) ||
@@ -167,7 +167,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         return failType != DONT_FAIL;
     }
 
-    public void testRejoinWithMultipartLoad() throws Exception {
+    /*public void testRejoinWithMultipartLoad() throws Exception {
         System.out.println("testRejoinWithMultipartLoad");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
@@ -332,7 +332,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         localServer.shutdown();
         cluster.shutDown();
-    }
+    }*/
 
     public void testRestoreThenRejoinPropagatesRestore() throws Exception {
         System.out.println("testRestoreThenRejoinThenRestore");
@@ -343,7 +343,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 "rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         ServerThread localServer = null;
         try {
-            boolean success = cluster.compile(builder);
+            boolean success = cluster.compileWithAdminMode(builder, 9998, false);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
             cluster.setHasLocalServer(false);
@@ -383,9 +383,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             client = ClientFactory.createClient(m_cconfig);
             client.createConnection("localhost");
 
-            /*
-             * Also make sure a catalog update doesn't reset m_haveDoneRestore
-             */
+            // Also make sure a catalog update doesn't reset m_haveDoneRestore
             String newCatalogURL = Configuration.getPathToCatalogForTest("rejoin.jar");
             String deploymentURL = Configuration.getPathToCatalogForTest("rejoin.xml");
 
@@ -640,6 +638,50 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
+    public void testRejoinPropogateAdminMode() throws Exception {
+        //Reset the VoltFile prefix that may have been set by previous tests in this suite
+        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
+        VoltProjectBuilder builder = getBuilderForTest();
+        builder.setSecurityEnabled(true);
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compileWithAdminMode(builder, 9998, false);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+
+        ClientResponse response;
+        Client client;
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", 9999);
+
+        response = client.callProcedure("@AdminModeEnter");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        client.close();
+
+        cluster.shutDownSingleHost(0);
+        Thread.sleep(100);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:10000";
+        ServerThread localServer = new ServerThread(config);
+
+        localServer.start();
+        localServer.waitForInitialization();
+
+        Thread.sleep(1000);
+
+        assertTrue(VoltDB.instance().inAdminMode());
+
+        localServer.shutdown();
+        cluster.shutDown();
+    }
+
     class TrivialExportClient extends ExportClientBase {
 
         public class TrivialDecoder extends ExportDecoderBase {
@@ -679,13 +721,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     public void testRejoinWithExport() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
-        /*builder.setTableAsExportOnly("blah", false);
-        builder.setTableAsExportOnly("blah_replicated", false);
-        builder.setTableAsExportOnly("PARTITIONED", false);
-        builder.setTableAsExportOnly("PARTITIONED_LARGE", false);*/
+        //builder.setTableAsExportOnly("blah", false);
+        //builder.setTableAsExportOnly("blah_replicated", false);
+        //builder.setTableAsExportOnly("PARTITIONED", false);
+        //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
         builder.addExport("org.voltdb.export.processors.RawProcessor",
-                true  /*enabled*/,
-                null  /* authGroups (off) */);
+                true,  // enabled
+                null);  // authGroups (off)
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder);

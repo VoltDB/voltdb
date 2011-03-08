@@ -68,11 +68,13 @@ public class LocalCluster implements VoltServerConfig {
     final BackendTarget m_target;
     final String m_buildDir;
     int m_portOffset;
+    int m_adminPortOffset;
     boolean m_hasLocalServer = true;
     String m_pathToDeployment;
     int m_pathToDeploymentOffset;
     int m_rejoinOffset;
     FailureState m_failureState;
+    int m_baseAdminPort = -1;
 
     // state
     boolean m_compiled = false;
@@ -287,24 +289,27 @@ public class LocalCluster implements VoltServerConfig {
                                            "",
                                            "port",
                                            "-1",
+                                           "adminport",
+                                           "-1",
                                            "rejoinhost",
                                            "-1");
 
         // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = m_procBuilder.command().size() - 15;
-        m_debugOffset2 = m_procBuilder.command().size() - 14;
+        m_debugOffset1 = m_procBuilder.command().size() - 17;
+        m_debugOffset2 = m_procBuilder.command().size() - 16;
         if (m_debug) {
             m_procBuilder.command().add(m_debugOffset1, "");
             m_procBuilder.command().add(m_debugOffset1, "");
         }
 
-        m_voltFilePrefixOffset = m_procBuilder.command().size() - 13;
+        m_voltFilePrefixOffset = m_procBuilder.command().size() - 15;
         m_procBuilder.command().add(m_voltFilePrefixOffset, "");
 
-        m_portOffset = m_procBuilder.command().size() - 3;
-        m_pathToDeploymentOffset = m_procBuilder.command().size() - 5;
+        m_portOffset = m_procBuilder.command().size() - 5;
+        m_adminPortOffset = m_procBuilder.command().size() - 3;
+        m_pathToDeploymentOffset = m_procBuilder.command().size() - 7;
         m_rejoinOffset = m_procBuilder.command().size() - 1;
-        m_timestampSaltOffset = m_procBuilder.command().size() - 9;
+        m_timestampSaltOffset = m_procBuilder.command().size() - 11;
 
         if (m_target.isIPC) {
             m_procBuilder.command().add("");
@@ -313,10 +318,6 @@ public class LocalCluster implements VoltServerConfig {
             m_ipcPortOffset2 = m_procBuilder.command().size() - 1;
             m_procBuilder.command().add("");
             m_ipcPortOffset3 = m_procBuilder.command().size() - 1;
-        }
-
-        for (String s : m_procBuilder.command()) {
-            System.out.println(s);
         }
 
         // set the working directory to obj/release/prod
@@ -363,14 +364,14 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     @Override
-    public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
-                                        boolean adminOnStartup)
+    public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
         if (m_compiled) {
             return true;
         }
+        m_baseAdminPort = adminPort;
         m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
-                                     adminPort, adminOnStartup);
+                                     m_baseAdminPort, adminOnStartup);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
 
@@ -441,6 +442,7 @@ public class LocalCluster implements VoltServerConfig {
             config.m_pathToDeployment = m_pathToDeployment;
             config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
             config.m_port = VoltDB.DEFAULT_PORT;
+            config.m_adminPort = m_baseAdminPort;
             ArrayList<Integer> ports = new ArrayList<Integer>();
             for (EEProcess proc : m_eeProcs.get(0)) {
                 ports.add(proc.port());
@@ -528,6 +530,7 @@ public class LocalCluster implements VoltServerConfig {
     private void startOne(int hostId, boolean clearLocalDataDirectories) {
         try {
             m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
+            m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort + hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, "");
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
@@ -608,6 +611,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // port for the new node
         int portNo = VoltDB.DEFAULT_PORT + hostId;
+        int adminPortNo = m_baseAdminPort + hostId;
 
         // port to connect to (not too simple, eh?)
         int portNoToRejoin = VoltDB.DEFAULT_PORT + ((hostId + 1) % getNodeCount());
@@ -615,6 +619,7 @@ public class LocalCluster implements VoltServerConfig {
 
         if (portOffset != null) {
             portNoToRejoin = VoltDB.DEFAULT_PORT + portOffset;
+            adminPortNo = m_baseAdminPort + portOffset;
         }
 
         ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
@@ -655,6 +660,7 @@ public class LocalCluster implements VoltServerConfig {
         long start = 0;
         try {
             m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
+            m_procBuilder.command().set(m_adminPortOffset, String.valueOf(adminPortNo));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, rejoinHost + ":" + String.valueOf(portNoToRejoin));
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));

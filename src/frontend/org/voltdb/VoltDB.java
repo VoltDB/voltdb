@@ -90,6 +90,9 @@ public class VoltDB {
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
 
+        /** override for the admin port number in the deployment file */
+        public int m_adminPort = -1;
+
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = DEFAULT_INTERNAL_PORT;
 
@@ -178,6 +181,12 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("port ")) {
                     m_port = Integer.parseInt(arg.substring("port ".length()));
+                }
+                else if (arg.equals("adminport")) {
+                    m_adminPort = Integer.parseInt(args[++i]);
+                }
+                else if (arg.startsWith("adminport ")) {
+                    m_adminPort = Integer.parseInt(arg.substring("adminport ".length()));
                 }
                 else if (arg.equals("internalport")) {
                     m_internalPort = Integer.parseInt(args[++i]);

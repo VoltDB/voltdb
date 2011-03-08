@@ -117,6 +117,7 @@ public class RejoinTestBase extends TestCase {
 
         builder.addProcedures(pi);
         builder.addProcedures(PROCEDURES);
+
         return builder;
     }
 
@@ -129,13 +130,14 @@ public class RejoinTestBase extends TestCase {
         Context retval = new Context();
 
         VoltProjectBuilder builder = getBuilderForTest();
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 2, 1, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 2, 1, "localhost", 9998, false);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+        config.m_adminPort = 9998;
         retval.localServer = new ServerThread(config);
 
         long deploymentCRC = CatalogUtil.getDeploymentCRC(builder.getPathToDeployment());

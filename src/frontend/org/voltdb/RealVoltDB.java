@@ -275,6 +275,7 @@ public class RealVoltDB implements VoltDBInterface
 
     private volatile boolean m_isRunning = false;
 
+    @Override
     public boolean recovering() { return m_recovering; }
 
     private long m_recoveryStartTime = System.currentTimeMillis();
@@ -402,6 +403,11 @@ public class RealVoltDB implements VoltDBInterface
             {
                 m_inAdminMode = true;
             }
+            // set the adminPort from the deployment file
+            int adminPort = m_catalogContext.cluster.getAdminport();
+            // but allow command line override
+            if (config.m_adminPort > 0)
+                adminPort = config.m_adminPort;
 
             // requires a catalog context.
             m_faultManager = new FaultDistributor(this);
@@ -418,32 +424,32 @@ public class RealVoltDB implements VoltDBInterface
             TheHashinator.initialize(catalog);
 
             // start the httpd dashboard/jsonapi
-            int port = m_catalogContext.cluster.getHttpdportno();
+            int httpPort = m_catalogContext.cluster.getHttpdportno();
             boolean jsonEnabled = m_catalogContext.cluster.getJsonapi();
 
             // if not set by the user, just find a free port
-            if (port == 0) {
+            if (httpPort == 0) {
                 // if not set by the user, start at 8080
-                port = 8080;
+                httpPort = 8080;
 
-                for (; true; port++) {
+                for (; true; httpPort++) {
                     try {
-                        m_adminListener = new HTTPAdminListener(jsonEnabled, port);
+                        m_adminListener = new HTTPAdminListener(jsonEnabled, httpPort);
                         break;
                     } catch (Exception e1) {}
                 }
-                if (port == 8081)
+                if (httpPort == 8081)
                     hostLog.info("HTTP admin console unable to bind to port 8080");
-                else if (port > 8081)
-                    hostLog.info("HTTP admin console unable to bind to ports 8080 through " + (port - 1));
-                hostLog.info("HTTP admin console listening on port " + port);
+                else if (httpPort > 8081)
+                    hostLog.info("HTTP admin console unable to bind to ports 8080 through " + (httpPort - 1));
+                hostLog.info("HTTP admin console listening on port " + httpPort);
             }
             else {
                 try {
-                    m_adminListener = new HTTPAdminListener(jsonEnabled, port);
-                    hostLog.info("HTTP admin console listening on port " + port);
+                    m_adminListener = new HTTPAdminListener(jsonEnabled, httpPort);
+                    hostLog.info("HTTP admin console listening on port " + httpPort);
                 } catch (Exception e1) {
-                    hostLog.info("HTTP admin console unable to bind to port " + port);
+                    hostLog.info("HTTP admin console unable to bind to port " + httpPort);
                 }
             }
 
@@ -458,8 +464,8 @@ public class RealVoltDB implements VoltDBInterface
             }
             String localMetadata = addr.getHostAddress();
             localMetadata += ":" + Integer.valueOf(config.m_port);
-            localMetadata += ":" + Integer.valueOf(m_catalogContext.cluster.getAdminport());
-            localMetadata += ":" + Integer.valueOf(port); // json
+            localMetadata += ":" + Integer.valueOf(adminPort);
+            localMetadata += ":" + Integer.valueOf(httpPort); // json
             // possibly atomic swap from null to realz
             m_localMetadata = localMetadata;
 
@@ -644,15 +650,16 @@ public class RealVoltDB implements VoltDBInterface
                 // create CI for each local non-EE site
                 if ((sitesHostId == myHostId) && (site.getIsexec() == false)) {
                     ClientInterface ci =
-                        ClientInterface.create(
-                                               m_network,
+                        ClientInterface.create(m_network,
                                                m_messenger,
                                                m_catalogContext,
                                                m_catalogContext.numberOfNodes,
                                                currSiteId,
                                                site.getInitiatorid(),
-                                               config.m_port + portOffset++,
+                                               config.m_port + portOffset,
+                                               adminPort + portOffset,
                                                m_config.m_timestampTestingSalt);
+                    portOffset++;
                     m_clientInterfaces.add(ci);
                     try {
                         ci.startAcceptingConnections();
@@ -698,6 +705,8 @@ public class RealVoltDB implements VoltDBInterface
             fivems = new PeriodicWorkTimerThread(m_clientInterfaces,
                                                  m_statsManager);
             fivems.start();
+
+            hostLog.info(String.format("The Server is%s running in admin mode on port %d", m_inAdminMode ? "" : " not", adminPort));
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
         }

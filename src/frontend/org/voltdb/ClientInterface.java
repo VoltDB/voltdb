@@ -718,6 +718,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             int siteId,
             int initiatorId,
             int port,
+            int adminPort,
             long timestampTestingSalt) {
 
         int myHostId = -1;
@@ -761,7 +762,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(context, siteId);
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
-                port, context, network, siteId, initiator,
+                port, adminPort, context, network, siteId, initiator,
                 plannerThread, allPartitions,
                 VoltDB.instance().recovering());
         onBackPressure.m_ci = ci;
@@ -770,7 +771,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         return ci;
     }
 
-    ClientInterface(int port, CatalogContext context, VoltNetwork network, int siteId,
+    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network, int siteId,
                     TransactionInitiator initiator, AsyncCompilerWorkThread plannerThread,
                     int[] allPartitions, boolean recovering)
     {
@@ -788,10 +789,8 @@ public class ClientInterface implements DumpManager.Dumpable {
         m_acceptor = new ClientAcceptor(port, network, false);
 
         m_adminAcceptor = null;
-        if (context.cluster.getAdminenabled())
-        {
-            m_adminAcceptor = new ClientAcceptor(context.cluster.getAdminport(),
-                                                 network, true);
+        if (context.cluster.getAdminenabled()) {
+            m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
         }
 
         if (!recovering)
