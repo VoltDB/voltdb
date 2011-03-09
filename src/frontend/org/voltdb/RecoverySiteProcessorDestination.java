@@ -322,7 +322,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             } else {
                 m_skipPastTxnId = null;
                 try {
-                    processNextInitiateResponse();
+                    processNextInitiateResponse(txnId);
                 } catch (IOException e) {
                     recoveryLog.fatal("Error process a second initiate response", e);
                     VoltDB.crashVoltDB();
@@ -363,13 +363,13 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 return;
             }
 
-            if (container == null && !checkMailbox(false)) {
+            if (!checkMailbox(false, txnId)) {
                 Thread.yield();
             }
         }
     }
 
-    private boolean checkMailbox(boolean block) {
+    private boolean checkMailbox(boolean block, long txnId) {
         VoltMessage message = null;
         if (block) {
             message = m_mailbox.recvBlocking();
@@ -384,7 +384,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                             " while a recovery was already in progress. Ignoring it.");
                 }
             } else {
-                m_messageHandler.handleMessage(message);
+                m_messageHandler.handleMessage(message, txnId);
             }
         }
         return message != null;
@@ -474,7 +474,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
 
         m_iodaemon = new IODaemon(m_sc);
 
-        processNextInitiateResponse();
+        processNextInitiateResponse(txnId);
 
         return;
     }
@@ -484,15 +484,15 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
      * multi-part transactions.
      * @throws IOException
      */
-    private void processNextInitiateResponse() throws IOException {
+    private void processNextInitiateResponse(long txnId) throws IOException {
         final long startTime = System.currentTimeMillis();
         /*
          * Poll the mailbox so that heartbeat and txns messages are received. It is necessary
          * to participate in that process so the source site can unblock its priority queue if it
          * is blocked on safety or ordering.
          */
-        while (m_incoming.peek() == null && System.currentTimeMillis() - startTime < 5000) {
-            checkMailbox(false);
+        while (m_incoming.peek() == null && System.currentTimeMillis() - startTime < 500000000) {
+            checkMailbox(false, txnId);
             Thread.yield();
         }
         if (m_incoming.peek() == null) {
@@ -516,7 +516,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         } else {
             m_skipPastTxnId = ackMessage.getLong();
             recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
-                    sourceSite + " will delay sync until after executing txnId " + m_stopBeforeTxnId);
+                    sourceSite + " will delay sync until after executing txnId " + m_skipPastTxnId);
         }
         ackMessageContainer.discard();
     }

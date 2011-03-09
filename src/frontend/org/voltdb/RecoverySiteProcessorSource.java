@@ -498,11 +498,12 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
          * the priority queue is empty.
          */
         if (!m_sentInitiateResponse) {
+            m_stopBeforeTxnId = Math.max(nextTxnId, m_destinationStoppedBeforeTxnId);
             recoveryLog.info(
                     "Sending recovery initiate response from " + m_siteId +
-                    " before txnId " + nextTxnId + " to site " + m_destinationSiteId);
+                    " before txnId " + nextTxnId + " to site " + m_destinationSiteId +
+                    " choosing to stop before txnId " + m_stopBeforeTxnId);
             m_sentInitiateResponse = true;
-            m_stopBeforeTxnId = Math.max(nextTxnId, m_destinationStoppedBeforeTxnId);
             ByteBuffer buf = ByteBuffer.allocate(17);
             BBContainer cont = DBBPool.wrapBB(buf);
             buf.putInt(13);
@@ -664,7 +665,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                             " while a recovery was already in progress. Ignoring it.");
                 }
             } else {
-                m_messageHandler.handleMessage(message);
+                m_messageHandler.handleMessage(message, Long.MIN_VALUE);
             }
         }
     }

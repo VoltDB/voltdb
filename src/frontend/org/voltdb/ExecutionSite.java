@@ -125,7 +125,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * The permit is only acquired by recovering partitions and not the source
      * partitions.
      */
-    private static final Semaphore m_recoveryPermit = new Semaphore(1);
+    static final Semaphore m_recoveryPermit = new Semaphore(Integer.MAX_VALUE);
 
     private boolean m_recovering = false;
     private boolean m_haveRecoveryPermit = false;
@@ -145,6 +145,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
     HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
     private final RestrictedPriorityQueue m_transactionQueue;
+
+    private TransactionState m_currentTransactionState;
 
     // The time in ms since epoch of the last call to tick()
     long lastTickTime = 0;
@@ -426,11 +428,65 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
     /**
      * Passed to recovery processors which forward non-recovery messages to this handler.
+     * Also used when recovery is enabled and there is no recovery processor for messages
+     * received once the priority queue is initialized and returning txns. It is necessary
+     * to do the special prehandling in this handler where txnids that are earlier then what
+     * has been released from the queue during recovery because multi-part txns can involve
+     * the recovering partition after the queue has already released work after the multi-part txn.
+     * The recovering partition was going to give an empty responses anyways so it is fine to do
+     * that in this message handler.
      */
-    private final MessageHandler m_messageHandler = new MessageHandler() {
+    private final MessageHandler m_recoveryMessageHandler = new MessageHandler() {
         @Override
-        public void handleMessage(VoltMessage message) {
-            handleMailboxMessage(message);
+        public void handleMessage(VoltMessage message, long txnId) {
+            if (message instanceof TransactionInfoBaseMessage) {
+                long noticeTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+                /**
+                 * If the recovery processor and by extension this site receives
+                 * a message regarding a txnid < the current supplied txnId then
+                 * the message is for a multi-part txn that this site is a member of
+                 * but doesn't have any info for. Send an ack with no extra processing.
+                 */
+                if (noticeTxnId < txnId) {
+                    if (message instanceof CompleteTransactionMessage) {
+                        CompleteTransactionMessage complete = (CompleteTransactionMessage)message;
+                        CompleteTransactionResponseMessage ctrm =
+                            new CompleteTransactionResponseMessage(complete, m_siteId);
+                        try
+                        {
+                            m_mailbox.send(complete.getCoordinatorSiteId(), 0, ctrm);
+                        }
+                        catch (MessagingException e) {
+                            throw new RuntimeException(e);
+                        }
+                    } else if (message instanceof FragmentTaskMessage) {
+                        FragmentTaskMessage ftask = (FragmentTaskMessage)message;
+                        FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_siteId);
+                        response.setRecovering(true);
+                        response.setStatus(FragmentResponseMessage.SUCCESS, null);
+
+                        // add a dummy table for all of the expected dependency ids
+                        for (int i = 0; i < ftask.getFragmentCount(); i++) {
+                            response.addDependency(ftask.getOutputDepId(i),
+                                    new VoltTable(new VoltTable.ColumnInfo("DUMMY", VoltType.BIGINT)));
+                        }
+
+                        try {
+                            m_mailbox.send(response.getDestinationSiteId(), 0, response);
+                        } catch (MessagingException e) {
+                            throw new RuntimeException(e);
+                        }
+
+                    } else {
+                        handleMailboxMessageNonRecursable(message);
+                    }
+                } else {
+                    handleMailboxMessageNonRecursable(message);
+                }
+            } else {
+                handleMailboxMessageNonRecursable(message);
+            }
+
         }
     };
 
@@ -889,11 +945,12 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                     m_mailbox,
                                     m_siteId,
                                     m_onRecoveryCompletion,
-                                    m_messageHandler);
+                                    m_recoveryMessageHandler);
                     }
                 }
 
                 TransactionState currentTxnState = m_transactionQueue.poll();
+                m_currentTransactionState = currentTxnState;
                 if (currentTxnState == null) {
                     // poll the messaging layer for a while as this site has nothing to do
                     // this will likely have a message/several messages immediately in a heavy workload
@@ -1006,7 +1063,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
     }
 
-    private void handleMailboxMessage(VoltMessage message)
+    private void handleMailboxMessage(VoltMessage message) {
+        if (m_recovering == true && m_recoveryProcessor == null && m_currentTransactionState != null) {
+            m_recoveryMessageHandler.handleMessage(message, m_currentTransactionState.txnId);
+        } else {
+            handleMailboxMessageNonRecursable(message);
+        }
+    }
+
+    private void handleMailboxMessageNonRecursable(VoltMessage message)
     {
         if (message instanceof TransactionInfoBaseMessage) {
             TransactionInfoBaseMessage info = (TransactionInfoBaseMessage)message;
@@ -1117,7 +1182,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     m_mailbox,
                     m_siteId,
                     m_onRecoveryCompletion,
-                    m_messageHandler);
+                    m_recoveryMessageHandler);
         }
         else if (message instanceof FragmentResponseMessage) {
             FragmentResponseMessage response = (FragmentResponseMessage)message;

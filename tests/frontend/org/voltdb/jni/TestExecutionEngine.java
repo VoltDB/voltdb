@@ -210,7 +210,7 @@ public class TestExecutionEngine extends TestCase {
         final MessageHandler mh = new MessageHandler() {
 
             @Override
-            public void handleMessage(VoltMessage message) {
+            public void handleMessage(VoltMessage message, long txnId) {
                 fail();
             }
         };

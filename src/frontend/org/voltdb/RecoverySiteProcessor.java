@@ -65,9 +65,13 @@ public abstract class RecoverySiteProcessor {
     /**
      * doRecoveryWork loops on receiving messages. This interface is invoked
      * to handle non recovery messages.
+     * The transaction id is the id of the earliest known txn at the recovering partition.
+     * Txn messages with later txnIds should have regular message handling that result in normal priority
+     * queue activity. Txn messages with earlier txn ids should acked immediately if they are multi-part
+     * fragment tasks or commit notices do prevent the recovering partition from blocking progress.
      */
     public interface MessageHandler {
-        public void handleMessage(VoltMessage message);
+        public void handleMessage(VoltMessage message, long txnId);
     }
 
     abstract public void handleSiteFaults(HashSet<Integer> failedSites, SiteTracker tracker);
