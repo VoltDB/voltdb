@@ -167,7 +167,10 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         return failType != DONT_FAIL;
     }
 
-    /*public void testRejoinWithMultipartLoad() throws Exception {
+    public void testRejoinWithMultipartLoad() throws Exception {
+        ExecutionSite.m_recoveryPermit.drainPermits();
+        ExecutionSite.m_recoveryPermit.release();
+        try {
         System.out.println("testRejoinWithMultipartLoad");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
@@ -213,7 +216,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                                         ClientResponse clientResponse)
                                         throws Exception {
                                     if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                                        System.err.println(clientResponse.getStatusString());
+                 //                       System.err.println(clientResponse.getStatusString());
                                     }
                                 }
 
@@ -332,7 +335,11 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         localServer.shutdown();
         cluster.shutDown();
-    }*/
+        } finally {
+            ExecutionSite.m_recoveryPermit.drainPermits();
+            ExecutionSite.m_recoveryPermit.release(Integer.MAX_VALUE);
+        }
+    }
 
     public void testRestoreThenRejoinPropagatesRestore() throws Exception {
         System.out.println("testRestoreThenRejoinThenRestore");
