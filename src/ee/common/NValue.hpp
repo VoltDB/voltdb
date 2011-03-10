@@ -18,15 +18,16 @@
 #ifndef NVALUE_HPP_
 #define NVALUE_HPP_
 
+#include "common/ExportSerializeIo.h"
+#include "common/FatalException.hpp"
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
+#include "common/StringRef.h"
+#include "common/ThreadLocalPool.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
-#include "common/ExportSerializeIo.h"
 #include "common/types.h"
 #include "common/value_defs.h"
-#include "common/FatalException.hpp"
-#include "common/ThreadLocalPool.h"
 
 #include <cassert>
 #include <cfloat>
@@ -316,10 +317,11 @@ class NValue {
     }
 
     /**
-     * 17 bytes of storage for NValue data.
-     * The 17th byte stores the ValueType!
+     * 16 bytes of storage for NValue data.
      */
-    char m_data[17];
+    char m_data[16];
+    ValueType m_valueType;
+    bool m_sourceInlined;
 
     /**
      * Private constructor that initializes storage and the specifies the type of value
@@ -328,6 +330,7 @@ class NValue {
     NValue(const ValueType type) {
         ::memset( m_data, 0, 16);
         setValueType(type);
+        m_sourceInlined = false;
     }
 
     /**
@@ -336,7 +339,7 @@ class NValue {
      * is used to store the type
      */
     void setValueType(ValueType type) {
-        reinterpret_cast<uint8_t*>(m_data)[16] = static_cast<uint8_t>(type);
+        m_valueType = type;
     }
 
     /**
@@ -344,7 +347,12 @@ class NValue {
      * to prevent code outside of NValue from branching based on the type of a value.
      */
     ValueType getValueType() const {
-        return static_cast<ValueType>(m_data[16]);
+        return m_valueType;
+    }
+
+    void setSourceInlined(bool sourceInlined)
+    {
+        m_sourceInlined = sourceInlined;
     }
 
     /**
@@ -481,8 +489,8 @@ class NValue {
      * Not truly symmetrical with getObjectValue which returns the actual object past
      * the length preceding value
      */
-    void setObjectValue(char *object) {
-        *reinterpret_cast<char**>(m_data) = object;
+    void setObjectValue(void* object) {
+        *reinterpret_cast<void**>(m_data) = object;
     }
 
     /**
@@ -494,7 +502,16 @@ class NValue {
         } else if(*reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL) {
             return NULL;
         } else {
-            void * value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
+            void* value;
+            if (m_sourceInlined)
+            {
+                value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
+            }
+            else
+            {
+                StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
+                value = sref->get() + getObjectLengthLength();
+            }
             return value;
         }
     }
@@ -988,7 +1005,17 @@ class NValue {
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                    msg);
             }
-            ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), getObjectLengthLength() + objectLength);
+            if (m_sourceInlined)
+            {
+                ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), getObjectLengthLength() + objectLength);
+            }
+            else
+            {
+                const StringRef* sref =
+                    *reinterpret_cast<StringRef* const*>(m_data);
+                ::memcpy(storage, sref->get(),
+                         getObjectLengthLength() + objectLength);
+            }
         }
 
     }
@@ -1432,14 +1459,11 @@ class NValue {
         const int32_t length = static_cast<int32_t>(value.length());
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         const int32_t minLength = length + lengthLength;
-#ifdef MEMCHECK
-        char *storage = new char[minLength];
-#else
-        char *storage = reinterpret_cast<char*>(ThreadLocalPool::get(minLength)->malloc());
-#endif
+        StringRef* sref = StringRef::create(minLength);
+        char* storage = sref->get();
         setObjectLengthToLocation(length, storage);
         ::memcpy( storage + lengthLength, value.c_str(), length);
-        retval.setObjectValue(storage);
+        retval.setObjectValue(sref);
         retval.setObjectLength(length);
         retval.setObjectLengthLength(lengthLength);
         return retval;
@@ -1571,17 +1595,19 @@ inline NValue NValue::op_or(const NValue rhs) const {
  * the object to the heap
  */
 inline void NValue::free() const {
-    switch (getValueType()) {
-      case VALUE_TYPE_VARCHAR:
-#ifdef MEMCHECK
-          delete[] *reinterpret_cast<const char* const*>(m_data);
-#else
-          if (*reinterpret_cast<const char* const*>(m_data) != NULL) {
-              ThreadLocalPool::get(getObjectLength() + getObjectLengthLength())->free(*reinterpret_cast<void**>(const_cast<char*>(m_data)));
-          }
-#endif
+    switch (getValueType())
+    {
+    case VALUE_TYPE_VARCHAR:
+        {
+            assert(!m_sourceInlined);
+            StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
+            if (sref != NULL)
+            {
+                StringRef::destroy(sref);
+            }
+        }
         break;
-      default:
+    default:
         return;
     }
 }
@@ -1701,49 +1727,63 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
                                                  const ValueType type,
                                                  const bool isInlined)
 {
-        NValue retval(type);
-        switch (type) {
-          case VALUE_TYPE_TIMESTAMP:
-            retval.getTimestamp() = *reinterpret_cast<const int64_t*>(storage);
-            break;
-          case VALUE_TYPE_TINYINT:
-            retval.getTinyInt() = *reinterpret_cast<const int8_t*>(storage);
-            break;
-          case VALUE_TYPE_SMALLINT:
-            retval.getSmallInt() = *reinterpret_cast<const int16_t*>(storage);
-            break;
-          case VALUE_TYPE_INTEGER:
-            retval.getInteger() = *reinterpret_cast<const int32_t*>(storage);
-            break;
-          case VALUE_TYPE_BIGINT:
-            retval.getBigInt() = *reinterpret_cast<const int64_t*>(storage);
-            break;
-          case VALUE_TYPE_DOUBLE:
-            retval.getDouble() = *reinterpret_cast<const double*>(storage);
-            break;
-          case VALUE_TYPE_DECIMAL:
-            ::memcpy( retval.m_data, storage, NValue::getTupleStorageSize(type));
-            break;
-          case VALUE_TYPE_VARCHAR: {
-            //Potentially non-inlined type requires special handling
-            if (isInlined) {
-                //If it is inlined the storage area contains the actual data so copy a reference
-                //to the storage area
-                *reinterpret_cast<void**>(retval.m_data) = const_cast<void*>(storage);
-            } else {
-                //If it isn't inlined the storage area contains a pointer to the memory location
-                //containing the string.
-                memcpy( retval.m_data, storage, sizeof(void*));
+    NValue retval(type);
+    switch (type)
+    {
+    case VALUE_TYPE_TIMESTAMP:
+        retval.getTimestamp() = *reinterpret_cast<const int64_t*>(storage);
+        break;
+    case VALUE_TYPE_TINYINT:
+        retval.getTinyInt() = *reinterpret_cast<const int8_t*>(storage);
+        break;
+    case VALUE_TYPE_SMALLINT:
+        retval.getSmallInt() = *reinterpret_cast<const int16_t*>(storage);
+        break;
+    case VALUE_TYPE_INTEGER:
+        retval.getInteger() = *reinterpret_cast<const int32_t*>(storage);
+        break;
+    case VALUE_TYPE_BIGINT:
+        retval.getBigInt() = *reinterpret_cast<const int64_t*>(storage);
+        break;
+    case VALUE_TYPE_DOUBLE:
+        retval.getDouble() = *reinterpret_cast<const double*>(storage);
+        break;
+    case VALUE_TYPE_DECIMAL:
+        ::memcpy( retval.m_data, storage, NValue::getTupleStorageSize(type));
+        break;
+    case VALUE_TYPE_VARCHAR: {
+        //Potentially non-inlined type requires special handling
+        char* data = NULL;
+        if (isInlined) {
+            //If it is inlined the storage area contains the actual data so copy a reference
+            //to the storage area
+            *reinterpret_cast<void**>(retval.m_data) = const_cast<void*>(storage);
+            data = *reinterpret_cast<char**>(retval.m_data);
+            retval.setSourceInlined(true);
+        } else {
+            //If it isn't inlined the storage area contains a pointer to the
+            // StringRef object containing the string's memory
+            memcpy( retval.m_data, storage, sizeof(void*));
+            StringRef* sref = *reinterpret_cast<StringRef**>(retval.m_data);
+            // If the StringRef pointer is null, that's because this
+            // was a null value; leave the data pointer as NULL so
+            // that getObjectLengthFromLocation will figure this out
+            // correctly, otherwise get the right char* from the StringRef
+            if (sref != NULL)
+            {
+                data = sref->get();
             }
-            const int32_t length = getObjectLengthFromLocation(*reinterpret_cast<char**>(retval.m_data));
-            retval.setObjectLength(length);
-            retval.setObjectLengthLength(getAppropriateObjectLengthLength(length));
-            break;
-          }
-          default:
-              throwFatalException( "NValue::getLength() unrecognized type '%d'", type);
         }
-        return retval;
+        const int32_t length = getObjectLengthFromLocation(data);
+        //std::cout << "NValue::deserializeFromTupleStorage: length: " << length << std::endl;
+        retval.setObjectLength(length);
+        retval.setObjectLengthLength(getAppropriateObjectLengthLength(length));
+        break;
+    }
+    default:
+        throwFatalException( "NValue::getLength() unrecognized type '%d'", type);
+    }
+    return retval;
 }
 
 /**
@@ -1793,7 +1833,6 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 length = getObjectLength();
                 const int8_t lengthLength = getObjectLengthLength();
                 const int32_t minlength = lengthLength + length;
-                char *copy = NULL;
                 if (length > maxLength) {
                     char msg[1024];
                     snprintf(msg, 1024, "Object exceeds specified size. Size is %d"
@@ -1803,18 +1842,11 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                         msg);
 
                 }
-                if (dataPool != NULL) {
-                    copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
-                } else {
-#ifdef MEMCHECK
-                    copy = new char[minlength];
-#else
-                    copy = reinterpret_cast<char*>(ThreadLocalPool::get(minlength)->malloc());
-#endif
-                }
+                StringRef* sref = StringRef::create(minlength, dataPool);
+                char *copy = sref->get();
                 setObjectLengthToLocation(length, copy);
                 ::memcpy(copy + lengthLength, getObjectValue(), length);
-                *reinterpret_cast<char**>(storage) = copy;
+                *reinterpret_cast<StringRef**>(storage) = sref;
             }
         }
         break;
@@ -1863,9 +1895,13 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         }
         else {
             if (isNull() || getObjectLength() <= maxLength) {
-                // copy the pointers
-                *reinterpret_cast<char**>(storage) =
-                  *reinterpret_cast<char* const*>(m_data);
+                if (m_sourceInlined && !isInlined)
+                {
+                    throwFatalException("Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
+                }
+                // copy the StringRef pointers
+                *reinterpret_cast<StringRef**>(storage) =
+                  *reinterpret_cast<StringRef* const*>(m_data);
             }
             else {
                 const int32_t length = getObjectLength();
@@ -1939,19 +1975,11 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
               }
               const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
               const int32_t minlength = lengthLength + length;
-              char *copy = NULL;
-              if (dataPool != NULL) {
-                  copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
-              } else {
-#ifdef MEMCHECK
-                  copy = new char[minlength];
-#else
-                  copy = reinterpret_cast<char*>(ThreadLocalPool::get(minlength)->malloc());
-#endif
-              }
+              StringRef* sref = StringRef::create(minlength, dataPool);
+              char* copy = sref->get();
               setObjectLengthToLocation( length, copy);
               ::memcpy(copy + lengthLength, data, length);
-              *reinterpret_cast<char**>(storage) = copy;
+              *reinterpret_cast<StringRef**>(storage) = sref;
           }
           break;
       }
@@ -2008,19 +2036,11 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
           }
           const void *str = input.getRawPointer(length);
           const int32_t minlength = lengthLength + length;
-          char *copy = NULL;
-          if (dataPool != NULL) {
-              copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
-          } else {
-#ifdef MEMCHECK
-              copy = new char[minlength];
-#else
-              copy = reinterpret_cast<char*>(ThreadLocalPool::get(minlength)->malloc());
-#endif
-          }
+          StringRef* sref = StringRef::create(minlength, dataPool);
+          char* copy = sref->get();
           retval.setObjectLengthToLocation( length, copy);
           ::memcpy(copy + lengthLength, str, length);
-          retval.setObjectValue(copy);
+          retval.setObjectValue(sref);
           retval.setObjectLength(length);
           retval.setObjectLengthLength(lengthLength);
           break;

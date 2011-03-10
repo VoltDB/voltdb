@@ -185,11 +185,19 @@ CTX.INPUT['catalog'] = """
  snapshotschedule.cpp
 """
 
+CTX.INPUT['structures'] = """
+ CompactingPool.cpp
+ ContiguousAllocator.cpp
+"""
+
 CTX.INPUT['common'] = """
+ CompactingStringPool.cpp
+ CompactingStringStorage.cpp
  ThreadLocalPool.cpp
  SegvException.cpp
  SerializableEEException.cpp
  SQLException.cpp
+ StringRef.cpp
  tabletuple.cpp
  TupleSchema.cpp
  types.cpp
@@ -375,6 +383,7 @@ if whichtests in ("${eetestsuite}", "structures"):
     CTX.TESTS['structures'] = """
      CompactingMapTest
      CompactingHashTest
+     CompactingPoolTest
     """
 
 ###############################################################################

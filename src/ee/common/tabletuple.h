@@ -206,9 +206,9 @@ public:
     void setNValue(const int idx, voltdb::NValue value);
 
     /*
-     * Version of setSlimValue that will allocate space to copy
+     * Version of setNValue that will allocate space to copy
      * strings that can't be inlined rather then copying the
-     * pointer. Used when setting a SlimValue that will go into
+     * pointer. Used when setting an NValue that will go into
      * permanent storage in a persistent table.  It is also possible
      * to provide NULL for stringPool in which case the strings will
      * be allocated on the heap.

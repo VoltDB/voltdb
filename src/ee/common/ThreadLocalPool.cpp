@@ -25,6 +25,7 @@ namespace voltdb {
  * Thread local key for storing thread specific memory pools
  */
 static pthread_key_t m_key;
+static pthread_key_t m_stringKey;
 /**
  * Thread local key for storing integer value of amount of memory allocated
  */
@@ -38,6 +39,7 @@ typedef PairType* PairTypePtr;
 
 static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
+    (void)pthread_key_create( &m_stringKey, NULL);
     (void)pthread_key_create( &m_keyAllocated, NULL);
 }
 
@@ -48,6 +50,7 @@ ThreadLocalPool::ThreadLocalPool() {
         pthread_setspecific( m_key, static_cast<const void *>(
                 new PairType(
                         1, new MapType())));
+        pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
     } else {
         PairTypePtr p =
                 static_cast<PairTypePtr>(pthread_getspecific(m_key));
@@ -64,6 +67,8 @@ ThreadLocalPool::~ThreadLocalPool() {
         if (p->first == 1) {
             delete p->second;
             pthread_setspecific( m_key, NULL);
+            delete static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+            pthread_setspecific(m_stringKey, NULL);
             delete static_cast<std::size_t*>(pthread_getspecific(m_keyAllocated));
             pthread_setspecific( m_keyAllocated, NULL);
         } else {
@@ -148,13 +153,20 @@ static std::size_t getAllocationSizeForObject(std::size_t length) {
         return 524288;
     } else if (length <= 524288 + 262144) {
         return 524288 + 262144;
-        //Need space for a length prefix
-    } else if (length <= 1048576 + 4) {
-        return 1048576 + 4;
+        //Need space for a length prefix and a backpointer
+    } else if (length <= 1048576 + sizeof(int32_t) + sizeof(void*)) {
+        return 1048576 + sizeof(int32_t) + sizeof(void*);
     } else {
         throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %Zu", length);
     }
+    // NOT REACHED
     return length + 4;
+}
+
+CompactingStringStorage*
+ThreadLocalPool::getStringPool()
+{
+    return static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
 }
 
 boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPool::get(std::size_t size) {
@@ -198,7 +210,10 @@ boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPoo
 }
 
 std::size_t ThreadLocalPool::getPoolAllocationSize() {
-    return *static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated));
+    size_t bytes_allocated =
+        *static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated));
+    bytes_allocated += (static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey)))->getPoolAllocationSize();
+    return bytes_allocated;
 }
 
 char * voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {

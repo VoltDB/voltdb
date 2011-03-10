@@ -25,6 +25,7 @@
 #include <map>
 #include <algorithm>
 #include <cstdlib>
+#include <cstdio>
 #include <sys/time.h>
 #include <boost/unordered_map.hpp>
 #include "harness.h"

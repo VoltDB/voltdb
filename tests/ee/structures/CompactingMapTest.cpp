@@ -25,11 +25,13 @@
 #include <map>
 #include <algorithm>
 #include <cstdlib>
+#include <cstdio>
 #include <sys/time.h>
 #include "harness.h"
 #include "structures/CompactingMap.h"
 
 using namespace voltdb;
+using namespace std;
 
 class StringComparator {
 public:

@@ -19,8 +19,6 @@
 #define CONTIGUOUSALLOCATOR_H_
 
 #include <cstdlib>
-#include <cstdio>
-#include <vector>
 
 namespace voltdb {
 
@@ -58,78 +56,6 @@ public:
 
     size_t bytesAllocated() const;
 };
-
-ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize)
-: m_count(0), m_allocSize(allocSize), m_chunkSize(chunkSize), m_tail(NULL), m_blockCount(0) {}
-
-ContiguousAllocator::~ContiguousAllocator() {
-    while (m_tail) {
-        Buffer *buf = m_tail->prev;
-        free(m_tail);
-        m_tail = buf;
-    }
-}
-
-void *ContiguousAllocator::alloc() {
-    m_count++;
-
-    // determine where in the current block the new alloc will go
-    int64_t blockOffset = (m_count - 1) % m_chunkSize;
-
-    // if a new block is needed...
-    if (blockOffset == 0) {
-        void *memory = malloc(sizeof(Buffer) + m_allocSize * m_chunkSize);
-
-        Buffer *buf = reinterpret_cast<Buffer*>(memory);
-
-        // for debugging
-        //memset(buf, 0, sizeof(sizeof(ChainedBuffer) + m_allocSize * m_chunkSize));
-
-        buf->prev = m_tail;
-        m_tail = buf;
-        m_blockCount++;
-    }
-
-    // get a pointer to where the new alloc will live
-    void *retval = m_tail->data + (m_allocSize * blockOffset);
-    assert(retval == last());
-    return retval;
-}
-
-void *ContiguousAllocator::last() const {
-    assert(m_count > 0);
-    assert(m_tail != NULL);
-
-    // determine where in the current block the last alloc is
-    int64_t blockOffset = (m_count - 1) % m_chunkSize;
-    return m_tail->data + (m_allocSize * blockOffset);
-}
-
-void ContiguousAllocator::trim() {
-    // for debugging
-    //memset(last(), 0, allocSize);
-
-    assert(m_count > 0);
-    assert(m_tail != NULL);
-
-    m_count--;
-
-    // determine where in the current block the last alloc is
-    int64_t blockOffset = m_count % m_chunkSize;
-
-    // yay! kill a block
-    if (blockOffset == 0) {
-        Buffer *buf = m_tail->prev;
-        free(m_tail);
-        m_tail = buf;
-        m_blockCount--;
-    }
-}
-
-size_t ContiguousAllocator::bytesAllocated() const {
-    size_t total = static_cast<size_t>(m_blockCount * m_allocSize * m_chunkSize);
-    return total;
-}
 
 } // namespace voltdb
 

@@ -17,6 +17,9 @@
 
 #ifndef THREADLOCALPOOL_H_
 #define THREADLOCALPOOL_H_
+
+#include "CompactingStringStorage.h"
+
 #include "boost/pool/pool.hpp"
 #include "boost/shared_ptr.hpp"
 
@@ -55,6 +58,8 @@ public:
     static boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > getExact(std::size_t size);
 
     static std::size_t getPoolAllocationSize();
+
+    static CompactingStringStorage* getStringPool();
 };
 }
 

@@ -46,6 +46,12 @@
 #ifndef NATIVEEXPORTSERIALIZEIO_H
 #define NATIVEEXPORTSERIALIZEIO_H
 
+#include <cassert>
+#include <cstring>
+#include <limits>
+#include <stdint.h>
+#include <string>
+
 namespace voltdb {
 
 /*
