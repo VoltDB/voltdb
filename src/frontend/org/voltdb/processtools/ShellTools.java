@@ -37,7 +37,6 @@ public abstract class ShellTools {
         try {
             p = pb.start();
         } catch (IOException e) {
-            e.printStackTrace();
             return null;
         }
         return p;
