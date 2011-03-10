@@ -117,8 +117,8 @@ public class StarvationTracker extends SiteStatsSource {
             final long totalTime = System.nanoTime() - m_startTime;
             rowValues[columnNameToIndex.get("COUNT")] = m_count;
             rowValues[columnNameToIndex.get("PERCENT")] = m_totalTime / (totalTime / 100.0);
-            long uSecs = (m_totalTime / m_count) / 1000;
-            rowValues[columnNameToIndex.get("AVG")] = (m_totalTime / m_count) / 1000;
+            long uSecs = m_count > 0 ? (m_totalTime / m_count) / 1000 : 0l;
+            rowValues[columnNameToIndex.get("AVG")] = uSecs;
             rowValues[columnNameToIndex.get("MIN")] = m_min;
             rowValues[columnNameToIndex.get("MAX")] = m_max;
             rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(m_sumOfSquares / m_count - uSecs * uSecs);
