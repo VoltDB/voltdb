@@ -75,6 +75,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool;
@@ -94,7 +95,7 @@ import org.voltdb.utils.Pair;
     private ArrayDeque<VoltPort> m_activeUpdateList = m_selectorUpdates_1;
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
-    private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
+    private final CopyOnWriteArrayList<VoltPort> m_ports = new CopyOnWriteArrayList<VoltPort>();
     private final boolean m_useBlockingSelect;
     private final boolean m_useExecutorService;
     private final ArrayList<WeakReference<Thread>> m_networkThreads = new ArrayList<WeakReference<Thread>>();
@@ -333,9 +334,7 @@ import org.voltdb.utils.Pair;
 
             return port;
         } finally {
-            synchronized (m_ports) {
-                m_ports.add(port);
-            }
+            m_ports.add(port);
             releaseRegistrationLock();
         }
     }
@@ -351,17 +350,13 @@ import org.voltdb.utils.Pair;
 
         acquireRegistrationLock();
         try {
-            synchronized (m_ports) {
-                if (!m_ports.contains(port)) {
-                    return;
-                }
+            if (!m_ports.contains(port)) {
+                return;
             }
             port.unregistering();
             selectionKey.cancel();
             selectionKey.attach(null);
-            synchronized (m_ports) {
-                m_ports.remove(port);
-            }
+            m_ports.remove(port);
         } finally {
             releaseRegistrationLock();
         }
@@ -512,9 +507,7 @@ import org.voltdb.utils.Pair;
         if (key.isValid()) {
             key.interestOps (port.interestOps());
         } else {
-            synchronized (m_ports) {
-                m_ports.remove(port);
-            }
+            m_ports.remove(port);
         }
     }
 
@@ -587,25 +580,23 @@ import org.voltdb.utils.Pair;
         long totalMessagesRead = 0;
         long totalWritten = 0;
         long totalMessagesWritten = 0;
-        synchronized (m_ports) {
-            for (VoltPort p : m_ports) {
-                final long read = p.readStream().getBytesRead(interval);
-                final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(interval);
-                final long messagesRead = p.getMessagesRead(interval);
-                totalRead += read;
-                totalMessagesRead += messagesRead;
-                totalWritten += writeInfo[0];
-                totalMessagesWritten += writeInfo[1];
-                retval.put(
-                        p.connectionId(),
-                        Pair.of(
-                                p.m_remoteHost,
-                                new long[] {
-                                        read,
-                                        messagesRead,
-                                        writeInfo[0],
-                                        writeInfo[1] }));
-            }
+        for (VoltPort p : m_ports) {
+            final long read = p.readStream().getBytesRead(interval);
+            final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(interval);
+            final long messagesRead = p.getMessagesRead(interval);
+            totalRead += read;
+            totalMessagesRead += messagesRead;
+            totalWritten += writeInfo[0];
+            totalMessagesWritten += writeInfo[1];
+            retval.put(
+                    p.connectionId(),
+                    Pair.of(
+                            p.m_remoteHost,
+                            new long[] {
+                                    read,
+                                    messagesRead,
+                                    writeInfo[0],
+                                    writeInfo[1] }));
         }
         retval.put(
                 -1L,

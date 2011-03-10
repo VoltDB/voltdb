@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
@@ -83,7 +84,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     private ClientAcceptor m_adminAcceptor;
     private final TransactionInitiator m_initiator;
     private final AsyncCompilerWorkThread m_asyncCompilerWorkThread;
-    private final ArrayList<Connection> m_connections = new ArrayList<Connection>();
+    private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -604,9 +605,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         @Override
         public void stopping(Connection c) {
-            synchronized (m_connections) {
-                m_connections.remove(c);
-            }
+            m_connections.remove(c);
         }
 
         @Override
@@ -1164,13 +1163,8 @@ public class ClientInterface implements DumpManager.Dumpable {
      * @param now Current time in milliseconds
      */
     private final void checkForDeadConnections(final long now) {
-        Connection connectionsToCheck[];
-        synchronized (m_connections) {
-            connectionsToCheck = m_connections.toArray(new Connection[m_connections.size()]);
-        }
-
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
-        for (final Connection c : connectionsToCheck) {
+        for (final Connection c : m_connections) {
             final int delta = c.writeStream().calculatePendingWriteDelta(now);
             if (delta > 4000) {
                 connectionsToRemove.add(c);
@@ -1365,16 +1359,12 @@ public class ClientInterface implements DumpManager.Dumpable {
         Map<Long, Pair<String, long[]>> client_stats =
             new HashMap<Long, Pair<String, long[]>>();
 
-        Connection connections[];
-        synchronized (m_connections) {
-            connections = m_connections.toArray(new Connection[m_connections.size()]);
-        }
         Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
 
         // put all the live connections in the stats map, then fill in admin and
         // outstanding txn info from the inflight stats
 
-        for (Connection c : connections)
+        for (Connection c : m_connections)
         {
             if (!client_stats.containsKey(c.connectionId()))
             {
