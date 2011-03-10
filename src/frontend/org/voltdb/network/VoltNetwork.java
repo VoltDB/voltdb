@@ -100,6 +100,7 @@ import org.voltdb.utils.Pair;
     private final boolean m_useExecutorService;
     private final ArrayList<WeakReference<Thread>> m_networkThreads = new ArrayList<WeakReference<Thread>>();
     private final ArrayList<DBBPool> m_poolsToClearOnShutdown = new ArrayList<DBBPool>();
+    public final int threadPoolSize;
 
     /**
      * Synchronizes registration and unregistration of channels
@@ -119,8 +120,7 @@ import org.voltdb.utils.Pair;
         m_selector = selector;
         m_useBlockingSelect = true;
         m_useExecutorService = false;
-
-
+        threadPoolSize = 1;
     }
 
     public VoltNetwork() {
@@ -152,19 +152,21 @@ import org.voltdb.utils.Pair;
             m_useExecutorService = useExecutorService;
         }
         if (!m_useExecutorService) {
+            threadPoolSize = 1;
             return;
         }
 
-        int threadPoolSize = 1;
-        if (threads != null) {
+        // determine the number of threads to use
+        if (threads != null)
             threadPoolSize = threads.intValue();
-        } else if (availableProcessors <= 4) {
+        else if (availableProcessors <= 4)
             threadPoolSize = 1;
-        } else if (availableProcessors <= 8) {
+        else if (availableProcessors <= 8)
             threadPoolSize = 2;
-        } else if (availableProcessors <= 16) {
+        else if (availableProcessors > 8)
             threadPoolSize = 2;
-        }
+        else
+            threadPoolSize = 1;
 
         final ThreadFactory tf = new ThreadFactory() {
             private ThreadGroup group = new ThreadGroup(Thread.currentThread().getThreadGroup(), "Network threads");

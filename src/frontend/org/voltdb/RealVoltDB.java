@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -45,6 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Site;
+import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -70,6 +73,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltSampler;
 
 public class RealVoltDB implements VoltDBInterface
@@ -307,6 +311,12 @@ public class RealVoltDB implements VoltDBInterface
     @Override
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
+
+            // start (asynchronously) getting platform info
+            // this will start a thread that should die in less
+            // than a second
+            PlatformProperties.fetchPlatformProperties();
+
             if (config.m_useCommitLog) {
                 try {
                     m_commitLog = new CommitLogImpl( config.m_commitLogDir, config.m_commitInterval, config.m_waitForCommit);
@@ -345,15 +355,6 @@ public class RealVoltDB implements VoltDBInterface
                 }
             }
 
-            // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
-            try {
-                System.setOut(new PrintStream(System.out, true, "UTF-8"));
-                System.setErr(new PrintStream(System.err, true, "UTF-8"));
-            } catch (UnsupportedEncodingException e) {
-                hostLog.fatal("Support for the UTF-8 encoding is required for VoltDB. This means you are likely running an unsupported JVM.");
-                VoltDB.crashVoltDB();
-            }
-
             // useful for debugging, but doesn't do anything unless VLog is enabled
             if (config.m_port != VoltDB.DEFAULT_PORT) {
                 VLog.setPortNo(config.m_port);
@@ -361,6 +362,21 @@ public class RealVoltDB implements VoltDBInterface
             VLog.log("\n### RealVoltDB.initialize() for port %d ###", config.m_port);
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+            // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
+            try {
+                System.setOut(new PrintStream(System.out, true, "UTF-8"));
+                System.setErr(new PrintStream(System.err, true, "UTF-8"));
+            } catch (UnsupportedEncodingException e) {
+                hostLog.fatal("Support for the UTF-8 encoding is required for VoltDB. This means you are likely running an unsupported JVM. Exiting.");
+                System.exit(-1);
+            }
+
+            // check that this is a 64 bit VM
+            if (System.getProperty("java.vm.name").contains("64") == false) {
+                hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
+                System.exit(-1);
+            }
 
             // start the dumper thread
             if (config.listenForDumpRequests)
@@ -426,6 +442,7 @@ public class RealVoltDB implements VoltDBInterface
             // start the httpd dashboard/jsonapi
             int httpPort = m_catalogContext.cluster.getHttpdportno();
             boolean jsonEnabled = m_catalogContext.cluster.getJsonapi();
+            String httpPortExtraLogMessage = null;
 
             // if not set by the user, just find a free port
             if (httpPort == 0) {
@@ -439,17 +456,16 @@ public class RealVoltDB implements VoltDBInterface
                     } catch (Exception e1) {}
                 }
                 if (httpPort == 8081)
-                    hostLog.info("HTTP admin console unable to bind to port 8080");
+                    httpPortExtraLogMessage = "HTTP admin console unable to bind to port 8080";
                 else if (httpPort > 8081)
-                    hostLog.info("HTTP admin console unable to bind to ports 8080 through " + (httpPort - 1));
-                hostLog.info("HTTP admin console listening on port " + httpPort);
+                    httpPortExtraLogMessage = "HTTP admin console unable to bind to ports 8080 through " + String.valueOf(httpPort - 1);
             }
             else {
                 try {
                     m_adminListener = new HTTPAdminListener(jsonEnabled, httpPort);
-                    hostLog.info("HTTP admin console listening on port " + httpPort);
                 } catch (Exception e1) {
-                    hostLog.info("HTTP admin console unable to bind to port " + httpPort);
+                    hostLog.info("HTTP admin console unable to bind to port " + httpPort + ". Exiting.");
+                    System.exit(-1);
                 }
             }
 
@@ -487,7 +503,8 @@ public class RealVoltDB implements VoltDBInterface
                     VoltDB.crashVoltDB();
                 }
 
-                hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
+                hostLog.info(String.format("Beginning inter-node communicaton on port %d.", config.m_internalPort));
                 m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, m_catalogContext.catalogCRC, depCRC, hostLog);
                 Object retval[] = m_messenger.waitForGroupJoin();
                 m_instanceId = new Object[] { retval[0], retval[1] };
@@ -622,20 +639,20 @@ public class RealVoltDB implements VoltDBInterface
 
             // set up profiling and tracing
             // hack to prevent profiling on multiple machines
-            if (m_localSites.size() == 1) {
-                if (m_config.m_profilingLevel != ProcedureProfiler.Level.DISABLED)
-                    hostLog.l7dlog(
-                                   Level.INFO,
+            if (m_config.m_profilingLevel != ProcedureProfiler.Level.DISABLED) {
+                if (m_localSites.size() == 1) {
+                    hostLog.l7dlog(Level.INFO,
                                    LogKeys.host_VoltDB_ProfileLevelIs.name(),
                                    new Object[] { m_config.m_profilingLevel },
                                    null);
-                ProcedureProfiler.profilingLevel = m_config.m_profilingLevel;
-            }
-            else {
-                hostLog.l7dlog(
-                               Level.INFO,
-                               LogKeys.host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts.name(),
-                               null);
+                    ProcedureProfiler.profilingLevel = m_config.m_profilingLevel;
+                }
+                else {
+                    hostLog.l7dlog(
+                                   Level.INFO,
+                                   LogKeys.host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts.name(),
+                                   null);
+                }
             }
 
             // if a workload tracer is specified, start her up!
@@ -690,7 +707,10 @@ public class RealVoltDB implements VoltDBInterface
             } catch (Exception e) {}
 
             // Start running the socket handlers
-            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartingNetwork.name(), null);
+            hostLog.l7dlog(Level.INFO,
+                           LogKeys.host_VoltDB_StartingNetwork.name(),
+                           new Object[] { m_network.threadPoolSize },
+                           null);
             m_network.start();
 
             // tell other booting nodes that this node is ready. Primary purpose is to publish a hostname
@@ -706,7 +726,13 @@ public class RealVoltDB implements VoltDBInterface
                                                  m_statsManager);
             fivems.start();
 
-            hostLog.info(String.format("The Server is%s running in admin mode on port %d", m_inAdminMode ? "" : " not", adminPort));
+            // print out a bunch of useful system info
+            logDebuggingInfo(adminPort, httpPort, httpPortExtraLogMessage, jsonEnabled);
+
+            int k = m_catalogContext.numberOfExecSites / m_catalogContext.numberOfPartitions;
+            if (k == 1) {
+                hostLog.warn("Running without redundancy (k=0) is not recommended for production use.");
+            }
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
         }
@@ -769,6 +795,7 @@ public class RealVoltDB implements VoltDBInterface
             rejoinPort = Integer.parseInt(rejoinHostAddressString.substring(colonIndex + 1).trim());
         }
 
+        hostLog.info(String.format("Inter-node communicaton will use port %d.", config.m_internalPort));
         ServerSocketChannel listener = null;
         try {
             listener = ServerSocketChannel.open();
@@ -846,6 +873,78 @@ public class RealVoltDB implements VoltDBInterface
             VoltDB.crashVoltDB();
         }
         return downHosts;
+    }
+
+    void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
+        // print out awesome network stuff
+        hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
+        if (m_catalogContext.cluster.getAdminenabled()) {
+            hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", adminPort));
+        }
+        else {
+            hostLog.info("The admin client port is disabled.");
+        }
+        if (m_inAdminMode) {
+            hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
+        }
+        if (httpPortExtraLogMessage != null)
+            hostLog.info(httpPortExtraLogMessage);
+        hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", httpPort));
+        if (jsonEnabled) {
+            hostLog.info(String.format("Json API over HTTP enabled at path /api/1.0/, listening on port %d.", httpPort));
+        }
+        else {
+            hostLog.info("Json API disabled.");
+        }
+        if (m_catalogContext.cluster.getSecurityenabled()) {
+            hostLog.info("Client authentication is enabled.");
+        }
+        else {
+            hostLog.info("Client authentication is not enabled. Anonymous clients accepted.");
+        }
+
+        // replay command line args that we can see
+        List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
+        StringBuilder sb = new StringBuilder("Available JVM arguments:");
+        for (String iarg : iargs)
+            sb.append(" ").append(iarg);
+        if (iargs.size() > 0) hostLog.info(sb.toString());
+        else hostLog.info("No JVM command line args known.");
+
+        // java heap size
+        long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
+        javamaxheapmem /= (1024 * 1024);
+        hostLog.info(String.format("Maximum usable Java heap set to %d mb.", javamaxheapmem));
+
+        // auto snapshot info
+        SnapshotSchedule sshed = m_catalogContext.database.getSnapshotschedule().get("default");
+        if (sshed == null) {
+            hostLog.info("No schedule set for automated snapshots.");
+        }
+        else {
+            final String frequencyUnitString = sshed.getFrequencyunit().toLowerCase();
+            final char frequencyUnit = frequencyUnitString.charAt(0);
+            String msg = "[unknown frequency]";
+            switch (frequencyUnit) {
+            case 's':
+                msg = String.valueOf(sshed.getFrequencyvalue()) + " seconds";
+                break;
+            case 'm':
+                msg = String.valueOf(sshed.getFrequencyvalue()) + " minutes";
+                break;
+            case 'h':
+                msg = String.valueOf(sshed.getFrequencyvalue()) + " hours";
+                break;
+            }
+            hostLog.info("Automatic snapshots enabled every " + msg + " to " + sshed.getPath());
+        }
+
+        // print out a bunch of useful system info
+        PlatformProperties pp = PlatformProperties.getPlatformProperties();
+        String[] lines = pp.toLogLines().split("\n");
+        for (String line : lines) {
+            hostLog.info(line.trim());
+        }
     }
 
     public static String[] extractBuildInfo() {

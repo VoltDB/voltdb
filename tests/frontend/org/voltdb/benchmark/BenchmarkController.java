@@ -37,8 +37,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -464,7 +464,7 @@ public class BenchmarkController {
             // WAIT FOR SERVERS TO BE READY
             String readyMsg = "Server completed initialization.";
             ProcessData.OutputLine line = m_serverPSM.nextBlocking();
-            while(line.message.equals(readyMsg) == false) {
+            while(line.message.endsWith(readyMsg) == false) {
                 if (m_config.showConsoleOutput)
                 {
                     System.err.printf("(%s): \"%s\"\n", line.processName, line.message);

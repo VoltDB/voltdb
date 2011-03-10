@@ -17,14 +17,14 @@
 
 package org.voltdb.export;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.TreeMap;
-import java.util.HashMap;
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.io.File;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.TreeMap;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -137,6 +137,7 @@ public class ExportManager
         final Connector conn= db.getConnectors().get("0");
 
         if (conn == null) {
+            exportLog.info("System is not using any export functionality.");
             return;
         }
 
@@ -144,6 +145,8 @@ public class ExportManager
             exportLog.info("Export is disabled by user configuration.");
             return;
         }
+
+        exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
         final String elloader = conn.getLoaderclass();
         try {

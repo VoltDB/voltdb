@@ -90,7 +90,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // base class loads the volt shared library
         super(site);
         //exceptionBuffer.order(ByteOrder.nativeOrder());
-        System.out.println("Creating Execution Engine on clusterIndex=" + clusterIndex
+        LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
                 + ", site_id = " + siteId + "...");
         /*
          * (Ning): The reason I'm testing if we're running in Sun's JVM is that
@@ -110,6 +110,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     hostname);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(false, new BufferGrowCallback() {
+            @Override
             public void onBufferGrow(final FastSerializer obj) {
                 LOG.trace("Parameter buffer has grown. re-setting to EE..");
                 final int code = nativeSetBuffers(pointer,

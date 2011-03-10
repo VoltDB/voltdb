@@ -65,19 +65,18 @@ import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.UsersType;
-import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
-import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
-import org.voltdb.utils.VoltFile;
 import org.xml.sax.SAXException;
 
 /**
@@ -669,8 +668,21 @@ public abstract class CatalogUtil {
         int kFactor = cluster.getKfactor();
 
         ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor, leader);
-        hostLog.l7dlog(Level.INFO, LogKeys.compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost.name(),
-                new Object[] {config.getLeaderAddress(), config.getHostCount(), config.getSitesPerHost()}, null);
+        hostLog.l7dlog(Level.INFO,
+                       LogKeys.compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost.name(),
+                       new Object[] { config.getHostCount(),
+                                      config.getLeaderAddress(),
+                                      config.getSitesPerHost(),
+                                      config.getReplicationFactor() },
+                       null);
+        int replicas = config.getReplicationFactor() + 1;
+        int partitionCount = config.getSitesPerHost() * config.getHostCount() / replicas;
+        hostLog.info(String.format("The entire cluster has %d %s of%s %d logical partition%s.",
+                                   replicas,
+                                   replicas > 1 ? "copies" : "copy",
+                                   partitionCount > 1 ? " each of the" : "",
+                                   partitionCount,
+                                   partitionCount > 1 ? "s" : ""));
 
         if (!config.validate()) {
             hostLog.error(config.getErrorMsg());
@@ -683,9 +695,11 @@ public abstract class CatalogUtil {
                 CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                 SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
                 sched.setPrefix(cluster.getPartitionDetection().getSnapshot().getPrefix());
+                hostLog.info("Detection of network partitions in the cluster enabled.");
             }
             else {
                 catCluster.setNetworkpartition(false);
+                hostLog.info("Detection of network partitions in the cluster is not enabled.");
             }
             // copy admin mode configuration from xml to catalog
             if (cluster.getAdminMode() != null)

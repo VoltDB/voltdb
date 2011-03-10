@@ -49,14 +49,10 @@ public class EELibraryLoader {
                 try {
                     final VoltLogger hostLog = new VoltLogger("HOST");
                     final String libname = "voltdb-" + VoltDB.instance().getVersionString();
-                    hostLog.info("Attempting to load native VoltDB library " + libname +
-                            ". Expect to see a confirmation following this upon success. " +
-                            "If none appears then you may need to compile VoltDB for your platform " +
-                            "or you may be running a 32-bit JVM.");
+                    hostLog.info("Loading native VoltDB code ("+libname+"). A confirmation message will follow if the loading is successful.");
                     System.loadLibrary(libname);
                     voltSharedLibraryLoaded = true;
-                    hostLog.info("Successfully loaded native VoltDB library " + libname +
-                    ".");
+                    hostLog.info("Successfully loaded native VoltDB library " + libname + ".");
                 } catch (Throwable e) {
                     if (mustSuccede) {
                         hostLog.fatal("Library VOLTDB JNI shared library loading failed. Library path "

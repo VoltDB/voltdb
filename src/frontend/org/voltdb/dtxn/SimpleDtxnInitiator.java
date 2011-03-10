@@ -105,7 +105,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                long timestampTestingSalt)
     {
         assert(messenger != null);
-        hostLog.info("INITIALIZING INITIATOR ID: " + initiatorId  + ", SITEID: " + siteId);
+        hostLog.trace("Initializing Initiator ID: " + initiatorId  + ", SiteID: " + siteId);
 
         m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);
         m_hostId = hostId;
