@@ -491,7 +491,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
          * to participate in that process so the source site can unblock its priority queue if it
          * is blocked on safety or ordering.
          */
-        while (m_incoming.peek() == null && System.currentTimeMillis() - startTime < 500000000) {
+        while (m_incoming.peek() == null && System.currentTimeMillis() - startTime < 5000) {
             checkMailbox(false, txnId);
             Thread.yield();
         }
