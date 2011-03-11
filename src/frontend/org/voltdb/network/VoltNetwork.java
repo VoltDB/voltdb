@@ -70,12 +70,11 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool;

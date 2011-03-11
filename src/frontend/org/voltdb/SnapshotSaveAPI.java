@@ -17,8 +17,15 @@
 
 package org.voltdb;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -146,6 +153,7 @@ public class SnapshotSaveAPI
     }
 
 
+    @SuppressWarnings("unused")
     private void createSetup(String file_path, String file_nonce,
             long txnId, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {

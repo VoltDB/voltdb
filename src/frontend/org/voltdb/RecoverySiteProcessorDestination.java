@@ -30,7 +30,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
