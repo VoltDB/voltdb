@@ -424,6 +424,8 @@ public class RealVoltDB implements VoltDBInterface
             // but allow command line override
             if (config.m_adminPort > 0)
                 adminPort = config.m_adminPort;
+            // other places might use config to figure out the port
+            config.m_adminPort = adminPort;
 
             // requires a catalog context.
             m_faultManager = new FaultDistributor(this);

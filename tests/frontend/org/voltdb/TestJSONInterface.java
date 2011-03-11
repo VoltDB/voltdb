@@ -60,7 +60,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -78,12 +77,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
-import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
-import org.voltdb.compiler.procedures.DelayProc;
-import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
@@ -192,10 +186,14 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, 200 /* HTTP_OK */);
+        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, int expectedCode) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin) throws Exception {
+        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */);
+    }
+
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
@@ -209,6 +207,9 @@ public class TestJSONInterface extends TestCase {
                 params.put("Hashedpassword", getHashedPasswordForHTTPVar(password));
             else
                 params.put("Password", password);
+        }
+        if (admin) {
+            params.put("admin", "true");
         }
 
         String varString = getHTTPVarString(params);
@@ -241,7 +242,7 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public void testSimple() throws Exception {
+    /*public void testSimple() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 23 not null, " +
@@ -263,7 +264,7 @@ public class TestJSONInterface extends TestCase {
         builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
         builder.addProcedures(CrazyBlahProc.class);
         builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, "localhost", 21213, false);
         assertTrue(success);
 
         config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
@@ -597,7 +598,7 @@ public class TestJSONInterface extends TestCase {
         ParameterSet pset = new ParameterSet();
         pset.setParameters("foo", "bar", "foobar");
         try {
-            callProcOverJSON("Insert", pset, null, null, false, 403); // HTTP_FORBIDDEN
+            callProcOverJSON("Insert", pset, null, null, false, false, 403); // HTTP_FORBIDDEN
         }
         catch (Exception e) {
             // make sure failed due to permissions on http
@@ -672,6 +673,102 @@ public class TestJSONInterface extends TestCase {
 
         callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
         callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
+
+        server.shutdown();
+        server.join();
+    }*/
+
+    public void testAdminMode() throws Exception {
+        String simpleSchema =
+            "create table blah (" +
+            "ival bigint default 23 not null, " +
+            "sval varchar(200) default 'foo', " +
+            "dateval timestamp, " +
+            "fval float, " +
+            "decval decimal, " +
+            "PRIMARY KEY(ival));";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        String schemaPath = schemaFile.getPath();
+        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addSchema(schemaPath);
+        builder.addPartitionInfo("blah", "ival");
+        builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
+        builder.addProcedures(CrazyBlahProc.class);
+        builder.setHTTPDPort(8095);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, "localhost", 21213, true);
+        assertTrue(success);
+
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+        config.m_pathToDeployment = builder.getPathToDeployment();
+
+        ServerThread server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        ParameterSet pset = new ParameterSet();
+        String responseJSON;
+        Response response;
+
+        // Call insert on admin port
+        pset.setParameters(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SUCCESS);
+
+        // Call insert on closed client port and expect failure
+        pset.setParameters(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
+
+        // open client port
+        pset.setParameters();
+        responseJSON = callProcOverJSON("@AdminModeExit", pset, null, null, false, true);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SUCCESS);
+
+        // call insert on open client port
+        pset.setParameters(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SUCCESS);
+
+        // call insert on admin port again (now that both ports are open)
+        pset.setParameters(3, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SUCCESS);
+
+        // put the system in admin mode
+        pset.setParameters();
+        responseJSON = callProcOverJSON("@AdminModeEnter", pset, null, null, false, true);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SUCCESS);
+
+        // Call insert on admin port
+        pset.setParameters(4, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SUCCESS);
+
+        // Call insert on closed client port and expect failure
+        pset.setParameters(5, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
 
         server.shutdown();
         server.join();

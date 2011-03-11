@@ -41,6 +41,7 @@ public class AuthenticatedConnectionCache {
 
     final String m_hostname;
     final int m_port;
+    final int m_adminPort;
     final int m_targetSize; // goal size of the client cache
 
     /**
@@ -56,7 +57,7 @@ public class AuthenticatedConnectionCache {
 
     // The set of active connections.
     Map<String, Connection> m_connections = new TreeMap<String, Connection>();
-    // The optional unauthenticated client which should only work if auth is off
+    // The optional unauthenticated clients which should only work if auth is off
     ClientImpl m_unauthCient = null;
 
     public AuthenticatedConnectionCache(int targetSize) {
@@ -64,19 +65,37 @@ public class AuthenticatedConnectionCache {
     }
 
     public AuthenticatedConnectionCache(int targetSize, String serverHostname) {
-        this(targetSize, serverHostname, VoltDB.DEFAULT_PORT);
+        this(targetSize, serverHostname, VoltDB.DEFAULT_PORT, 0);
     }
 
-    public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort) {
+    public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort, int adminPort) {
         assert(serverHostname != null);
         assert(serverPort > 0);
 
         m_hostname = serverHostname;
         m_port = serverPort;
+        m_adminPort = adminPort;
         m_targetSize = targetSize;
     }
 
-    public synchronized Client getClient(String userName, byte[] hashedPassword) throws IOException {
+    public synchronized Client getClient(String userName, byte[] hashedPassword, boolean admin) throws IOException {
+        // ADMIN MODE
+        if (admin) {
+            ClientImpl adminClient = null;
+            adminClient = (ClientImpl) ClientFactory.createClient();
+            if ((userName == null) || (userName == "")) {
+                if ((hashedPassword != null) && (hashedPassword.length > 0)) {
+                    throw new IOException("Username was null but password was not.");
+                }
+                adminClient.createConnection(m_hostname, m_adminPort);
+            }
+            else {
+                adminClient.createConnectionWithHashedCredentials(m_hostname, m_adminPort, userName, hashedPassword);
+            }
+
+            return adminClient;
+        }
+
         // UN-AUTHENTICATED
         if ((userName == null) || (userName == "")) {
             if ((hashedPassword != null) && (hashedPassword.length > 0)) {

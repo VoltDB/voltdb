@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.CountDownLatch;
 
 import javax.servlet_voltpatches.http.HttpServletResponse;
 
@@ -31,6 +32,7 @@ import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
@@ -44,6 +46,7 @@ public class HTTPClientInterface {
         final Request m_request;
         final Continuation m_continuation;
         final String m_jsonp;
+        final CountDownLatch m_latch = new CountDownLatch(1);
 
         public JSONProcCallback(Request request, Continuation continuation, String jsonp) {
             assert(request != null);
@@ -70,6 +73,11 @@ public class HTTPClientInterface {
             m_request.setHandled(true);
             response.getWriter().print(msg);
             m_continuation.complete();
+            m_latch.countDown();
+        }
+
+        public void waitForResponse() throws InterruptedException {
+            m_latch.await();
         }
     }
 
@@ -85,6 +93,7 @@ public class HTTPClientInterface {
         String msg;
 
         Client client = null;
+        boolean adminMode = false;
 
         Continuation continuation = ContinuationSupport.getContinuation(request);
         continuation.suspend(response);
@@ -92,7 +101,8 @@ public class HTTPClientInterface {
         try {
             if (m_connections == null) {
                 int port = VoltDB.instance().getConfig().m_port;
-                m_connections = new AuthenticatedConnectionCache(10, "localhost", port);
+                int adminPort = VoltDB.instance().getConfig().m_adminPort;
+                m_connections = new AuthenticatedConnectionCache(10, "localhost", port, adminPort);
             }
 
             String username = request.getParameter("User");
@@ -101,6 +111,13 @@ public class HTTPClientInterface {
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
             String jsonp = request.getParameter("jsonp");
+            String admin = request.getParameter("admin");
+
+            // check for admin mode
+            if (admin != null) {
+                if (admin.compareToIgnoreCase("true") == 0)
+                    adminMode = true;
+            }
 
             // null procs are bad news
             if (procName == null) {
@@ -136,7 +153,7 @@ public class HTTPClientInterface {
             assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20));
 
             // get a connection to localhost from the pool
-            client = m_connections.getClient(username, hashedPasswordBytes);
+            client = m_connections.getClient(username, hashedPasswordBytes, adminMode);
 
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
@@ -166,6 +183,9 @@ public class HTTPClientInterface {
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
             }
+            if (adminMode) {
+                cb.waitForResponse();
+            }
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -183,7 +203,21 @@ public class HTTPClientInterface {
         finally {
             if (client != null) {
                 assert(m_connections != null);
-                m_connections.releaseClient(client);
+                // admin connections aren't cached
+                if (adminMode) {
+                    if (client != null) {
+                        try {
+                            client.close();
+                        } catch (InterruptedException e) {
+                            VoltLogger log = new VoltLogger("HOST");
+                            log.warn("JSON interface was interrupted while closing an internal admin client connection.");
+                        }
+                    }
+                }
+                // other connections are cached
+                else {
+                    m_connections.releaseClient(client);
+                }
             }
         }
     }
