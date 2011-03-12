@@ -172,7 +172,7 @@ class VoltQueryClient(cmd.Cmd):
         self.close()
         self.fs = None
 
-    def help_connect(self):
+    def help_disconnect(self):
         self.safe_print("Disconnect from the server")
 
     def do_quit(self, command):
