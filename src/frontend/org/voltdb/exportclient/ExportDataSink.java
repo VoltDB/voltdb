@@ -60,9 +60,6 @@ public class ExportDataSink {
         if (m_activeConnection == null) {
             m_activeConnection = connectionName;
         }
-        if (!m_activeConnection.equals(connectionName)) {
-            System.out.println("OH holy hell " + connectionName + " and " + m_activeConnection);
-        }
         m_rxQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
         m_txQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
     }

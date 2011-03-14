@@ -707,12 +707,12 @@ public class RealVoltDB implements VoltDBInterface
                                              0, m_memoryStats);
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
-//            try {
-//                final Class<?> statsManagerClass =
-//                    Class.forName("org.voltdb.management.JMXStatsManager");
-//                m_statsManager = (StatsManager)statsManagerClass.newInstance();
-//                m_statsManager.initialize(new ArrayList<Integer>(m_localSites.keySet()));
-//            } catch (Exception e) {}
+            try {
+                final Class<?> statsManagerClass =
+                    Class.forName("org.voltdb.management.JMXStatsManager");
+                m_statsManager = (StatsManager)statsManagerClass.newInstance();
+                m_statsManager.initialize(new ArrayList<Integer>(m_localSites.keySet()));
+            } catch (Exception e) {}
 
             // Start running the socket handlers
             hostLog.l7dlog(Level.INFO,
