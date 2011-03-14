@@ -26,7 +26,7 @@ namespace voltdb {
  */
 void PersistentTableUndoDeleteAction::undo() {
     TableTuple tuple( m_tuple, m_table->schema());
-    m_table->insertTupleForUndo(m_tuple, m_wrapperOffset);
+    m_table->insertTupleForUndo(m_tuple);
 }
 
 /*

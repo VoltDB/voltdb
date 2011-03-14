@@ -51,13 +51,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final String m_database;
     private final String m_tableName;
-    private final long m_tableId;
+    private final String m_signature;
     private final int m_siteId;
     private final int m_partitionId;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
     private long m_firstUnpolledUso = 0;
     private final StreamBlockQueue m_committedBuffers;
+    private boolean m_endOfStream = false;
+    private final File m_adFile;
+    private Runnable m_onDrain;
 
     /**
      * Create a new data source.
@@ -69,15 +72,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param tableId
      * @param catalogMap
      */
-    public ExportDataSource(String db, String tableName,
-                         int partitionId, int siteId, long tableId,
+    public ExportDataSource(
+            Runnable onDrain,
+            String db, String tableName,
+                         int partitionId, int siteId, String signature,
                          CatalogMap<Column> catalogMap,
                          String overflowPath) throws IOException
     {
+        m_onDrain = onDrain;
         m_database = db;
         m_tableName = tableName;
 
-        String nonce = tableName + "_" + tableId + "_" + siteId + "_" + partitionId;
+        String nonce = signature + "_" + siteId + "_" + partitionId;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
@@ -86,7 +92,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * a catalog version and a table id so that it is constant across
          * catalog updates that add or drop tables.
          */
-        m_tableId = tableId;
+        m_signature = signature;
         m_partitionId = partitionId;
         m_siteId = siteId;
 
@@ -117,6 +123,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
 
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
+        m_adFile = adFile;
+        exportLog.info("Creating ad for " + nonce);
         assert(!adFile.exists());
         FastSerializer fs = new FastSerializer();
         fs.writeInt(m_siteId);
@@ -128,7 +136,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         fos.close();
     }
 
-    public ExportDataSource(String overflowPath, File adFile) throws IOException {
+    public ExportDataSource(Runnable onDrain, File adFile) throws IOException {
+        m_onDrain = onDrain;
+        m_adFile = adFile;
+        String overflowPath = adFile.getParent();
         FileInputStream fis = new FileInputStream(adFile);
         byte data[] = new byte[(int)adFile.length()];
         int read = fis.read(data);
@@ -139,9 +150,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_siteId = fds.readInt();
         m_database = fds.readString();
-
         m_partitionId = fds.readInt();
-        m_tableId = fds.readLong();
+        m_signature = fds.readString();
         m_tableName = fds.readString();
         int numColumns = fds.readInt();
         for (int ii=0; ii < numColumns; ++ii) {
@@ -149,7 +159,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_columnTypes.add(fds.readInt());
         }
 
-        String nonce = m_tableName + "_" + m_tableId + "_" + m_siteId + "_" + m_partitionId;
+        String nonce = m_signature + "_" + m_siteId + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
     }
 
@@ -190,7 +200,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void exportAction(RawProcessor.ExportInternalMessage m) throws MessagingException {
         ExportProtoMessage message = m.m_m;
-        ExportProtoMessage result = new ExportProtoMessage( message.m_partitionId, message.m_tableId);
+        ExportProtoMessage result = new ExportProtoMessage( message.m_partitionId, message.m_signature);
         ExportInternalMessage mbp = new ExportInternalMessage(m.m_sb, result);
         StreamBlock first_unpolled_block = null;
 
@@ -198,6 +208,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         //outside of the m_committedBuffers critical section
         ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
 
+        boolean hitEndOfStreamWithNoRunnable = false;
         try {
             //Perform all interaction with m_committedBuffers under lock
             //because pushExportBuffer may be called from an ExecutionSite at any time
@@ -212,6 +223,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         ExportManager.instance().queueMessage(mbp);
                         return;
                     }
+                }
+
+                if (m_endOfStream && m_committedBuffers.sizeInBytes() == 0) {
+                    if (m_onDrain != null) {
+                        try {
+                            m_onDrain.run();
+                        } finally {
+                            m_onDrain = null;
+                        }
+                    } else {
+                        hitEndOfStreamWithNoRunnable = true;
+                    }
+                    return;
                 }
 
                 //Reset the first unpolled uso so that blocks that have already been polled will
@@ -258,6 +282,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             for (StreamBlock sb : blocksToDelete) {
                 sb.deleteContent();
             }
+            //Cheesy hack for now where we serve info about old
+            //data sources from previous generations. In reality accessing
+            //this generation is something of an error
+            if (hitEndOfStreamWithNoRunnable) {
+                ByteBuffer buf = ByteBuffer.allocate(4);
+                buf.putInt(0).flip();
+                result.pollResponse(m_firstUnpolledUso, buf);
+                ExportManager.instance().queueMessage(mbp);
+            }
         }
 
         if (message.isPoll()) {
@@ -285,8 +318,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_tableName;
     }
 
-    public long getTableId() {
-        return m_tableId;
+    public String getSignature() {
+        return m_signature;
     }
 
     public int getSiteId() {
@@ -299,7 +332,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void writeAdvertisementTo(FastSerializer fs) throws IOException {
         fs.writeInt(getPartitionId());
-        fs.writeLong(getTableId());
+        fs.writeString(m_signature);
         fs.writeString(getTableName());
         fs.writeInt(m_columnNames.size());
         for (int ii=0; ii < m_columnNames.size(); ++ii) {
@@ -358,9 +391,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_committedBuffers.sizeInBytes();
     }
 
-    public void pushExportBuffer(long uso, final long bufferPtr, ByteBuffer buffer, boolean sync) {
+    public void pushExportBuffer(long uso, final long bufferPtr, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         synchronized (m_committedBuffers) {
+            if (endOfStream) {
+                assert(!m_endOfStream);
+                assert(bufferPtr == 0);
+                assert(buffer == null);
+                assert(!sync);
+                m_endOfStream = endOfStream;
+
+                if (m_committedBuffers.sizeInBytes() == 0) {
+                    exportLog.info("Pushed EOS buffer with 0 bytes remaining");
+                    try {
+                        m_onDrain.run();
+                    } finally {
+                        m_onDrain = null;
+                    }
+                }
+                return;
+            }
+            assert(!m_endOfStream);
             if (buffer != null) {
                 try {
                     m_committedBuffers.offer(new StreamBlock(
@@ -388,6 +439,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         }
+    }
+
+    public void closeAndDelete() throws IOException {
+        m_committedBuffers.closeAndDelete();
     }
 
 }

@@ -23,8 +23,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.PrintStream;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -55,6 +54,7 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.StringInputStream;
+import org.voltdb.utils.VoltTypeUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
@@ -428,6 +428,7 @@ public class DDLCompiler {
 
         NodeList childNodes = node.getChildNodes();
 
+        ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
         for (int i = 0; i < childNodes.getLength(); i++) {
             Node subNode = childNodes.item(i);
 
@@ -437,7 +438,7 @@ public class DDLCompiler {
                 for (int j = 0; j < columnNodes.getLength(); j++) {
                     Node columnNode = columnNodes.item(j);
                     if (columnNode.getNodeName().equals("column"))
-                        addColumnToCatalog(table, columnNode, colIndex++);
+                        addColumnToCatalog(table, columnNode, colIndex++, columnTypes);
                 }
                 // limit the total number of columns in a table
                 if (colIndex > MAX_COLUMNS) {
@@ -466,6 +467,8 @@ public class DDLCompiler {
             }
         }
 
+        table.setSignature(VoltTypeUtil.getSignatureForTable(name, columnTypes));
+
         /*
          * Validate that the total size
          */
@@ -489,7 +492,7 @@ public class DDLCompiler {
         }
     }
 
-    void addColumnToCatalog(Table table, Node node, int index) throws VoltCompilerException {
+    void addColumnToCatalog(Table table, Node node, int index, ArrayList<VoltType> columnTypes) throws VoltCompilerException {
         assert node.getNodeName().equals("column");
 
         NamedNodeMap attrs = node.getAttributes();
@@ -534,6 +537,7 @@ public class DDLCompiler {
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
 
         VoltType type = VoltType.typeFromString(typename);
+        columnTypes.add(type);
         int size = Integer.parseInt(sizeString);
         // check valid length if varchar
         if (type == VoltType.STRING) {

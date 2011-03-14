@@ -83,7 +83,20 @@ public class RejoinTestBase extends TestCase {
             "pkey integer default 0 not null, " +
             "value VARCHAR(36) default 0 not null, " +
             "value1 VARCHAR(17700) default 0 not null, " +
-            "PRIMARY KEY(pkey));";
+            "PRIMARY KEY(pkey));" +
+            "CREATE TABLE ENG798 (" +
+            "    c1 VARCHAR(16) NOT NULL," +
+            "    c2 BIGINT DEFAULT 0 NOT NULL," +
+            "    c3 VARCHAR(36) DEFAULT '' NOT NULL," +
+            "    c4 VARCHAR(36)," +
+            "    c5 TIMESTAMP," +
+            "    c6 TINYINT DEFAULT 0," +
+            "    c7 TIMESTAMP" +
+            ");" +
+            "CREATE VIEW V_ENG798(c1, c6, c2, c3, c4, c5, total) " +
+            "    AS SELECT c1, c6, c2, c3, c4, c5, COUNT(*)" +
+            "    FROM ENG798 " +
+            "    GROUP BY c1, c6, c2, c3, c4, c5;";
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         String schemaPath = schemaFile.getPath();
@@ -95,6 +108,7 @@ public class RejoinTestBase extends TestCase {
         builder.addPartitionInfo("PARTITIONED", "pkey");
         builder.addPartitionInfo("PARTITIONED_LARGE", "pkey");
         builder.addPartitionInfo("TEST_INLINED_STRING", "pkey");
+        builder.addPartitionInfo("ENG798", "C1");
 
         GroupInfo gi = new GroupInfo("foo", true, true);
         builder.addGroups(new GroupInfo[] { gi } );

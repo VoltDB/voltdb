@@ -59,7 +59,7 @@ class StreamedTable : public Table {
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings);
     virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
-    virtual void setDelegateId(int64_t delegateId);
+    virtual void setSignatureAndGeneration(std::string signature, int64_t generation);
 
     virtual std::string tableType() const {
         return "StreamedTable";
@@ -71,6 +71,18 @@ class StreamedTable : public Table {
     //Override and say how many bytes are in Java and C++
     int64_t allocatedTupleMemory() const;
 
+
+    /**
+     * Get the current offset in bytes of the export stream for this Table
+     * since startup.
+     */
+    void getExportStreamSequenceNo(long &seqNo, size_t &streamBytesUsed);
+
+    /**
+     * Set the current offset in bytes of the export stream for this Table
+     * since startup (used for rejoin/recovery).
+     */
+    void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed);
   protected:
     // Stats
     voltdb::StreamedTableStats stats_;

@@ -69,4 +69,6 @@ public interface BinaryDeque {
     public boolean isEmpty() throws IOException;
 
     public long sizeInBytes();
+
+    public void closeAndDelete() throws IOException;
 }

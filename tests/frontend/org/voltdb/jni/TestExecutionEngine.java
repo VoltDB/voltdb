@@ -55,7 +55,7 @@ import org.voltdb.utils.Pair;
 public class TestExecutionEngine extends TestCase {
 
     public void testLoadCatalogs() throws Exception {
-        sourceEngine.loadCatalog(m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.serialize());
     }
 
     public void testLoadBadCatalogs() throws Exception {
@@ -66,7 +66,7 @@ public class TestExecutionEngine extends TestCase {
          */
         String badCatalog = m_catalog.serialize().replaceFirst("set", "bad");
         try {
-            sourceEngine.loadCatalog(badCatalog);
+            sourceEngine.loadCatalog( 0, badCatalog);
         } catch (final EEException e) {
             return;
         }
@@ -129,7 +129,7 @@ public class TestExecutionEngine extends TestCase {
     }
 
     public void testLoadTable() throws Exception {
-        sourceEngine.loadCatalog(m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
@@ -141,9 +141,9 @@ public class TestExecutionEngine extends TestCase {
     }
 
     public void testStreamTables() throws Exception {
-        sourceEngine.loadCatalog(m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.serialize());
         ExecutionEngine destinationEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
-        destinationEngine.loadCatalog(m_catalog.serialize());
+        destinationEngine.loadCatalog( 0, m_catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
@@ -170,9 +170,8 @@ public class TestExecutionEngine extends TestCase {
 
 
             serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
-            assertEquals( 21, serialized);
+            assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
-            assertEquals( WAREHOUSE_TABLEID, container.b.getInt());
 
             assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.tableHashCode(WAREHOUSE_TABLEID));
 
@@ -184,7 +183,7 @@ public class TestExecutionEngine extends TestCase {
 
 
             serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
-            assertEquals( 21, serialized);
+            assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( STOCK_TABLEID, container.b.getInt());
 
@@ -238,7 +237,7 @@ public class TestExecutionEngine extends TestCase {
                     final ExecutionEngine sourceEngine =
                         new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, sourceId, sourceId, "");
                     sourceReference.set(sourceEngine);
-                    sourceEngine.loadCatalog(serializedCatalog);
+                    sourceEngine.loadCatalog( 0, serializedCatalog);
 
                     try {
                         loadTestTables( sourceEngine, m_catalog);
@@ -295,7 +294,7 @@ public class TestExecutionEngine extends TestCase {
                 final ExecutionEngine destinationEngine =
                     new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "");
                 destinationReference.set(destinationEngine);
-                destinationEngine.loadCatalog(serializedCatalog);
+                destinationEngine.loadCatalog( 0, serializedCatalog);
                 RecoverySiteProcessorDestination destinationProcess =
                     new RecoverySiteProcessorDestination(
                             tablesAndSources,
@@ -337,7 +336,7 @@ public class TestExecutionEngine extends TestCase {
     }
 
     public void testGetStats() throws Exception {
-        sourceEngine.loadCatalog(m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.serialize());
 
         final int WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
         final int STOCK_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();

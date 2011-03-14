@@ -31,9 +31,8 @@ class PersistentTableUndoInsertAction: public voltdb::UndoAction {
 public:
     inline PersistentTableUndoInsertAction(voltdb::TableTuple insertedTuple,
                                            voltdb::PersistentTable *table,
-                                           voltdb::Pool *pool,
-                                           size_t wrapperOffset)
-        : m_tuple(insertedTuple), m_table(table), m_wrapperOffset(wrapperOffset)
+                                           voltdb::Pool *pool)
+        : m_tuple(insertedTuple), m_table(table)
     {
         void *tupleData = pool->allocate(m_tuple.tupleLength());
         m_tuple.move(tupleData);
@@ -55,7 +54,6 @@ public:
 private:
     voltdb::TableTuple m_tuple;
     PersistentTable *m_table;
-    size_t m_wrapperOffset;
 };
 
 }

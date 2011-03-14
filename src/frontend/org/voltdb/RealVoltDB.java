@@ -198,6 +198,7 @@ public class RealVoltDB implements VoltDBInterface
         private volatile ExecutionSite m_siteObj;
         private final boolean m_recovering;
         private final HashSet<Integer> m_failedHostIds;
+        private final long m_txnId;
 
         public ExecutionSiteRunner(
                 final int siteId,
@@ -209,6 +210,7 @@ public class RealVoltDB implements VoltDBInterface
             m_serializedCatalog = serializedCatalog;
             m_recovering = recovering;
             m_failedHostIds = failedHostIds;
+            m_txnId = context.m_transactionId;
         }
 
         @Override
@@ -223,7 +225,8 @@ public class RealVoltDB implements VoltDBInterface
                                   m_serializedCatalog,
                                   null,
                                   m_recovering,
-                                  m_failedHostIds);
+                                  m_failedHostIds,
+                                  m_txnId);
             synchronized (this) {
                 m_isSiteCreated = true;
                 this.notifyAll();
@@ -410,7 +413,9 @@ public class RealVoltDB implements VoltDBInterface
 
             serializedCatalog = catalog.serialize();
 
-            m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
+            m_catalogContext = new CatalogContext(
+                    TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0),
+                    catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
 
             // See if we should bring the server up in admin mode
             m_inAdminMode = false;
@@ -617,7 +622,8 @@ public class RealVoltDB implements VoltDBInterface
                                   serializedCatalog,
                                   null,
                                   m_recovering,
-                                  downHosts);
+                                  downHosts,
+                                  m_catalogContext.m_transactionId);
             m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
             m_currentThreadSite = siteObj;
 
@@ -701,12 +707,12 @@ public class RealVoltDB implements VoltDBInterface
                                              0, m_memoryStats);
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
-            try {
-                final Class<?> statsManagerClass =
-                    Class.forName("org.voltdb.management.JMXStatsManager");
-                m_statsManager = (StatsManager)statsManagerClass.newInstance();
-                m_statsManager.initialize(new ArrayList<Integer>(m_localSites.keySet()));
-            } catch (Exception e) {}
+//            try {
+//                final Class<?> statsManagerClass =
+//                    Class.forName("org.voltdb.management.JMXStatsManager");
+//                m_statsManager = (StatsManager)statsManagerClass.newInstance();
+//                m_statsManager.initialize(new ArrayList<Integer>(m_localSites.keySet()));
+//            } catch (Exception e) {}
 
             // Start running the socket handlers
             hostLog.l7dlog(Level.INFO,
@@ -849,6 +855,7 @@ public class RealVoltDB implements VoltDBInterface
         Object retval[] = m_messenger.waitForGroupJoin(60 * 1000);
 
         m_catalogContext = new CatalogContext(
+                TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0),
                 m_catalogContext.catalog,
                 m_catalogContext.pathToCatalogJar,
                 deploymentCRC,
@@ -1290,7 +1297,8 @@ public class RealVoltDB implements VoltDBInterface
 
             // 0. A new catalog! Update the global context and the context tracker
             lastCatalogUpdate_txnId = currentTxnId;
-            m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands, true, deploymentCRC);
+            m_catalogContext =
+                m_catalogContext.update(currentTxnId, newCatalogURL, diffCommands, true, deploymentCRC);
             m_txnIdToContextTracker.put(currentTxnId, new ContextTracker(m_catalogContext));
 
             // 1. update the export manager.
@@ -1311,7 +1319,8 @@ public class RealVoltDB implements VoltDBInterface
     {
         synchronized(m_catalogUpdateLock)
         {
-            m_catalogContext = m_catalogContext.update(CatalogContext.NO_PATH,
+            //Reuse the txn id since this doesn't change schema/procs/export
+            m_catalogContext = m_catalogContext.update( m_catalogContext.m_transactionId, CatalogContext.NO_PATH,
                                                        diffCommands, false, -1);
         }
 

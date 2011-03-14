@@ -67,7 +67,7 @@ class AddDropTableTest : public Test {
           "set /clusters[cluster]/sites[0] partition /clusters[cluster]/partitions[0]\n"
           "set /clusters[cluster]/sites[0] host /clusters[cluster]/hosts[0]";
 
-        bool loadResult = m_engine->loadCatalog(initialCatalog);
+        bool loadResult = m_engine->loadCatalog( -2, initialCatalog);
         ASSERT_TRUE(loadResult);
     }
 
@@ -295,7 +295,7 @@ TEST_F(AddDropTableTest, DeletionsSetCleared)
  */
 TEST_F(AddDropTableTest, AddTable)
 {
-    bool changeResult = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    bool changeResult = m_engine->updateCatalog( 0, tableACmds(), ++m_catVersion);
     ASSERT_TRUE(changeResult);
 
     Table *table1, *table2;
@@ -322,7 +322,7 @@ TEST_F(AddDropTableTest, AddTwoTablesDropTwoTables)
 
     // add tableA, tableB
     std::string a_and_b = tableACmds() + "\n" + tableBCmds();
-    bool changeResult = m_engine->updateCatalog(a_and_b, ++m_catVersion);
+    bool changeResult = m_engine->updateCatalog( 0, a_and_b, ++m_catVersion);
     ASSERT_TRUE(changeResult);
     ASSERT_EQ(2, db->tables().size());
 
@@ -347,7 +347,7 @@ TEST_F(AddDropTableTest, AddTwoTablesDropTwoTables)
     table2->incrementRefcount();
 
     std::string drop = tableADeleteCmd() + "\n" + tableBDeleteCmd();
-    changeResult = m_engine->updateCatalog(drop, ++m_catVersion);
+    changeResult = m_engine->updateCatalog( 1,drop, ++m_catVersion);
     ASSERT_TRUE(changeResult);
     ASSERT_EQ(0, db->tables().size());
     ASSERT_EQ(NULL, m_engine->getTable(1)); // catalogId
@@ -366,7 +366,7 @@ TEST_F(AddDropTableTest, AddTwoTablesDropTwoTables)
 TEST_F(AddDropTableTest, DropTable)
 {
     // add. verified by AddTable test.
-    bool result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    bool result = m_engine->updateCatalog( 0, tableACmds(), ++m_catVersion);
     ASSERT_TRUE(result);
 
     Table *table1, *table2;
@@ -379,7 +379,7 @@ TEST_F(AddDropTableTest, DropTable)
     ASSERT_TRUE(table1 != NULL);
 
     // and delete
-    result = m_engine->updateCatalog(tableADeleteCmd(), ++m_catVersion);
+    result = m_engine->updateCatalog( 1, tableADeleteCmd(), ++m_catVersion);
     ASSERT_TRUE(result);
 
     table2 = m_engine->getTable("tableA");
@@ -405,7 +405,7 @@ TEST_F(AddDropTableTest, AddDropAdd)
     // result = m_engine->updateCatalog(addboth, ++m_catVersion);
     // ASSERT_TRUE(result);
 
-    result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    result = m_engine->updateCatalog( -1, tableACmds(), ++m_catVersion);
     ASSERT_TRUE(result);
 
     for (int ii=0; ii < 20; ii++) {
@@ -413,11 +413,11 @@ TEST_F(AddDropTableTest, AddDropAdd)
         // ASSERT_TRUE(result);
 
         // A-only to B-only
-        result = m_engine->updateCatalog(tableADeleteCmd() + "\n" + tableBCmds(), ++m_catVersion);
+        result = m_engine->updateCatalog( (ii * 2), tableADeleteCmd() + "\n" + tableBCmds(), ++m_catVersion);
         ASSERT_TRUE(result);
 
         // B-only to A-only
-        result = m_engine->updateCatalog(tableBDeleteCmd() + "\n" + tableACmds(), ++m_catVersion);
+        result = m_engine->updateCatalog( (ii * 2) + 1, tableBDeleteCmd() + "\n" + tableACmds(), ++m_catVersion);
         ASSERT_TRUE(result);
 
         // result = m_engine->updateCatalog(tableBCmds(), ++m_catVersion);
@@ -432,10 +432,10 @@ TEST_F(AddDropTableTest, AddDropAdd)
  */
 TEST_F(AddDropTableTest, StatsWithDropTable)
 {
-    bool result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    bool result = m_engine->updateCatalog( 0, tableACmds(), ++m_catVersion);
     ASSERT_TRUE(result);
 
-    result = m_engine->updateCatalog(tableBCmds(), ++m_catVersion);
+    result = m_engine->updateCatalog( 1, tableBCmds(), ++m_catVersion);
     ASSERT_TRUE(result);
 
     // get stats - relying on valgrind for most verification here
@@ -444,7 +444,7 @@ TEST_F(AddDropTableTest, StatsWithDropTable)
     ASSERT_TRUE(statresult == 1);
 
     // delete A.
-    result = m_engine->updateCatalog(tableADeleteCmd(), ++m_catVersion);
+    result = m_engine->updateCatalog( 2, tableADeleteCmd(), ++m_catVersion);
     ASSERT_TRUE(result);
 
     // get stats for the remaining table by relative offset
@@ -452,7 +452,7 @@ TEST_F(AddDropTableTest, StatsWithDropTable)
     statresult = m_engine->getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators1, 1, false, 1L);
     ASSERT_TRUE(statresult == 1);
 
-    result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    result = m_engine->updateCatalog( 3, tableACmds(), ++m_catVersion);
     ASSERT_TRUE(result);
 
     // get stats for the tables by relative offset
@@ -467,11 +467,11 @@ TEST_F(AddDropTableTest, StatsWithDropTable)
 TEST_F(AddDropTableTest, BadDropTable)
 {
     bool result;
-    result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    result = m_engine->updateCatalog( 0, tableACmds(), ++m_catVersion);
     ASSERT_TRUE(result);
 
     try {
-        result = m_engine->updateCatalog(tableBDeleteCmd(), ++m_catVersion);
+        result = m_engine->updateCatalog( 1, tableBDeleteCmd(), ++m_catVersion);
         ASSERT_TRUE(false);
     }
     catch (SerializableEEException ex) {
@@ -486,11 +486,11 @@ TEST_F(AddDropTableTest, BadDropTable)
 TEST_F(AddDropTableTest, BadAddTable)
 {
     bool result;
-    result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    result = m_engine->updateCatalog( 0, tableACmds(), ++m_catVersion);
     ASSERT_TRUE(result);
 
     try {
-        result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+        result = m_engine->updateCatalog( 1, tableACmds(), ++m_catVersion);
         ASSERT_TRUE(false);
     }
     catch (SerializableEEException ex) {

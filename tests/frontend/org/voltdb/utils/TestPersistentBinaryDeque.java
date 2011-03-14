@@ -25,18 +25,20 @@ package org.voltdb.utils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.TreeSet;
+import java.util.*;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import static org.junit.Assert.*;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class TestPersistentBinaryDeque {
 
-    private final static File TEST_DIR = new File("/tmp/pbd_test");
+    private final static File TEST_DIR = new File("/tmp/" + System.getProperty("user.name"));
 
     private static final String TEST_NONCE = "pbd_nonce";
 
@@ -65,6 +67,8 @@ public class TestPersistentBinaryDeque {
 
     @Test
     public void testOfferThanPoll() throws Exception {
+        assertNull(m_pbd.poll());
+
         //Make sure a single file with the appropriate data is created
         m_pbd.offer(defaultContainer);
         File files[] = TEST_DIR.listFiles();
@@ -92,11 +96,14 @@ public class TestPersistentBinaryDeque {
 
     @Test
     public void testOfferThenPushThenPoll() throws Exception {
+        assertTrue(m_pbd.isEmpty());
         //Make it create two full segments
         for (int ii = 0; ii < 64; ii++) {
             defaultBuffer.clear();
             m_pbd.offer(defaultContainer);
+            assertFalse(m_pbd.isEmpty());
         }
+        assertEquals(((1024 * 1024 * 2) + 4) * 64, m_pbd.sizeInBytes());
         File files[] = TEST_DIR.listFiles();
         assertEquals( 3, files.length);
 
@@ -132,8 +139,13 @@ public class TestPersistentBinaryDeque {
         names = getSortedDirectoryListing();
         assertEquals( 4, names.size());
 
+        assertEquals(((1024 * 1024 * 2) + 4) * 66, m_pbd.sizeInBytes());
+
         retval1.discard();
+        assertEquals(((1024 * 1024 * 2) + 4) * 66, m_pbd.sizeInBytes());
         retval2.discard();
+
+        assertEquals(((1024 * 1024 * 2) + 4) * 64, m_pbd.sizeInBytes());
 
         names = getSortedDirectoryListing();
         assertEquals( 3, names.size());
@@ -146,6 +158,9 @@ public class TestPersistentBinaryDeque {
             assertTrue(defaultBuffer.equals(retval.b));
             retval.discard();
         }
+
+        assertEquals( 0, m_pbd.sizeInBytes());
+        assertTrue(m_pbd.isEmpty());
 
         //Expect just the current write segment
         names = getSortedDirectoryListing();
@@ -182,11 +197,125 @@ public class TestPersistentBinaryDeque {
         assertTrue(names.first().equals("pbd_nonce.3.pbd"));
     }
 
+    @Test
+    public void testInvalidDirectory() throws Exception {
+        m_pbd.close();
+        try {
+            m_pbd = new PersistentBinaryDeque( "foo", new File("/usr/bin"));
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void testMissingSegment() throws Exception {
+        ArrayList<BBContainer> polled = new ArrayList<BBContainer>();
+        for (int ii = 0; ii < 10; ii++) {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocate(20)) });
+            m_pbd.poll();
+        }
+        m_pbd.close();
+        File toDelete = new File(TEST_DIR + File.separator + TEST_NONCE + ".4.pbd");
+        assertTrue(toDelete.exists());
+        assertTrue(toDelete.delete());
+        try {
+            m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR);
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void testOfferFailsWhenClosed() throws Exception {
+        m_pbd.close();
+        try {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocate(20)) });
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void testPushFailsWhenClosed() throws Exception {
+        m_pbd.close();
+        try {
+            m_pbd.push(new BBContainer[][] { new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocate(20)) } });
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void testPushMultipleSegments() throws Exception {
+        m_pbd.push(new BBContainer[][] {
+                new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 32)) },
+                new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 32)) },
+                new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 32)) }});
+    }
+
+    @Test
+    public void testPollWhileClosed() throws Exception {
+        m_pbd.close();
+        try {
+            m_pbd.poll();
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void testSyncWhileClosed() throws Exception {
+        m_pbd.close();
+        try {
+            m_pbd.sync();
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void testIsEmptyWhileClosed() throws Exception {
+        m_pbd.close();
+        try {
+            m_pbd.isEmpty();
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void testPushMaxSize() throws Exception {
+        try {
+            m_pbd.push(new BBContainer[][] {
+                new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 64)) }});
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void testOfferMaxSize() throws Exception {
+        try {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 64)) });
+        } catch (IOException e) {
+            return;
+        }
+        fail();
+    }
+
     @Before
     public void setUp() throws Exception {
         if (TEST_DIR.exists()) {
             for (File f : TEST_DIR.listFiles()) {
-                f.delete();
+                VoltFile.recursivelyDelete(f);
             }
             TEST_DIR.delete();
         }
@@ -197,7 +326,9 @@ public class TestPersistentBinaryDeque {
 
     @After
     public void tearDown() throws Exception {
-        m_pbd.close();
+        try {
+            m_pbd.close();
+        } catch (Exception e) {}
         try {
             if (TEST_DIR.exists()) {
                 for (File f : TEST_DIR.listFiles()) {

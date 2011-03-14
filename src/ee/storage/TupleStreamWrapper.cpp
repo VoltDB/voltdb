@@ -39,15 +39,14 @@ const int METADATA_COL_CNT = 6;
 const int MAX_BUFFER_AGE = 4000;
 
 TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
-                                       CatalogId siteId,
-                                       int64_t lastFlush)
+                                       CatalogId siteId)
     : m_partitionId(partitionId), m_siteId(siteId),
-      m_lastFlush(lastFlush), m_defaultCapacity(EL_BUFFER_SIZE),
+      m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
       m_openTransactionId(0), m_openTransactionUso(0),
-      m_committedTransactionId(0), m_committedUso(0)
+      m_committedTransactionId(0), m_committedUso(0),
+      m_signature(""), m_generation(0)
 {
-    assert(lastFlush > -1);
     extendBufferChain(m_defaultCapacity);
 }
 
@@ -85,6 +84,27 @@ void TupleStreamWrapper::cleanupManagedBuffers()
     }
 }
 
+
+void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_t generation) {
+    assert(generation > m_generation);
+    assert(signature == m_signature || m_signature == string(""));
+
+    //The first time through this is catalog load and m_generation will be 0
+    //Don't send the end of stream notice.
+    if (generation != m_generation && m_generation > 0) {
+        //Notify that no more data is coming from this generation.
+        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                m_generation,
+                m_partitionId,
+                m_signature,
+                NULL,
+                false,
+                true);
+    }
+    m_signature = signature;
+    m_generation = generation;
+}
+
 /*
  * Handoff fully committed blocks to the top end.
  *
@@ -95,6 +115,7 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
 {
     if (currentTxnId < m_openTransactionId)
     {
+        //std::cout << currentTxnId << ", " << m_openTransactionId << std::endl;
         throwFatalException("Transactions moving backwards");
     }
 
@@ -102,12 +123,17 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     if ((currentTxnId == m_openTransactionId) &&
         (lastCommittedTxnId == m_committedTransactionId))
     {
+        //std::cout << "Current txnid(" << currentTxnId << ") == m_openTransactionId(" << m_openTransactionId <<
+        //") && lastCommittedTxnId(" << lastCommittedTxnId << ") m_committedTransactionId(" <<
+        //m_committedTransactionId << ")" << std::endl;
         if (sync) {
             ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                    m_generation,
                     m_partitionId,
-                    m_delegateId,
+                    m_signature,
                     NULL,
-                    true );
+                    true,
+                    false);
         }
         return;
     }
@@ -117,6 +143,8 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     // - The current transaction is now our open transaction
     if (m_openTransactionId < currentTxnId)
     {
+        //std::cout << "m_openTransactionId(" << m_openTransactionId << ") < currentTxnId("
+        //<< currentTxnId << ")" << std::endl;
         m_committedUso = m_uso;
         // Advance the tip to the new transaction.
         m_committedTransactionId = m_openTransactionId;
@@ -128,6 +156,8 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     // committed state.
     if (m_openTransactionId <= lastCommittedTxnId)
     {
+        //std::cout << "m_openTransactionId(" << m_openTransactionId << ") <= lastCommittedTxnId(" <<
+        //lastCommittedTxnId << ")" << std::endl;
         m_committedUso = m_uso;
         m_committedTransactionId = m_openTransactionId;
     }
@@ -135,15 +165,20 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     while (!m_pendingBlocks.empty())
     {
         StreamBlock* block = m_pendingBlocks.front();
+        //std::cout << "m_committedUso(" << m_committedUso << "), block->uso() + block->offset() == "
+        //<< (block->uso() + block->offset()) << std::endl;
+
         // check that the entire remainder is committed
         if (m_committedUso >= (block->uso() + block->offset()))
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
             ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                    m_generation,
                     m_partitionId,
-                    m_delegateId,
+                    m_signature,
                     block,
+                    false,
                     false);
             delete block;
             m_pendingBlocks.pop_front();
@@ -156,10 +191,12 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
 
     if (sync) {
         ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                m_generation,
                 m_partitionId,
-                m_delegateId,
+                m_signature,
                 NULL,
-                true );
+                true,
+                false);
     }
 }
 
@@ -228,7 +265,7 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
                 //The block is handed off to the topend which is responsible for releasing the
                 //memory associated with the block data. The metadata is deleted here.
                 ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                        m_partitionId, m_delegateId, m_currBlock, false);
+                        m_generation, m_partitionId, m_signature, m_currBlock, false, false);
                 delete m_currBlock;
             } else {
                 m_pendingBlocks.push_back(m_currBlock);
@@ -258,7 +295,6 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
  */
 void
 TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
-                                  int64_t lastTickTime,
                                   int64_t lastCommittedTxnId,
                                   int64_t currentTxnId)
 {

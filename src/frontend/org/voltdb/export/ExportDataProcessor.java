@@ -39,14 +39,7 @@ public interface ExportDataProcessor  {
      */
     void addLogger(VoltLogger logger);
 
-    /** Pass the loader each table in each database.
-     * This is called for each unique datasource. It may be recalled with
-     * new datasources if the catalog changes at runtime.
-     * @param database these tables belong to.
-     * @param tableName for the database
-     * @param tableId corresponding to tableName.
-     */
-    void addDataSource(ExportDataSource dataSource);
+    void setExportGeneration(ExportGeneration generation);
 
     /**
      * Inform the processor that initialization is complete; commence work.
@@ -77,4 +70,5 @@ public interface ExportDataProcessor  {
      * @return  true if connector implements the service.
      */
     boolean isConnectorForService(String service);
+
 }

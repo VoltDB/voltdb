@@ -43,7 +43,7 @@ void PersistentTableUndoUpdateAction::undo() {
             tupleInTable = m_table->lookupTuple(m_oldTuple);
         }
     }
-    m_table->updateTupleForUndo(m_oldTuple, tupleInTable, m_revertIndexes, m_wrapperOffset);
+    m_table->updateTupleForUndo(m_oldTuple, tupleInTable, m_revertIndexes);
 
     /*
      * Free the strings from the new tuple that updated in the old tuple.

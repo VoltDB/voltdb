@@ -33,8 +33,7 @@ import junit.framework.TestCase;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.export.ExportDataSource;
-import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.export.*;
 import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
@@ -43,6 +42,7 @@ import org.voltdb.network.Connection;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 
@@ -182,11 +182,11 @@ public class TestRawProcessor extends TestCase {
         }
 
         public MockExportDataSource(String db, String tableName,
-                                 int partitionId, int siteId, int tableId) throws Exception
+                                 int partitionId, int siteId, String tableSignature) throws Exception
         {
-            super(db, tableName, partitionId, siteId, tableId,
+            super(null, db, tableName, partitionId, siteId, tableSignature,
                   m_mockVoltDB.getCatalogContext().database.getTables().get("TableName").getColumns(),
-                  "/tmp");
+                  "/tmp/" + System.getProperty("user.name"));
         }
 
         @Override
@@ -194,7 +194,7 @@ public class TestRawProcessor extends TestCase {
             // Simulate what ExecutionEngineJNI and ExecutionSite do.
             if (m.m_m.isPoll()) {
                 ExportProtoMessage r =
-                    new ExportProtoMessage(m.m_m.getPartitionId(), m.m_m.getTableId());
+                    new ExportProtoMessage(m.m_m.getPartitionId(), m.m_m.getSignature());
                 ByteBuffer data = ByteBuffer.allocate(8);
                 data.putInt(100); // some fake poll data
                 data.putInt(200); // more fake poll data
@@ -213,8 +213,11 @@ public class TestRawProcessor extends TestCase {
 
     @Override
     public void setUp() throws Exception {
-
-        File directory = new File("/tmp");
+        File directory = new File("/tmp/" + System.getProperty("user.name"));
+        VoltFile.recursivelyDelete(directory);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
         for (File f : directory.listFiles()) {
             if (f.getName().endsWith(".pbd") || f.getName().endsWith(".ad")) {
                 f.delete();
@@ -222,17 +225,19 @@ public class TestRawProcessor extends TestCase {
         }
 
         rp = new RawProcessor();
-        ds = new MockExportDataSource("db", "table", 1, 3, 2);
-        rp.addDataSource(ds);
+        ds = new MockExportDataSource("db", "table", 1, 3, "foo");
+        ExportGeneration generation = new ExportGeneration( 0, null, directory);
+        generation.addDataSource(ds);
+        rp.setExportGeneration(generation);
 
         c = new MockConnection();
         sb = rp.new ProtoStateBlock(c, false);
-        m = new ExportProtoMessage(1, 2);
-        m_postadmin = new ExportProtoMessage(1, 2);
+        m = new ExportProtoMessage(1, "foo");
+        m_postadmin = new ExportProtoMessage(1, "foo");
 
         // partition, site do not align match datasource
-        bad_m1 = new ExportProtoMessage(10, 2);
-        bad_m2 = new ExportProtoMessage(1, 10);
+        bad_m1 = new ExportProtoMessage(10, "foo");
+        bad_m2 = new ExportProtoMessage(1, "bar");
     }
 
     public void assertErrResponse() {

@@ -42,6 +42,12 @@ class CatalogDelegate {
     /* Deleted from the catalog */
     virtual void deleteCommand() = 0;
 
+    int64_t catalogUpdate(int32_t catalogVersion, int32_t catalogId) {
+        m_catalogVersion = catalogVersion;
+        m_catalogId = catalogId;
+        return delegateId();
+    }
+
     /* Read the path */
     const std::string& path() {
         return m_path;

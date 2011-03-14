@@ -301,7 +301,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jstring serialized_catalog) {
+    jlong engine_ptr, jlong txnId, jstring serialized_catalog) {
     VOLT_DEBUG("nativeLoadCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -320,7 +320,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->loadCatalog(str);
+        bool success = engine->loadCatalog(txnId, str);
 
         if (success) {
             VOLT_DEBUG("loadCatalog succeeded");
@@ -346,7 +346,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jstring catalog_diffs, jint catalog_version) {
+    jlong engine_ptr, jlong txnId, jstring catalog_diffs, jint catalog_version) {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -365,7 +365,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->updateCatalog(str, catalog_version);
+        bool success = engine->updateCatalog( txnId, str, catalog_version);
 
         if (success) {
             VOLT_DEBUG("updateCatalog succeeded");
@@ -1038,7 +1038,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
  * @param pollAction true if this call requests a poll
  * @param syncAction true if the stream offset being set for a table
  * @param ackOffset  if acking, the universal stream offset being acked/released
- * @param tableId    the table ID to which the Export action applies
+ * @param tableSignature    Signature of the table to which the Export action applies
  *
  * @return the universal stream offset for the last octet in any
  * returned poll results (returned via the query results buffer).  On
@@ -1052,17 +1052,20 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
    jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
-   jlong tableId) {
+   jstring tableSignature) {
     VOLT_DEBUG("nativeExportAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    const char *signatureChars = env->GetStringUTFChars(tableSignature, NULL);
+    std::string signature(signatureChars, env->GetStringUTFLength(tableSignature));
+    env->ReleaseStringUTFChars(tableSignature, signatureChars);
     try {
         try {
             engine->resetReusedResultOutputBuffer();
             return engine->exportAction(syncAction,
                                         static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(seqNo),
-                                        static_cast<int64_t>(tableId));
+                                        signature);
         } catch (SQLException e) {
             throwFatalException("%s", e.message().c_str());
         }

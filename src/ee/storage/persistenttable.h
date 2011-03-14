@@ -153,7 +153,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * Inserts a Tuple without performing an allocation for the
      * uninlined strings.
      */
-    void insertTupleForUndo(char *tuple, size_t elMark);
+    void insertTupleForUndo(char *tuple);
 
     /*
      * Note that inside update tuple the order of sourceTuple and
@@ -169,14 +169,14 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * by the UndoAction.
      */
     void updateTupleForUndo(TableTuple &sourceTuple, TableTuple &targetTuple,
-                            bool revertIndexes, size_t elMark);
+                            bool revertIndexes);
 
     /*
      * Delete a tuple by looking it up via table scan or a primary key
      * index lookup.
      */
     bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
-    void deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t elMark);
+    void deleteTupleForUndo(voltdb::TableTuple &tupleCopy);
 
     /*
      * Lookup the address of the tuple that is identical to the specified tuple.
@@ -205,14 +205,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      *  uses Tuple.copy.
      */
     TableTuple& getTempTupleInlined(TableTuple &source);
-
-    // Export-related inherited methods
-    virtual void flushOldTuples(int64_t timeInMillis);
-
-    /**
-     * Inform the tuple stream wrapper of the table's delegate id
-     */
-    void setDelegateId(int64_t delegateId);
 
     /** Add a view to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
@@ -250,27 +242,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * the tuple data.
      */
     size_t hashCode();
-
-    /**
-     * Get the current offset in bytes of the export stream for this Table
-     * since startup.
-     */
-    void getExportStreamSequenceNo(long &seqNo, size_t &streamBytesUsed) {
-        seqNo = m_exportEnabled ? m_tsSeqNo : -1;
-        streamBytesUsed = m_wrapper ? m_wrapper->bytesUsed() : 0;
-    }
-
-    /**
-     * Set the current offset in bytes of the export stream for this Table
-     * since startup (used for rejoin/recovery).
-     */
-    virtual void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
-        // assume this only gets called from a fresh rejoined node
-        assert(m_tsSeqNo == 0);
-        m_tsSeqNo = seqNo;
-        if (m_wrapper)
-            m_wrapper->setBytesUsed(streamBytesUsed);
-    }
 
     size_t getBlocksNotPendingSnapshotCount() {
         return m_blocksNotPendingSnapshot.size();
@@ -317,8 +288,6 @@ protected:
 
     bool checkNulls(TableTuple &tuple) const;
 
-    size_t appendToELBuffer(TableTuple &tuple, int64_t seqNo, TupleStreamWrapper::Type type);
-
     PersistentTable(ExecutorContext *ctx, bool exportEnabled);
     void onSetColumns();
 
@@ -356,10 +325,6 @@ protected:
     TableIndex** m_indexes;
     int m_indexCount;
     TableIndex *m_pkeyIndex;
-
-    // temporary for tuplestream stuff
-    TupleStreamWrapper *m_wrapper;
-    int64_t m_tsSeqNo;
 
     // partition key
     int m_partitionColumn;

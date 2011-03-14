@@ -173,10 +173,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Catalog Functions
         // -------------------------------------------------
-        bool loadCatalog(const std::string &catalogPayload);
-        bool updateCatalog(const std::string &catalogPayload, int catalogVersion);
-        bool processCatalogAdditions(bool addAll);
-        bool processCatalogDeletes();
+        bool loadCatalog(const int64_t txnId, const std::string &catalogPayload);
+        bool updateCatalog(const int64_t txnId, const std::string &catalogPayload, int catalogVersion);
+        bool processCatalogAdditions(bool addAll, int64_t txnId);
+        bool processCatalogDeletes(int64_t txnId);
         bool rebuildPlanFragmentCollections();
         bool rebuildTableCollections();
 
@@ -368,7 +368,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * @return the universal offset for any poll results (results
          * returned separatedly via QueryResults buffer)
          */
-        int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, int64_t tableId);
+        int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, std::string tableSignature);
 
         /**
          * Retrieve a hash code for the specified table
@@ -440,13 +440,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         std::map<int32_t, Table*> m_snapshottingTables;
 
         /*
-         * Map of catalog ids to exporting tables.
+         * Map of table signatures to exporting tables.
          */
-        std::map<int64_t, Table*> m_exportingTables;
+        std::map<std::string, Table*> m_exportingTables;
 
         /**
          * System Catalog.
-        */
+         */
         boost::shared_ptr<catalog::Catalog> m_catalog;
         int m_catalogVersion;
         catalog::Database *m_database;

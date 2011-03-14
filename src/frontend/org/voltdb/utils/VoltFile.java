@@ -35,7 +35,7 @@ public class VoltFile extends File {
     /*
      * The prefix to attach to the beginning of all paths
      */
-    private static File m_voltFilePrefix = System.getenv("VoltFilePrefix") != null ?
+    private static File m_voltFilePrefix = System.getProperty("VoltFilePrefix") != null ?
             new File (System.getProperty("VoltFilePrefix")) : null;
 
     /*

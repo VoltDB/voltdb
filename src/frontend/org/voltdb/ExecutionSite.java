@@ -672,7 +672,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                   final int siteId, String serializedCatalog,
                   RestrictedPriorityQueue transactionQueue,
                   boolean recovering,
-                  HashSet<Integer> failedHostIds)
+                  HashSet<Integer> failedHostIds,
+                  final long txnId)
     {
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
                 new Object[] { String.valueOf(siteId) }, null);
@@ -682,7 +683,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_txnlog = new VoltLogger(txnlog_name);
         m_recovering = recovering;
         m_context = voltdb.getCatalogContext();
-
+        //lastCommittedTxnId = txnId;
         for (Integer failedHostId : failedHostIds) {
             m_knownFailedSites.addAll(m_context.siteTracker.getAllSitesForHost(failedHostId));
         }
@@ -706,7 +707,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 serializedCatalog = voltdb.getCatalogContext().catalog.serialize();
             }
             hsql = null;
-            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog);
+            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog, txnId);
         }
 
         // Should pass in the watchdog class to allow sleepy dogs..
@@ -790,7 +791,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     }
 
     private ExecutionEngine
-    initializeEE(BackendTarget target, String serializedCatalog)
+    initializeEE(BackendTarget target, String serializedCatalog, final long txnId)
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
 
@@ -806,9 +807,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                         Integer.valueOf(site.getPartition().getTypeName()),
                         Integer.valueOf(site.getHost().getTypeName()),
                         hostname);
-                eeTemp.loadCatalog(serializedCatalog);
+                eeTemp.loadCatalog( txnId, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
-                eeTemp.tick( lastTickTime, 0);
+                eeTemp.tick( lastTickTime, txnId);
             }
             else {
                 // set up the EE over IPC
@@ -823,7 +824,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             hostname,
                             target,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0));
-                eeTemp.loadCatalog(serializedCatalog);
+                eeTemp.loadCatalog( 0, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
             }
@@ -858,7 +859,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
         m_context = context;
         loadProceduresFromCatalog(VoltDB.getEEBackendType());
-        ee.updateCatalog(catalogDiffCommands, m_context.catalogVersion);
+        //Necessary to quiesce before updating the catalog
+        //so export data for the old generation is pushed to Java.
+        ee.quiesce(lastCommittedTxnId);
+        ee.updateCatalog( context.m_transactionId, catalogDiffCommands, m_context.catalogVersion);
 
         return true;
     }
@@ -1234,7 +1238,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                 exportm.m_m.getAckOffset(),
                                 0,
                                 exportm.m_m.getPartitionId(),
-                                exportm.m_m.getTableId());
+                                exportm.m_m.getSignature());
             // not all actions generate a response
             if (response != null) {
                 ExportInternalMessage mbp = new ExportInternalMessage(exportm.m_sb, response);

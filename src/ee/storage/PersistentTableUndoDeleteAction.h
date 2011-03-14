@@ -32,14 +32,10 @@ class PersistentTableUndoDeleteAction: public voltdb::UndoAction {
 public:
     inline PersistentTableUndoDeleteAction(char *deletedTuple,
                                            voltdb::PersistentTable *table)
-        : m_tuple(deletedTuple), m_table(table), m_wrapperOffset(0)
+        : m_tuple(deletedTuple), m_table(table)
     {}
 
     virtual ~PersistentTableUndoDeleteAction();
-
-    void setELMark(size_t mark) {
-        m_wrapperOffset = mark;
-    }
 
     /*
      * Undo whatever this undo action was created to undo. In this case reinsert the tuple into the table.
@@ -54,7 +50,6 @@ public:
 private:
     char *m_tuple;
     PersistentTable *m_table;
-    size_t m_wrapperOffset;
 };
 
 }

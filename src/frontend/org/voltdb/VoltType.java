@@ -36,60 +36,60 @@ public enum VoltType {
      * Used for uninitialized types in some places. Not a valid value
      * for actual user data.
      */
-    INVALID   ((byte)0, -1, null, new Class[] {}),
+    INVALID   ((byte)0, -1, null, new Class[] {}, '0'),
 
     /**
      * Used to type java null values that have no type. Not a valid value
      * for actual user data.
      */
-    NULL      ((byte)1, -1, null, new Class[] {}),
+    NULL      ((byte)1, -1, null, new Class[] {}, '0'),
 
     /**
      * Used for some literal constants parsed by our SQL parser. Not a
      * valid value for actual user data. See {@link #DECIMAL} for decimal
      * type.
      */
-    NUMERIC   ((byte)2, 0, null, new Class[] {}),
+    NUMERIC   ((byte)2, 0, null, new Class[] {}, '0'),
 
     /**
      * 1-byte signed 2s-compliment byte.
      * Lowest value means NULL in the database.
      */
-    TINYINT   ((byte)3, 1, "tinyint", new Class[] {byte.class, Byte.class}),
+    TINYINT   ((byte)3, 1, "tinyint", new Class[] {byte.class, Byte.class}, 't'),
 
     /**
      * 2-byte signed 2s-compliment short.
      * Lowest value means NULL in the database.
      */
-    SMALLINT  ((byte)4, 2, "smallint", new Class[] {short.class, Short.class}),
+    SMALLINT  ((byte)4, 2, "smallint", new Class[] {short.class, Short.class}, 's'),
 
     /**
      * 4-byte signed 2s-compliment integer.
      * Lowest value means NULL in the database.
      */
     INTEGER   ((byte)5, 4, "integer",
-               new Class[] {int.class, Integer.class, AtomicInteger.class}),
+               new Class[] {int.class, Integer.class, AtomicInteger.class}, 'i'),
 
     /**
      * 8-byte signed 2s-compliment long.
      * Lowest value means NULL in the database.
      */
     BIGINT    ((byte)6, 8, "bigint",
-               new Class[] {long.class, Long.class, AtomicLong.class}),
+               new Class[] {long.class, Long.class, AtomicLong.class}, 'b'),
 
     /**
      * 8-bytes in IEEE 754 "double format".
      * Some NaN values may represent NULL in the database (TBD).
      */
     FLOAT     ((byte)8, 8, "float",
-            new Class[] {double.class, Double.class, float.class, Float.class}),
+            new Class[] {double.class, Double.class, float.class, Float.class}, 'f'),
 
     /**
      * 8-byte long value representing milliseconds after the epoch.
      * The epoch is Jan. 1 1970 00:00:00 GMT. Negative values represent
      * time before the epoch. This covers roughly 4000BC to 8000AD.
      */
-    TIMESTAMP ((byte)11, 8, "timestamp", new Class[] {TimestampType.class}),
+    TIMESTAMP ((byte)11, 8, "timestamp", new Class[] {TimestampType.class}, 'p'),
 
     /**
      * UTF-8 string with up to 32K chars.
@@ -97,22 +97,22 @@ public enum VoltType {
      * but the API uses strings.
      */
     STRING    ((byte)9, -1, "varchar",
-               new Class[] {String.class, byte[].class, Byte[].class}),
+               new Class[] {String.class, byte[].class, Byte[].class}, 'v'),
 
     /**
      * VoltTable type for Procedure parameters
      */
-    VOLTTABLE ((byte)21, -1, null, new Class[] {VoltTable.class}),
+    VOLTTABLE ((byte)21, -1, null, new Class[] {VoltTable.class}, '0'),
 
     /**
      * Fixed precision=38, scale=12 storing sign and null-status in a preceding byte
      */
-    DECIMAL  ((byte)22, 16, "decimal", new Class[] {BigDecimal.class}),
+    DECIMAL  ((byte)22, 16, "decimal", new Class[] {BigDecimal.class}, 'd'),
 
     /**
      * Fixed precision=38, scale=12 string representation of a decimal
      */
-    DECIMAL_STRING  ((byte)23, 9, "decimal", new Class[] {});
+    DECIMAL_STRING  ((byte)23, 9, "decimal", new Class[] {}, '0');
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a string or blob
@@ -130,13 +130,16 @@ public enum VoltType {
     private final int m_lengthInBytes;
     private final String m_sqlString;
     private final Class<?>[] m_classes;
+    private char m_signatureChar;
 
     private VoltType(byte val, int lengthInBytes,
-            String sqlString, Class<?>[] classes) {
+            String sqlString, Class<?>[] classes,
+            char signatureChar) {
         m_val = val;
         m_lengthInBytes = lengthInBytes;
         m_sqlString = sqlString;
         m_classes = classes;
+        m_signatureChar = signatureChar;
     }
 
     private static Map<Class<?>, VoltType> s_classes;
@@ -434,6 +437,11 @@ public enum VoltType {
         default:
             return false;
         }
+    }
+
+    public char getSignatureChar() {
+        assert(m_signatureChar != '0');
+        return m_signatureChar;
     }
 
     public static final int NULL_STRING_LENGTH = -1;

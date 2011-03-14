@@ -30,8 +30,7 @@ StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId,
-                                           m_executorContext->m_lastTickTime);
+                                           m_executorContext->m_siteId);
     }
 }
 
@@ -144,7 +143,6 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastTickTime,
                                  m_executorContext->m_lastCommittedTxnId,
                                  m_executorContext->currentTxnId());
     }
@@ -153,9 +151,9 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 /**
  * Inform the tuple stream wrapper of the table's delegate id
  */
-void StreamedTable::setDelegateId(int64_t delegateId) {
+void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation) {
     if (m_wrapper) {
-        m_wrapper->setDelegateId(delegateId);
+        m_wrapper->setSignatureAndGeneration(signature, generation);
     }
 }
 
@@ -179,4 +177,24 @@ int64_t StreamedTable::allocatedTupleMemory() const {
         m_wrapper->allocatedByteCount();
     }
     return 0;
+}
+
+/**
+ * Get the current offset in bytes of the export stream for this Table
+ * since startup.
+ */
+void StreamedTable::getExportStreamSequenceNo(long &seqNo, size_t &streamBytesUsed) {
+    seqNo = m_sequenceNo;
+    streamBytesUsed = m_wrapper->bytesUsed();
+}
+
+/**
+ * Set the current offset in bytes of the export stream for this Table
+ * since startup (used for rejoin/recovery).
+ */
+void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
+    // assume this only gets called from a fresh rejoined node
+    assert(m_sequenceNo == 0);
+    m_sequenceNo = seqNo;
+    m_wrapper->setBytesUsed(streamBytesUsed);
 }

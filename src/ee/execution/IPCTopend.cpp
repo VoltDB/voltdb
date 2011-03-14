@@ -52,12 +52,18 @@ void IPCTopend::crashVoltDB(FatalException e) {
     m_vdbipc->crashVoltDB(e);
 }
 
-int64_t IPCTopend::getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
-    return m_vdbipc->getQueuedExportBytes( partitionId, delegateId);
+int64_t IPCTopend::getQueuedExportBytes(int32_t partitionId, std::string signature) {
+    return m_vdbipc->getQueuedExportBytes( partitionId, signature);
 }
 
-void IPCTopend::pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block, bool sync) {
-    m_vdbipc->pushExportBuffer(partitionId, delegateId, block, sync);
+void IPCTopend::pushExportBuffer(
+        int64_t exportGeneration,
+        int32_t partitionId,
+        std::string signature,
+        StreamBlock *block,
+        bool sync,
+        bool endOfStream) {
+    m_vdbipc->pushExportBuffer(exportGeneration, partitionId, signature, block, sync, endOfStream);
 }
 }
 

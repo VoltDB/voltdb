@@ -106,6 +106,23 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(tester.verifyExportOffsets());
     }
 
+    private void quiesceAndVerifyRetryWorkOnIOException(final Client client, ExportTestClient tester)
+    throws Exception
+    {
+        quiesce(client);
+        while (true) {
+            try {
+                tester.work();
+            } catch (IOException e) {
+                System.out.println(e.toString());
+                continue;
+            }
+            break;
+        }
+        assertTrue(tester.allRowsVerified());
+        assertTrue(tester.verifyExportOffsets());
+    }
+
     private void quiesceAndVerifyFalse(final Client client, ExportTestClient tester)
     throws Exception
     {
@@ -133,6 +150,40 @@ public class TestExportSuite extends RegressionSuite {
         super.tearDown();
         m_tester.disconnect();
         assertTrue(callbackSucceded);
+    }
+
+    /*
+     *  Test Export of a DROPPED table.  Queues some data to a table.
+     *  Then drops the table and restarts the server. Verifies that Export can successfully
+     *  drain the dropped table. IE, drop table doesn't lose Export data.
+     */
+    public void testExportAndDroppedTableThenShutdown() throws Exception {
+        Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        // now drop the no-nulls table
+        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
+        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
+        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
+                deploymentURL);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        quiesce(client);
+
+        m_config.shutDown();
+        m_config.startUp(false);
+
+        client = getClient();
+
+        m_tester.reserveVerifiers();
+
+        // must still be able to verify the export data.
+        quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
     }
 
     /*
@@ -170,31 +221,6 @@ public class TestExportSuite extends RegressionSuite {
      *  drain the dropped table. IE, drop table doesn't lose Export data.
      */
     public void testExportAndDroppedTable() throws Exception {
-        final Client client = getClient();
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
-
-        // now drop the no-nulls table
-        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
-        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
-                deploymentURL);
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-
-        // must still be able to verify the export data.
-        quiesceAndVerify(client, m_tester);
-    }
-
-    /*
-     *  Test Export of a DROPPED table.  Queues some data to a table.
-     *  Then drops the table and verifies that Export can successfully
-     *  drain the dropped table. IE, drop table doesn't lose Export data.
-     */
-    public void testExportAndDroppedTableThenShutdown() throws Exception {
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -210,16 +236,12 @@ public class TestExportSuite extends RegressionSuite {
                 deploymentURL);
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
-        m_config.shutDown();
-        m_config.startUp();
-
         client = getClient();
 
-        //Reinit the tester since the server was restarted
-        m_tester = new ExportTestClient(getServerConfig().getNodeCount());
+        m_tester.reserveVerifiers();
 
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_tester);
+        quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
     }
 
     /**
@@ -575,7 +597,7 @@ public class TestExportSuite extends RegressionSuite {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, 1,
-                                  BackendTarget.NATIVE_EE_JNI);
+                                  BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, false);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config);
@@ -585,7 +607,7 @@ public class TestExportSuite extends RegressionSuite {
          * compile a catalog without the NO_NULLS table for add/drop tests
          */
         config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, 1,
-                                              BackendTarget.NATIVE_EE_JNI);
+                                              BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, false);
         project = new VoltProjectBuilder();
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
@@ -611,7 +633,7 @@ public class TestExportSuite extends RegressionSuite {
          * compile a catalog with an added table for add/drop tests
          */
         config = new LocalCluster("export-ddl-addedtable.jar", 2, 3, 1,
-                                  BackendTarget.NATIVE_EE_JNI);
+                                  BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, false);
         project = new VoltProjectBuilder();
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));

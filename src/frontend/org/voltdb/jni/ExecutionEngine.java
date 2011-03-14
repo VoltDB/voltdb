@@ -266,10 +266,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void release() throws EEException, InterruptedException;
 
     /** Pass the catalog to the engine */
-    abstract public void loadCatalog(final String serializedCatalog) throws EEException;
+    abstract public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    abstract public void updateCatalog(final String diffCommands, int catalogVersion) throws EEException;
+    abstract public void updateCatalog(final long txnId, final String diffCommands, int catalogVersion) throws EEException;
 
     /** Run a plan fragment */
     abstract public DependencyPair executePlanFragment(
@@ -357,12 +357,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Execute an Export action against the execution engine.
      * @param syncAction TODO
      * @param ackTxnId if an ack, the transaction id being acked
-     * @param tableId the table being polled or acked.
+     * @param tableSignature the signature of the table being polled or acked.
      * @param syncOffset TODO
      * @return the response ExportMessage
      */
     public abstract ExportProtoMessage exportAction( boolean syncAction,
-            long ackOffset, long seqNo, int partitionId, long tableId);
+            long ackOffset, long seqNo, int partitionId, String tableSignature);
 
     /**
      * Calculate a hash code for a table.
@@ -440,21 +440,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Load the system catalog for this engine.
      * @param pointer the VoltDBEngine pointer
+     * @param txnId the catalog is being loaded at
      * @param serialized_catalog the root catalog object serialized as text strings.
      * this parameter is jstring, not jbytearray because Catalog is serialized into
      * human-readable text strings separated by line feeds.
      * @return error code
      */
-    protected native int nativeLoadCatalog(long pointer, String serialized_catalog);
+    protected native int nativeLoadCatalog(long pointer, long txnId, String serialized_catalog);
 
     /**
      * Update the EE's catalog.
      * @param pointer the VoltDBEngine pointer
+     * @param txnId
      * @param diff_commands Commands to apply to the existing EE catalog to update it
      * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, String diff_commands, int catalogVersion);
+    protected native int nativeUpdateCatalog(long pointer, long txnId, String diff_commands, int catalogVersion);
 
     /**
      * This method is called to initially load table data.
@@ -619,7 +621,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * results buffer. A single action may encompass both a poll and ack.
      * @param pointer Pointer to an engine instance
      * @param mAckOffset The offset being ACKd.
-     * @param mTableId The table ID being acted against.
+     * @param mTableSignature Signature of the table being acted against
      * @return
      */
     protected native long nativeExportAction(
@@ -627,7 +629,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean syncAction,
             long mAckOffset,
             long seqNo,
-            long mTableId);
+            String mTableSignature);
 
     /**
      * This code only does anything useful on MACOSX.

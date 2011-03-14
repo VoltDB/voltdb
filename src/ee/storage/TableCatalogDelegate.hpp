@@ -35,7 +35,7 @@ class ExecutorContext;
 
 class TableCatalogDelegate : public CatalogDelegate {
   public:
-    TableCatalogDelegate(int32_t catalogVersion, int32_t catalogId, std::string path);
+    TableCatalogDelegate(int32_t catalogVersion, int32_t catalogId, std::string path, std::string signature);
     virtual ~TableCatalogDelegate();
 
 
@@ -57,9 +57,14 @@ class TableCatalogDelegate : public CatalogDelegate {
         return m_exportEnabled;
     }
 
+    std::string signature() {
+        return m_signature;
+    }
+
   private:
     voltdb::Table *m_table;
     bool m_exportEnabled;
+    std::string m_signature;
 };
 
 }

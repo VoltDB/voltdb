@@ -55,7 +55,7 @@ public class ExportConnection {
     private final String m_password;
 
     // cached reference to ELClientBase's collection of ELDataSinks
-    private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
+    private final HashMap<String, HashMap<Integer, ExportDataSink>> m_sinks;
 
     public final ArrayList<AdvertisedDataSource> dataSources;
     public final ArrayList<String> hosts;
@@ -65,7 +65,7 @@ public class ExportConnection {
     public ExportConnection(
             String username, String password,
             InetSocketAddress serverAddr,
-            HashMap<Long, HashMap<Integer, ExportDataSink>> dataSinks)
+            HashMap<String, HashMap<Integer, ExportDataSink>> dataSinks)
     {
         m_username = username != null ? username : "";
         m_password = password != null ? password : "";
@@ -178,7 +178,7 @@ public class ExportConnection {
 
             if (m != null && m.isPollResponse()) {
                 m_lastAckOffset = m.getAckOffset();
-                ExportDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
+                ExportDataSink rx_sink = m_sinks.get(m.getSignature()).get(m.getPartitionId());
                 rx_sink.getRxQueue(name).offer(m);
                 messagesOffered++;
             }
@@ -213,7 +213,7 @@ public class ExportConnection {
     private void open() throws IOException
     {
         m_logger.info("Opening new EL stream connection.");
-        ExportProtoMessage m = new ExportProtoMessage(-1, -1);
+        ExportProtoMessage m = new ExportProtoMessage(-1, null);
         m.open();
         sendMessage(m);
     }

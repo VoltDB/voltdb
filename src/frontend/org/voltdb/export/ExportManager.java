@@ -25,6 +25,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.HashMap;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.io.File;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -62,6 +68,9 @@ public class ExportManager
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
+    private AtomicReference<TreeMap< Long, ExportGeneration>> m_generations =
+        new AtomicReference<TreeMap<Long, ExportGeneration>>(new TreeMap<Long, ExportGeneration>());
+
     /**
      * Thrown if the initial setup of the loader fails
      */
@@ -82,16 +91,45 @@ public class ExportManager
      * Supporting multiple loaders mainly involves reference counting
      * the EE data blocks and bookkeeping ACKs from processors.
      */
-    ArrayDeque<ExportDataProcessor> m_processors = new ArrayDeque<ExportDataProcessor>();
-
-    /**
-     * Existing datasources that have been advertised to processors
-     */
-    HashMap<Integer, TreeMap<Long, ExportDataSource>> m_dataSourcesByPartition = new HashMap<Integer, TreeMap<Long, ExportDataSource>>();
+    AtomicReference<ExportDataProcessor> m_processor = new AtomicReference<ExportDataProcessor>();
 
     /** Obtain the global ExportManager via its instance() method */
     private static ExportManager m_self;
     private final int m_hostId;
+
+    private String m_loaderClass;
+
+    private final Runnable m_onGenerationDrained = new Runnable() {
+        @Override
+        public void run() {
+            TreeMap<Long, ExportGeneration> generations = new TreeMap<Long, ExportGeneration>(m_generations.get());
+            ExportGeneration generation = generations.firstEntry().getValue();
+            generations.remove(generations.firstEntry().getKey());
+            generations.firstEntry().getValue().inheritOldDataSources(generation);
+            exportLog.info("Finished draining generation " + generation.m_timestamp);
+            m_generations.set(generations);
+            try {
+                generation.closeAndDelete();
+            } catch (IOException e) {
+                exportLog.error(e);
+            }
+
+            exportLog.info("Creating connector " + m_loaderClass);
+            ExportDataProcessor newProcessor = null;
+            try {
+                final Class<?> loaderClass = Class.forName(m_loaderClass);
+                newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+                newProcessor.addLogger(exportLog);
+                newProcessor.setExportGeneration(generations.firstEntry().getValue());
+                newProcessor.readyForData();
+                m_processor.getAndSet(newProcessor).shutdown();
+            } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
+                exportLog.error(e);
+            } catch (IllegalAccessException e) {
+                exportLog.error(e);
+            }
+        }
+    };
 
     /**
      * Construct ExportManager using catalog.
@@ -149,16 +187,25 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
         final String elloader = conn.getLoaderclass();
+        m_loaderClass = conn.getLoaderclass();
+
         try {
-            exportLog.info("Creating connector " + elloader);
+            exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = null;
-            final Class<?> loaderClass = Class.forName(elloader);
+            final Class<?> loaderClass = Class.forName(m_loaderClass);
             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+            m_processor.set(newProcessor);
             newProcessor.addLogger(exportLog);
-            addDiskBasedTableInfos(catalogContext, conn, newProcessor);
-            addTableInfos(catalogContext, conn, newProcessor);
+            File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+            initializePersistedGenerations(
+                        exportOverflowDirectory,
+                        catalogContext, conn);
+            ExportGeneration currentGeneration =
+                new ExportGeneration( catalogContext.m_transactionId, m_onGenerationDrained, exportOverflowDirectory);
+            currentGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
+            m_generations.get().put( catalogContext.m_transactionId, currentGeneration);
+            newProcessor.setExportGeneration(m_generations.get().firstEntry().getValue());
             newProcessor.readyForData();
-            m_processors.add(newProcessor);
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
@@ -169,42 +216,30 @@ public class ExportManager
         }
     }
 
-    private void addDiskBasedTableInfos(CatalogContext catalogContext,
-            final Connector conn, ExportDataProcessor processor) {
-        /*
-         * First check for old export data that is persisted to disk
-         */
-        String overflowPath = catalogContext.cluster.getExportoverflow();
-        File overflowPathFile = new VoltFile(overflowPath);
 
-        /*
-         * Find all the advertisements. Once one is found, extract the nonce
-         * and check for any data files related to the advertisement. If no data files
-         * exist ignore the advertisement.
-         */
-        for (File f : overflowPathFile.listFiles()) {
-            if (f.getName().endsWith(".ad")) {
-                boolean haveDataFiles = false;
-                String nonce = f.getName().substring(0, f.getName().length() - 3);
-                for (File dataFile : overflowPathFile.listFiles()) {
-                    if (dataFile.getName().startsWith(nonce) && !dataFile.getName().equals(f.getName())) {
-                        haveDataFiles = true;
-                        break;
-                    }
-                }
 
-                if (haveDataFiles) {
-                    try {
-                        addDataSource( processor, overflowPath, f);
-                    } catch (IOException e) {
-                        exportLog.fatal(e);
-                        VoltDB.crashVoltDB();
-                    }
-                } else {
-                    //Delete ads that have no data
-                    f.delete();
+    private void initializePersistedGenerations(
+            File exportOverflowDirectory, CatalogContext catalogContext,
+            Connector conn) throws IOException {
+        TreeSet<File> generationDirectories = new TreeSet<File>();
+        for (File f : exportOverflowDirectory.listFiles()) {
+            if (f.isDirectory()) {
+                if (!f.canRead() || !f.canWrite() || !f.canExecute()) {
+                    throw new RuntimeException("Can't one of read/write/execute directory " + f);
                 }
+                generationDirectories.add(f);
             }
+        }
+
+        //Only give the processor to the oldest generation
+        for (File generationDirectory : generationDirectories) {
+            ExportGeneration generation =
+                new ExportGeneration(
+                        m_onGenerationDrained,
+                        generationDirectory,
+                        Long.valueOf(generationDirectory.getName()));
+            generation.initializeGenerationFromDisk(conn);
+            m_generations.get().put( Long.valueOf(generationDirectory.getName()), generation);
         }
     }
 
@@ -213,90 +248,60 @@ public class ExportManager
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
-
-        for (ExportDataProcessor processor : m_processors) {
-            addTableInfos(catalogContext, conn, processor);
-        }
-    }
-
-    private void addTableInfos(CatalogContext catalogContext,
-            final Connector conn, ExportDataProcessor processor)
-    {
-        /*
-         * Now create datasources based on the catalog
-         */
-        Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
-        while (tableInfoIt.hasNext()) {
-            ConnectorTableInfo next = tableInfoIt.next();
-            Table table = next.getTable();
-            addDataSources(processor, table, m_hostId, catalogContext);
+        if (conn == null) {
+            return;
         }
 
-    }
+        m_loaderClass = conn.getLoaderclass();
 
-    /*
-     * Create a datasource based on an ad file
-     */
-    private void addDataSource(
-            ExportDataProcessor newProcessor,
-            String overflowPath,
-            File adFile) throws IOException {
-        ExportDataSource source = new ExportDataSource( overflowPath, adFile);
-        TreeMap<Long, ExportDataSource> dataSourcesForPartition =
-            m_dataSourcesByPartition.get(source.getPartitionId());
-        if (dataSourcesForPartition == null) {
-            dataSourcesForPartition = new TreeMap<Long, ExportDataSource>();
-            m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
+        File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+
+        ExportGeneration newGeneration = null;
+        try {
+            newGeneration = new ExportGeneration(
+                    catalogContext.m_transactionId,
+                    m_onGenerationDrained,
+                    exportOverflowDirectory);
+        } catch (IOException e1) {
+            exportLog.error(e1);
+            VoltDB.crashVoltDB();
         }
-        dataSourcesForPartition.put( source.getTableId(), source);
-        newProcessor.addDataSource(source);
-    }
+        newGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
 
-    // silly helper to add datasources for a table catalog object
-    private void addDataSources(ExportDataProcessor newProcessor,
-            Table table, int hostId, CatalogContext catalogContext)
-    {
-        SiteTracker siteTracker = catalogContext.siteTracker;
-        ArrayList<Integer> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
-
-        // make the catalog versioned table id. there is coordinated logic
-        // common/CatalogDelegate.cpp
-        long tmp = (long)(catalogContext.catalogVersion) << 32L;
-        final long delegateId = tmp + table.getRelativeIndex();
-
-        String overflowPath = catalogContext.cluster.getExportoverflow();
-        for (Integer site : sites) {
-            Integer partition = siteTracker.getPartitionForSite(site);
-            /*
-             * IOException can occur if there is a problem
-             * with the persistent aspects of the datasource storage
-             */
-            try {
-                TreeMap<Long, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-                if (dataSourcesForPartition == null) {
-                    dataSourcesForPartition = new TreeMap<Long, ExportDataSource>();
-                    m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
-                }
-                //A catalog update might mean the table already exists.
-                //Old export data might have been on disk resulting the datasource already being created.
-                if (dataSourcesForPartition.containsKey(delegateId)) {
-                    continue;
-                }
-                ExportDataSource exportDataSource = new ExportDataSource("database",
-                                  table.getTypeName(),
-                                  partition,
-                                  site,
-                                  delegateId,
-                                  table.getColumns(),
-                                  overflowPath);
-                dataSourcesForPartition.put(delegateId, exportDataSource);
-                newProcessor.addDataSource(exportDataSource);
-
-            } catch (IOException e) {
-                exportLog.fatal(e);
-                VoltDB.crashVoltDB();
+        while (true) {
+            TreeMap<Long, ExportGeneration> oldGenerations = m_generations.get();
+            TreeMap<Long, ExportGeneration> generations = new TreeMap<Long, ExportGeneration>(oldGenerations);
+            generations.put(catalogContext.m_transactionId, newGeneration);
+            if (m_generations.compareAndSet( oldGenerations, generations)) {
+                break;
             }
         }
+//
+//        Runnable switchToNextGeneration = new Runnable() {
+//            @Override
+//            public void run() {
+//                ExportDataProcessor processor = m_processors.peek();
+//                processor.shutdown();
+//
+//                ExportGeneration currentGeneration = m_generations.lastEntry().getValue();
+//                try {
+//                    currentGeneration.closeAndDelete();
+//                } catch (IOException e) {
+//                    exportLog.error(e);
+//                }
+//                m_generations.remove(m_generations.lastEntry().getKey());
+//
+//                ExportGeneration newGeneration = m_generations.firstEntry().getValue();
+//                newGeneration.registerWithProcessor(processor);
+//                processor.readyForData();
+//
+//                if (m_generations.size() > 1) {
+//                    processor.setOnAllSourcesDrained(this);
+//                }
+//            }
+//        };
+//
+//        m_processors.peek().setOnAllSourcesDrained(switchToNextGeneration);
     }
 
     /**
@@ -306,14 +311,14 @@ public class ExportManager
     public void queueMessage(ExportInternalMessage mbp) {
         // TODO: supporting multiple processors requires slicing the
         // data buffer so each processor gets a readonly buffer.
-        m_processors.getFirst().queueMessage(mbp);
+        m_processor.get().queueMessage(mbp);
     }
 
     public void shutdown() {
-        for (ExportDataProcessor p : m_processors) {
-            p.shutdown();
+        ExportDataProcessor proc = m_processor.get();
+        if (proc != null) {
+            proc.shutdown();
         }
-
     }
 
     /**
@@ -322,12 +327,9 @@ public class ExportManager
      */
     public InputHandler createInputHandler(String service, boolean isAdminPort)
     {
-        InputHandler handler = null;
-        for (ExportDataProcessor p : m_processors) {
-            handler = p.createInputHandler(service, isAdminPort);
-            if (handler != null) {
-                return handler;
-            }
+        ExportDataProcessor proc = m_processor.get();
+        if (proc != null) {
+            return proc.createInputHandler(service, isAdminPort);
         }
         return null;
     }
@@ -339,67 +341,55 @@ public class ExportManager
      * @return classname responsible for service
      */
     public String getConnectorForService(String service) {
-        for (ExportDataProcessor p : m_processors) {
-            if (p.isConnectorForService(service)) {
-                return p.getClass().getCanonicalName();
-            }
+        ExportDataProcessor proc = m_processor.get();
+        if (proc != null && proc.isConnectorForService(service)) {
+            return proc.getClass().getCanonicalName();
         }
         return null;
     }
 
-    public static long getQueuedExportBytes(int partitionId, long delegateId) {
+    public static long getQueuedExportBytes(int partitionId, String signature) {
         ExportManager instance = instance();
-        assert(instance.m_dataSourcesByPartition.containsKey(partitionId));
-        assert(instance.m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
-        TreeMap<Long, ExportDataSource> sources = instance.m_dataSourcesByPartition.get(partitionId);
-
-        if (sources == null) {
-            exportLog.error("Could not find export data sources for partition "
-                    + partitionId);
-            return 0;
+        TreeMap<Long, ExportGeneration> generations = instance.m_generations.get();
+        if (generations.isEmpty()) {
+            assert(false);
+            return -1;
         }
 
-        ExportDataSource source = sources.get(delegateId);
-        if (source == null) {
-            exportLog.error("Could not find export data source for partition " + partitionId +
-                    " delegate id " + delegateId);
-            return 0;
+        long exportBytes = 0;
+        for (ExportGeneration generation : generations.values()) {
+            exportBytes += generation.getQueuedExportBytes( partitionId, signature);
         }
-        return source.sizeInBytes();
+
+        return exportBytes;
     }
 
     /*
      * This method pulls double duty as a means of pushing export buffers
      * and "syncing" export data to disk. Syncing doesn't imply fsync, it just means
      * writing the data to a file instead of keeping it all in memory.
+     * End of stream indicates that no more data is coming from this source
+     * for this generation.
      */
     public static void pushExportBuffer(
+            long exportGeneration,
             int partitionId,
-            long delegateId,
+            String signature,
             long uso,
             long bufferPtr,
             ByteBuffer buffer,
-            boolean sync) {
+            boolean sync,
+            boolean endOfStream) {
         ExportManager instance = instance();
-        assert(instance.m_dataSourcesByPartition.containsKey(partitionId));
-        assert(instance.m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
-        TreeMap<Long, ExportDataSource> sources = instance.m_dataSourcesByPartition.get(partitionId);
-
-        if (sources == null) {
-            exportLog.error("Could not find export data sources for partition "
-                    + partitionId + " the export data is being discarded");
+        ExportGeneration generation = instance.m_generations.get().get(exportGeneration);
+        if (generation == null) {
+            assert(false);
             DBBPool.deleteCharArrayMemory(bufferPtr);
+            exportLog.error("Could not a find an export generation " + exportGeneration +
+                    ". Should be impossible. Discarding export data");
             return;
         }
 
-        ExportDataSource source = sources.get(delegateId);
-        if (source == null) {
-            exportLog.error("Could not find export data source for partition " + partitionId +
-                    " delegate id " + delegateId + " the export data is being discarded");
-            DBBPool.deleteCharArrayMemory(bufferPtr);
-            return;
-        }
-
-        source.pushExportBuffer(uso, bufferPtr, buffer, sync);
+        generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
     }
 }

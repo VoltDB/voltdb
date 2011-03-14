@@ -34,7 +34,7 @@ public:
             voltdb::TableTuple &oldTuple,
             voltdb::PersistentTable *table,
             voltdb::Pool *pool)
-        : m_oldTuple(oldTuple), m_table(table), m_revertIndexes(false), m_wrapperOffset(0)
+        : m_oldTuple(oldTuple), m_table(table), m_revertIndexes(false)
     {
         /*
          * Copy the old tuple and the new tuple. The new tuple will be
@@ -48,10 +48,6 @@ public:
 
     inline TableTuple& getOldTuple() {
         return m_oldTuple;
-    }
-
-    inline void setELMark(size_t mark) {
-        m_wrapperOffset = mark;
     }
 
     inline void setNewTuple(TableTuple &newTuple, voltdb::Pool *pool) {
@@ -118,7 +114,6 @@ private:
     std::vector<const char*> oldUninlineableColumns;
     std::vector<const char*> newUninlineableColumns;
     bool m_revertIndexes;
-    size_t m_wrapperOffset;
 };
 
 }

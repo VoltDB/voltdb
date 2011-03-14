@@ -75,11 +75,11 @@ public class TestExportDataSource extends TestCase {
         for (String table_name : tables)
         {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource("database",
+            ExportDataSource s = new ExportDataSource( null, "database",
                                                 table.getTypeName(),
                                                 m_part,
                                                 m_site,
-                                                table.getRelativeIndex(),
+                                                table.getSignature(),
                                                 table.getColumns(),
                                                 "/tmp");
 
@@ -87,7 +87,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(table_name, s.getTableName());
             assertEquals(m_part, s.getPartitionId());
             assertEquals(m_site, s.getSiteId());
-            assertEquals(table.getRelativeIndex(), s.getTableId());
+            assertEquals(table.getSignature(), s.getSignature());
             // There are 6 additional Export columns added
             assertEquals(2 + 6, s.m_columnNames.size());
             assertEquals(2 + 6, s.m_columnTypes.size());
@@ -103,32 +103,33 @@ public class TestExportDataSource extends TestCase {
     public void testPoll() throws Exception{
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource("database",
+        ExportDataSource s = new ExportDataSource( null,
+                                            "database",
                                             table.getTypeName(),
                                             m_part,
                                             m_site,
-                                            table.getRelativeIndex(),
+                                            table.getSignature(),
                                             table.getColumns(),
                                             "/tmp");
         ByteBuffer foo = ByteBuffer.allocate(20);
-        s.pushExportBuffer(23, 0, foo.duplicate(), false);
+        s.pushExportBuffer(23, 0, foo.duplicate(), false, false);
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
-        s.pushExportBuffer(43, 0, foo.duplicate(), false);
+        s.pushExportBuffer(43, 0, foo.duplicate(), false, false);
         assertEquals(s.sizeInBytes(), 40 );
-        s.pushExportBuffer(63, 0, foo.duplicate(), false);
+        s.pushExportBuffer(63, 0, foo.duplicate(), false, false);
 
         //Only two are kept in memory, flattening the third takes 12 bytes extra so 72 instead of 60
         assertEquals(s.sizeInBytes(), 72);
 
         //Sync which flattens them all
-        s.pushExportBuffer(63, 0, null, true);
+        s.pushExportBuffer(63, 0, null, true, false);
 
         //flattened size with 60 + (12 * 3)
         assertEquals( 96, s.sizeInBytes());
 
-        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getSignature());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
         final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
@@ -146,7 +147,7 @@ public class TestExportDataSource extends TestCase {
         ExportInternalMessage mbp = ref.get();
 
         assertEquals(m_part, mbp.m_m.m_partitionId);
-        assertEquals(table.getRelativeIndex(), mbp.m_m.m_tableId);
+        assertEquals(table.getSignature(), mbp.m_m.m_signature);
         assertEquals( 43, mbp.m_m.m_offset);
         foo = ByteBuffer.allocate(24);
         foo.order(ByteOrder.LITTLE_ENDIAN);
@@ -162,7 +163,7 @@ public class TestExportDataSource extends TestCase {
         mbp = ref.get();
 
         assertEquals(m_part, mbp.m_m.m_partitionId);
-        assertEquals(table.getRelativeIndex(), mbp.m_m.m_tableId);
+        assertEquals(table.getSignature(), mbp.m_m.m_signature);
         assertEquals( 63, mbp.m_m.m_offset);
         assertEquals( foo, mbp.m_m.m_data);
 
@@ -174,7 +175,7 @@ public class TestExportDataSource extends TestCase {
         mbp = ref.get();
 
         assertEquals(m_part, mbp.m_m.m_partitionId);
-        assertEquals(table.getRelativeIndex(), mbp.m_m.m_tableId);
+        assertEquals(table.getSignature(), mbp.m_m.m_signature);
         assertEquals( 83, mbp.m_m.m_offset);
         assertEquals( foo, mbp.m_m.m_data);
 
@@ -186,7 +187,7 @@ public class TestExportDataSource extends TestCase {
         mbp = ref.get();
 
         assertEquals(m_part, mbp.m_m.m_partitionId);
-        assertEquals(table.getRelativeIndex(), mbp.m_m.m_tableId);
+        assertEquals(table.getSignature(), mbp.m_m.m_signature);
         assertEquals( 83, mbp.m_m.m_offset);
         assertEquals( 0, mbp.m_m.m_data.getInt());
     }
@@ -199,16 +200,18 @@ public class TestExportDataSource extends TestCase {
     {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource("database",
+        ExportDataSource s = new ExportDataSource(
+                                            null,
+                                            "database",
                                             table.getTypeName(),
                                             m_part,
                                             m_site,
-                                            table.getRelativeIndex(),
+                                            table.getSignature(),
                                             table.getColumns(),
                                             "/tmp");
 
         // we get nothing with no data
-        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getSignature());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
         final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
@@ -226,10 +229,10 @@ public class TestExportDataSource extends TestCase {
         assertEquals(mbp.m_m.m_data.getInt(), 0);
 
         ByteBuffer firstBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 9);
-        s.pushExportBuffer(0, 0, firstBuffer, false);
+        s.pushExportBuffer(0, 0, firstBuffer, false, false);
 
         ByteBuffer secondBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 10);
-        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 9, 0, secondBuffer, false);
+        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 9, 0, secondBuffer, false, false);
 
         // release the first buffer
         m.ack(MAGIC_TUPLE_SIZE * 9);
@@ -251,16 +254,18 @@ public class TestExportDataSource extends TestCase {
     {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource("database",
+        ExportDataSource s = new ExportDataSource(
+                                            null,
+                                            "database",
                                             table.getTypeName(),
                                             m_part,
                                             m_site,
-                                            table.getRelativeIndex(),
+                                            table.getSignature(),
                                             table.getColumns(),
                                             "/tmp");
 
         // we get nothing with no data
-        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getSignature());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
         final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
@@ -278,7 +283,7 @@ public class TestExportDataSource extends TestCase {
         assertEquals(mbp.m_m.m_data.getInt(), 0);
 
         ByteBuffer firstBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 3);
-        s.pushExportBuffer(0, 0, firstBuffer, false);
+        s.pushExportBuffer(0, 0, firstBuffer, false, false);
 
         // release part of the committed data
         m.ack(MAGIC_TUPLE_SIZE * 2);
@@ -293,7 +298,7 @@ public class TestExportDataSource extends TestCase {
         assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE);
 
         //Reset close flag
-        m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        m = new ExportProtoMessage(m_part, table.getSignature());
         m.poll();
         pair = new RawProcessor.ExportInternalMessage(null, m);
 
@@ -307,7 +312,7 @@ public class TestExportDataSource extends TestCase {
         assertEquals(mbp.m_m.m_data.getInt(), 0);
 
         ByteBuffer secondBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 6);
-        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 3, 0, secondBuffer, false);
+        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 3, 0, secondBuffer, false, false);
 
         m.ack(MAGIC_TUPLE_SIZE * 3);
         s.exportAction(pair);
@@ -327,15 +332,17 @@ public class TestExportDataSource extends TestCase {
     {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource("database",
+        ExportDataSource s = new ExportDataSource(
+                                            null,
+                                            "database",
                                             table.getTypeName(),
                                             m_part,
                                             m_site,
-                                            table.getRelativeIndex(),
+                                            table.getSignature(),
                                             table.getColumns(),
                                             "/tmp");
 
-        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getSignature());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
         final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
@@ -348,10 +355,10 @@ public class TestExportDataSource extends TestCase {
         m.poll();
 
         ByteBuffer firstBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 9);
-        s.pushExportBuffer(0, 0, firstBuffer, false);
+        s.pushExportBuffer(0, 0, firstBuffer, false, false);
 
         ByteBuffer secondBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 10);
-        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 9, 0, secondBuffer, false);
+        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 9, 0, secondBuffer, false, false);
 
         // release part of the first buffer
         m.ack(MAGIC_TUPLE_SIZE * 4);

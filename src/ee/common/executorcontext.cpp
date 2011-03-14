@@ -45,7 +45,6 @@ ExecutorContext::ExecutorContext(CatalogId siteId,
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     pthread_setspecific( m_key, static_cast<const void *>(this));
     m_lastCommittedTxnId = 0;
-    m_lastTickTime = 0;
 }
 
 ExecutorContext* ExecutorContext::getExecutorContext() {

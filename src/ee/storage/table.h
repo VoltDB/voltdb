@@ -297,9 +297,10 @@ class Table {
     virtual void flushOldTuples(int64_t timeInMillis) {
     }
     /**
-     * Inform the tuple stream wrapper of the table's delegate id
+     * Inform the tuple stream wrapper of the table's signature and the timestamp
+     * of the current export generation
      */
-    virtual void setDelegateId(int64_t delegateId) {
+    virtual void setSignatureAndGeneration(std::string signature, int64_t generation) {
     }
 
 protected:

@@ -111,6 +111,7 @@ begin Table                   "A table (relation) in the database"
   int estimatedtuplecount     "A rough estimate of the number of tuples in the table; used for planning"
   MaterializedViewInfo* views "Information about materialized views based on this table's content"
   Table? materializer         "If this is a materialized view, this field stores the source table"
+  string signature            "Catalog version independent signature of the table consisting of name and schema"
 end
 
 begin MaterializedViewInfo "Information used to build and update a materialized view"

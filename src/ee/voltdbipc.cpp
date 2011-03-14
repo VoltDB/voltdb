@@ -195,8 +195,15 @@ typedef struct {
     int32_t isSync;
     int64_t offset;
     int64_t seqNo;
-    int64_t tableId;
+    int32_t tableSignatureLength;
+    char tableSignature[0];
 }__attribute__((packed)) export_action;
+
+typedef struct {
+    struct ipc_command cmd;
+    int64_t txnId;
+    char data[0];
+}__attribute__((packed)) catalog_load;
 
 
 using namespace voltdb;
@@ -361,8 +368,9 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
     if (!m_engine)
         return kErrorCode_Error;
 
+    catalog_load *msg = reinterpret_cast<catalog_load*>(cmd);
     try {
-        if (m_engine->loadCatalog(std::string(cmd->data)) == true) {
+        if (m_engine->loadCatalog(ntohll(msg->txnId), std::string(msg->data)) == true) {
             return kErrorCode_Success;
         }
     } catch (SerializableEEException &e) {}
@@ -379,11 +387,12 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     struct updatecatalog {
         struct ipc_command cmd;
         int catalogVersion;
+        int64_t txnId;
         char data[];
     };
     struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(std::string(uc->data), ntohl(uc->catalogVersion)) == true) {
+        if (m_engine->updateCatalog(ntohll(uc->txnId), std::string(uc->data), ntohl(uc->catalogVersion)) == true) {
             return kErrorCode_Success;
         }
     } catch (FatalException e) {
@@ -994,10 +1003,12 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     export_action *action = (export_action*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
+    int32_t tableSignatureLength = ntohl(action->tableSignatureLength);
+    std::string tableSignature(action->tableSignature, tableSignatureLength);
     long result = m_engine->exportAction(action->isSync,
                                          static_cast<int64_t>(ntohll(action->offset)),
                                          static_cast<int64_t>(ntohll(action->seqNo)),
-                                         static_cast<int64_t>(ntohll(action->tableId)));
+                                         tableSignature);
     int buflength = m_engine->getResultsSize();
 
     // write offset across bigendian.
@@ -1071,11 +1082,12 @@ void VoltDBIPC::threadLocalPoolAllocations() {
     writeOrDie(m_fd, (unsigned char*)response, 9);
 }
 
-int64_t VoltDBIPC::getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
+int64_t VoltDBIPC::getQueuedExportBytes(int32_t partitionId, std::string signature) {
     m_reusedResultBuffer[0] = kErrorCode_getQueuedExportBytes;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(partitionId);
-    *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[5]) = htonll(delegateId);
-    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 13);
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[5]) = htonl(static_cast<int32_t>(signature.size()));
+    ::memcpy( &m_reusedResultBuffer[9], signature.c_str(), signature.size());
+    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 9 + signature.size());
 
     int64_t netval;
     ssize_t bytes = read(m_fd, &netval, sizeof(int64_t));
@@ -1090,25 +1102,42 @@ int64_t VoltDBIPC::getQueuedExportBytes(int32_t partitionId, int64_t delegateId)
     return retval;
 }
 
-void VoltDBIPC::pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock *block, bool sync) {
-    m_reusedResultBuffer[0] = kErrorCode_pushExportBuffer;
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(partitionId);
-    *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[5]) = htonll(delegateId);
+void VoltDBIPC::pushExportBuffer(
+        int64_t exportGeneration,
+        int32_t partitionId,
+        std::string signature,
+        voltdb::StreamBlock *block,
+        bool sync,
+        bool endOfStream) {
+    int32_t index = 0;
+    m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
+    *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(exportGeneration);
+    index += 8;
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
+    index += 4;
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(static_cast<int32_t>(signature.size()));
+    index += 4;
+    ::memcpy( &m_reusedResultBuffer[index], signature.c_str(), signature.size());
+    index += static_cast<int32_t>(signature.size());
     if (block != NULL) {
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[13]) = htonll(block->uso());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->uso());
     } else {
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[13]) = 0;
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;
     }
-    *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[21]) =
+    index += 8;
+    *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =
         sync ?
             static_cast<int8_t>(1) : static_cast<int8_t>(0);
+    *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =
+        endOfStream ?
+            static_cast<int8_t>(1) : static_cast<int8_t>(0);
     if (block != NULL) {
-        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[22]) = htonl(block->rawLength());
-        writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 26);
+        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(block->rawLength());
+        writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
         writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
     } else {
-        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[22]) = htonl(0);
-        writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 26);
+        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
+        writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
     }
     delete [] block->rawPtr();
 }

@@ -312,7 +312,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ExecutionEngine.crashVoltDB(message, traces, filename, lineno);
                 }
                 if (status == kErrorCode_pushExportBuffer) {
-                    ByteBuffer header = ByteBuffer.allocate(21);
+                    ByteBuffer header = ByteBuffer.allocate(30);
                     while (header.hasRemaining()) {
                         final int read = m_socket.getChannel().read(header);
                         if (read == -1) {
@@ -321,10 +321,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     }
                     header.flip();
 
+                    long exportGeneration = header.getLong();
                     int partitionId = header.getInt();
-                    long delegateId = header.getLong();
+                    int signatureLength = header.getInt();
+                    byte signatureBytes[] = new byte[signatureLength];
+                    header.get(signatureBytes);
+                    String signature = new String(signatureBytes, "UTF-8");
                     long uso = header.getLong();
                     boolean sync = header.get() == 1 ? true : false;
+                    boolean isEndOfGeneration = header.get() == 1 ? true : false;
                     int length = header.getInt();
                     ByteBuffer exportBuffer = ByteBuffer.allocateDirect(length);
                     while (exportBuffer.hasRemaining()) {
@@ -335,7 +340,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     }
                     exportBuffer.flip();
                     ExportManager.pushExportBuffer(
-                            partitionId, delegateId, uso, 0, length == 0 ? null : exportBuffer, sync);
+                            exportGeneration,
+                            partitionId,
+                            signature,
+                            uso,
+                            0,
+                            length == 0 ? null : exportBuffer,
+                            sync,
+                            isEndOfGeneration);
                     continue;
                 }
                 if (status == kErrorCode_getQueuedExportBytes) {
@@ -349,9 +361,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     header.flip();
 
                     int partitionId = header.getInt();
-                    long delegateId = header.getLong();
+                    int signatureLength = header.getInt();
+                    byte signatureBytes[] = new byte[signatureLength];
+                    header.get(signatureBytes);
+                    String signature = new String(signatureBytes, "UTF-8");
 
-                    long retval = ExportManager.getQueuedExportBytes(partitionId, delegateId);
+                    long retval = ExportManager.getQueuedExportBytes(partitionId, signature);
                     ByteBuffer buf = ByteBuffer.allocate(8);
                     buf.putLong(retval).flip();
 
@@ -601,7 +616,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the catalog as a UTF-8 byte string via connection */
     @Override
-    public void loadCatalog(final String serializedCatalog) throws EEException {
+    public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -611,6 +626,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
             m_data.putInt(Commands.LoadCatalog.m_id);
+            m_data.putLong(txnId);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -631,7 +647,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void updateCatalog(final String catalogDiffs, int catalogVersion) throws EEException {
+    public void updateCatalog(final long txnId, final String catalogDiffs, int catalogVersion) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -642,6 +658,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             m_data.putInt(Commands.UpdateCatalog.m_id);
             m_data.putInt(catalogVersion);
+            m_data.putLong(txnId);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -1181,14 +1198,19 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public ExportProtoMessage exportAction(boolean syncAction,
-            long ackOffset, long seqNo, int partitionId, long mTableId) {
+            long ackOffset, long seqNo, int partitionId, String mTableSignature) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
             m_data.putInt(syncAction ? 1 : 0);
             m_data.putLong(ackOffset);
             m_data.putLong(seqNo);
-            m_data.putLong(mTableId);
+            if (mTableSignature == null) {
+                m_data.putInt(-1);
+            } else {
+                m_data.putInt(mTableSignature.getBytes("UTF-8").length);
+                m_data.put(mTableSignature.getBytes("UTF-8"));
+            }
             m_data.flip();
             m_connection.write();
 
@@ -1200,7 +1222,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             long result_offset = results.getLong();
             if (result_offset < 0) {
                 ExportProtoMessage reply = null;
-                reply = new ExportProtoMessage(partitionId, mTableId);
+                reply = new ExportProtoMessage(partitionId, mTableSignature);
                 reply.error();
                 return reply;
             }

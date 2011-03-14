@@ -35,7 +35,7 @@ public class ExportDataSink {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     boolean m_active = true;
-    final long tableId;
+    final String m_tableSignature;
     final int partitionId;
     final String m_tableName;
     final ExportDecoderBase m_decoder;
@@ -46,9 +46,9 @@ public class ExportDataSink {
 
     boolean m_started = false;
 
-    public ExportDataSink(int partitionId, long tableId, String tableName,
-            ExportDecoderBase decoder) {
-        this.tableId = tableId;
+    public ExportDataSink(int partitionId, String tableSignature,
+                      String tableName, ExportDecoderBase decoder) {
+        m_tableSignature = tableSignature;
         this.partitionId = partitionId;
         m_tableName = tableName;
         m_decoder = decoder;
@@ -59,6 +59,9 @@ public class ExportDataSink {
     void addExportConnection(String connectionName) {
         if (m_activeConnection == null) {
             m_activeConnection = connectionName;
+        }
+        if (!m_activeConnection.equals(connectionName)) {
+            System.out.println("OH holy hell " + connectionName + " and " + m_activeConnection);
         }
         m_rxQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
         m_txQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
@@ -91,17 +94,17 @@ public class ExportDataSink {
         m_logger.trace("Polling table " + m_tableName + ", partition "
                 + partitionId + " for new data.");
 
-        ExportProtoMessage m = new ExportProtoMessage(partitionId, tableId);
+        ExportProtoMessage m = new ExportProtoMessage(partitionId, m_tableSignature);
         m.poll();
         m_txQueues.get(m_activeConnection).offer(m);
     }
 
     private void pollAndAck(ExportProtoMessage prev) {
-        m_logger.debug("Poller, table " + m_tableName + ": pollAndAck "
-                + prev.getAckOffset());
-        ExportProtoMessage next = new ExportProtoMessage(partitionId, tableId);
+        m_logger.debug("Poller, table " + m_tableName + ": pollAndAck " +
+                       prev.getAckOffset());
+        ExportProtoMessage next = new ExportProtoMessage(partitionId, m_tableSignature);
         next.poll().ack(prev.getAckOffset());
-        ExportProtoMessage ack = new ExportProtoMessage(partitionId, tableId);
+        ExportProtoMessage ack = new ExportProtoMessage(partitionId, m_tableSignature);
         ack.ack(prev.getAckOffset());
 
         for (String connectionName : m_txQueues.keySet()) {
@@ -156,5 +159,9 @@ public class ExportDataSink {
         } finally {
             m.getData().order(ByteOrder.BIG_ENDIAN);
         }
+    }
+
+    public void connectionClosed() {
+        m_started = false;
     }
 }

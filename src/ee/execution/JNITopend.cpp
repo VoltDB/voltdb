@@ -21,6 +21,7 @@
 #include "common/debuglog.h"
 #include "storage/table.h"
 
+using namespace std;
 
 namespace voltdb{
 
@@ -113,7 +114,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(IJJJLjava/nio/ByteBuffer;Z)V");
+            "(JILjava/lang/String;JJLjava/nio/ByteBuffer;ZZ)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
@@ -123,7 +124,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_getQueuedExportBytesMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "getQueuedExportBytes",
-            "(IJ)J");
+            "(ILjava/lang/String;)J");
     if (m_getQueuedExportBytesMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_getQueuedExportBytesMID != NULL);
@@ -220,42 +221,59 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
 }
 
-int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
-    return m_jniEnv->CallStaticLongMethod(
+int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
+    jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
+    int64_t retval = m_jniEnv->CallStaticLongMethod(
             m_exportManagerClass,
             m_getQueuedExportBytesMID,
             partitionId,
-            delegateId);
+            signatureString);
+    m_jniEnv->DeleteLocalRef(signatureString);
+    return retval;
 }
 
-void JNITopend::pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block, bool sync) {
+void JNITopend::pushExportBuffer(
+        int64_t exportGeneration,
+        int32_t partitionId,
+        string signature,
+        StreamBlock *block,
+        bool sync,
+        bool endOfStream) {
+    jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
             m_jniEnv->ExceptionDescribe();
             throw std::exception();
         }
+        //std::cout << "Block is length " << block->rawLength() << std::endl;
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
+                exportGeneration,
                 partitionId,
-                delegateId,
+                signatureString,
                 block->uso(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
-                sync ? JNI_TRUE : JNI_FALSE);
+                sync ? JNI_TRUE : JNI_FALSE,
+                endOfStream ? JNI_TRUE : JNI_FALSE);
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
+        //std::cout << "Block is null" << std::endl;
         m_jniEnv->CallStaticVoidMethod(
                         m_exportManagerClass,
                         m_pushExportBufferMID,
+                        exportGeneration,
                         partitionId,
-                        delegateId,
+                        signatureString,
                         static_cast<int64_t>(0),
                         NULL,
                         NULL,
-                        sync ? JNI_TRUE : JNI_FALSE);
+                        sync ? JNI_TRUE : JNI_FALSE,
+                        endOfStream ? JNI_TRUE : JNI_FALSE);
     }
+    m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
         throw std::exception();

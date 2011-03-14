@@ -171,12 +171,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      *  catalog.
      */
     @Override
-    public void loadCatalog(final String serializedCatalog) throws EEException {
+    public void loadCatalog(long txnId, final String serializedCatalog) throws EEException {
         //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeLoadCatalog(pointer, serializedCatalog);
+            errorCode = nativeLoadCatalog(pointer, txnId, serializedCatalog);
         }
         checkErrorCode(errorCode);
         //LOG.info("Loaded Catalog.");
@@ -187,12 +187,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * engine's catalog.
      */
     @Override
-    public void updateCatalog(final String catalogDiffs, int catalogVersion) throws EEException {
+    public void updateCatalog(long txnId, final String catalogDiffs, int catalogVersion) throws EEException {
         //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeUpdateCatalog(pointer, catalogDiffs, catalogVersion);
+            errorCode = nativeUpdateCatalog(pointer, txnId, catalogDiffs, catalogVersion);
         }
         checkErrorCode(errorCode);
     }
@@ -489,14 +489,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public ExportProtoMessage exportAction(boolean syncAction,
-            long ackTxnId, long seqNo, int partitionId, long tableId)
+            long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
         deserializer.clear();
         ExportProtoMessage result = null;
         long retval = nativeExportAction(pointer,
-                                         syncAction, ackTxnId, seqNo, tableId);
+                                         syncAction, ackTxnId, seqNo, tableSignature);
         if (retval < 0) {
-            result = new ExportProtoMessage(partitionId, tableId);
+            result = new ExportProtoMessage(partitionId, tableSignature);
             result.error();
         }
         return result;

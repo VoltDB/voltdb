@@ -44,11 +44,12 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
         m_recoveryPhase = RECOVERY_MSG_TYPE_COMPLETE;
         out->writeByte(static_cast<int8_t>(RECOVERY_MSG_TYPE_COMPLETE));
         out->writeInt(m_tableId);
+//        out->writeTextString(m_table->m_Tuple);
         // last message gets the export stream counter
-        long seqNo = 0; size_t offset = 0;
-        m_table->getExportStreamSequenceNo(seqNo, offset);
-        out->writeLong(seqNo);
-        out->writeLong((long) offset);
+//        long seqNo = 0; size_t offset = 0;
+//        m_table->getExportStreamSequenceNo(seqNo, offset);
+//        out->writeLong(seqNo);
+//        out->writeLong((long) offset);
         //No tuple count added to message because completion message is only used in Java
         return false;
     }

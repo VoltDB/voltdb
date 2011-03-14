@@ -157,7 +157,7 @@ class ExecutionEngineTest : public Test {
              */
             engine = new voltdb::VoltDBEngine();
             ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, ""));
-            ASSERT_TRUE(engine->loadCatalog(catalog_string));
+            ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
 
             /*
              * Get a link to the catalog and pull out information about it

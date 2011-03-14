@@ -86,21 +86,14 @@ PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     m_iter(this, m_data.begin()),
     m_executorContext(ctx),
     m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
-    m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL), m_wrapper(NULL),
-    m_tsSeqNo(0), stats_(this), m_exportEnabled(exportEnabled),
+    m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL),
+    stats_(this),
     m_COWContext(NULL),
     m_failedCompactionCount(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
-    }
-
-    if (exportEnabled)
-    {
-        m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId,
-                                           m_executorContext->m_lastTickTime);
     }
 }
 
@@ -138,7 +131,6 @@ PersistentTable::~PersistentTable() {
         delete m_views[i];
     }
 
-    delete m_wrapper;
 }
 
 // ------------------------------------------------------------------
@@ -231,7 +223,6 @@ void setSearchKeyFromTuple(TableTuple &source) {
  * uninlined strings and creates and registers an UndoAction.
  */
 bool PersistentTable::insertTuple(TableTuple &source) {
-    size_t elMark = 0;
 
     // not null checks at first
     FAIL_IF(!checkNulls(source)) {
@@ -278,13 +269,6 @@ bool PersistentTable::insertTuple(TableTuple &source) {
                                          CONSTRAINT_TYPE_UNIQUE);
     }
 
-    // if EL is enabled, append the tuple to the buffer
-    // exportxxx: memoizing this more cache friendly?
-    if (m_exportEnabled) {
-        elMark =
-          appendToELBuffer(m_tmpTarget1, m_tsSeqNo++, TupleStreamWrapper::INSERT);
-    }
-
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
         m_nonInlinedMemorySize += m_tmpTarget1.getNonInlinedMemorySize();
@@ -298,7 +282,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     assert(pool);
     PersistentTableUndoInsertAction *ptuia =
       new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
-      PersistentTableUndoInsertAction(m_tmpTarget1, this, pool, elMark);
+      PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
     undoQuantum->registerUndoAction(ptuia);
 
     // handle any materialized views
@@ -313,17 +297,12 @@ bool PersistentTable::insertTuple(TableTuple &source) {
  * Insert a tuple but don't allocate a new copy of the uninlineable
  * strings or create an UndoAction or update a materialized view.
  */
-void PersistentTable::insertTupleForUndo(char *tuple, size_t wrapperOffset) {
+void PersistentTable::insertTupleForUndo(char *tuple) {
 
     m_tmpTarget1.move(tuple);
     m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
     m_usedTupleCount++;
-
-    // rollback Export
-    if (m_exportEnabled) {
-        m_wrapper->rollbackTo(wrapperOffset);
-    }
 
     /*
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
@@ -342,7 +321,6 @@ void PersistentTable::insertTupleForUndo(char *tuple, size_t wrapperOffset) {
  * updated strings and creates an UndoAction.
  */
 bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes) {
-    size_t elMark = 0;
 
     /*
      * Create and register an undo action and then use the copy of
@@ -397,14 +375,6 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
         updateFromAllIndexes(ptuua->getOldTuple(), target);
     }
 
-    // if EL is enabled, append the tuple to the buffer
-    if (m_exportEnabled) {
-        // only need the earliest mark
-        elMark = appendToELBuffer(ptuua->getOldTuple(), m_tsSeqNo, TupleStreamWrapper::DELETE);
-        appendToELBuffer(target, m_tsSeqNo++, TupleStreamWrapper::INSERT);
-        ptuua->setELMark(elMark);
-    }
-
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleUpdate(ptuua->getOldTuple(), target);
@@ -440,7 +410,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
  * data ptr that will be used as the value in the index.
  */
 void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
-                                         bool revertIndexes, size_t wrapperOffset) {
+                                         bool revertIndexes) {
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
         m_nonInlinedMemorySize -= target.getNonInlinedMemorySize();
@@ -478,10 +448,6 @@ void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
         }
         updateFromAllIndexes(targetBackup, target);
     }
-
-    if (m_exportEnabled) {
-        m_wrapper->rollbackTo(wrapperOffset);
-    }
 }
 
 bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings) {
@@ -513,12 +479,6 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
         m_views[i]->processTupleDelete(target);
     }
 
-    // if EL is enabled, append the tuple to the buffer
-    if (m_exportEnabled) {
-        size_t elMark = appendToELBuffer(target, m_tsSeqNo++, TupleStreamWrapper::DELETE);
-        ptuda->setELMark(elMark);
-    }
-
     undoQuantum->registerUndoAction(ptuda, this);
     return true;
 }
@@ -532,7 +492,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
  * correct dirty setting when the tuple was originally inserted.
  * TODO remove duplication with regular delete. Also no view updates.
  */
-void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy, size_t wrapperOffset) {
+void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
     TableTuple target = lookupTuple(tupleCopy);
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
@@ -545,11 +505,6 @@ void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy, size_t wrapperOf
 
         // Also make sure they are not trying to delete our m_tempTuple
         assert(&target != &m_tempTuple);
-
-        // rollback Export
-        if (m_exportEnabled) {
-            m_wrapper->rollbackTo(wrapperOffset);
-        }
 
         // Just like insert, we want to remove this tuple from all of our indexes
         deleteFromAllIndexes(&target);
@@ -774,49 +729,10 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple) {
         m_views[i]->processTupleInsert(m_tmpTarget1);
     }
 
-    // if EL is enabled, append the tuple to the buffer
-    if (m_exportEnabled) {
-        appendToELBuffer(m_tmpTarget1, m_tsSeqNo++,
-                         TupleStreamWrapper::INSERT);
-    }
-
     // Account for non-inlined memory allocated via bulk load or recovery
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
         m_nonInlinedMemorySize += tuple.getNonInlinedMemorySize();
-    }
-}
-
-size_t PersistentTable::appendToELBuffer(TableTuple &tuple, int64_t seqNo,
-                                         TupleStreamWrapper::Type type) {
-
-    return m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                  m_executorContext->currentTxnId(),
-                                  seqNo,
-                                  m_executorContext->currentTxnTimestamp(),
-                                  tuple, type);
-}
-
-/**
- * Flush tuple stream wrappers. A negative time instructs an
- * immediate flush.
- */
-void PersistentTable::flushOldTuples(int64_t timeInMillis)
-{
-    if (m_exportEnabled && m_wrapper) {
-        m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastTickTime,
-                                 m_executorContext->m_lastCommittedTxnId,
-                                 m_executorContext->currentTxnId());
-    }
-}
-
-/**
- * Inform the tuple stream wrapper of the table's delegate id
- */
-void PersistentTable::setDelegateId(int64_t delegateId) {
-    if (m_exportEnabled && m_wrapper) {
-        m_wrapper->setDelegateId(delegateId);
     }
 }
 

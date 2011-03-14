@@ -23,7 +23,7 @@ namespace voltdb {
  * Undo whatever this undo action was created to undo
  */
 void PersistentTableUndoInsertAction::undo() {
-    m_table->deleteTupleForUndo(m_tuple, m_wrapperOffset);
+    m_table->deleteTupleForUndo(m_tuple);
 }
 
 /*

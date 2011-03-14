@@ -122,12 +122,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadCatalog(final String serializedCatalog) throws EEException {
+    public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException {
         // TODO Auto-generated method stub
     }
 
     @Override
-    public void updateCatalog(final String catalogDiffs, int catalogVersion) throws EEException {
+    public void updateCatalog(final long txnId, final String catalogDiffs, int catalogVersion) throws EEException {
         // TODO Auto-generated method stub
     }
 
@@ -199,7 +199,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public ExportProtoMessage exportAction(boolean syncAction,
-            long ackOffset, long seqNo, int partitionId, long mTableId) {
+            long ackOffset, long seqNo, int partitionId, String mTableSignature) {
         // TODO Auto-generated method stub
         return null;
     }

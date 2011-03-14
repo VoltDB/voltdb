@@ -70,11 +70,9 @@ class ExecutorContext {
     }
 
     // data available via tick()
-    void setupForTick(int64_t lastCommittedTxnId,
-                      int64_t lastTickTime)
+    void setupForTick(int64_t lastCommittedTxnId)
     {
         m_lastCommittedTxnId = lastCommittedTxnId;
-        m_lastTickTime = lastTickTime;
     }
 
     // data available via quiesce()
@@ -110,11 +108,6 @@ class ExecutorContext {
         return m_lastCommittedTxnId;
     }
 
-    /** Time of the last tick() invocation. */
-    int64_t lastTickTime() {
-        return m_lastTickTime;
-    }
-
     static ExecutorContext* getExecutorContext();
 
   private:
@@ -124,7 +117,6 @@ class ExecutorContext {
 
   public:
     int64_t m_lastCommittedTxnId;
-    int64_t m_lastTickTime;
     CatalogId m_siteId;
     CatalogId m_partitionId;
     std::string m_hostname;

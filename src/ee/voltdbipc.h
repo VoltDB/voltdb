@@ -81,8 +81,8 @@ public:
      */
     void terminate();
 
-    int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId);
-    void pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock *block, bool sync);
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
+    void pushExportBuffer(int64_t exportGeneration, int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, bool endOfStream);
 private:
     voltdb::VoltDBEngine *m_engine;
     long int m_counter;

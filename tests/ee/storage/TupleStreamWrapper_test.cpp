@@ -70,7 +70,7 @@ public:
     void crashVoltDB(voltdb::FatalException e) {
     }
 
-    int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) {
         int64_t bytes = 0;
         for (int ii = 0; ii < blocks.size(); ii++) {
             bytes += blocks[ii]->rawLength();
@@ -78,19 +78,19 @@ public:
         return bytes;
     }
 
-    virtual void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block, bool sync) {
+    virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream) {
         if (sync) {
             return;
         }
         partitionIds.push(partitionId);
-        delegateIds.push(delegateId);
+        signatures.push(signature);
         blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(shared_ptr<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
 
     queue<int32_t> partitionIds;
-    queue<int64_t> delegateIds;
+    queue<std::string> signatures;
     deque<shared_ptr<StreamBlock> > blocks;
     vector<shared_ptr<char> > data;
     bool receivedExportBuffer;
@@ -119,7 +119,7 @@ public:
                                          true);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new TupleStreamWrapper(1, 1, 1);
+        m_wrapper = new TupleStreamWrapper(1, 1);
 
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);
@@ -225,7 +225,7 @@ TEST_F(TupleStreamWrapperTest, DoOneTuple)
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
-    m_wrapper->periodicFlush(-1, 0, 2, 2);
+    m_wrapper->periodicFlush(-1, 2, 2);
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -248,13 +248,13 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 0, 9, 10);
+    m_wrapper->periodicFlush(-1, 9, 10);
 
     for (int i = 10; i < 20; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 0, 19, 19);
+    m_wrapper->periodicFlush(-1, 19, 19);
 
     EXPECT_EQ( 1786, m_wrapper->allocatedByteCount());
 
@@ -286,13 +286,13 @@ TEST_F(TupleStreamWrapperTest, FarFutureFlush)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 0, 99, 100);
+    m_wrapper->periodicFlush(-1, 99, 100);
 
     for (int i = 100; i < 110; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 0, 130, 131);
+    m_wrapper->periodicFlush(-1, 130, 131);
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -391,7 +391,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndFlush) {
     ASSERT_FALSE(m_topend.receivedExportBuffer);
 
     // Now, flush the buffer with the tick
-    m_wrapper->periodicFlush(-1, 0, 1, 1);
+    m_wrapper->periodicFlush(-1, 1, 1);
 
     // should be able to get 2 buffers, one full and one with one tuple
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -431,7 +431,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
     m_wrapper->rollbackTo(mark);
 
     // so flush and make sure we got something sane
-    m_wrapper->periodicFlush(-1, 0, 1, 2);
+    m_wrapper->periodicFlush(-1, 1, 2);
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
@@ -469,7 +469,7 @@ TEST_F(TupleStreamWrapperTest, RollbackFirstTuple)
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
-    m_wrapper->periodicFlush(-1, 0, 2, 2);
+    m_wrapper->periodicFlush(-1, 2, 2);
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -497,7 +497,7 @@ TEST_F(TupleStreamWrapperTest, RollbackMiddleTuple)
     size_t mark = m_wrapper->bytesUsed();
     appendTuple(10, 11);
     m_wrapper->rollbackTo(mark);
-    m_wrapper->periodicFlush(-1, 0, 10, 11);
+    m_wrapper->periodicFlush(-1, 10, 11);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
@@ -526,7 +526,7 @@ TEST_F(TupleStreamWrapperTest, RollbackWholeBuffer)
         appendTuple(10, 11);
     }
     m_wrapper->rollbackTo(mark);
-    m_wrapper->periodicFlush(-1, 0, 10, 11);
+    m_wrapper->periodicFlush(-1, 10, 11);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();

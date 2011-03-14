@@ -19,6 +19,7 @@ package org.voltdb.export;
 import java.util.ArrayDeque;
 import java.util.Iterator;
 
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.PersistentBinaryDeque;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.VoltFile;
@@ -37,6 +38,9 @@ import java.nio.ByteBuffer;
  *
  */
 public class StreamBlockQueue {
+
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+
     /**
      * Deque containing reference to stream blocks that are in memory. Some of these
      * stream blocks may still be persisted to disk others are stored completely in memory
@@ -73,8 +77,7 @@ public class StreamBlockQueue {
         try {
             cont = m_persistentDeque.poll();
         } catch (IOException e) {
-            //TODO What is the right error handling strategy for these IOExceptions?
-            throw new RuntimeException(e);
+            exportLog.error(e);
         }
 
         if (cont == null) {
@@ -138,7 +141,7 @@ public class StreamBlockQueue {
 
                 StreamBlock block = pollPersistentDeque(false);
                 if (block == null) {
-                    return null;
+                    throw new java.util.NoSuchElementException();
                 } else {
                     m_memoryIterator = m_memoryDeque.iterator();
                     for (int ii = 0; ii < m_memoryDeque.size(); ii++) {
@@ -172,15 +175,16 @@ public class StreamBlockQueue {
         return sb;
     }
 
-    public void pop() {
+    public StreamBlock pop() {
         if (m_memoryDeque.isEmpty()) {
-            if (pollPersistentDeque(true) == null) {
+            StreamBlock sb = pollPersistentDeque(true);
+            if (sb == null) {
                 throw new java.util.NoSuchElementException();
             }
+            return sb;
         } else {
-            m_memoryDeque.pop();
+            return m_memoryDeque.pop();
         }
-
     }
 
     /*
@@ -194,21 +198,11 @@ public class StreamBlockQueue {
             //Don't offer into the memory deque if there is anything waiting to be
             //polled out of the persistent deque. Check the persistent deque
             if (pollPersistentDeque(false) != null) {
-                //Polling the persistent deque cause there to be two blocks in memory
-                if (m_memoryDeque.size() > 1) {
-                    m_persistentDeque.offer(streamBlock.asBufferChain());
-                //Poll persistent deque one more time, if it fails then keep this one in memory
-                } else if (pollPersistentDeque(false) == null) {
-                    m_memoryDeque.offer(streamBlock);
-                } else {
-                //Polling a second time moved a second block in memory from disk, flush this one to disk
-                    m_persistentDeque.offer( streamBlock.asBufferChain());
-                }
+               m_persistentDeque.offer( streamBlock.asBufferChain());
             } else {
             //Persistent deque is empty put this in memory
-                m_memoryDeque.offer(streamBlock);
+               m_memoryDeque.offer(streamBlock);
             }
-
         }
     }
 
@@ -219,20 +213,27 @@ public class StreamBlockQueue {
      * buffers to disk
      */
     public void sync(boolean nofsync) throws IOException {
-        ArrayDeque<BBContainer[]> buffersToPush = new ArrayDeque<BBContainer[]>();
-        Iterator<StreamBlock> iter = m_memoryDeque.descendingIterator();
-        while (iter.hasNext()) {
-            StreamBlock sb = iter.next();
-            if (sb.isPersisted()) {
-                break;
+        if (m_memoryDeque.peek() != null && !m_memoryDeque.peek().isPersisted()) {
+            ArrayDeque<BBContainer[]> buffersToPush = new ArrayDeque<BBContainer[]>();
+            Iterator<StreamBlock> iter = m_memoryDeque.iterator();
+            while (iter.hasNext()) {
+                StreamBlock sb = iter.next();
+                if (sb.isPersisted()) {
+                    exportLog.error("Found a persisted export buffer after a memory buffer." +
+                            " This shouldn't happen. Will make a best effort to return all the data " +
+                            " and not leak memory");
+                    break;
+                }
+
+                buffersToPush.offer( sb.asBufferChain() );
+                iter.remove();
             }
-            buffersToPush.push( sb.asBufferChain() );
-            iter.remove();
+            m_memoryDeque.clear();
+            if (!buffersToPush.isEmpty()) {
+                m_persistentDeque.push(buffersToPush.toArray(new BBContainer[0][0]));
+            }
         }
-        m_memoryDeque.clear();
-        if (!buffersToPush.isEmpty()) {
-            m_persistentDeque.push(buffersToPush.toArray(new BBContainer[0][0]));
-        }
+
         if (!nofsync) {
             m_persistentDeque.sync();
         }
@@ -247,5 +248,19 @@ public class StreamBlockQueue {
             memoryBlockUsage += b.totalUso();
         }
         return memoryBlockUsage + m_persistentDeque.sizeInBytes();
+    }
+
+    public void close() throws IOException {
+        sync(true);
+        m_persistentDeque.close();
+    }
+
+    public void closeAndDelete() throws IOException {
+        m_persistentDeque.closeAndDelete();
+        for (StreamBlock sb : m_memoryDeque) {
+            if (!sb.isPersisted()) {
+                sb.deleteContent();
+            }
+        }
     }
 }

@@ -38,7 +38,7 @@ class TupleStreamWrapper {
 public:
     enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId, int64_t createTime);
+    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId);
 
     ~TupleStreamWrapper() {
         cleanupManagedBuffers();
@@ -57,9 +57,7 @@ public:
      */
     void setDefaultCapacity(size_t capacity);
 
-    void setDelegateId(int64_t delegateId) {
-        m_delegateId = delegateId;
-    }
+    void setSignatureAndGeneration(std::string signature, int64_t generation);
 
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
@@ -74,7 +72,7 @@ public:
 
     int64_t allocatedByteCount() const {
         return (m_pendingBlocks.size() * m_defaultCapacity) +
-                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes( m_partitionId, m_delegateId);
+                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes( m_partitionId, m_signature);
     }
 
     /** truncate stream back to mark */
@@ -82,7 +80,6 @@ public:
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
-                       int64_t lastTickTime,
                        int64_t lastComittedTxnId,
                        int64_t currentTxnId);
 
@@ -132,7 +129,8 @@ public:
     /** current committed uso */
     size_t m_committedUso;
 
-    int64_t m_delegateId;
+    std::string m_signature;
+    int64_t m_generation;
 };
 
 }

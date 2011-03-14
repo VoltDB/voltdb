@@ -32,8 +32,14 @@ public:
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
     void crashVoltDB(FatalException e);
-    int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId);
-    void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block, bool sync);
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
+    void pushExportBuffer(
+            int64_t exportGeneration,
+            int32_t partitionId,
+            std::string signature,
+            StreamBlock *block,
+            bool sync,
+            bool endOfStream);
 
 private:
     JNIEnv *m_jniEnv;

@@ -56,18 +56,18 @@ class MockTopend : public Topend {
     MockTopend() {
     }
 
-    void pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock* block, bool sync) {
+    void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, voltdb::StreamBlock* block, bool sync, bool endOfStream) {
         if (sync) {
             return;
         }
         partitionIds.push(partitionId);
-        delegateIds.push(delegateId);
+        signatures.push(signature);
         blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(shared_ptr<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
 
-    int64_t getQueuedExportBytes(int32_t partitionId, int64_t delegateId) {
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) {
         return 0;
     }
 
@@ -82,7 +82,7 @@ class MockTopend : public Topend {
     }
 
     queue<int32_t> partitionIds;
-    queue<int64_t> delegateIds;
+    queue<std::string> signatures;
     vector<shared_ptr<StreamBlock> > blocks;
     vector<shared_ptr<char> > data;
     bool receivedExportBuffer;

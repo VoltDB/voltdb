@@ -18,6 +18,7 @@
 package org.voltdb.export;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
@@ -56,19 +57,19 @@ public class ExportProtoMessage
      */
     static public class AdvertisedDataSource {
         final private int m_partitionId;
-        final private long m_tableId;
+        final private String m_signature;
         final private String m_tableName;
 
         private ArrayList<String> m_columnNames = new ArrayList<String>();
 
         private ArrayList<VoltType> m_columnTypes = new ArrayList<VoltType>();
 
-        public AdvertisedDataSource(int p_id, long t_id, String t_name,
+        public AdvertisedDataSource(int p_id, String t_signature, String t_name,
                                     ArrayList<String> names,
                                     ArrayList<VoltType> types)
         {
             m_partitionId = p_id;
-            m_tableId = t_id;
+            m_signature = t_signature;
             m_tableName = t_name;
             m_columnNames = names;
             m_columnTypes = types;
@@ -78,8 +79,8 @@ public class ExportProtoMessage
             return m_partitionId;
         }
 
-        public long tableId() {
-            return m_tableId;
+        public String signature() {
+            return m_signature;
         }
 
         public VoltType columnType(int index) {
@@ -103,6 +104,11 @@ public class ExportProtoMessage
         public String tableName() {
             return m_tableName;
         }
+
+        @Override
+        public String toString() {
+            return "Table: " + m_tableName + " partition " + partitionId() + " signature " + signature();
+        }
     }
 
     /**
@@ -116,20 +122,23 @@ public class ExportProtoMessage
     public static ExportProtoMessage readExternal(FastDeserializer fds)
     throws IOException
     {
-        ExportProtoMessage m = new ExportProtoMessage(0, 0);
+        ExportProtoMessage m = new ExportProtoMessage(0, null);
         m.m_version = fds.readShort();
         m.m_type = fds.readShort();
         m.m_partitionId = fds.readInt();
-        m.m_tableId = fds.readLong();
+        m.m_signature = fds.readString();
         m.m_offset = fds.readLong();
         // if no data is remaining, m_data will have 0 capacity.
         m.m_data = fds.remainder();
         return m;
     }
 
-    public ExportProtoMessage(int partitionId, long tableId) {
+    public ExportProtoMessage(int partitionId, String signature) {
         m_partitionId = partitionId;
-        m_tableId = tableId;
+        m_signature = signature;
+        if (m_signature == null) {
+            m_signatureBytes = new byte[0];
+        }
     }
 
     public String messageTypesAsString() {
@@ -151,23 +160,39 @@ public class ExportProtoMessage
         return fs.getBuffer();
     }
 
+    private byte m_signatureBytes[] = null;
+
     /**
      * Total bytes that would be used if serialized in its current state.
-     * Does not include the 4 byte length prefix!
+     * Does not include the 4 byte length prefix or the variable length signature!
      * @return byte count.
      */
     public int serializableBytes() {
-        return FIXED_PAYLOAD_LENGTH + (m_data != null ? m_data.remaining() : 0);
+        if (m_signatureBytes == null) {
+            try {
+                m_signatureBytes = m_signature.getBytes("UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+        }
+        return FIXED_PAYLOAD_LENGTH + (m_data != null ? m_data.remaining() : 0) + m_signatureBytes.length;
     }
 
     public void writeToFastSerializer(FastSerializer fs) throws IOException
     {
+        if (m_signatureBytes == null) {
+            try {
+                m_signatureBytes = m_signature.getBytes("UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+        }
         // write the length first. then the payload.
         fs.writeInt(serializableBytes());
         fs.writeShort(m_version);
         fs.writeShort(m_type);
         fs.writeInt(m_partitionId);
-        fs.writeLong(m_tableId);
+        fs.writeString(m_signature);
         fs.writeLong(m_offset);
         if (m_data != null) {
             fs.write(m_data);
@@ -227,8 +252,8 @@ public class ExportProtoMessage
         return m_partitionId;
     }
 
-    public long getTableId() {
-        return m_tableId;
+    public String getSignature() {
+        return m_signature;
     }
 
     public long getAckOffset() {
@@ -262,14 +287,14 @@ public class ExportProtoMessage
             ArrayList<String> names = new ArrayList<String>();
 
             int p_id = fds.readInt();
-            long t_id = fds.readLong();
+            String t_signature = fds.readString();
             String t_name = fds.readString();
             int colcnt = fds.readInt();
             for (int jj = 0; jj < colcnt; jj++) {
                 names.add(fds.readString());
                 types.add(VoltType.get((byte)fds.readInt()));
             }
-            sources.add(new AdvertisedDataSource(p_id, t_id,
+            sources.add(new AdvertisedDataSource(p_id, t_signature,
                                                 t_name, names, types));
         }
 
@@ -288,7 +313,7 @@ public class ExportProtoMessage
     public String toString() {
         String s = "ExportProtoMessage: type(" + m_type + ") offset(" +
                 m_offset + ") partitionId(" + m_partitionId +
-                ") tableId(" + m_tableId +")" + " serializableBytes(" +
+                ") signature(" + m_signature +")" + " serializableBytes(" +
                 serializableBytes() + ")";
         if (m_data != null) {
             s = s + " payloadBytes(" + m_data.remaining() +")";
@@ -301,7 +326,7 @@ public class ExportProtoMessage
 
     // calculate bytes of fixed payload
     private static int FIXED_PAYLOAD_LENGTH =
-        (Short.SIZE/8 * 2) + Integer.SIZE/8 + (Long.SIZE/8 * 2);
+        (Short.SIZE/8 * 2) + (Integer.SIZE/8 * 2) + (Long.SIZE/8);
 
     // message version. Currently all messages are version 1.
     short m_version = 1;
@@ -313,7 +338,7 @@ public class ExportProtoMessage
     int m_partitionId = -1;
 
     // the table id for this ack or poll
-    long m_tableId = -1;
+    String m_signature = null;
 
     // if kAck, the offset being acked.
     // if kPollResponse, the offset of the last byte returned.

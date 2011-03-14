@@ -238,11 +238,6 @@ VoltDBEngine::~VoltDBEngine() {
     }
     m_snapshottingTables.clear();
 
-    BOOST_FOREACH (TIDPair tidPair, m_exportingTables) {
-        tidPair.second->decrementRefcount();
-    }
-    m_exportingTables.clear();
-
     delete m_topend;
     delete m_executorContext;
 }
@@ -521,10 +516,11 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     return true;
 }
 
-bool VoltDBEngine::loadCatalog(const string &catalogPayload) {
+bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload) {
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
     m_catalog->execute(catalogPayload);
+
 
     if (updateCatalogDatabaseReference() == false) {
         return false;
@@ -547,7 +543,7 @@ bool VoltDBEngine::loadCatalog(const string &catalogPayload) {
     }
 
     // load up all the tables, adding all tables
-    if (processCatalogAdditions(true) == false) {
+    if (processCatalogAdditions(true, txnId) == false) {
         return false;
     }
 
@@ -576,7 +572,7 @@ bool VoltDBEngine::loadCatalog(const string &catalogPayload) {
  * deleteChildCommand() interface.
  */
 bool
-VoltDBEngine::processCatalogDeletes()
+VoltDBEngine::processCatalogDeletes(int64_t txnId)
 {
     vector<string> deletions;
     m_catalog->getDeletedPaths(deletions);
@@ -585,6 +581,17 @@ VoltDBEngine::processCatalogDeletes()
     {
         map<string, CatalogDelegate*>::iterator pos;
         if ((pos = m_catalogDelegates.find(*pathIter)) != m_catalogDelegates.end()) {
+            TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
+            /*
+             * Instruct the table to flush all export data
+             * Then tell it about the new export generation/catalog txnid
+             * which will cause it to notify the topend export data source
+             * that no more data is coming for the previous generation
+             */
+            if (tcd && tcd->exportEnabled()) {
+                m_exportingTables.erase(tcd->signature());
+                tcd->getTable()->setSignatureAndGeneration( tcd->signature(), txnId);
+            }
             pos->second->deleteCommand();
             delete pos->second;
             m_catalogDelegates.erase(pos++);
@@ -596,9 +603,11 @@ VoltDBEngine::processCatalogDeletes()
 
 /*
  * Create catalog delegates for new catalog items.
+ * Use the txnId of the catalog update as the generation for export
+ * data
  */
 bool
-VoltDBEngine::processCatalogAdditions(bool addAll)
+VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 {
     // process new tables.
     map<string, catalog::Table*>::const_iterator it = m_database->tables().begin();
@@ -607,7 +616,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll)
         catalog::Table *t = it->second;
         if (addAll || t->wasAdded()) {
             TableCatalogDelegate *tcd =
-                new TableCatalogDelegate(m_catalogVersion, t->relativeIndex(), t->path());
+                new TableCatalogDelegate(m_catalogVersion, t->relativeIndex(), t->path(), t->signature());
             if (tcd->init(m_executorContext, *m_database, *t) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            it->second->name().c_str());
@@ -615,9 +624,23 @@ VoltDBEngine::processCatalogAdditions(bool addAll)
             }
             m_catalogDelegates[tcd->path()] = tcd;
             if (tcd->exportEnabled()) {
-                tcd->getTable()->incrementRefcount();
-                tcd->getTable()->setDelegateId(tcd->delegateId());
-                m_exportingTables[tcd->delegateId()] = tcd->getTable();
+                tcd->getTable()->setSignatureAndGeneration(t->signature(), txnId);
+                m_exportingTables[t->signature()] = tcd->getTable();
+            }
+        } else {
+            /*
+             * Instruct the table that was not added but is being retained to flush
+             * Then tell it about the new export generation/catalog txnid
+             * which will cause it to notify the topend export data source
+             * that no more data is coming for the previous generation
+             */
+            map<string, CatalogDelegate*>::iterator pos;
+            if ((pos = m_catalogDelegates.find(t->path())) != m_catalogDelegates.end()) {
+                TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
+                if (tcd && tcd->exportEnabled()) {
+                    Table *table = tcd->getTable();
+                    table->setSignatureAndGeneration( t->signature(), txnId);
+                }
             }
         }
         ++it;
@@ -633,7 +656,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll)
  * delete or modify the corresponding exectution engine objects.
  */
 bool
-VoltDBEngine::updateCatalog(const string &catalogPayload, int catalogVersion)
+VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload, int catalogVersion)
 {
     assert(m_catalog != NULL); // the engine must be initialized
     assert((m_catalogVersion + 1) == catalogVersion);
@@ -650,12 +673,12 @@ VoltDBEngine::updateCatalog(const string &catalogPayload, int catalogVersion)
         return false;
     }
 
-    if (processCatalogDeletes() == false) {
+    if (processCatalogDeletes(txnId) == false) {
         VOLT_ERROR("Error processing catalog deletions.");
         return false;
     }
 
-    if (processCatalogAdditions(false) == false) {
+    if (processCatalogAdditions(false, txnId) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
@@ -1010,8 +1033,8 @@ bool VoltDBEngine::isLocalSite(const NValue& value)
 
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
-    m_executorContext->setupForTick(lastCommittedTxnId, timeInMillis);
-    typedef pair<int64_t, Table*> TablePair;
+    m_executorContext->setupForTick(lastCommittedTxnId);
+    typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }
@@ -1020,7 +1043,7 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
 /** For now, bring the Export system to a steady state with no buffers with content */
 void VoltDBEngine::quiesce(int64_t lastCommittedTxnId) {
     m_executorContext->setupForQuiesce(lastCommittedTxnId);
-    typedef pair<int64_t, Table*> TablePair;
+    typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
     }
@@ -1271,9 +1294,9 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 }
 
 int64_t
-VoltDBEngine::exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, int64_t tableId)
+VoltDBEngine::exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, std::string tableSignature)
 {
-    map<int64_t, Table*>::iterator pos = m_exportingTables.find(tableId);
+    map<string, Table*>::iterator pos = m_exportingTables.find(tableSignature);
 
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {

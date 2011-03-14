@@ -31,7 +31,7 @@ import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 
 public class TestExportDataSink extends TestCase {
 
-    static final int TABLE_ID = 1;
+    static final String TABLE_SIGNATURE = "foo";
     static final int PARTITION_ID = 2;
 
     class TestExportDecoder extends ExportDecoderBase
@@ -59,9 +59,9 @@ public class TestExportDataSink extends TestCase {
     {
         String CONN_NAME = "ryanlovestheyankees";
         ExportDataSink dut =
-            new ExportDataSink(PARTITION_ID, TABLE_ID, "coffeetable",
+            new ExportDataSink(PARTITION_ID, TABLE_SIGNATURE, "coffeetable",
                            new TestExportDecoder(new AdvertisedDataSource(PARTITION_ID,
-                                                                          TABLE_ID,
+                                                                          TABLE_SIGNATURE,
                                                                           "coffeetable",
                                                                           null, null)));
         dut.addExportConnection(CONN_NAME);
@@ -72,7 +72,7 @@ public class TestExportDataSink extends TestCase {
         assertTrue(m.isPoll());
         assertFalse(m.isAck());
         // move the offset along a bit
-        m = new ExportProtoMessage(PARTITION_ID, TABLE_ID);
+        m = new ExportProtoMessage(PARTITION_ID, TABLE_SIGNATURE);
         m.pollResponse(0, makeFakePollData(10));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
@@ -81,7 +81,7 @@ public class TestExportDataSink extends TestCase {
         assertTrue(m.isPoll());
         assertTrue(m.isAck());
         assertEquals(0, m.getAckOffset());
-        m = new ExportProtoMessage(PARTITION_ID, TABLE_ID);
+        m = new ExportProtoMessage(PARTITION_ID, TABLE_SIGNATURE);
         m.pollResponse(10, makeFakePollData(20));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
@@ -91,7 +91,7 @@ public class TestExportDataSink extends TestCase {
         assertTrue(m.isAck());
         assertEquals(10, m.getAckOffset());
         // stall the poll and verify the incoming message is just a poll
-        m = new ExportProtoMessage(PARTITION_ID, TABLE_ID);
+        m = new ExportProtoMessage(PARTITION_ID, TABLE_SIGNATURE);
         m.pollResponse(20, makeFakePollData(0));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();

@@ -42,15 +42,15 @@ public abstract class ExportClientBase {
     private final List<InetSocketAddress> m_servers;
     protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections;
 
-    // First hash by table, second by partition
-    private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
+    // First hash by table signature, second by partition
+    private final HashMap<String, HashMap<Integer, ExportDataSink>> m_sinks;
 
     // credentials
     private String m_username = "", m_password = "";
 
     public ExportClientBase()
     {
-        m_sinks = new HashMap<Long, HashMap<Integer, ExportDataSink>>();
+        m_sinks = new HashMap<String, HashMap<Integer, ExportDataSink>>();
         m_exportConnections = new HashMap<InetSocketAddress, ExportConnection>();
         m_servers = new ArrayList<InetSocketAddress>();
     }
@@ -76,30 +76,33 @@ public abstract class ExportClientBase {
     public abstract ExportDecoderBase constructExportDecoder(AdvertisedDataSource source);
 
     private void constructExportDataSinks(ExportConnection elConnection) {
+        m_logger.info("Num data sources is " + elConnection.dataSources.size());
+        m_logger.info("Processing data sources for connection " + elConnection);
         for (AdvertisedDataSource source : elConnection.dataSources) {
             // Construct the app-specific decoder supplied by subclass
             // and build an ExportDataSink for this data source
-            m_logger.info("Creating decoder for table: " + source.tableName() +
-                          ", part ID: " + source.partitionId());
             // Put the ExportDataSink in our hashed collection if it doesn't exist
             ExportDataSink sink = null;
-            long table_id = source.tableId();
+            String table_signature = source.signature();
             int part_id = source.partitionId();
             HashMap<Integer, ExportDataSink> part_map =
-                m_sinks.get(table_id);
+                m_sinks.get(table_signature);
             if (part_map == null) {
                 part_map = new HashMap<Integer, ExportDataSink>();
-                m_sinks.put(table_id, part_map);
+                m_sinks.put(table_signature, part_map);
             }
             if (!part_map.containsKey(part_id)) {
+                m_logger.info("Creating decoder for table: " + source.tableName() +
+                        ", table ID, " + source.signature() + " part ID: " + source.partitionId());
                 ExportDecoderBase decoder = constructExportDecoder(source);
                 sink = new ExportDataSink(source.partitionId(),
-                                      source.tableId(),
+                                      source.signature(),
                                       source.tableName(),
                                       decoder);
                 part_map.put(part_id, sink);
             }
             sink = part_map.get(part_id);
+            m_logger.info("Providing connection " + elConnection.name + " for table id " + source.signature() + " to sink " + sink);
             // and plug the ExportConnection into the ExportDataSink
             sink.addExportConnection(elConnection.name);
         }
@@ -132,6 +135,11 @@ public abstract class ExportClientBase {
     public void disconnect() {
         for (ExportConnection connection : m_exportConnections.values()) {
             connection.closeExportConnection();
+        }
+        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values()) {
+            for (ExportDataSink sink : part_map.values()) {
+                sink.connectionClosed();
+            }
         }
         m_exportConnections.clear();
         m_connected.set(false);

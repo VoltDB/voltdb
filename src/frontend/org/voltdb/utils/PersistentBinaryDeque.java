@@ -26,6 +26,7 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -249,6 +250,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 public void finalize() {
                     if (!discarded) {
                         exportLog.error(m_file + " had a buffer that was finalized without being discarded");
+                        assert(false);
                         discard();
                     }
                 }
@@ -382,7 +384,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
             needed +=  b.b.remaining();
         }
 
-        assert(needed < DequeSegment.m_chunkSize);
+        if (needed > DequeSegment.m_chunkSize - 4) {
+            throw new IOException("Maxiumum object size is " + (DequeSegment.m_chunkSize - 4));
+        }
 
         if (m_writeSegment.remaining() < needed) {
             openNewWriteSegment();
@@ -412,11 +416,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
 
             if (available - needed < 0) {
-                assert(needed < DequeSegment.m_chunkSize - 4);
+                if (needed > DequeSegment.m_chunkSize - 4) {
+                    throw new IOException("Maximum object size is " + (DequeSegment.m_chunkSize - 4));
+                }
                 segments.offer( currentSegment );
                 currentSegment = new ArrayDeque<BBContainer[]>();
                 available = DequeSegment.m_chunkSize - 4;
             }
+            available -= needed;
             currentSegment.add(object);
         }
 
@@ -503,7 +510,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (m_writeSegment == null) {
             throw new IOException("Closed");
         }
-        m_finishedSegments.put(m_writeSegment.m_index, m_writeSegment);
+        if (m_writeSegment.getNumEntries() > 0) {
+            m_finishedSegments.put(m_writeSegment.m_index, m_writeSegment);
+        } else {
+            m_writeSegment.closeAndDelete();
+        }
         m_writeSegment = null;
         for (DequeSegment segment : m_finishedSegments.values()) {
             segment.close();
@@ -530,5 +541,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     public long sizeInBytes() {
         return m_sizeInBytes.get();
+    }
+
+    @Override
+    public synchronized void closeAndDelete() throws IOException {
+        m_writeSegment.closeAndDelete();
+        for (DequeSegment ds : m_finishedSegments.values()) {
+            ds.closeAndDelete();
+        }
     }
 }

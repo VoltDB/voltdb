@@ -19,7 +19,6 @@ package org.voltdb.export.processors;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
@@ -46,13 +45,13 @@ import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.NotImplementedException;
-
+import org.voltdb.export.ExportGeneration;
 
 /**
  * A processor that provides a data block queue over a socket to
  * a remote listener without any translation of data.
  */
-public class RawProcessor extends Thread implements ExportDataProcessor {
+public class RawProcessor implements ExportDataProcessor {
 
     // polling protocol states
     public final static int CONNECTED = 1;
@@ -71,14 +70,7 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
     private final LinkedBlockingDeque<ExportInternalMessage> m_mailbox =
         new LinkedBlockingDeque<ExportInternalMessage>();
 
-    /**
-     * Data sources, one per table per site, provide the interface to
-     * poll() and ack() Export data from the execution engines. Data sources
-     * are configured by the Export manager at initialization time.
-     * partitionid : <tableid : datasource>.
-     */
-    HashMap<Integer, HashMap<Long, ExportDataSource>> m_sources =
-        new HashMap<Integer, HashMap<Long, ExportDataSource>>();
+    private ExportGeneration m_generation = null;
 
     ArrayList<ExportDataSource> m_sourcesArray =
         new ArrayList<ExportDataSource>();
@@ -93,11 +85,37 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
 
     /**
-     * Set of accepted client connections. MUST synchronize on m_connections
-     * to read or modify this collection. This data member is accessed concurrently
-     * by AcceptorThread and the processor thread.
+     * Cheesy mechanism to send exactly one error message to
+     * cause the client to reconnect.
      */
-    final ArrayDeque<Connection> m_connections = new ArrayDeque<Connection>();
+    private boolean m_shouldErrorClientOnceToForceReconnect = false;
+
+    private Connection m_currentConnection = null;
+
+    // this run loop can almost be eliminated.  the InputHandler can
+    // call the sb.event() function directly. event() never blocks.
+    // just need a way for execution sites to respond with poll
+    // responses. Would be really great if we had an interface to
+    // schedule a non-network event against an input handler.
+    private final Runnable m_runLoop = new Runnable() {
+        @Override
+        public void run() {
+            ExportInternalMessage p;
+            while (m_shouldContinue.get() == true) {
+                try {
+                    p = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);
+                    if (p != null) {
+                        p.m_sb.event(p.m_m);
+                    }
+                }
+                catch (InterruptedException e) {
+                    // acceptable. just re-loop.
+                }
+            }
+        }
+    };
+
+    private Thread m_thread = null;
 
     /**
      * State for an individual Export protocol connection. This could probably be
@@ -120,7 +138,7 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
             m_state = RawProcessor.CLOSED;
             for (ExportDataSource ds : m_sourcesArray) {
                 ExportProtoMessage m =
-                    new ExportProtoMessage(ds.getPartitionId(), ds.getTableId()).close();
+                    new ExportProtoMessage(ds.getPartitionId(), ds.getSignature()).close();
                 try {
                     ds.exportAction(new ExportInternalMessage(this, m));
                 } catch (Exception e) {
@@ -141,10 +159,9 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
             if (m_logger != null) {
                 m_logger.error("Closing Export connection with error: " + string);
             }
-            closeConnection();
 
             final ExportProtoMessage r =
-                new ExportProtoMessage(m.getPartitionId(), m.getTableId());
+                new ExportProtoMessage(m.getPartitionId(), m.getSignature());
             r.error();
 
             m_c.writeStream().enqueue(
@@ -160,6 +177,7 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
                     public void cancel() {
                     }
                 });
+            closeConnection();
         }
 
         void event(final ExportProtoMessage m)
@@ -178,6 +196,8 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
             {
                 protocolError(m, "Server currently unavailable for export connections on this port");
                 return;
+            } else if (m_shouldErrorClientOnceToForceReconnect) {
+                protocolError(m, "Reconnect to receive new ads");
             }
 
             else if (m.isOpen()) {
@@ -233,7 +253,7 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
                     return;
                 }
 
-                final ExportProtoMessage r = new ExportProtoMessage(-1, -1);
+                final ExportProtoMessage r = new ExportProtoMessage(-1, "");
                 r.openResponse(fs.getBuffer());
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
@@ -257,11 +277,11 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
                     return;
                 }
                 ExportDataSource source =
-                    RawProcessor.this.getDataSourceFor(m.getPartitionId(), m.getTableId());
+                    RawProcessor.this.getDataSourceFor(m.getPartitionId(), m.getSignature());
                 if (source == null) {
                     protocolError(m, "No Export data source exists for partition(" +
                                   m.getPartitionId() + ") and table(" +
-                                  m.getTableId() + ") pair.");
+                                  m.getSignature() + ") pair.");
                     return;
                 }
                 try {
@@ -355,6 +375,7 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
          */
         @Override
         public void starting(Connection c) {
+            m_currentConnection = c;
             m_sb = new ProtoStateBlock(c, m_isAdminPort);
         }
 
@@ -363,6 +384,7 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
          */
         @Override
         public void stopping(Connection c) {
+            m_currentConnection = null;
             m_sb.closeConnection();
         }
 
@@ -424,35 +446,20 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
         m_logger = null;
     }
 
-    ExportDataSource getDataSourceFor(int partitionId, long tableId) {
-        HashMap<Long, ExportDataSource> partmap = m_sources.get(partitionId);
+    ExportDataSource getDataSourceFor(int partitionId, String signature) {
+        HashMap<String, ExportDataSource> partmap = m_generation.m_dataSourcesByPartition.get(partitionId);
         if (partmap == null) {
             return null;
         }
-        ExportDataSource source = partmap.get(tableId);
+        ExportDataSource source = partmap.get(signature);
         return source;
-    }
-
-
-    @Override
-    public void addDataSource(ExportDataSource dataSource) {
-        int partid = dataSource.getPartitionId();
-        long tableid = dataSource.getTableId();
-
-        m_sourcesArray.add(dataSource);
-        HashMap<Long, ExportDataSource> partmap = m_sources.get(partid);
-        if (partmap == null) {
-            partmap = new HashMap<Long, ExportDataSource>();
-            m_sources.put(partid, partmap);
-        }
-        assert(partmap.get(tableid) == null);
-        partmap.put(tableid, dataSource);
     }
 
     @Override
     public void readyForData() {
+        m_thread = new Thread(m_runLoop, "Raw export processor");
+        m_thread.start();
         m_logger.info("Processor ready for data.");
-        this.start();
     }
 
     @Override
@@ -463,27 +470,6 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
     @Override
     public void queueMessage(ExportInternalMessage m) {
         m_mailbox.add(m);
-    }
-
-    // this run loop can almost be eliminated.  the InputHandler can
-    // call the sb.event() function directly. event() never blocks.
-    // just need a way for execution sites to respond with poll
-    // responses. Would be really great if we had an interface to
-    // schedule a non-network event against an input handler.
-    @Override
-    public void run() {
-        ExportInternalMessage p;
-        while (m_shouldContinue.get() == true) {
-            try {
-                p = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);
-                if (p != null) {
-                    p.m_sb.event(p.m_m);
-                }
-            }
-            catch (InterruptedException e) {
-                // acceptable. just re-loop.
-            }
-        }
     }
 
     @Override
@@ -497,12 +483,25 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
 
     @Override
     public void shutdown() {
-        m_shouldContinue.set(false);
-        this.interrupt();
-        try {
-            this.join();
+        if (m_thread != null) {
+            m_shouldContinue.set(false);
+            //Don't interrupt me while I'm talking
+            if (m_thread != Thread.currentThread()) {
+                m_thread.interrupt();
+                try {
+                    m_thread.join();
+                }
+                catch (InterruptedException e) {
+                    m_logger.error("Interruption not expected", e);
+                }
+            }
+            m_generation = null;
+            m_shouldContinue.set(true);
+            m_thread = null;
         }
-        catch (InterruptedException e) {
+        if (m_currentConnection != null) {
+            m_currentConnection.unregister();
+            m_currentConnection = null;
         }
     }
 
@@ -514,4 +513,13 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
         return false;
     }
 
+    @Override
+    public void setExportGeneration(ExportGeneration generation) {
+        m_generation = generation;
+        for (HashMap<String, ExportDataSource> sources : generation.m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : sources.values()) {
+                m_sourcesArray.add(source);
+            }
+        }
+    }
 }

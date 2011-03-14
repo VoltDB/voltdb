@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -262,16 +263,26 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                     " for table " + m_tables.get(tableId).m_name);
         } else if (type == RecoveryMessageType.Complete) {
             message.position(messageTypeOffset + 5);
-            long seqNo = message.getLong();
-            long bytesUsed = message.getLong();
-            assert(seqNo >= -1);
+
+//            long seqNo = message.getLong();
+//            long bytesUsed = message.getLong();
+//            int signatureLength = message.getInt();
+//            assert(signatureLength > 0);
+//            byte signatureBytes[] = new byte[signatureLength];
+//            String signature;
+//            try {
+//                signature = new String(signatureBytes, "UTF-8");
+//            } catch (UnsupportedEncodingException e) {
+//                throw new RuntimeException(e);
+//            }
+//            assert(seqNo >= -1);
             RecoveryTable table = m_tables.remove(tableId);
             recoveryLog.info("Received completion message at site " + m_siteId +
-                    " for table " + table.m_name + " with export info (" + seqNo +
-                    "," + bytesUsed + ")");
-            if (seqNo >= 0) {
-                m_engine.exportAction( true, bytesUsed, seqNo, m_partitionId, tableId);
-            }
+                    " for table " + table.m_name );//+ " with export info (" + seqNo +
+//                    "," + bytesUsed + ")");
+//            if (seqNo >= 0) {
+//                m_engine.exportAction( true, bytesUsed, seqNo, m_partitionId, signature);
+//            }
 
         } else {
             recoveryLog.fatal("Received an unexpect message of type " + type);

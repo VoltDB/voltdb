@@ -28,33 +28,51 @@ import java.util.HashMap;
 
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportConnection;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.logging.VoltLogger;
 
 public class ExportTestClient extends ExportClientBase
 {
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
     // hash table name + partition to verifier
     private final HashMap<String, ExportTestVerifier> m_verifiers =
         new HashMap<String, ExportTestVerifier>();
+
+    private HashMap<String, ExportTestVerifier> m_verifiersToReserve = new HashMap<String, ExportTestVerifier>();
 
     public ExportTestClient(int nodeCount)
     {
         super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
     }
 
+    /*
+     * The export client base is going to reconnect. Reserve it the old verifiers
+     * that have the test data.
+     */
+    public void reserveVerifiers() {
+        m_verifiersToReserve = new HashMap<String, ExportTestVerifier>(m_verifiers);
+    }
+
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
     {
+        String key = source.tableName() + source.partitionId();
+        if (m_verifiersToReserve.containsKey(key)) {
+            return m_verifiersToReserve.remove(key);
+        }
+
         // create a verifier with the 'schema'
         ExportTestVerifier verifier = new ExportTestVerifier(source);
         // hash it by table name + partition ID
-        System.out.println("Creating verifier for table: " + source.tableName() +
+        m_logger.info("Creating verifier for table: " + source.tableName() +
                            ", part ID: " + source.partitionId());
-        if (!m_verifiers.containsKey(source.tableName() + source.partitionId()))
+        if (!m_verifiers.containsKey(key))
         {
-            m_verifiers.put(source.tableName() + source.partitionId(),
+            m_verifiers.put(key,
                             verifier);
         }
         return verifier;
@@ -110,18 +128,18 @@ public class ExportTestClient extends ExportClientBase
     {
         boolean retval = true;
 
-        HashMap<Long, Long> table_offsets = new HashMap<Long, Long>();
+        HashMap<String, HashMap<Integer, Long>> table_offsets = new HashMap<String, HashMap<Integer,Long>>();
 
         // Generate polls for every connection/table/partition
         for (ExportConnection connection : m_exportConnections.values())
         {
-            HashMap<Long, Long> seen_responses = new HashMap<Long, Long>();
+            HashMap<String, HashMap<Integer, Long>> seen_responses = new HashMap<String, HashMap<Integer, Long>>();
             for (AdvertisedDataSource source : connection.dataSources)
             {
                 try
                 {
                     ExportProtoMessage poll = new ExportProtoMessage(source.partitionId(),
-                                                               source.tableId());
+                                                               source.signature());
                     poll.poll();
                     connection.sendMessage(poll);
 
@@ -130,32 +148,44 @@ public class ExportTestClient extends ExportClientBase
                     // We know all possibly outstanding responses will be fully
                     // drained, so just wait until we get any response for
                     // this data source
-                    while (m == null || m.getTableId() != source.tableId() ||
+                    while (m == null || !m.getSignature().equals(source.signature())  ||
                            m.getPartitionId() != source.partitionId())
                     {
                         m = connection.nextMessage();
                     }
                     assert(m.isPollResponse());
                     long offset = m.getAckOffset();
+
                     // Now, see if we've seen this offset for this table.  If so,
                     // check to see that it's equal.  Otherwise, stash it.
-                    Long table_hash = m.getTableId() * 137 + m.getPartitionId();
-                    if (!table_offsets.containsKey(table_hash))
+                    HashMap<Integer, Long> offsets = table_offsets.get(m.m_signature);
+                    if (offsets == null) {
+                        offsets = new HashMap<Integer, Long>();
+                        table_offsets.put(m.m_signature, offsets);
+                    }
+
+                    if (!offsets.containsKey(source.partitionId()))
                     {
-                        table_offsets.put(table_hash, offset);
+                        offsets.put( source.partitionId(), offset);
                     }
                     else
                     {
-                        if (table_offsets.get(table_hash) != offset)
+                        if (offsets.get(source.partitionId()) != offset)
                         {
                             System.out.println("Mismatched Export offset: " + offset);
                             System.out.println("  Table ID: " + source.tableName());
                             System.out.println("  Partition: " + source.partitionId());
-                            System.out.println("  Orig. offset: " + table_offsets.get(table_hash));
+                            System.out.println("  Orig. offset: " + offsets.get(m.m_partitionId));
                             retval = false;
                         }
                     }
-                    if (seen_responses.containsKey(table_hash))
+
+                    HashMap<Integer, Long> responses = seen_responses.get(m.m_signature);
+                    if (responses == null) {
+                        responses = new HashMap<Integer, Long>();
+                        seen_responses.put(m.m_signature, responses);
+                    }
+                    if (responses.containsKey(source.partitionId()))
                     {
                         System.out.println("Saw duplicate response from connection: " +
                                            connection.name);
@@ -165,7 +195,7 @@ public class ExportTestClient extends ExportClientBase
                     }
                     else
                     {
-                        seen_responses.put(table_hash, offset);
+                        responses.put(source.partitionId(), offset);
                     }
                 }
                 catch (IOException e)
@@ -174,10 +204,22 @@ public class ExportTestClient extends ExportClientBase
                     System.exit(1);
                 }
             }
-            if (seen_responses.entrySet().size() != connection.dataSources.size())
+
+            int seenResponseCount = 0;
+            for (HashMap<Integer, Long> responses : seen_responses.values()) {
+                seenResponseCount += responses.size();
+            }
+            org.voltdb.VoltType type = VoltType.BIGINT;
+            switch (type) {
+            case BIGINT:
+                break;
+            }
+            if (seenResponseCount != connection.dataSources.size())
             {
                 System.out.println("Didn't see enough responses from connection: " +
-                                   connection.name);
+                                   connection.name + " saw "
+                                   + seen_responses.entrySet().size() + " but expected "
+                                   + connection.dataSources.size());
                 retval = false;
             }
         }
