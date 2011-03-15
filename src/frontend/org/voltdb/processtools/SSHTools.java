@@ -35,7 +35,11 @@ public class SSHTools {
     }
 
     public SSHTools(String username, String key, String password) {
-        m_username = username;
+        if (username != null && username.isEmpty()) {
+            m_username = null;
+        } else {
+            m_username = username;
+        }
         m_keyFile = key;
         m_password = password;
     }
