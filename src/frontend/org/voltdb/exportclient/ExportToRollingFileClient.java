@@ -242,19 +242,23 @@ public class ExportToRollingFileClient extends ExportClientBase {
 
     private static void printHelpAndQuit(int code) {
         System.out
-                .println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToRollingFileClient --help");
+                .println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToRollingFileClient "
+                        + "--help");
         System.out
                 .println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToRollingFileClient "
-                        + "--servers server1,server2,... --type CSV|TSV "
-                        + "--outdir dir --nonce any_string "
-                        + "--user export_username --password export_password");
+                        + "--servers server1[,server2,...,serverN]"
+                        + "--discard");
         System.out
                 .println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToRollingFileClient "
-                        + "--servers server1,server2,... --type CSV|TSV "
-                        + "--discard"
-                        + "--skipinternals"
-                        + "--user export_username --password export_password"
-                        + "--period rolling_period_in_minutes  --dateformat date_pattern_for_file_name");
+                        + "--servers server1[,server2,...,serverN]"
+                        + "--type (csv|tsv) "
+                        + "--nonce file_prefix "
+                        + "[--period rolling_period_in_minutes]"
+                        + "[--dateformat date_pattern_for_file_name]"
+                        + "[--outdir target_directory] "
+                        + "[--skipinternals] "
+                        + "[--user export_username]"
+                        + "[--password export_password]");
         System.exit(code);
     }
 
@@ -370,20 +374,15 @@ public class ExportToRollingFileClient extends ExportClientBase {
             printHelpAndQuit(-1);
         }
         if (user == null) {
-            System.err.println("ExportToRollingFile: must provide a username");
-            printHelpAndQuit(-1);
+            user = "";
         }
         if (password == null) {
-            System.err.println("ExportToRollingFile: must provide a password");
-            printHelpAndQuit(-1);
-        }
-        if (escaper == null) {
-            System.err.println("ExportToRollingFile: must provide an output type");
-            printHelpAndQuit(-1);
+            password = "";
         }
         if (!discard) {
             if (nonce == null) {
-                System.err.println("ExportToRollingFile: must provide a filename nonce");
+                System.err
+                        .println("ExportToFile: must provide a filename nonce");
                 printHelpAndQuit(-1);
             }
             if (outdir == null) {
@@ -392,6 +391,11 @@ public class ExportToRollingFileClient extends ExportClientBase {
         } else {
             outdir = null;
             nonce = null;
+            escaper = new CSVWriter();
+        }
+        if (escaper == null) {
+            System.err.println("ExportToRollingFile: must provide an output type");
+            printHelpAndQuit(-1);
         }
         ExportToRollingFileClient client = new ExportToRollingFileClient(escaper, nonce, outdir, period, dateformat,
                 firstfield);

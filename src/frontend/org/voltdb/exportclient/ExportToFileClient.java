@@ -206,18 +206,21 @@ public class ExportToFileClient extends ExportClientBase {
 
     private static void printHelpAndQuit(int code) {
         System.out
-                .println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToFileClient --help");
+                .println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToFileClient "
+                        + "--help");
         System.out
                 .println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToFileClient "
-                        + "--servers server1,server2,... --type CSV|TSV "
-                        + "--outdir dir --nonce any_string "
-                        + "--user export_username --password export_password");
+                        + "--servers server1[,server2,...,serverN]"
+                        + "--discard");
         System.out
                 .println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToFileClient "
-                        + "--servers server1,server2,... --type CSV|TSV "
-                        + "--discard"
-                        + "--skipinternals"
-                        + "--user export_username --password export_password");
+                        + "--servers server1[,server2,...,serverN]"
+                        + "--type (csv|tsv) "
+                        + "--nonce file_prefix "
+                        + "[--outdir target_directory] "
+                        + "[--skipinternals] "
+                        + "[--user export_username]"
+                        + "[--password export_password]");
         System.exit(code);
     }
 
@@ -329,16 +332,10 @@ public class ExportToFileClient extends ExportClientBase {
             printHelpAndQuit(-1);
         }
         if (user == null) {
-            System.err.println("ExportToFile: must provide a username");
-            printHelpAndQuit(-1);
+            user = "";
         }
         if (password == null) {
-            System.err.println("ExportToFile: must provide a password");
-            printHelpAndQuit(-1);
-        }
-        if (escaper == null) {
-            System.err.println("ExportToFile: must provide an output type");
-            printHelpAndQuit(-1);
+            password = "";
         }
         if (!discard) {
             if (nonce == null) {
@@ -352,6 +349,11 @@ public class ExportToFileClient extends ExportClientBase {
         } else {
             outdir = null;
             nonce = null;
+            escaper = new CSVWriter();
+        }
+        if (escaper == null) {
+            System.err.println("ExportToFile: must provide an output type");
+            printHelpAndQuit(-1);
         }
         ExportToFileClient client = new ExportToFileClient(escaper, nonce,
                 outdir, firstfield);
