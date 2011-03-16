@@ -111,7 +111,6 @@ const int64_t AD_HOC_FRAG_ID = -1;
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentUndoQuantum(NULL),
-      m_catalogVersion(0),
       m_staticParams(MAX_PARAM_COUNT),
       m_currentOutputDepId(-1),
       m_currentInputDepId(-1),
@@ -616,7 +615,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
         catalog::Table *t = it->second;
         if (addAll || t->wasAdded()) {
             TableCatalogDelegate *tcd =
-                new TableCatalogDelegate(m_catalogVersion, t->relativeIndex(), t->path(), t->signature());
+                new TableCatalogDelegate(t->relativeIndex(), t->path(), t->signature());
             if (tcd->init(m_executorContext, *m_database, *t) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            it->second->name().c_str());
@@ -656,17 +655,15 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
  * delete or modify the corresponding exectution engine objects.
  */
 bool
-VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload, int catalogVersion)
+VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
 {
     assert(m_catalog != NULL); // the engine must be initialized
-    assert((m_catalogVersion + 1) == catalogVersion);
 
     VOLT_DEBUG("Updating catalog...");
 
     // apply the diff commands to the existing catalog
     // throws SerializeEEExceptions on error.
     m_catalog->execute(catalogPayload);
-    m_catalogVersion = catalogVersion;
 
     if (updateCatalogDatabaseReference() == false) {
         VOLT_ERROR("Error re-caching catalog references.");

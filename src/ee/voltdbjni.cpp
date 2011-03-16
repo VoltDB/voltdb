@@ -346,7 +346,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jlong txnId, jstring catalog_diffs, jint catalog_version) {
+    jlong engine_ptr, jlong txnId, jstring catalog_diffs) {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -365,7 +365,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->updateCatalog( txnId, str, catalog_version);
+        bool success = engine->updateCatalog( txnId, str);
 
         if (success) {
             VOLT_DEBUG("updateCatalog succeeded");

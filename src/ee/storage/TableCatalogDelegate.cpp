@@ -41,8 +41,8 @@
 using namespace std;
 namespace voltdb {
 
-TableCatalogDelegate::TableCatalogDelegate(int32_t catalogVersion, int32_t catalogId, string path, string signature) :
-    CatalogDelegate(catalogVersion, catalogId, path), m_table(NULL), m_exportEnabled(false),
+TableCatalogDelegate::TableCatalogDelegate(int32_t catalogId, string path, string signature) :
+    CatalogDelegate(catalogId, path), m_table(NULL), m_exportEnabled(false),
     m_signature(signature)
 {
 }

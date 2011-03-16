@@ -386,13 +386,12 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
 
     struct updatecatalog {
         struct ipc_command cmd;
-        int catalogVersion;
         int64_t txnId;
         char data[];
     };
     struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(ntohll(uc->txnId), std::string(uc->data), ntohl(uc->catalogVersion)) == true) {
+        if (m_engine->updateCatalog(ntohll(uc->txnId), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
     } catch (FatalException e) {

@@ -187,12 +187,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * engine's catalog.
      */
     @Override
-    public void updateCatalog(long txnId, final String catalogDiffs, int catalogVersion) throws EEException {
+    public void updateCatalog(long txnId, final String catalogDiffs) throws EEException {
         //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeUpdateCatalog(pointer, txnId, catalogDiffs, catalogVersion);
+            errorCode = nativeUpdateCatalog(pointer, txnId, catalogDiffs);
         }
         checkErrorCode(errorCode);
     }

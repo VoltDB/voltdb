@@ -269,7 +269,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    abstract public void updateCatalog(final long txnId, final String diffCommands, int catalogVersion) throws EEException;
+    abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
 
     /** Run a plan fragment */
     abstract public DependencyPair executePlanFragment(
@@ -463,7 +463,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, long txnId, String diff_commands, int catalogVersion);
+    protected native int nativeUpdateCatalog(long pointer, long txnId, String diff_commands);
 
     /**
      * This method is called to initially load table data.

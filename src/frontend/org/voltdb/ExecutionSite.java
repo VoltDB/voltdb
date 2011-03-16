@@ -862,7 +862,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         ee.quiesce(lastCommittedTxnId);
-        ee.updateCatalog( context.m_transactionId, catalogDiffCommands, m_context.catalogVersion);
+        ee.updateCatalog( context.m_transactionId, catalogDiffCommands);
 
         return true;
     }

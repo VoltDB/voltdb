@@ -115,7 +115,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** Constructor for test code: this does not enable JNI callbacks. */
         VoltDBEngine() :
           m_currentUndoQuantum(NULL),
-          m_catalogVersion(0),
           m_staticParams(MAX_PARAM_COUNT),
           m_currentOutputDepId(-1),
           m_currentInputDepId(-1),
@@ -174,7 +173,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Catalog Functions
         // -------------------------------------------------
         bool loadCatalog(const int64_t txnId, const std::string &catalogPayload);
-        bool updateCatalog(const int64_t txnId, const std::string &catalogPayload, int catalogVersion);
+        bool updateCatalog(const int64_t txnId, const std::string &catalogPayload);
         bool processCatalogAdditions(bool addAll, int64_t txnId);
         bool processCatalogDeletes(int64_t txnId);
         bool rebuildPlanFragmentCollections();
@@ -450,7 +449,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * System Catalog.
          */
         boost::shared_ptr<catalog::Catalog> m_catalog;
-        int m_catalogVersion;
         catalog::Database *m_database;
 
         /** reused parameter container. */

@@ -127,7 +127,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void updateCatalog(final long txnId, final String catalogDiffs, int catalogVersion) throws EEException {
+    public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
         // TODO Auto-generated method stub
     }
 

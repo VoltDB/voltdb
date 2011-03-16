@@ -31,8 +31,7 @@ namespace voltdb {
 
 class CatalogDelegate {
   public:
-    CatalogDelegate(int32_t catalogVersion, int32_t catalogId, std::string path) :
-        m_catalogVersion(catalogVersion), m_catalogId(catalogId), m_path(path) {
+    CatalogDelegate(int32_t catalogId, std::string path) : m_catalogId(catalogId), m_path(path) {
     }
 
     virtual ~CatalogDelegate() {
@@ -42,10 +41,8 @@ class CatalogDelegate {
     /* Deleted from the catalog */
     virtual void deleteCommand() = 0;
 
-    int64_t catalogUpdate(int32_t catalogVersion, int32_t catalogId) {
-        m_catalogVersion = catalogVersion;
+    void catalogUpdate(int32_t catalogId) {
         m_catalogId = catalogId;
-        return delegateId();
     }
 
     /* Read the path */
@@ -53,17 +50,7 @@ class CatalogDelegate {
         return m_path;
     }
 
-    /* Return the global delegate id (catalog version | catalog id) */
-    int64_t delegateId() const {
-        int64_t shiftedVersion = m_catalogVersion;
-        shiftedVersion = shiftedVersion << 32;
-        return (shiftedVersion + m_catalogId);
-    }
-
   private:
-    /* The catalog version when this delegate was created */
-    int32_t m_catalogVersion;
-
     /* The catalog id when this delegate was created */
     int32_t m_catalogId;
 

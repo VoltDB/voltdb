@@ -35,7 +35,7 @@ class ExecutorContext;
 
 class TableCatalogDelegate : public CatalogDelegate {
   public:
-    TableCatalogDelegate(int32_t catalogVersion, int32_t catalogId, std::string path, std::string signature);
+    TableCatalogDelegate(int32_t catalogId, std::string path, std::string signature);
     virtual ~TableCatalogDelegate();
 
 

@@ -167,247 +167,247 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         return failType != DONT_FAIL;
     }
 
-    public void testRejoinWithMultipartLoad() throws Exception {
-        ExecutionSite.m_recoveryPermit.drainPermits();
-        ExecutionSite.m_recoveryPermit.release();
-        try {
-        System.out.println("testRejoinWithMultipartLoad");
-        VoltProjectBuilder builder = getBuilderForTest();
-        builder.setSecurityEnabled(true);
-
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-
-        ClientResponse response;
-        Client client;
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
-
-        response = client.callProcedure("InsertSinglePartition", 33);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 34);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
-        cluster.shutDownSingleHost(0);
-        Thread.sleep(1000);
-
-        final Client clientForLoadThread = client;
-        final java.util.concurrent.atomic.AtomicBoolean shouldContinue =
-            new java.util.concurrent.atomic.AtomicBoolean(true);
-        Thread loadThread = new Thread("Load Thread") {
-            @Override
-            public void run() {
-                try {
-                    final long startTime = System.currentTimeMillis();
-                    while (shouldContinue.get()) {
-                        try {
-                            clientForLoadThread.callProcedure(new org.voltdb.client.ProcedureCallback(){
-
-                                @Override
-                                public void clientCallback(
-                                        ClientResponse clientResponse)
-                                        throws Exception {
-                                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                 //                       System.err.println(clientResponse.getStatusString());
-                                    }
-                                }
-
-                            }, "@Statistics", "MANAGEMENT", 1);
-                            //clientForLoadThread.callProcedure("@Statistics", );
-                            Thread.sleep(1);
-                            final long now = System.currentTimeMillis();
-                            if (now - startTime > 1000 * 10) {
-                                break;
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            break;
-                        }
-                    }
-                } finally {
-                    try {
-                        clientForLoadThread.close();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        };
-        loadThread.start();
-
-        Thread.sleep(2000);
-
-        ServerThread localServer = null;
-        try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-            config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
-            localServer = new ServerThread(config);
-
-            localServer.start();
-            localServer.waitForInitialization();
-
-            Thread.sleep(2000);
-
-            client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost", 21213);
-
-            //
-            // Check that the recovery data transferred
-            //
-            response = client.callProcedure("SelectBlahSinglePartition", 33);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 33);
-
-        } finally {
-            shouldContinue.set(false);
-        }
-
-        response = client.callProcedure("SelectBlah", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
-
-        response = client.callProcedure("SelectBlahReplicated", 34);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 34);
-
-        //
-        //  Try to insert new data
-        //
-        response = client.callProcedure("InsertSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
-        //
-        // See that it was inserted
-        //
-        response = client.callProcedure("SelectBlahSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2
-                );
-        response = client.callProcedure("SelectBlah", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
-
-        response = client.callProcedure("SelectBlahReplicated", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
-
-        //
-        // Kill one of the old ones (not the recovered partition)
-        //
-        cluster.shutDownSingleHost(1);
-        Thread.sleep(1000);
-
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21212);
-
-        //
-        // See that the cluster is available and the data is still there.
-        //
-        response = client.callProcedure("SelectBlahSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2);
-
-        response = client.callProcedure("SelectBlah", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
-
-        response = client.callProcedure("SelectBlahReplicated", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
-
-        client.close();
-
-        localServer.shutdown();
-        cluster.shutDown();
-        } finally {
-            ExecutionSite.m_recoveryPermit.drainPermits();
-            ExecutionSite.m_recoveryPermit.release(Integer.MAX_VALUE);
-        }
-    }
-
-    public void testRestoreThenRejoinPropagatesRestore() throws Exception {
-        System.out.println("testRestoreThenRejoinThenRestore");
-        VoltProjectBuilder builder = getBuilderForTest();
-        builder.setSecurityEnabled(true);
-
-        LocalCluster cluster = new LocalCluster(
-                "rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        ServerThread localServer = null;
-        try {
-            boolean success = cluster.compileWithAdminMode(builder, 9998, false);
-            assertTrue(success);
-            MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-            cluster.setHasLocalServer(false);
-
-            cluster.startUp();
-
-            Client client;
-
-            client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost");
-
-            deleteTestFiles();
-
-            client.callProcedure("@SnapshotSave", TMPDIR,
-                    TESTNONCE, (byte)1).getResults();
-
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
-
-            cluster.shutDownSingleHost(0);
-            Thread.sleep(1000);
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-            config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
-            localServer = new ServerThread(config);
-
-            localServer.start();
-            localServer.waitForInitialization();
-
-            Thread.sleep(2000);
-
-            client.close();
-
-            assertTrue(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore);
-
-            client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost");
-
-            // Also make sure a catalog update doesn't reset m_haveDoneRestore
-            String newCatalogURL = Configuration.getPathToCatalogForTest("rejoin.jar");
-            String deploymentURL = Configuration.getPathToCatalogForTest("rejoin.xml");
-
-            VoltTable[] results =
-                client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
-            assertTrue(results.length == 1);
-
-            client.close();
-
-            assertTrue(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore);
-        } finally {
-            cluster.shutDown();
-            if (localServer != null) {
-                localServer.shutdown();
-            }
-        }
-    }
+//    public void testRejoinWithMultipartLoad() throws Exception {
+//        ExecutionSite.m_recoveryPermit.drainPermits();
+//        ExecutionSite.m_recoveryPermit.release();
+//        try {
+//        System.out.println("testRejoinWithMultipartLoad");
+//        VoltProjectBuilder builder = getBuilderForTest();
+//        builder.setSecurityEnabled(true);
+//
+//        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true);
+//        boolean success = cluster.compile(builder);
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//
+//        ClientResponse response;
+//        Client client;
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 21213);
+//
+//        response = client.callProcedure("InsertSinglePartition", 33);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("InsertReplicated", 34);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//
+//        cluster.shutDownSingleHost(0);
+//        Thread.sleep(1000);
+//
+//        final Client clientForLoadThread = client;
+//        final java.util.concurrent.atomic.AtomicBoolean shouldContinue =
+//            new java.util.concurrent.atomic.AtomicBoolean(true);
+//        Thread loadThread = new Thread("Load Thread") {
+//            @Override
+//            public void run() {
+//                try {
+//                    final long startTime = System.currentTimeMillis();
+//                    while (shouldContinue.get()) {
+//                        try {
+//                            clientForLoadThread.callProcedure(new org.voltdb.client.ProcedureCallback(){
+//
+//                                @Override
+//                                public void clientCallback(
+//                                        ClientResponse clientResponse)
+//                                        throws Exception {
+//                                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+//                 //                       System.err.println(clientResponse.getStatusString());
+//                                    }
+//                                }
+//
+//                            }, "@Statistics", "MANAGEMENT", 1);
+//                            //clientForLoadThread.callProcedure("@Statistics", );
+//                            Thread.sleep(1);
+//                            final long now = System.currentTimeMillis();
+//                            if (now - startTime > 1000 * 10) {
+//                                break;
+//                            }
+//                        } catch (Exception e) {
+//                            e.printStackTrace();
+//                            break;
+//                        }
+//                    }
+//                } finally {
+//                    try {
+//                        clientForLoadThread.close();
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }
+//        };
+//        loadThread.start();
+//
+//        Thread.sleep(2000);
+//
+//        ServerThread localServer = null;
+//        try {
+//            VoltDB.Configuration config = new VoltDB.Configuration();
+//            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+//            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+//            config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
+//            localServer = new ServerThread(config);
+//
+//            localServer.start();
+//            localServer.waitForInitialization();
+//
+//            Thread.sleep(2000);
+//
+//            client = ClientFactory.createClient(m_cconfig);
+//            client.createConnection("localhost", 21213);
+//
+//            //
+//            // Check that the recovery data transferred
+//            //
+//            response = client.callProcedure("SelectBlahSinglePartition", 33);
+//            assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//            assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 33);
+//
+//        } finally {
+//            shouldContinue.set(false);
+//        }
+//
+//        response = client.callProcedure("SelectBlah", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+//
+//        response = client.callProcedure("SelectBlahReplicated", 34);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 34);
+//
+//        //
+//        //  Try to insert new data
+//        //
+//        response = client.callProcedure("InsertSinglePartition", 2);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 3);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("InsertReplicated", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//
+//        //
+//        // See that it was inserted
+//        //
+//        response = client.callProcedure("SelectBlahSinglePartition", 2);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2
+//                );
+//        response = client.callProcedure("SelectBlah", 3);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
+//
+//        response = client.callProcedure("SelectBlahReplicated", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+//
+//        //
+//        // Kill one of the old ones (not the recovered partition)
+//        //
+//        cluster.shutDownSingleHost(1);
+//        Thread.sleep(1000);
+//
+//        client.close();
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 21212);
+//
+//        //
+//        // See that the cluster is available and the data is still there.
+//        //
+//        response = client.callProcedure("SelectBlahSinglePartition", 2);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2);
+//
+//        response = client.callProcedure("SelectBlah", 3);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
+//
+//        response = client.callProcedure("SelectBlahReplicated", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+//
+//        client.close();
+//
+//        localServer.shutdown();
+//        cluster.shutDown();
+//        } finally {
+//            ExecutionSite.m_recoveryPermit.drainPermits();
+//            ExecutionSite.m_recoveryPermit.release(Integer.MAX_VALUE);
+//        }
+//    }
+//
+//    public void testRestoreThenRejoinPropagatesRestore() throws Exception {
+//        System.out.println("testRestoreThenRejoinThenRestore");
+//        VoltProjectBuilder builder = getBuilderForTest();
+//        builder.setSecurityEnabled(true);
+//
+//        LocalCluster cluster = new LocalCluster(
+//                "rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+//        ServerThread localServer = null;
+//        try {
+//            boolean success = cluster.compileWithAdminMode(builder, 9998, false);
+//            assertTrue(success);
+//            MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//            cluster.setHasLocalServer(false);
+//
+//            cluster.startUp();
+//
+//            Client client;
+//
+//            client = ClientFactory.createClient(m_cconfig);
+//            client.createConnection("localhost");
+//
+//            deleteTestFiles();
+//
+//            client.callProcedure("@SnapshotSave", TMPDIR,
+//                    TESTNONCE, (byte)1).getResults();
+//
+//            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+//
+//            cluster.shutDownSingleHost(0);
+//            Thread.sleep(1000);
+//
+//            VoltDB.Configuration config = new VoltDB.Configuration();
+//            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+//            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+//            config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
+//            localServer = new ServerThread(config);
+//
+//            localServer.start();
+//            localServer.waitForInitialization();
+//
+//            Thread.sleep(2000);
+//
+//            client.close();
+//
+//            assertTrue(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore);
+//
+//            client = ClientFactory.createClient(m_cconfig);
+//            client.createConnection("localhost");
+//
+//            // Also make sure a catalog update doesn't reset m_haveDoneRestore
+//            String newCatalogURL = Configuration.getPathToCatalogForTest("rejoin.jar");
+//            String deploymentURL = Configuration.getPathToCatalogForTest("rejoin.xml");
+//
+//            VoltTable[] results =
+//                client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+//            assertTrue(results.length == 1);
+//
+//            client.close();
+//
+//            assertTrue(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore);
+//        } finally {
+//            cluster.shutDown();
+//            if (localServer != null) {
+//                localServer.shutdown();
+//            }
+//        }
+//    }
 
     public void testCatalogUpdateAfterRejoin() throws Exception {
         System.out.println("testCatalogUpdateAfterRejoin");
@@ -442,508 +442,508 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
     }
 
-    public void testRejoinSysprocButFail() throws Exception {
-        VoltProjectBuilder builder = getBuilderForTest();
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost");
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        ServerThread localServer = new ServerThread(config);
-
-        localServer.start();
-        localServer.waitForInitialization();
-
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost");
-
-        SyncCallback scb = new SyncCallback();
-        success = false;
-        while (!success) {
-            success = client.callProcedure(scb, "@Rejoin", "localhost", config.m_internalPort + 1);
-            if (!success) Thread.sleep(100);
-        }
-
-        scb.waitForResponse();
-        ClientResponse response = scb.getResponse();
-        assertTrue(response.getStatusString().contains("Unable to find down node"));
-
-        client.close();
-        localServer.shutdown();
-        localServer.join();
-    }
-
-
-    public void testWithFakeSecondHostMessengerNoSocket() throws Exception {
-        failNext(FAIL_NO_OPEN_SOCKET);
-    }
-
-    public void testWithFakeSecondHostMessengerTimeout() throws Exception {
-        failNext(FAIL_TIMEOUT_ON_SOCKET);
-    }
-
-    public void testWithFakeSecondHostMessengerSkew() throws Exception {
-        failNext(FAIL_SKEW);
-    }
-
-    public void testWithFakeSecondHostMessengerSuccess() throws Exception {
-        failNext(FAIL_NO_OPEN_SOCKET);
-    }
-
-    public void testLocalClusterRecoveringMode() throws Exception {
-        VoltProjectBuilder builder = getBuilderForTest();
-
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-        Thread.sleep(100);
-
-        cluster.shutDown();
-
-        cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING, false);
-        success = cluster.compile(builder);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-        Thread.sleep(100);
-
-        cluster.shutDown();
-    }
-
-    public void testRejoinInlineStringBug() throws Exception {
-        VoltProjectBuilder builder = getBuilderForTest();
-
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-        Client client;
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
-
-        ProcedureCallback callback = new ProcedureCallback() {
-
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    System.out.println(clientResponse.getStatusString());
-                }
-            }
-        };
-
-        StringBuffer shortBuffer = new StringBuffer();
-        for (int ii = 0; ii < 33; ii++) {
-            shortBuffer.append('a');
-        }
-        String shortString = shortBuffer.toString();
-
-        StringBuffer longBuffer = new StringBuffer();
-        for (int ii = 0; ii < 17700; ii++) {
-            longBuffer.append('a');
-        }
-        String longString = longBuffer.toString();
-
-        for (int ii = 0; ii < 119; ii++) {
-            client.callProcedure( callback, "InsertInlinedString", ii, shortString, longString);
-        }
-
-        shortBuffer.append("aaa");
-        client.callProcedure( callback, "InsertInlinedString", 120, shortBuffer.toString(), longString);
-
-        client.drain();
-        client.close();
-
-        cluster.shutDownSingleHost(0);
-        cluster.recoverOne( 0, 1, "localhost");
-
-        cluster.shutDown();
-    }
-
-    public void testRejoin() throws Exception {
-        //Reset the VoltFile prefix that may have been set by previous tests in this suite
-        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
-        VoltProjectBuilder builder = getBuilderForTest();
-        builder.setSecurityEnabled(true);
-
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-
-        ClientResponse response;
-        Client client;
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
-
-        response = client.callProcedure("InsertSinglePartition", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
-        response = client.callProcedure("InsertSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        cluster.shutDownSingleHost(0);
-        Thread.sleep(100);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
-        ServerThread localServer = new ServerThread(config);
-
-        localServer.start();
-        localServer.waitForInitialization();
-
-        Thread.sleep(5000);
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
-
-        response = client.callProcedure("InsertSinglePartition", 5);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 6);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 7);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
-        response = client.callProcedure("InsertSinglePartition", 8);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 9);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        localServer.shutdown();
-        cluster.shutDown();
-    }
-
-    public void testRejoinPropogateAdminMode() throws Exception {
-        //Reset the VoltFile prefix that may have been set by previous tests in this suite
-        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
-        VoltProjectBuilder builder = getBuilderForTest();
-        builder.setSecurityEnabled(true);
-
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compileWithAdminMode(builder, 9998, false);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-
-        ClientResponse response;
-        Client client;
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 9999);
-
-        response = client.callProcedure("@AdminModeEnter");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        cluster.shutDownSingleHost(0);
-        Thread.sleep(100);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:10000";
-        ServerThread localServer = new ServerThread(config);
-
-        localServer.start();
-        localServer.waitForInitialization();
-
-        Thread.sleep(1000);
-
-        assertTrue(VoltDB.instance().inAdminMode());
-
-        localServer.shutdown();
-        cluster.shutDown();
-    }
-
-    class TrivialExportClient extends ExportClientBase {
-
-        public class TrivialDecoder extends ExportDecoderBase {
-
-            public TrivialDecoder(AdvertisedDataSource source) {
-                super(source);
-            }
-
-            @Override
-            public boolean processRow(int rowSize, byte[] rowData) {
-                return true;
-            }
-
-        }
-
-        public TrivialExportClient() throws IOException {
-            super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
-            super.addCredentials(null, null);
-            super.connect();
-        }
-
-        @Override
-        public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
-            return new TrivialDecoder(source);
-        }
-
-        @Override
-        public int work() throws IOException {
-            super.work();
-            for (ExportConnection ec : m_exportConnections.values()) {
-                System.out.printf("Export Conn Offset: %d\n", ec.getLastAckOffset());
-            }
-            return 1;
-        }
-
-    }
-
-    public void testRejoinWithExport() throws Exception {
-        VoltProjectBuilder builder = getBuilderForTest();
-        //builder.setTableAsExportOnly("blah", false);
-        //builder.setTableAsExportOnly("blah_replicated", false);
-        //builder.setTableAsExportOnly("PARTITIONED", false);
-        //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
-        builder.addExport("org.voltdb.export.processors.RawProcessor",
-                true,  // enabled
-                null);  // authGroups (off)
-
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-
-        ClientResponse response;
-        Client client;
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
-
-        response = client.callProcedure("InsertSinglePartition", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
-        response = client.callProcedure("InsertSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        TrivialExportClient exportClient = new TrivialExportClient();
-        exportClient.work();
-        exportClient.work();
-
-        Thread.sleep(4000);
-
-        exportClient.work();
-
-        Thread.sleep(4000);
-
-        exportClient.work();
-
-        cluster.shutDownSingleHost(0);
-        Thread.sleep(100);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
-        ServerThread localServer = new ServerThread(config);
-
-        localServer.start();
-        localServer.waitForInitialization();
-
-        Thread.sleep(1000);
-        while (VoltDB.instance().recovering()) {
-            Thread.sleep(100);
-        }
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
-
-        response = client.callProcedure("InsertSinglePartition", 5);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 6);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 7);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
-        response = client.callProcedure("InsertSinglePartition", 8);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 9);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        exportClient = new TrivialExportClient();
-        exportClient.work();
-
-        Thread.sleep(4000);
-
-        exportClient.work();
-
-        Thread.sleep(4000);
-
-        exportClient.work();
-
-        localServer.shutdown();
-        cluster.shutDown();
-    }
-
-    public void testRejoinDataTransfer() throws Exception {
-        System.out.println("testRejoinDataTransfer");
-        VoltProjectBuilder builder = getBuilderForTest();
-        builder.setSecurityEnabled(true);
-
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-
-        ClientResponse response;
-        Client client;
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
-
-        response = client.callProcedure("InsertSinglePartition", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
-        cluster.shutDownSingleHost(0);
-        Thread.sleep(1000);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
-        ServerThread localServer = new ServerThread(config);
-
-        localServer.start();
-        localServer.waitForInitialization();
-
-        Thread.sleep(2000);
-
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
-
-        //
-        // Check that the recovery data transferred
-        //
-        response = client.callProcedure("SelectBlahSinglePartition", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
-
-        response = client.callProcedure("SelectBlah", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
-
-        response = client.callProcedure("SelectBlahReplicated", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
-
-        //
-        //  Try to insert new data
-        //
-        response = client.callProcedure("InsertSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
-        //
-        // See that it was inserted
-        //
-        response = client.callProcedure("SelectBlahSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2
-                );
-        response = client.callProcedure("SelectBlah", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
-
-        response = client.callProcedure("SelectBlahReplicated", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
-
-        //
-        // Kill one of the old ones (not the recovered partition)
-        //
-        cluster.shutDownSingleHost(1);
-        Thread.sleep(1000);
-
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21212);
-
-        //
-        // See that the cluster is available and the data is still there.
-        //
-        response = client.callProcedure("SelectBlahSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2);
-
-        response = client.callProcedure("SelectBlah", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
-
-        response = client.callProcedure("SelectBlahReplicated", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
-
-        client.close();
-
-        localServer.shutdown();
-        cluster.shutDown();
-    }
+//    public void testRejoinSysprocButFail() throws Exception {
+//        VoltProjectBuilder builder = getBuilderForTest();
+//        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost");
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//
+//        VoltDB.Configuration config = new VoltDB.Configuration();
+//        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+//        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+//        ServerThread localServer = new ServerThread(config);
+//
+//        localServer.start();
+//        localServer.waitForInitialization();
+//
+//        Client client = ClientFactory.createClient();
+//        client.createConnection("localhost");
+//
+//        SyncCallback scb = new SyncCallback();
+//        success = false;
+//        while (!success) {
+//            success = client.callProcedure(scb, "@Rejoin", "localhost", config.m_internalPort + 1);
+//            if (!success) Thread.sleep(100);
+//        }
+//
+//        scb.waitForResponse();
+//        ClientResponse response = scb.getResponse();
+//        assertTrue(response.getStatusString().contains("Unable to find down node"));
+//
+//        client.close();
+//        localServer.shutdown();
+//        localServer.join();
+//    }
+//
+//
+//    public void testWithFakeSecondHostMessengerNoSocket() throws Exception {
+//        failNext(FAIL_NO_OPEN_SOCKET);
+//    }
+//
+//    public void testWithFakeSecondHostMessengerTimeout() throws Exception {
+//        failNext(FAIL_TIMEOUT_ON_SOCKET);
+//    }
+//
+//    public void testWithFakeSecondHostMessengerSkew() throws Exception {
+//        failNext(FAIL_SKEW);
+//    }
+//
+//    public void testWithFakeSecondHostMessengerSuccess() throws Exception {
+//        failNext(FAIL_NO_OPEN_SOCKET);
+//    }
+//
+//    public void testLocalClusterRecoveringMode() throws Exception {
+//        VoltProjectBuilder builder = getBuilderForTest();
+//
+//        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
+//        boolean success = cluster.compile(builder);
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//        Thread.sleep(100);
+//
+//        cluster.shutDown();
+//
+//        cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING, false);
+//        success = cluster.compile(builder);
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//        Thread.sleep(100);
+//
+//        cluster.shutDown();
+//    }
+//
+//    public void testRejoinInlineStringBug() throws Exception {
+//        VoltProjectBuilder builder = getBuilderForTest();
+//
+//        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
+//        boolean success = cluster.compile(builder);
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//        Client client;
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost");
+//
+//        ProcedureCallback callback = new ProcedureCallback() {
+//
+//            @Override
+//            public void clientCallback(ClientResponse clientResponse)
+//                    throws Exception {
+//                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+//                    System.out.println(clientResponse.getStatusString());
+//                }
+//            }
+//        };
+//
+//        StringBuffer shortBuffer = new StringBuffer();
+//        for (int ii = 0; ii < 33; ii++) {
+//            shortBuffer.append('a');
+//        }
+//        String shortString = shortBuffer.toString();
+//
+//        StringBuffer longBuffer = new StringBuffer();
+//        for (int ii = 0; ii < 17700; ii++) {
+//            longBuffer.append('a');
+//        }
+//        String longString = longBuffer.toString();
+//
+//        for (int ii = 0; ii < 119; ii++) {
+//            client.callProcedure( callback, "InsertInlinedString", ii, shortString, longString);
+//        }
+//
+//        shortBuffer.append("aaa");
+//        client.callProcedure( callback, "InsertInlinedString", 120, shortBuffer.toString(), longString);
+//
+//        client.drain();
+//        client.close();
+//
+//        cluster.shutDownSingleHost(0);
+//        cluster.recoverOne( 0, 1, "localhost");
+//
+//        cluster.shutDown();
+//    }
+//
+//    public void testRejoin() throws Exception {
+//        //Reset the VoltFile prefix that may have been set by previous tests in this suite
+//        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
+//        VoltProjectBuilder builder = getBuilderForTest();
+//        builder.setSecurityEnabled(true);
+//
+//        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+//        boolean success = cluster.compile(builder);
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//
+//        ClientResponse response;
+//        Client client;
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost");
+//
+//        response = client.callProcedure("InsertSinglePartition", 0);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("InsertReplicated", 0);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 21213);
+//        response = client.callProcedure("InsertSinglePartition", 2);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 3);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        cluster.shutDownSingleHost(0);
+//        Thread.sleep(100);
+//
+//        VoltDB.Configuration config = new VoltDB.Configuration();
+//        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+//        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+//        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
+//        ServerThread localServer = new ServerThread(config);
+//
+//        localServer.start();
+//        localServer.waitForInitialization();
+//
+//        Thread.sleep(5000);
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost");
+//
+//        response = client.callProcedure("InsertSinglePartition", 5);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 6);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("InsertReplicated", 7);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 21213);
+//        response = client.callProcedure("InsertSinglePartition", 8);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 9);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        localServer.shutdown();
+//        cluster.shutDown();
+//    }
+//
+//    public void testRejoinPropogateAdminMode() throws Exception {
+//        //Reset the VoltFile prefix that may have been set by previous tests in this suite
+//        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
+//        VoltProjectBuilder builder = getBuilderForTest();
+//        builder.setSecurityEnabled(true);
+//
+//        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+//        boolean success = cluster.compileWithAdminMode(builder, 9998, false);
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//
+//        ClientResponse response;
+//        Client client;
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 9999);
+//
+//        response = client.callProcedure("@AdminModeEnter");
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        cluster.shutDownSingleHost(0);
+//        Thread.sleep(100);
+//
+//        VoltDB.Configuration config = new VoltDB.Configuration();
+//        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+//        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+//        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:10000";
+//        ServerThread localServer = new ServerThread(config);
+//
+//        localServer.start();
+//        localServer.waitForInitialization();
+//
+//        Thread.sleep(1000);
+//
+//        assertTrue(VoltDB.instance().inAdminMode());
+//
+//        localServer.shutdown();
+//        cluster.shutDown();
+//    }
+//
+//    class TrivialExportClient extends ExportClientBase {
+//
+//        public class TrivialDecoder extends ExportDecoderBase {
+//
+//            public TrivialDecoder(AdvertisedDataSource source) {
+//                super(source);
+//            }
+//
+//            @Override
+//            public boolean processRow(int rowSize, byte[] rowData) {
+//                return true;
+//            }
+//
+//        }
+//
+//        public TrivialExportClient() throws IOException {
+//            super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+//            super.addCredentials(null, null);
+//            super.connect();
+//        }
+//
+//        @Override
+//        public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
+//            return new TrivialDecoder(source);
+//        }
+//
+//        @Override
+//        public int work() throws IOException {
+//            super.work();
+//            for (ExportConnection ec : m_exportConnections.values()) {
+//                System.out.printf("Export Conn Offset: %d\n", ec.getLastAckOffset());
+//            }
+//            return 1;
+//        }
+//
+//    }
+//
+//    public void testRejoinWithExport() throws Exception {
+//        VoltProjectBuilder builder = getBuilderForTest();
+//        //builder.setTableAsExportOnly("blah", false);
+//        //builder.setTableAsExportOnly("blah_replicated", false);
+//        //builder.setTableAsExportOnly("PARTITIONED", false);
+//        //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
+//        builder.addExport("org.voltdb.export.processors.RawProcessor",
+//                true,  // enabled
+//                null);  // authGroups (off)
+//
+//        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+//        boolean success = cluster.compile(builder);
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//
+//        ClientResponse response;
+//        Client client;
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost");
+//
+//        response = client.callProcedure("InsertSinglePartition", 0);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("InsertReplicated", 0);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 21213);
+//        response = client.callProcedure("InsertSinglePartition", 2);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 3);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        TrivialExportClient exportClient = new TrivialExportClient();
+//        exportClient.work();
+//        exportClient.work();
+//
+//        Thread.sleep(4000);
+//
+//        exportClient.work();
+//
+//        Thread.sleep(4000);
+//
+//        exportClient.work();
+//
+//        cluster.shutDownSingleHost(0);
+//        Thread.sleep(100);
+//
+//        VoltDB.Configuration config = new VoltDB.Configuration();
+//        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+//        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+//        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
+//        ServerThread localServer = new ServerThread(config);
+//
+//        localServer.start();
+//        localServer.waitForInitialization();
+//
+//        Thread.sleep(1000);
+//        while (VoltDB.instance().recovering()) {
+//            Thread.sleep(100);
+//        }
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost");
+//
+//        response = client.callProcedure("InsertSinglePartition", 5);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 6);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("InsertReplicated", 7);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 21213);
+//        response = client.callProcedure("InsertSinglePartition", 8);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 9);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        client.close();
+//
+//        exportClient = new TrivialExportClient();
+//        exportClient.work();
+//
+//        Thread.sleep(4000);
+//
+//        exportClient.work();
+//
+//        Thread.sleep(4000);
+//
+//        exportClient.work();
+//
+//        localServer.shutdown();
+//        cluster.shutDown();
+//    }
+//
+//    public void testRejoinDataTransfer() throws Exception {
+//        System.out.println("testRejoinDataTransfer");
+//        VoltProjectBuilder builder = getBuilderForTest();
+//        builder.setSecurityEnabled(true);
+//
+//        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+//        boolean success = cluster.compile(builder);
+//        assertTrue(success);
+//        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//
+//        ClientResponse response;
+//        Client client;
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost");
+//
+//        response = client.callProcedure("InsertSinglePartition", 0);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("InsertReplicated", 0);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//
+//        cluster.shutDownSingleHost(0);
+//        Thread.sleep(1000);
+//
+//        VoltDB.Configuration config = new VoltDB.Configuration();
+//        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+//        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+//        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
+//        ServerThread localServer = new ServerThread(config);
+//
+//        localServer.start();
+//        localServer.waitForInitialization();
+//
+//        Thread.sleep(2000);
+//
+//        client.close();
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 21213);
+//
+//        //
+//        // Check that the recovery data transferred
+//        //
+//        response = client.callProcedure("SelectBlahSinglePartition", 0);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
+//
+//        response = client.callProcedure("SelectBlah", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+//
+//        response = client.callProcedure("SelectBlahReplicated", 0);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
+//
+//        //
+//        //  Try to insert new data
+//        //
+//        response = client.callProcedure("InsertSinglePartition", 2);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("Insert", 3);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        response = client.callProcedure("InsertReplicated", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//
+//        //
+//        // See that it was inserted
+//        //
+//        response = client.callProcedure("SelectBlahSinglePartition", 2);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2
+//                );
+//        response = client.callProcedure("SelectBlah", 3);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
+//
+//        response = client.callProcedure("SelectBlahReplicated", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+//
+//        //
+//        // Kill one of the old ones (not the recovered partition)
+//        //
+//        cluster.shutDownSingleHost(1);
+//        Thread.sleep(1000);
+//
+//        client.close();
+//
+//        client = ClientFactory.createClient(m_cconfig);
+//        client.createConnection("localhost", 21212);
+//
+//        //
+//        // See that the cluster is available and the data is still there.
+//        //
+//        response = client.callProcedure("SelectBlahSinglePartition", 2);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2);
+//
+//        response = client.callProcedure("SelectBlah", 3);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
+//
+//        response = client.callProcedure("SelectBlahReplicated", 1);
+//        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+//        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+//
+//        client.close();
+//
+//        localServer.shutdown();
+//        cluster.shutDown();
+//    }
 
 }

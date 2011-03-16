@@ -647,7 +647,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void updateCatalog(final long txnId, final String catalogDiffs, int catalogVersion) throws EEException {
+    public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -657,7 +657,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
             m_data.putInt(Commands.UpdateCatalog.m_id);
-            m_data.putInt(catalogVersion);
             m_data.putLong(txnId);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
