@@ -59,16 +59,19 @@ public class ExportProtoMessage
         final public int partitionId;
         final public String signature;
         final public String tableName;
+        final public long systemStartTimestamp;
         final public ArrayList<String> columnNames = new ArrayList<String>();
         final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
 
         public AdvertisedDataSource(int p_id, String t_signature, String t_name,
+                                    long systemStartTimestamp,
                                     ArrayList<String> names,
                                     ArrayList<VoltType> types)
         {
             partitionId = p_id;
             signature = t_signature;
             tableName = t_name;
+            this.systemStartTimestamp = systemStartTimestamp;
 
             // null checks are for happy-making test time
             if (names != null)
@@ -269,13 +272,16 @@ public class ExportProtoMessage
             int p_id = fds.readInt();
             String t_signature = fds.readString();
             String t_name = fds.readString();
+            long sysStartTimestamp = fds.readLong();
+            //long sysStartTimestamp = 0;
+            System.out.printf("Timestamp: %d\n", sysStartTimestamp);
             int colcnt = fds.readInt();
             for (int jj = 0; jj < colcnt; jj++) {
                 names.add(fds.readString());
                 types.add(VoltType.get((byte)fds.readInt()));
             }
-            sources.add(new AdvertisedDataSource(p_id, t_signature,
-                                                t_name, names, types));
+            sources.add(new AdvertisedDataSource(p_id, t_signature, t_name,
+                                                 sysStartTimestamp, names, types));
         }
 
         // deserialize the list of running hosts

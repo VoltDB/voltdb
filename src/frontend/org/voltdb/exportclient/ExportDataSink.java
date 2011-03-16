@@ -20,8 +20,8 @@ package org.voltdb.exportclient;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Queue;
 import java.util.Map.Entry;
+import java.util.Queue;
 
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
@@ -39,7 +39,11 @@ public class ExportDataSink {
     final int partitionId;
     final String m_tableName;
     final ExportDecoderBase m_decoder;
+
+    // the preferred connection for a given partition/table combo
     String m_activeConnection = null;
+    // the time the JVM started for the preferred connection
+    long m_activeConnectionTimestamp = Long.MAX_VALUE;
 
     private final HashMap<String, LinkedList<ExportProtoMessage>> m_rxQueues;
     private final HashMap<String, LinkedList<ExportProtoMessage>> m_txQueues;
@@ -56,10 +60,14 @@ public class ExportDataSink {
         m_txQueues = new HashMap<String, LinkedList<ExportProtoMessage>>();
     }
 
-    void addExportConnection(String connectionName) {
-        if (m_activeConnection == null) {
+    void addExportConnection(String connectionName, long connectionTimestamp) {
+        // pick the oldest connection
+        // FYI: m_activeConnectionTimestamp defaults to Long.MAX
+        if (connectionTimestamp < m_activeConnectionTimestamp) {
             m_activeConnection = connectionName;
+            m_activeConnectionTimestamp = connectionTimestamp;
         }
+
         m_rxQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
         m_txQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
     }
@@ -77,11 +85,12 @@ public class ExportDataSink {
             poll();
             m_started = true;
         }
-        for (Entry<String, LinkedList<ExportProtoMessage>> rx_conn : m_rxQueues
-                .entrySet()) {
+        for (Entry<String, LinkedList<ExportProtoMessage>> rx_conn : m_rxQueues.entrySet()) {
             ExportProtoMessage m = rx_conn.getValue().poll();
             if (m != null && m.isPollResponse()) {
-                m_activeConnection = rx_conn.getKey();
+                // john thinks this should never require assignment
+                assert(m_activeConnection == rx_conn.getKey());
+                //m_activeConnection = rx_conn.getKey();
                 handlePollResponse(m);
             }
         }

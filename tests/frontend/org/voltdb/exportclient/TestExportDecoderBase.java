@@ -66,7 +66,7 @@ public class TestExportDecoderBase extends TestCase
             col_types.add(COLUMN_TYPES[i]);
         }
         AdvertisedDataSource source =
-            new AdvertisedDataSource(0, "foo", "yankeelover",
+            new AdvertisedDataSource(0, "foo", "yankeelover", 0,
                                      col_names, col_types);
         return source;
     }

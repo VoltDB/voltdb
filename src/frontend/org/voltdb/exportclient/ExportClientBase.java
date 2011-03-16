@@ -108,7 +108,7 @@ public abstract class ExportClientBase {
             sink = part_map.get(part_id);
             m_logger.info("Providing connection " + elConnection.name + " for table id " + source.signature + " to sink " + sink);
             // and plug the ExportConnection into the ExportDataSink
-            sink.addExportConnection(elConnection.name);
+            sink.addExportConnection(elConnection.name, source.systemStartTimestamp);
         }
     }
 

@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -150,6 +151,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_partitionId = fds.readInt();
         m_signature = fds.readString();
         m_tableName = fds.readString();
+        fds.readLong(); // timestamp of JVM startup can be ignored
         int numColumns = fds.readInt();
         for (int ii=0; ii < numColumns; ++ii) {
             m_columnNames.add(fds.readString());
@@ -331,6 +333,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         fs.writeInt(getPartitionId());
         fs.writeString(m_signature);
         fs.writeString(getTableName());
+        fs.writeLong(ManagementFactory.getRuntimeMXBean().getStartTime());
         fs.writeInt(m_columnNames.size());
         for (int ii=0; ii < m_columnNames.size(); ++ii) {
             fs.writeString(m_columnNames.get(ii));
