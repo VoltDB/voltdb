@@ -20,11 +20,13 @@
         <partitions>
             <partition table='ITEM' column='ITEMID' />
             <partition table='BID' column='ITEMID' />
+            <partition table='ITEM_EXPORT' column='ITEMID' />
+            <partition table='BID_EXPORT' column='ITEMID' />
         </partitions>
         <export>
             <tables>
-                <table name="ITEM"/>
-                <table name="BID"/>
+                <table name="ITEM_EXPORT"/>
+                <table name="BID_EXPORT"/>
             </tables>
         </export>
     </database>

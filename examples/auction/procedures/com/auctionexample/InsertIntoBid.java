@@ -40,6 +40,7 @@ import org.voltdb.types.TimestampType;
 public class InsertIntoBid extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO BID VALUES (?, ?, ?, ?, ?);");
+    public final SQLStmt insertForExport = new SQLStmt("INSERT INTO BID_EXPORT VALUES (?, ?, ?, ?, ?);");
 
     /**
      *
@@ -53,6 +54,7 @@ public class InsertIntoBid extends VoltProcedure {
      */
     public VoltTable[] run(int bidid, int itemid, int bidderid, TimestampType bidtime, double bidprice) throws VoltAbortException {
         voltQueueSQL(insert, bidid, itemid, bidderid, bidtime, bidprice);
+        voltQueueSQL(insertForExport, bidid, itemid, bidderid, bidtime, bidprice);
         return voltExecuteSQL();
     }
 }

@@ -59,6 +59,10 @@ public class BidOnAuction extends VoltProcedure {
         "INSERT INTO BID VALUES (?, ?, ?, ?, ?);"
     );
 
+    public final SQLStmt insertBidForExport = new SQLStmt(
+            "INSERT INTO BID_EXPORT VALUES (?, ?, ?, ?, ?);"
+    );
+
     public final SQLStmt updateAuctionBid = new SQLStmt(
         "UPDATE ITEM SET HIGHBIDID = ? " +
         "WHERE ITEMID = ?;"
@@ -130,6 +134,7 @@ public class BidOnAuction extends VoltProcedure {
         // if we're all set to insert
         if (bidTest == 0) {
             voltQueueSQL(insertBid, newBidId, itemId, userId, currentTime, newBidAmount);
+            voltQueueSQL(insertBidForExport, newBidId, itemId, userId, currentTime, newBidAmount);
             voltQueueSQL(updateAuctionBid, newBidId, itemId);
             final VoltTable[] results = voltExecuteSQL();
             // ensure we successfully inserted the row

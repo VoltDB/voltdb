@@ -97,7 +97,7 @@ class Loader {
 
             VoltTable[] table = client.callProcedure("InsertIntoItem", itemId, itemName, itemDescription,
                     sellerId, categoryId, itemId, startPrice, startTime, endTime).getResults();
-            if (table.length != 1)
+            if (table.length != 2)
                 throw new Exception("InsertIntoItem returned the wrong number of tables.");
             if (table[0].asScalarLong() != 1)
                 throw new Exception("InsertIntoItem modified the wrong number of tuples.");
@@ -107,7 +107,7 @@ class Loader {
 
             // insert a user-less bid into the bid table with price = auction.startprice
             table = client.callProcedure("InsertIntoBid", itemId, itemId, -1, 0L, startPrice).getResults();
-            if (table.length != 1)
+            if (table.length != 2)
                 throw new Exception("InsertIntoBid returned the wrong number of tables.");
             if (table[0].asScalarLong() != 1)
                 throw new Exception("InsertIntoBid modified the wrong number of tuples.");
