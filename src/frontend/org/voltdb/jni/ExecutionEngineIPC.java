@@ -115,7 +115,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         RecoveryMessage(21),
         TableHashCode(22),
         Hashinate(23),
-        GetPoolAllocations(24);
+        GetPoolAllocations(24),
+        GetUSOs(25);
         Commands(final int id) {
             m_id = id;
         }
@@ -1248,7 +1249,32 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public long[] getUSOForExportTable(String tableSignature) {
-        // TODO Auto-generated method stub
+        long[] retval = null;
+        try {
+            m_data.clear();
+            m_data.putInt(Commands.GetUSOs.m_id);
+            if (tableSignature == null) {
+                m_data.putInt(-1);
+            } else {
+                m_data.putInt(tableSignature.getBytes("UTF-8").length);
+                m_data.put(tableSignature.getBytes("UTF-8"));
+            }
+            m_data.flip();
+            m_connection.write();
+
+            ByteBuffer results = ByteBuffer.allocate(16);
+            while (results.remaining() > 0)
+                m_connection.m_socketChannel.read(results);
+            results.flip();
+
+            retval = new long[2];
+            retval[0] = results.getLong();
+            retval[1] = results.getLong();
+
+        } catch (final IOException e) {
+            throw new RuntimeException(e);
+        }
+
         return null;
     }
 

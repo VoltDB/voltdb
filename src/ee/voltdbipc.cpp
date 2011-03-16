@@ -201,6 +201,12 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
+    int32_t tableSignatureLength;
+    char tableSignature[0];
+}__attribute__((packed)) get_uso;
+
+typedef struct {
+    struct ipc_command cmd;
     int64_t txnId;
     char data[0];
 }__attribute__((packed)) catalog_load;
@@ -1004,7 +1010,7 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     m_engine->resetReusedResultOutputBuffer();
     int32_t tableSignatureLength = ntohl(action->tableSignatureLength);
     std::string tableSignature(action->tableSignature, tableSignatureLength);
-    long result = m_engine->exportAction(action->isSync,
+    int64_t result = m_engine->exportAction(action->isSync,
                                          static_cast<int64_t>(ntohll(action->offset)),
                                          static_cast<int64_t>(ntohll(action->seqNo)),
                                          tableSignature);
@@ -1018,8 +1024,28 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), buflength);
 }
 
-void VoltDBIPC::hashinate(struct ipc_command* cmd)
-{
+void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
+    get_uso *get = (get_uso*)cmd;
+
+    m_engine->resetReusedResultOutputBuffer();
+    int32_t tableSignatureLength = ntohl(get->tableSignatureLength);
+    std::string tableSignature(get->tableSignature, tableSignatureLength);
+
+    size_t ackOffset;
+    int64_t seqNo;
+    m_engine->getUSOForExportTable(ackOffset, seqNo, tableSignature);
+
+    // write offset across bigendian.
+    int64_t ackOffsetI64 = static_cast<int64_t>(ackOffset);
+    ackOffsetI64 = htonll(ackOffsetI64);
+    writeOrDie(m_fd, (unsigned char*)&ackOffsetI64, sizeof(ackOffsetI64));
+
+    // write the poll data. It is at least 4 bytes of length prefix.
+    seqNo = htonll(seqNo);
+    writeOrDie(m_fd, (unsigned char*)&seqNo, sizeof(seqNo));
+}
+
+void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     hashinate_msg* hash = (hashinate_msg*)cmd;
     NValueArray& params = m_engine->getParameterContainer();
 
