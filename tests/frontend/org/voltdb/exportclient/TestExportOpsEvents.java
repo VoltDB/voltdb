@@ -127,7 +127,8 @@ public class TestExportOpsEvents extends TestCase {
         client.createConnection("localhost");
         client.callProcedure("Insert", 0);
         client.callProcedure("Insert", 1);
-        client.callProcedure("Insert", 2);
+        client.callProcedure("@AdHoc", "insert into blah values (2);");
+
         client.close();
 
         // kill and rejoin a node async

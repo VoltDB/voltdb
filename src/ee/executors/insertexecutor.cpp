@@ -101,6 +101,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const catalog::Datab
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_targetTable);
     m_partitionColumn = -1;
     m_partitionColumnIsString = false;
+    m_isStreamed = (persistentTarget == NULL);
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
         if (m_partitionColumn != -1) {
@@ -109,6 +110,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const catalog::Datab
             }
         }
     }
+
     m_multiPartition = m_node->isMultiPartition();
     return true;
 }
@@ -167,6 +169,13 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 // don't insert
                 continue;
             }
+        }
+
+        // for multi partition export tables,
+        //  only insert them into one place (the partition with hash(0))
+        if (m_isStreamed && m_multiPartition) {
+            bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
+            if (!isLocal) continue;
         }
 
         // try to put the tuple into the target table

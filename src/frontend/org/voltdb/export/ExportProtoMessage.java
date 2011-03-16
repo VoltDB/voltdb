@@ -273,8 +273,6 @@ public class ExportProtoMessage
             String t_signature = fds.readString();
             String t_name = fds.readString();
             long sysStartTimestamp = fds.readLong();
-            //long sysStartTimestamp = 0;
-            System.out.printf("Timestamp: %d\n", sysStartTimestamp);
             int colcnt = fds.readInt();
             for (int jj = 0; jj < colcnt; jj++) {
                 names.add(fds.readString());
