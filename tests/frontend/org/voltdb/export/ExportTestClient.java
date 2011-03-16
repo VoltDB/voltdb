@@ -60,7 +60,7 @@ public class ExportTestClient extends ExportClientBase
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
     {
-        String key = source.tableName() + source.partitionId();
+        String key = source.tableName + source.partitionId;
         if (m_verifiersToReserve.containsKey(key)) {
             return m_verifiersToReserve.remove(key);
         }
@@ -68,8 +68,8 @@ public class ExportTestClient extends ExportClientBase
         // create a verifier with the 'schema'
         ExportTestVerifier verifier = new ExportTestVerifier(source);
         // hash it by table name + partition ID
-        m_logger.info("Creating verifier for table: " + source.tableName() +
-                           ", part ID: " + source.partitionId());
+        m_logger.info("Creating verifier for table: " + source.tableName +
+                           ", part ID: " + source.partitionId);
         if (!m_verifiers.containsKey(key))
         {
             m_verifiers.put(key,
@@ -138,8 +138,8 @@ public class ExportTestClient extends ExportClientBase
             {
                 try
                 {
-                    ExportProtoMessage poll = new ExportProtoMessage(source.partitionId(),
-                                                               source.signature());
+                    ExportProtoMessage poll = new ExportProtoMessage(source.partitionId,
+                                                               source.signature);
                     poll.poll();
                     connection.sendMessage(poll);
 
@@ -148,8 +148,8 @@ public class ExportTestClient extends ExportClientBase
                     // We know all possibly outstanding responses will be fully
                     // drained, so just wait until we get any response for
                     // this data source
-                    while (m == null || !m.getSignature().equals(source.signature())  ||
-                           m.getPartitionId() != source.partitionId())
+                    while (m == null || !m.getSignature().equals(source.signature)  ||
+                           m.getPartitionId() != source.partitionId)
                     {
                         m = connection.nextMessage();
                     }
@@ -164,17 +164,17 @@ public class ExportTestClient extends ExportClientBase
                         table_offsets.put(m.m_signature, offsets);
                     }
 
-                    if (!offsets.containsKey(source.partitionId()))
+                    if (!offsets.containsKey(source.partitionId))
                     {
-                        offsets.put( source.partitionId(), offset);
+                        offsets.put( source.partitionId, offset);
                     }
                     else
                     {
-                        if (offsets.get(source.partitionId()) != offset)
+                        if (offsets.get(source.partitionId) != offset)
                         {
                             System.out.println("Mismatched Export offset: " + offset);
-                            System.out.println("  Table ID: " + source.tableName());
-                            System.out.println("  Partition: " + source.partitionId());
+                            System.out.println("  Table ID: " + source.tableName);
+                            System.out.println("  Partition: " + source.partitionId);
                             System.out.println("  Orig. offset: " + offsets.get(m.m_partitionId));
                             retval = false;
                         }
@@ -185,17 +185,17 @@ public class ExportTestClient extends ExportClientBase
                         responses = new HashMap<Integer, Long>();
                         seen_responses.put(m.m_signature, responses);
                     }
-                    if (responses.containsKey(source.partitionId()))
+                    if (responses.containsKey(source.partitionId))
                     {
                         System.out.println("Saw duplicate response from connection: " +
                                            connection.name);
-                        System.out.println("   for table: " + source.tableName() +
-                                           ", " + source.partitionId());
+                        System.out.println("   for table: " + source.tableName +
+                                           ", " + source.partitionId);
                         retval = false;
                     }
                     else
                     {
-                        responses.put(source.partitionId(), offset);
+                        responses.put(source.partitionId, offset);
                     }
                 }
                 catch (IOException e)

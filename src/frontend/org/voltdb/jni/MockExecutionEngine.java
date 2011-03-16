@@ -205,6 +205,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public long[] getUSOForExportTable(String tableSignature) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
     public void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
         // TODO Auto-generated method stub
 
@@ -216,8 +222,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, int partitionCount)
-    {
+    public int hashinate(Object value, int partitionCount) {
         // TODO Auto-generated method stub
         return 0;
     }

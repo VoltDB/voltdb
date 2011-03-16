@@ -24,21 +24,12 @@
 package org.voltdb.regressionsuites;
 
 import java.nio.channels.SocketChannel;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestMaliciousClientSuite extends RegressionSuite {

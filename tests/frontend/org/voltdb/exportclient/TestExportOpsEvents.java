@@ -25,6 +25,7 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CountDownLatch;
 
 import junit.framework.TestCase;
 
@@ -110,6 +111,67 @@ public class TestExportOpsEvents extends TestCase {
 
         assertTrue(client.connect());
         client.disconnect();
+
+        VoltDBFickleCluster.stop();
+    }
+
+    public void testConnectingToRejoiningCluster() throws Exception {
+        NullExportClient expClient = new NullExportClient();
+        expClient.addServerInfo(new InetSocketAddress("localhost", 21212));
+
+        VoltDBFickleCluster.start();
+
+        assertTrue(expClient.connect());
+
+        org.voltdb.client.Client client = org.voltdb.client.ClientFactory.createClient();
+        client.createConnection("localhost");
+        client.callProcedure("Insert", 0);
+        client.callProcedure("Insert", 1);
+        client.callProcedure("Insert", 2);
+        client.close();
+
+        // kill and rejoin a node async
+        final CountDownLatch latch = new CountDownLatch(1);
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    VoltDBFickleCluster.killNode();
+                    Thread.sleep(500);
+                    VoltDBFickleCluster.rejoinNode();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    fail();
+                }
+                latch.countDown();
+            }
+        }.start();
+
+        // work for 10 seconds, or until the connection is dropped
+        long now = System.currentTimeMillis();
+        boolean success = false;
+        while ((System.currentTimeMillis() - now) < 10000) {
+            try {
+                expClient.work();
+            }
+            catch (IOException e) {
+                // this is supposed to happen
+                success = true;
+                break;
+            }
+        }
+        assertTrue(success);
+        expClient.disconnect();
+
+        // wait for the rejoin to be done
+        latch.await();
+
+        // connect
+        assertTrue(expClient.connect());
+
+        // verify stream offsets (TODO)
+
+        expClient.disconnect();
 
         VoltDBFickleCluster.stop();
     }

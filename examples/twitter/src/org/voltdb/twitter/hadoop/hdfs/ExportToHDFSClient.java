@@ -86,10 +86,10 @@ public class ExportToHDFSClient extends ExportClientBase {
 
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
-        if (!decoders.containsKey(source.tableName())) {
-            decoders.put(source.tableName(), new ExportToHDFSDecoder(source, hdfs, uri));
+        if (!decoders.containsKey(source.tableName)) {
+            decoders.put(source.tableName, new ExportToHDFSDecoder(source, hdfs, uri));
         }
-        return decoders.get(source.tableName());
+        return decoders.get(source.tableName);
     }
 
 }

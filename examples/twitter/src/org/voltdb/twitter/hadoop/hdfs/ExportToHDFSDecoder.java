@@ -35,7 +35,7 @@ public class ExportToHDFSDecoder extends ExportDecoderBase {
 
     public ExportToHDFSDecoder(AdvertisedDataSource source, FileSystem hdfs, String uri) {
         super(source);
-        out = new RollingAppender(hdfs, uri, source.tableName());
+        out = new RollingAppender(hdfs, uri, source.tableName);
     }
 
     @Override

@@ -78,7 +78,7 @@ public class ExportToFileClient extends ExportClientBase {
                 String filename = null;
                 try {
                     filename = outdir.getPath() + File.separator + nonce + "-"
-                            + source.tableName() + "." + escaper.getExtension();
+                            + source.tableName + "." + escaper.getExtension();
                     m_logger.info("Opening filename " + filename);
                     m_Writer = new BufferedWriter(new OutputStreamWriter(
                             new FileOutputStream(filename), "UTF-8"), 1048576);
@@ -86,7 +86,7 @@ public class ExportToFileClient extends ExportClientBase {
                 } catch (Exception e) {
                     m_logger.error(e.getMessage());
                     m_logger.error("Error: Failed to create output file: "
-                            + filename + " for table " + source.tableName());
+                            + filename + " for table " + source.tableName);
                     throw new RuntimeException();
                 }
             } else {
@@ -108,7 +108,7 @@ public class ExportToFileClient extends ExportClientBase {
                 row = decodeRow(rowData);
             } catch (IOException e) {
                 m_logger.error("Unable to decode row for table: "
-                        + m_source.tableName());
+                        + m_source.tableName);
                 return false;
             }
 
@@ -196,7 +196,7 @@ public class ExportToFileClient extends ExportClientBase {
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         // For every source that provides part of a table, use the same
         // export decoder.
-        String table_name = source.tableName();
+        String table_name = source.tableName;
         if (!m_tableDecoders.containsKey(table_name)) {
             m_tableDecoders.put(table_name, new ExportToFileDecoder(source,
                     m_nonce, m_outDir, m_escaper, m_firstfield));

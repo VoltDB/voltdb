@@ -23,17 +23,19 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.TreeSet;
-import java.util.*;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import static org.junit.Assert.*;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class TestPersistentBinaryDeque {
@@ -210,7 +212,6 @@ public class TestPersistentBinaryDeque {
 
     @Test
     public void testMissingSegment() throws Exception {
-        ArrayList<BBContainer> polled = new ArrayList<BBContainer>();
         for (int ii = 0; ii < 10; ii++) {
             m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(ByteBuffer.allocate(20)) });
             m_pbd.poll();

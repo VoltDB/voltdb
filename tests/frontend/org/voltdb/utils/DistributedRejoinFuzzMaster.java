@@ -22,14 +22,12 @@
  */
 package org.voltdb.utils;
 
-import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.ArrayList;
 
+import org.voltdb.benchmark.KillStragglers;
 import org.voltdb.processtools.ProcessData;
 import org.voltdb.processtools.ProcessSetManager;
 import org.voltdb.processtools.SSHTools;
-import org.voltdb.processtools.ShellTools;
-import org.voltdb.benchmark.KillStragglers;
 
 public class DistributedRejoinFuzzMaster {
 

@@ -17,13 +17,13 @@
 
 package org.voltdb.export;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileInputStream;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -31,8 +31,8 @@ import org.voltdb.catalog.Column;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool;
@@ -59,7 +59,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private long m_firstUnpolledUso = 0;
     private final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
-    private final File m_adFile;
     private Runnable m_onDrain;
 
     /**
@@ -123,7 +122,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
 
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
-        m_adFile = adFile;
         exportLog.info("Creating ad for " + nonce);
         assert(!adFile.exists());
         FastSerializer fs = new FastSerializer();
@@ -138,7 +136,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ExportDataSource(Runnable onDrain, File adFile) throws IOException {
         m_onDrain = onDrain;
-        m_adFile = adFile;
         String overflowPath = adFile.getParent();
         FileInputStream fis = new FileInputStream(adFile);
         byte data[] = new byte[(int)adFile.length()];

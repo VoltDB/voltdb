@@ -76,13 +76,14 @@ class StreamedTable : public Table {
      * Get the current offset in bytes of the export stream for this Table
      * since startup.
      */
-    void getExportStreamSequenceNo(long &seqNo, size_t &streamBytesUsed);
+    void getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed);
 
     /**
      * Set the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
     void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed);
+
   protected:
     // Stats
     voltdb::StreamedTableStats stats_;

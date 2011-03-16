@@ -18,7 +18,6 @@ package org.voltdb;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -433,7 +432,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         }
         m_sourceSiteId = sourceSiteId;
         m_onCompletion = onCompletion;
-        assert(!m_tables.isEmpty());
+        //assert(!m_tables.isEmpty());
 
     }
 
@@ -531,6 +530,27 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
                     sourceSite + " will delay sync until after executing txnId " + m_skipPastTxnId);
         }
+
+        // get the information about ackOffsets and seqNo from the export tables
+        // this is a set of newline-delimited strings, one per export-table
+        // each a triple of the form: "table-signature,ackOffset,seqNo"
+        int byteLen = ackMessage.getInt();
+        if (byteLen > 0) {
+            byte[] exportUSOBytes = new byte[byteLen];
+            ackMessage.get(exportUSOBytes);
+            String exportUSOs = new String(exportUSOBytes, "UTF-8");
+
+            // parse the strings and set the values in the engine
+            String[] tableUSOs = exportUSOs.trim().split("\n");
+            for (String tableUSO : tableUSOs) {
+                String[] parts = tableUSO.trim().split(",");
+                assert(parts.length == 3);
+                long ackOffset = Long.parseLong(parts[1]);
+                long seqNo = Long.parseLong(parts[2]);
+                m_engine.exportAction(true, ackOffset, seqNo, m_partitionId, parts[0]);
+            }
+        }
+
         ackMessageContainer.discard();
     }
 

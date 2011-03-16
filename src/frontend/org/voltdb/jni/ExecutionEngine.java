@@ -365,6 +365,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long ackOffset, long seqNo, int partitionId, String tableSignature);
 
     /**
+     * Get the seqNo and offset for an export table.
+     * @param tableSignature the signature of the table being polled or acked.
+     * @return the response ExportMessage
+     */
+    public abstract long[] getUSOForExportTable(String tableSignature);
+
+    /**
      * Calculate a hash code for a table.
      * @param pointer Pointer to an engine instance
      * @param tableId table to calculate a hash code for
@@ -630,6 +637,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long mAckOffset,
             long seqNo,
             String mTableSignature);
+
+    /**
+     * Get the USO for an export table. This is primarily used for recovery.
+     *
+     * @param pointer Pointer to an engine instance
+     * @param tableId The table in question
+     * @return The USO for the export table.
+     */
+    public native long[] nativeGetUSOForExportTable(long pointer, String mTableSignature);
 
     /**
      * This code only does anything useful on MACOSX.

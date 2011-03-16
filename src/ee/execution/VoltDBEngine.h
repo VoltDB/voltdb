@@ -370,6 +370,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, std::string tableSignature);
 
+        void getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string tableSignature);
+
         /**
          * Retrieve a hash code for the specified table
          */

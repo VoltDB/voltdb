@@ -275,6 +275,15 @@ class Table {
     }
 
     /**
+     * Get the current offset in bytes of the export stream for this Table
+     * since startup (used for rejoin/recovery).
+     */
+    virtual void getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed) {
+        // this should be overidden by any table involved in an export
+        assert(false);
+    }
+
+    /**
      * Release any committed Export bytes up to the provided stream offset
      */
     virtual bool releaseExportBytes(int64_t releaseOffset) {

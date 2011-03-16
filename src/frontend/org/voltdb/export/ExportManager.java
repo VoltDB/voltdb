@@ -20,33 +20,21 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.HashMap;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.io.File;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -186,7 +174,6 @@ public class ExportManager
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
-        final String elloader = conn.getLoaderclass();
         m_loaderClass = conn.getLoaderclass();
 
         try {

@@ -83,8 +83,8 @@ public abstract class ExportClientBase {
             // and build an ExportDataSink for this data source
             // Put the ExportDataSink in our hashed collection if it doesn't exist
             ExportDataSink sink = null;
-            String table_signature = source.signature();
-            int part_id = source.partitionId();
+            String table_signature = source.signature;
+            int part_id = source.partitionId;
             HashMap<Integer, ExportDataSink> part_map =
                 m_sinks.get(table_signature);
             if (part_map == null) {
@@ -92,17 +92,21 @@ public abstract class ExportClientBase {
                 m_sinks.put(table_signature, part_map);
             }
             if (!part_map.containsKey(part_id)) {
-                m_logger.info("Creating decoder for table: " + source.tableName() +
-                        ", table ID, " + source.signature() + " part ID: " + source.partitionId());
+                m_logger.info("Creating decoder for table: " + source.tableName +
+                        ", table ID, " + source.signature + " part ID: " + source.partitionId);
                 ExportDecoderBase decoder = constructExportDecoder(source);
-                sink = new ExportDataSink(source.partitionId(),
-                                      source.signature(),
-                                      source.tableName(),
+                sink = new ExportDataSink(source.partitionId,
+                                      source.signature,
+                                      source.tableName,
                                       decoder);
                 part_map.put(part_id, sink);
             }
+            else {
+                // verify the export data is the same across partitions
+                //sink = part_map.pu
+            }
             sink = part_map.get(part_id);
-            m_logger.info("Providing connection " + elConnection.name + " for table id " + source.signature() + " to sink " + sink);
+            m_logger.info("Providing connection " + elConnection.name + " for table id " + source.signature + " to sink " + sink);
             // and plug the ExportConnection into the ExportDataSink
             sink.addExportConnection(elConnection.name);
         }

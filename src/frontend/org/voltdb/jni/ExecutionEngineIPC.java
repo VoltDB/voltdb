@@ -1248,6 +1248,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
+    public long[] getUSOForExportTable(String tableSignature) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
     public void processRecoveryMessage( ByteBuffer buffer, long pointer) {
         try {
             m_data.clear();

@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -95,6 +96,9 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      * Placed in each message as a return address for acks
      */
     private final int m_siteId;
+
+    /** Used to get a txn-specific version of the catalog */
+    private final ExecutionSite m_site;
 
     /**
      * Number of buffers that can be sent before having to wait for acks to previously sent buffers
@@ -405,6 +409,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      * @param onCompletion What to do when data recovery is complete.
      */
     public RecoverySiteProcessorSource(
+            ExecutionSite site,
             long destinationTxnId,
             int destinationSiteId,
             HashMap<Pair<String, Integer>, HashSet<Integer>> tableToSites,
@@ -415,6 +420,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             MessageHandler messageHandler,
             SocketChannel sc) throws IOException {
         super();
+        m_site = site;
         m_sc = sc;
         m_mailbox = mailbox;
         m_engine = engine;
@@ -457,12 +463,13 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             recoveryLog.info(
                     "Sending blocked on multi-part notification from " + m_siteId +
                     " at txnId " + currentTxnId + " to site " + m_destinationSiteId);
-            ByteBuffer buf = ByteBuffer.allocate(17);
+            ByteBuffer buf = ByteBuffer.allocate(21);
             BBContainer cont = DBBPool.wrapBB(buf);
-            buf.putInt(13);//Length prefix
+            buf.putInt(17);//Length prefix
             buf.putInt(m_siteId);
             buf.put(kEXECUTE_PAST_TXN);
             buf.putLong(currentTxnId);
+            buf.putInt(0); // placeholder for USO sync string
             buf.flip();
             m_outgoing.offer(cont);
         }
@@ -504,12 +511,39 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     " before txnId " + nextTxnId + " to site " + m_destinationSiteId +
                     " choosing to stop before txnId " + m_stopBeforeTxnId);
             m_sentInitiateResponse = true;
-            ByteBuffer buf = ByteBuffer.allocate(17);
+
+            // get the export table info
+            StringBuilder sb = new StringBuilder();
+            if (m_site != null) {
+                for (Table t : m_site.m_context.database.getTables()) {
+                    if (!CatalogUtil.isTableExportOnly(m_site.m_context.database, t))
+                        continue;
+                    // now export tables only
+                    String sig = t.getSignature();
+                    sb.append(sig);
+                    long[] temp = m_engine.getUSOForExportTable(sig);
+                    sb.append(",").append(temp[0]).append(",").append(temp[1]).append("\n");
+                }
+                assert(m_site.ee == m_engine);
+                //System.err.printf("SiteID: %d\n", m_site.m_siteId);
+                //System.err.println("USO SOURCE: " + sb.toString());
+            }
+
+            // get the bytes for the export info
+            byte[] exportUSOBytes = null;
+            try { exportUSOBytes = sb.toString().getBytes("UTF-8"); }
+            catch (UnsupportedEncodingException e) {}
+
+            // write the message
+            ByteBuffer buf = ByteBuffer.allocate(21 + exportUSOBytes.length);
             BBContainer cont = DBBPool.wrapBB(buf);
-            buf.putInt(13);
+            buf.putInt(17 + exportUSOBytes.length); // length prefix
             buf.putInt(m_siteId);
             buf.put(kSTOP_AT_TXN);
             buf.putLong(m_stopBeforeTxnId);
+            buf.putInt(exportUSOBytes.length);
+            buf.put(exportUSOBytes);
+
             buf.flip();
             m_outgoing.offer(cont);
         }
@@ -671,6 +705,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     }
 
     public static RecoverySiteProcessorSource createProcessor(
+            ExecutionSite site,
             RecoveryMessage rm,
             Database db,
             SiteTracker tracker,
@@ -723,6 +758,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
             final long destinationTxnId = rm.txnId();
             source = new RecoverySiteProcessorSource(
+                    site,
                     destinationTxnId,
                     destinationSiteId,
                     tableToDestinationSite,

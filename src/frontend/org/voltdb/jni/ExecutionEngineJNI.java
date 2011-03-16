@@ -503,6 +503,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
+    public long[] getUSOForExportTable(String tableSignature) {
+        return nativeGetUSOForExportTable(pointer, tableSignature);
+    }
+
+    @Override
     public void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
         nativeProcessRecoveryMessage( pointer, bufferPointer, buffer.position(), buffer.remaining());
     }

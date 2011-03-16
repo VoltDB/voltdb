@@ -1182,6 +1182,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     " from site " + rm.sourceSite() + " requesting recovery start before txnid " +
                     recoveringPartitionTxnId);
             m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
+                    this,
                     rm,
                     m_context.database,
                     m_context.siteTracker,

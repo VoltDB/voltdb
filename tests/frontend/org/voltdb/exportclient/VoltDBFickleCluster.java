@@ -53,7 +53,7 @@ public class VoltDBFickleCluster extends LocalCluster {
     }
 
     public static void rejoinNode() throws Exception {
-        m_cluster.recoverOne(0, 0, "localhost:21213");
+        m_cluster.recoverOne(1, 0, "localhost");
     }
 
     public void mutateCatalog() throws Exception {
@@ -68,6 +68,9 @@ public class VoltDBFickleCluster extends LocalCluster {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 23 not null, " +
+            "PRIMARY KEY(ival));\n" +
+            "create table blah2 (" +
+            "ival bigint default 23 not null, " +
             "PRIMARY KEY(ival));";
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
@@ -77,7 +80,8 @@ public class VoltDBFickleCluster extends LocalCluster {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
+        builder.addPartitionInfo("blah2", "ival");
+        builder.addStmtProcedure("Insert", "insert into blah values (?);", "blah.ival: 0");
         builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
         builder.setTableAsExportOnly("blah");
         boolean success = m_cluster.compile(builder);

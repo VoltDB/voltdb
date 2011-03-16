@@ -16,17 +16,16 @@
  */
 package org.voltdb.utils;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.EOFException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -539,6 +538,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return segment.m_objectReadIndex >= segment.getNumEntries();
     }
 
+    @Override
     public long sizeInBytes() {
         return m_sizeInBytes.get();
     }

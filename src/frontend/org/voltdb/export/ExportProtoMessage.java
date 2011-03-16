@@ -56,58 +56,38 @@ public class ExportProtoMessage
      * The Export data source metadata returned in a kOpenResponse message.
      */
     static public class AdvertisedDataSource {
-        final private int m_partitionId;
-        final private String m_signature;
-        final private String m_tableName;
-
-        private ArrayList<String> m_columnNames = new ArrayList<String>();
-
-        private ArrayList<VoltType> m_columnTypes = new ArrayList<VoltType>();
+        final public int partitionId;
+        final public String signature;
+        final public String tableName;
+        final public ArrayList<String> columnNames = new ArrayList<String>();
+        final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
 
         public AdvertisedDataSource(int p_id, String t_signature, String t_name,
                                     ArrayList<String> names,
                                     ArrayList<VoltType> types)
         {
-            m_partitionId = p_id;
-            m_signature = t_signature;
-            m_tableName = t_name;
-            m_columnNames = names;
-            m_columnTypes = types;
-        }
+            partitionId = p_id;
+            signature = t_signature;
+            tableName = t_name;
 
-        public int partitionId() {
-            return m_partitionId;
-        }
-
-        public String signature() {
-            return m_signature;
+            // null checks are for happy-making test time
+            if (names != null)
+                columnNames.addAll(names);
+            if (types != null)
+                columnTypes.addAll(types);
         }
 
         public VoltType columnType(int index) {
-            return m_columnTypes.get(index);
-        }
-
-        public ArrayList<VoltType> columnTypes()
-        {
-            return m_columnTypes;
+            return columnTypes.get(index);
         }
 
         public String columnName(int index) {
-            return m_columnNames.get(index);
-        }
-
-        public ArrayList<String> columnNames()
-        {
-            return m_columnNames;
-        }
-
-        public String tableName() {
-            return m_tableName;
+            return columnNames.get(index);
         }
 
         @Override
         public String toString() {
-            return "Table: " + m_tableName + " partition " + partitionId() + " signature " + signature();
+            return "Table: " + tableName + " partition " + partitionId + " signature " + signature;
         }
     }
 

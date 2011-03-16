@@ -1077,6 +1077,37 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeGetUSOForExportTable
+ * Signature: (JLjava/lang/String;)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jstring tableSignature) {
+
+    VOLT_DEBUG("nativeGetUSOForExportTable in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    const char *signatureChars = env->GetStringUTFChars(tableSignature, NULL);
+    std::string signature(signatureChars, env->GetStringUTFLength(tableSignature));
+    env->ReleaseStringUTFChars(tableSignature, signatureChars);
+    try {
+        jlong data[2];
+        size_t ackOffset;
+        int64_t seqNo;
+        engine->getUSOForExportTable(ackOffset, seqNo, signature);
+        data[0] = ackOffset;
+        data[1] = seqNo;
+        jlongArray retval = env->NewLongArray(2);
+        env->SetLongArrayRegion(retval, 0, 2, data);
+        return retval;
+    }
+    catch (FatalException e) {
+        topend->crashVoltDB(e);
+    }
+    return NULL;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeProcessRecoveryMessage
  * Signature: (JJII)V
  */

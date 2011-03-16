@@ -40,8 +40,8 @@ class ExportTestVerifier extends ExportDecoderBase
     ExportTestVerifier(AdvertisedDataSource source)
     {
         super(source);
-        m_tableName = source.tableName();
-        m_partitionId = source.partitionId();
+        m_tableName = source.tableName;
+        m_partitionId = source.partitionId;
         m_data = new ArrayDeque<Object[]>();
     }
 

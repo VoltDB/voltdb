@@ -39,7 +39,7 @@ public abstract class ExportDecoderBase {
 
     public ExportDecoderBase(AdvertisedDataSource source) {
         m_source = source;
-        m_tableSchema = source.columnTypes();
+        m_tableSchema = source.columnTypes;
     }
 
     /**

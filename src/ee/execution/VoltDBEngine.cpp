@@ -1321,6 +1321,24 @@ VoltDBEngine::exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, st
     return 0;
 }
 
+void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string tableSignature) {
+
+    // defaults mean failure
+    ackOffset = 0;
+    seqNo = -1;
+
+    map<string, Table*>::iterator pos = m_exportingTables.find(tableSignature);
+
+    // return no data and polled offset for unavailable tables.
+    if (pos == m_exportingTables.end()) {
+        return;
+    }
+
+    Table *table_for_el = pos->second;
+    table_for_el->getExportStreamPositions(seqNo, ackOffset);
+    return;
+}
+
 size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     map<int32_t, Table*>::iterator it = m_tables.find(tableId);
     if (it == m_tables.end()) {

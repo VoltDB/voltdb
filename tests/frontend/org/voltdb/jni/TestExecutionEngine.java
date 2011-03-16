@@ -253,6 +253,7 @@ public class TestExecutionEngine extends TestCase {
                     SocketChannel sc = RecoverySiteProcessorSource.createRecoveryConnection(rm.address(), rm.port());
                     final RecoverySiteProcessorSource sourceProcessor =
                         new RecoverySiteProcessorSource(
+                                null,
                                 rm.txnId(),
                                 rm.sourceSite(),
                                 tablesAndDestinations,
