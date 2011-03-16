@@ -505,18 +505,19 @@ public class TestExportSuite extends RegressionSuite {
             client.callProcedure("Insert", params);
         }
         // this blocks until the snapshot is complete
-        client.callProcedure("@SnapshotSave", "/tmp", "testExportPlusSnapshot", (byte)1).getResults();
+        client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testExportPlusSnapshot", (byte)1).getResults();
 
         // verify. copped from TestSaveRestoreSysprocSuite
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final PrintStream ps = new PrintStream(baos);
         final PrintStream original = System.out;
+        new java.io.File("/tmp/" + System.getProperty("user.name")).mkdir();
         try {
             System.setOut(ps);
             final String args[] = new String[] {
                     "testExportPlusSnapshot",
                     "--dir",
-                    "/tmp"
+                    "/tmp/" + System.getProperty("user.name")
             };
             SnapshotVerifier.main(args);
             ps.flush();
