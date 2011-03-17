@@ -1023,7 +1023,7 @@ TEST CASES
                 <exclude name="**/TestFailuresSuite.class" />
                 <exclude name="**/TestFixedSQLSuite.class" />
                 <exclude name="**/TestPlansGroupBySuite.class" />
-                <exclude name="**/TestRejoinFuzz*.class" />
+                <exclude name="**/TestRejoin*.class" />
                 <exclude name="**/TestRollbackSuite.class" />
                 <exclude name="**/TestSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestSQLFeaturesSuite.class" />
@@ -1036,6 +1036,7 @@ TEST CASES
                 <exclude name="**/TestSqlAggregateSuite.class" />
                 <exclude name="**/TestOrderBySuite.class" />
                 <exclude name="**/TestTPCCSuite.class" />
+                <exclude name="**/TestCatalogUpdateSuite.class" />
             </fileset>
         </tests>
     </run_junit>
