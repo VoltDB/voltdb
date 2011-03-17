@@ -146,9 +146,8 @@ public class TestCatalogUtil extends TestCase {
         // admin-mode section actually impacts CRC, dupe above and add it
         final String dep4 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
-                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
-                            "      <admin-mode port='32323' adminstartup='true'/>" +
-                            "   </cluster>" +
+                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "   <admin-mode port='32323' adminstartup='true'/>" +
                             "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "   <httpd port='0' >" +
                             "       <jsonapi enabled='true'/>" +
@@ -158,10 +157,9 @@ public class TestCatalogUtil extends TestCase {
         // hearbeat-config section actually impacts CRC, dupe above and add it
         final String dep5 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
-                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
-                            "      <admin-mode port='32323' adminstartup='true'/>" +
-                            "      <heartbeat timeout='30'/>" +
-                            "   </cluster>" +
+                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "       <admin-mode port='32323' adminstartup='true'/>" +
+                            "   <heartbeat timeout='30'/>" +
                             "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "   <httpd port='0' >" +
                             "       <jsonapi enabled='true'/>" +
@@ -197,10 +195,9 @@ public class TestCatalogUtil extends TestCase {
         final String dep =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
-            "      <admin-mode port='32323' adminstartup='true'/>" +
-            "      <heartbeat timeout='30'/>" +
-            "   </cluster>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <admin-mode port='32323' adminstartup='true'/>" +
+            "   <heartbeat timeout='30'/>" +
             "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <httpd port='0' >" +
             "       <jsonapi enabled='true'/>" +
@@ -211,10 +208,9 @@ public class TestCatalogUtil extends TestCase {
         final String boom =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'>" +
-            "      <admin-mode port='32323' adminstartup='true'/>" +
-            "      <heartbeat timeout='0'/>" +
-            "   </cluster>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <admin-mode port='32323' adminstartup='true'/>" +
+            "   <heartbeat timeout='0'/>" +
             "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <httpd port='0' >" +
             "       <jsonapi enabled='true'/>" +

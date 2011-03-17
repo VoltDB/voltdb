@@ -435,7 +435,7 @@ public abstract class CatalogUtil {
         }
 
         // set the cluster info
-        setClusterInfo(catalog, deployment.getCluster());
+        setClusterInfo(catalog, deployment);
 
         //Set the snapshot schedule
         setSnapshotInfo( catalog, deployment.getSnapshot());
@@ -485,7 +485,7 @@ public abstract class CatalogUtil {
         sb.append(ct.getSitesperhost()).append(",");
 
         sb.append(" PARTITIONDETECTION ");
-        PartitionDetectionType pdt = ct.getPartitionDetection();
+        PartitionDetectionType pdt = deployment.getPartitionDetection();
         if (pdt != null) {
             sb.append(pdt.isEnabled()).append(",");
             PartitionDetectionType.Snapshot st = pdt.getSnapshot();
@@ -494,15 +494,16 @@ public abstract class CatalogUtil {
         }
 
         sb.append(" ADMINMODE ");
-        AdminModeType amt = ct.getAdminMode();
+        AdminModeType amt = deployment.getAdminMode();
         if (amt != null)
         {
+            sb.append(amt.isEnabled());
             sb.append(amt.getPort()).append(",");
             sb.append(amt.isAdminstartup()).append("\n");
         }
 
         sb.append(" HEARTBEATCONFIG ");
-        HeartbeatType hbt = ct.getHeartbeat();
+        HeartbeatType hbt = deployment.getHeartbeat();
         if (hbt != null)
         {
             sb.append(hbt.getTimeout()).append("\n");
@@ -528,6 +529,7 @@ public abstract class CatalogUtil {
             if (jt != null) {
                 sb.append(jt.isEnabled()).append(",");
             }
+            sb.append(ht.isEnabled());
             sb.append(ht.getPort());
         }
 
@@ -591,13 +593,8 @@ public abstract class CatalogUtil {
             JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
             // This schema shot the sheriff.
             SchemaFactory sf = SchemaFactory.newInstance(javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
-
-            // This is ugly, but I couldn't get CatalogUtil.class.getResource("../compiler/DeploymentFileSchema.xsd")
-            // to work and gave up.
             Schema schema = sf.newSchema(VoltDB.class.getResource("compiler/DeploymentFileSchema.xsd"));
-
             Unmarshaller unmarshaller = jc.createUnmarshaller();
-            // But did not shoot unmarshaller!
             unmarshaller.setSchema(schema);
             JAXBElement<DeploymentType> result =
                 (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
@@ -661,7 +658,8 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param cluster A reference to the <cluster> element of the deployment.xml file.
      */
-    private static void setClusterInfo(Catalog catalog, ClusterType cluster) {
+    private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
+        ClusterType cluster = deployment.getCluster();
         int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
         String leader = cluster.getLeader();
@@ -690,32 +688,33 @@ public abstract class CatalogUtil {
             ClusterCompiler.compile(catalog, config);
             // copy partition detection configuration from xml to catalog
             Cluster catCluster = catalog.getClusters().get("cluster");
-            if (cluster.getPartitionDetection() != null && cluster.getPartitionDetection().isEnabled()) {
+            if (deployment.getPartitionDetection() != null && deployment.getPartitionDetection().isEnabled()) {
                 catCluster.setNetworkpartition(true);
                 CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                 SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                sched.setPrefix(cluster.getPartitionDetection().getSnapshot().getPrefix());
-                hostLog.info("Detection of network partitions in the cluster enabled.");
+                sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
+                hostLog.info("Detection of network partitions in the cluster is enabled.");
             }
             else {
                 catCluster.setNetworkpartition(false);
                 hostLog.info("Detection of network partitions in the cluster is not enabled.");
             }
+
             // copy admin mode configuration from xml to catalog
-            if (cluster.getAdminMode() != null)
+            if (deployment.getAdminMode() != null && deployment.getAdminMode().isEnabled())
             {
                 catCluster.setAdminenabled(true);
-                catCluster.setAdminport(cluster.getAdminMode().getPort());
-                catCluster.setAdminstartup(cluster.getAdminMode().isAdminstartup());
+                catCluster.setAdminport(deployment.getAdminMode().getPort());
+                catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
             }
             else
             {
                 catCluster.setAdminenabled(false);
             }
 
-            if (cluster.getHeartbeat() != null)
+            if (deployment.getHeartbeat() != null)
             {
-                catCluster.setHeartbeattimeout(cluster.getHeartbeat().getTimeout());
+                catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
             }
             else
             {
@@ -757,21 +756,30 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
-        // Catalog Connector
-        // Relying on schema's enforcement of at most 1 connector
-        org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
-        catconn.setLoaderclass(exportType.getClazz());
-        // Figure out if the connector is enabled or disabled
-        // Export will be disabled if there is no destination.
         boolean adminstate = exportType.isEnabled();
+        String connector = "org.voltdb.export.processors.RawProcessor";
+        if (exportType.getClazz() != null) {
+            connector = exportType.getClazz();
+        }
+
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
+        if (catconn == null) {
+            if (adminstate) {
+                hostLog.info("Export configuration enabled in deployment file however no export " +
+                        "tables are present in the project file. Export disabled.");
+            }
+            return;
+        }
+
+        catconn.setLoaderclass(connector);
+        catconn.setEnabled(adminstate);
 
         if (!adminstate) {
             hostLog.info("Export configuration is present and is " +
-                             "configured to be disabled. Export will be disabled.");
+               "configured to be disabled. Export will be disabled.");
         }
-        catconn.setEnabled(adminstate);
     }
 
     /**
@@ -817,12 +825,7 @@ public abstract class CatalogUtil {
                 VoltDB.crashVoltDB();
             }
 
-            if (snapshotSettings.getRetain() == null) {
-                hostLog.fatal("Snapshot retain value not provided");
-                VoltDB.crashVoltDB();
-            }
-
-            int retain = snapshotSettings.getRetain().intValue();
+            int retain = snapshotSettings.getRetain();
             if (retain < 1) {
                 hostLog.fatal("Snapshot retain value " + retain +
                         " is not a valid value. Must be 1 or greater.");
@@ -950,15 +953,14 @@ public abstract class CatalogUtil {
 
     private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
         // defaults
-        int httpdPort = 0;
+        int httpdPort = -1;
         boolean jsonEnabled = true;
 
         Cluster cluster = catalog.getClusters().get("cluster");
 
         // if the httpd info is available, use it
-        if (httpd != null) {
+        if (httpd != null && httpd.isEnabled()) {
            httpdPort = httpd.getPort();
-           // if the json api info is available, use it
            HttpdType.Jsonapi jsonapi = httpd.getJsonapi();
            if (jsonapi != null)
                jsonEnabled = jsonapi.isEnabled();

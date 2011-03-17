@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.xml.bind.*;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -49,6 +50,10 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
+import org.voltdb.compiler.deploymentfile.*;
+import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
+import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -186,7 +191,9 @@ public class VoltProjectBuilder {
     private boolean m_elenabled;      // true if enabled; false if disabled
     List<String> m_elAuthGroups;      // authorized groups
 
-    int m_httpdPortNo = 0; // zero defaults to first open port >= 8080
+    // zero defaults to first open port >= 8080.
+    // negative one means disabled in the deployment file.
+    int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
 
     BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
@@ -476,6 +483,7 @@ public class VoltProjectBuilder {
 
         // this stuff could all be converted to org.voltdb.compiler.projectfile.*
         // jaxb objects and (WE ARE!) marshaled to XML. Just needs some elbow grease.
+        // (see the deployment file code below, which has been converted).
 
         DocumentBuilderFactory docFactory;
         DocumentBuilder docBuilder;
@@ -535,10 +543,29 @@ public class VoltProjectBuilder {
         final String projectPath = projectFile.getPath();
 
         boolean success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides);
-        m_pathToDeployment = writeDeploymentFile(
-                hostCount, sitesPerHost, leaderAddress,
-                replication, voltRoot, ppdEnabled,
-                ppdPath, ppdPrefix, adminEnabled, adminPort, adminOnStartup);
+        try {
+            m_pathToDeployment = writeDeploymentFile(
+                    hostCount, sitesPerHost, leaderAddress,
+                    replication, voltRoot, ppdEnabled,
+                    ppdPath, ppdPrefix, adminEnabled, adminPort, adminOnStartup);
+        } catch (Exception e) {
+            System.out.println("Failed to create deployment file in testcase.");
+            e.printStackTrace();
+            System.out.println("hostcount: " + hostCount);
+            System.out.println("sitesPerHost: " + sitesPerHost);
+            System.out.println("leaderAddress: " + leaderAddress);
+            System.out.println("replication: " + replication);
+            System.out.println("voltRoot: " + voltRoot);
+            System.out.println("ppdEnabled: " + ppdEnabled);
+            System.out.println("ppdPath: " + ppdPath);
+            System.out.println("ppdPrefix: " + ppdPrefix);
+            System.out.println("adminEnabled: " + adminEnabled);
+            System.out.println("adminPort: " + adminPort);
+            System.out.println("adminOnStartup: " + adminOnStartup);
+
+            // sufficient to escape and fail test cases?
+            throw new RuntimeException(e);
+        }
 
         return success;
     }
@@ -742,156 +769,121 @@ public class VoltProjectBuilder {
      * @param leader Leader address.
      * @param kFactor Replication factor.
      * @return Returns the path the temporary file was written to.
+     * @throws IOException
+     * @throws JAXBException
      */
     private String writeDeploymentFile(
             int hostCount, int sitesPerHost, String leader, int kFactor, String voltRoot,
             boolean ppdEnabled, String ppdPath, String ppdPrefix,
-            boolean adminEnabled, int adminPort, boolean adminOnStartup)
+            boolean adminEnabled, int adminPort, boolean adminOnStartup) throws IOException, JAXBException
     {
-        DocumentBuilderFactory docFactory;
-        DocumentBuilder docBuilder;
-        Document doc;
-        try {
-            docFactory = DocumentBuilderFactory.newInstance();
-            docBuilder = docFactory.newDocumentBuilder();
-            doc = docBuilder.newDocument();
-        }
-        catch (final ParserConfigurationException e) {
-            e.printStackTrace();
-            return null;
-        }
+        org.voltdb.compiler.deploymentfile.ObjectFactory factory =
+            new org.voltdb.compiler.deploymentfile.ObjectFactory();
 
         // <deployment>
-        final Element deployment = doc.createElement("deployment");
-        doc.appendChild(deployment);
+        DeploymentType deployment = factory.createDeploymentType();
+        JAXBElement<DeploymentType> doc = factory.createDeployment(deployment);
 
         // <cluster>
-        final Element cluster = doc.createElement("cluster");
-        cluster.setAttribute("hostcount", new Integer(hostCount).toString());
-        cluster.setAttribute("sitesperhost", new Integer(sitesPerHost).toString());
-        cluster.setAttribute("leader", leader);
-        cluster.setAttribute("kfactor", new Integer(kFactor).toString());
-        deployment.appendChild(cluster);
+        ClusterType cluster = factory.createClusterType();
+        deployment.setCluster(cluster);
+        cluster.setHostcount(hostCount);
+        cluster.setSitesperhost(sitesPerHost);
+        cluster.setLeader(leader);
+        cluster.setKfactor(kFactor);
 
         // <paths>
-        final Element paths = doc.createElement("paths");
-        final Element voltroot = doc.createElement("voltroot");
-        voltroot.setAttribute("path", voltRoot);
-        paths.appendChild(voltroot);
+        PathsType paths = factory.createPathsType();
+        deployment.setPaths(paths);
+        PathEntry voltroot = factory.createPathEntry();
+        paths.setVoltroot(voltroot);
+        voltroot.setPath(voltRoot);
 
         if (ppdPath != null) {
-            final Element ppdPathElement = doc.createElement("partitiondetectionsnapshot");
-            ppdPathElement.setAttribute("path", ppdPath);
-            paths.appendChild(ppdPathElement);
+            PathEntry ppdPathElement = factory.createPathEntry();
+            paths.setPartitiondetectionsnapshot(ppdPathElement);
+            ppdPathElement.setPath(ppdPath);
         }
 
         if (m_snapshotPath != null) {
-            final Element snapshotPathElement = doc.createElement("snapshots");
-            snapshotPathElement.setAttribute("path", m_snapshotPath);
-            paths.appendChild(snapshotPathElement);
+            PathEntry snapshotPathElement = factory.createPathEntry();
+            snapshotPathElement.setPath(m_snapshotPath);
+            paths.setSnapshots(snapshotPathElement);
         }
-
-        deployment.appendChild(paths);
 
         if (m_snapshotPrefix != null) {
-            final Element snapshot = doc.createElement("snapshot");
-            snapshot.setAttribute("frequency", m_snapshotFrequency);
-            snapshot.setAttribute("prefix", m_snapshotPrefix);
-            snapshot.setAttribute("retain", Integer.toString(m_snapshotRetain));
-            deployment.appendChild(snapshot);
+            SnapshotType snapshot = factory.createSnapshotType();
+            deployment.setSnapshot(snapshot);
+            snapshot.setFrequency(m_snapshotFrequency);
+            snapshot.setPrefix(m_snapshotPrefix);
+            snapshot.setRetain(m_snapshotRetain);
         }
 
-        // <cluster>/<partition-detection>/<snapshot>
-        if (ppdEnabled) {
-            final Element ppd = doc.createElement("partition-detection");
-            cluster.appendChild(ppd);
-            ppd.setAttribute("enabled", "true");
-            final Element ss = doc.createElement("snapshot");
-            ss.setAttribute("prefix", ppdPrefix);
-            ppd.appendChild(ss);
-        }
+        // <partition-detection>/<snapshot>
+        PartitionDetectionType ppd = factory.createPartitionDetectionType();
+        deployment.setPartitionDetection(ppd);
+        ppd.setEnabled(ppdEnabled);
+        Snapshot ppdsnapshot = factory.createPartitionDetectionTypeSnapshot();
+        ppd.setSnapshot(ppdsnapshot);
+        ppdsnapshot.setPrefix(ppdPrefix);
 
-        if (adminEnabled)
-        {
-            final Element admin = doc.createElement("admin-mode");
-            cluster.appendChild(admin);
-            admin.setAttribute("port", new Integer(adminPort).toString());
-            if (adminOnStartup)
-            {
-                admin.setAttribute("adminstartup", "true");
-            }
-        }
+        // <admin-mode>
+        AdminModeType admin = factory.createAdminModeType();
+        deployment.setAdminMode(admin);
+        admin.setEnabled(adminEnabled);
+        admin.setPort(adminPort);
+        admin.setAdminstartup(adminOnStartup);
 
         // <users>
-        Element users = null;
         if (m_users.size() > 0) {
-            users = doc.createElement("users");
-            deployment.appendChild(users);
-        }
+            UsersType users = factory.createUsersType();
+            deployment.setUsers(users);
 
-        // <user>
-        for (final UserInfo info : m_users) {
-            final Element user = doc.createElement("user");
-            user.setAttribute("name", info.name);
-            user.setAttribute("password", info.password);
-            // build up user/@groups. This attribute must be redesigned
-            if (info.groups.length > 0) {
-                final StringBuilder groups = new StringBuilder();
-                for (final String group : info.groups) {
-                    if (groups.length() > 0)
-                        groups.append(",");
-                    groups.append(group);
+            // <user>
+            for (final UserInfo info : m_users) {
+                User user = factory.createUsersTypeUser();
+                users.getUser().add(user);
+                user.setName(info.name);
+                user.setPassword(info.password);
+
+                // build up user/@groups.
+                if (info.groups.length > 0) {
+                    final StringBuilder groups = new StringBuilder();
+                    for (final String group : info.groups) {
+                        if (groups.length() > 0)
+                            groups.append(",");
+                        groups.append(group);
+                    }
+                    user.setGroups(groups.toString());
                 }
-                user.setAttribute("groups", groups.toString());
             }
-            users.appendChild(user);
         }
 
-        // <httpd>
-        final Element httpd = doc.createElement("httpd");
-        httpd.setAttribute("port", Integer.valueOf(m_httpdPortNo).toString());
-        final Element jsonapi = doc.createElement("jsonapi");
-        jsonapi.setAttribute("enabled", new Boolean(m_jsonApiEnabled).toString());
-        httpd.appendChild(jsonapi);
-        deployment.appendChild(httpd);
+        // <httpd>. Disabled unless port # is configured by a testcase
+        HttpdType httpd = factory.createHttpdType();
+        deployment.setHttpd(httpd);
+        httpd.setEnabled(m_httpdPortNo != -1);
+        httpd.setPort(m_httpdPortNo);
+        Jsonapi json = factory.createHttpdTypeJsonapi();
+        httpd.setJsonapi(json);
+        json.setEnabled(m_jsonApiEnabled);
 
         // <export>
+        ExportType export = factory.createExportType();
+        deployment.setExport(export);
+        export.setEnabled(m_elenabled);
         if (m_elloader != null) {
-            final Element export = doc.createElement("export");
-            deployment.appendChild(export);
-            export.setAttribute("class", m_elloader);
-            export.setAttribute("enabled", m_elenabled ? "true" : "false");
+            export.setClazz(m_elloader);
         }
 
-        // boilerplate to write this DOM object to file.
-        StreamResult result;
-        try {
-            final Transformer transformer = TransformerFactory.newInstance().newTransformer();
-            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-            result = new StreamResult(new StringWriter());
-            final DOMSource domSource = new DOMSource(doc);
-            transformer.transform(domSource, result);
-        }
-        catch (final TransformerConfigurationException e) {
-            e.printStackTrace();
-            return null;
-        }
-        catch (final TransformerFactoryConfigurationError e) {
-            e.printStackTrace();
-            return null;
-        }
-        catch (final TransformerException e) {
-            e.printStackTrace();
-            return null;
-        }
-
-        String xml = result.getWriter().toString();
-        System.out.println(xml);
-
-        final File deploymentFile =
-            writeStringToTempFile(result.getWriter().toString());
-        final String deploymentPath = deploymentFile.getPath();
-
+        // Have some yummy boilerplate!
+        File file = File.createTempFile("myAppDeployment", ".tmp");
+        JAXBContext context = JAXBContext.newInstance(DeploymentType.class);
+        Marshaller marshaller = context.createMarshaller();
+        marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT,
+                Boolean.TRUE);
+        marshaller.marshal(doc, file);
+        final String deploymentPath = file.getPath();
         return deploymentPath;
     }
 

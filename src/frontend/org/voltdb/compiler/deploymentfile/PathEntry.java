@@ -15,15 +15,15 @@ import javax.xml.bind.annotation.XmlType;
 
 
 /**
- * <p>Java class for heartbeatType complex type.
+ * <p>Java class for pathEntry complex type.
  * 
  * <p>The following schema fragment specifies the expected content contained within this class.
  * 
  * <pre>
- * &lt;complexType name="heartbeatType">
+ * &lt;complexType name="pathEntry">
  *   &lt;complexContent>
  *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
- *       &lt;attribute name="timeout" use="required" type="{}timeoutType" />
+ *       &lt;attribute name="path" use="required" type="{http://www.w3.org/2001/XMLSchema}string" />
  *     &lt;/restriction>
  *   &lt;/complexContent>
  * &lt;/complexType>
@@ -32,26 +32,34 @@ import javax.xml.bind.annotation.XmlType;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "heartbeatType")
-public class HeartbeatType {
+@XmlType(name = "pathEntry")
+public class PathEntry {
 
     @XmlAttribute(required = true)
-    protected int timeout;
+    protected String path;
 
     /**
-     * Gets the value of the timeout property.
+     * Gets the value of the path property.
      * 
+     * @return
+     *     possible object is
+     *     {@link String }
+     *     
      */
-    public int getTimeout() {
-        return timeout;
+    public String getPath() {
+        return path;
     }
 
     /**
-     * Sets the value of the timeout property.
+     * Sets the value of the path property.
      * 
+     * @param value
+     *     allowed object is
+     *     {@link String }
+     *     
      */
-    public void setTimeout(int value) {
-        this.timeout = value;
+    public void setPath(String value) {
+        this.path = value;
     }
 
 }

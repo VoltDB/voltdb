@@ -446,11 +446,11 @@ public class RealVoltDB implements VoltDBInterface
             // Initialize the complex partitioning scheme
             TheHashinator.initialize(catalog);
 
-            // start the httpd dashboard/jsonapi
+            // start the httpd dashboard/jsonapi. A port value of -1 means disabled
+            // by the deployment.xml configuration.
             int httpPort = m_catalogContext.cluster.getHttpdportno();
             boolean jsonEnabled = m_catalogContext.cluster.getJsonapi();
             String httpPortExtraLogMessage = null;
-
             // if not set by the user, just find a free port
             if (httpPort == 0) {
                 // if not set by the user, start at 8080
@@ -467,7 +467,7 @@ public class RealVoltDB implements VoltDBInterface
                 else if (httpPort > 8081)
                     httpPortExtraLogMessage = "HTTP admin console unable to bind to ports 8080 through " + String.valueOf(httpPort - 1);
             }
-            else {
+            else if (httpPort != -1) {
                 try {
                     m_adminListener = new HTTPAdminListener(jsonEnabled, httpPort);
                 } catch (Exception e1) {
@@ -899,7 +899,12 @@ public class RealVoltDB implements VoltDBInterface
         }
         if (httpPortExtraLogMessage != null)
             hostLog.info(httpPortExtraLogMessage);
-        hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", httpPort));
+        if (httpPort != -1) {
+            hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", httpPort));
+        }
+        else {
+            hostLog.info(String.format("Local machine HTTP monitoring is disabled."));
+        }
         if (jsonEnabled) {
             hostLog.info(String.format("Json API over HTTP enabled at path /api/1.0/, listening on port %d.", httpPort));
         }

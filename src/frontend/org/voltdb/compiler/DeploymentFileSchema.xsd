@@ -37,25 +37,37 @@
   <xs:complexType name="deploymentType">
     <xs:all>
       <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
-      <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="paths" minOccurs="1" maxOccurs="1" type="pathsType" />
-      <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
+      <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
+      <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
+      <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
+      <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
+      <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
     </xs:all>
   </xs:complexType>
 
   <!-- <cluster> -->
   <xs:complexType name="clusterType">
-    <xs:all>
-        <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
-        <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
-        <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
-    </xs:all>
-    <xs:attribute name="hostcount" type="xs:int" use="required"/>
-    <xs:attribute name="sitesperhost" type="xs:int" use="required"/>
+    <xs:attribute name="hostcount" type="xs:int" default="1"/>
+    <xs:attribute name="sitesperhost" type="xs:int" default="2"/>
     <xs:attribute name="leader" type="xs:string" use="required"/>
-    <xs:attribute name="kfactor" type="xs:int" use="optional" default="0"/>
+    <xs:attribute name="kfactor" type="xs:int" default="0"/>
+  </xs:complexType>
+
+  <!-- <paths> -->
+  <xs:complexType name="pathEntry">
+      <xs:attribute name="path" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="pathsType">
+    <xs:all>
+        <xs:element name="voltroot" type="pathEntry" minOccurs="1" maxOccurs="1"/>
+        <xs:element name="snapshots" type="pathEntry" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="partitiondetectionsnapshot" type="pathEntry" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="exportoverflow" type="pathEntry" minOccurs="0" maxOccurs="1"/>
+    </xs:all>
   </xs:complexType>
 
   <!-- <partition-detection>/<snapshot> -->
@@ -67,13 +79,14 @@
              </xs:complexType>
           </xs:element>
       </xs:all>
-      <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+      <xs:attribute name="enabled" type="xs:boolean" default="true"/>
    </xs:complexType>
 
   <!-- <admin-mode> -->
   <xs:complexType name="adminModeType">
-    <xs:attribute name="port" type="xs:int" use="required"/>
-    <xs:attribute name="adminstartup" type="xs:boolean" use="optional" default="false"/>
+    <xs:attribute name="port" type="xs:int" default="21210"/>
+    <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
   <!-- <heartbeat-config> -->
@@ -87,68 +100,44 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- <httpd> -->
+  <xs:complexType name="httpdType">
+    <xs:sequence>
+      <xs:element name="jsonapi" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="port" type="xs:int" default="8080"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- <snapshot> -->
+  <xs:complexType name="snapshotType">
+    <xs:attribute name="frequency" type="xs:string" use="required"/>
+    <xs:attribute name="retain" type="xs:int" use="required"/>
+    <xs:attribute name="prefix" type="xs:string" use="required"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- <export> -->
+  <xs:complexType name="exportType">
+    <xs:attribute name="class" type="xs:string" default="org.voltdb.export.processors.RawProcessor"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
   <!-- <users> -->
   <xs:complexType name="usersType">
     <xs:sequence>
       <xs:element name="user" minOccurs="1" maxOccurs="unbounded">
         <xs:complexType>
           <xs:attribute name="name" type="xs:string" use="required"/>
-          <xs:attribute name="groups" type="xs:string" />
+          <xs:attribute name="groups" type="xs:string"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
-  </xs:complexType>
-
-  <!-- <httpd> -->
-  <xs:complexType name="httpdType">
-    <xs:sequence>
-      <xs:element name="jsonapi" minOccurs="0" maxOccurs="1">
-        <xs:complexType>
-          <xs:attribute name="enabled" type="xs:boolean" use="required"/>
-        </xs:complexType>
-      </xs:element>
-    </xs:sequence>
-    <xs:attribute name="port" type="xs:int" use="optional" default="0"/>
-  </xs:complexType>
-
-  <!-- <paths> -->
-  <xs:complexType name="pathsType">
-    <xs:all>
-      <xs:element name="voltroot" minOccurs="1" maxOccurs="1">
-        <xs:complexType>
-          <xs:attribute name="path" type="xs:string" use="required"/>
-        </xs:complexType>
-      </xs:element>
-      <xs:element name="snapshots" minOccurs="0" maxOccurs="1">
-        <xs:complexType>
-          <xs:attribute name="path" type="xs:string" use="required"/>
-        </xs:complexType>
-      </xs:element>
-      <xs:element name="partitiondetectionsnapshot" minOccurs="0" maxOccurs="1">
-        <xs:complexType>
-          <xs:attribute name="path" type="xs:string" use="required"/>
-        </xs:complexType>
-      </xs:element>
-      <xs:element name="exportoverflow" minOccurs="0" maxOccurs="1">
-        <xs:complexType>
-          <xs:attribute name="path" type="xs:string" use="required"/>
-        </xs:complexType>
-      </xs:element>
-    </xs:all>
-  </xs:complexType>
-
-  <!-- <snapshot> -->
-  <xs:complexType name="snapshotType">
-    <xs:attribute name="frequency" type="xs:string" use="required"  />
-    <xs:attribute name="retain" type="xs:integer" use="required" />
-    <xs:attribute name="prefix" type="xs:string" use="required" />
-  </xs:complexType>
-
-  <!-- <export> -->
-  <xs:complexType name="exportType">
-    <xs:attribute name="class" type="xs:string" use="optional" default="org.voltdb.export.processors.RawProcessor"/>
-    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
   </xs:complexType>
 
 </xs:schema>
