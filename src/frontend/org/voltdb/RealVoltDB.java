@@ -495,7 +495,8 @@ public class RealVoltDB implements VoltDBInterface
             // Prepare the network socket manager for work
             m_network = new VoltNetwork();
             final HashSet<Integer> downHosts = new HashSet<Integer>();
-            if (config.m_rejoinToHostAndPort == null) {
+            boolean isRejoin = config.m_rejoinToHostAndPort != null;
+            if (!isRejoin) {
                 // Create the intra-cluster mesh
                 InetAddress leader = null;
                 try {
@@ -545,7 +546,7 @@ public class RealVoltDB implements VoltDBInterface
 
             // Let the Export system read its configuration from the catalog.
             try {
-                ExportManager.initialize(myHostId, m_catalogContext);
+                ExportManager.initialize(myHostId, m_catalogContext, isRejoin);
             } catch (ExportManager.SetupException e) {
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ExportInitFailure.name(), e);
                 System.exit(-1);

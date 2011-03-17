@@ -27,6 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.io.File;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
@@ -150,6 +151,38 @@ public class TestExportSuite extends RegressionSuite {
         super.tearDown();
         m_tester.disconnect();
         assertTrue(callbackSucceded);
+    }
+
+    /*
+     *  Test Export of a DROPPED table.  Queues some data to a table.
+     *  Then drops the table and restarts the server. Verifies that Export can successfully
+     *  drain the dropped table. IE, drop table doesn't lose Export data.
+     */
+    public void testExportAndThenRejoinClearsExportOverflow() throws Exception {
+        Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        client.drain();
+
+        ((LocalCluster)m_config).shutDownSingleHost(1);
+        File exportOverflowDir =
+            new File(((LocalCluster)m_config).getSubRoots().get(1),
+                "/tmp/" + System.getProperty("user.name") + "/export_overflow");
+        File files[] = exportOverflowDir.listFiles();
+        ((LocalCluster)m_config).recoverOne(1, null, "localhost");
+        Thread.sleep(500);
+        File filesAfterRejoin[] = exportOverflowDir.listFiles();
+        for (File f : files) {
+            for (File f2 : filesAfterRejoin) {
+                if (f.getPath().equals(f2.getPath())) {
+                    fail("Files " + f + " still exists after rejoin in export overflow directory");
+                }
+            }
+        }
     }
 
     /*

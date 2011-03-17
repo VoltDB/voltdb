@@ -1080,7 +1080,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  * Method:    nativeGetUSOForExportTable
  * Signature: (JLjava/lang/String;)[J
  */
-JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable
+SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable
   (JNIEnv *env, jobject obj, jlong engine_ptr, jstring tableSignature) {
 
     VOLT_DEBUG("nativeGetUSOForExportTable in C++ called");

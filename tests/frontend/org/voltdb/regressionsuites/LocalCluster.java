@@ -958,4 +958,8 @@ public class LocalCluster implements VoltServerConfig {
         return files;
     }
 
+    public ArrayList<File> getSubRoots() {
+        return m_subRoots;
+    }
+
 }

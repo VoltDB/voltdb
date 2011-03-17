@@ -35,6 +35,7 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -125,13 +126,38 @@ public class ExportManager
      * @param catalogContext
      * @throws ExportManager.SetupException
      */
-    public static synchronized void initialize(int myHostId, CatalogContext catalogContext)
+    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, boolean isRejoin)
         throws ExportManager.SetupException
     {
+        /*
+         * If a node is rejoining it is because it crashed. Export overflow isn't crash safe so it isn't possible
+         * to recover the data. Delete it instead.
+         */
+        if (isRejoin) {
+            deleteExportOverflowData(catalogContext);
+        }
         ExportManager tmp = new ExportManager(myHostId, catalogContext);
         m_self = tmp;
     }
 
+    private static void deleteExportOverflowData(CatalogContext context) {
+        File exportOverflowDirectory = new File(context.cluster.getExportoverflow());
+        exportLog.info("Deleting export overflow data from " + exportOverflowDirectory);
+        if (!exportOverflowDirectory.exists()) {
+            return;
+        }
+        File files[] = exportOverflowDirectory.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                try {
+                    VoltFile.recursivelyDelete(f);
+                } catch (IOException e) {
+                    exportLog.fatal(e);
+                    VoltDB.crashVoltDB();
+                }
+            }
+        }
+    }
     /**
      * Get the global instance of the ExportManager.
      * @return The global single instance of the ExportManager.
