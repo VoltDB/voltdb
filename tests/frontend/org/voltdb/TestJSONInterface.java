@@ -60,6 +60,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -77,7 +78,8 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.procedures.CrazyBlahProc;
+import org.voltdb.compiler.VoltProjectBuilder.*;
+import org.voltdb.compiler.procedures.*;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
@@ -242,7 +244,7 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    /*public void testSimple() throws Exception {
+    public void testSimple() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 23 not null, " +
@@ -676,7 +678,7 @@ public class TestJSONInterface extends TestCase {
 
         server.shutdown();
         server.join();
-    }*/
+    }
 
     public void testAdminMode() throws Exception {
         String simpleSchema =
