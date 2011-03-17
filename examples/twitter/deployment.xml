@@ -4,6 +4,5 @@
     <paths>
         <voltroot path="/tmp" />
     </paths>
-    <export>
-    </export>
+    <export/>
 </deployment>
