@@ -63,11 +63,21 @@
 
   <xs:complexType name="pathsType">
     <xs:all>
-        <xs:element name="voltroot" type="pathEntry" minOccurs="1" maxOccurs="1"/>
+        <xs:element name="voltdbroot" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="voltdbroot"/>
+            </xs:complexType>
+        </xs:element>
         <xs:element name="snapshots" type="pathEntry" minOccurs="0" maxOccurs="1"/>
         <xs:element name="partitiondetectionsnapshot" type="pathEntry" minOccurs="0" maxOccurs="1"/>
         <xs:element name="exportoverflow" type="pathEntry" minOccurs="0" maxOccurs="1"/>
     </xs:all>
+  </xs:complexType>
+
+  <!-- <admin-mode> (always enabled.) -->
+  <xs:complexType name="adminModeType">
+    <xs:attribute name="port" type="xs:int" default="21210"/>
+    <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <partition-detection>/<snapshot> -->
@@ -81,13 +91,6 @@
       </xs:all>
       <xs:attribute name="enabled" type="xs:boolean" default="true"/>
    </xs:complexType>
-
-  <!-- <admin-mode> -->
-  <xs:complexType name="adminModeType">
-    <xs:attribute name="port" type="xs:int" default="21210"/>
-    <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
-    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
-  </xs:complexType>
 
   <!-- <heartbeat-config> -->
   <xs:complexType name="heartbeatType">

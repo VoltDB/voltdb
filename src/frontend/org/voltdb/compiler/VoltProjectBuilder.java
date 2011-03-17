@@ -53,6 +53,7 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.compiler.deploymentfile.*;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
+import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
@@ -462,20 +463,20 @@ public class VoltProjectBuilder {
             java.io.File voltRootFile = new java.io.File(voltRootPath);
             if (!voltRootFile.exists()) {
                 if (!voltRootFile.mkdir()) {
-                    throw new RuntimeException("Unable to create voltroot \"" + voltRootPath + "\" for test");
+                    throw new RuntimeException("Unable to create voltdbroot \"" + voltRootPath + "\" for test");
                 }
             }
             if (!voltRootFile.isDirectory()) {
-                throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not a directory");
+                throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not a directory");
             }
             if (!voltRootFile.canRead()) {
-                throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not readable");
+                throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not readable");
             }
             if (!voltRootFile.canWrite()) {
-                throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
+                throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
             }
             if (!voltRootFile.canExecute()) {
-                throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
+                throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
             }
             voltRoot = voltRootPath;
         }
@@ -795,9 +796,9 @@ public class VoltProjectBuilder {
         // <paths>
         PathsType paths = factory.createPathsType();
         deployment.setPaths(paths);
-        PathEntry voltroot = factory.createPathEntry();
-        paths.setVoltroot(voltroot);
-        voltroot.setPath(voltRoot);
+        Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
+        paths.setVoltdbroot(voltdbroot);
+        voltdbroot.setPath(voltRoot);
 
         if (ppdPath != null) {
             PathEntry ppdPathElement = factory.createPathEntry();
@@ -828,11 +829,15 @@ public class VoltProjectBuilder {
         ppdsnapshot.setPrefix(ppdPrefix);
 
         // <admin-mode>
-        AdminModeType admin = factory.createAdminModeType();
-        deployment.setAdminMode(admin);
-        admin.setEnabled(adminEnabled);
-        admin.setPort(adminPort);
-        admin.setAdminstartup(adminOnStartup);
+        // can't be disabled, but only write out the non-default config if
+        // requested by a test. otherwise, take the implied defaults (or
+        // whatever local cluster overrides on the command line).
+        if (adminEnabled) {
+            AdminModeType admin = factory.createAdminModeType();
+            deployment.setAdminMode(admin);
+            admin.setPort(adminPort);
+            admin.setAdminstartup(adminOnStartup);
+        }
 
         // <users>
         if (m_users.size() > 0) {

@@ -117,7 +117,7 @@ public class TestCatalogUtil extends TestCase {
         final String dep1 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
                             "<cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
-                            "<paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                            "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "<httpd port='0'>" +
                             "<jsonapi enabled='true'/>" +
                             "</httpd>" +
@@ -127,7 +127,7 @@ public class TestCatalogUtil extends TestCase {
         final String dep2 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
                             "<cluster hostcount='4' kfactor='1' leader='localhost' sitesperhost='2'/>" +
-                            "<paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                            "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "<httpd port='0'>" +
                             "<jsonapi enabled='true'/>" +
                             "</httpd>" +
@@ -137,7 +137,7 @@ public class TestCatalogUtil extends TestCase {
         final String dep3 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
                             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2' />" +
-                            "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "   <httpd port='0' >" +
                             "       <jsonapi enabled='true'/>" +
                             "   </httpd>" +
@@ -148,7 +148,7 @@ public class TestCatalogUtil extends TestCase {
                             "<deployment>" +
                             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
                             "   <admin-mode port='32323' adminstartup='true'/>" +
-                            "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "   <httpd port='0' >" +
                             "       <jsonapi enabled='true'/>" +
                             "   </httpd>" +
@@ -160,7 +160,7 @@ public class TestCatalogUtil extends TestCase {
                             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
                             "       <admin-mode port='32323' adminstartup='true'/>" +
                             "   <heartbeat timeout='30'/>" +
-                            "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "   <httpd port='0' >" +
                             "       <jsonapi enabled='true'/>" +
                             "   </httpd>" +
@@ -198,7 +198,7 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
             "   <admin-mode port='32323' adminstartup='true'/>" +
             "   <heartbeat timeout='30'/>" +
-            "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <httpd port='0' >" +
             "       <jsonapi enabled='true'/>" +
             "   </httpd>" +
@@ -211,7 +211,7 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
             "   <admin-mode port='32323' adminstartup='true'/>" +
             "   <heartbeat timeout='0'/>" +
-            "   <paths><voltroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <httpd port='0' >" +
             "       <jsonapi enabled='true'/>" +
             "   </httpd>" +

@@ -497,7 +497,6 @@ public abstract class CatalogUtil {
         AdminModeType amt = deployment.getAdminMode();
         if (amt != null)
         {
-            sb.append(amt.isEnabled());
             sb.append(amt.getPort()).append(",");
             sb.append(amt.isAdminstartup()).append("\n");
         }
@@ -701,7 +700,7 @@ public abstract class CatalogUtil {
             }
 
             // copy admin mode configuration from xml to catalog
-            if (deployment.getAdminMode() != null && deployment.getAdminMode().isEnabled())
+            if (deployment.getAdminMode() != null)
             {
                 catCluster.setAdminenabled(true);
                 catCluster.setAdminport(deployment.getAdminMode().getPort());
@@ -848,12 +847,16 @@ public abstract class CatalogUtil {
     private static void setPathsInfo(Catalog catalog, PathsType paths) {
         assert(paths != null);
 
-        File voltRoot = new VoltFile(paths.getVoltroot().getPath());
-        validateDirectory("volt root", voltRoot);
+        File voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
+        if (!voltDbRoot.exists()) {
+            hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
+            voltDbRoot.mkdir();
+        }
+        validateDirectory("volt root", voltDbRoot);
 
         File snapshotPath;
         if (paths.getSnapshots() == null) {
-            snapshotPath = new VoltFile(voltRoot, "snapshots");
+            snapshotPath = new VoltFile(voltDbRoot, "snapshots");
             if (!snapshotPath.exists()) {
                 if (!snapshotPath.mkdir()) {
                     hostLog.fatal("Failed to create snapshot directory \"" + snapshotPath + "\"");
@@ -867,7 +870,7 @@ public abstract class CatalogUtil {
 
         File ppdSnapshotPath;
         if (paths.getPartitiondetectionsnapshot() == null) {
-            ppdSnapshotPath = new VoltFile(voltRoot, "partition_detection_snapshot");
+            ppdSnapshotPath = new VoltFile(voltDbRoot, "partition_detection_snapshot");
             if (!ppdSnapshotPath.exists()) {
                 if (!ppdSnapshotPath.mkdir()) {
                     hostLog.fatal("Failed to create partition detection snapshot directory \""
@@ -882,7 +885,7 @@ public abstract class CatalogUtil {
 
         File exportOverflowPath;
         if (paths.getExportoverflow() == null) {
-            exportOverflowPath = new VoltFile(voltRoot, "export_overflow");
+            exportOverflowPath = new VoltFile(voltDbRoot, "export_overflow");
             if (!exportOverflowPath.exists()) {
                 if (!exportOverflowPath.mkdir()) {
                     hostLog.fatal("Failed to create export overflow directory \""
@@ -896,7 +899,7 @@ public abstract class CatalogUtil {
         validateDirectory("export overflow", exportOverflowPath);
 
         //Set the volt root in the catalog
-        catalog.getClusters().get("cluster").setVoltroot(voltRoot.getPath());
+        catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());
 
         //Set the auto-snapshot schedule path if there are auto-snapshots
         SnapshotSchedule schedule = catalog.getClusters().get("cluster").getDatabases().
@@ -912,7 +915,7 @@ public abstract class CatalogUtil {
         }
 
         //Set the volt root
-        catalog.getClusters().get("cluster").setVoltroot(voltRoot.getPath());
+        catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());
 
         //Also set the export overflow directory
         catalog.getClusters().get("cluster").setExportoverflow(exportOverflowPath.getPath());
