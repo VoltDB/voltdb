@@ -625,7 +625,9 @@ public class PlanAssembler {
         Table targetTable = m_parsedInsert.tableList.get(0);
 
         // this is never going to go well
-        if (m_singlePartition && (targetTable.getIsreplicated())) {
+        if (m_singlePartition && targetTable.getIsreplicated() &&
+           (CatalogUtil.isTableExportOnly(m_catalogDb, targetTable) == false)) {
+
             String msg =
                 "Trying to insert into replicated table '"
                         + targetTable.getTypeName() + "'";

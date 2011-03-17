@@ -481,7 +481,8 @@ public abstract class ProcedureCompiler {
                 CatalogMap<Column> columns = table.getColumns();
                 Column partitionColumn = table.getPartitioncolumn();
                 if (partitionColumn == null) {
-                    String msg = "PartitionInfo for procedure " + procedure.getClassname() + " refers to a replicated table (no partition column).";
+                    String msg = String.format("PartitionInfo for procedure %s references table %s which has no partition column (may be replicated).",
+                            procedure.getClassname(), table.getTypeName());
                     throw compiler.new VoltCompilerException(msg);
                 }
 

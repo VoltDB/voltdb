@@ -79,13 +79,13 @@ public class VoltDBFickleCluster extends LocalCluster {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addSchema(schemaPath);
-        builder.addPartitionInfo("blah", "ival");
+        //builder.addPartitionInfo("blah", "ival");
         builder.addPartitionInfo("blah2", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);", "blah.ival: 0");
+        builder.addStmtProcedure("Insert", "insert into blah values (?);", "blah2.ival: 0");
         builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
         builder.setTableAsExportOnly("blah");
         boolean success = m_cluster.compile(builder);
-        //assert(success);
+        assert(success);
 
         simpleSchema =
             "create table blah2 (" +

@@ -202,14 +202,17 @@ public class VoltCompiler {
     }
 
     class VoltXMLErrorHandler implements ErrorHandler {
+        @Override
         public void error(final SAXParseException exception) throws SAXException {
             addErr(exception.getMessage(), exception.getLineNumber());
         }
 
+        @Override
         public void fatalError(final SAXParseException exception) throws SAXException {
             //addErr(exception.getMessage(), exception.getLineNumber());
         }
 
+        @Override
         public void warning(final SAXParseException exception) throws SAXException {
             addWarn(exception.getMessage(), exception.getLineNumber());
         }
@@ -822,9 +825,10 @@ public class VoltCompiler {
                     throw new VoltCompilerException("View configured as an export-only table");
                 }
                 if (tableref.getIsreplicated()) {
-                    compilerLog.error("While configuring export, table " + tablename + " is a " +
-                        "replicated table. An export only table must be partitioned.");
-                    throw new VoltCompilerException("View configured as an export-only table");
+                    // if you don't specify partition columns, make
+                    // export tables partitioned, but on no specific column (iffy)
+                    tableref.setIsreplicated(false);
+                    tableref.setPartitioncolumn(null);
                 }
 
                 org.voltdb.catalog.ConnectorTableInfo connTableInfo = catconn.getTableinfo().add(tablename);
