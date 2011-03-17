@@ -7,6 +7,6 @@
        <user name="admin" password="nasa" groups="admin-group" />
     </users>
     <paths>
-        <voltroot path="/tmp" />
+        <voltdbroot path="/tmp" />
     </paths>
 </deployment>

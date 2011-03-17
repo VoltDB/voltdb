@@ -4,6 +4,6 @@
             sitesperhost="2"
             leader="localhost" />
    <paths>
-       <voltroot path="/tmp" />
+       <voltdbroot path="/tmp" />
    </paths>
 </deployment>

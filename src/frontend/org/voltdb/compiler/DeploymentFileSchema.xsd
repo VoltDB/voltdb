@@ -37,7 +37,7 @@
   <xs:complexType name="deploymentType">
     <xs:all>
       <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
-      <xs:element name="paths" minOccurs="1" maxOccurs="1" type="pathsType" />
+      <xs:element name="paths" minOccurs="0" maxOccurs="1" type="pathsType" />
       <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
       <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>

@@ -2,6 +2,6 @@
 <deployment>
     <cluster hostcount="1" sitesperhost="3" leader="localhost" kfactor="0" />
     <paths>
-        <voltroot path="/tmp" />
+        <voltdbroot path="/tmp" />
     </paths>
 </deployment>

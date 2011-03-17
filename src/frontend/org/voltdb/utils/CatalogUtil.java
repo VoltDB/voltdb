@@ -845,17 +845,25 @@ public abstract class CatalogUtil {
      * @param paths A reference to the <paths> element of the deployment.xml file.
      */
     private static void setPathsInfo(Catalog catalog, PathsType paths) {
-        assert(paths != null);
+        File voltDbRoot;
 
-        File voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
-        if (!voltDbRoot.exists()) {
-            hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
-            voltDbRoot.mkdir();
+        // Handle default voltdbroot (and completely missing "paths" element).
+        if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null) {
+            voltDbRoot = new VoltFile("voltdbroot");
+            if (!voltDbRoot.exists()) {
+                hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
+                if (!voltDbRoot.mkdir()) {
+                    hostLog.fatal("Failed to create voltdbroot directory \"" + voltDbRoot + "\"");
+                }
+            }
+        } else {
+            voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
         }
+
         validateDirectory("volt root", voltDbRoot);
 
         File snapshotPath;
-        if (paths.getSnapshots() == null) {
+        if (paths == null || paths.getSnapshots() == null) {
             snapshotPath = new VoltFile(voltDbRoot, "snapshots");
             if (!snapshotPath.exists()) {
                 if (!snapshotPath.mkdir()) {
@@ -869,7 +877,7 @@ public abstract class CatalogUtil {
         validateDirectory("snapshot path", snapshotPath);
 
         File ppdSnapshotPath;
-        if (paths.getPartitiondetectionsnapshot() == null) {
+        if (paths == null || paths.getPartitiondetectionsnapshot() == null) {
             ppdSnapshotPath = new VoltFile(voltDbRoot, "partition_detection_snapshot");
             if (!ppdSnapshotPath.exists()) {
                 if (!ppdSnapshotPath.mkdir()) {
@@ -884,7 +892,7 @@ public abstract class CatalogUtil {
         validateDirectory("partition detection snapshot path", ppdSnapshotPath);
 
         File exportOverflowPath;
-        if (paths.getExportoverflow() == null) {
+        if (paths == null || paths.getExportoverflow() == null) {
             exportOverflowPath = new VoltFile(voltDbRoot, "export_overflow");
             if (!exportOverflowPath.exists()) {
                 if (!exportOverflowPath.mkdir()) {
@@ -913,9 +921,6 @@ public abstract class CatalogUtil {
         if (schedule != null) {
             schedule.setPath(ppdSnapshotPath.getPath());
         }
-
-        //Set the volt root
-        catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());
 
         //Also set the export overflow directory
         catalog.getClusters().get("cluster").setExportoverflow(exportOverflowPath.getPath());
