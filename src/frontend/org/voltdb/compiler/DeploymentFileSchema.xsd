@@ -76,7 +76,7 @@
 
   <!-- <admin-mode> (always enabled.) -->
   <xs:complexType name="adminModeType">
-    <xs:attribute name="port" type="xs:int" default="21210"/>
+    <xs:attribute name="port" type="xs:int" default="21211"/>
     <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
 

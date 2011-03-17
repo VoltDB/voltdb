@@ -419,8 +419,7 @@ public class RealVoltDB implements VoltDBInterface
 
             // See if we should bring the server up in admin mode
             m_inAdminMode = false;
-            if (m_catalogContext.cluster.getAdminenabled() &&
-                m_catalogContext.cluster.getAdminstartup())
+            if (m_catalogContext.cluster.getAdminstartup())
             {
                 m_inAdminMode = true;
             }
@@ -888,12 +887,8 @@ public class RealVoltDB implements VoltDBInterface
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
         // print out awesome network stuff
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
-        if (m_catalogContext.cluster.getAdminenabled()) {
-            hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", adminPort));
-        }
-        else {
-            hostLog.info("The admin client port is disabled.");
-        }
+        hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", adminPort));
+
         if (m_inAdminMode) {
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
         }

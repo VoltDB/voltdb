@@ -702,13 +702,14 @@ public abstract class CatalogUtil {
             // copy admin mode configuration from xml to catalog
             if (deployment.getAdminMode() != null)
             {
-                catCluster.setAdminenabled(true);
                 catCluster.setAdminport(deployment.getAdminMode().getPort());
                 catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
             }
             else
             {
-                catCluster.setAdminenabled(false);
+                // encode the default values
+                catCluster.setAdminport(21211);
+                catCluster.setAdminstartup(false);
             }
 
             if (deployment.getHeartbeat() != null)
@@ -861,6 +862,7 @@ public abstract class CatalogUtil {
         }
 
         validateDirectory("volt root", voltDbRoot);
+        hostLog.info("Using \"" + voltDbRoot.getAbsolutePath() + "\" for voltdbroot directory.");
 
         File snapshotPath;
         if (paths == null || paths.getSnapshots() == null) {

@@ -788,9 +788,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         m_acceptor = new ClientAcceptor(port, network, false);
 
         m_adminAcceptor = null;
-        if (context.cluster.getAdminenabled()) {
-            m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
-        }
+        m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
 
         if (!recovering)
         {
