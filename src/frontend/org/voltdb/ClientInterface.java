@@ -216,6 +216,14 @@ public class ClientInterface implements DumpManager.Dumpable {
             try {
                 socket = ServerSocketChannel.open();
             } catch (IOException e) {
+                if (m_isAdmin) {
+                    hostLog.fatal("Failed to open admin wire protocol listener on port "
+                            + m_port + "(" + e.getMessage() + ")");
+                }
+                else {
+                    hostLog.fatal("Failed to open native wire protocol listener on port "
+                            + m_port + "(" + e.getMessage() + ")");
+                }
                 throw new RuntimeException(e);
             }
             m_serverSocket = socket;

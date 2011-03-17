@@ -708,7 +708,7 @@ public abstract class CatalogUtil {
             else
             {
                 // encode the default values
-                catCluster.setAdminport(21211);
+                catCluster.setAdminport(VoltDB.DEFAULT_ADMIN_PORT);
                 catCluster.setAdminstartup(false);
             }
 
@@ -964,7 +964,7 @@ public abstract class CatalogUtil {
     private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
         // defaults
         int httpdPort = -1;
-        boolean jsonEnabled = true;
+        boolean jsonEnabled = false;
 
         Cluster cluster = catalog.getClusters().get("cluster");
 

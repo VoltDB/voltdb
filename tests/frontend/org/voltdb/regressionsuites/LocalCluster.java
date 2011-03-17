@@ -74,7 +74,7 @@ public class LocalCluster implements VoltServerConfig {
     int m_pathToDeploymentOffset;
     int m_rejoinOffset;
     FailureState m_failureState;
-    int m_baseAdminPort = -1;
+    int m_baseAdminPort = VoltDB.DEFAULT_ADMIN_PORT;
 
     // state
     boolean m_compiled = false;
@@ -529,8 +529,10 @@ public class LocalCluster implements VoltServerConfig {
 
     private void startOne(int hostId, boolean clearLocalDataDirectories) {
         try {
+            // voltdb client/native ports move forward from 21212
             m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
-            m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort + hostId));
+            // voltdb admin-mode ports move backwards from 21211
+            m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, "");
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
@@ -611,7 +613,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // port for the new node
         int portNo = VoltDB.DEFAULT_PORT + hostId;
-        int adminPortNo = m_baseAdminPort + hostId;
+        int adminPortNo = m_baseAdminPort - hostId;
 
         // port to connect to (not too simple, eh?)
         int portNoToRejoin = VoltDB.DEFAULT_PORT + ((hostId + 1) % getNodeCount());
@@ -619,7 +621,7 @@ public class LocalCluster implements VoltServerConfig {
 
         if (portOffset != null) {
             portNoToRejoin = VoltDB.DEFAULT_PORT + portOffset;
-            adminPortNo = m_baseAdminPort + portOffset;
+            // adminPortNo = m_baseAdminPort - portOffset;
         }
 
         ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);

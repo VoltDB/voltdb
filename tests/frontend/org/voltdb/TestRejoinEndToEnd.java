@@ -663,7 +663,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Client client;
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 9999);
+        client.createConnection("localhost", 9997);
 
         response = client.callProcedure("@AdminModeEnter");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -675,7 +675,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:10000";
+        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:9996";
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
