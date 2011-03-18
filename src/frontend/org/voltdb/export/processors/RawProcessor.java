@@ -30,11 +30,11 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
+import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
@@ -45,7 +45,6 @@ import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.NotImplementedException;
-import org.voltdb.export.ExportGeneration;
 
 /**
  * A processor that provides a data block queue over a socket to
@@ -226,19 +225,12 @@ public class RawProcessor implements ExportDataProcessor {
                     //  - the catalog context knows which hosts are up
                     //  - the hostmessenger knows the hostnames of hosts
                     CatalogContext cx = VoltDB.instance().getCatalogContext();
-                    HostMessenger hm = VoltDB.instance().getHostMessenger();
-                    int myHostId = -1;
-                    if (hm != null) myHostId = hm.getHostId();
-
-                    // skip the current host... obviously the recipient of the message
-                    // knows about the current host
                     if (cx != null) {
                         Set<Integer> liveHosts = cx.siteTracker.getAllLiveHosts();
-                        fs.writeInt(liveHosts.size() - 1);
+                        fs.writeInt(liveHosts.size());
                         for (int hostId : liveHosts) {
-                            if (hostId == myHostId) continue;
                             String metadata = VoltDB.instance().getClusterMetadataMap().get(hostId);
-                            System.out.printf("hostid %d, metadata: %s", hostId, metadata);
+                            //System.out.printf("hostid %d, metadata: %s\n", hostId, metadata);
                             assert(metadata.contains(":"));
                             fs.writeString(metadata);
                         }

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 
@@ -42,25 +43,51 @@ public abstract class ExportClientBase {
     private final List<InetSocketAddress> m_servers;
     protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections;
 
+    protected final boolean m_useAdminPorts;
+
     // First hash by table signature, second by partition
     private final HashMap<String, HashMap<Integer, ExportDataSink>> m_sinks;
 
     // credentials
     private String m_username = "", m_password = "";
 
-    public ExportClientBase()
+    public ExportClientBase() {
+        this(false);
+    }
+
+    public ExportClientBase(boolean useAdminPorts)
     {
         m_sinks = new HashMap<String, HashMap<Integer, ExportDataSink>>();
         m_exportConnections = new HashMap<InetSocketAddress, ExportConnection>();
         m_servers = new ArrayList<InetSocketAddress>();
+        m_useAdminPorts = useAdminPorts;
     }
 
     /**
-     * Provide the ExportClient with a list of servers to which to connect
-     * @param servers
+     * Add a server to the list that ExportClient will try to connect to
+     * @param server
      */
     public void addServerInfo(InetSocketAddress server) {
         m_servers.add(server);
+    }
+
+    /**
+     * Add a server to the list that ExportClient will try to connect to
+     * @param server
+     */
+    public void addServerInfo(String server, boolean adminIfNoPort) {
+        InetSocketAddress addr = null;
+        int defaultPort = adminIfNoPort ? VoltDB.DEFAULT_ADMIN_PORT : VoltDB.DEFAULT_PORT;
+        String[] parts = server.trim().split(":");
+        if (parts.length == 1) {
+            addr = new InetSocketAddress(parts[0], defaultPort);
+        }
+        else {
+            assert(parts.length == 2);
+            int port = Integer.parseInt(parts[1]);
+            addr = new InetSocketAddress(parts[0], port);
+        }
+        m_servers.add(addr);
     }
 
     public void addCredentials(String username, String password) {
@@ -123,7 +150,7 @@ public abstract class ExportClientBase {
                 /*String[] parts = hostname.split(":");
                 InetSocketAddress addr2 = new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
                 assert(m_servers.contains(addr2));*/
-        }
+            }
 
             constructExportDataSinks(retval);
         }
@@ -172,51 +199,56 @@ public abstract class ExportClientBase {
             throw new IOException("No servers provided for export client.");
         }
 
+        m_sinks.clear();
+        m_exportConnections.clear();
+
         // Connect to one of the specified servers.  This will open the sockets,
         // advance the Export protocol to the open state to each server, retrieve
         // each AdvertisedDataSource list, and create data sinks for every
         // table/partition pair.
+        boolean foundOneActiveServer = false;
         for (InetSocketAddress serverAddr : m_servers) {
             ExportConnection exportConnection = null;
             try {
                 exportConnection = new ExportConnection(m_username, m_password, serverAddr, m_sinks);
                 exportConnection.openExportConnection();
 
-                constructExportDataSinks(exportConnection);
+                // failed to connect
+                if (!exportConnection.isConnected())
+                    continue;
+
+                // from here down, assume we connected
 
                 // successfully connected to one server, now rebuild the set of servers in the world
                 m_servers.clear();
-                // add this server as we know it's valid
-                m_servers.add(serverAddr);
-
                 for (String hostname : exportConnection.hosts) {
                     assert(hostname.contains(":"));
                     String[] parts = hostname.split(":");
-                    InetSocketAddress addr = new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
+                    int port = m_useAdminPorts ? Integer.valueOf(parts[2]) : Integer.valueOf(parts[1]);
+                    InetSocketAddress addr = new InetSocketAddress(parts[0], port);
                     m_servers.add(addr);
                 }
 
-                // add this one fully formed connection
-                m_exportConnections.put(serverAddr, exportConnection);
-
                 // exit out of the loop
+                foundOneActiveServer = true;
                 break;
             }
             catch (IOException e) {
-                if (exportConnection != null)
-                    exportConnection.closeExportConnection();
-                m_sinks.clear();
-                m_exportConnections.clear();
                 if (e.getMessage().contains("Authentication")) {
                     throw e;
                 }
+                // ignore non-auth errors
+            }
+            finally {
+                // disconnect from the "discovery server"
+                if (exportConnection != null)
+                    exportConnection.closeExportConnection();
             }
         }
 
-        if (m_exportConnections.size() == 0) {
+        if (!foundOneActiveServer) {
             return false;
         }
-        assert (m_exportConnections.size() == 1);
 
         // connect to the rest of the servers
         // try three rounds with a pause in the middle of each
@@ -224,12 +256,13 @@ public abstract class ExportClientBase {
             for (InetSocketAddress addr : m_servers) {
                 if (m_exportConnections.containsKey(addr)) continue;
                 ExportConnection connection = connectToServer(addr);
-                if (connection != null)
+                if (connection != null) {
                     m_exportConnections.put(addr, connection);
+                }
             }
 
             // check for successful connection to all servers
-            if (m_servers.size() != m_exportConnections.size())
+            if (m_servers.size() == m_exportConnections.size())
                 break;
 
             // sleep for 1/4 second
@@ -305,11 +338,11 @@ public abstract class ExportClientBase {
             }
             return maxPollWaitTime;
         }
-            }
+    }
 
     public void run() throws IOException {
         run(0);
-            }
+    }
 
     public void run(long timeout) throws IOException {
 

@@ -54,7 +54,7 @@ public class TestExportOpsEvents extends TestCase {
         }
     }
 
-    public void testConnectingToNothing() throws IOException {
+    /*public void testConnectingToNothing() throws IOException {
         NullExportClient client = new NullExportClient();
         client.addServerInfo(new InetSocketAddress("localhost", 21212));
 
@@ -80,7 +80,7 @@ public class TestExportOpsEvents extends TestCase {
         assertTrue(client.connect());
         client.disconnect();
         VoltDBFickleCluster.stop();
-    }
+    }*/
 
     public void testConnectingToFailingCluster() throws Exception {
         NullExportClient client = new NullExportClient();

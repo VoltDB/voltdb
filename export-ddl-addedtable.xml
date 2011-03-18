@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<deployment>
+<cluster hostcount="3" kfactor="1" leader="localhost" sitesperhost="2"/>
+<paths>
+<voltroot path="/tmp/jhugg"/>
+</paths>
+<httpd port="0">
+<jsonapi enabled="true"/>
+</httpd>
+<export class="org.voltdb.export.processors.RawProcessor" enabled="true"/>
+</deployment>
