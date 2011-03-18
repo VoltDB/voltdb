@@ -91,7 +91,7 @@ public class TestAdminMode extends RegressionSuite
             assertEquals(100, results[0].asScalarLong());
 
             // exit admin mode and get busy from both ports
-            adminclient.callProcedure("@AdminModeExit");
+            adminclient.callProcedure("@Resume");
             results = client.callProcedure("CountA").getResults();
             assertEquals(100, results[0].asScalarLong());
             results = adminclient.callProcedure("CountA").getResults();
@@ -116,7 +116,7 @@ public class TestAdminMode extends RegressionSuite
             admin_failed = false;
             try
             {
-                client.callProcedure("@AdminModeExit");
+                client.callProcedure("@Resume");
             }
             catch (ProcCallException e)
             {
@@ -171,7 +171,7 @@ public class TestAdminMode extends RegressionSuite
                                                             "LIVECLIENTS",
                                                             0).getResults();
             System.out.println(results[0].toString());
-            results = adminclient.callProcedure("@AdminModeExit").getResults();
+            results = adminclient.callProcedure("@Resume").getResults();
             System.out.println(results[0].toString());
             // queue up a bunch of invocations but don't read the responses
             for (int i = 0; i < 10000; i++)
@@ -244,7 +244,7 @@ public class TestAdminMode extends RegressionSuite
 //                                                            "LIVECLIENTS",
 //                                                            0).getResults();
 //            System.out.println(results[0].toString());
-//            results = adminclient.callProcedure("@AdminModeExit").getResults();
+//            results = adminclient.callProcedure("@Resume").getResults();
 //            System.out.println(results[0].toString());
 //            // queue up a bunch of invocations but don't read the responses
 //            for (int i = 0; i < 20000000; i++)
@@ -266,7 +266,7 @@ public class TestAdminMode extends RegressionSuite
 //                    else
 //                    {
 //                        adminclient.callProcedure(new Callback(false),
-//                                                  "@AdminModeExit");
+//                                                  "@Resume");
 //                        production = true;
 //                    }
 //                }

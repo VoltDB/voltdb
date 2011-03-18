@@ -85,7 +85,7 @@ class VoltQueryClient(cmd.Cmd):
 
         self.pause = VoltProcedure(self.fs, "@Pause")
 
-        self.adminmodeexit = VoltProcedure(self.fs, "@AdminModeExit")
+        self.pause = VoltProcedure(self.fs, "@Pause")
 
         self.shutdown = VoltProcedure(self.fs, "@Shutdown")
 
@@ -328,16 +328,16 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("Enters cluster Admin Mode.\nYou must be connected to the admin port in order to call this function.")
         self.safe_print("\tpause")
 
-    def do_adminmodeexit(self, command):
+    def do_pause(self, command):
         if self.fs == None:
             return
         self.safe_print("Exiting Admin Mode...")
-        self.response = self.__safe_call(self.adminmodeexit, timeout = self.__timeout)
+        self.response = self.__safe_call(self.pause, timeout = self.__timeout)
         self.safe_print(self.response)
 
-    def help_adminmodeexit(self):
+    def help_pause(self):
         self.safe_print("Exits cluster Admin Mode.\nYou must be connected to the admin port in order to call this function.")
-        self.safe_print("\tadminmodeexit")
+        self.safe_print("\tpause")
 
     def do_adhoc(self, command):
         if self.fs == None:

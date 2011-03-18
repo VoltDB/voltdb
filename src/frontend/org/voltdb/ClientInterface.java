@@ -966,7 +966,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
             if (task.procName.equals("@Pause") ||
-                task.procName.equals("@AdminModeExit"))
+                task.procName.equals("@Resume"))
             {
                 if (!handler.isAdmin())
                 {

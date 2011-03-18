@@ -732,7 +732,7 @@ public class TestJSONInterface extends TestCase {
 
         // open client port
         pset.setParameters();
-        responseJSON = callProcOverJSON("@AdminModeExit", pset, null, null, false, true);
+        responseJSON = callProcOverJSON("@Resume", pset, null, null, false, true);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
