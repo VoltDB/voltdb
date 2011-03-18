@@ -665,7 +665,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client = ClientFactory.createClient(m_cconfig);
         client.createConnection("localhost", 9997);
 
-        response = client.callProcedure("@AdminModeEnter");
+        response = client.callProcedure("@Pause");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         client.close();
 

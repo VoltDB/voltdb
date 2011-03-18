@@ -83,7 +83,7 @@ class VoltQueryClient(cmd.Cmd):
 
         self.quiesce = VoltProcedure(self.fs, "@Quiesce")
 
-        self.adminmodeenter = VoltProcedure(self.fs, "@AdminModeEnter")
+        self.pause = VoltProcedure(self.fs, "@Pause")
 
         self.adminmodeexit = VoltProcedure(self.fs, "@AdminModeExit")
 
@@ -317,16 +317,16 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("Quiesce the system")
         self.safe_print("\tquiesce")
 
-    def do_adminmodeenter(self, command):
+    def do_pause(self, command):
         if self.fs == None:
             return
         self.safe_print("Entering Admin Mode...")
-        self.response = self.__safe_call(self.adminmodeenter, timeout = self.__timeout)
+        self.response = self.__safe_call(self.pause, timeout = self.__timeout)
         self.safe_print(self.response)
 
-    def help_adminmodeenter(self):
+    def help_pause(self):
         self.safe_print("Enters cluster Admin Mode.\nYou must be connected to the admin port in order to call this function.")
-        self.safe_print("\tadminmodeenter")
+        self.safe_print("\tpause")
 
     def do_adminmodeexit(self, command):
         if self.fs == None:

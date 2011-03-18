@@ -753,7 +753,7 @@ public class TestJSONInterface extends TestCase {
 
         // put the system in admin mode
         pset.setParameters();
-        responseJSON = callProcOverJSON("@AdminModeEnter", pset, null, null, false, true);
+        responseJSON = callProcOverJSON("@Pause", pset, null, null, false, true);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);

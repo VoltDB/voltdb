@@ -35,7 +35,7 @@ import org.voltdb.catalog.Procedure;
 
 @ProcInfo(singlePartition = false)
 
-public class AdminModeEnter extends VoltSystemProcedure
+public class Pause extends VoltSystemProcedure
 {
     @Override
     public void init(int numberOfPartitions, SiteProcedureConnection site,
@@ -50,7 +50,7 @@ public class AdminModeEnter extends VoltSystemProcedure
             HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context)
     {
-        throw new RuntimeException("AdminModeEnter was given an " +
+        throw new RuntimeException("Pause was given an " +
                                    "invalid fragment id: " + String.valueOf(fragmentId));
     }
 

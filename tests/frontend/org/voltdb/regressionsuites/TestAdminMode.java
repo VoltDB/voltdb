@@ -101,7 +101,7 @@ public class TestAdminMode extends RegressionSuite
             boolean admin_failed = false;
             try
             {
-                client.callProcedure("@AdminModeEnter");
+                client.callProcedure("@Pause");
             }
             catch (ProcCallException e)
             {
@@ -129,7 +129,7 @@ public class TestAdminMode extends RegressionSuite
                        admin_failed);
 
             // turn admin mode back on.
-            adminclient.callProcedure("@AdminModeEnter");
+            adminclient.callProcedure("@Pause");
 
             // XXX-ADMIN add polling here although it shouldn't matter for
             // this synchronous, slow access.  We'll add another test for
@@ -260,7 +260,7 @@ public class TestAdminMode extends RegressionSuite
 //                    if (production)
 //                    {
 //                        adminclient.callProcedure(new Callback(false),
-//                                                  "@AdminModeEnter");
+//                                                  "@Pause");
 //                        production = false;
 //                    }
 //                    else
