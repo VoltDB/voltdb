@@ -25,7 +25,8 @@ using namespace std;
 namespace voltdb {
 RecoveryContext::RecoveryContext(PersistentTable *table, int32_t tableId) :
         m_table(table),
-        m_iterator(table->iterator()),
+        m_firstMessage(true),
+        m_iterator(m_table->iterator()),
         m_tableId(tableId),
         m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
 }
@@ -38,6 +39,18 @@ RecoveryContext::RecoveryContext(PersistentTable *table, int32_t tableId) :
 bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
     if (m_recoveryPhase == RECOVERY_MSG_TYPE_COMPLETE) {
         return false;
+    }
+
+    // We need to initialize the iterator over the table the first
+    // time we call here.  The implementation in Java guarantees that
+    // once we start generating these recovery messages that no
+    // additional transactions will change the table state (and leave
+    // us with an inconsistent iterator).
+    if (m_firstMessage)
+    {
+        m_iterator = m_table->iterator();
+        m_firstMessage = false;
+
     }
 
     if (!m_iterator.hasNext()) {

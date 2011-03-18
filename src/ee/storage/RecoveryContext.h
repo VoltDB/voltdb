@@ -44,6 +44,7 @@ private:
      */
     PersistentTable *m_table;
 
+    bool m_firstMessage;
     /*
      * Iterator over the table. Iterator is configured
      * to scan every data block and ignore updates
