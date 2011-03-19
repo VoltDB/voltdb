@@ -107,6 +107,8 @@
      most examples don't include an example of export. -->
 <target name="export">
     <invoke-java classname="org.voltdb.exportclient.ExportToFileClient" >
+        <arg value="--connect"/>
+        <arg value="admin"/>
         <arg value="--servers"/>
         <arg value="localhost"/>
         <arg value="--type"/>

@@ -237,7 +237,7 @@ public class ExportToFileClient extends ExportClientBase {
         return m_tableDecoders.get(table_name);
     }
 
-    private static void printHelpAndQuit(int code) {
+    protected static void printHelpAndQuit(int code) {
         System.out
                 .println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
                         + "--help");
@@ -448,8 +448,10 @@ public class ExportToFileClient extends ExportClientBase {
         // main loop
         try {
             client.run();
-        } catch (IOException e) {
+        }
+        catch (ExportClientException e) {
             e.printStackTrace();
+            System.exit(-1);
         }
     }
 }

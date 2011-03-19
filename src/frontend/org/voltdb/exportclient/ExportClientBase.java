@@ -189,14 +189,16 @@ public abstract class ExportClientBase {
         return retval;
     }
 
-    public boolean connect() throws IOException {
+    public boolean connect() throws ExportClientException {
         if (m_connected.get()) {
             m_logger.error("Export client already connected.");
-            throw new IOException("Export client already connected.");
+            throw new ExportClientException(ExportClientException.Type.USER_ERROR,
+                                            "Export client already connected.");
         }
         if (m_servers.size() == 0) {
             m_logger.error("No servers provided for export client.");
-            throw new IOException("No servers provided for export client.");
+            throw new ExportClientException(ExportClientException.Type.USER_ERROR,
+                                            "No servers provided for export client.");
         }
 
         m_sinks.clear();
@@ -235,7 +237,8 @@ public abstract class ExportClientBase {
             }
             catch (IOException e) {
                 if (e.getMessage().contains("Authentication")) {
-                    throw e;
+                    throw new ExportClientException(ExportClientException.Type.AUTH_FAILURE,
+                            "Authentication failure", e);
                 }
                 // ignore non-auth errors
             }
@@ -288,14 +291,11 @@ public abstract class ExportClientBase {
      * Override if the specific client has strange workflow/termination conditions.
      * Largely for Export clients used for test.
      */
-    protected int work() throws IOException
+    protected int work() throws ExportClientException
     {
         int offeredMsgs = 0;
 
-        if (!m_connected.get()) {
-            if (!connect())
-                return 0;
-        }
+        assert(m_connected.get());
 
         // work all the ExportDataSinks.
         // process incoming data and generate outgoing ack/polls
@@ -315,19 +315,27 @@ public abstract class ExportClientBase {
         // make sure still connected
         if (!checkConnections()) {
             disconnect();
-            throw new IOException("Disconnected from one or more export servers");
+            throw new ExportClientException(ExportClientException.Type.DISCONNECT_UNEXPECTED,
+                    "Disconnected from one or more export servers");
         }
 
         return offeredMsgs;
     }
 
-    protected long getNextPollDuration(long currentDuration, boolean isIdle) {
+    protected long getNextPollDuration(long currentDuration,
+                                       boolean isIdle,
+                                       boolean disconnectedWithError,
+                                       boolean disconnectedForUpdate) {
+
         // milliseconds to increment wait time when idle
         final long pollBackOffAddend = 100;
         // factor by which poll_wait_time should be reduced when not idle.
         final long pollAccelerateFactor = 2;
         // maximum value of poll_wait_time
-        final long maxPollWaitTime = 2000;
+        final long maxPollWaitTime = 4000;
+
+        if (disconnectedForUpdate || disconnectedWithError)
+            return maxPollWaitTime;
 
         if (!isIdle) {
             return currentDuration / pollAccelerateFactor;
@@ -340,31 +348,86 @@ public abstract class ExportClientBase {
         }
     }
 
-    public void run() throws IOException {
+    protected void run() throws ExportClientException {
         run(0);
     }
 
-    public void run(long timeout) throws IOException {
+    protected void run(long timeout) throws ExportClientException {
 
         // current wait time between polls
         long pollTimeMS = 0;
 
         long now = System.currentTimeMillis();
 
-        while ((System.currentTimeMillis() - now) < timeout) {
+        // run until the timeout
+        // runs forever if timeout == 0
+        while ((timeout == 0) || ((System.currentTimeMillis() - now) < timeout)) {
 
-            // suck down some export data (if available)
+            // use the variables to decide how long to wait at the end of the loop
+            boolean connected = m_connected.get();
             int offeredMsgs = 0;
+            boolean disconnectedWithError = false;
+            boolean disconnectedForUpdate = false;
+
+            // if not connected, take a stab at it
+            if (!connected) {
                 try {
-                offeredMsgs = work();
+                    connected = connect();
+                } catch (ExportClientException e) {
+                    m_logger.warn(e.getMessage(), e);
+                    e.printStackTrace();
+
+                    // handle the problem and decide whether
+                    // to continue or to punt up a stack frame
+                    switch (e.type) {
+                    case AUTH_FAILURE:
+                        disconnectedWithError = true;
+                        break;
+                    case DISCONNECT_UNEXPECTED:
+                        disconnectedWithError = true;
+                        break;
+                    case DISCONNECT_UPDATE:
+                        disconnectedForUpdate = true;
+                        break;
+                    case USER_ERROR:
+                        throw e;
+                    }
                 }
-            catch (IOException e) {
-                e.printStackTrace();
+            }
+
+            // if connected, try to actually do some export work
+            if (connected) {
+                // suck down some export data (if available)
+                try {
+                    offeredMsgs = work();
+                }
+                catch (ExportClientException e) {
+                    m_logger.warn(e.getMessage(), e);
+                    e.printStackTrace();
+
+                    // handle the problem and decide whether
+                    // to continue or to punt up a stack frame
+                    switch (e.type) {
+                    case AUTH_FAILURE:
+                        assert(false);
+                        break;
+                    case DISCONNECT_UNEXPECTED:
+                        disconnectedWithError = true;
+                        break;
+                    case DISCONNECT_UPDATE:
+                        disconnectedForUpdate = true;
+                        break;
+                    case USER_ERROR:
+                        throw e;
+                    }
+                }
             }
 
             // pause for the right amount of time
-            pollTimeMS = getNextPollDuration(pollTimeMS, offeredMsgs == 0);
+            pollTimeMS = getNextPollDuration(pollTimeMS, offeredMsgs == 0,
+                    disconnectedWithError, disconnectedForUpdate);
             if (pollTimeMS > 0) {
+                m_logger.trace(String.format("Sleeping for %d ms due to inactivity or no connection.", pollTimeMS));
                 try { Thread.sleep(pollTimeMS); }
                 catch (InterruptedException e) {}
             }

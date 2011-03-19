@@ -43,6 +43,7 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportConnection;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -704,7 +705,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         }
 
-        public TrivialExportClient() throws IOException {
+        public TrivialExportClient() throws ExportClientException {
             super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
             super.addCredentials(null, null);
             super.connect();
@@ -716,7 +717,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
 
         @Override
-        public int work() throws IOException {
+        public int work() throws ExportClientException {
             super.work();
             for (ExportConnection ec : m_exportConnections.values()) {
                 System.out.printf("Export Conn Offset: %d\n", ec.getLastAckOffset());

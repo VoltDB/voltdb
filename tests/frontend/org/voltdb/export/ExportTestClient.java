@@ -31,6 +31,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportConnection;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.logging.VoltLogger;
@@ -227,7 +228,7 @@ public class ExportTestClient extends ExportClientBase
     }
 
     @Override
-    public int work() throws IOException
+    public int work() throws ExportClientException
     {
         while (!done())
         {

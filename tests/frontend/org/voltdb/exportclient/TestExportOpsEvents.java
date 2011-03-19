@@ -23,7 +23,6 @@
 
 package org.voltdb.exportclient;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CountDownLatch;
 
@@ -54,7 +53,7 @@ public class TestExportOpsEvents extends TestCase {
         }
     }
 
-    /*public void testConnectingToNothing() throws IOException {
+    public void testConnectingToNothing() throws ExportClientException {
         NullExportClient client = new NullExportClient();
         client.addServerInfo(new InetSocketAddress("localhost", 21212));
 
@@ -80,7 +79,7 @@ public class TestExportOpsEvents extends TestCase {
         assertTrue(client.connect());
         client.disconnect();
         VoltDBFickleCluster.stop();
-    }*/
+    }
 
     public void testConnectingToFailingCluster() throws Exception {
         NullExportClient client = new NullExportClient();
@@ -99,7 +98,7 @@ public class TestExportOpsEvents extends TestCase {
             try {
                 client.work();
             }
-            catch (IOException e) {
+            catch (ExportClientException e) {
                 // this is supposed to happen
                 success = true;
                 break;
@@ -155,7 +154,7 @@ public class TestExportOpsEvents extends TestCase {
             try {
                 expClient.work();
             }
-            catch (IOException e) {
+            catch (ExportClientException e) {
                 // this is supposed to happen
                 success = true;
                 break;

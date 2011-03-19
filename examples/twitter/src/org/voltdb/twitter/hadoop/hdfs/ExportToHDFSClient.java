@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.Path;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.logging.VoltLogger;
 
@@ -46,7 +47,7 @@ public class ExportToHDFSClient extends ExportClientBase {
     private String uri;
     private Map<String, ExportToHDFSDecoder> decoders;
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws ExportClientException, IOException {
         if (args.length != 2) {
             LOG.fatal("usage: [hdfs output dir] [server list (comma seperated)]");
             System.exit(1);
@@ -58,7 +59,7 @@ public class ExportToHDFSClient extends ExportClientBase {
         new ExportToHDFSClient(servers, hdfsOutputDir).run();
     }
 
-    public ExportToHDFSClient(String hdfsOutputDir, String servers) throws IOException {
+    public ExportToHDFSClient(String hdfsOutputDir, String servers) throws ExportClientException, IOException {
         String uri = "hdfs://localhost:9000" + hdfsOutputDir;
         Path path = new Path(uri);
         FileSystem hdfs = FileSystem.get(URI.create(uri), new Configuration());
@@ -78,7 +79,7 @@ public class ExportToHDFSClient extends ExportClientBase {
 
         try {
             connect();
-        } catch (IOException e) {
+        } catch (ExportClientException e) {
             LOG.fatal("Unable to connect to VoltDB servers for export");
             System.exit(1);
         }

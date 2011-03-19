@@ -199,8 +199,7 @@ public class ExportConnection {
                         try {
                             sendMessage(tx_m);
                         } catch (IOException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
+                            m_logger.trace("Failed to send message to server", e);
                         }
                     }
                 }
