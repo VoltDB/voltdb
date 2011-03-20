@@ -18,6 +18,8 @@ The commands to process these files (not using Ant) are the following:
 
   $ java -Djava.library.path=../../voltdb/ org.voltdb.VoltDB catalog helloworld.jar deployment deployment.xml
 
-        (in separate window, run client application)
+        (in a separate window, set default to the helloworld sample directory
+         then set the class path and run the client application)
 
+  $ export CLASSPATH=.:../../voltdb/*
   $ java Client
