@@ -1220,7 +1220,7 @@ public class RealVoltDB implements VoltDBInterface
             // clean up any connections made
             messenger.rejoinForeignHostRollback();
         }
-        System.out.printf("Setting lastNodeRejoinFinish_txnId: %d\n", lastNodeRejoinFinish_txnId);
+        System.out.printf("Setting lastNodeRejoinFinish_txnId to: %d\n", currentTxnId);
         lastNodeRejoinFinish_txnId = currentTxnId;
 
         return null;
