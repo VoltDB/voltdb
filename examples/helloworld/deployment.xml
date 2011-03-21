@@ -3,7 +3,4 @@
    <cluster hostcount="1"
             sitesperhost="2"
             leader="localhost" />
-   <paths>
-       <voltdbroot path="/tmp" />
-   </paths>
 </deployment>
