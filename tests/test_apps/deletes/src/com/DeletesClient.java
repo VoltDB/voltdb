@@ -81,6 +81,7 @@ public class DeletesClient
     static long m_totalDeadDeletes = 0;
     static long m_totalDeadDeleteTime = 0;
     static long m_expectedDeadDeletes = 0;
+    static long m_expectedCounts = 0;
     static ArrayList<Integer> m_snapshotSizes = new ArrayList<Integer>();
     static boolean m_snapshotInProgress = false;
 
@@ -412,6 +413,62 @@ public class DeletesClient
         System.out.println("Total delete TPS: " + (m_totalDeadDeletes * 1000)/m_totalDeadDeleteTime);
     }
 
+    static void countBatch(Client client, long batch)
+    {
+        System.out.println("Counting batch: " + batch);
+        m_expectedCounts = 1;
+        long start_time = System.currentTimeMillis();
+        for (int i = 0; i < 1; i++)
+        {
+            try
+            {
+                while (!client.callProcedure(new ProcedureCallback()
+                {
+                    @Override
+                    public void clientCallback(ClientResponse response) {
+                        if (response.getStatus() != ClientResponse.SUCCESS){
+                            System.out.println("failed count batch");
+                            System.out.println(response.getStatusString());
+                        }
+                        else
+                        {
+                            System.out.println("Batch has " +
+                                               response.getResults()[0].asScalarLong() +
+                                               " items");
+                            m_expectedCounts--;
+                        }
+                    }
+                },
+                "CountBatchSize", "", batch)
+                )
+                {
+                    try
+                    {
+                        client.backpressureBarrier();
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+            }
+            catch (NoConnectionsException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            catch (IOException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        while (m_expectedCounts != 0)
+        {
+            Thread.yield();
+        }
+        long elapsed = System.currentTimeMillis() - start_time;
+    }
+
     // stolen from TestSaveRestoreSysproc
     static void validateSnapshot()
     {
@@ -652,6 +709,7 @@ public class DeletesClient
                 deleteDeceased(client);
                 deceased_counter = 0;
             }
+            countBatch(client, m_batchNumber - m_batchesToKeep - 1);
 
             deleteBatch(client, m_batchesToKeep);
         }
