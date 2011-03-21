@@ -31,15 +31,15 @@ import org.voltdb.processtools.SSHTools;
 
 public class DistributedRejoinFuzzMaster {
 
-    private static final String nodes[] = new String[] { "volt7b", "volt7c", "volt7d", "volt7e" };
+    private static final String nodes[] = new String[] { "volt3g", "volt3h", "volt3i", "volt3j" };
 
-    private static final String safeNode = "volt7b";
+    private static final String safeNode = "volt3g";
 
-    private static final String rejoinCommand = "java -classpath /home/izzy/joiner/voltdb-1.2.1/obj/release/dist/voltdb/voltdb-1.2.1.06.jar -Djava.library.path=/home/izzy/joiner/voltdb-1.2.1/obj/release/dist/voltdb -Xmx2048m -XX:-ReduceInitialCardMarks -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError -Dlog4j.configuration=file:log-server.xml org.voltdb.VoltDB catalog catalog.jar deployment deployment.xml rejoinhost ";
+    private static final String rejoinCommand = "java -classpath /home/izzy/volteng/obj/release/dist/voltdb/voltdb-1.3.trunk.jar -Djava.library.path=/home/izzy/volteng/obj/release/dist/voltdb -Xmx2048m -XX:-ReduceInitialCardMarks -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError org.voltdb.VoltDB catalog catalog.jar deployment deployment.xml rejoinhost ";
 
-    private static final String startCommand = "java -classpath /home/izzy/joiner/voltdb-1.2.1/obj/release/dist/voltdb/voltdb-1.2.1.06.jar -Djava.library.path=/home/izzy/joiner/voltdb-1.2.1/obj/release/dist/voltdb -Xmx2048m -XX:-ReduceInitialCardMarks -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError -Dlog4j.configuration=file:log-server.xml org.voltdb.VoltDB catalog catalog.jar deployment deployment.xml";
+    private static final String startCommand = "java -classpath /home/izzy/volteng/obj/release/dist/voltdb/voltdb-1.3.trunk.jar -Djava.library.path=/home/izzy/volteng/obj/release/dist/voltdb -Xmx2048m -XX:-ReduceInitialCardMarks -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError org.voltdb.VoltDB catalog catalog.jar deployment deployment.xml";
 
-    private static final String remotePath = "/home/izzy/joiner/voltdb-1.2.1/tests/test_apps/deletes";
+    private static final String remotePath = "/home/izzy/volteng/tests/test_apps/deletes";
 
     private static final String remoteUser = "izzy";
     /**
@@ -74,9 +74,10 @@ public class DistributedRejoinFuzzMaster {
         // WAIT FOR SERVERS TO BE READY
         String readyMsg = "Server completed initialization.";
         ProcessData.OutputLine line = psm.nextBlocking();
-        while(line.message.equals(readyMsg) == false) {
-            System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+        System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+        while(line.message.contains(readyMsg) == false) {
             line = psm.nextBlocking();
+            System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
         }
 
         // if the rejoin times out, the node's name will be recorded here
@@ -126,17 +127,18 @@ public class DistributedRejoinFuzzMaster {
             psm.startProcess( forWhomTheBellTolls, recoverCommand);
 
             String recoverMessage = "Node recovery completed after";
-            String retryMessage = "Timed out waiting for other nodes to connect";
+            String retryMessage = "Timed out waiting";
+            String retryMessage2 = "Recovering node timed out rejoining";
             line = psm.nextBlocking();
-            System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
             boolean recovered = line.message.contains(recoverMessage);
-            boolean retry = line.message.contains(retryMessage);
+            boolean retry = line.message.contains(retryMessage) || line.message.contains(retryMessage2);
+            System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
             while(!recovered && !retry)
             {
-                System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
                 line = psm.nextBlocking();
                 recovered = line.message.contains(recoverMessage);
-                retry = line.message.contains(retryMessage);
+                retry = line.message.contains(retryMessage) || line.message.contains(retryMessage2);
+                System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
             }
             if (!recovered)
             {
