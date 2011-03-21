@@ -983,6 +983,11 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
+    if (m_recoveryContext != NULL)
+    {
+        std::cout << "Deferring compaction until recovery is complete..." << std::endl;
+        return;
+    }
     bool hadWork1 = true;
     bool hadWork2 = true;
     std::cout << "Doing forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
