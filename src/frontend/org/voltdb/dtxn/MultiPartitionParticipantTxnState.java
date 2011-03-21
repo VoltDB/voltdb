@@ -570,17 +570,20 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         // that may now be satisfied.  We can't remove them from
         // the map in this loop because we induce a
         // ConcurrentModificationException
-        ArrayList<WorkUnit> done_wus = new ArrayList<WorkUnit>();
-        for (WorkUnit w : m_missingDependencies.values())
+        if (m_missingDependencies != null)
         {
-            if (w.allDependenciesSatisfied()) {
-                done_wus.add(w);
+            ArrayList<WorkUnit> done_wus = new ArrayList<WorkUnit>();
+            for (WorkUnit w : m_missingDependencies.values())
+            {
+                if (w.allDependenciesSatisfied()) {
+                    done_wus.add(w);
+                }
             }
-        }
 
-        for (WorkUnit w : done_wus)
-        {
-            handleWorkUnitComplete(w);
+            for (WorkUnit w : done_wus)
+            {
+                handleWorkUnitComplete(w);
+            }
         }
 
         // Also, check to see if we're just waiting on acks from
