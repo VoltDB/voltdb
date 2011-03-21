@@ -1,0 +1,36 @@
+General QA application
+===========================
+
+This example application, derived from the Voter Benchmark provides support for various QA tasks. 
+
+ant targets
+-----------
+
+ant (default)       : compile all Java clients and stored procedures, build the catalog, and start the server
+
+ant server          : start the server
+
+ant rejoin          : start the server and performs a node rejoin - you must specify the node to rejoin with an
+                      additional command line parameter in the form: -Dhost=hostname
+                      - Purpose: cluster resiliency validation
+
+ant jiggle          : start the client, more than 1 client is permitted.
+                      - Purpose: support for generic load simulations
+
+ant wait-s          : starts the single-partition wait client - this client simulates logn-running single-partition
+                      requests.
+                      - Purpose: support for rejoin & admin mode operations under load
+
+ant wait-m          : starts the multi-partition wait client - this client simulates logn-running multi-partition
+                      requests.
+                      - Purpose: support for rejoin & admin mode operations under load
+
+ant export          : starts the ExportToFile client
+                      - Purpose: export client validation
+
+ant srccompile      : compiles the source code
+
+ant catalog         : build the catalog
+
+ant clean           : remove compiled files, log, etc.
+    

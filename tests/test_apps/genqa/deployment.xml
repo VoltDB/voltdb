@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="2" leader="localhost" kfactor="0">
+        <heartbeat timeout="10"/>
+        <admin-mode port="6667" />
+    </cluster>
+    <snapshot prefix="genqa" retain="3" frequency="600s"/>
+    <paths>
+        <voltroot path="/tmp/genqa" />
+    </paths>
+    <httpd port="8080">
+        <jsonapi enabled="true"/>
+    </httpd>
+</deployment>
