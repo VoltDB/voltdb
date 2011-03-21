@@ -129,8 +129,9 @@ public class SysProcFragmentId
     public static final long PF_setInstanceIdAggregator = 163;
 
     // @Rejoin
-    public static final long PF_rejoinPrepare = 170;
-    public static final long PF_rejoinCommit = 171;
-    public static final long PF_rejoinRollback = 172;
-    public static final long PF_rejoinAggregate = 173;
+    public static final long PF_rejoinBlock = 170;
+    public static final long PF_rejoinPrepare = 171;
+    public static final long PF_rejoinCommit = 172;
+    public static final long PF_rejoinRollback = 173;
+    public static final long PF_rejoinAggregate = 174;
 }

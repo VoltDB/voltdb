@@ -58,10 +58,22 @@ public class Rejoin extends VoltSystemProcedure {
     public void init(int numberOfPartitions, SiteProcedureConnection site,
             Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
         super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
+        site.registerPlanFragment(SysProcFragmentId.PF_rejoinBlock, this);
         site.registerPlanFragment(SysProcFragmentId.PF_rejoinPrepare, this);
         site.registerPlanFragment(SysProcFragmentId.PF_rejoinCommit, this);
         site.registerPlanFragment(SysProcFragmentId.PF_rejoinRollback, this);
         site.registerPlanFragment(SysProcFragmentId.PF_rejoinAggregate, this);
+    }
+
+    VoltTable phaseZeroBlock(int hostId, int rejoinHostId, String rejoiningHostName)
+    {
+        VoltTable retval = new VoltTable(
+                new ColumnInfo("HostId", VoltType.INTEGER),
+                new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
+        );
+
+        retval.addRow(hostId, null);
+        return retval;
     }
 
     /**
@@ -236,7 +248,14 @@ public class Rejoin extends VoltSystemProcedure {
         Object[] oparams = params.toArray();
         VoltTable depResult = null;
 
-        if (fragmentId == SysProcFragmentId.PF_rejoinPrepare) {
+        if (fragmentId == SysProcFragmentId.PF_rejoinBlock)
+        {
+            int rejoinHostId = (Integer) oparams[0];
+            String rejoiningHostName = (String) oparams[1];
+            depResult = phaseZeroBlock(hostId, rejoinHostId, rejoiningHostName);
+            return new DependencyPair(DEP_rejoinAllNodeWork, depResult);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_rejoinPrepare) {
             int rejoinHostId = (Integer) oparams[0];
             String rejoiningHostName = (String) oparams[1];
             int portToConnect = (Integer) oparams[2];
@@ -279,11 +298,33 @@ public class Rejoin extends VoltSystemProcedure {
         }
         int hostId = downHosts.iterator().next();
 
-
         // start the chain of joining plan fragments
 
         VoltTable[] results;
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+        // create a work fragment to block the whole cluster so that no
+        // long-tail execution site work can cause late failure (ENG-1051)
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_rejoinBlock;
+        pfs[1].outputDepId = DEP_rejoinAllNodeWork;
+        pfs[1].inputDepIds = new int[]{};
+        pfs[1].multipartition = true;
+        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters.setParameters(hostId, rejoiningHostname);
+
+        // create a work fragment to aggregate the results.
+        // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_rejoinAggregate;
+        pfs[0].outputDepId = DEP_rejoinAggregate;
+        pfs[0].inputDepIds = new int[]{ DEP_rejoinAllNodeWork };
+        pfs[0].multipartition = false;
+        pfs[0].parameters = new ParameterSet();
+
+        // distribute and execute these fragments providing pfs and id of the
+        // aggregator's output dependency table.
+        results = executeSysProcPlanFragments(pfs, DEP_rejoinAggregate);
+
         // create a work fragment to prepare to add the node to the cluster
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_rejoinPrepare;
