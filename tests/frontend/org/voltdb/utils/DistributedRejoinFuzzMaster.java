@@ -35,13 +35,75 @@ public class DistributedRejoinFuzzMaster {
 
     private static final String safeNode = "volt3g";
 
-    private static final String rejoinCommand = "java -classpath /home/izzy/volteng/obj/release/dist/voltdb/voltdb-1.3.trunk.jar -Djava.library.path=/home/izzy/volteng/obj/release/dist/voltdb -Xmx2048m -XX:-ReduceInitialCardMarks -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError org.voltdb.VoltDB catalog catalog.jar deployment deployment.xml rejoinhost ";
+    private static final String distLocale = "/home/izzy/volteng/obj/release/dist/voltdb/";
 
-    private static final String startCommand = "java -classpath /home/izzy/volteng/obj/release/dist/voltdb/voltdb-1.3.trunk.jar -Djava.library.path=/home/izzy/volteng/obj/release/dist/voltdb -Xmx2048m -XX:-ReduceInitialCardMarks -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError org.voltdb.VoltDB catalog catalog.jar deployment deployment.xml";
+    private static final String voltJar = "voltdb-1.3.trunk.jar";
+
+    private static final String rejoinCommand =
+        "java -classpath " + distLocale + voltJar + " -Djava.library.path=" + distLocale +
+        " -Xmx2048m -XX:-ReduceInitialCardMarks -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError org.voltdb.VoltDB catalog catalog.jar deployment deployment.xml rejoinhost ";
+
+    private static final String startCommand =
+        "java -classpath " + distLocale + voltJar + " -Djava.library.path=" + distLocale +
+        " -Xmx2048m -XX:-ReduceInitialCardMarks -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError org.voltdb.VoltDB catalog catalog.jar deployment deployment.xml";
 
     private static final String remotePath = "/home/izzy/volteng/tests/test_apps/deletes";
 
     private static final String remoteUser = "izzy";
+
+    static void killNode(String forWhomTheBellTolls, ProcessSetManager psm)
+    {
+        psm.killProcess(forWhomTheBellTolls);
+        new KillStragglers(remoteUser,
+                           forWhomTheBellTolls,
+                           remotePath).run();
+        System.out.printf("****************** killing process %s\n",forWhomTheBellTolls);
+
+        String failureDetectionComplete = new String("Handling node faults");
+        int detectionCompleteCount = 0;
+        while (detectionCompleteCount != ((nodes.length - 1) * 2)) {
+            ProcessData.OutputLine line = psm.nextBlocking();
+            System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+            if (line.message.contains(failureDetectionComplete)) {
+                detectionCompleteCount++;
+                System.out.printf("****************** detectionCompleteCount %d\n",detectionCompleteCount);
+            }
+        }
+    }
+
+    // This should succeed.  If we fail, we want to rejoin this host again
+    // so we return this hostname.
+    static String rejoinNodeFull(String rejoiningNode, String recoverConnectTo,
+                                 SSHTools ssh, ProcessSetManager psm)
+    {
+        String nextDeathHost = null;
+
+        String recoverCommand[] = ssh.convert(rejoiningNode, remotePath, rejoinCommand + recoverConnectTo);
+        psm.startProcess(rejoiningNode, recoverCommand);
+
+        String recoverMessage = "Node recovery completed after";
+        String retryMessage = "Timed out waiting";
+        String retryMessage2 = "Recovering node timed out rejoining";
+        ProcessData.OutputLine line = psm.nextBlocking();
+        boolean recovered = line.message.contains(recoverMessage);
+        boolean retry = line.message.contains(retryMessage) || line.message.contains(retryMessage2);
+        System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+        while(!recovered && !retry)
+        {
+            line = psm.nextBlocking();
+            recovered = line.message.contains(recoverMessage);
+            retry = line.message.contains(retryMessage) || line.message.contains(retryMessage2);
+            System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+        }
+        if (!recovered)
+        {
+            assert(retry);
+            nextDeathHost = rejoiningNode;
+        }
+
+        return nextDeathHost;
+    }
+
     /**
      * @param args
      */
@@ -94,23 +156,8 @@ public class DistributedRejoinFuzzMaster {
                     forWhomTheBellTolls = nodes[r.nextInt(nodes.length)];
                 }
 
+                killNode(forWhomTheBellTolls, psm);
 
-                psm.killProcess(forWhomTheBellTolls);
-                new KillStragglers(remoteUser,
-                                   forWhomTheBellTolls,
-                                   remotePath).run();
-                System.out.printf("****************** killing process %s\n",forWhomTheBellTolls);
-
-                String failureDetectionComplete = new String("Handling node faults");
-                int detectionCompleteCount = 0;
-                while (detectionCompleteCount != ((nodes.length - 1) * 2)) {
-                    line = psm.nextBlocking();
-                    if (line.message.contains(failureDetectionComplete)) {
-                        detectionCompleteCount++;
-                        System.out.printf("****************** detectionCompleteCount %d\n",detectionCompleteCount);
-                    }
-                    System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
-                }
                 Thread.sleep(1000);
             }
 
@@ -123,32 +170,8 @@ public class DistributedRejoinFuzzMaster {
             //    }
             //}
 
-            String recoverCommand[] = ssh.convert(forWhomTheBellTolls, remotePath, rejoinCommand + recoverConnectTo);
-            psm.startProcess( forWhomTheBellTolls, recoverCommand);
-
-            String recoverMessage = "Node recovery completed after";
-            String retryMessage = "Timed out waiting";
-            String retryMessage2 = "Recovering node timed out rejoining";
-            line = psm.nextBlocking();
-            boolean recovered = line.message.contains(recoverMessage);
-            boolean retry = line.message.contains(retryMessage) || line.message.contains(retryMessage2);
-            System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
-            while(!recovered && !retry)
-            {
-                line = psm.nextBlocking();
-                recovered = line.message.contains(recoverMessage);
-                retry = line.message.contains(retryMessage) || line.message.contains(retryMessage2);
-                System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
-            }
-            if (!recovered)
-            {
-                assert(retry);
-                retryRejoinNode = forWhomTheBellTolls;
-            }
-            else
-            {
-                retryRejoinNode = null;
-            }
+            retryRejoinNode = rejoinNodeFull(forWhomTheBellTolls, recoverConnectTo,
+                                             ssh, psm);
         }
     }
 
