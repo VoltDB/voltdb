@@ -80,6 +80,39 @@ TEST_F(CompactingPoolTest, basic_ops)
     EXPECT_EQ(size * num_elements, dut.getBytesAllocated());
 }
 
+TEST_F(CompactingPoolTest, bytes_allocated_test)
+{
+    int32_t size = 1024 * 512; // half a meg object
+    int32_t num_elements = ((2 * 1024 * 1024) / size) + 1;
+
+    // need to top 2GB to overflow
+    int64_t bigsize = 2L * (1024L * 1024L * 1024L) + (1024L * 1024L * 10L);
+    int64_t elems_needed = bigsize / size + 1;
+    void* elems[elems_needed];
+
+    CompactingPool dut(size, num_elements);
+    for (int i = 0; i < elems_needed; ++i)
+    {
+        elems[i] = dut.malloc();
+        // return value of getBytesAllocated() is unsigned.  However,
+        // when it overflows internally, we get a HUGE value back.
+        // Our sanity check is that the value is less than twice the
+        // giant memory we're trying to fill
+        EXPECT_TRUE(dut.getBytesAllocated() < (bigsize * 2L));
+    }
+    // Ghetto way to get INT_MAX
+    // Make sure that we would have, in fact, overflowed an int32_t
+    EXPECT_TRUE(dut.getBytesAllocated() > 0x7fffffff);
+
+    for (int i = 0; i < elems_needed; ++i)
+    {
+        // bonus extra hack test.  If we keep freeing the first
+        // element, it should get compacted into and we can free it
+        // again!
+        dut.free(elems[0]);
+    }
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

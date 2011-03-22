@@ -89,6 +89,8 @@ void ContiguousAllocator::trim() {
 }
 
 size_t ContiguousAllocator::bytesAllocated() const {
-    size_t total = static_cast<size_t>(m_blockCount * m_allocSize * m_chunkSize);
+    size_t total = static_cast<size_t>(m_blockCount) *
+        static_cast<size_t>(m_allocSize) *
+        static_cast<size_t>(m_chunkSize);
     return total;
 }

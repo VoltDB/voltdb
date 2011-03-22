@@ -757,6 +757,36 @@ TEST_F(CompactingMapTest, RandomMulti) {
     std::cout << "EqualRange: " << equalRanges << std::endl;
 }
 
+// ENG-1057
+//
+// I have commented this out intentionally.  It demonstrates that the
+// bytesAllocated() reported by the index doesn't overflow and become
+// negative, but it runs really slowly under valgrind and I'm not
+// happy checking it in, but I want evidence left around.  There's an
+// argument to be made that the equivalent test in CompactingPoolTest
+// covers this since the defect is actually in ContiguousAllocator.
+// --izzy 3/22/2011
+//
+// TEST_F(CompactingMapTest, bytesAllocated) {
+//     voltdb::CompactingMap<int, int, IntComparator> volt(true, IntComparator());
+//
+//     int64_t entry_size = 40; // magic
+//     int64_t bigsize = 2L * (1024L * 1024L * 1024L) + (1024L * 1024L * 10L);
+//     int64_t num_entries = (bigsize / entry_size) + 1;
+//
+//     for (int i = 0; i < num_entries; ++i)
+//     {
+//         volt.insert(std::pair<int,int>(i,i));
+//         // return value of bytesAllocated() is unsigned.  However,
+//         // when it overflows internally, we get a HUGE value back.
+//         // Our sanity check is that the value is less than twice the
+//         // giant memory we're trying to fill
+//         ASSERT_TRUE(volt.bytesAllocated() < (bigsize * 2L));
+//     }
+//     // Make sure that we would have, in fact, overflowed an int32_t
+//     EXPECT_TRUE(volt.bytesAllocated() > 0x7fffffff);
+// }
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
