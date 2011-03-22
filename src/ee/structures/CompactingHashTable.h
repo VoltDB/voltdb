@@ -68,14 +68,14 @@ namespace voltdb {
 
         // start with a roughly 512k hash table
         // (includes 64k 8B pointers)
-        static const uint64_t BUCKET_INITIAL_INDEX = 3;
+        static const uint64_t BUCKET_INITIAL_INDEX = 14;
 
         // 20000 HashNodes per chunk is about 625k / chunk
         static const uint64_t ALLOCATOR_CHUNK_SIZE = 20000;
 
 #else // for MEMCHECK
         // for debugging with valgrind
-        static const uint32_t BUCKET_INITIAL_INDEX = 0;
+        static const uint64_t BUCKET_INITIAL_INDEX = 0;
         static const uint64_t ALLOCATOR_CHUNK_SIZE = 2;
 
 #endif // MEMCHECK
@@ -198,27 +198,38 @@ namespace voltdb {
 
     template<class K, class T, class H, class EK, class ET>
     const uint64_t CompactingHashTable<K, T, H, EK, ET>::TABLE_SIZES[] = {
-        2,
-        5,
-        11,
-        65537,
-        131101,
-        262147,
-        524309,
-        1048583,
-        2097169,
-        4194319,
-        8388617,
-        16777259,
-        33554467,
-        67108879,
-        134217757,
-        268435459,
-        536870923,
-        1073741827,
-        2147483659,
-        4294967311,
-        8589934609
+        3,
+        7,
+        13,
+        31,
+        61,
+        127,
+        251,
+        509,
+        1021,
+        2039,
+        4093,
+        8191,
+        16381,
+        32749,
+        65521,
+        131071,
+        262139,
+        524287,
+        1048573,
+        2097143,
+        4194301,
+        8388593,
+        16777213,
+        33554393,
+        67108859,
+        134217689,
+        268435399,
+        536870909,
+        1073741789,
+        2147483647,
+        4294967291,
+        8589934583
     };
 
 
