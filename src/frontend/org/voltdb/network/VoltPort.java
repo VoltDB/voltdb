@@ -18,14 +18,15 @@
 package org.voltdb.network;
 
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.ByteBuffer;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
+import java.util.ArrayDeque;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.ArrayDeque;
 
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 /** Encapsulates a socket registration for a VoltNetwork */
@@ -33,6 +34,8 @@ public class VoltPort implements Callable<VoltPort>, Connection
 {
     /** The network this port participates in */
     private final VoltNetwork m_network;
+
+    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     /** The currently selected operations on this port. */
     private int m_readyOps = 0;
@@ -67,7 +70,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
 
     private NIOReadStream m_readStream;
     private NIOWriteStream m_writeStream;
-    private AtomicLong m_messagesRead = new AtomicLong(0);
+    private final AtomicLong m_messagesRead = new AtomicLong(0);
     private long m_lastMessagesRead = 0;
     final int m_expectedOutgoingMessageSize;
     final String m_remoteHost;
@@ -78,10 +81,10 @@ public class VoltPort implements Callable<VoltPort>, Connection
      */
     static final ThreadLocal<DBBPool> m_pool =
         new ThreadLocal<DBBPool>() {
-            @Override
-            protected DBBPool initialValue() {
-                return new DBBPool();
-            }
+        @Override
+        protected DBBPool initialValue() {
+            return new DBBPool();
+        }
     };
 
     /** Wrap a socket with a VoltPort */
@@ -119,11 +122,13 @@ public class VoltPort implements Callable<VoltPort>, Connection
         synchronized(m_lock) {
             assert m_running == false;
             m_running = true;
+            m_readyOps = 0;
             m_readyOps = m_selectionKey.readyOps();      // runnable.run() doesn't accept parameters
         }
     }
 
     /** VoltNetwork invokes this to prepare and invoke run() */
+    @Override
     public VoltPort call() throws IOException {
         try {
             final DBBPool pool = m_pool.get();
@@ -191,7 +196,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
                 try {
                     m_channel.socket().shutdownInput();
                 } catch (SocketException e) {
-                     //Safe to ignore to these
+                    //Safe to ignore to these
                 }
             }
 
@@ -342,14 +347,23 @@ public class VoltPort implements Callable<VoltPort>, Connection
      * longer be interacted with.
      */
     void unregistered() {
-        m_handler.stopped(this);
-        m_writeStream.shutdown();
-        m_readStream.shutdown();
         try {
-            m_channel.close();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            try {
+                m_handler.stopped(this);
+            } finally {
+                try {
+                    m_writeStream.shutdown();
+                } finally {
+                    m_readStream.shutdown();
+                }
+            }
+        } finally {
+            networkLog.info("Closing channel " + m_toString);
+            try {
+                m_channel.close();
+            } catch (IOException e) {
+                networkLog.warn(e);
+            }
         }
     }
 
@@ -392,7 +406,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
         return m_hasQueuedRunnables;
     }
 
-    private ArrayDeque<Runnable> m_scheduledRunnables = new ArrayDeque<Runnable>();
+    private final ArrayDeque<Runnable> m_scheduledRunnables = new ArrayDeque<Runnable>();
 
     @Override
     public void scheduleRunnable(Runnable r) {

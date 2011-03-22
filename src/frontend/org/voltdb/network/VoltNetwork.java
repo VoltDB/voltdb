@@ -82,7 +82,7 @@ import org.voltdb.utils.EstTimeUpdater;
 import org.voltdb.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
- public class VoltNetwork implements Runnable
+public class VoltNetwork implements Runnable
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
@@ -168,7 +168,7 @@ import org.voltdb.utils.Pair;
             threadPoolSize = 1;
 
         final ThreadFactory tf = new ThreadFactory() {
-            private ThreadGroup group = new ThreadGroup(Thread.currentThread().getThreadGroup(), "Network threads");
+            private final ThreadGroup group = new ThreadGroup(Thread.currentThread().getThreadGroup(), "Network threads");
             private int threadIndex = 0;
             @Override
             public Thread newThread(final Runnable run) {
@@ -225,41 +225,41 @@ import org.voltdb.utils.Pair;
 
         //It is really handy to be able to uncomment this and print bandwidth usage. Hopefully
         //management tools will replace it.
-//        new Thread() {
-//            @Override
-//            public void run() {
-//                long last = System.currentTimeMillis();
-//                while (true) {
-//                    try {
-//                        Thread.sleep(10000);
-//                    } catch (InterruptedException e) {
-//                        // TODO Auto-generated catch block
-//                        e.printStackTrace();
-//                    }
-//                    final long now = System.currentTimeMillis();
-//                    long totalRead = 0;
-//                    long totalMessagesRead = 0;
-//                    long totalWritten = 0;
-//                    long totalMessagesWritten = 0;
-//                    synchronized (m_ports) {
-//                        for (VoltPort p : m_ports) {
-//                            final long read = p.readStream().getBytesRead(true);
-//                            final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(true);
-//                            final long messagesRead = p.getMessagesRead(true);
-//                            totalRead += read;
-//                            totalMessagesRead += messagesRead;
-//                            totalWritten += writeInfo[0];
-//                            totalMessagesWritten += writeInfo[1];
-//                        }
-//                    }
-//                    double delta = (now - last) / 1000.0;
-//                    double mbRead = totalRead / (1024.0 * 1024.0);
-//                    double mbWritten = totalWritten / (1024.0 * 1024.0);
-//                    System.out.printf("Transferred %.2f/%.2f (IN/OUT)/sec\n", mbRead / delta, mbWritten / delta);
-//                    last = now;
-//                }
-//            }
-//        }.start();
+        //        new Thread() {
+        //            @Override
+        //            public void run() {
+        //                long last = System.currentTimeMillis();
+        //                while (true) {
+        //                    try {
+        //                        Thread.sleep(10000);
+        //                    } catch (InterruptedException e) {
+        //                        // TODO Auto-generated catch block
+        //                        e.printStackTrace();
+        //                    }
+        //                    final long now = System.currentTimeMillis();
+        //                    long totalRead = 0;
+        //                    long totalMessagesRead = 0;
+        //                    long totalWritten = 0;
+        //                    long totalMessagesWritten = 0;
+        //                    synchronized (m_ports) {
+        //                        for (VoltPort p : m_ports) {
+        //                            final long read = p.readStream().getBytesRead(true);
+        //                            final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(true);
+        //                            final long messagesRead = p.getMessagesRead(true);
+        //                            totalRead += read;
+        //                            totalMessagesRead += messagesRead;
+        //                            totalWritten += writeInfo[0];
+        //                            totalMessagesWritten += writeInfo[1];
+        //                        }
+        //                    }
+        //                    double delta = (now - last) / 1000.0;
+        //                    double mbRead = totalRead / (1024.0 * 1024.0);
+        //                    double mbWritten = totalWritten / (1024.0 * 1024.0);
+        //                    System.out.printf("Transferred %.2f/%.2f (IN/OUT)/sec\n", mbRead / delta, mbWritten / delta);
+        //                    last = now;
+        //                }
+        //            }
+        //        }.start();
     }
 
 
@@ -349,19 +349,28 @@ import org.voltdb.utils.Pair;
         assert(c != null);
         SelectionKey selectionKey = port.getKey();
 
-        acquireRegistrationLock();
         try {
-            if (!m_ports.contains(port)) {
-                return;
+            acquireRegistrationLock();
+            try {
+                if (!m_ports.contains(port)) {
+                    return;
+                }
+                try {
+                    port.unregistering();
+                } finally {
+                    try {
+                        selectionKey.attach(null);
+                        selectionKey.cancel();
+                    } finally {
+                        m_ports.remove(port);
+                    }
+                }
+            } finally {
+                releaseRegistrationLock();
             }
-            port.unregistering();
-            selectionKey.cancel();
-            selectionKey.attach(null);
-            m_ports.remove(port);
         } finally {
-            releaseRegistrationLock();
+            port.unregistered();
         }
-        port.unregistered();
     }
 
     /** Set interest registrations for a port */
@@ -451,7 +460,7 @@ import org.voltdb.utils.Pair;
     }
 
     protected void installInterests() {
-     // swap the update lists to avoid contention while
+        // swap the update lists to avoid contention while
         // draining the requested values. also guarantees
         // that the end of the list will be reached if code
         // appends to the update list without bound.
@@ -479,8 +488,19 @@ import org.voltdb.utils.Pair;
                         port.m_selectionKey.channel().close();
                     } catch (IOException e) {}
                 } else if (port.hasQueuedRunnables()) {
+                    /*
+                     * Can get a cancelled key exception if the
+                     * connection closed remotely. Still want to run the remaining code
+                     * to completely disconnect it.
+                     */
+                    try {
                         port.lockForHandlingWork();
                         port.getKey().interestOps(0);
+                    } catch (java.nio.channels.CancelledKeyException e) {
+                        networkLog.warn(
+                                "Had a cancelled key exception while processing queued runnables for port "
+                                + port.m_remoteHost, e);
+                    }
                     m_selector.selectedKeys().remove(port.getKey());
                     Runnable r = getPortCallRunnable(port);
                     if (m_useExecutorService) {
