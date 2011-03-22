@@ -123,6 +123,18 @@ public class RealVoltDB implements VoltDBInterface
                 VoltDB.crashVoltDB();
             }
             m_waitForFaultReported.release();
+
+            /*
+             * Use a new thread since this is a asynchronous (and infrequent)
+             * task and locks are being held by the fault distributor.
+             */
+            new Thread() {
+                @Override
+                public void run() {
+                    //Notify the export manager the cluster topology has changed
+                    ExportManager.instance().notifyOfClusterTopologyChange();
+                }
+            }.start();
         }
 
         @Override
@@ -414,7 +426,7 @@ public class RealVoltDB implements VoltDBInterface
             serializedCatalog = catalog.serialize();
 
             m_catalogContext = new CatalogContext(
-                    TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0),
+                    0,
                     catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
 
             // See if we should bring the server up in admin mode
@@ -535,6 +547,8 @@ public class RealVoltDB implements VoltDBInterface
                 ExecutionSite.recoveringSiteCount.set(
                         m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size());
             }
+            m_catalogContext.m_transactionId = m_messenger.getDiscoveredCatalogTxnId();
+            assert(m_messenger.getDiscoveredCatalogTxnId() != 0);
 
             // Use the host messenger's hostId.
             int myHostId = m_messenger.getHostId();
@@ -1137,7 +1151,8 @@ public class RealVoltDB implements VoltDBInterface
         InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
         try {
             messenger.rejoinForeignHostPrepare(rejoinHostId, addr, m_catalogContext.catalogCRC,
-                    m_catalogContext.deploymentCRC, liveHosts, m_catalogContext.catalogVersion);
+                    m_catalogContext.deploymentCRC, liveHosts,
+                    m_catalogContext.catalogVersion, m_catalogContext.m_transactionId);
             return null;
         } catch (Exception e) {
             //e.printStackTrace();
@@ -1215,6 +1230,9 @@ public class RealVoltDB implements VoltDBInterface
                 TransactionInitiator initiator = ci.getInitiator();
                 initiator.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
             }
+
+            //Notify the export manager the cluster topology has changed
+            ExportManager.instance().notifyOfClusterTopologyChange();
         }
         else {
             // clean up any connections made

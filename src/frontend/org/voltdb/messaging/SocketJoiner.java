@@ -68,6 +68,7 @@ public class SocketJoiner extends Thread {
     static final int CATVER_FAILURE = 8;
     static final int DEPCRC_FAILURE = 16;
     static final int HAVE_DONE_RESTORE_FAILURE = 32;
+    static final int CATTXNID_FAILURE = 64;
 
     static final int PING = 333;
     InetAddress m_coordIp = null;
@@ -83,6 +84,7 @@ public class SocketJoiner extends Thread {
     long m_catalogCRC;
     long m_deploymentCRC;
     int m_discoveredCatalogVersion = 0;
+    long m_discoveredCatalogTxnId = 0;
 
     // from configuration data
     int m_internalPort;
@@ -243,7 +245,8 @@ public class SocketJoiner extends Thread {
 
         // make sure the primary node knows it's own metadata
         VoltDB.instance().getClusterMetadataMap().put(0, VoltDB.instance().getLocalMetadata());
-
+        long txnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+        m_discoveredCatalogTxnId = txnId;
         try {
             while (m_sockets.size() < (m_expectedHosts - 1)) {
                 socket = m_listenerSocket.accept();
@@ -255,6 +258,7 @@ public class SocketJoiner extends Thread {
                 out = getOutputForHost(nextHostId);
                 out.writeInt(nextHostId);
                 out.write(instanceIdBuffer.array());
+                out.writeLong(txnId);
                 out.flush();
                 in = getInputForHost(nextHostId);
                 int response = in.readInt();
@@ -415,11 +419,12 @@ public class SocketJoiner extends Thread {
             // send the local hostid out
             LOG.debug("Non-Primary Reading its Host ID");
             m_localHostId = in.readInt();
-            byte instanceIdBytes[] = new byte[12];
+            byte instanceIdBytes[] = new byte[20];
             in.read(instanceIdBytes);
             ByteBuffer instanceId = ByteBuffer.wrap(instanceIdBytes);
             m_timestamp = instanceId.getLong();
             m_addr = instanceId.getInt();
+            m_discoveredCatalogTxnId = instanceId.getLong();
             m_sockets.put(COORD_HOSTID, socket);
 
             // start the server socket on the right interface
@@ -585,6 +590,7 @@ public class SocketJoiner extends Thread {
             long othercrcs[] = new long[m_expectedHosts - 1];
             long otherdepcrcs[] = new long[m_expectedHosts - 1];
             int catalogVersions[] = new int[m_expectedHosts - 1];
+            long catalogTxnIds[] = new long[m_expectedHosts - 1];
             boolean haveDoneRestore[] = new boolean[m_expectedHosts - 1];
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
@@ -603,6 +609,7 @@ public class SocketJoiner extends Thread {
                 difftimes[i] = System.currentTimeMillis() - timestamp;
                 catalogVersions[i] = in.readInt();
                 haveDoneRestore[i] = in.readByte() == 0 ? false : true;
+                catalogTxnIds[i] = in.readLong();
                 i++;
             }
 
@@ -649,6 +656,13 @@ public class SocketJoiner extends Thread {
             for (int version : catalogVersions) {
                 if (version != m_discoveredCatalogVersion) {
                     errors |= CATVER_FAILURE;
+                }
+            }
+
+            m_discoveredCatalogTxnId = catalogTxnIds[0];
+            for (long txnId : catalogTxnIds) {
+                if (txnId != m_discoveredCatalogTxnId) {
+                    errors |= CATTXNID_FAILURE;
                 }
             }
 
@@ -739,7 +753,8 @@ public class SocketJoiner extends Thread {
             long catalogCRC,
             long deploymentCRC,
             HashSet<Integer> liveHosts,
-            int catalogVersionNumber) throws Exception {
+            int catalogVersionNumber,
+            long catalogTxnId) throws Exception {
         SocketChannel remoteConnection = null;
         try {
             // open a connection to the re-joining node
@@ -787,6 +802,8 @@ public class SocketJoiner extends Thread {
             //Write whether a restore of the cluster has already been done
             out.writeByte(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore ? 1 : 0);
 
+            out.writeLong(catalogTxnId);
+
             // flush these 3 writes
             out.flush();
 
@@ -815,6 +832,10 @@ public class SocketJoiner extends Thread {
                     msg += String.format("Cluster nodes didn't agree on all catalog metadata.\n");
                     msg += String.format("This is likely a bug in VoltDB and you should contact the VoltDB team.\n");
                 }
+                if ((errors & CATTXNID_FAILURE) != 0) {
+                    msg += String.format("Cluster nodes didn't agree on catalog txn id.\n");
+                    msg += String.format("This is likely a bug in VoltDB and you should contact the VoltDB team.\n");
+                }
                 throw new Exception(msg);
             }
         }
@@ -835,6 +856,10 @@ public class SocketJoiner extends Thread {
 
     int getDiscoveredCatalogVersionId() {
         return m_discoveredCatalogVersion;
+    }
+
+    long getDiscoveredCatalogTxnId() {
+        return m_discoveredCatalogTxnId;
     }
 
     Map<Integer, SocketChannel> getHostsAndSockets() {

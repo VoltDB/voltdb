@@ -144,6 +144,10 @@ public class HostMessenger implements Messenger {
         return m_joiner.getDiscoveredCatalogVersionId();
     }
 
+    public long getDiscoveredCatalogTxnId() {
+        return m_joiner.getDiscoveredCatalogTxnId();
+    }
+
     public synchronized Object[] waitForGroupJoin() {
          return waitForGroupJoin(0);
     }
@@ -446,7 +450,8 @@ public class HostMessenger implements Messenger {
                                          long catalogCRC,
                                          long deploymentCRC,
                                          HashSet<Integer> liveHosts,
-                                         int catalogVersionNumber) throws Exception {
+                                         int catalogVersionNumber,
+                                         long catalogTxnId) throws Exception {
         if (hostId < 0)
             throw new Exception("Rejoin HostId can be negative.");
         if (m_foreignHosts.length <= hostId)
@@ -457,7 +462,7 @@ public class HostMessenger implements Messenger {
 
         SocketChannel sock = SocketJoiner.connect(
                 m_localHostId, hostId, addr, catalogCRC, deploymentCRC,
-                liveHosts, catalogVersionNumber);
+                liveHosts, catalogVersionNumber, catalogTxnId);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
         m_tempNewFH.sendReadyMessage();
