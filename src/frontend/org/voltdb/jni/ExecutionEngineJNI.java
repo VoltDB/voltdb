@@ -496,7 +496,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         long retval = nativeExportAction(pointer,
                                          syncAction, ackTxnId, seqNo, tableSignature);
         if (retval < 0) {
-            result = new ExportProtoMessage(partitionId, tableSignature);
+            result = new ExportProtoMessage( 0, partitionId, tableSignature);
             result.error();
         }
         return result;

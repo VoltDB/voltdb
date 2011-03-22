@@ -83,13 +83,7 @@ public class RawProcessor implements ExportDataProcessor {
      */
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
 
-    /**
-     * Cheesy mechanism to send exactly one error message to
-     * cause the client to reconnect.
-     */
-    private boolean m_shouldErrorClientOnceToForceReconnect = false;
-
-    private Connection m_currentConnection = null;
+    private volatile Connection m_currentConnection = null;
 
     // this run loop can almost be eliminated.  the InputHandler can
     // call the sb.event() function directly. event() never blocks.
@@ -137,7 +131,7 @@ public class RawProcessor implements ExportDataProcessor {
             m_state = RawProcessor.CLOSED;
             for (ExportDataSource ds : m_sourcesArray) {
                 ExportProtoMessage m =
-                    new ExportProtoMessage(ds.getPartitionId(), ds.getSignature()).close();
+                    new ExportProtoMessage( ds.getGeneration(), ds.getPartitionId(), ds.getSignature()).close();
                 try {
                     ds.exportAction(new ExportInternalMessage(this, m));
                 } catch (Exception e) {
@@ -160,7 +154,7 @@ public class RawProcessor implements ExportDataProcessor {
             }
 
             final ExportProtoMessage r =
-                new ExportProtoMessage(m.getPartitionId(), m.getSignature());
+                new ExportProtoMessage( m.getGeneration(), m.getPartitionId(), m.getSignature());
             r.error();
 
             m_c.writeStream().enqueue(
@@ -195,8 +189,6 @@ public class RawProcessor implements ExportDataProcessor {
             {
                 protocolError(m, "Server currently unavailable for export connections on this port");
                 return;
-            } else if (m_shouldErrorClientOnceToForceReconnect) {
-                protocolError(m, "Reconnect to receive new ads");
             }
 
             else if (m.isOpen()) {
@@ -245,7 +237,7 @@ public class RawProcessor implements ExportDataProcessor {
                     return;
                 }
 
-                final ExportProtoMessage r = new ExportProtoMessage(-1, "");
+                final ExportProtoMessage r = new ExportProtoMessage( -1, -1, "");
                 r.openResponse(fs.getBuffer());
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
@@ -369,6 +361,13 @@ public class RawProcessor implements ExportDataProcessor {
         public void starting(Connection c) {
             m_currentConnection = c;
             m_sb = new ProtoStateBlock(c, m_isAdminPort);
+        }
+
+        @Override
+        public void started(Connection c) {
+            if (!m_shouldContinue.get()) {
+                c.unregister();
+            }
         }
 
         /**
@@ -514,4 +513,14 @@ public class RawProcessor implements ExportDataProcessor {
             }
         }
     }
+
+    @Override
+    public void bootClient() {
+        final Connection c = m_currentConnection;
+        if (c != null) {
+            m_logger.info("There was an export connection to boot.");
+            c.unregister();
+        }
+    }
 }
+

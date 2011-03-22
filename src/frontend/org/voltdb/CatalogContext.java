@@ -48,7 +48,7 @@ public class CatalogContext {
     public final String pathToCatalogJar;
     public final long catalogCRC;
     public final long deploymentCRC;
-    public final long m_transactionId;
+    public long m_transactionId;
 
     // PRIVATE
     //private final String m_path;

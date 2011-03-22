@@ -45,6 +45,12 @@ public class TestExportDataSink extends TestCase {
         public boolean processRow(int rowSize, byte[] rowData) {
             return true;
         }
+
+        @Override
+        public void sourceNoLongerAdvertised() {
+            // TODO Auto-generated method stub
+
+        }
     }
 
     ByteBuffer makeFakePollData(int length)
@@ -59,10 +65,10 @@ public class TestExportDataSink extends TestCase {
     {
         String CONN_NAME = "ryanlovestheyankees";
         ExportDataSink dut =
-            new ExportDataSink(PARTITION_ID, TABLE_SIGNATURE, "coffeetable",
+            new ExportDataSink( 0, PARTITION_ID, TABLE_SIGNATURE, "coffeetable",
                            new TestExportDecoder(new AdvertisedDataSource(PARTITION_ID,
                                                                           TABLE_SIGNATURE,
-                                                                          "coffeetable", 0,
+                                                                          "coffeetable", 0, 32,
                                                                           null, null)));
         dut.addExportConnection(CONN_NAME, 0);
         assertNull(dut.getTxQueue(CONN_NAME).peek());
@@ -70,9 +76,10 @@ public class TestExportDataSink extends TestCase {
         assertNotNull(dut.getTxQueue(CONN_NAME).peek());
         ExportProtoMessage m = dut.getTxQueue(CONN_NAME).poll();
         assertTrue(m.isPoll());
-        assertFalse(m.isAck());
+        assertEquals(Long.MIN_VALUE, m.getAckOffset());
+        assertTrue(m.isAck());
         // move the offset along a bit
-        m = new ExportProtoMessage(PARTITION_ID, TABLE_SIGNATURE);
+        m = new ExportProtoMessage( 0,PARTITION_ID, TABLE_SIGNATURE);
         m.pollResponse(0, makeFakePollData(10));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
@@ -81,7 +88,7 @@ public class TestExportDataSink extends TestCase {
         assertTrue(m.isPoll());
         assertTrue(m.isAck());
         assertEquals(0, m.getAckOffset());
-        m = new ExportProtoMessage(PARTITION_ID, TABLE_SIGNATURE);
+        m = new ExportProtoMessage( 0, PARTITION_ID, TABLE_SIGNATURE);
         m.pollResponse(10, makeFakePollData(20));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
@@ -91,13 +98,14 @@ public class TestExportDataSink extends TestCase {
         assertTrue(m.isAck());
         assertEquals(10, m.getAckOffset());
         // stall the poll and verify the incoming message is just a poll
-        m = new ExportProtoMessage(PARTITION_ID, TABLE_SIGNATURE);
+        m = new ExportProtoMessage( 0, PARTITION_ID, TABLE_SIGNATURE);
         m.pollResponse(20, makeFakePollData(0));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
         assertNotNull(dut.getTxQueue(CONN_NAME).peek());
         m = dut.getTxQueue(CONN_NAME).poll();
         assertTrue(m.isPoll());
-        assertFalse(m.isAck());
+        assertTrue(m.isAck());
+        assertEquals(m.getAckOffset(), 10);
     }
 }

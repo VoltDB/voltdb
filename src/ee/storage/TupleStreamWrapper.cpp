@@ -100,6 +100,19 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
                 NULL,
                 false,
                 true);
+        /*
+         * With the new generational code the USO is reset to 0 for each
+         * generation. The sequence number stored on the table outside the wrapper
+         * is not reset and remains constant. USO is really just for transport purposes.
+         */
+        m_uso = 0;
+        m_openTransactionId = 0;
+        m_openTransactionUso = 0;
+        m_committedTransactionId = 0;
+        m_committedUso = 0;
+        //Reconstruct the next block so it has a USO of 0.
+        assert(m_currBlock->offset() == 0);
+        extendBufferChain(m_defaultCapacity);
     }
     m_signature = signature;
     m_generation = generation;

@@ -54,6 +54,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final String m_tableName;
     private final String m_signature;
     private final int m_siteId;
+    private final long m_generation;
     private final int m_partitionId;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
@@ -75,10 +76,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public ExportDataSource(
             Runnable onDrain,
             String db, String tableName,
-                         int partitionId, int siteId, String signature,
-                         CatalogMap<Column> catalogMap,
-                         String overflowPath) throws IOException
-    {
+            int partitionId, int siteId, String signature, long generation,
+            CatalogMap<Column> catalogMap,
+            String overflowPath) throws IOException
+            {
+        m_generation = generation;
         m_onDrain = onDrain;
         m_database = db;
         m_tableName = tableName;
@@ -133,9 +135,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         fos.write(fs.getBytes());
         fos.getFD().sync();
         fos.close();
-    }
+            }
 
     public ExportDataSource(Runnable onDrain, File adFile) throws IOException {
+        /*
+         * Certainly no more data coming if this is coming off of disk
+         */
+        m_endOfStream = true;
         m_onDrain = onDrain;
         String overflowPath = adFile.getParent();
         FileInputStream fis = new FileInputStream(adFile);
@@ -148,6 +154,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_siteId = fds.readInt();
         m_database = fds.readString();
+        m_generation = fds.readLong();
         m_partitionId = fds.readInt();
         m_signature = fds.readString();
         m_tableName = fds.readString();
@@ -160,6 +167,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         String nonce = m_signature + "_" + m_siteId + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
+        final StreamBlock sb = m_committedBuffers.peek();
+        if (sb != null) {
+            m_firstUnpolledUso = sb.uso();
+        }
     }
 
     private void resetPollMarker() throws IOException {
@@ -198,14 +209,21 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @throws MessagingException
      */
     public void exportAction(RawProcessor.ExportInternalMessage m) throws MessagingException {
+        assert(m.m_m.getGeneration() == m_generation);
         ExportProtoMessage message = m.m_m;
-        ExportProtoMessage result = new ExportProtoMessage( message.m_partitionId, message.m_signature);
+        ExportProtoMessage result =
+            new ExportProtoMessage(
+                    message.getGeneration(), message.m_partitionId, message.m_signature);
         ExportInternalMessage mbp = new ExportInternalMessage(m.m_sb, result);
         StreamBlock first_unpolled_block = null;
 
         //Assemble a list of blocks to delete so that they can be deleted
         //outside of the m_committedBuffers critical section
         ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
+
+        if (m_partitionId == 2 && m_tableName.equals("NO_NULLS")) {
+            System.out.println("Recevied " + m + " for no nulls");
+        }
 
         boolean hitEndOfStreamWithNoRunnable = false;
         try {
@@ -330,6 +348,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void writeAdvertisementTo(FastSerializer fs) throws IOException {
+        fs.writeLong(m_generation);
         fs.writeInt(getPartitionId());
         fs.writeString(m_signature);
         fs.writeString(getTableName());
@@ -366,14 +385,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return result;
         }
 
-       result = (m_partitionId - o.m_partitionId);
-       if (result != 0) {
-           return result;
-       }
+        result = (m_partitionId - o.m_partitionId);
+        if (result != 0) {
+            return result;
+        }
 
-       // does not verify replicated / unreplicated.
-       // does not verify column names / schema
-       return 0;
+        // does not verify replicated / unreplicated.
+        // does not verify column names / schema
+        return 0;
     }
 
     /**
@@ -445,4 +464,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_committedBuffers.closeAndDelete();
     }
 
+    public long getGeneration() {
+        return m_generation;
+    }
 }

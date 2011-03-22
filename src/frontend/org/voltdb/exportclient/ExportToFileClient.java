@@ -52,7 +52,7 @@ public class ExportToFileClient extends ExportClientBase {
     protected final DelimitedDataWriter m_escaper;
     protected final String m_nonce;
     protected final File m_outDir;
-    protected final HashMap<String, ExportToFileDecoder> m_tableDecoders;
+    protected final HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
     protected final int m_period;
     protected final SimpleDateFormat m_dateformat;
     protected final int m_firstfield;
@@ -71,6 +71,8 @@ public class ExportToFileClient extends ExportClientBase {
         protected BufferedWriter m_Writer;
         protected final SimpleDateFormat m_sdf;
         protected final int m_firstfield;
+        private final long m_generation;
+        private final String m_tableName;
 
         private void EnsureFileStream() {
 
@@ -104,7 +106,7 @@ public class ExportToFileClient extends ExportClientBase {
 
             m_logger.info("Opening filename " + m_currentFilename);
             try {
-                m_Writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(m_currentFilename), "UTF-8"),
+                m_Writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(m_currentFilename, true), "UTF-8"),
                         1048576);
             } catch (Exception e) {
                 m_logger.error(e.getMessage());
@@ -113,13 +115,15 @@ public class ExportToFileClient extends ExportClientBase {
             }
         }
 
-        public ExportToFileDecoder(AdvertisedDataSource source, String nonce, File outdir,
-                DelimitedDataWriter escaper, int period, SimpleDateFormat dateformat, int firstfield) {
+        public ExportToFileDecoder(AdvertisedDataSource source, String tableName, String nonce, File outdir,
+                DelimitedDataWriter escaper, int period, SimpleDateFormat dateformat, int firstfield, long generation) {
             super(source);
             m_escaper = escaper;
             m_currentFilename = "";
             m_Writer = null;
             m_lastWriterCreation = null;
+            m_generation = generation;
+            m_tableName = tableName;
             m_sdf = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss:SSS:");
             m_firstfield = firstfield;
 
@@ -127,7 +131,8 @@ public class ExportToFileClient extends ExportClientBase {
             if (outdir != null) {
                 m_period = period;
                 m_dateformat = dateformat;
-                m_prefix = outdir.getPath() + File.separator + nonce + "-" + source.tableName + ".";
+                m_prefix = outdir.getPath() +
+                            File.separator + m_generation + "-" + nonce + "-" + source.tableName + ".";
                 m_extension = "." + escaper.getExtension();
                 m_discard = false;
             } else {
@@ -140,10 +145,6 @@ public class ExportToFileClient extends ExportClientBase {
         public boolean processRow(int rowSize, byte[] rowData) {
             // Return immediately if we're in discard mode
             if (m_discard) return true;
-
-            // Ensure we have a valid file stream to push data to - no
-            // try/catch: a failure there is final
-            EnsureFileStream();
 
             // Grab the data row
             Object[] row = null;
@@ -181,6 +182,13 @@ public class ExportToFileClient extends ExportClientBase {
         }
 
         @Override
+        public void onBlockStart() {
+            // Ensure we have a valid file stream to push data to - no
+            // try/catch: a failure there is final
+            EnsureFileStream();
+        }
+
+        @Override
         public void onBlockCompletion() {
             if (m_Writer != null) {
                 try {
@@ -206,6 +214,24 @@ public class ExportToFileClient extends ExportClientBase {
             super.finalize();
         }
 
+        @Override
+        public void sourceNoLongerAdvertised() {
+            if (m_Writer != null) {
+                try {
+                    m_Writer.flush();
+                    m_Writer.close();
+                } catch (Exception e) {
+                    m_logger.error(e.getMessage());
+                    throw new RuntimeException();
+                }
+            }
+            HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
+            decoders.remove(m_tableName);
+            if (decoders.isEmpty()) {
+                m_tableDecoders.remove(m_generation);
+            }
+        }
+
     }
 
     public ExportToFileClient(DelimitedDataWriter escaper,
@@ -219,7 +245,7 @@ public class ExportToFileClient extends ExportClientBase {
         m_escaper = escaper;
         m_nonce = nonce;
         m_outDir = outdir;
-        m_tableDecoders = new HashMap<String, ExportToFileDecoder>();
+        m_tableDecoders = new HashMap<Long, HashMap<String, ExportToFileDecoder>>();
         m_period = period;
         m_dateformat = dateformat;
         m_firstfield = firstfield;
@@ -230,11 +256,16 @@ public class ExportToFileClient extends ExportClientBase {
         // For every source that provides part of a table, use the same
         // export decoder.
         String table_name = source.tableName;
-        if (!m_tableDecoders.containsKey(table_name)) {
-            m_tableDecoders.put(table_name, new ExportToFileDecoder(source, m_nonce, m_outDir, m_escaper,
-                    m_period, m_dateformat, m_firstfield));
+        HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(source.m_generation);
+        if (decoders == null) {
+            decoders = new HashMap<String, ExportToFileDecoder>();
+            m_tableDecoders.put(source.m_generation, decoders);
         }
-        return m_tableDecoders.get(table_name);
+        if (!decoders.containsKey(table_name)) {
+            decoders.put(table_name, new ExportToFileDecoder(source, table_name, m_nonce, m_outDir, m_escaper,
+                    m_period, m_dateformat, m_firstfield, source.m_generation));
+        }
+        return decoders.get(table_name);
     }
 
     protected static void printHelpAndQuit(int code) {

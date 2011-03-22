@@ -1222,22 +1222,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             long result_offset = results.getLong();
             if (result_offset < 0) {
                 ExportProtoMessage reply = null;
-                reply = new ExportProtoMessage(partitionId, mTableSignature);
+                reply = new ExportProtoMessage( 0, partitionId, mTableSignature);
                 reply.error();
                 return reply;
             }
             else {
-                results = ByteBuffer.allocate(4);
-                while (results.remaining() > 0)
-                    m_connection.m_socketChannel.read(results);
-                results.flip();
-                int result_sz = results.getInt();
-                data = ByteBuffer.allocate(result_sz + 4);
-                data.putInt(result_sz);
-                while (data.remaining() > 0)
-                    m_connection.m_socketChannel.read(data);
-                data.flip();
-
                 return null;
             }
 

@@ -160,4 +160,9 @@ class ExportTestVerifier extends ExportDecoderBase
         return result;
 
     }
+
+    @Override
+    public void sourceNoLongerAdvertised() {
+        m_ackRepeats = 100;
+    }
 }

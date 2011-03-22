@@ -46,6 +46,11 @@ public class TestExportOpsEvents extends TestCase {
             public boolean processRow(int rowSize, byte[] rowData) {
                 return true;
             }
+            @Override
+            public void sourceNoLongerAdvertised() {
+                // TODO Auto-generated method stub
+
+            }
         }
         @Override
         public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {

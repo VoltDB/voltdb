@@ -16,9 +16,14 @@
  */
 package org.voltdb.export;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -28,7 +33,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool;
-import java.util.concurrent.atomic.AtomicInteger;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -53,7 +58,7 @@ public class ExportGeneration {
         new HashMap<Integer, HashMap<String, ExportDataSource>>();
 
     private int m_numSources = 0;
-    private AtomicInteger m_drainedSources = new AtomicInteger(0);
+    private final AtomicInteger m_drainedSources = new AtomicInteger(0);
 
     private final Runnable m_onAllSourcesDrained;
 
@@ -157,8 +162,8 @@ public class ExportGeneration {
              * This is fine. If the table is dropped it won't have an entry in the generation created
              * after the table was dropped.
              */
-//            exportLog.error("Could not find export data sources for generation " + m_timestamp + " partition "
-//                    + partitionId);
+            //            exportLog.error("Could not find export data sources for generation " + m_timestamp + " partition "
+            //                    + partitionId);
             return 0;
         }
 
@@ -233,6 +238,7 @@ public class ExportGeneration {
                         partition,
                         site,
                         table.getSignature(),
+                        m_timestamp,
                         table.getColumns(),
                         m_directory.getPath());
                 m_numSources++;
@@ -248,10 +254,10 @@ public class ExportGeneration {
 
     public void pushExportBuffer(int partitionId, String signature, long uso,
             long bufferPtr, ByteBuffer buffer, boolean sync, boolean endOfStream) {
-//        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
-//        for (Integer i : m_dataSourcesByPartition.keySet()) {
-//            System.out.println("Have partition " + i);
-//        }
+        //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
+        //        for (Integer i : m_dataSourcesByPartition.keySet()) {
+        //            System.out.println("Have partition " + i);
+        //        }
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         HashMap<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
@@ -275,39 +281,12 @@ public class ExportGeneration {
         source.pushExportBuffer(uso, bufferPtr, buffer, sync, endOfStream);
     }
 
-    /**
-     * Inherit all old datasources that are no longer active so we can lie
-     * to the export client that thinks those things are still relevant.
-     * Allows the export client to remain less complex for now.
-     */
-    public void inheritOldDataSources(ExportGeneration oldGeneration) {
-        HashMap<Integer, HashMap<String, ExportDataSource>> oldSourcesByPartition =
-            oldGeneration.m_dataSourcesByPartition;
-
-        for (Map.Entry<Integer, HashMap<String, ExportDataSource>> partitionAndSources :
-            oldSourcesByPartition.entrySet()) {
-            HashMap<String, ExportDataSource> oldSourcesBySignature = partitionAndSources.getValue();
-            HashMap<String, ExportDataSource> currentSourcesBySignature =
-                m_dataSourcesByPartition.get(partitionAndSources.getKey());
-
-            if (currentSourcesBySignature == null) {
-                currentSourcesBySignature = new HashMap<String, ExportDataSource>();
-                m_dataSourcesByPartition.put(partitionAndSources.getKey(), currentSourcesBySignature);
-            }
-
-            for (Map.Entry<String, ExportDataSource> sourceBySignature : oldSourcesBySignature.entrySet()) {
-                if (!currentSourcesBySignature.containsKey(sourceBySignature.getKey())) {
-                    currentSourcesBySignature.put(sourceBySignature.getKey(), sourceBySignature.getValue());
-                }
-            }
-        }
-    }
-
     public void closeAndDelete() throws IOException {
         for (HashMap<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : map.values()) {
                 source.closeAndDelete();
             }
         }
+        VoltFile.recursivelyDelete(m_directory);
     }
 }

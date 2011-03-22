@@ -1014,14 +1014,10 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
                                          static_cast<int64_t>(ntohll(action->offset)),
                                          static_cast<int64_t>(ntohll(action->seqNo)),
                                          tableSignature);
-    int buflength = m_engine->getResultsSize();
 
     // write offset across bigendian.
     result = htonll(result);
     writeOrDie(m_fd, (unsigned char*)&result, sizeof(result));
-
-    // write the poll data. It is at least 4 bytes of length prefix.
-    writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), buflength);
 }
 
 void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {

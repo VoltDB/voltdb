@@ -184,7 +184,7 @@ public class TestRawProcessor extends TestCase {
         public MockExportDataSource(String db, String tableName,
                                  int partitionId, int siteId, String tableSignature) throws Exception
         {
-            super(null, db, tableName, partitionId, siteId, tableSignature,
+            super(null, db, tableName, partitionId, siteId, tableSignature, 0,
                   m_mockVoltDB.getCatalogContext().database.getTables().get("TableName").getColumns(),
                   "/tmp/" + System.getProperty("user.name"));
         }
@@ -194,7 +194,7 @@ public class TestRawProcessor extends TestCase {
             // Simulate what ExecutionEngineJNI and ExecutionSite do.
             if (m.m_m.isPoll()) {
                 ExportProtoMessage r =
-                    new ExportProtoMessage(m.m_m.getPartitionId(), m.m_m.getSignature());
+                    new ExportProtoMessage( m.m_m.getGeneration(), m.m_m.getPartitionId(), m.m_m.getSignature());
                 ByteBuffer data = ByteBuffer.allocate(8);
                 data.putInt(100); // some fake poll data
                 data.putInt(200); // more fake poll data
@@ -232,12 +232,12 @@ public class TestRawProcessor extends TestCase {
 
         c = new MockConnection();
         sb = rp.new ProtoStateBlock(c, false);
-        m = new ExportProtoMessage(1, "foo");
-        m_postadmin = new ExportProtoMessage(1, "foo");
+        m = new ExportProtoMessage( -1, 1, "foo");
+        m_postadmin = new ExportProtoMessage( -1, 1, "foo");
 
         // partition, site do not align match datasource
-        bad_m1 = new ExportProtoMessage(10, "foo");
-        bad_m2 = new ExportProtoMessage(1, "bar");
+        bad_m1 = new ExportProtoMessage( -1, 10, "foo");
+        bad_m2 = new ExportProtoMessage( -1, 1, "bar");
     }
 
     public void assertErrResponse() {

@@ -42,6 +42,7 @@ public class ExportProtoMessage
     public static final short kClose          = 1 << 5;
     public static final short kError          = 1 << 6;
     public static final short kSync           = 1 << 7;
+    private long m_generation;
 
     public boolean isOpen()         {return (m_type & kOpen) != 0;}
     public boolean isOpenResponse() {return (m_type & kOpenResponse) != 0;}
@@ -59,18 +60,39 @@ public class ExportProtoMessage
         final public int partitionId;
         final public String signature;
         final public String tableName;
+        final public long m_generation;
         final public long systemStartTimestamp;
         final public ArrayList<String> columnNames = new ArrayList<String>();
         final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
 
+        @Override
+        public int hashCode() {
+            return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId + signature.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o instanceof AdvertisedDataSource) {
+                AdvertisedDataSource other = (AdvertisedDataSource)o;
+                if (other.m_generation == m_generation &&
+                        other.signature.equals(signature) &&
+                        other.partitionId == partitionId) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public AdvertisedDataSource(int p_id, String t_signature, String t_name,
                                     long systemStartTimestamp,
+                                    long generation,
                                     ArrayList<String> names,
                                     ArrayList<VoltType> types)
         {
             partitionId = p_id;
             signature = t_signature;
             tableName = t_name;
+            m_generation = generation;
             this.systemStartTimestamp = systemStartTimestamp;
 
             // null checks are for happy-making test time
@@ -90,7 +112,7 @@ public class ExportProtoMessage
 
         @Override
         public String toString() {
-            return "Table: " + tableName + " partition " + partitionId + " signature " + signature;
+            return "Generation: " + m_generation + " Table: " + tableName + " partition " + partitionId + " signature " + signature;
         }
     }
 
@@ -105,9 +127,10 @@ public class ExportProtoMessage
     public static ExportProtoMessage readExternal(FastDeserializer fds)
     throws IOException
     {
-        ExportProtoMessage m = new ExportProtoMessage(0, null);
+        ExportProtoMessage m = new ExportProtoMessage( 0, 0, null);
         m.m_version = fds.readShort();
         m.m_type = fds.readShort();
+        m.m_generation = fds.readLong();
         m.m_partitionId = fds.readInt();
         m.m_signature = fds.readString();
         m.m_offset = fds.readLong();
@@ -116,7 +139,8 @@ public class ExportProtoMessage
         return m;
     }
 
-    public ExportProtoMessage(int partitionId, String signature) {
+    public ExportProtoMessage(long generation, int partitionId, String signature) {
+        m_generation = generation;
         m_partitionId = partitionId;
         m_signature = signature;
         if (m_signature == null) {
@@ -174,6 +198,7 @@ public class ExportProtoMessage
         fs.writeInt(serializableBytes());
         fs.writeShort(m_version);
         fs.writeShort(m_type);
+        fs.writeLong(m_generation);
         fs.writeInt(m_partitionId);
         fs.writeString(m_signature);
         fs.writeLong(m_offset);
@@ -243,6 +268,10 @@ public class ExportProtoMessage
         return m_offset;
     }
 
+    public long getGeneration() {
+        return m_generation;
+    }
+
     /**
      * Provide a simple accessor to read the list of advertised data sources
      * returned as the payload to an open response.
@@ -269,6 +298,7 @@ public class ExportProtoMessage
             ArrayList<VoltType> types = new ArrayList<VoltType>();
             ArrayList<String> names = new ArrayList<String>();
 
+            long generation = fds.readLong();
             int p_id = fds.readInt();
             String t_signature = fds.readString();
             String t_name = fds.readString();
@@ -279,7 +309,7 @@ public class ExportProtoMessage
                 types.add(VoltType.get((byte)fds.readInt()));
             }
             sources.add(new AdvertisedDataSource(p_id, t_signature, t_name,
-                                                 sysStartTimestamp, names, types));
+                                                 sysStartTimestamp, generation, names, types));
         }
 
         // deserialize the list of running hosts
@@ -310,7 +340,7 @@ public class ExportProtoMessage
 
     // calculate bytes of fixed payload
     private static int FIXED_PAYLOAD_LENGTH =
-        (Short.SIZE/8 * 2) + (Integer.SIZE/8 * 2) + (Long.SIZE/8);
+        (Short.SIZE/8 * 2) + (Integer.SIZE/8 * 2) + (Long.SIZE/8 * 2);
 
     // message version. Currently all messages are version 1.
     short m_version = 1;

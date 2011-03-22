@@ -71,4 +71,6 @@ public interface ExportDataProcessor  {
      */
     boolean isConnectorForService(String service);
 
+    void bootClient();
+
 }

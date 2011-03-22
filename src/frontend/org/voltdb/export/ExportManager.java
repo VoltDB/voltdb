@@ -57,7 +57,7 @@ public class ExportManager
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    private AtomicReference<TreeMap< Long, ExportGeneration>> m_generations =
+    private final AtomicReference<TreeMap< Long, ExportGeneration>> m_generations =
         new AtomicReference<TreeMap<Long, ExportGeneration>>(new TreeMap<Long, ExportGeneration>());
 
     /**
@@ -94,14 +94,8 @@ public class ExportManager
             TreeMap<Long, ExportGeneration> generations = new TreeMap<Long, ExportGeneration>(m_generations.get());
             ExportGeneration generation = generations.firstEntry().getValue();
             generations.remove(generations.firstEntry().getKey());
-            generations.firstEntry().getValue().inheritOldDataSources(generation);
             exportLog.info("Finished draining generation " + generation.m_timestamp);
             m_generations.set(generations);
-            try {
-                generation.closeAndDelete();
-            } catch (IOException e) {
-                exportLog.error(e);
-            }
 
             exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = null;
@@ -111,10 +105,17 @@ public class ExportManager
                 newProcessor.addLogger(exportLog);
                 newProcessor.setExportGeneration(generations.firstEntry().getValue());
                 newProcessor.readyForData();
-                m_processor.getAndSet(newProcessor).shutdown();
             } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
                 exportLog.error(e);
             } catch (IllegalAccessException e) {
+                exportLog.error(e);
+            }
+
+            m_processor.getAndSet(newProcessor).shutdown();
+            try {
+                generation.closeAndDelete();
+            } catch (IOException e) {
+                e.printStackTrace();
                 exportLog.error(e);
             }
         }
@@ -127,7 +128,7 @@ public class ExportManager
      * @throws ExportManager.SetupException
      */
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, boolean isRejoin)
-        throws ExportManager.SetupException
+    throws ExportManager.SetupException
     {
         /*
          * If a node is rejoining it is because it crashed. Export overflow isn't crash safe so it isn't possible
@@ -211,8 +212,8 @@ public class ExportManager
             newProcessor.addLogger(exportLog);
             File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
             initializePersistedGenerations(
-                        exportOverflowDirectory,
-                        catalogContext, conn);
+                    exportOverflowDirectory,
+                    catalogContext, conn);
             ExportGeneration currentGeneration =
                 new ExportGeneration( catalogContext.m_transactionId, m_onGenerationDrained, exportOverflowDirectory);
             currentGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
@@ -256,12 +257,26 @@ public class ExportManager
         }
     }
 
+    public void notifyOfClusterTopologyChange() {
+        exportLog.info("Attempting to boot export client due to rejoin or other cluster topology change");
+        if (m_loaderClass == null) {
+            return;
+        }
+        ExportDataProcessor proc = m_processor.get();
+        while (proc == null) {
+            Thread.yield();
+            proc = m_processor.get();
+        }
+        proc.bootClient();
+    }
+
     public void updateCatalog(CatalogContext catalogContext)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
         if (conn == null) {
+            m_loaderClass = null;
             return;
         }
 
@@ -289,32 +304,32 @@ public class ExportManager
                 break;
             }
         }
-//
-//        Runnable switchToNextGeneration = new Runnable() {
-//            @Override
-//            public void run() {
-//                ExportDataProcessor processor = m_processors.peek();
-//                processor.shutdown();
-//
-//                ExportGeneration currentGeneration = m_generations.lastEntry().getValue();
-//                try {
-//                    currentGeneration.closeAndDelete();
-//                } catch (IOException e) {
-//                    exportLog.error(e);
-//                }
-//                m_generations.remove(m_generations.lastEntry().getKey());
-//
-//                ExportGeneration newGeneration = m_generations.firstEntry().getValue();
-//                newGeneration.registerWithProcessor(processor);
-//                processor.readyForData();
-//
-//                if (m_generations.size() > 1) {
-//                    processor.setOnAllSourcesDrained(this);
-//                }
-//            }
-//        };
-//
-//        m_processors.peek().setOnAllSourcesDrained(switchToNextGeneration);
+        //
+        //        Runnable switchToNextGeneration = new Runnable() {
+        //            @Override
+        //            public void run() {
+        //                ExportDataProcessor processor = m_processors.peek();
+        //                processor.shutdown();
+        //
+        //                ExportGeneration currentGeneration = m_generations.lastEntry().getValue();
+        //                try {
+        //                    currentGeneration.closeAndDelete();
+        //                } catch (IOException e) {
+        //                    exportLog.error(e);
+        //                }
+        //                m_generations.remove(m_generations.lastEntry().getKey());
+        //
+        //                ExportGeneration newGeneration = m_generations.firstEntry().getValue();
+        //                newGeneration.registerWithProcessor(processor);
+        //                processor.readyForData();
+        //
+        //                if (m_generations.size() > 1) {
+        //                    processor.setOnAllSourcesDrained(this);
+        //                }
+        //            }
+        //        };
+        //
+        //        m_processors.peek().setOnAllSourcesDrained(switchToNextGeneration);
     }
 
     /**
@@ -322,9 +337,20 @@ public class ExportManager
      * @param mbp
      */
     public void queueMessage(ExportInternalMessage mbp) {
+        /*
+         * Processor will be null while export generation is changing.
+         * It is possible for messages to be delivered to the processor
+         * from a connection that is going to be closed in a second.
+         * It is okay to drop the message based on the asusmption the connection
+         * is going to be closed. The export client will reconnect and resend
+         * this message.
+         */
         // TODO: supporting multiple processors requires slicing the
         // data buffer so each processor gets a readonly buffer.
-        m_processor.get().queueMessage(mbp);
+        ExportDataProcessor proc = m_processor.get();
+        if (proc != null) {
+            proc.queueMessage(mbp);
+        }
     }
 
     public void shutdown() {
@@ -363,18 +389,24 @@ public class ExportManager
 
     public static long getQueuedExportBytes(int partitionId, String signature) {
         ExportManager instance = instance();
-        TreeMap<Long, ExportGeneration> generations = instance.m_generations.get();
-        if (generations.isEmpty()) {
-            assert(false);
-            return -1;
-        }
+        try {
+            TreeMap<Long, ExportGeneration> generations = instance.m_generations.get();
+            if (generations.isEmpty()) {
+                assert(false);
+                return -1;
+            }
 
-        long exportBytes = 0;
-        for (ExportGeneration generation : generations.values()) {
-            exportBytes += generation.getQueuedExportBytes( partitionId, signature);
-        }
+            long exportBytes = 0;
+            for (ExportGeneration generation : generations.values()) {
+                exportBytes += generation.getQueuedExportBytes( partitionId, signature);
+            }
 
-        return exportBytes;
+            return exportBytes;
+        } catch (Exception e) {
+            //Don't let anything take down the execution site thread
+            exportLog.error(e);
+        }
+        return 0;
     }
 
     /*
@@ -394,15 +426,20 @@ public class ExportManager
             boolean sync,
             boolean endOfStream) {
         ExportManager instance = instance();
-        ExportGeneration generation = instance.m_generations.get().get(exportGeneration);
-        if (generation == null) {
-            assert(false);
-            DBBPool.deleteCharArrayMemory(bufferPtr);
-            exportLog.error("Could not a find an export generation " + exportGeneration +
-                    ". Should be impossible. Discarding export data");
-            return;
-        }
+        try {
+            ExportGeneration generation = instance.m_generations.get().get(exportGeneration);
+            if (generation == null) {
+                assert(false);
+                DBBPool.deleteCharArrayMemory(bufferPtr);
+                exportLog.error("Could not a find an export generation " + exportGeneration +
+                ". Should be impossible. Discarding export data");
+                return;
+            }
 
-        generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
+            generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
+        } catch (Exception e) {
+            //Don't let anything take down the execution site thread
+            exportLog.error(e);
+        }
     }
 }

@@ -20,6 +20,7 @@ package org.voltdb.exportclient;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 
@@ -39,19 +40,24 @@ public class ExportDataSink {
     final int partitionId;
     final String m_tableName;
     final ExportDecoderBase m_decoder;
+    final long m_generation;
 
     // the preferred connection for a given partition/table combo
     String m_activeConnection = null;
     // the time the JVM started for the preferred connection
     long m_activeConnectionTimestamp = Long.MAX_VALUE;
 
+    private final HashMap<String, Long> m_knownConnections = new HashMap<String, Long>();
     private final HashMap<String, LinkedList<ExportProtoMessage>> m_rxQueues;
     private final HashMap<String, LinkedList<ExportProtoMessage>> m_txQueues;
 
+    private long m_lastAckOffset = Long.MIN_VALUE;
+
     boolean m_started = false;
 
-    public ExportDataSink(int partitionId, String tableSignature,
-                      String tableName, ExportDecoderBase decoder) {
+    public ExportDataSink(long generation, int partitionId, String tableSignature,
+            String tableName, ExportDecoderBase decoder) {
+        m_generation = generation;
         m_tableSignature = tableSignature;
         this.partitionId = partitionId;
         m_tableName = tableName;
@@ -61,13 +67,7 @@ public class ExportDataSink {
     }
 
     void addExportConnection(String connectionName, long connectionTimestamp) {
-        // pick the oldest connection
-        // FYI: m_activeConnectionTimestamp defaults to Long.MAX
-        if (connectionTimestamp < m_activeConnectionTimestamp) {
-            m_activeConnection = connectionName;
-            m_activeConnectionTimestamp = connectionTimestamp;
-        }
-
+        m_knownConnections.put(connectionName, connectionTimestamp);
         m_rxQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
         m_txQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
     }
@@ -82,6 +82,20 @@ public class ExportDataSink {
 
     public void work() {
         if (!m_started) {
+            if (!m_knownConnections.containsKey(m_activeConnection)) {
+                Map.Entry<String, Long> oldestEntry = null;
+                for (Map.Entry<String, Long> entry : m_knownConnections.entrySet()) {
+                    if (oldestEntry == null) {
+                        oldestEntry = entry;
+                    } else {
+                        if (oldestEntry.getValue() < entry.getValue()) {
+                            oldestEntry = entry;
+                        }
+                    }
+                }
+                m_activeConnection = oldestEntry.getKey();
+                m_activeConnectionTimestamp = oldestEntry.getValue();
+            }
             poll();
             m_started = true;
         }
@@ -100,17 +114,18 @@ public class ExportDataSink {
         m_logger.trace("Polling table " + m_tableName + ", partition "
                 + partitionId + " for new data.");
 
-        ExportProtoMessage m = new ExportProtoMessage(partitionId, m_tableSignature);
-        m.poll();
+        ExportProtoMessage m = new ExportProtoMessage( m_generation, partitionId, m_tableSignature);
+        m.poll().ack(m_lastAckOffset);
         m_txQueues.get(m_activeConnection).offer(m);
     }
 
     private void pollAndAck(ExportProtoMessage prev) {
         m_logger.debug("Poller, table " + m_tableName + ": pollAndAck " +
-                       prev.getAckOffset());
-        ExportProtoMessage next = new ExportProtoMessage(partitionId, m_tableSignature);
+                prev.getAckOffset());
+        ExportProtoMessage next = new ExportProtoMessage( m_generation, partitionId, m_tableSignature);
+        m_lastAckOffset = prev.getAckOffset();
         next.poll().ack(prev.getAckOffset());
-        ExportProtoMessage ack = new ExportProtoMessage(partitionId, m_tableSignature);
+        ExportProtoMessage ack = new ExportProtoMessage( m_generation, partitionId, m_tableSignature);
         ack.ack(prev.getAckOffset());
 
         for (String connectionName : m_txQueues.keySet()) {
@@ -139,7 +154,7 @@ public class ExportDataSink {
 
             // read the streamblock length prefix.
             int ttllength = m.getData().getInt();
-            m_logger.trace("Poller: table: " + m_tableName + ", partition: "
+            m_logger.info("Poller: generation: " + m_generation + " table: " + m_tableName + ", partition: "
                     + partitionId + " : data payload bytes: " + ttllength);
 
             // a stream block prefix of 0 also means empty queue.
@@ -169,5 +184,34 @@ public class ExportDataSink {
 
     public void connectionClosed() {
         m_started = false;
+        m_knownConnections.clear();
+        m_activeConnection = null;
+        m_activeConnectionTimestamp = Long.MAX_VALUE;
+        m_rxQueues.clear();
+        m_txQueues.clear();
+    }
+
+    public void sourceNoLongerAdvertised() {
+        m_logger.info("ExportDataSink generation " + m_generation +
+                " signature " + m_tableSignature + " partition " + partitionId + " is no longer advertised");
+        /*
+         * Process all remaining incoming messages
+         */
+        for (Entry<String, LinkedList<ExportProtoMessage>> rx_conn : m_rxQueues.entrySet()) {
+            while (!rx_conn.getValue().isEmpty()) {
+                ExportProtoMessage m = rx_conn.getValue().poll();
+                if (m != null && m.isPollResponse()) {
+                    // john thinks this should never require assignment
+                    assert(m_activeConnection == rx_conn.getKey());
+                    //m_activeConnection = rx_conn.getKey();
+                    handlePollResponse(m);
+                }
+            }
+        }
+
+        /*
+         * Notify the decoder that no more data will come
+         */
+        m_decoder.sourceNoLongerAdvertised();
     }
 }

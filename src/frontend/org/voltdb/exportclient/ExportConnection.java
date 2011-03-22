@@ -55,7 +55,7 @@ public class ExportConnection {
     private final String m_password;
 
     // cached reference to ELClientBase's collection of ELDataSinks
-    private final HashMap<String, HashMap<Integer, ExportDataSink>> m_sinks;
+    private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks;
 
     public final ArrayList<AdvertisedDataSource> dataSources;
     public final ArrayList<String> hosts;
@@ -65,7 +65,7 @@ public class ExportConnection {
     public ExportConnection(
             String username, String password,
             InetSocketAddress serverAddr,
-            HashMap<String, HashMap<Integer, ExportDataSink>> dataSinks)
+            HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> dataSinks)
     {
         m_username = username != null ? username : "";
         m_password = password != null ? password : "";
@@ -178,7 +178,28 @@ public class ExportConnection {
 
             if (m != null && m.isPollResponse()) {
                 m_lastAckOffset = m.getAckOffset();
-                ExportDataSink rx_sink = m_sinks.get(m.getSignature()).get(m.getPartitionId());
+
+                HashMap<String, HashMap<Integer, ExportDataSink>> gen_map = m_sinks.get(m.getGeneration());
+                if (gen_map == null) {
+                    m_logger.error("Could not find sinks for generation " + m.getGeneration());
+                    continue;
+                }
+
+                HashMap<Integer, ExportDataSink> part_map = gen_map.get(m.getSignature());
+                if (part_map == null) {
+                    m_logger.error("Could not find datasink for generation "
+                            + m.getGeneration() + " table signature " + m.getSignature());
+                    continue;
+                }
+
+                ExportDataSink rx_sink = part_map.get(m.getPartitionId());
+                if (rx_sink == null) {
+                    m_logger.error("Could not datasink for generation "
+                            + m.getGeneration() + " table signature " + m.getSignature() +
+                            " partition " + m.getPartitionId());
+                    continue;
+                }
+
                 rx_sink.getRxQueue(name).offer(m);
                 messagesOffered++;
             }
@@ -186,20 +207,22 @@ public class ExportConnection {
         while (m_state == CONNECTED && m != null);
 
         // service all the ELDataSink TX queues
-        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values()) {
-            for (ExportDataSink tx_sink : part_map.values()) {
-                Queue<ExportProtoMessage> tx_queue =
-                    tx_sink.getTxQueue(name);
-                // this connection might not be connected to every sink
-                if (tx_queue != null) {
-                    // XXX loop to drain the tx queue?
-                    ExportProtoMessage tx_m =
-                        tx_queue.poll();
-                    if (tx_m != null) {
-                        try {
-                            sendMessage(tx_m);
-                        } catch (IOException e) {
-                            m_logger.trace("Failed to send message to server", e);
+        for (HashMap<String, HashMap<Integer, ExportDataSink>> gen_map : m_sinks.values()) {
+            for (HashMap<Integer, ExportDataSink> part_map : gen_map.values()) {
+                for (ExportDataSink tx_sink : part_map.values()) {
+                    Queue<ExportProtoMessage> tx_queue =
+                        tx_sink.getTxQueue(name);
+                    // this connection might not be connected to every sink
+                    if (tx_queue != null) {
+                        // XXX loop to drain the tx queue?
+                        ExportProtoMessage tx_m =
+                            tx_queue.poll();
+                        if (tx_m != null) {
+                            try {
+                                sendMessage(tx_m);
+                            } catch (IOException e) {
+                                m_logger.trace("Failed to send message to server", e);
+                            }
                         }
                     }
                 }
@@ -212,7 +235,7 @@ public class ExportConnection {
     private void open() throws IOException
     {
         m_logger.info("Opening new EL stream connection.");
-        ExportProtoMessage m = new ExportProtoMessage(-1, null);
+        ExportProtoMessage m = new ExportProtoMessage( -1, -1, null);
         m.open();
         sendMessage(m);
     }

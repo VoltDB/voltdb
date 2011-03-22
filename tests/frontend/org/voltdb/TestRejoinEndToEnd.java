@@ -703,6 +703,12 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 return true;
             }
 
+            @Override
+            public void sourceNoLongerAdvertised() {
+                // TODO Auto-generated method stub
+
+            }
+
         }
 
         public TrivialExportClient() throws ExportClientException {

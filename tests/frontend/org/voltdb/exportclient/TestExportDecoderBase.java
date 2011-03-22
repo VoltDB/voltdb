@@ -45,6 +45,12 @@ public class TestExportDecoderBase extends TestCase
         {
             return false;
         }
+
+        @Override
+        public void sourceNoLongerAdvertised() {
+            // TODO Auto-generated method stub
+
+        }
     }
 
     static final String[] COLUMN_NAMES =
@@ -66,7 +72,7 @@ public class TestExportDecoderBase extends TestCase
             col_types.add(COLUMN_TYPES[i]);
         }
         AdvertisedDataSource source =
-            new AdvertisedDataSource(0, "foo", "yankeelover", 0,
+            new AdvertisedDataSource(0, "foo", "yankeelover", 0, 32,
                                      col_names, col_types);
         return source;
     }

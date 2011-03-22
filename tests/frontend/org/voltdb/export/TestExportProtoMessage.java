@@ -54,28 +54,28 @@ public class TestExportProtoMessage extends TestCase {
     }
 
     public void testIsOpen() {
-        ExportProtoMessage m = new ExportProtoMessage(1, "");
+        ExportProtoMessage m = new ExportProtoMessage( 0, 1, "");
         m.open();
         assertTrue(m.isOpen());
         assertMsgType(m, ExportProtoMessage.kOpen);
     }
 
     public void testIsOpenResponse() {
-        ExportProtoMessage m = new ExportProtoMessage(1, "");
+        ExportProtoMessage m = new ExportProtoMessage( 0, 1, "");
         m.openResponse(null);
         assertTrue(m.isOpenResponse());
         assertMsgType(m, ExportProtoMessage.kOpenResponse);
     }
 
     public void testIsPoll() {
-        ExportProtoMessage m = new ExportProtoMessage(1, "");
+        ExportProtoMessage m = new ExportProtoMessage( 0, 1, "");
         m.poll();
         assertTrue(m.isPoll());
         assertMsgType(m, ExportProtoMessage.kPoll);
     }
 
     public void testIsPollResponse() {
-        ExportProtoMessage m = new ExportProtoMessage(1, "");
+        ExportProtoMessage m = new ExportProtoMessage( 0, 1, "");
         ByteBuffer bb = ByteBuffer.allocate(10);
         m.pollResponse(1024, bb);
         assertTrue(m.isPollResponse());
@@ -85,7 +85,7 @@ public class TestExportProtoMessage extends TestCase {
     }
 
     public void testIsAck() {
-        ExportProtoMessage m = new ExportProtoMessage(1, "");
+        ExportProtoMessage m = new ExportProtoMessage( -1, 1, "");
         m.ack(2048);
         assertTrue(m.isAck());
         assertTrue(m.getAckOffset() == 2048);
@@ -93,14 +93,14 @@ public class TestExportProtoMessage extends TestCase {
     }
 
     public void testIsClose() {
-        ExportProtoMessage m = new ExportProtoMessage(1, "");
+        ExportProtoMessage m = new ExportProtoMessage( -1, 1, "");
         m.close();
         assertTrue(m.isClose());
         assertMsgType(m, ExportProtoMessage.kClose);
     }
 
     public void testIsError() {
-        ExportProtoMessage m = new ExportProtoMessage(1, "");
+        ExportProtoMessage m = new ExportProtoMessage( -1, 1, "");
         m.error();
         assertTrue(m.isError());
         assertMsgType(m, ExportProtoMessage.kError);
@@ -111,7 +111,7 @@ public class TestExportProtoMessage extends TestCase {
     public void testReadExternal1() throws IOException {
         ExportProtoMessage m1, m2;
 
-        m1 = new ExportProtoMessage(1, "foo");
+        m1 = new ExportProtoMessage( -1, 1, "foo");
         ByteBuffer b = ByteBuffer.allocate(100);
         b.putInt(100);
         b.putInt(200);
@@ -139,7 +139,7 @@ public class TestExportProtoMessage extends TestCase {
     public void testReadExternal2() throws IOException {
         ExportProtoMessage m1, m2;
 
-        m1 = new ExportProtoMessage(1, "foo");
+        m1 = new ExportProtoMessage( -1, 1, "foo");
         m1.ack(2000);
 
         ByteBuffer bm1 = m1.toBuffer();
@@ -162,7 +162,7 @@ public class TestExportProtoMessage extends TestCase {
     public void testReadExternal3() throws IOException {
         ExportProtoMessage m1, m2;
 
-        m1 = new ExportProtoMessage(1, "foo");
+        m1 = new ExportProtoMessage( -1, 1, "foo");
         ByteBuffer b = ByteBuffer.allocate(0);
         m1.pollResponse(1000, b);
 
@@ -183,7 +183,7 @@ public class TestExportProtoMessage extends TestCase {
 
     // mimic what raw processor and the el poller do to each other
     public void testELPollerPattern() throws IOException {
-        final ExportProtoMessage r = new ExportProtoMessage(1, "bar");
+        final ExportProtoMessage r = new ExportProtoMessage( -1, 1, "bar");
         ByteBuffer data = ByteBuffer.allocate(8);
         data.putInt(100);
         data.putInt(200);
@@ -205,7 +205,7 @@ public class TestExportProtoMessage extends TestCase {
             }.serialize(p);
 
         ByteBuffer b = bb.b;
-        assertEquals(31, b.getInt());
+        assertEquals(39, b.getInt());
         FastDeserializer fds = new FastDeserializer(b);
         ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
         assertEquals(1, m.m_partitionId);

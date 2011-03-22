@@ -57,4 +57,10 @@ public class ExportToHDFSDecoder extends ExportDecoderBase {
 
         return true;
     }
+
+    @Override
+    public void sourceNoLongerAdvertised() {
+        // TODO Auto-generated method stub
+
+    }
 }

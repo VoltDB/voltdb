@@ -80,6 +80,7 @@ public class TestExportDataSource extends TestCase {
                                                 m_part,
                                                 m_site,
                                                 table.getSignature(),
+                                                0,
                                                 table.getColumns(),
                                                 "/tmp");
 
@@ -109,6 +110,7 @@ public class TestExportDataSource extends TestCase {
                                             m_part,
                                             m_site,
                                             table.getSignature(),
+                                            0,
                                             table.getColumns(),
                                             "/tmp");
         ByteBuffer foo = ByteBuffer.allocate(20);
@@ -129,7 +131,7 @@ public class TestExportDataSource extends TestCase {
         //flattened size with 60 + (12 * 3)
         assertEquals( 96, s.sizeInBytes());
 
-        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getSignature());
+        ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
         final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
@@ -207,11 +209,12 @@ public class TestExportDataSource extends TestCase {
                                             m_part,
                                             m_site,
                                             table.getSignature(),
+                                            0,
                                             table.getColumns(),
                                             "/tmp");
 
         // we get nothing with no data
-        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getSignature());
+        ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
         final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
@@ -261,11 +264,12 @@ public class TestExportDataSource extends TestCase {
                                             m_part,
                                             m_site,
                                             table.getSignature(),
+                                            0,
                                             table.getColumns(),
                                             "/tmp");
 
         // we get nothing with no data
-        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getSignature());
+        ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
         final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
@@ -298,7 +302,7 @@ public class TestExportDataSource extends TestCase {
         assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE);
 
         //Reset close flag
-        m = new ExportProtoMessage(m_part, table.getSignature());
+        m = new ExportProtoMessage( 0, m_part, table.getSignature());
         m.poll();
         pair = new RawProcessor.ExportInternalMessage(null, m);
 
@@ -339,10 +343,11 @@ public class TestExportDataSource extends TestCase {
                                             m_part,
                                             m_site,
                                             table.getSignature(),
+                                            0,
                                             table.getColumns(),
                                             "/tmp");
 
-        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getSignature());
+        ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
         final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();

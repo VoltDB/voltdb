@@ -27,6 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.io.File;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
@@ -60,7 +61,7 @@ public class TestExportSuite extends RegressionSuite {
 
     /** Shove a table name and pkey in front of row data */
     private Object[] convertValsToParams(String tableName, final int i,
-                                         final Object[] rowdata)
+            final Object[] rowdata)
     {
         final Object[] params = new Object[rowdata.length + 2];
         params[0] = tableName;
@@ -72,7 +73,7 @@ public class TestExportSuite extends RegressionSuite {
 
     /** Push pkey into expected row data */
     private Object[] convertValsToRow(final int i, final char op,
-                                      final Object[] rowdata) {
+            final Object[] rowdata) {
         final Object[] row = new Object[rowdata.length + 2];
         row[0] = (byte)(op == 'I' ? 1 : 0);
         row[1] = i;
@@ -116,8 +117,9 @@ public class TestExportSuite extends RegressionSuite {
                 tester.work();
             } catch (ExportClientException e) {
                 tester.disconnect();
+                tester.reserveVerifiers();
                 boolean success = tester.connect();
-                assert(success);
+                assertTrue(success);
                 System.out.println(e.toString());
                 continue;
             }
@@ -156,15 +158,77 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(callbackSucceded);
     }
 
+    private boolean callbackSucceded = true;
+    class RollbackCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+            if (clientResponse.getStatus() != ClientResponse.USER_ABORT) {
+                callbackSucceded = false;
+                System.err.println(clientResponse.getException());
+            }
+        }
+    }
+
+    public void testExportClientIsBootedAfterRejoin() throws Exception {
+        Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow( m_tester.m_generationsSeen.last(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        client.drain();
+
+        /*
+         *  Kill a host and then process the failure
+         */
+        ((LocalCluster)m_config).shutDownSingleHost(1);
+        Thread.sleep(500);
+        boolean threwException = false;
+        try {
+            m_tester.work(1000);
+        } catch (ExportClientException e) {
+            m_tester.disconnect();
+            m_tester.reserveVerifiers();
+            boolean success = m_tester.connect();
+            assertTrue(success);
+            System.out.println(e.toString());
+            threwException = true;
+        }
+        assertTrue(threwException);
+
+        //Reconnect, then do work and expect failure, after a recovery
+        ((LocalCluster)m_config).recoverOne(1, null, "localhost");
+        Thread.sleep(500);
+        threwException = false;
+        try {
+            m_tester.work(1000);
+        } catch (ExportClientException e) {
+            m_tester.disconnect();
+            m_tester.reserveVerifiers();
+            boolean success = m_tester.connect();
+            assertTrue(success);
+            System.out.println(e.toString());
+            threwException = true;
+        }
+        assertTrue(threwException);
+
+        /*
+         * After being booted try to reconnect. This should work.
+         */
+        Thread.sleep(1000);
+        quiesceAndVerifyRetryWorkOnIOException(getClient(), m_tester);
+    }
+
     //  Test Export of a DROPPED table.  Queues some data to a table.
     //  Then drops the table and restarts the server. Verifies that Export can successfully
     //  drain the dropped table. IE, drop table doesn't lose Export data.
     //
-    /*public void testExportAndThenRejoinClearsExportOverflow() throws Exception {
+    public void testExportAndThenRejoinClearsExportOverflow() throws Exception {
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -173,19 +237,27 @@ public class TestExportSuite extends RegressionSuite {
         ((LocalCluster)m_config).shutDownSingleHost(1);
         File exportOverflowDir =
             new File(((LocalCluster)m_config).getSubRoots().get(1),
-                "/tmp/" + System.getProperty("user.name") + "/export_overflow");
+                    "/tmp/" + System.getProperty("user.name") + "/export_overflow");
         File files[] = exportOverflowDir.listFiles();
+        long modifiedTimes[] = new long[files.length];
+        int ii = 0;
+        for (File f : files) {
+            modifiedTimes[ii++] = f.lastModified();
+        }
+
         ((LocalCluster)m_config).recoverOne(1, null, "localhost");
         Thread.sleep(500);
         File filesAfterRejoin[] = exportOverflowDir.listFiles();
+        ii = 0;
         for (File f : files) {
             for (File f2 : filesAfterRejoin) {
-                if (f.getPath().equals(f2.getPath())) {
+                if (f.getPath().equals(f2.getPath()) && modifiedTimes[ii] == f2.lastModified()) {
                     fail("Files " + f + " still exists after rejoin in export overflow directory");
                 }
             }
+            ii++;
         }
-    }*/
+    }
 
     //  Test Export of a DROPPED table.  Queues some data to a table.
     //  Then drops the table and restarts the server. Verifies that Export can successfully
@@ -195,7 +267,7 @@ public class TestExportSuite extends RegressionSuite {
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.first(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -214,7 +286,37 @@ public class TestExportSuite extends RegressionSuite {
 
         client = getClient();
 
-        m_tester.reserveVerifiers();
+        /**
+         * There will be 3 disconnects. Once for the shutdown, once for first generation,
+         * another for the 2nd generation created by the catalog change. The predicate is a complex
+         * way of saying make sure that the tester has created verifiers for
+         */
+        for (int ii = 0; m_tester.m_generationsSeen.size() < 3 ||
+                m_tester.m_verifiers.get(m_tester.m_generationsSeen.last()).size() < 6; ii++) {
+            Thread.sleep(500);
+            boolean threwException = false;
+            try {
+                m_tester.work(1000);
+            } catch (ExportClientException e) {
+                m_tester.disconnect();
+                m_tester.reserveVerifiers();
+                boolean success = m_tester.connect();
+                assertTrue(success);
+                System.out.println(e.toString());
+                threwException = true;
+            }
+            if (ii < 3) {
+                assertTrue(threwException);
+            }
+        }
+
+        for (int i=10; i < 20; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow( m_tester.m_generationsSeen.last(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        client.drain();
 
         // must still be able to verify the export data.
         quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
@@ -240,7 +342,7 @@ public class TestExportSuite extends RegressionSuite {
         // verify that it exports
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ADDED_TABLE", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(), "ADDED_TABLE", i, convertValsToRow(i, 'I', rowdata));
             final Object[]  params = convertValsToParams("ADDED_TABLE", i, rowdata);
             client.callProcedure("InsertAddedTable", params);
         }
@@ -256,7 +358,7 @@ public class TestExportSuite extends RegressionSuite {
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -304,7 +406,8 @@ public class TestExportSuite extends RegressionSuite {
             // register only even rows with tester
             if ((i % 2) == 0)
             {
-                m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+                m_tester.addRow( m_tester.m_generationsSeen.last(),
+                        "ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             }
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
@@ -319,7 +422,7 @@ public class TestExportSuite extends RegressionSuite {
 
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(), "ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             // Only do the first 7 inserts
             if (i < 7)
@@ -338,7 +441,8 @@ public class TestExportSuite extends RegressionSuite {
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
             // add wrong pkeys on purpose!
-            m_tester.addRow("ALLOW_NULLS", i + 10, convertValsToRow(i+10, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(),
+                    "ALLOW_NULLS", i + 10, convertValsToRow(i+10, 'I', rowdata));
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -355,7 +459,8 @@ public class TestExportSuite extends RegressionSuite {
 
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(),
+                    "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -384,16 +489,6 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
-    private boolean callbackSucceded = true;
-    class RollbackCallback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse clientResponse) {
-            if (clientResponse.getStatus() != ClientResponse.USER_ABORT) {
-                callbackSucceded = false;
-                System.err.println(clientResponse.getException());
-            }
-        }
-    }
 
     /*
      * Sends many tuples to an Export enabled VoltServer and verifies the receipt
@@ -429,7 +524,8 @@ public class TestExportSuite extends RegressionSuite {
                 } while (!done);
             }
             else {
-                m_tester.addRow("ALLOW_NULLS", pkey, convertValsToRow(pkey, 'I', rowdata));
+                m_tester.addRow( m_tester.m_generationsSeen.last(),
+                        "ALLOW_NULLS", pkey, convertValsToRow(pkey, 'I', rowdata));
                 // the sync call back isn't synchronous if it isn't explicitly blocked on...
                 boolean done;
                 do {
@@ -505,13 +601,15 @@ public class TestExportSuite extends RegressionSuite {
         for (int i=0; i < 10; i++) {
             // add data to a first (persistent) table
             Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(),
+                    "ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
 
             // add data to a second (streaming) table.
             rowdata = TestSQLTypesSuite.m_defaultValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(),
+                    "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -526,13 +624,15 @@ public class TestExportSuite extends RegressionSuite {
         for (int i=0; i < 10; i++) {
             // add data to a first (persistent) table
             Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(),
+                    "ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
 
             // add data to a second (streaming) table.
             rowdata = TestSQLTypesSuite.m_defaultValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( m_tester.m_generationsSeen.last(),
+                    "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -602,8 +702,8 @@ public class TestExportSuite extends RegressionSuite {
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
-                       true  /*enabled*/,
-                       null  /* authGroups (off) */);
+                true  /*enabled*/,
+                null  /* authGroups (off) */);
         // "WITH_DEFAULTS" is a non-exported persistent table
         project.setTableAsExportOnly("ALLOW_NULLS");
         project.setTableAsExportOnly("NO_NULLS");
@@ -616,21 +716,21 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addProcedures(PROCEDURES);
 
-// JNI, single server
-// Use the cluster only config. Multiple topologies with the extra catalog for the
-// Add drop tests is harder. Restrict to the single (complex) topology.
-//
-//        config = new LocalSingleProcessServer("export-ddl.jar", 2,
-//                                              BackendTarget.NATIVE_EE_JNI);
-//        config.compile(project);
-//        builder.addServerConfig(config);
+        // JNI, single server
+        // Use the cluster only config. Multiple topologies with the extra catalog for the
+        // Add drop tests is harder. Restrict to the single (complex) topology.
+        //
+        //        config = new LocalSingleProcessServer("export-ddl.jar", 2,
+        //                                              BackendTarget.NATIVE_EE_JNI);
+        //        config.compile(project);
+        //        builder.addServerConfig(config);
 
 
         /*
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, 1,
-                                  BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, false);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config);
@@ -640,12 +740,12 @@ public class TestExportSuite extends RegressionSuite {
          * compile a catalog without the NO_NULLS table for add/drop tests
          */
         config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, 1,
-                                              BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, false);
+                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true);
         project = new VoltProjectBuilder();
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
-                       true,  //enabled
-                       null); // authGroups (off)
+                true,  //enabled
+                null); // authGroups (off)
         // "WITH_DEFAULTS" is a non-exported persistent table
         project.setTableAsExportOnly("ALLOW_NULLS");
 
@@ -666,14 +766,14 @@ public class TestExportSuite extends RegressionSuite {
          * compile a catalog with an added table for add/drop tests
          */
         config = new LocalCluster("export-ddl-addedtable.jar", 2, 3, 1,
-                                  BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, false);
+                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true);
         project = new VoltProjectBuilder();
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-addedtable-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
-                       true  /*enabled*/,
-                       null  /* authGroups (off) */);
+                true  /*enabled*/,
+                null  /* authGroups (off) */);
         // "WITH_DEFAULTS" is a non-exported persistent table
         project.setTableAsExportOnly("ALLOW_NULLS");   // persistent table
         project.setTableAsExportOnly("ADDED_TABLE");   // persistent table

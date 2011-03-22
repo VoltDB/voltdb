@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.HashSet;
 
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
@@ -46,7 +47,9 @@ public abstract class ExportClientBase {
     protected final boolean m_useAdminPorts;
 
     // First hash by table signature, second by partition
-    private final HashMap<String, HashMap<Integer, ExportDataSink>> m_sinks;
+    private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks;
+
+    private final HashSet<AdvertisedDataSource> m_knownDataSources = new HashSet<AdvertisedDataSource>();
 
     // credentials
     private String m_username = "", m_password = "";
@@ -57,7 +60,7 @@ public abstract class ExportClientBase {
 
     public ExportClientBase(boolean useAdminPorts)
     {
-        m_sinks = new HashMap<String, HashMap<Integer, ExportDataSink>>();
+        m_sinks = new HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>>();
         m_exportConnections = new HashMap<InetSocketAddress, ExportConnection>();
         m_servers = new ArrayList<InetSocketAddress>();
         m_useAdminPorts = useAdminPorts;
@@ -112,17 +115,25 @@ public abstract class ExportClientBase {
             ExportDataSink sink = null;
             String table_signature = source.signature;
             int part_id = source.partitionId;
+            HashMap<String, HashMap<Integer, ExportDataSink>> gen_map =
+                m_sinks.get(source.m_generation);
+            if (gen_map == null) {
+                gen_map = new HashMap<String, HashMap<Integer, ExportDataSink>>();
+                m_sinks.put(source.m_generation, gen_map);
+            }
+
             HashMap<Integer, ExportDataSink> part_map =
-                m_sinks.get(table_signature);
+                gen_map.get(table_signature);
             if (part_map == null) {
                 part_map = new HashMap<Integer, ExportDataSink>();
-                m_sinks.put(table_signature, part_map);
+                gen_map.put(table_signature, part_map);
             }
             if (!part_map.containsKey(part_id)) {
-                m_logger.info("Creating decoder for table: " + source.tableName +
+                m_logger.info("Creating decoder for generation " + source.m_generation + " table: " + source.tableName +
                         ", table ID, " + source.signature + " part ID: " + source.partitionId);
                 ExportDecoderBase decoder = constructExportDecoder(source);
-                sink = new ExportDataSink(source.partitionId,
+                sink = new ExportDataSink( source.m_generation,
+                                      source.partitionId,
                                       source.signature,
                                       source.tableName,
                                       decoder);
@@ -167,9 +178,11 @@ public abstract class ExportClientBase {
         for (ExportConnection connection : m_exportConnections.values()) {
             connection.closeExportConnection();
         }
-        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values()) {
-            for (ExportDataSink sink : part_map.values()) {
-                sink.connectionClosed();
+        for (HashMap<String, HashMap<Integer, ExportDataSink>> gen_map : m_sinks.values()) {
+            for (HashMap<Integer, ExportDataSink> part_map : gen_map.values()) {
+                for (ExportDataSink sink : part_map.values()) {
+                    sink.connectionClosed();
+                }
             }
         }
         m_exportConnections.clear();
@@ -201,7 +214,6 @@ public abstract class ExportClientBase {
                                             "No servers provided for export client.");
         }
 
-        m_sinks.clear();
         m_exportConnections.clear();
 
         // Connect to one of the specified servers.  This will open the sockets,
@@ -253,6 +265,7 @@ public abstract class ExportClientBase {
             return false;
         }
 
+        HashSet<AdvertisedDataSource> foundSources = new HashSet<AdvertisedDataSource>();
         // connect to the rest of the servers
         // try three rounds with a pause in the middle of each
         for (int tryCount = 0; tryCount < 3; tryCount++) {
@@ -261,6 +274,7 @@ public abstract class ExportClientBase {
                 ExportConnection connection = connectToServer(addr);
                 if (connection != null) {
                     m_exportConnections.put(addr, connection);
+                    foundSources.addAll(connection.dataSources);
                 }
             }
 
@@ -272,12 +286,30 @@ public abstract class ExportClientBase {
             try { Thread.sleep(250); } catch (InterruptedException e) {}
         }
 
+        /*
+         * All datasinks that are no longer advertised anywhere in the cluster need to be discarded
+         */
+        HashSet<AdvertisedDataSource> knownSources = new HashSet<AdvertisedDataSource>(m_knownDataSources);
+        knownSources.removeAll(foundSources);
+
+        for (AdvertisedDataSource source : knownSources) {
+            HashMap<String, HashMap<Integer, ExportDataSink>> gen_map = m_sinks.get(source.m_generation);
+            HashMap<Integer, ExportDataSink> part_map = gen_map.get(source.signature);
+            ExportDataSink sink = part_map.remove(source.partitionId);
+            if (part_map.isEmpty()) {
+                gen_map.remove(source.signature);
+            }
+            if (gen_map.isEmpty()) {
+                m_sinks.remove(source.m_generation);
+            }
+            sink.sourceNoLongerAdvertised();
+        }
+        m_knownDataSources.clear();
+        m_knownDataSources.addAll(foundSources);
+
         // check for non-complete connection and roll back if so
         if (m_servers.size() != m_exportConnections.size()) {
-            m_sinks.clear();
-            for (ExportConnection ec : m_exportConnections.values())
-                ec.closeExportConnection();
-            m_exportConnections.clear();
+            disconnect();
             return false;
         }
 
@@ -299,9 +331,11 @@ public abstract class ExportClientBase {
 
         // work all the ExportDataSinks.
         // process incoming data and generate outgoing ack/polls
-        for (HashMap<Integer, ExportDataSink> partMap : m_sinks.values()) {
-            for (ExportDataSink sink : partMap.values()) {
-                sink.work();
+        for (HashMap<String, HashMap<Integer, ExportDataSink>> gen_map : m_sinks.values()) {
+            for (HashMap<Integer, ExportDataSink> part_map : gen_map.values()) {
+                for (ExportDataSink sink : part_map.values()) {
+                    sink.work();
+                }
             }
         }
 

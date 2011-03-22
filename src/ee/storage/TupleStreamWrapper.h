@@ -24,7 +24,7 @@
 #include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
-
+#include "common/Topend.h"
 #include <deque>
 
 namespace voltdb {
@@ -67,6 +67,10 @@ public:
     /** Set the total number of bytes used (for rejoin/recover) */
     void setBytesUsed(size_t count) {
         assert(m_uso == 0);
+        StreamBlock *sb = new StreamBlock(new char[0], 0, count);
+        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                                m_generation, m_partitionId, m_signature, sb, false, false);
+        delete m_currBlock;
         m_uso = count;
     }
 
