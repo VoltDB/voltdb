@@ -208,10 +208,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                             recoveryLog.info("Processor spent " +
                                     (m_timeSpentSerializing.get() / 1000.0) + " seconds serializing");
                             synchronized (RecoverySiteProcessorSource.this) {
-                                if (m_onCompletion != null) {
-                                    m_onCompletion.run();
+                                if (!m_ioclosed) {
                                     closeIO();
-                                    m_onCompletion = null;
                                 }
                             }
                         } else {
@@ -654,30 +652,26 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                         }
                     }
                 }
-                if (!m_ackTracker.hasOutstanding()) {
-                    return;
-                } else {
-                    final long startWait = System.currentTimeMillis();
-                    while (m_inThread.isAlive() && System.currentTimeMillis() - startWait < 5000) {
-                        /*
-                         * Process mailbox messages as part of this loop. This is necessary to ensure the txn
-                         * ordering and heartbeat process moves forward at the recovering partition.
-                         */
-                        checkMailbox(false);
-                    }
-                    //Make sure that the last ack is processed and onCompletion is run
-                    synchronized (this) {
-                        if (m_inThread.isAlive()) {
-                            if (m_onCompletion != null) {
-                                recoveryLog.error("Timed out waiting for acks for the last few recovery messages");
-                                m_onCompletion.run();
-                                m_onCompletion = null;
-                                closeIO();
-                            }
-                        }
-                    }
-                    return;
+                final long startWait = System.currentTimeMillis();
+                while (m_inThread.isAlive() && System.currentTimeMillis() - startWait < 5000) {
+                    /*
+                     * Process mailbox messages as part of this loop. This is necessary to ensure the txn
+                     * ordering and heartbeat process moves forward at the recovering partition.
+                     */
+                    checkMailbox(false);
                 }
+                //Make sure that the last ack is processed and onCompletion is run
+                synchronized (this) {
+                    if (m_inThread.isAlive()) {
+                        recoveryLog.error("Timed out waiting for acks for the last few recovery messages");
+                        closeIO();
+                    }
+                    if (m_onCompletion != null) {
+                        m_onCompletion.run();
+                        m_onCompletion = null;
+                    }
+                }
+                return;
             }
 
             checkMailbox(true);
