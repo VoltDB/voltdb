@@ -303,15 +303,19 @@ public class ClientInterface implements DumpManager.Dumpable {
                                         socket.socket().setTcpNoDelay(false);
                                         socket.socket().setKeepAlive(true);
 
-                                        synchronized (m_connections){
-                                            Connection c = null;
-                                            if (!m_hasDTXNBackPressure) {
-                                                c = m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
+                                        if (handler instanceof ClientInputHandler) {
+                                            synchronized (m_connections){
+                                                Connection c = null;
+                                                if (!m_hasDTXNBackPressure) {
+                                                    c = m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
+                                                }
+                                                else {
+                                                    c = m_network.registerChannel(socket, handler, 0);
+                                                }
+                                                m_connections.add(c);
                                             }
-                                            else {
-                                                c = m_network.registerChannel(socket, handler, 0);
-                                            }
-                                            m_connections.add(c);
+                                        } else {
+                                            m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
                                         }
                                         success = true;
                                     }
