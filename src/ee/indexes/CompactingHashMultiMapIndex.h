@@ -103,7 +103,7 @@ public:
                                  const TableTuple *newTupleValue) {
         assert(oldTupleValue->address() != newTupleValue->address());
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        typename MapType::iterator iter = m_entries.find(m_tmp1, oldTupleValue, false);
+        typename MapType::iterator iter = m_entries.find(m_tmp1, oldTupleValue);
         if (iter.isEnd()) return false;
         iter.setValue(newTupleValue);
         m_updates++;

@@ -62,18 +62,20 @@ namespace voltdb {
         // (new hash will be 30% full)
         static const uint64_t MIN_LOAD_FACTOR = 15; // %
 
+        static const uint64_t TABLE_SIZES[];
+
 #ifndef MEMCHECK
 
         // start with a roughly 512k hash table
         // (includes 64k 8B pointers)
-        static const uint64_t BUCKET_INITIAL_COUNT = 1024 * 64;
+        static const uint64_t BUCKET_INITIAL_INDEX = 3;
 
         // 20000 HashNodes per chunk is about 625k / chunk
         static const uint64_t ALLOCATOR_CHUNK_SIZE = 20000;
 
 #else // for MEMCHECK
         // for debugging with valgrind
-        static const uint32_t BUCKET_INITIAL_COUNT = 8;
+        static const uint32_t BUCKET_INITIAL_INDEX = 0;
         static const uint64_t ALLOCATOR_CHUNK_SIZE = 2;
 
 #endif // MEMCHECK
@@ -112,7 +114,7 @@ namespace voltdb {
         bool m_unique;                    // support unique
         uint64_t m_count;                 // number of items in the hash
         uint64_t m_uniqueCount;           // number of unique keys
-        uint64_t m_size;                  // current bucket count
+        int m_sizeIndex;                  // current bucket count (from array)
         ContiguousAllocator m_allocator;  // allocator supporting compaction
         Hasher m_hasher;                  // instance of the hashing function
         KeyEqChecker m_keyEq;             // instance of the key eq checker
@@ -191,8 +193,34 @@ namespace voltdb {
         /** see if the hash needs to grow or shrink */
         void checkLoadFactor();
         /** grow/shrink the hash table */
-        void resize(uint64_t newSize);
+        void resize(int newSizeIndex);
     };
+
+    template<class K, class T, class H, class EK, class ET>
+    const uint64_t CompactingHashTable<K, T, H, EK, ET>::TABLE_SIZES[] = {
+        2,
+        5,
+        11,
+        65537,
+        131101,
+        262147,
+        524309,
+        1048583,
+        2097169,
+        4194319,
+        8388617,
+        16777259,
+        33554467,
+        67108879,
+        134217757,
+        268435459,
+        536870923,
+        1073741827,
+        2147483659,
+        4294967311,
+        8589934609
+    };
+
 
     ///////////////////////////////////////////
     //
@@ -205,23 +233,23 @@ namespace voltdb {
     : m_unique(unique),
     m_count(0),
     m_uniqueCount(0),
-    m_size(BUCKET_INITIAL_COUNT),
+    m_sizeIndex(BUCKET_INITIAL_INDEX),
     m_allocator(unique ? sizeof(HashNodeSmall) : sizeof(HashNode), ALLOCATOR_CHUNK_SIZE),
     m_hasher(hasher),
     m_keyEq(keyEq),
     m_dataEq(dataEq)
     {
         // allocate the hash table and bzero it (bzero is crucial)
-        void *memory = mmap(NULL, sizeof(HashNode*) * BUCKET_INITIAL_COUNT, PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+        void *memory = mmap(NULL, sizeof(HashNode*) * TABLE_SIZES[m_sizeIndex], PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
         assert(memory);
         m_buckets = reinterpret_cast<HashNode**>(memory);
-        memset(m_buckets, 0, sizeof(HashNode*) * BUCKET_INITIAL_COUNT);
+        memset(m_buckets, 0, sizeof(HashNode*) * TABLE_SIZES[m_sizeIndex]);
     }
 
     template<class K, class T, class H, class EK, class ET>
     CompactingHashTable<K, T, H, EK, ET>::~CompactingHashTable() {
         // unlink all of the nodes, which will call destructors correctly
-        for (size_t i = 0; i < m_size; ++i) {
+        for (size_t i = 0; i < TABLE_SIZES[m_sizeIndex]; ++i) {
             while (m_buckets[i]) {
                 HashNode *node = m_buckets[i];
                 if (m_unique)
@@ -235,7 +263,7 @@ namespace voltdb {
         }
 
         // delete the hashtable
-        munmap(m_buckets, sizeof(HashNode*) * m_size);
+        munmap(m_buckets, sizeof(HashNode*) * TABLE_SIZES[m_sizeIndex]);
 
         // when the allocator gets cleaned up, it will
         // free the memory used for nodes
@@ -244,7 +272,7 @@ namespace voltdb {
     template<class K, class T, class H, class EK, class ET>
     typename CompactingHashTable<K, T, H, EK, ET>::iterator CompactingHashTable<K, T, H, EK, ET>::find(const Key &key) const {
         uint64_t hash = m_hasher(key);
-        uint64_t bucketOffset = hash % m_size;
+        uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
         const HashNode *foundNode = find(m_buckets[bucketOffset], key);
         return iterator(foundNode);
     }
@@ -252,7 +280,7 @@ namespace voltdb {
     template<class K, class T, class H, class EK, class ET>
     typename CompactingHashTable<K, T, H, EK, ET>::iterator CompactingHashTable<K, T, H, EK, ET>::find(const Key &key, const Data &value) const {
         uint64_t hash = m_hasher(key);
-        uint64_t bucketOffset = hash % m_size;
+        uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
         const HashNode *foundNode = find(m_buckets[bucketOffset], key, value);
         return iterator(foundNode);
     }
@@ -260,7 +288,8 @@ namespace voltdb {
     template<class K, class T, class H, class EK, class ET>
     bool CompactingHashTable<K, T, H, EK, ET>::insert(const Key &key, const Data &value) {
         uint64_t hash = m_hasher(key);
-        uint64_t bucketOffset = hash % m_size;
+
+        uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
         return insert(&(m_buckets[bucketOffset]), hash, key, value);
     }
 
@@ -269,7 +298,7 @@ namespace voltdb {
         assert(m_unique);
         HashNode *prevBucketNode = NULL;
         uint64_t hash = m_hasher(key);
-        uint64_t bucketOffset = hash % m_size;
+        uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
 
         for (HashNode *node = m_buckets[bucketOffset]; node; node = node->nextInBucket) {
             if (m_keyEq(node->key, key)) {
@@ -288,7 +317,7 @@ namespace voltdb {
     bool CompactingHashTable<K, T, H, EK, ET>::erase(const Key &key, const Data &value) {
         HashNode *prevBucketNode = NULL, *keyHeadNode = NULL, *prevKeyNode = NULL;
         uint64_t hash = m_hasher(key);
-        uint64_t bucketOffset = hash % m_size;
+        uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
 
         for (HashNode *node = m_buckets[bucketOffset]; node; node = node->nextInBucket) {
             if (m_keyEq(node->key, key)) {
@@ -467,7 +496,7 @@ namespace voltdb {
         }
 
         // find the bucket for the last node
-        uint64_t bucketOffset = last->hash % m_size;
+        uint64_t bucketOffset = last->hash % TABLE_SIZES[m_sizeIndex];
 
         // find the last node and what points to it
         HashNode *prevBucketNode = NULL, *keyHeadNode = NULL, *prevKeyNode = NULL;
@@ -543,53 +572,53 @@ namespace voltdb {
 
     template<class K, class T, class H, class EK, class ET>
     void CompactingHashTable<K, T, H, EK, ET>::checkLoadFactor() {
-        uint64_t lf = (m_uniqueCount * 100) / m_size;
-        uint64_t newSize = m_size;
+        uint64_t lf = (m_uniqueCount * 100) / TABLE_SIZES[m_sizeIndex];
+        int newSizeIndex = m_sizeIndex;
         if (lf > MAX_LOAD_FACTOR)
-            newSize <<= 1;
+            newSizeIndex++;
         else if(lf < MIN_LOAD_FACTOR)
-            newSize >>= 1;
-        if (newSize != m_size) {
+            newSizeIndex--;
+        if (newSizeIndex != m_sizeIndex) {
             // make sure the hash doesn't over-shrink
-            if (newSize >= BUCKET_INITIAL_COUNT)
-                resize(newSize);
+            if (newSizeIndex >= BUCKET_INITIAL_INDEX)
+                resize(newSizeIndex);
         }
     }
 
     template<class K, class T, class H, class EK, class ET>
-    void CompactingHashTable<K, T, H, EK, ET>::resize(uint64_t newSize) {
+    void CompactingHashTable<K, T, H, EK, ET>::resize(int newSizeIndex) {
         //std::cout << "SIZING BUFFER" << std::endl;
         //std::cout.flush();
 
         // create new double size buffer
-        void *memory = mmap(NULL, sizeof(HashNode*) * newSize, PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+        void *memory = mmap(NULL, sizeof(HashNode*) * TABLE_SIZES[newSizeIndex], PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
         assert(memory);
         HashNode **newBuckets = reinterpret_cast<HashNode**>(memory);
-        memset(newBuckets, 0, newSize * sizeof(HashNode*));
+        memset(newBuckets, 0, TABLE_SIZES[newSizeIndex] * sizeof(HashNode*));
 
         // move all of the existing values
-        for (uint32_t i = 0; i < m_size; ++i) {
+        for (uint32_t i = 0; i < TABLE_SIZES[m_sizeIndex]; ++i) {
             while (m_buckets[i]) {
                 HashNode *node = m_buckets[i];
                 m_buckets[i] = node->nextInBucket;
 
-                uint64_t bucketOffset = node->hash % newSize;
+                uint64_t bucketOffset = node->hash % TABLE_SIZES[newSizeIndex];
                 node->nextInBucket = newBuckets[bucketOffset];
                 newBuckets[bucketOffset] = node;
             }
         }
 
         // swap the table buffers
-        munmap(m_buckets, m_size * sizeof(HashNode*));
+        munmap(m_buckets, TABLE_SIZES[m_sizeIndex] * sizeof(HashNode*));
         m_buckets = newBuckets;
-        m_size = newSize;
+        m_sizeIndex = newSizeIndex;
     }
 
     template<class K, class T, class H, class EK, class ET>
     bool CompactingHashTable<K, T, H, EK, ET> ::verify() {
         size_t manualCount = 0;
 
-        for (uint64_t bucketi = 0; bucketi < m_size; ++bucketi) {
+        for (uint64_t bucketi = 0; bucketi < TABLE_SIZES[m_sizeIndex]; ++bucketi) {
             for (HashNode *node = m_buckets[bucketi]; node; node = node->nextInBucket) {
                 if (m_unique) {
                     uint64_t hash = m_hasher(node->key);
@@ -597,7 +626,7 @@ namespace voltdb {
                         printf("Node hash doesn't match expected value.\n");
                         return false;
                     }
-                    if ((hash % m_size) != bucketi) {
+                    if ((hash % TABLE_SIZES[m_sizeIndex]) != bucketi) {
                         printf("Node hash doesn't match expected bucket index.\n");
                         return false;
                     }
@@ -611,7 +640,7 @@ namespace voltdb {
                             printf("Node hash doesn't match expected value.\n");
                             return false;
                         }
-                        if ((hash % m_size) != bucketi) {
+                        if ((hash % TABLE_SIZES[m_sizeIndex]) != bucketi) {
                             printf("Node hash doesn't match expected bucket index.\n");
                             return false;
                         }

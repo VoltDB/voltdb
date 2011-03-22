@@ -55,7 +55,6 @@
 #include "indexes/CompactingTreeMultiMapIndex.h"
 #include "indexes/CompactingHashUniqueIndex.h"
 #include "indexes/CompactingHashMultiMapIndex.h"
-#include "indexes/HashTableUniqueIndex.h"
 #include "indexes/HashTableMultiMapIndex.h"
 
 namespace voltdb {
@@ -119,13 +118,13 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
 
     if ((ints_only) && (type == HASH_TABLE_INDEX) && (unique)) {
         if (keySize <= sizeof(uint64_t)) {
-            return new HashTableUniqueIndex<IntsKey<1>, IntsHasher<1>, IntsEqualityChecker<1> >(schemeCopy);
+            return new CompactingHashUniqueIndex<IntsKey<1>, IntsHasher<1>, IntsEqualityChecker<1> >(schemeCopy);
         } else if (keySize <= sizeof(int64_t) * 2) {
-            return new HashTableUniqueIndex<IntsKey<2>, IntsHasher<2>, IntsEqualityChecker<2> >(schemeCopy);
+            return new CompactingHashUniqueIndex<IntsKey<2>, IntsHasher<2>, IntsEqualityChecker<2> >(schemeCopy);
         } else if (keySize <= sizeof(int64_t) * 3) {
-            return new HashTableUniqueIndex<IntsKey<3>, IntsHasher<3>, IntsEqualityChecker<3> >(schemeCopy);
+            return new CompactingHashUniqueIndex<IntsKey<3>, IntsHasher<3>, IntsEqualityChecker<3> >(schemeCopy);
         } else if (keySize <= sizeof(int64_t) * 4) {
-            return new HashTableUniqueIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
+            return new CompactingHashUniqueIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
             throwFatalException( "We currently only support hash index on unique integer keys of size 32 bytes or smaller..." );
         }
