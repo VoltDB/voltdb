@@ -4,4 +4,5 @@
     <paths>
       <voltdbroot path="/tmp"/>
     </paths>
+    <httpd/>
 </deployment>
