@@ -574,14 +574,17 @@ namespace voltdb {
     void CompactingHashTable<K, T, H, EK, ET>::checkLoadFactor() {
         uint64_t lf = (m_uniqueCount * 100) / TABLE_SIZES[m_sizeIndex];
         int newSizeIndex = m_sizeIndex;
-        if (lf > MAX_LOAD_FACTOR)
+        if (lf > MAX_LOAD_FACTOR) {
             newSizeIndex++;
-        else if(lf < MIN_LOAD_FACTOR)
-            newSizeIndex--;
-        if (newSizeIndex != m_sizeIndex) {
+        }
+        else if(lf < MIN_LOAD_FACTOR) {
             // make sure the hash doesn't over-shrink
-            if (newSizeIndex >= BUCKET_INITIAL_INDEX)
-                resize(newSizeIndex);
+            if (newSizeIndex != BUCKET_INITIAL_INDEX) {
+                newSizeIndex--;
+            }
+        }
+        if (newSizeIndex != m_sizeIndex) {
+            resize(newSizeIndex);
         }
     }
 
