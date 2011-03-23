@@ -171,7 +171,7 @@ namespace voltdb {
         size_t size() const { return m_count; }
 
         /** Return bytes used for this index */
-        size_t bytesAllocated() const { return m_allocator.bytesAllocated() + sizeof(m_buckets); }
+        size_t bytesAllocated() const { return m_allocator.bytesAllocated() + TABLE_SIZES[m_sizeIndex] * sizeof(HashNode*); }
 
         /** verification for debugging and testing */
         bool verify();
@@ -515,13 +515,18 @@ namespace voltdb {
             prevKeyNode = NULL;
             keyHeadNode = n;
             if (m_unique) {
-                if (n != last) continue; // not found
+                if (n != last) {
+                    prevBucketNode = n;
+                    continue; // not found
+                }
 
                 // update things that point to the last node
-                if (prevKeyNode)
-                    prevKeyNode->nextWithKey = node;
-                else
+                if (prevBucketNode) {
+                    prevBucketNode->nextInBucket = node;
+                }
+                else {
                     m_buckets[bucketOffset] = node;
+                }
 
                 // copy the last node over the deleted node
                 node->hash = last->hash;
@@ -530,7 +535,7 @@ namespace voltdb {
                 node->value = last->value;
 
                 // destructor and memory release
-                (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
+                (reinterpret_cast<HashNodeSmall*>(last))->~HashNodeSmall();
                 m_allocator.trim();
                 assert(m_allocator.count() == m_count);
 
@@ -566,7 +571,7 @@ namespace voltdb {
                     node->value = last->value;
 
                     // destructor and memory release
-                    node->~HashNode();
+                    last->~HashNode();
                     m_allocator.trim();
                     assert(m_allocator.count() == m_count);
 
