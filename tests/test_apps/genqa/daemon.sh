@@ -1,5 +1,5 @@
 #!/bin/bash
-usage="Usage: daemon.sh (start|stop) [rejoinhostname]"
+usage="Usage: daemon.sh (start|stop) [rejoin-hostname]"
 if [ $# = 0 ]; then
  echo $usage
  exit 1

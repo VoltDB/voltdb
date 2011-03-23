@@ -10,9 +10,6 @@
             <schema path='ddl.sql' />
         </schemas>
         <procedures>
-            <procedure class='com.procedures.Initialize' />
-            <procedure class='com.procedures.Results' />
-            <procedure class='com.procedures.Vote' />
             <procedure class='com.procedures.JiggleSinglePartition' />
             <procedure class='com.procedures.JiggleMultiPartition' />
             <procedure class='com.procedures.JiggleSinglePartitionWithDeletionExport' />
@@ -23,7 +20,6 @@
             <procedure class='com.procedures.WaitMultiPartition' />
         </procedures>
         <partitions>
-            <partition table='votes' column='phone_number' />
             <partition table='partitioned_table' column='rowid' />
             <partition table='export_partitioned_table' column='rowid' />
             <partition table='export_replicated_table' column='rowid' /> <!-- temporary so I can build! -->
