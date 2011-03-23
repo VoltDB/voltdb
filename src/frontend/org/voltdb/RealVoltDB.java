@@ -248,7 +248,19 @@ public class RealVoltDB implements VoltDBInterface
                     throw new RuntimeException(e);
                 }
             }
-            m_siteObj.run();
+            try
+            {
+                m_siteObj.run();
+            }
+            catch (Throwable t)
+            {
+                String errmsg = "ExecutionSite: " + m_siteId + " encountered an " +
+                "unexpected error and will die, taking this VoltDB node down.";
+                System.err.println(errmsg);
+                t.printStackTrace();
+                hostLog.fatal(errmsg, t);
+                VoltDB.crashVoltDB();
+            }
         }
 
     }
@@ -1027,7 +1039,20 @@ public class RealVoltDB implements VoltDBInterface
         // start one site in the current thread
         Thread.currentThread().setName("ExecutionSiteAndVoltDB");
         m_isRunning = true;
-        m_currentThreadSite.run();
+        try
+        {
+            m_currentThreadSite.run();
+        }
+        catch (Throwable t)
+        {
+            String errmsg = "ExecutionSite: " + m_currentThreadSite.m_siteId +
+            " encountered an " +
+            "unexpected error and will die, taking this VoltDB node down.";
+            System.err.println(errmsg);
+            t.printStackTrace();
+            hostLog.fatal(errmsg, t);
+            VoltDB.crashVoltDB();
+        }
     }
 
     /**

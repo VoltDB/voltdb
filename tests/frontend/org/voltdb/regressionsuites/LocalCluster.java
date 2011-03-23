@@ -871,6 +871,36 @@ public class LocalCluster implements VoltServerConfig {
         return true;
     }
 
+    public int getLiveNodeCount()
+    {
+        int count = 0;
+        if (m_hasLocalServer)
+        {
+            count++;
+        }
+
+        if (m_cluster != null)
+        {
+            for (Process proc : m_cluster)
+            {
+                try
+                {
+                    if (proc != null)
+                    {
+                        proc.exitValue();
+                    }
+                }
+                catch (IllegalThreadStateException ex)
+                {
+                    // not dead yet!
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
     public int getBlessedPartitionDetectionProcId() {
         int currMin = Integer.MAX_VALUE;
         int currMinIdx = 0;
