@@ -154,7 +154,7 @@ public class ExportDataSink {
 
             // read the streamblock length prefix.
             int ttllength = m.getData().getInt();
-            m_logger.info("Poller: generation: " + m_generation + " table: " + m_tableName + ", partition: "
+            m_logger.trace("Poller: generation: " + m_generation + " table: " + m_tableName + ", partition: "
                     + partitionId + " : data payload bytes: " + ttllength);
 
             // a stream block prefix of 0 also means empty queue.
@@ -192,7 +192,7 @@ public class ExportDataSink {
     }
 
     public void sourceNoLongerAdvertised() {
-        m_logger.info("ExportDataSink generation " + m_generation +
+        m_logger.debug("ExportDataSink generation " + m_generation +
                 " signature " + m_tableSignature + " partition " + partitionId + " is no longer advertised");
         /*
          * Process all remaining incoming messages

@@ -106,8 +106,8 @@ public abstract class ExportClientBase {
     public abstract ExportDecoderBase constructExportDecoder(AdvertisedDataSource source);
 
     private void constructExportDataSinks(ExportConnection elConnection) {
-        m_logger.info("Num data sources is " + elConnection.dataSources.size());
-        m_logger.info("Processing data sources for connection " + elConnection);
+        m_logger.debug("Num data sources is " + elConnection.dataSources.size());
+        m_logger.debug("Processing data sources for connection " + elConnection);
         for (AdvertisedDataSource source : elConnection.dataSources) {
             // Construct the app-specific decoder supplied by subclass
             // and build an ExportDataSink for this data source
@@ -129,7 +129,7 @@ public abstract class ExportClientBase {
                 gen_map.put(table_signature, part_map);
             }
             if (!part_map.containsKey(part_id)) {
-                m_logger.info("Creating decoder for generation " + source.m_generation + " table: " + source.tableName +
+                m_logger.debug("Creating decoder for generation " + source.m_generation + " table: " + source.tableName +
                         ", table ID, " + source.signature + " part ID: " + source.partitionId);
                 ExportDecoderBase decoder = constructExportDecoder(source);
                 sink = new ExportDataSink( source.m_generation,
@@ -144,7 +144,7 @@ public abstract class ExportClientBase {
                 //sink = part_map.pu
             }
             sink = part_map.get(part_id);
-            m_logger.info("Providing connection " + elConnection.name + " for table id " + source.signature + " to sink " + sink);
+            m_logger.debug("Providing connection " + elConnection.name + " for table id " + source.signature + " to sink " + sink);
             // and plug the ExportConnection into the ExportDataSink
             sink.addExportConnection(elConnection.name, source.systemStartTimestamp);
         }
