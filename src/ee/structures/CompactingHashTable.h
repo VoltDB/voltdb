@@ -245,7 +245,7 @@ namespace voltdb {
     m_count(0),
     m_uniqueCount(0),
     m_sizeIndex(BUCKET_INITIAL_INDEX),
-    m_allocator(unique ? sizeof(HashNodeSmall) : sizeof(HashNode), ALLOCATOR_CHUNK_SIZE),
+    m_allocator((int32_t)(unique ? sizeof(HashNodeSmall) : sizeof(HashNode)), ALLOCATOR_CHUNK_SIZE),
     m_hasher(hasher),
     m_keyEq(keyEq),
     m_dataEq(dataEq)
