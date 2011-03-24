@@ -397,8 +397,8 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             //Didn't get the value. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (timeout reading message length).");
+                authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                              "): wire protocol violation (timeout reading message length).");
                 //Send negative response
                 responseBuffer.put((byte)2).flip();
                 socket.write(responseBuffer);
