@@ -25,6 +25,7 @@
 #include <map>
 #include <algorithm>
 #include <cstdlib>
+#include <cmath>
 #include <cstdio>
 #include <sys/time.h>
 #include <boost/unordered_map.hpp>
@@ -66,6 +67,237 @@ public:
     }
 };
 
+bool coinFlip() {
+    return rand() > (RAND_MAX / 2);
+}
+
+int64_t randomValue(int64_t absMax) {
+    int64_t value = rand() % absMax;
+    if (coinFlip()) value *= -1;
+    return value;
+}
+
+void uniqueFuzzIteration() {
+    const int ITERATIONS = 10000;
+
+    boost::unordered_map<int64_t,int64_t> stl;
+    voltdb::CompactingHashTable<int64_t,int64_t> volt(true);
+
+    std::pair<boost::unordered_map<int64_t,int64_t>::iterator, bool> insertSTLIter;
+    boost::unordered_map<int64_t,int64_t>::iterator stlIter;
+
+    voltdb::CompactingHashTable<int64_t,int64_t>::iterator voltIter;
+
+    double mix = rand();
+
+    for (int i = 0; i < ITERATIONS; i++) {
+        bool insert = rand() >= mix;
+
+        int64_t value = rand();
+        if (insert) {
+            insertSTLIter = stl.insert(pair<int64_t,int64_t>(value,value));
+            bool didInsert = volt.insert(value, value);
+            assert (insertSTLIter.second == didInsert);
+        }
+        else {
+            stlIter = stl.find(value);
+            voltIter = volt.find(value);
+            assert( (stlIter == stl.end()) == (voltIter.isEnd()) );
+            if (stlIter != stl.end()) {
+                stl.erase(stlIter);
+                volt.erase(voltIter);
+            }
+        }
+
+        assert( stl.size() == volt.size() );
+    }
+
+    volt.verify();
+}
+
+void multiFuzzIteration() {
+    const int ITERATIONS = 10000;
+
+    // mix of inserts and deletes
+    double mix = rand();
+
+    // whether to allow failed deletes or inserts (50%)
+    bool alwaysSucceed = coinFlip();
+
+    // how many of the same value to insert
+    // how many nodes to delete for each pass
+    // (picks a random power of 2 which is <= 16)
+    int dups = (int)log(rand() % 65536);
+    if (dups == 0) dups = 1;
+
+    // max positive and negative value to insert
+    int range = rand();
+    if (alwaysSucceed) range = (int)log(range);
+    else range = range % ITERATIONS * dups / 2;
+
+    printf("Running %.2f mix with %d dups, %d max and %s alwaysSucceed.\n",
+           mix / (double)RAND_MAX,
+           dups,
+           range,
+           alwaysSucceed ? "DO" : "DO NOT");
+
+    // counters
+    int insertions = 0;
+    int deletions = 0;
+
+    // data structures and iterators
+    boost::unordered_multimap<int64_t,int64_t> stl;
+    voltdb::CompactingHashTable<int64_t,int64_t> volt(false);
+    boost::unordered_multimap<int64_t,int64_t>::iterator stlIter;
+    boost::unordered_multimap<int64_t,int64_t>::iterator stlIter2;
+    voltdb::CompactingHashTable<int64_t,int64_t>::iterator voltIter;
+
+    // the main loop
+    for (int i = 0; i < ITERATIONS; i++) {
+        // pick whether to insert or remove
+        bool insert = rand() >= mix;
+
+        if (insert) {
+            int64_t value = randomValue(range);
+            for (int j = 0; j < dups; j++) {
+                int64_t toInsert = randomValue(100);
+                stlIter = stl.insert(pair<int64_t,int64_t>(value, toInsert));
+                bool didInsert = volt.insert(value, toInsert);
+                insertions++;
+                assert(didInsert);
+            }
+        }
+        else {
+            for (int j = 0; j < dups; j++) {
+                if (volt.size() == 0)
+                    break;
+
+                int64_t value = randomValue(range);
+                stlIter = stl.find(value);
+                if (stlIter == stl.end()) {
+                    voltIter = volt.find(value);
+                    assert(voltIter.isEnd());
+                    if (alwaysSucceed) j--;
+                }
+                else {
+                    int64_t stlValue = stlIter->second;
+                    if (coinFlip()) {
+                        stlIter2 = stlIter;
+                        stlIter2++;
+                        if ((stlIter2 != stl.end()) && (stlIter2->first == value)) {
+                            stlIter = stlIter2;
+                            stlValue = stlIter->second;
+                        }
+                    }
+
+                    voltIter = volt.find(value, stlValue);
+                    assert(voltIter.isEnd() == false);
+
+                    int64_t stlKey = stlIter->first;
+                    int64_t voltKey = voltIter.key();
+                    int64_t voltValue = voltIter.value();
+
+                    assert(stlKey == voltKey);
+                    assert(stlValue == voltValue);
+
+                    // this should always succeed
+                    stl.erase(stlIter);
+
+                    // try to delete something that doesn't exist by value
+                    bool erased = volt.erase(stlKey, 1000);
+                    assert(!erased);
+
+                    // now delete the real thing
+                    erased = volt.erase(stlKey, stlValue);
+                    assert(erased);
+                    deletions++;
+                }
+            }
+        }
+
+        assert( stl.size() == volt.size() );
+    }
+
+    volt.verify();
+
+    printf("  did %d insertions and %d deletions.\n", insertions, deletions);
+}
+
+TEST_F(CompactingHashTest, Fuzz) {
+    const int ITERATIONS = 10;
+
+    for (int i = 0; i < ITERATIONS; i++)
+        uniqueFuzzIteration();
+
+    for (int i = 0; i < ITERATIONS; i++)
+        multiFuzzIteration();
+}
+
+TEST_F(CompactingHashTest, MissingByKey) {
+    voltdb::CompactingHashTable<int64_t,int64_t> volt(false);
+    voltdb::CompactingHashTable<int64_t,int64_t>::iterator voltIter;
+
+    volt.insert(1,1);
+    voltIter = volt.find(1,1);
+    bool erased = volt.erase(1,2);
+    assert(!erased);
+    voltIter.setValue(2);
+    erased = volt.erase(1,2);
+    assert(erased);
+}
+
+TEST_F(CompactingHashTest, ShrinkAndGrowUnique) {
+    const int ITERATIONS = 10000;
+
+    voltdb::CompactingHashTable<uint64_t,uint64_t> volt(true);
+
+    for (uint64_t i = 0; i < ITERATIONS; i++)
+        ASSERT_TRUE(volt.insert(i, i));
+
+    volt.verify();
+
+    for (uint64_t i = 0; i < ITERATIONS; i++)
+        ASSERT_TRUE(volt.erase(i, i));
+
+    volt.verify();
+
+    for (uint64_t i = 0; i < ITERATIONS; i++)
+        ASSERT_TRUE(volt.insert(i, i));
+
+    volt.verify();
+
+    for (uint64_t i = 0; i < ITERATIONS; i++)
+        ASSERT_TRUE(volt.erase(i, i));
+
+    volt.verify();
+}
+
+TEST_F(CompactingHashTest, ShrinkAndGrowMulti) {
+    const int ITERATIONS = 10000;
+
+    voltdb::CompactingHashTable<uint64_t,uint64_t> volt(false);
+
+    for (uint64_t i = 0; i < ITERATIONS; i++)
+        ASSERT_TRUE(volt.insert(i, i));
+
+    volt.verify();
+
+    for (uint64_t i = 0; i < ITERATIONS; i++)
+        ASSERT_TRUE(volt.erase(i, i));
+
+    volt.verify();
+
+    for (uint64_t i = 0; i < ITERATIONS; i++)
+        ASSERT_TRUE(volt.insert(i, i));
+
+    volt.verify();
+
+    for (uint64_t i = 0; i < ITERATIONS; i++)
+        ASSERT_TRUE(volt.erase(i, i));
+
+    volt.verify();
+}
+
 TEST_F(CompactingHashTest, Benchmark) {
     const int ITERATIONS = 10000;
 
@@ -102,6 +334,7 @@ TEST_F(CompactingHashTest, Benchmark) {
 
         ASSERT_TRUE(volt.size() == val + 1);
     }
+    ASSERT_TRUE(volt.verify());
 
     for (uint64_t val = 0; val < ITERATIONS; val += 2) {
         iter = volt.find(val);
@@ -110,6 +343,7 @@ TEST_F(CompactingHashTest, Benchmark) {
         iter = volt.find(val);
         ASSERT_TRUE(iter.isEnd());
     }
+    ASSERT_TRUE(volt.verify());
 
     for (uint64_t val = 0; val < ITERATIONS; val++) {
         iter = volt.find(val);
@@ -121,6 +355,7 @@ TEST_F(CompactingHashTest, Benchmark) {
             ASSERT_TRUE(iter.value() == val);
         }
     }
+    ASSERT_TRUE(volt.verify());
 
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
@@ -215,10 +450,6 @@ TEST_F(CompactingHashTest, BenchmarkDel) {
         ASSERT_FALSE(iter.isEnd());
         volt.erase(iter);
     }
-
-    /*for (int i = 0; i < ITERATIONS; i += 1) {
-        volt.equalRange(keyFromInt(i));
-    }*/
 
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
@@ -323,6 +554,7 @@ TEST_F(CompactingHashTest, Trivial) {
     uint64_t two = 2;
     uint64_t three = 3;
     bool success;
+    voltdb::CompactingHashTable<uint64_t,uint64_t>::iterator iter;
 
     // UNIQUE MAP
     voltdb::CompactingHashTable<uint64_t,uint64_t> m(true);
@@ -336,7 +568,6 @@ TEST_F(CompactingHashTest, Trivial) {
     ASSERT_TRUE(m.verify());
     ASSERT_TRUE(m.size() == 3);
 
-    voltdb::CompactingHashTable<uint64_t,uint64_t>::iterator iter;
     iter = m.find(two);
     ASSERT_FALSE(iter.isEnd());
     ASSERT_EQ(iter.key(), two);
@@ -351,7 +582,7 @@ TEST_F(CompactingHashTest, Trivial) {
 
     // MULTIMAP
     voltdb::CompactingHashTable<uint64_t,uint64_t> m2(false);
-    success = m2.insert(one,one);
+    success = m2.insert(one,two);
     ASSERT_TRUE(success);
     success = m2.insert(one,one);
     ASSERT_TRUE(success);
@@ -368,8 +599,14 @@ TEST_F(CompactingHashTest, Trivial) {
 
     ASSERT_TRUE(m2.verify());
     ASSERT_TRUE(m2.size() == 7);
+
+    iter = m2.find(one, two);
+    ASSERT_FALSE(iter.isEnd());
+    ASSERT_EQ(iter.key(), one);
+    ASSERT_EQ(iter.value(), two);
 }
 
 int main() {
+    assert(printf("Assertions are enabled\n"));
     return TestSuite::globalInstance()->runAll();
 }
