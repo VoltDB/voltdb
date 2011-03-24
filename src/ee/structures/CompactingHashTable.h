@@ -349,6 +349,7 @@ namespace voltdb {
                     }
                     prevKeyNode = node;
                 }
+                break;
             }
             prevBucketNode = node;
         }

@@ -169,7 +169,7 @@ protected:
 
     inline bool deleteEntryPrivate(const TableTuple *tuple, const KeyType &key) {
         ++m_deletes;
-        return m_entries.erase(key, tuple);
+        return m_entries.erase(key, tuple->address());
     }
 
     bool moveToKey(const KeyType &key) {
