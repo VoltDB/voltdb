@@ -432,20 +432,31 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
             assert(!m_endOfStream);
             if (buffer != null) {
-                try {
-                    m_committedBuffers.offer(new StreamBlock(
-                            new BBContainer(buffer, bufferPtr) {
-                                @Override
-                                public void discard() {
-                                    DBBPool.deleteCharArrayMemory(address);
-                                    deleted.set(true);
-                                }
-                            }, uso, false));
-                } catch (IOException e) {
-                    exportLog.error(e);
-                    if (!deleted.get()) {
-                        DBBPool.deleteCharArrayMemory(bufferPtr);
+                if (buffer.capacity() > 0) {
+                    try {
+                        m_committedBuffers.offer(new StreamBlock(
+                                new BBContainer(buffer, bufferPtr) {
+                                    @Override
+                                    public void discard() {
+                                        DBBPool.deleteCharArrayMemory(address);
+                                        deleted.set(true);
+                                    }
+                                }, uso, false));
+                    } catch (IOException e) {
+                        exportLog.error(e);
+                        if (!deleted.get()) {
+                            DBBPool.deleteCharArrayMemory(bufferPtr);
+                        }
                     }
+                } else {
+                    /*
+                     * TupleStreamWrapper::setBytesUsed propagates the USO by sending
+                     * over an empty stream block. The block will be deleted
+                     * on the native side when this method returns
+                     */
+                    exportLog.info("Syncing first unpolled USO to " + uso + " for table "
+                            + m_tableName + " partition " + m_partitionId);
+                    m_firstUnpolledUso = uso;
                 }
             }
             if (sync) {

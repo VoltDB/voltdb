@@ -70,7 +70,8 @@ public:
         StreamBlock *sb = new StreamBlock(new char[1], 0, count);
         ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
                                 m_generation, m_partitionId, m_signature, sb, false, false);
-        delete m_currBlock;
+        delete [] sb->rawPtr();
+        delete sb;
         m_uso = count;
     }
 
