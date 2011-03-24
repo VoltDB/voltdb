@@ -1211,8 +1211,9 @@ public abstract class VoltProcedure {
             try {
                 fs.writeObject(paramSet);
             } catch (IOException e) {
-                e.printStackTrace();
-                assert(false);
+                throw new RuntimeException("Error serializing parameters for SQL statement: " +
+                                           stmt.getText() + " with params: " +
+                                           paramSet.toJSONString(), e);
             }
             ByteBuffer params = fs.getBuffer();
             assert(params != null);

@@ -30,6 +30,7 @@ import java.math.BigInteger;
 import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -47,8 +48,10 @@ public class TestRollbackSuite extends RegressionSuite {
         MultiPartitionJavaError.class,
         MultiPartitionJavaAbort.class,
         MultiPartitionConstraintError.class,
+        MultiPartitionParamSerializationError.class,
         SinglePartitionUpdateConstraintError.class,
         SinglePartitionConstraintFailureAndContinue.class,
+        SinglePartitionParamSerializationError.class,
         SelectAll.class,
         ReadMatView.class,
         FetchNORowUsingIndex.class,
@@ -66,6 +69,31 @@ public class TestRollbackSuite extends RegressionSuite {
      */
     public TestRollbackSuite(String name) {
         super(name);
+    }
+
+    public void testParameterSetSerializationErrorRollback()
+    throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+
+        try
+        {
+            client.callProcedure("MultiPartitionParamSerializationError", 0);
+            fail("MultiPartitionParamSerializationError should have thrown a ProcCallException, not succeeded");
+        }
+        catch (ProcCallException e) {
+        }
+
+        try
+        {
+            client.callProcedure("SinglePartitionParamSerializationError", 0);
+            fail("SinglePartitionParamSerializationError should have thrown a ProcCallException, not succeeded");
+        }
+        catch (ProcCallException e) {
+        }
+
+        VoltTable results = client.callProcedure("@Statistics", "procedure", 0).getResults()[0];
+        System.out.println("results: " + results);
     }
 
     public void testSinglePartitionJavaFailure() throws IOException {
@@ -917,6 +945,7 @@ public class TestRollbackSuite extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addSchema(SinglePartitionJavaError.class.getResource("tpcc-extraview-ddl.sql"));
         project.addDefaultPartitioning();
+        project.addPartitionInfo("ALL_TYPES", "ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 

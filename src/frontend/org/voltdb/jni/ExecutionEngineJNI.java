@@ -215,6 +215,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
 
         // serialize the param set
+        // This should have been serialized sanely by VoltProcedure.slowPath()
+        // or failed and rolled back at that point.  This parameter set serialization
+        // had better not fail.
         fsForParameterSet.clear();
         try {
             parameterSet.writeExternal(fsForParameterSet);
@@ -309,12 +312,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         // serialize the param sets
         fsForParameterSet.clear();
-        try {
-            for (int i = 0; i < batchSize; ++i) {
+        for (int i = 0; i < batchSize; ++i) {
+            try {
                 parameterSets[i].writeExternal(fsForParameterSet);
             }
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception); // can't happen
+            catch (final IOException exception) {
+                throw new RuntimeException("Error serializing parameters for SQL batch element: " +
+                                           i + " with plan fragment ID: " + planFragmentIds[i] +
+                                           " and with params: " +
+                                           parameterSets[i].toJSONString(), exception);
+            }
         }
         // checkMaxFsSize();
 
