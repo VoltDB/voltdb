@@ -246,8 +246,6 @@ public class SnapshotDelete extends VoltSystemProcedure {
         assert(f.isDirectory());
         assert(f.canRead());
         assert(f.canWrite());
-        final String digestName =
-            SnapshotUtil.constructDigestFilenameForNonce(nonce.substring(0, nonce.lastIndexOf('-')));
         return java.util.Arrays.asList(f.listFiles(new FileFilter() {
 
             @Override
@@ -260,7 +258,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                     return false;
                 }
 
-                if (pathname.getName().startsWith(nonce) || pathname.getName().equals(digestName)) {
+                if (pathname.getName().startsWith(nonce)) {
                     return true;
                 }
                 return false;

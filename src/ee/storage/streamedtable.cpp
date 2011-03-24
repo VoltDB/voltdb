@@ -161,6 +161,10 @@ void StreamedTable::undo(size_t mark)
 {
     if (m_wrapper) {
         m_wrapper->rollbackTo(mark);
+        //Decrementing the sequence number should make the stream of tuples
+        //contiguous outside of actual system failures. Should be more useful
+        //then having gaps.
+        m_sequenceNo--;
     }
 }
 

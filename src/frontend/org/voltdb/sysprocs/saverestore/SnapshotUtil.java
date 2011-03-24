@@ -44,10 +44,13 @@ import java.util.zip.CRC32;
 import org.voltdb.VoltDB;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.*;
+import org.voltdb.client.ConnectionUtil;
+import org.voltdb.logging.VoltLoggerFactory;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.VoltFile;
+import org.json_voltpatches.*;
 
 public class SnapshotUtil {
 
@@ -65,8 +68,11 @@ public class SnapshotUtil {
             long txnId,
             String path,
             String nonce,
-            List<Table> tables) throws IOException {
-        final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce));
+            List<Table> tables,
+            int hostId,
+            Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers
+            ) throws IOException {
+        final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
         if (f.exists()) {
             if (!f.delete()) {
                 throw new IOException("Unable to write table list file " + f);
@@ -74,18 +80,40 @@ public class SnapshotUtil {
         }
         FileOutputStream fos = new FileOutputStream(f);
         StringWriter sw = new StringWriter();
-        sw.append(Long.toString(txnId));
-        if (!tables.isEmpty()) {
-            sw.append(',');
-        }
-        for (int ii = 0; ii < tables.size(); ii++) {
-            sw.append(tables.get(ii).getTypeName());
-            if (!(ii == (tables.size() - 1))) {
-                sw.append(',');
-            } else {
-                sw.append('\n');
+        JSONStringer stringer = new JSONStringer();
+        try {
+            stringer.object();
+            stringer.key("version").value(1);
+            stringer.key("txnId").value(txnId);
+            stringer.key("tables").array();
+            for (int ii = 0; ii < tables.size(); ii++) {
+                stringer.value(tables.get(ii).getTypeName());
             }
+            stringer.endArray();
+            stringer.key("exportSequenceNumbers").array();
+            for (Map.Entry<String, List<Pair<Integer, Long>>> entry : exportSequenceNumbers.entrySet()) {
+                stringer.object();
+
+                stringer.key("exportTableName").value(entry.getKey());
+
+                stringer.key("sequenceNumberPerPartition").array();
+                for (Pair<Integer, Long> sequenceNumber : entry.getValue()) {
+                    stringer.object();
+                    stringer.key("partition").value(sequenceNumber.getFirst());
+                    stringer.key("exportSequenceNumber").value(sequenceNumber.getSecond());
+                    stringer.endObject();
+                }
+                stringer.endArray();
+
+                stringer.endObject();
+            }
+            stringer.endArray();
+            stringer.endObject();
+        } catch (JSONException e) {
+            throw new IOException(e);
         }
+
+        sw.append(stringer.toString());
 
         final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
         final CRC32 crc = new CRC32();
@@ -99,27 +127,22 @@ public class SnapshotUtil {
         fos.close();
     }
 
-    public static List<String> retrieveRelevantTableNames(String path,
+    public static List<JSONObject> retrieveDigests(String path,
             String nonce) throws Exception {
-        return retrieveRelevantTableNamesAndTime(new VoltFile(path, constructDigestFilenameForNonce(nonce))).getSecond();
+        VoltFile directoryWithDigest = new VoltFile(path);
+        ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
+        for (File f : directoryWithDigest.listFiles()) {
+            if (f.getName().startsWith(nonce + "-host_") && f.getName().endsWith(".digest")) {
+                digests.add(CRCCheck(f));
+            }
+        }
+        return digests;
     }
 
     /**
-     * Retrieve a list of tables from a digest. Doesn't return the snapshot time
-     * value that is stashed in the digest file.
-     * @param f
-     * @throws Exception
-     */
-    public static Pair<Long, List<String>> retrieveRelevantTableNamesAndTime(File f) throws Exception {
-        String tableList = CRCCheck(f);
-        String tableNames[] = tableList.split(",");
-        String actualTableNames[] = new String[tableNames.length - 1];
-        System.arraycopy( tableNames, 1, actualTableNames, 0, tableNames.length - 1);
-        return Pair.of(Long.valueOf(tableNames[0]),
-                       java.util.Arrays.asList(actualTableNames));
-    }
-
-    /**
+     *
+     * This isn't just a CRC check. It also loads the file and returns it as
+     * a JSON object.
      * Check if the CRC of the snapshot digest. Note that this only checks if
      * the CRC at the beginning of the digest file matches the CRC of the digest
      * file itself.
@@ -130,13 +153,15 @@ public class SnapshotUtil {
      * @throws IOException
      *             If CRC does not match
      */
-    public static String CRCCheck(File f) throws IOException {
+    public static JSONObject CRCCheck(File f) throws IOException {
         final FileInputStream fis = new FileInputStream(f);
         try {
             final BufferedInputStream bis = new BufferedInputStream(fis);
             ByteBuffer crcBuffer = ByteBuffer.allocate(4);
             if (4 != bis.read(crcBuffer.array())) {
-                throw new EOFException("EOF while attempting to read CRC from snapshot digest");
+                throw new EOFException(
+                        "EOF while attempting to read CRC from snapshot digest " + f +
+                        " on host " + ConnectionUtil.getHostnameOrAddress());
             }
             final int crc = crcBuffer.getInt();
             final InputStreamReader isr = new InputStreamReader(bis, "UTF-8");
@@ -144,24 +169,73 @@ public class SnapshotUtil {
             while (true) {
                 int nextChar = isr.read();
                 if (nextChar == -1) {
-                    throw new EOFException("EOF while reading snapshot digest");
+                    break;
                 }
+                //The original format had a single newline terminate the file.
+                //Still here for backwards compatiblity with previously generated
+                //digests
                 if (nextChar == '\n') {
                     break;
                 }
                 caw.write(nextChar);
             }
-            String tableList = caw.toString();
-            byte tableListBytes[] = tableList.getBytes("UTF-8");
-            CRC32 tableListCRC = new CRC32();
-            tableListCRC.update(tableListBytes);
-            tableListCRC.update("\n".getBytes("UTF-8"));
-            final int calculatedValue = (int)tableListCRC.getValue();
-            if (crc != calculatedValue) {
-                throw new IOException("CRC of snapshot digest did not match digest contents");
+
+            /*
+             * Try and parse the contents as a JSON object. If it succeeds then assume
+             * it is a the new version of the digest file. It is unlikely the old version
+             * will successfully parse as JSON because it starts with a number
+             * instead of an open brace.
+             */
+            JSONObject obj = null;
+            try {
+                obj = new JSONObject(caw.toString());
+            } catch (JSONException e) {
+                //assume it is the old format
             }
 
-            return tableList;
+            /*
+             * Convert the old style file to a JSONObject so it can be presented
+             * via a consistent interface.
+             */
+            if (obj == null) {
+                String tableList = caw.toString();
+                byte tableListBytes[] = tableList.getBytes("UTF-8");
+                CRC32 tableListCRC = new CRC32();
+                tableListCRC.update(tableListBytes);
+                tableListCRC.update("\n".getBytes("UTF-8"));
+                final int calculatedValue = (int)tableListCRC.getValue();
+                if (crc != calculatedValue) {
+                    throw new IOException("CRC of snapshot digest did not match digest contents");
+                }
+
+                String tableNames[] = tableList.split(",");
+                long txnId = Long.valueOf(tableNames[0]);
+
+                obj = new JSONObject();
+                try {
+                    obj.put("version", 0);
+                    obj.put("txnId", txnId);
+                    for (int ii = 1; ii < tableNames.length; ii++) {
+                        obj.append("tables", tableNames[ii]);
+                    }
+                } catch (JSONException e) {
+                    throw new IOException(e);
+                }
+                return obj;
+            } else {
+                /*
+                 * Verify the CRC and then return the data as a JSON object.
+                 */
+                String tableList = caw.toString();
+                byte tableListBytes[] = tableList.getBytes("UTF-8");
+                CRC32 tableListCRC = new CRC32();
+                tableListCRC.update(tableListBytes);
+                final int calculatedValue = (int)tableListCRC.getValue();
+                if (crc != calculatedValue) {
+                    throw new IOException("CRC of snapshot digest did not match digest contents");
+                }
+                return obj;
+            }
         } finally {
             try {
                 if (fis != null)
@@ -232,8 +306,7 @@ public class SnapshotUtil {
             }
 
             for (String snapshotName : snapshotNames) {
-                if (pathname.getName().startsWith(snapshotName + "-") ||
-                        pathname.getName().equals(constructDigestFilenameForNonce(snapshotName))) {
+                if (pathname.getName().startsWith(snapshotName + "-")) {
                     return true;
                 }
             }
@@ -299,22 +372,18 @@ public class SnapshotUtil {
 
             try {
                 if (f.getName().endsWith(".digest")) {
-                    Pair<Long, List<String>> result = null;
-                    try {
-                        result = retrieveRelevantTableNamesAndTime(f);
-                    } catch (Exception e) {
-                        System.err.println(e.getMessage());
-                        System.err.println("Error: Unable to process digest " + f.getPath());
-                        continue;
-                    }
-                    Long snapshotTxnId = result.getFirst();
+                    JSONObject digest = CRCCheck(f);
+                    Long snapshotTxnId = digest.getLong("txnId");
                     Snapshot s = snapshots.get(snapshotTxnId);
                     if (s == null) {
                         s = new Snapshot();
                         snapshots.put(snapshotTxnId, s);
                     }
                     TreeSet<String> tableSet = new TreeSet<String>();
-                    tableSet.addAll(result.getSecond());
+                    JSONArray tables = digest.getJSONArray("tables");
+                    for (int ii = 0; ii < tables.length(); ii++) {
+                        tableSet.add(tables.getString(ii));
+                    }
                     s.m_digestTables.add(tableSet);
                     s.m_digests.add(f);
                 } else {
@@ -356,7 +425,11 @@ public class SnapshotUtil {
             } catch (IOException e) {
                 System.err.println(e.getMessage());
                 System.err.println("Error: Unable to process " + f.getPath());
-            } finally {
+            } catch (JSONException e) {
+                System.err.println(e.getMessage());
+                System.err.println("Error: Unable to process " + f.getPath());
+            }
+            finally {
                 try {
                     if (fis != null) {
                         fis.close();
@@ -633,8 +706,8 @@ public class SnapshotUtil {
      * Generates the digest filename for the given nonce.
      * @param nonce
      */
-    public static final String constructDigestFilenameForNonce(String nonce) {
-        return (nonce + ".digest");
+    public static final String constructDigestFilenameForNonce(String nonce, int hostId) {
+        return (nonce + "-host_" + hostId + ".digest");
     }
 
     public static final List<Table> getTablesToSave(Database database)

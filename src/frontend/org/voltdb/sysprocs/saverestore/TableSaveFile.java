@@ -30,10 +30,14 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.zip.CRC32;
 
+
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONArray;
 
 /**
  * An abstraction around a table's save file for restore.  Deserializes the
@@ -211,26 +215,69 @@ public class TableSaveFile
             for (int ii = 0; ii < 4; ii++) {
                 m_versionNum[ii] = fd.readInt();
             }
-            m_txnId = fd.readLong();
-            m_hostId = fd.readInt();
-            m_hostname = fd.readString();
-            m_clusterName = fd.readString();
-            m_databaseName = fd.readString();
-            m_tableName = fd.readString();
-            m_isReplicated = fd.readBoolean();
-            if (!m_isReplicated) {
-                m_partitionIds = (int[])fd.readArray(int.class);
-                if (!m_completed) {
-                    for (Integer partitionId : m_partitionIds) {
-                        m_corruptedPartitions.add(partitionId);
+
+            /*
+             * Support the original pre 1.3 header format as well as a new JSON format.
+             * JSON will make it possible to add info to a snapshot header without
+             * breaking backwards compatibility.
+             */
+            if (m_versionNum[3] == 0) {
+                m_txnId = fd.readLong();
+                m_hostId = fd.readInt();
+                m_hostname = fd.readString();
+                m_clusterName = fd.readString();
+                m_databaseName = fd.readString();
+                m_tableName = fd.readString();
+                m_isReplicated = fd.readBoolean();
+                if (!m_isReplicated) {
+                    m_partitionIds = (int[])fd.readArray(int.class);
+                    if (!m_completed) {
+                        for (Integer partitionId : m_partitionIds) {
+                            m_corruptedPartitions.add(partitionId);
+                        }
+                    }
+                    m_totalPartitions = fd.readInt();
+                } else {
+                    m_partitionIds = new int[] {0};
+                    m_totalPartitions = 1;
+                    if (!m_completed) {
+                        m_corruptedPartitions.add(0);
                     }
                 }
-                m_totalPartitions = fd.readInt();
             } else {
-                m_partitionIds = new int[] {0};
-                m_totalPartitions = 1;
-                if (!m_completed) {
-                    m_corruptedPartitions.add(0);
+                assert(m_versionNum[3] == 1);
+                int numJSONBytes = fd.readInt();
+                byte jsonBytes[] = new byte[numJSONBytes];
+                fd.readFully(jsonBytes);
+                String jsonString = new String(jsonBytes, "UTF-8");
+                JSONObject obj = new JSONObject(jsonString);
+
+                m_txnId = obj.getLong("txnId");
+                m_hostId = obj.getInt("hostId");
+                m_hostname = obj.getString("hostname");
+                m_clusterName = obj.getString("clusterName");
+                m_databaseName = obj.getString("databaseName");
+                m_tableName = obj.getString("tableName");
+                m_isReplicated = obj.getBoolean("isReplicated");
+                if (!m_isReplicated) {
+                    JSONArray partitionIds = obj.getJSONArray("partitionIds");
+                    m_partitionIds = new int[partitionIds.length()];
+                    for (int ii = 0; ii < m_partitionIds.length; ii++) {
+                        m_partitionIds[ii] = partitionIds.getInt(ii);
+                    }
+
+                    if (!m_completed) {
+                        for (Integer partitionId : m_partitionIds) {
+                            m_corruptedPartitions.add(partitionId);
+                        }
+                    }
+                    m_totalPartitions = obj.getInt("numPartitions");
+                } else {
+                    m_partitionIds = new int[] {0};
+                    m_totalPartitions = 1;
+                    if (!m_completed) {
+                        m_corruptedPartitions.add(0);
+                    }
                 }
             }
             /*
@@ -242,6 +289,8 @@ public class TableSaveFile
         } catch (BufferOverflowException e) {
             throw new IOException(e);
         } catch (IndexOutOfBoundsException e) {
+            throw new IOException(e);
+        } catch (JSONException e) {
             throw new IOException(e);
         }
     }
@@ -447,6 +496,7 @@ public class TableSaveFile
                 } catch (InterruptedException e) {
                     return;
                 }
+                boolean expectedAnotherChunk = false;
                 try {
 
                     /*
@@ -461,6 +511,7 @@ public class TableSaveFile
                     }
                     chunkLengthB.flip();
                     final int nextChunkLength = chunkLengthB.getInt();
+                    expectedAnotherChunk = true;
 
                     /*
                      * Get the partition id and its CRC and validate it. Validating the
@@ -620,6 +671,10 @@ public class TableSaveFile
                 } catch (EOFException eof) {
                     synchronized (TableSaveFile.this) {
                         m_hasMoreChunks = false;
+                        if (expectedAnotherChunk) {
+                            m_chunkReaderException = new IOException(
+                                    "Expected to find another chunk but reached end of file instead");
+                        }
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (IOException e) {

@@ -94,6 +94,10 @@ public class SysProcFragmentId
     public static final long PF_restoreSendReplicatedTableResults = 68;
     public static final long PF_restoreSendPartitionedTable = 69;
     public static final long PF_restoreSendPartitionedTableResults = 70;
+    public static final long PF_restoreDigestScan = 71;
+    public static final long PF_restoreDigestScanResults = 72;
+    public static final long PF_restoreDistributeExportSequenceNumbers = 73;
+    public static final long PF_restoreDistributeExportSequenceNumbersResults = 74;
 
     // @StartSampler
     public static final long PF_startSampler = 80;

@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.io.*;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
@@ -63,7 +64,10 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.sysprocs.saverestore.TableSaveFileState;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
+import org.json_voltpatches.*;
+import org.voltdb.utils.Pair;
 
 @ProcInfo (
     singlePartition = false
@@ -78,6 +82,27 @@ public class SnapshotRestore extends VoltSystemProcedure
         SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_restoreScanResults = (int)
         SysProcFragmentId.PF_restoreScanResults;
+
+    /*
+     * Plan fragments for retrieving the digests
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
+    private static final int DEP_restoreDigestScan = (int)
+        SysProcFragmentId.PF_restoreDigestScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    private static final int DEP_restoreDigestScanResults = (int)
+        SysProcFragmentId.PF_restoreDigestScanResults;
+
+    /*
+     * Plan fragments for distributing the full set of export sequence numbers
+     * to every partition where the relevant ones can be selected
+     * and forwarded to the EE.
+     */
+    private static final int DEP_restoreDistributeExportSequenceNumbers = (int)
+        SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    private static final int DEP_restoreDistributeExportSequenceNumbersResults = (int)
+        SysProcFragmentId.PF_restoreDistributeExportSequenceNumbersResults;
 
     private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
@@ -201,6 +226,18 @@ public class SnapshotRestore extends VoltSystemProcedure
         site.registerPlanFragment(SysProcFragmentId.
                                   PF_restoreSendPartitionedTableResults,
                                   this);
+        site.registerPlanFragment(SysProcFragmentId.
+                PF_restoreDigestScan,
+                this);
+        site.registerPlanFragment(SysProcFragmentId.
+                PF_restoreDigestScanResults,
+                this);
+        site.registerPlanFragment(SysProcFragmentId.
+                PF_restoreDistributeExportSequenceNumbers,
+                this);
+        site.registerPlanFragment(SysProcFragmentId.
+                PF_restoreDistributeExportSequenceNumbersResults,
+                this);
         m_cluster = cluster;
         m_siteId = site.getCorrespondingSiteId();
         m_hostId =
@@ -220,7 +257,142 @@ public class SnapshotRestore extends VoltSystemProcedure
                         SystemProcedureExecutionContext context)
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
-        if (fragmentId == SysProcFragmentId.PF_restoreScan)
+        if (fragmentId == SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers)
+        {
+            assert(params.toArray()[0] != null);
+            assert(params.toArray()[0] instanceof byte[]);
+            VoltTable result = new VoltTable(new VoltTable.ColumnInfo("RESULT", VoltType.STRING));
+
+            try {
+                ByteArrayInputStream bais = new ByteArrayInputStream((byte[])params.toArray()[0]);
+                ObjectInputStream ois = new ObjectInputStream(bais);
+
+                //Sequence numbers for every table and partition
+                Map<String, Map<Integer, Long>> exportSequenceNumbers =
+                    (Map<String, Map<Integer, Long>>)ois.readObject();
+                Database db = context.getDatabase();
+                Integer myPartitionId = context.getExecutionSite().getCorrespondingPartitionId();
+
+                //Iterate the export tables
+                for (Table t : db.getTables()) {
+                    if (!CatalogUtil.isTableExportOnly( db, t))
+                        continue;
+
+                    String signature = t.getSignature();
+                    String name = t.getTypeName();
+
+                    //Sequence numbers for this table for every partition
+                    Map<Integer, Long> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
+                    if (sequenceNumberPerPartition == null) {
+                        HOST_LOG.warn("Could not find export sequence number for table " + name +
+                                ". This warning is safe to ignore if you are loading a pre 1.3 snapshot" +
+                                " which would not contain these sequence numbers (added in 1.3)." +
+                                " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
+                                " are reset to 0");
+                        continue;
+                    }
+
+                    Long sequenceNumber =
+                        sequenceNumberPerPartition.get(myPartitionId);
+                    if (sequenceNumber == null) {
+                        HOST_LOG.warn("Could not find an export sequence number for table " + name +
+                                " partition " + myPartitionId +
+                                ". This warning is safe to ignore if you are loading a pre 1.3 snapshot " +
+                                " which would not contain these sequence numbers (added in 1.3)." +
+                                " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
+                                " are reset to 0");
+                        continue;
+                    }
+                    //Forward the sequence number to the EE
+                    context.getExecutionEngine().exportAction(
+                            false,
+                            0,
+                            sequenceNumber,
+                            myPartitionId,
+                            signature);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();//l4j doesn't print the stack trace
+                HOST_LOG.error(e);
+                result.addRow("FAILURE");
+            }
+            return new DependencyPair(DEP_restoreDistributeExportSequenceNumbers, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreDistributeExportSequenceNumbersResults)
+        {
+            TRACE_LOG.trace("Aggregating digest scan state");
+            assert(dependencies.size() > 0);
+            List<VoltTable> dep = dependencies.get(DEP_restoreDistributeExportSequenceNumbers);
+            VoltTable result = new VoltTable(new VoltTable.ColumnInfo("RESULT", VoltType.STRING));
+            for (VoltTable table : dep)
+            {
+                while (table.advanceRow())
+                {
+                    // the actually adds the active row... weird...
+                    result.add(table);
+                }
+            }
+            return new DependencyPair(DEP_restoreDistributeExportSequenceNumbersResults, result);
+        } else if (fragmentId == SysProcFragmentId.PF_restoreDigestScan)
+        {
+            VoltTable result = new VoltTable(
+                    new VoltTable.ColumnInfo("DIGEST", VoltType.STRING),
+                    new VoltTable.ColumnInfo("RESULT", VoltType.STRING),
+                    new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
+            // Choose the lowest site ID on this host to do the file scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
+                try {
+                    // implicitly synchronized by the way restore operates.
+                    // this scan must complete on every site and return results
+                    // to the coordinator for aggregation before it will send out
+                    // distribution fragments, so two sites on the same node
+                    // can't be attempting to set and clear this HashSet simultaneously
+                    TRACE_LOG.trace("Checking saved table digest state for restore of: "
+                                    + m_filePath + ", " + m_fileNonce);
+                    List<JSONObject> digests =
+                        SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce);
+
+                    for (JSONObject obj : digests) {
+                        result.addRow(obj.toString(), "SUCCESS", null);
+                    }
+                } catch (Exception e) {
+                    StringWriter sw = new StringWriter();
+                    PrintWriter pw = new PrintWriter(sw);
+                    e.printStackTrace(pw);
+                    pw.flush();
+                    e.printStackTrace();//l4j doesn't print stack traces
+                    HOST_LOG.error(e);
+                    result.addRow(null, "FAILURE", sw.toString());
+                    return new DependencyPair(DEP_restoreDigestScan, result);
+                }
+            }
+            return new DependencyPair(DEP_restoreDigestScan, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreDigestScanResults)
+        {
+            TRACE_LOG.trace("Aggregating digest scan state");
+            assert(dependencies.size() > 0);
+            List<VoltTable> dep = dependencies.get(DEP_restoreDigestScan);
+            VoltTable result = new VoltTable(
+                    new VoltTable.ColumnInfo("DIGEST", VoltType.STRING),
+                    new VoltTable.ColumnInfo("RESULT", VoltType.STRING),
+                    new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
+            for (VoltTable table : dep)
+            {
+                while (table.advanceRow())
+                {
+                    // the actually adds the active row... weird...
+                    result.add(table);
+                }
+            }
+            return new DependencyPair(DEP_restoreDigestScanResults, result);
+        } else if (fragmentId == SysProcFragmentId.PF_restoreScan)
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
@@ -614,6 +786,23 @@ public class SnapshotRestore extends VoltSystemProcedure
         VoltTable[] savefile_data;
         savefile_data = performRestoreScanWork(path, nonce);
 
+        List<JSONObject> digests;
+        Map<String, Map<Integer, Long>> exportSequenceNumbers;
+        try {
+            Pair<List<JSONObject>, Map<String, Map<Integer, Long>>> digestScanResult =
+                performRestoreDigestScanWork();
+            digests = digestScanResult.getFirst();
+            exportSequenceNumbers = digestScanResult.getSecond();
+        } catch (VoltAbortException e) {
+            ColumnInfo[] result_columns = new ColumnInfo[2];
+            int ii = 0;
+            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
+            results[0].addRow("FAILURE", e.toString());
+            return results;
+        }
+
         ClusterSaveFileState savefile_state = null;
         try
         {
@@ -624,9 +813,17 @@ public class SnapshotRestore extends VoltSystemProcedure
             throw new VoltAbortException(e.getMessage());
         }
 
-        List<String> relevantTableNames = null;
+        HashSet<String> relevantTableNames = new HashSet<String>();
         try {
-            relevantTableNames = SnapshotUtil.retrieveRelevantTableNames(path, nonce);
+            if (digests.isEmpty()) {
+                throw new Exception("No digests found");
+            }
+            for (JSONObject obj : digests) {
+                JSONArray tables = obj.getJSONArray("tables");
+                for (int ii = 0; ii < tables.length(); ii++) {
+                    relevantTableNames.add(tables.getString(ii));
+                }
+            }
         } catch (Exception e) {
             ColumnInfo[] result_columns = new ColumnInfo[2];
             int ii = 0;
@@ -670,6 +867,30 @@ public class SnapshotRestore extends VoltSystemProcedure
             return results;
         }
 
+        /*
+         * Serialize all the export sequence nubmers and then distribute them in a
+         * plan fragment and each receiver will pull the relevant information for
+         * itself
+         */
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ObjectOutputStream oos = new ObjectOutputStream(baos);
+            oos.writeObject(exportSequenceNumbers);
+            oos.flush();
+            byte exportSequenceNumberBytes[] = baos.toByteArray();
+            oos.close();
+
+            results = performDistributeExportSequenceNumbers(exportSequenceNumberBytes);
+        } catch (IOException e) {
+            throw new VoltAbortException(e);
+        }
+
+        while (results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                throw new VoltAbortException("Error distributing export sequence numbers");
+            }
+        }
+
         results = performTableRestoreWork(savefile_state);
 
         final long endTime = System.currentTimeMillis();
@@ -687,6 +908,34 @@ public class SnapshotRestore extends VoltSystemProcedure
 //            // TODO Auto-generated catch block
 //            e.printStackTrace();
 //        }
+        return results;
+    }
+
+    private VoltTable[] performDistributeExportSequenceNumbers(
+            byte[] exportSequenceNumberBytes) {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+
+        // This fragment causes each execution site to confirm the likely
+        // success of writing tables to disk
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers;
+        pfs[0].outputDepId = DEP_restoreDistributeExportSequenceNumbers;
+        pfs[0].inputDepIds = new int[] {};
+        pfs[0].multipartition = true;
+        ParameterSet params = new ParameterSet();
+        params.setParameters(exportSequenceNumberBytes);
+        pfs[0].parameters = params;
+
+        // This fragment aggregates the save-to-disk sanity check results
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_restoreDistributeExportSequenceNumbersResults;
+        pfs[1].outputDepId = DEP_restoreDistributeExportSequenceNumbersResults;
+        pfs[1].inputDepIds = new int[] { DEP_restoreDistributeExportSequenceNumbers };
+        pfs[1].multipartition = false;
+        pfs[1].parameters = new ParameterSet();
+
+        VoltTable[] results;
+        results = executeSysProcPlanFragments(pfs, DEP_restoreDistributeExportSequenceNumbersResults);
         return results;
     }
 
@@ -786,6 +1035,104 @@ public class SnapshotRestore extends VoltSystemProcedure
         results = executeSysProcPlanFragments(pfs, DEP_restoreScanResults);
         return results;
     }
+
+    private final Pair<List<JSONObject>, Map<String, Map<Integer, Long>>> performRestoreDigestScanWork()
+{
+    SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+
+    // This fragment causes each execution site to confirm the likely
+    // success of writing tables to disk
+    pfs[0] = new SynthesizedPlanFragment();
+    pfs[0].fragmentId = SysProcFragmentId.PF_restoreDigestScan;
+    pfs[0].outputDepId = DEP_restoreDigestScan;
+    pfs[0].inputDepIds = new int[] {};
+    pfs[0].multipartition = true;
+    pfs[0].parameters = new ParameterSet();
+
+    // This fragment aggregates the save-to-disk sanity check results
+    pfs[1] = new SynthesizedPlanFragment();
+    pfs[1].fragmentId = SysProcFragmentId.PF_restoreDigestScanResults;
+    pfs[1].outputDepId = DEP_restoreDigestScanResults;
+    pfs[1].inputDepIds = new int[] { DEP_restoreDigestScan };
+    pfs[1].multipartition = false;
+    pfs[1].parameters = new ParameterSet();
+
+    VoltTable[] results;
+    results = executeSysProcPlanFragments(pfs, DEP_restoreDigestScanResults);
+
+    HashMap<String, Map<Integer, Long>> exportSequenceNumbers =
+        new HashMap<String, Map<Integer, Long>>();
+
+    Long digestTxnId = null;
+    ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
+    /*
+     * Retrieve and aggregate the per table per partition sequence numbers from
+     * all the digest files retrieved across the cluster
+     */
+    try {
+        while (results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                throw new VoltAbortException(results[0].getString("ERR_MSG"));
+            }
+            JSONObject digest = new JSONObject(results[0].getString(0));
+            digests.add(digest);
+
+            /*
+             * Validate that the digests are all from the same snapshot
+             */
+            if (digestTxnId == null) {
+                digestTxnId = digest.getLong("txnId");
+            } else {
+                if (digest.getLong("txnId") != digestTxnId) {
+                    throw new VoltAbortException("Retrieved a digest with txnId " + digest.getLong("txnId") +
+                            " that doesn't match the txnId seen previously " + digestTxnId + " inspect the digests" +
+                            " with the provided nonce and ensure that they are all really from the same snapshot");
+                }
+            }
+
+            /*
+             * Snapshots from pre 1.3 VoltDB won't have sequence numbers
+             * Doing nothing will default it to zero.
+             */
+            if (digest.has("exportSequenceNumbers")) {
+                /*
+                 * An array of entries for each table
+                 */
+                JSONArray sequenceNumbers = digest.getJSONArray("exportSequenceNumbers");
+                for (int ii = 0; ii < sequenceNumbers.length(); ii++) {
+                    /*
+                     * An object containing all the sequence numbers for its partitions
+                     * in this table. This will be a subset since it is from a single digest
+                     */
+                    JSONObject tableSequenceNumbers = sequenceNumbers.getJSONObject(ii);
+                    String tableName = tableSequenceNumbers.getString("exportTableName");
+
+                    Map<Integer,Long> partitionSequenceNumbers =
+                        exportSequenceNumbers.get(tableName);
+                    if (partitionSequenceNumbers == null) {
+                        partitionSequenceNumbers = new HashMap<Integer,Long>();
+                        exportSequenceNumbers.put(tableName, partitionSequenceNumbers);
+                    }
+
+                    /*
+                     * Array of objects containing partition and sequence number pairs
+                     */
+                    JSONArray sourcePartitionSequenceNumbers =
+                        tableSequenceNumbers.getJSONArray("sequenceNumberPerPartition");
+                    for (int zz = 0; zz < sourcePartitionSequenceNumbers.length(); zz++) {
+                        int partition = sourcePartitionSequenceNumbers.getJSONObject(zz).getInt("partition");
+                        long sequenceNumber =
+                            sourcePartitionSequenceNumbers.getJSONObject(zz).getInt("exportSequenceNumber");
+                        partitionSequenceNumbers.put(partition, sequenceNumber);
+                    }
+                }
+            }
+        }
+    } catch (JSONException e) {
+        throw new VoltAbortException(e);
+    }
+    return Pair.of((List<JSONObject>)digests, (Map<String, Map<Integer, Long>>)exportSequenceNumbers);
+}
 
     private Set<Table> getTablesToRestore(Set<String> savedTableNames)
     {
@@ -891,7 +1238,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
         VoltTable[] results = new VoltTable[] { constructResultsTable() };
         results[0].addRow(m_hostId, hostname, m_siteId, tableName, -1,
-                "NO DATA TO DISTRIBUTE", "");
+                "SUCCESS", "NO DATA TO DISTRIBUTE");
         final Table new_catalog_table = getCatalogTable(tableName);
         Boolean needsConversion = null;
         while (savefile.hasMoreChunks())
@@ -1011,7 +1358,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
         VoltTable[] results = new VoltTable[] { constructResultsTable() };
         results[0].addRow(m_hostId, hostname, m_siteId, tableName, 0,
-                "NO DATA TO DISTRIBUTE", "");
+                "SUCCESS", "NO DATA TO DISTRIBUTE");
         final Table new_catalog_table = getCatalogTable(tableName);
         Boolean needsConversion = null;
         org.voltdb.utils.DBBPool.BBContainer c = null;

@@ -31,6 +31,7 @@ import java.util.zip.CRC32;
 import junit.framework.TestCase;
 
 import org.voltdb.DefaultSnapshotDataTarget;
+import org.voltdb.DeprecatedDefaultSnapshotDataTarget;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -44,7 +45,8 @@ import org.voltdb.utils.DBBPool.BBContainer;
  *
  */
 public class TestTableSaveFile extends TestCase {
-    private static int[] VERSION = { 0, 1, 2, 3 };
+    private static int[] VERSION0 = { 0, 0, 0, 0 };
+    private static int[] VERSION1 = { 0, 0, 0, 1 };
     private static int HOST_ID = 3;
     private static long TXN_ID = org.voltdb.TransactionIdManager.makeIdFromComponents(24, 32, 96);
     private static String CLUSTER_NAME = "TEST_CLUSTER";
@@ -113,7 +115,7 @@ public class TestTableSaveFile extends TestCase {
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
                 TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, table,
-                TXN_ID, VERSION);
+                TXN_ID, VERSION1);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
                 columnInfo.length);
@@ -141,7 +143,7 @@ public class TestTableSaveFile extends TestCase {
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
                 TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, vt,
-                TXN_ID, VERSION);
+                TXN_ID, VERSION1);
         dsdt.close();
 
         FileInputStream fis = new FileInputStream(f);
@@ -167,7 +169,57 @@ public class TestTableSaveFile extends TestCase {
         assertEquals("Foo", columnName);
 
         for (int i = 0; i < 4; i++) {
-            assertEquals(VERSION[i], savefile.getVersionNumber()[i]);
+            assertEquals(VERSION1[i], savefile.getVersionNumber()[i]);
+        }
+        assertEquals(TXN_ID, savefile.getTxnId());
+        assertEquals(HOST_ID, savefile.getHostId());
+        assertEquals(CLUSTER_NAME, savefile.getClusterName());
+        assertEquals(DATABASE_NAME, savefile.getDatabaseName());
+        assertEquals(TABLE_NAME, savefile.getTableName());
+        assertFalse(savefile.isReplicated());
+        int partitionIds[] = savefile.getPartitionIds();
+        for (int ii = 0; ii < 5; ii++) {
+            assertEquals(ii, partitionIds[ii]);
+        }
+        assertEquals(TOTAL_PARTITIONS, savefile.getTotalPartitions());
+    }
+
+    public void testLoadingVersion0Header() throws Exception {
+        final File f = File.createTempFile("foo", "bar");
+        f.deleteOnExit();
+        VoltTable.ColumnInfo columns[] = new VoltTable.ColumnInfo[] { new VoltTable.ColumnInfo(
+                "Foo", VoltType.STRING) };
+        VoltTable vt = new VoltTable(columns, 1);
+        DeprecatedDefaultSnapshotDataTarget dsdt = new DeprecatedDefaultSnapshotDataTarget(f,
+                HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
+                TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, vt,
+                TXN_ID, VERSION0);
+        dsdt.close();
+
+        FileInputStream fis = new FileInputStream(f);
+        TableSaveFile savefile = new TableSaveFile(fis.getChannel(), 3, null);
+
+        /*
+         * Table header should be 4 bytes metadata length 2 bytes column count 1
+         * byte column type 4 byte column name length 3 byte column name
+         */
+        // Subtract off the fake table column header and the header and
+        // tuple lengths
+        ByteBuffer tableHeader = savefile.getTableHeader();
+        tableHeader.position(0);
+        assertEquals(4 + 1 + 2 + 1 + 4 + 3, tableHeader.remaining());
+        assertEquals(tableHeader.getInt(), 11);
+        assertEquals(tableHeader.get(), Byte.MIN_VALUE);
+        assertEquals(tableHeader.getShort(), 1);
+        assertEquals(tableHeader.get(), VoltType.STRING.getValue());
+        assertEquals(tableHeader.getInt(), 3);
+        byte columnNameBytes[] = new byte[3];
+        tableHeader.get(columnNameBytes);
+        String columnName = new String(columnNameBytes, "UTF-8");
+        assertEquals("Foo", columnName);
+
+        for (int i = 0; i < 4; i++) {
+            assertEquals(VERSION0[i], savefile.getVersionNumber()[i]);
         }
         assertEquals(TXN_ID, savefile.getTxnId());
         assertEquals(HOST_ID, savefile.getHostId());

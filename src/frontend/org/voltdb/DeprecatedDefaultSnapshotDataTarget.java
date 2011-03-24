@@ -40,9 +40,8 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.json_voltpatches.JSONStringer;
 
-public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
+public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     public static volatile boolean m_simulateFullDiskWritingHeader = false;
     public static volatile boolean m_simulateFullDiskWritingChunk = false;
@@ -104,7 +103,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         }
     });
 
-    public DefaultSnapshotDataTarget(
+    public DeprecatedDefaultSnapshotDataTarget(
             final File file,
             final int hostId,
             final String clusterName,
@@ -126,10 +125,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 partitionIds,
                 schemaTable,
                 txnId,
-                new int[] { 0, 0, 0, 1 });
+                new int[] { 0, 0, 0, 0 });
     }
 
-    public DefaultSnapshotDataTarget(
+    public DeprecatedDefaultSnapshotDataTarget(
             final File file,
             final int hostId,
             final String clusterName,
@@ -154,35 +153,17 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         for (int ii = 0; ii < 4; ii++) {
             fs.writeInt(version[ii]);//version
         }
-        JSONStringer stringer = new JSONStringer();
-        byte jsonBytes[] = null;
-        try {
-            stringer.object();
-            stringer.key("txnId").value(txnId);
-            stringer.key("hostId").value(hostId);
-            stringer.key("hostname").value(hostname);
-            stringer.key("clusterName").value(clusterName);
-            stringer.key("databaseName").value(databaseName);
-            stringer.key("tableName").value(tableName.toUpperCase());
-            stringer.key("isReplicated").value(isReplicated);
-            if (!isReplicated) {
-                stringer.key("partitionIds").array();
-                for (int partitionId : partitionIds) {
-                    stringer.value(partitionId);
-                }
-                stringer.endArray();
-
-                stringer.key("numPartitions").value(numPartitions);
-            }
-            stringer.endObject();
-            String jsonString = stringer.toString();
-            jsonBytes = jsonString.getBytes("UTF-8");
-        } catch (Exception e) {
-            throw new IOException(e);
+        fs.writeLong(txnId);
+        fs.writeInt(hostId);
+        fs.writeString(hostname);
+        fs.writeString(clusterName);
+        fs.writeString(databaseName);
+        fs.writeString(tableName.toUpperCase());
+        fs.writeBoolean(isReplicated);
+        if (!isReplicated) {
+            fs.writeArray(partitionIds);
+            fs.writeInt(numPartitions);
         }
-        fs.writeInt(jsonBytes.length);
-        fs.write(jsonBytes);
-
         final BBContainer container = fs.getBBContainer();
         container.b.position(4);
         container.b.putInt(container.b.remaining() - 4);

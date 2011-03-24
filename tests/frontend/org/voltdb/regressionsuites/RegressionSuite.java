@@ -34,6 +34,7 @@ import junit.framework.TestCase;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.sysprocs.SnapshotRestore;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -65,7 +66,9 @@ public class RegressionSuite extends TestCase {
      * the VoltDB server using the VoltServerConfig instance provided.
      */
     @Override
-    public void setUp() {
+    public void setUp() throws Exception {
+        //New tests means a new server thread that hasn't done a restore
+        SnapshotRestore.m_haveDoneRestore = false;
         m_config.startUp(true);
     }
 

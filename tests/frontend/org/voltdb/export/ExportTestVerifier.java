@@ -36,6 +36,7 @@ class ExportTestVerifier extends ExportDecoderBase
     private int m_ackRepeats = 0;
     private final String m_tableName;
     private final int m_partitionId;
+    private long sequenceNumber = 0;
 
     ExportTestVerifier(AdvertisedDataSource source)
     {
@@ -128,6 +129,11 @@ class ExportTestVerifier extends ExportDecoderBase
                     m_rowFailed = true;
                 }
             }
+            if (!decoded[2].equals(sequenceNumber)) {
+                System.out.println("Failed on sequence number expected:" + sequenceNumber + "  exported:" + decoded[2]);
+                m_rowFailed = true;
+            }
+            sequenceNumber++;
         }
         catch (IOException e)
         {

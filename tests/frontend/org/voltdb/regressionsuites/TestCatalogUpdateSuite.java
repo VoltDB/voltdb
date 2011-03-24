@@ -645,7 +645,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     }
 
     @Override
-    public void setUp() {
+    public void setUp() throws Exception {
         super.setUp();
         callbackSuccess = true;
     }

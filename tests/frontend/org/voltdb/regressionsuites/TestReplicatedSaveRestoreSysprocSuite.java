@@ -41,7 +41,7 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
     }
 
     @Override
-    public void setUp()
+    public void setUp() throws Exception
     {
         super.setUp();
     }

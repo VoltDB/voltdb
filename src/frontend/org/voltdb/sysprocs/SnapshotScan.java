@@ -27,6 +27,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
@@ -243,13 +245,19 @@ public class SnapshotScan extends VoltSystemProcedure {
                         }
                         if (f.canRead()) {
                             try {
-                                List<String> tableNames = SnapshotUtil.retrieveRelevantTableNamesAndTime(f).getSecond();
+                                HashSet<String> tableNames = new HashSet<String>();
+                                JSONArray tables = SnapshotUtil.CRCCheck(f).getJSONArray("tables");
+                                for (int ii = 0; ii < tables.length(); ii++) {
+                                    tableNames.add(tables.getString(ii));
+                                }
                                 final StringWriter sw = new StringWriter();
-                                for (int ii = 0; ii < tableNames.size(); ii++) {
-                                    sw.append(tableNames.get(ii));
+                                int ii = 0;
+                                for (String name : tableNames) {
+                                    sw.append(name);
                                     if (ii != tableNames.size() - 1) {
                                         sw.append(',');
                                     }
+                                    ii++;
                                 }
                                 results.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
                                                path,
@@ -573,7 +581,7 @@ public class SnapshotScan extends VoltSystemProcedure {
         assert("TRUE".equals(r.getString("READABLE")));
         final String path = r.getString("PATH");
         final String nonce = r.getString("NAME").substring(0, r.getString("NAME").indexOf('-'));
-        final String combined = path + nonce;
+        final String combined = path + File.separator + nonce;
         Snapshot s = aggregates.get(combined);
         if (s == null) {
             s = new Snapshot(r);
@@ -589,8 +597,21 @@ public class SnapshotScan extends VoltSystemProcedure {
     private void hashDigestToSnapshot(VoltTableRow r, HashMap<String, Snapshot> aggregates) {
         assert(r.getString("RESULT").equals("SUCCESS"));
         final String path = r.getString("PATH");
-        final String nonce = r.getString("NAME").substring(0, r.getString("NAME").indexOf(".digest"));
-        final String combined = path + nonce;
+        String name = r.getString("NAME");
+        String nonce;
+        /*
+         * For compatibility with the pre 1.3 snapshots. Pre 1.3 all digests were the same at every
+         * node so the name was the same. Now that the host id is embedded it is harder
+         * to come up with the nonce used to create the Snapshot object. First check the filename
+         * for a -, if it doesn't have one then the there is no -host_ because it is the old style.
+         * If it has a - then the nonce will be before it.
+         */
+        if (name.indexOf("-") == -1) {
+            nonce = r.getString("NAME").substring(0, r.getString("NAME").indexOf(".digest"));
+        } else {
+            nonce = r.getString("NAME").substring(0, r.getString("NAME").indexOf("-"));
+        }
+        final String combined = path + File.separator + nonce;
         Snapshot s = aggregates.get(combined);
         if (s == null) {
             return;

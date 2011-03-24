@@ -41,6 +41,7 @@ import org.voltdb.export.ExportTestClient;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
+import org.voltdb.utils.VoltFile;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
@@ -138,9 +139,13 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     @Override
-    public void setUp()
+    public void setUp() throws Exception
     {
+        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+        File f = new File("/tmp/" + System.getProperty("user.name"));
+        f.mkdirs();
         super.setUp();
+
         callbackSucceded = true;
         m_tester = new ExportTestClient(getServerConfig().getNodeCount());
         try {
@@ -167,6 +172,58 @@ public class TestExportSuite extends RegressionSuite {
                 System.err.println(clientResponse.getException());
             }
         }
+    }
+
+    public void testExportSnapshotPreservesSequenceNumber() throws Exception {
+        Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow( m_tester.m_generationsSeen.first(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        quiesce(client);
+
+        client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
+
+        m_config.shutDown();
+        m_config.startUp(false);
+
+        client = getClient();
+
+        client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
+
+        /**
+         * There will be 1 disconnect for the
+         */
+        for (int ii = 0; m_tester.m_generationsSeen.size() < 2; ii++) {
+            Thread.sleep(500);
+            boolean threwException = false;
+            try {
+                m_tester.work(1000);
+            } catch (ExportClientException e) {
+                m_tester.disconnect();
+                m_tester.reserveVerifiers();
+                boolean success = m_tester.connect();
+                assertTrue(success);
+                System.out.println(e.toString());
+                threwException = true;
+            }
+            if (ii < 2) {
+                assertTrue(threwException);
+            }
+        }
+
+        for (int i=10; i < 20; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow( m_tester.m_generationsSeen.last(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        client.drain();
+
+        // must still be able to verify the export data.
+        quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
     }
 
     public void testExportClientIsBootedAfterRejoin() throws Exception {

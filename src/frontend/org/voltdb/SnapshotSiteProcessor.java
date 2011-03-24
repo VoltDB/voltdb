@@ -22,9 +22,14 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Pair;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -58,6 +63,13 @@ public class SnapshotSiteProcessor {
      */
     public static final LinkedList<Deque<SnapshotTableTask>> m_taskListsForSites =
         new LinkedList<Deque<SnapshotTableTask>>();
+
+    /**
+     * Sequence numbers for export tables. This is repopulated before each snapshot by each execution site
+     * that reaches the snapshot.
+     */
+    private static final Map<String, List<Pair<Integer, Long>>> m_exportSequenceNumbers =
+        new HashMap<String, List<Pair<Integer, Long>>>();
 
 
     /** Number of snapshot buffers to keep */
@@ -104,6 +116,40 @@ public class SnapshotSiteProcessor {
      * and does any potential snapshot work with that buffer
      */
     private final Runnable m_onPotentialSnapshotWork;
+
+    /*
+     * Synchronization is handled by SnapshotSaveAPI.startSnapshotting
+     * Store the export sequence numbers for every table and partition. This will
+     * be called by every execution site before the snapshot starts. Then the execution
+     * site that gets the setup permit will  use getExportSequenceNumbers to retrieve the full
+     * set and reset the contents.
+     */
+    public static void populateExportSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
+        ExecutionSite site = context.getExecutionSite();
+        for (Table t : site.m_context.database.getTables()) {
+            if (!CatalogUtil.isTableExportOnly(site.m_context.database, t))
+                continue;
+
+            List<Pair<Integer, Long>> sequenceNumbers = m_exportSequenceNumbers.get(t.getTypeName());
+            if (sequenceNumbers == null) {
+                sequenceNumbers = new ArrayList<Pair<Integer,Long>>();
+                m_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
+            }
+
+            long[] ackOffSetAndSequenceNumber = context.getExecutionEngine().getUSOForExportTable(t.getSignature());
+            sequenceNumbers.add(
+                    Pair.of(
+                            context.getExecutionSite().getCorrespondingPartitionId(),
+                            ackOffSetAndSequenceNumber[1]));
+        }
+    }
+
+    public static Map<String, List<Pair<Integer, Long>>> getExportSequenceNumbers() {
+        HashMap<String, List<Pair<Integer,Long>>> sequenceNumbers =
+            new HashMap<String, List<Pair<Integer, Long>>>(m_exportSequenceNumbers);
+        m_exportSequenceNumbers.clear();
+        return sequenceNumbers;
+    }
 
     /**
      * A class identifying a table that should be snapshotted as well as the destination

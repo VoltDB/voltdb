@@ -82,6 +82,9 @@ public class SnapshotSaveAPI
             }
 
             try {
+                //From within this EE, record the sequence numbers as of the start of the snapshot (now)
+                //so that the info can be put in the digest.
+                SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.acquire();
             } catch (InterruptedException e) {
                 result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
@@ -177,7 +180,9 @@ public class SnapshotSaveAPI
                         txnId,
                         file_path,
                         file_nonce,
-                        tables);
+                        tables,
+                        context.getExecutionSite().getCorrespondingHostId(),
+                        SnapshotSiteProcessor.getExportSequenceNumbers());
                 final AtomicInteger numTables = new AtomicInteger(tables.size());
                 final SnapshotRegistry.Snapshot snapshotRecord =
                     SnapshotRegistry.startSnapshot(

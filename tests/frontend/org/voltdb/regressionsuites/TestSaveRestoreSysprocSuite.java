@@ -69,7 +69,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     }
 
     @Override
-    public void setUp()
+    public void setUp() throws Exception
     {
         deleteTestFiles();
         super.setUp();
@@ -1157,6 +1157,16 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
             results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
             assertNotNull(results);
+            assertNotNull(results[0]);
+            boolean haveFailure = false;
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    haveFailure = true;
+                    break;
+                }
+            }
+            assertTrue(haveFailure);
+
             deleteTestFiles();
             releaseClient(client);
 
@@ -1200,6 +1210,19 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
             VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
             assertNotNull(results);
+            assertNotNull(results[0]);
+            boolean haveFailure = false;
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    haveFailure = true;
+                    break;
+                }
+            }
+            if (!haveFailure) {
+                System.out.println("foo");
+            }
+            assertTrue(haveFailure);
+
             deleteTestFiles();
             releaseClient(client);
 
