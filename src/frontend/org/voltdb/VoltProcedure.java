@@ -624,6 +624,10 @@ public abstract class VoltProcedure {
          */
         public VoltAbortException() {}
 
+        public VoltAbortException(Throwable t) {
+            super(t);
+        }
+
         /**
          * Constructs a new <code>AbortException</code> with the specified detail message.
          */
