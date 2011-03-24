@@ -283,7 +283,8 @@ public class TestExportSuite extends RegressionSuite {
         /**
          * There will be 1 disconnect for the
          */
-        for (int ii = 0; m_tester.m_generationsSeen.size() < 2; ii++) {
+        for (int ii = 0; m_tester.m_generationsSeen.size() < 2 ||
+             m_tester.m_verifiers.get(m_tester.m_generationsSeen.last()).size() < 6; ii++) {
             Thread.sleep(500);
             boolean threwException = false;
             try {
