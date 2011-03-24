@@ -18,7 +18,7 @@ Export
 ------
 The auction example is also set up to demonstrate the ability for VoltDB to export live data from a running database. To run the auction example with export enabled, you must do the following:
 
-1. Edit project.xml and change enabled="false" to enabled="true" in the <connector> tag.
+1. Edit deployment.xml and change enabled="false" to enabled="true" in the <export> tag.
 
 2. Start three terminal windows.
 
