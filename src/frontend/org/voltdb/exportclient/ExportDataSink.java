@@ -164,6 +164,7 @@ public class ExportDataSink {
                 return;
             }
 
+            m_decoder.onBlockStart();
             // run the verifier until m.getData() is consumed
             while (m.getData().hasRemaining()) {
                 int length = m.getData().getInt();
