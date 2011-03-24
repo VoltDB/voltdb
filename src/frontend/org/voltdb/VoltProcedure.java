@@ -1014,7 +1014,7 @@ public abstract class VoltProcedure {
         public final void endProcedure(boolean aborted, boolean failed) {
             if (m_currentStartTime > 0) {
                 final long endTime = System.nanoTime();
-                final int delta = (int)(endTime - m_currentStartTime);
+                final long delta = endTime - m_currentStartTime;
                 m_totalTimedExecutionTime += delta;
                 m_timedInvocations++;
                 m_minExecutionTime = Math.min( delta, m_minExecutionTime);

@@ -36,8 +36,14 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
+
+    static final Class<?>[] PROCEDURES =
+    {
+     GoSleep.class
+    };
 
     public TestSystemProcedureSuite(String name) {
         super(name);
@@ -126,10 +132,24 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_Procedure() throws Exception {
         Client client  = getClient();
         VoltTable results[] = null;
+        // 3 seconds translates to 3 billion nanos, which overflows internal
+        // values (ENG-1039)
+        results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
         results = client.callProcedure("@Statistics", "procedure", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
         System.out.println("Test procedures table: " + results[0].toString());
+
+        VoltTable stats = results[0];
+        stats.advanceRow();
+        // Check for overflow
+        assertTrue((Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT) > 0);
+        assertTrue((Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT) > 0);
+        assertTrue((Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT) > 0);
+        // check for reasonable values
+        assertTrue((Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT) > 3000000000L);
+        assertTrue((Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT) > 3000000000L);
+        assertTrue((Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT) > 3000000000L);
     }
 
     public void testStatistics_iostats() throws Exception {
@@ -391,6 +411,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
+        project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 
         config = new LocalSingleProcessServer("sysproc-twosites.jar", 2,
