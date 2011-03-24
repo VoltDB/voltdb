@@ -44,8 +44,6 @@ public class ExportDataSink {
 
     // the preferred connection for a given partition/table combo
     String m_activeConnection = null;
-    // the time the JVM started for the preferred connection
-    long m_activeConnectionTimestamp = Long.MAX_VALUE;
 
     private final HashMap<String, Long> m_knownConnections = new HashMap<String, Long>();
     private final HashMap<String, LinkedList<ExportProtoMessage>> m_rxQueues;
@@ -88,13 +86,12 @@ public class ExportDataSink {
                     if (oldestEntry == null) {
                         oldestEntry = entry;
                     } else {
-                        if (oldestEntry.getValue() < entry.getValue()) {
+                        if (oldestEntry.getValue() > entry.getValue()) {
                             oldestEntry = entry;
                         }
                     }
                 }
                 m_activeConnection = oldestEntry.getKey();
-                m_activeConnectionTimestamp = oldestEntry.getValue();
             }
             poll();
             m_started = true;
@@ -187,7 +184,6 @@ public class ExportDataSink {
         m_started = false;
         m_knownConnections.clear();
         m_activeConnection = null;
-        m_activeConnectionTimestamp = Long.MAX_VALUE;
         m_rxQueues.clear();
         m_txQueues.clear();
     }
