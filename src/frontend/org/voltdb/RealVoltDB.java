@@ -863,10 +863,10 @@ public class RealVoltDB implements VoltDBInterface
             client.createConnection(rejoinHost, rejoinPort);
             InetSocketAddress inetsockaddr = new InetSocketAddress(rejoinHost, rejoinPort);
             SocketChannel socket = SocketChannel.open(inetsockaddr);
-            String hostname = socket.socket().getLocalAddress().getCanonicalHostName();
+            String ip_addr = socket.socket().getLocalAddress().getHostAddress();
             socket.close();
             config.m_selectedRejoinInterface =
-                config.m_internalInterface.isEmpty() ? hostname : config.m_internalInterface;
+                config.m_internalInterface.isEmpty() ? ip_addr : config.m_internalInterface;
             client.callProcedure(
                     rcb,
                     "@Rejoin",
