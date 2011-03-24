@@ -133,44 +133,47 @@ public class VoltPort implements Callable<VoltPort>, Connection
         try {
             final DBBPool pool = m_pool.get();
 
-            /*
-             * Have the read stream fill from the network
-             */
-            if (readyForRead()) {
-                final int maxRead = m_handler.getMaxRead();
-                if (maxRead > 0) {
-                    fillReadStream( maxRead, pool);
-                    ByteBuffer message;
+            try {
+                /*
+                 * Have the read stream fill from the network
+                 */
+                if (readyForRead()) {
+                    final int maxRead = m_handler.getMaxRead();
+                    if (maxRead > 0) {
+                        fillReadStream( maxRead, pool);
+                        ByteBuffer message;
 
-                    /*
-                     * Process all the buffered bytes and retrieve as many messages as possible
-                     * and pass them off to the input handler.
-                     */
-                    while ((message = m_handler.retrieveNextMessage( this )) != null) {
-                        m_handler.handleMessage( message, this);
-                        m_messagesRead.incrementAndGet();
+                        /*
+                         * Process all the buffered bytes and retrieve as many messages as possible
+                         * and pass them off to the input handler.
+                         */
+                        while ((message = m_handler.retrieveNextMessage( this )) != null) {
+                            m_handler.handleMessage( message, this);
+                            m_messagesRead.incrementAndGet();
+                        }
                     }
                 }
-            }
 
-            drainWriteStream(pool);
+                drainWriteStream(pool);
+            } finally {
 
-            /*
-             * m_lock is used to protect the m_scheduledRunnables structure and doesn't need to be held
-             * while scheduled runnables are invoked. It can't be held because a scheduled runnable might
-             * need to acquire other locks such as the NIOWriteStream's lock for shutdown.
-             */
-            if (m_hasQueuedRunnables) {
-                while (true) {
-                    Runnable r;
-                    synchronized (m_lock) {
-                        if (m_scheduledRunnables.isEmpty()) {
-                            m_hasQueuedRunnables = false;
-                            break;
+                /*
+                 * m_lock is used to protect the m_scheduledRunnables structure and doesn't need to be held
+                 * while scheduled runnables are invoked. It can't be held because a scheduled runnable might
+                 * need to acquire other locks such as the NIOWriteStream's lock for shutdown.
+                 */
+                if (m_hasQueuedRunnables) {
+                    while (true) {
+                        Runnable r;
+                        synchronized (m_lock) {
+                            if (m_scheduledRunnables.isEmpty()) {
+                                m_hasQueuedRunnables = false;
+                                break;
+                            }
+                            r = m_scheduledRunnables.poll();
                         }
-                        r = m_scheduledRunnables.poll();
+                        r.run();
                     }
-                    r.run();
                 }
             }
         } finally {
