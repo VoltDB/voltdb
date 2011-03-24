@@ -463,7 +463,9 @@ public abstract class ExportClientBase {
             if (pollTimeMS > 0) {
                 m_logger.trace(String.format("Sleeping for %d ms due to inactivity or no connection.", pollTimeMS));
                 try { Thread.sleep(pollTimeMS); }
-                catch (InterruptedException e) {}
+                catch (InterruptedException e) {
+                    throw new ExportClientException(e);
+                }
             }
         }
     }

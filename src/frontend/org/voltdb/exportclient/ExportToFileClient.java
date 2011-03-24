@@ -485,4 +485,9 @@ public class ExportToFileClient extends ExportClientBase {
             System.exit(-1);
         }
     }
+
+    @Override
+    public void run() throws ExportClientException {
+        super.run();
+    }
 }

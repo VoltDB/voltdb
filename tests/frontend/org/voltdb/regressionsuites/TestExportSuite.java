@@ -23,13 +23,13 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
-import java.io.File;
+import java.io.*;
+import java.net.InetSocketAddress;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -42,11 +42,13 @@ import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
+import org.voltdb.exportclient.ExportToFileClient;
 
 /**
  *  End to end Export tests using the RawProcessor and the ExportSinkServer.
@@ -173,6 +175,91 @@ public class TestExportSuite extends RegressionSuite {
             }
         }
     }
+
+  //
+  //  Test that the file client can actually works
+  //
+  public void testExportToFileClient() throws Exception {
+      final Client client = getClient();
+      final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+      for (int i=0; i < 10; i++) {
+          m_tester.addRow( m_tester.m_generationsSeen.last(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+          final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+          client.callProcedure("Insert", params);
+      }
+      client.drain();
+      quiesce(client);
+      ExportToFileClient exportClient =
+          new ExportToFileClient(
+              new CSVWriter(),
+              "testnonce",
+              new File("/tmp/" + System.getProperty("user.name")),
+              60,
+              new SimpleDateFormat("yyyyMMddHHmmss"),
+              0,
+              false);
+      exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+      final Thread currentThread = Thread.currentThread();
+      new Thread() {
+          @Override
+          public void run() {
+              try {
+                  Thread.sleep(1000);
+                  currentThread.interrupt();
+              } catch (Exception e) {
+                  e.printStackTrace();
+              }
+          }
+      }.start();
+
+      boolean threwException = false;
+      try {
+          exportClient.run();
+      } catch (ExportClientException e) {
+          assertTrue(e.getCause() instanceof InterruptedException);
+          threwException = true;
+      }
+      assertTrue(threwException);
+
+      File tempDir = new File("/tmp/" + System.getProperty("user.name"));
+      File outfile = null;
+      for (File f : tempDir.listFiles()) {
+          if (f.getName().contains("testnonce") && f.getName().endsWith(".csv")) {
+              outfile = f;
+              break;
+          }
+      }
+      assertNotNull(outfile);
+
+      FileInputStream fis = new FileInputStream(outfile);
+      InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
+      BufferedReader br = new BufferedReader(isr);
+
+      ArrayList<String> lines = new ArrayList<String>();
+
+      String nextLine = null;
+      while ((nextLine = br.readLine()) != null) {
+          lines.add(nextLine);
+      }
+
+      assertEquals(lines.size(), 10);
+
+      ArrayList<String[]> splitLines = new ArrayList<String[]>();
+
+      for (String line : lines) {
+          line.split(",");
+      }
+
+      for (String split[] : splitLines) {
+          assertEquals(12, split.length);
+          assertTrue(Integer.valueOf(split[2]) < 4);
+          assertTrue(Integer.valueOf(split[3]) < 3);
+          Integer siteId = Integer.valueOf(split[4]);
+          assertTrue(siteId == 101 || siteId == 102 ||
+                  siteId == 201 || siteId == 202 || siteId == 301 || siteId == 302);
+          assertTrue(split[split.length - 1].equals(rowdata[rowdata.length -1].toString()));
+      }
+  }
 
     public void testExportSnapshotPreservesSequenceNumber() throws Exception {
         Client client = getClient();

@@ -30,6 +30,10 @@ public class ExportClientException extends Exception {
 
     public final Type type;
 
+    public ExportClientException(Throwable t) {
+        super(t);
+        type = Type.USER_ERROR;
+    }
     public ExportClientException(Type type, String message) {
         super(message);
         this.type = type;
