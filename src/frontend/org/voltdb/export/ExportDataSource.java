@@ -478,4 +478,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public long getGeneration() {
         return m_generation;
     }
+
+    public void truncateExportToTxnId(long txnId) {
+        m_committedBuffers.truncateToTxnId(txnId);
+    }
 }

@@ -24,8 +24,10 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
+import java.util.Iterator;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -549,5 +551,137 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (DequeSegment ds : m_finishedSegments.values()) {
             ds.closeAndDelete();
         }
+    }
+
+    @Override
+    public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
+        //+16 because I am not sure if the max chunk size is enforced right
+        ByteBuffer readBuffer = ByteBuffer.allocateDirect(DequeSegment.m_chunkSize + 16);
+
+        /*
+         * Iterator all the objects in all the segments and pass them to the truncator
+         * When it finds the truncation point
+         */
+        Long lastSegmentIndex = null;
+        for (Map.Entry<Long, DequeSegment> entry : m_finishedSegments.entrySet()) {
+            readBuffer.clear();
+            DequeSegment segment = entry.getValue();
+            long segmentIndex = entry.getKey();
+
+            File segmentFile = segment.m_file;
+            RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
+            FileChannel fc = ras.getChannel();
+
+            /*
+             * Read the entire segment into memory
+             */
+            while (readBuffer.hasRemaining()) {
+                int read = fc.read(readBuffer);
+                if (read == -1) {
+                    break;
+                }
+            }
+            readBuffer.flip();
+
+            //Get the number of objects and then iterator over them
+            int numObjects = readBuffer.getInt();
+            for (int ii = 0; ii < numObjects; ii++) {
+                final int nextObjectLength = readBuffer.getInt();
+                //Copy the next object into a separate heap byte buffer
+                //do the old limit stashing trick to avoid buffer overflow
+                ByteBuffer nextObject = ByteBuffer.allocate(nextObjectLength);
+                final int oldLimit = readBuffer.limit();
+                readBuffer.limit(readBuffer.position() + nextObjectLength);
+
+                nextObject.put(readBuffer).flip();
+
+                //Put back the original limit
+                readBuffer.limit(oldLimit);
+
+                //Handoff the object to the truncator and await a decision
+                ByteBuffer retval = truncator.parse(nextObject);
+                if (retval == null) {
+                    //Nothing to do, leave the object alone and move to the next
+                    continue;
+                } else {
+                    //If the returned bytebuffer is empty, remove the object and truncate the file
+                    if (retval.remaining() == 0) {
+                        //Don't forget to update the number of entries in the file
+                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
+                        numObjectsBuffer.putInt(0, ii);
+                        fc.position(0);
+                        while (numObjectsBuffer.hasRemaining()) {
+                            fc.write(numObjectsBuffer);
+                        }
+                        fc.truncate(readBuffer.position() - (nextObjectLength + 4));
+                        m_sizeInBytes.addAndGet(-(nextObjectLength + 4));
+                    } else {
+                        //In this case the object has been modified, insert/update in place
+                        //First calculate how much smaller/bigger it is.
+                        final int retvalSize = retval.remaining();
+                        final int delta = nextObjectLength - retvalSize;
+                        m_sizeInBytes.addAndGet(-delta);
+                        readBuffer.position(readBuffer.position() - (nextObjectLength + 4));
+                        readBuffer.putInt(retval.remaining());
+                        readBuffer.put(retval);
+                        readBuffer.flip();
+
+                        readBuffer.putInt(0, ii + 1);
+                        /*
+                         * SHOULD REALLY make a copy of the original and then swap them with renaming
+                         */
+                        fc.position(0);
+                        fc.truncate(0);
+
+                        while (readBuffer.hasRemaining()) {
+                            fc.write(readBuffer);
+                        }
+                    }
+                    //Set last segment and break the loop over this segment
+                    lastSegmentIndex = segmentIndex;
+                    break;
+                }
+            }
+
+            //If this is set the just processed segment was the last one
+            if (lastSegmentIndex != null) {
+                break;
+            }
+        }
+
+        /*
+         * Now truncate all the segments after the truncation point
+         */
+        Iterator<Map.Entry<Long, DequeSegment>> iterator = m_finishedSegments.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Long, DequeSegment> entry = iterator.next();
+            if (entry.getKey() <= lastSegmentIndex) {
+                continue;
+            }
+            DequeSegment ds = entry.getValue();
+            iterator.remove();
+            ds.closeAndDelete();
+        }
+
+        //The write segment may have the wrong index, delete it
+        m_writeSegment.closeAndDelete();
+
+        /*
+         * Reset the poll and write segments
+         */
+        //Find the first and last segment for polling and writing (after)
+        Long writeSegmentIndex = 0L;
+        try {
+            m_currentPollSegmentIndex = m_finishedSegments.firstKey();
+            writeSegmentIndex = m_finishedSegments.lastKey() + 1;
+        } catch (NoSuchElementException e) {}
+
+        m_writeSegment =
+            new DequeSegment(
+                    writeSegmentIndex,
+                    new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
+        m_writeSegment.open();
+        m_writeSegment.initNumEntries();
+
     }
 }

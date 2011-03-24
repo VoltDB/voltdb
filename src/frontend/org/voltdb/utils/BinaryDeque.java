@@ -18,6 +18,7 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 
+import java.nio.ByteBuffer;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
@@ -71,4 +72,23 @@ public interface BinaryDeque {
     public long sizeInBytes();
 
     public void closeAndDelete() throws IOException;
+
+    /*
+     * A binary deque truncator parses all the objects in a binary deque
+     * from head to tail until it find the truncation point. At the truncation
+     * point it can return a version of the last object passed to it that will be updated in place.
+     * Everything after that object in the deque will be truncated and deleted.
+     */
+    public interface BinaryDequeTruncator {
+        /*
+         * Invoked by parseAndTruncate on every object in the deque from head to tail
+         * until parse returns a non-null ByteBuffer. The returned ByteBuffer can be length 0 or it can contain
+         * an object to replace the last object that was passed to the binary deque. If the length is 0
+         * then the last object passed to parse will be truncated out of the deque. Part of the object
+         * or a new object can be returned to replace it.
+         */
+        public ByteBuffer parse(ByteBuffer b);
+    }
+
+    public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
 }

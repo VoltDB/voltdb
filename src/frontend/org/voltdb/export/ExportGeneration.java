@@ -289,4 +289,13 @@ public class ExportGeneration {
         }
         VoltFile.recursivelyDelete(m_directory);
     }
+
+    public void truncateExportToTxnId(long txnId,
+            int partitionId) {
+        HashMap<String, ExportDataSource> dataSources = m_dataSourcesByPartition.get(partitionId);
+        for (ExportDataSource source : dataSources.values()) {
+            source.truncateExportToTxnId(txnId);
+        }
+
+    }
 }

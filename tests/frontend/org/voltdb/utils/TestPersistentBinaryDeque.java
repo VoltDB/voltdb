@@ -22,6 +22,7 @@
  */
 package org.voltdb.utils;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -36,6 +37,7 @@ import java.util.TreeSet;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class TestPersistentBinaryDeque {
@@ -65,6 +67,170 @@ public class TestPersistentBinaryDeque {
             names.add(f.getName());
         }
         return names;
+    }
+
+    @Test
+    public void testEmptyTruncation() throws Exception {
+        TreeSet<String> listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 1);
+        m_pbd.close();
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 0);
+
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 1);
+
+        m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
+            @Override
+            public ByteBuffer parse(ByteBuffer b) {
+                fail();
+                return null;
+            }
+
+        });
+
+        for (int ii = 0; ii < 96; ii++) {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(getFilledBuffer(ii)) });
+        }
+
+        for (long ii = 0; ii < 96; ii++) {
+            BBContainer cont = m_pbd.poll();
+            assertNotNull(cont);
+            assertEquals(cont.b.remaining(), 1024 * 1024 * 2);
+            while (cont.b.remaining() > 7) {
+                assertEquals(cont.b.getLong(), ii);
+            }
+        }
+    }
+
+    @Test
+    public void testTruncatorWithEmptyBufferReturn() throws Exception {
+        assertNull(m_pbd.poll());
+
+        for (int ii = 0; ii < 96; ii++) {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(getFilledBuffer(ii)) });
+        }
+
+        m_pbd.close();
+
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+
+        TreeSet<String> listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 5);
+
+        m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
+            private long m_objectsParsed = 0;
+            @Override
+            public ByteBuffer parse(ByteBuffer b) {
+                if (b.getLong(0) != m_objectsParsed) {
+                    System.out.println("asd");
+                }
+                assertEquals(b.getLong(0), m_objectsParsed);
+                assertEquals(b.remaining(), 1024 * 1024 * 2 );
+                if (b.getLong(0) == 45) {
+                    b.limit(b.remaining() / 2);
+                    return ByteBuffer.allocate(0);
+                }
+                while (b.remaining() > 7) {
+                    assertEquals(b.getLong(), m_objectsParsed);
+                }
+                m_objectsParsed++;
+                return null;
+            }
+
+        });
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 3);
+
+        for (int ii = 46; ii < 96; ii++) {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(getFilledBuffer(ii)) });
+        }
+
+        long blocksFound = 0;
+        BBContainer cont = null;
+        while ((cont = m_pbd.poll()) != null) {
+            try {
+                ByteBuffer buffer = cont.b;
+                if (blocksFound == 45) {
+                    blocksFound++;//white lie, so we expect the right block contents
+                }
+                assertEquals(buffer.remaining(), 1024 * 1024 * 2);
+                while (buffer.remaining() > 7) {
+                    assertEquals(buffer.getLong(), blocksFound);
+                }
+            } finally {
+                blocksFound++;
+                cont.discard();
+            }
+        }
+        assertEquals(blocksFound, 96);
+    }
+
+    @Test
+    public void testTruncator() throws Exception {
+        assertNull(m_pbd.poll());
+
+        for (int ii = 0; ii < 96; ii++) {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(getFilledBuffer(ii)) });
+        }
+
+        m_pbd.close();
+
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+
+        TreeSet<String> listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 5);
+
+        m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
+            private long m_objectsParsed = 0;
+            @Override
+            public ByteBuffer parse(ByteBuffer b) {
+                assertEquals(b.getLong(0), m_objectsParsed);
+                assertEquals(b.remaining(), 1024 * 1024 * 2 );
+                if (b.getLong(0) == 45) {
+                    b.limit(b.remaining() / 2);
+                    return b.slice();
+                }
+                while (b.remaining() > 7) {
+                    assertEquals(b.getLong(), m_objectsParsed);
+                }
+                m_objectsParsed++;
+                return null;
+            }
+
+        });
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 3);
+
+        for (int ii = 46; ii < 96; ii++) {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(getFilledBuffer(ii)) });
+        }
+
+        long blocksFound = 0;
+        BBContainer cont = null;
+        while ((cont = m_pbd.poll()) != null) {
+            try {
+                ByteBuffer buffer = cont.b;
+                if (blocksFound == 45) {
+                    assertEquals(buffer.remaining(), 1024 * 1024);
+                } else {
+                    assertEquals(buffer.remaining(), 1024 * 1024 * 2);
+                }
+                while (buffer.remaining() > 7) {
+                    assertEquals(buffer.getLong(), blocksFound);
+                }
+            } finally {
+                blocksFound++;
+                cont.discard();
+            }
+        }
+        assertEquals(blocksFound, 96);
     }
 
     @Test

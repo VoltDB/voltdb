@@ -57,6 +57,7 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.export.ExportManager;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.ClusterSaveFileState;
 import org.voltdb.sysprocs.saverestore.SavedTableConverter;
@@ -97,7 +98,8 @@ public class SnapshotRestore extends VoltSystemProcedure
     /*
      * Plan fragments for distributing the full set of export sequence numbers
      * to every partition where the relevant ones can be selected
-     * and forwarded to the EE.
+     * and forwarded to the EE. Also distributes the txnId of the snapshot
+     * which is used to truncate export data on disk from after the snapshot
      */
     private static final int DEP_restoreDistributeExportSequenceNumbers = (int)
         SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -260,9 +262,13 @@ public class SnapshotRestore extends VoltSystemProcedure
         if (fragmentId == SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers)
         {
             assert(params.toArray()[0] != null);
+            assert(params.toArray().length == 2);
             assert(params.toArray()[0] instanceof byte[]);
             VoltTable result = new VoltTable(new VoltTable.ColumnInfo("RESULT", VoltType.STRING));
+            long snapshotTxnId = ((Long)params.toArray()[1]).longValue();
 
+            ExportManager.instance().
+                truncateExportToTxnId(snapshotTxnId, context.getExecutionSite().getCorrespondingPartitionId());
             try {
                 ByteArrayInputStream bais = new ByteArrayInputStream((byte[])params.toArray()[0]);
                 ObjectInputStream ois = new ObjectInputStream(bais);
@@ -880,8 +886,13 @@ public class SnapshotRestore extends VoltSystemProcedure
             byte exportSequenceNumberBytes[] = baos.toByteArray();
             oos.close();
 
-            results = performDistributeExportSequenceNumbers(exportSequenceNumberBytes);
+            results =
+                performDistributeExportSequenceNumbers(
+                        exportSequenceNumberBytes,
+                        digests.get(0).getLong("txnId"));
         } catch (IOException e) {
+            throw new VoltAbortException(e);
+        } catch (JSONException e) {
             throw new VoltAbortException(e);
         }
 
@@ -912,7 +923,8 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private VoltTable[] performDistributeExportSequenceNumbers(
-            byte[] exportSequenceNumberBytes) {
+            byte[] exportSequenceNumberBytes,
+            long txnId) {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
         // This fragment causes each execution site to confirm the likely
@@ -923,7 +935,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(exportSequenceNumberBytes);
+        params.setParameters(exportSequenceNumberBytes, txnId);
         pfs[0].parameters = params;
 
         // This fragment aggregates the save-to-disk sanity check results

@@ -442,4 +442,11 @@ public class ExportManager
             exportLog.error(e);
         }
     }
+
+    public void truncateExportToTxnId(long snapshotTxnId,
+            int correspondingPartitionId) {
+        for (ExportGeneration generation : m_generations.get().values()) {
+            generation.truncateExportToTxnId( snapshotTxnId, correspondingPartitionId);
+        }
+    }
 }

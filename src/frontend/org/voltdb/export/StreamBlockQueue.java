@@ -263,4 +263,8 @@ public class StreamBlockQueue {
             }
         }
     }
+
+    public void truncateToTxnId(long txnId) {
+
+    }
 }
