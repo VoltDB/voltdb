@@ -126,7 +126,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         private final SocketChannel m_sc;
         private volatile boolean closed = false;
         private volatile Exception m_lastException = null;
-        private final Thread m_inThread = new Thread() {
+        private final Thread m_inThread = new Thread("Recovery in thread for site " + m_siteId) {
             @Override
             public void run() {
                 try {

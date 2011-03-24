@@ -157,6 +157,9 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             try {
                 while (true) {
                     BBContainer message = m_outgoing.take();
+                    if (message.b == null) {
+                        return;
+                    }
                     try {
                         while (message.b.hasRemaining()) {
                             m_sc.write(message.b);
@@ -169,6 +172,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                 }
             } catch (InterruptedException e) {
                 return;
+            } finally {
+                try {
+                    m_sc.close();
+                } catch (IOException e) {
+                }
             }
         }
     };
@@ -229,12 +237,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
     private void closeIO() {
         m_ioclosed = true;
-        m_outThread.interrupt();
+        m_outgoing.offer(new BBContainer( null,0) {
+            @Override
+            public void discard() {}
+        });
         m_inThread.interrupt();
-        try {
-            m_sc.close();
-        } catch (IOException e) {
-        }
     }
 
     /**
