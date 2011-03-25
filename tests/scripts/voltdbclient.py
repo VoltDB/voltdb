@@ -817,6 +817,7 @@ class VoltException:
 
     def __init__(self, fser):
         self.type = self.VOLTEXCEPTION_NONE
+        self.typestr = "None"
         self.message = ""
 
         if fser != None:
@@ -839,13 +840,11 @@ class VoltException:
         self.message = ''.join(self.message)
 
         if self.type == self.VOLTEXCEPTION_GENERIC:
-            print "Python client got a generic serializable exception:", \
-                self.message
+            self.typestr = "Generic"
         elif self.type == self.VOLTEXCEPTION_EEEXCEPTION:
+            self.typestr = "EE Exception"
             # serialized size from EEException.java is 4 bytes
             self.error_code = fser.readInt32()
-            print "Exception was a Volt EE Exception, error code: %d" % \
-                (self.error_code)
         elif self.type == self.VOLTEXCEPTION_SQLEXCEPTION or \
                 self.type == self.VOLTEXCEPTION_CONSTRAINTFAILURE:
             self.sql_state_bytes = []
@@ -854,21 +853,31 @@ class VoltException:
             self.sql_state_bytes = ''.join(self.sql_state_bytes)
 
             if self.type == self.VOLTEXCEPTION_SQLEXCEPTION:
-                print "Exception was a Volt SQL Exception ", self.sql_state_bytes
+                self.typestr = "SQL Exception"
             else:
+                self.typestr = "Constraint Failure"
                 self.constraint_type = fser.readInt32()
                 self.table_name = fser.readString()
                 self.buffer_size = fser.readInt32()
                 self.buffer = []
                 for i in xrange(0, self.buffer_size):
                     self.buffer.append(fser.readByte())
-                print "Exception was a Volt Constraint Failure Exception" \
-                    " of type %d on table ID %s" % (self.constraint_type,
-                                                    self.table_name)
         else:
             for i in xrange(0, self.length - 3 - 2 - self.message_len):
                 fser.readByte()
             print "Python client deserialized unknown VoltException."
+
+    def __str__(self):
+        msgstr = "VoltException: type: %s\n" % self.typestr
+        if self.type == self.VOLTEXCEPTION_EEEXCEPTION:
+            msgstr += "  Error code: %d\n" % self.error_code
+        elif self.type == self.VOLTEXCEPTION_SQLEXCEPTION:
+            msgstr += "  SQL code: "
+            msgstr += self.sql_state_bytes
+        elif self.type == self.VOLTEXCEPTION_SQLEXCEPTION:
+            msgstr += "  Constraint violation type: %d\n" + self.constraint_type
+            msgstr += "  on table: %s\n" + self.table_name
+        return msgstr
 
 class VoltResponse:
     "VoltDB called procedure response (ClientResponse.java)"
@@ -919,9 +928,16 @@ class VoltResponse:
 
     def __str__(self):
         tablestr = "\n\n".join([str(i) for i in self.tables])
-        return "Status: %d\nInformation: %s\n%s" % (self.status,
-                                                    self.statusString,
-                                                    tablestr)
+        if self.exception is None:
+            return "Status: %d\nInformation: %s\n%s" % (self.status,
+                                                        self.statusString,
+                                                        tablestr)
+        else:
+            msgstr = "Status: %d\nInformation: %s\n%s\n" % (self.status,
+                                                            self.statusString,
+                                                            tablestr)
+            msgstr += "Exception: %s" % (self.exception)
+            return msgstr
 
 class VoltProcedure:
     "VoltDB called procedure interface"
