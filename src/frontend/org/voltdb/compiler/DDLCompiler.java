@@ -23,6 +23,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.PrintStream;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.Map.Entry;
 
@@ -545,6 +546,13 @@ public class DDLCompiler {
                 String msg = "VARCHAR Column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
                 throw m_compiler.new VoltCompilerException(msg);
             }
+        }
+        if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC))
+        {
+            // Until we support deserializing scientific notation in the EE, we'll
+            // coerce default values to plain notation here.  See ENG-952 for more info.
+            BigDecimal temp = new BigDecimal(defaultvalue);
+            defaultvalue = temp.toPlainString();
         }
 
         Column column = table.getColumns().add(name);

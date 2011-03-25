@@ -250,8 +250,11 @@ void NValue::createDecimalFromString(const std::string &txt) {
      */
     for (int ii = (setSign ? 1 : 0); ii < static_cast<int>(txt.size()); ii++) {
         if ((txt[ii] < '0' || txt[ii] > '9') && txt[ii] != '.') {
+            char message[4096];
+            snprintf(message, 4096, "Invalid characters in decimal string: %s",
+                     txt.c_str());
             throw SQLException(SQLException::volt_decimal_serialization_error,
-                               "Invalid characters");
+                               message);
         }
     }
 
