@@ -293,9 +293,10 @@ public class ExportGeneration {
     public void truncateExportToTxnId(long txnId,
             int partitionId) {
         HashMap<String, ExportDataSource> dataSources = m_dataSourcesByPartition.get(partitionId);
-        for (ExportDataSource source : dataSources.values()) {
-            source.truncateExportToTxnId(txnId);
+        if (dataSources != null) {
+            for (ExportDataSource source : dataSources.values()) {
+                source.truncateExportToTxnId(txnId);
+            }
         }
-
     }
 }
