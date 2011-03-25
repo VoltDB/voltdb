@@ -89,6 +89,8 @@ def run_once(name, command, statements):
         statement[name] = {"Status": client.response.status,
                            "Info": client.response.statusString,
                            "Result": encodestring(tablestr)}
+        if client.response.exception != None:
+            statement[name]["Exception"] = str(client.response.exception)
 
     client.onecmd("shutdown")
     server.communicate()
@@ -256,6 +258,7 @@ if __name__ == "__main__":
     success = True
     statistics = {}
     for config_name in configs_to_run:
+        print >> sys.stderr, "SQLCOVERAGE: STARTING ON CONFIG: %s" % config_name
         report_dir = output_dir + '/' + config_name
         config = config_list.get_config(config_name)
         result = run_config(config, basedir, report_dir, seed,
