@@ -70,6 +70,42 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
+    public void testTruncateFirstElement() throws Exception {
+        TreeSet<String> listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 1);
+
+        for (int ii = 0; ii < 96; ii++) {
+            m_pbd.offer(new BBContainer[] { DBBPool.wrapBB(getFilledBuffer(ii)) });
+        }
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 4);
+
+        m_pbd.close();
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 4);
+
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 5);
+
+        m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
+            @Override
+            public ByteBuffer parse(ByteBuffer b) {
+                return ByteBuffer.allocate(0);
+            }
+
+        });
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 1);
+        assertNull(m_pbd.poll());
+    }
+
+    @Test
     public void testEmptyTruncation() throws Exception {
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
@@ -104,6 +140,7 @@ public class TestPersistentBinaryDeque {
             while (cont.b.remaining() > 7) {
                 assertEquals(cont.b.getLong(), ii);
             }
+            cont.discard();
         }
     }
 

@@ -571,81 +571,94 @@ public class PersistentBinaryDeque implements BinaryDeque {
             File segmentFile = segment.m_file;
             RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
             FileChannel fc = ras.getChannel();
-
-            /*
-             * Read the entire segment into memory
-             */
-            while (readBuffer.hasRemaining()) {
-                int read = fc.read(readBuffer);
-                if (read == -1) {
-                    break;
-                }
-            }
-            readBuffer.flip();
-
-            //Get the number of objects and then iterator over them
-            int numObjects = readBuffer.getInt();
-            for (int ii = 0; ii < numObjects; ii++) {
-                final int nextObjectLength = readBuffer.getInt();
-                //Copy the next object into a separate heap byte buffer
-                //do the old limit stashing trick to avoid buffer overflow
-                ByteBuffer nextObject = ByteBuffer.allocate(nextObjectLength);
-                final int oldLimit = readBuffer.limit();
-                readBuffer.limit(readBuffer.position() + nextObjectLength);
-
-                nextObject.put(readBuffer).flip();
-
-                //Put back the original limit
-                readBuffer.limit(oldLimit);
-
-                //Handoff the object to the truncator and await a decision
-                ByteBuffer retval = truncator.parse(nextObject);
-                if (retval == null) {
-                    //Nothing to do, leave the object alone and move to the next
-                    continue;
-                } else {
-                    //If the returned bytebuffer is empty, remove the object and truncate the file
-                    if (retval.remaining() == 0) {
-                        //Don't forget to update the number of entries in the file
-                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
-                        numObjectsBuffer.putInt(0, ii);
-                        fc.position(0);
-                        while (numObjectsBuffer.hasRemaining()) {
-                            fc.write(numObjectsBuffer);
-                        }
-                        fc.truncate(readBuffer.position() - (nextObjectLength + 4));
-                        m_sizeInBytes.addAndGet(-(nextObjectLength + 4));
-                    } else {
-                        //In this case the object has been modified, insert/update in place
-                        //First calculate how much smaller/bigger it is.
-                        final int retvalSize = retval.remaining();
-                        final int delta = nextObjectLength - retvalSize;
-                        m_sizeInBytes.addAndGet(-delta);
-                        readBuffer.position(readBuffer.position() - (nextObjectLength + 4));
-                        readBuffer.putInt(retval.remaining());
-                        readBuffer.put(retval);
-                        readBuffer.flip();
-
-                        readBuffer.putInt(0, ii + 1);
-                        /*
-                         * SHOULD REALLY make a copy of the original and then swap them with renaming
-                         */
-                        fc.position(0);
-                        fc.truncate(0);
-
-                        while (readBuffer.hasRemaining()) {
-                            fc.write(readBuffer);
-                        }
+            try {
+                /*
+                 * Read the entire segment into memory
+                 */
+                while (readBuffer.hasRemaining()) {
+                    int read = fc.read(readBuffer);
+                    if (read == -1) {
+                        break;
                     }
-                    //Set last segment and break the loop over this segment
-                    lastSegmentIndex = segmentIndex;
+                }
+                readBuffer.flip();
+
+                //Get the number of objects and then iterator over them
+                int numObjects = readBuffer.getInt();
+                for (int ii = 0; ii < numObjects; ii++) {
+                    final int nextObjectLength = readBuffer.getInt();
+                    //Copy the next object into a separate heap byte buffer
+                    //do the old limit stashing trick to avoid buffer overflow
+                    ByteBuffer nextObject = ByteBuffer.allocate(nextObjectLength);
+                    final int oldLimit = readBuffer.limit();
+                    readBuffer.limit(readBuffer.position() + nextObjectLength);
+
+                    nextObject.put(readBuffer).flip();
+
+                    //Put back the original limit
+                    readBuffer.limit(oldLimit);
+
+                    //Handoff the object to the truncator and await a decision
+                    ByteBuffer retval = truncator.parse(nextObject);
+                    if (retval == null) {
+                        //Nothing to do, leave the object alone and move to the next
+                        continue;
+                    } else {
+                        long startSize = fc.size();
+                        //If the returned bytebuffer is empty, remove the object and truncate the file
+                        if (retval.remaining() == 0) {
+                            if (ii == 0) {
+                                /*
+                                 * If truncation is occuring at the first object
+                                 * Whammo! Delete the file. Do it by setting the lastSegmentIndex
+                                 * to 1 previous. We may end up with an empty finished segment
+                                 * set.
+                                 */
+                                lastSegmentIndex = segmentIndex - 1;
+                            } else {
+                                //Don't forget to update the number of entries in the file
+                                ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
+                                numObjectsBuffer.putInt(0, ii);
+                                fc.position(0);
+                                while (numObjectsBuffer.hasRemaining()) {
+                                    fc.write(numObjectsBuffer);
+                                }
+                                fc.truncate(readBuffer.position() - (nextObjectLength + 4));
+                            }
+
+                        } else {
+                            readBuffer.position(readBuffer.position() - (nextObjectLength + 4));
+                            readBuffer.putInt(retval.remaining());
+                            readBuffer.put(retval);
+                            readBuffer.flip();
+
+                            readBuffer.putInt(0, ii + 1);
+                            /*
+                             * SHOULD REALLY make a copy of the original and then swap them with renaming
+                             */
+                            fc.position(0);
+                            fc.truncate(0);
+
+                            while (readBuffer.hasRemaining()) {
+                                fc.write(readBuffer);
+                            }
+                        }
+                        long endSize = fc.size();
+                        m_sizeInBytes.addAndGet(endSize - startSize);
+                        //Set last segment and break the loop over this segment
+                        if (lastSegmentIndex == null) {
+                            lastSegmentIndex = segmentIndex;
+                        }
+                        break;
+                    }
+                }
+
+                //If this is set the just processed segment was the last one
+                if (lastSegmentIndex != null) {
                     break;
                 }
-            }
-
-            //If this is set the just processed segment was the last one
-            if (lastSegmentIndex != null) {
-                break;
+            } finally {
+                fc.close();
             }
         }
 
