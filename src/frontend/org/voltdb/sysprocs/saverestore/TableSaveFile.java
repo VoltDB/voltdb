@@ -374,6 +374,9 @@ public class TableSaveFile
     // Will get the next chunk of the table that is just over the chunk size
     public synchronized BBContainer getNextChunk() throws IOException
     {
+        if (m_chunkReaderException != null) {
+            throw m_chunkReaderException;
+        }
         if (!m_hasMoreChunks) {
             return m_availableChunks.poll();
         }
@@ -394,18 +397,21 @@ public class TableSaveFile
                     throw new IOException(e);
                 }
             }
+            if (m_chunkReaderException != null) {
+                throw m_chunkReaderException;
+            }
         }
         if (c != null) {
             m_chunkReads.release();
         }
-        if (m_chunkReaderException != null) {
-            throw m_chunkReaderException;
-        }
         return c;
     }
 
-    public synchronized boolean hasMoreChunks()
+    public synchronized boolean hasMoreChunks() throws IOException
     {
+        if (m_chunkReaderException != null) {
+            throw m_chunkReaderException;
+        }
         return m_hasMoreChunks || !m_availableChunks.isEmpty();
     }
 //
