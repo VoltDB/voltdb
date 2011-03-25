@@ -443,7 +443,7 @@ public abstract class ExpressionUtil {
         // to use the literal NULL. Thus the NULL values for each of the 4 integer types are considered
         // an underflow exception for the type.
 
-        if (integerType == VoltType.BIGINT) {
+        if (integerType == VoltType.BIGINT || integerType == VoltType.TIMESTAMP) {
             if (value == VoltType.NULL_BIGINT)
                 throw new NumberFormatException("Constant value underflows BIGINT type.");
         }

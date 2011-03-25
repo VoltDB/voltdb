@@ -433,6 +433,7 @@ public enum VoltType {
         case SMALLINT:
         case INTEGER:
         case BIGINT:
+        case TIMESTAMP:
             return true;
         default:
             return false;

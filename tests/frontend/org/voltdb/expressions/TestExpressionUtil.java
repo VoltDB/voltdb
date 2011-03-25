@@ -36,10 +36,6 @@ import org.voltdb.types.*;
 
 import junit.framework.*;
 
-/**
- *
- *
- */
 public class TestExpressionUtil extends TestCase {
     /**
      * Used for traversing trees.
@@ -450,4 +446,43 @@ public class TestExpressionUtil extends TestCase {
         assertEquals(bint.m_valueSize, VoltType.DECIMAL.getLengthInBytesForFixedTypes());
     }
 
+    public void testSetOutputTypeForInsertExpressionWithCveAndTimestamp() throws Exception
+    {
+        ConstantValueExpression cve = new ConstantValueExpression();
+        cve.setValue("4000000000");
+        cve.setValueSize(8);
+        cve.setValueType(VoltType.BIGINT);
+        HashMap<Integer, VoltType> override_map = new HashMap<Integer, VoltType>();
+        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        assertEquals(VoltType.TIMESTAMP, cve.getValueType());
+        assertEquals(8, cve.getValueSize());
+        System.out.println(override_map);
+
+        cve = new ConstantValueExpression();
+        cve.setValue("400000000");
+        cve.setValueSize(4);
+        cve.setValueType(VoltType.INTEGER);
+        override_map = new HashMap<Integer, VoltType>();
+        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        assertEquals(VoltType.TIMESTAMP, cve.getValueType());
+        assertEquals(8, cve.getValueSize());
+
+        cve = new ConstantValueExpression();
+        cve.setValue("4000");
+        cve.setValueSize(2);
+        cve.setValueType(VoltType.SMALLINT);
+        override_map = new HashMap<Integer, VoltType>();
+        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        assertEquals(VoltType.TIMESTAMP, cve.getValueType());
+        assertEquals(8, cve.getValueSize());
+
+        cve = new ConstantValueExpression();
+        cve.setValue("40");
+        cve.setValueSize(1);
+        cve.setValueType(VoltType.TINYINT);
+        override_map = new HashMap<Integer, VoltType>();
+        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        assertEquals(VoltType.TIMESTAMP, cve.getValueType());
+        assertEquals(8, cve.getValueSize());
+    }
 }
