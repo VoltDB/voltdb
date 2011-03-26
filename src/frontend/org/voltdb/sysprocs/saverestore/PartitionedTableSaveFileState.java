@@ -78,9 +78,24 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
     @Override
     public boolean isConsistent()
     {
-        return ((m_partitionsSeen.size() == m_totalPartitions) &&
-                (m_partitionsSeen.first() == 0) &&
-                (m_partitionsSeen.last() == m_totalPartitions - 1));
+        boolean consistent =
+            ((m_partitionsSeen.size() == m_totalPartitions) &&
+             (m_partitionsSeen.first() == 0) &&
+             (m_partitionsSeen.last() == m_totalPartitions - 1));
+        if (!consistent)
+        {
+            m_consistencyResult = "Table: " + getTableName() +
+                " is missing " + (m_totalPartitions - m_partitionsSeen.size()) +
+                " out of " + m_totalPartitions + " total partitions" +
+                " (partitions seen: " + m_partitionsSeen + ")";
+
+        }
+        else
+        {
+            m_consistencyResult = "Table: " + getTableName() +
+                " has consistent savefile state.";
+        }
+        return consistent;
     }
 
     int getTotalPartitions()
@@ -113,6 +128,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             String error = "Table: " + getTableName() + " was partitioned " +
             "but has a savefile which indicates replication at site: " +
             row.getLong("CURRENT_HOST_ID");
+            m_consistencyResult = error;
             throw new IOException(error);
         }
 
@@ -123,6 +139,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             row.getLong("TOTAL_PARTITIONS") + " (previous values were " +
             getTotalPartitions() + ") at site: " +
             row.getLong("CURRENT_HOST_ID");
+            m_consistencyResult = error;
             throw new IOException(error);
         }
     }

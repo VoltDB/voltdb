@@ -70,6 +70,9 @@ public class TestReplicatedTableSaveFileState extends TestCase
                 assertTrue(false);
             }
         }
+        assertTrue(m_state.isConsistent());
+        assertTrue(m_state.getConsistencyResult().
+                   contains("has consistent savefile state"));
         Set<Integer> sites = m_state.getHostsWithThisTable();
         assertTrue(sites.contains(0));
         assertTrue(sites.contains(1));
@@ -91,7 +94,8 @@ public class TestReplicatedTableSaveFileState extends TestCase
             }
             catch (IOException e)
             {
-                assertTrue(true);
+                assertTrue(m_state.getConsistencyResult().
+                           contains("but has a savefile which indicates partitioning at site"));
                 return;
             }
         }

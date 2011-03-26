@@ -50,6 +50,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     public boolean isConsistent()
     {
         // XXX right now there is nothing to check across all rows
+        m_consistencyResult = "Table: " + getTableName() +
+            " has consistent savefile state.";
         return true;
     }
 
@@ -85,6 +87,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
             String error = "Table: " + getTableName() + " was replicated " +
             "but has a savefile which indicates partitioning at site: " +
             row.getLong("CURRENT_HOST_ID");
+            m_consistencyResult = error;
             throw new IOException(error);
         }
     }

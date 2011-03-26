@@ -102,8 +102,7 @@ public class ClusterSaveFileState
         {
             if (!table_state.isConsistent())
             {
-                String error = "Table: " + table_state.getTableName() +
-                " has some inconsistency in the savefile state";
+                String error = table_state.getConsistencyResult();
                 throw new IOException(error);
             }
         }

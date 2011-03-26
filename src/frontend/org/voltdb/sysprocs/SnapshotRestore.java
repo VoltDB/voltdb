@@ -843,6 +843,11 @@ public class SnapshotRestore extends VoltSystemProcedure
         assert(relevantTableNames != null);
         assert(relevantTableNames.size() > 0);
 
+        // ENG-1078: I think this giant for/if block is only good for
+        // checking if there are no files for a table listed in the digest.
+        // There appear to be redundant checks for that, and then the per-table
+        // consistency check is preempted by the ClusterSaveFileState constructor
+        // called above.
         VoltTable[] results = null;
         for (String tableName : relevantTableNames) {
             if (!savefile_state.getSavedTableNames().contains(tableName)) {
@@ -854,10 +859,14 @@ public class SnapshotRestore extends VoltSystemProcedure
                     results = new VoltTable[] { new VoltTable(result_columns) };
                 }
                 results[0].addRow("FAILURE", "Save data contains no information for table " + tableName);
+                break;
             }
 
             final TableSaveFileState saveFileState = savefile_state.getTableState(tableName);
-            if (saveFileState == null || !saveFileState.isConsistent()) {
+            if (saveFileState == null)
+            {
+                // Pretty sure this is unreachable
+                // See ENG-1078
                 if (results == null) {
                     ColumnInfo[] result_columns = new ColumnInfo[2];
                     int ii = 0;
@@ -865,9 +874,20 @@ public class SnapshotRestore extends VoltSystemProcedure
                     result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
                     results = new VoltTable[] { new VoltTable(result_columns) };
                 }
-                results[0].addRow( "FAILURE",
-                        "Save data for " + tableName + " is inconsistent " +
-                        "(potentially missing partitions) or corrupted");
+                results[0].addRow( "FAILURE", "Save data contains no information for table " + tableName);
+            }
+            else if (!saveFileState.isConsistent())
+            {
+                // Also pretty sure this is unreachable
+                // See ENG-1078
+                if (results == null) {
+                    ColumnInfo[] result_columns = new ColumnInfo[2];
+                    int ii = 0;
+                    result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+                    results = new VoltTable[] { new VoltTable(result_columns) };
+                }
+                results[0].addRow( "FAILURE", saveFileState.getConsistencyResult());
             }
         }
         if (results != null) {

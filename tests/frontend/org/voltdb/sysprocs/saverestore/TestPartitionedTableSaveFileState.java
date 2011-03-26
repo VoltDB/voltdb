@@ -92,6 +92,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
         }
         assertEquals(m_state.getTotalPartitions(), 4);
         assertTrue(m_state.isConsistent());
+        assertTrue(m_state.getConsistencyResult().
+                   contains("has consistent savefile state"));
 
         Set<Integer> partitions = m_state.getPartitionSet();
         assertEquals(partitions.size(), 4);
@@ -136,7 +138,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
             }
             catch (IOException e)
             {
-                assertTrue(true);
+                assertTrue(m_state.getConsistencyResult().
+                           contains("but has a savefile which indicates replication at site"));
                 return;
             }
         }
@@ -157,7 +160,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
             }
             catch (IOException e)
             {
-                assertTrue(true);
+                assertTrue(m_state.getConsistencyResult().
+                           contains("with an inconsistent number of total partitions"));
                 return;
             }
         }
@@ -183,6 +187,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
             }
         }
         assertFalse(m_state.isConsistent());
+        assertTrue(m_state.getConsistencyResult().
+                   contains("is missing 1 out of 3 total partitions"));
     }
 
     // Things to consider testing:

@@ -39,6 +39,7 @@ public abstract class TableSaveFileState
     TableSaveFileState(String tableName)
     {
         m_tableName = tableName;
+        m_consistencyResult = "Table: " + m_tableName + " not yet processed";
         m_planDependencyIds = new HashSet<Integer>();
     }
 
@@ -48,6 +49,11 @@ public abstract class TableSaveFileState
     String getTableName()
     {
         return m_tableName;
+    }
+
+    public String getConsistencyResult()
+    {
+        return m_consistencyResult;
     }
 
     abstract void addHostData(VoltTableRow row) throws IOException;
@@ -81,7 +87,8 @@ public abstract class TableSaveFileState
         return m_rootDependencyId;
     }
 
+    int m_rootDependencyId;
+    protected String m_consistencyResult;
     private final String m_tableName;
     private final Set<Integer> m_planDependencyIds;
-    int m_rootDependencyId;
 }
