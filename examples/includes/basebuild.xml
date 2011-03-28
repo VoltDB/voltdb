@@ -50,6 +50,9 @@
 <target name="default" depends="srccompile, proccompile, catalog, server"
         description="Compile and start server."/>
 
+<target name="build" depends="srccompile, proccompile, catalog"
+        description="Compile all code files and catalog."/>
+
 <target name="clean" description="Remove compilation artifacts">
     <delete includeemptydirs="true" failonerror='false'>
         <fileset dir="${build.dir}" includes="**/*" />
