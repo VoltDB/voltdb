@@ -1,0 +1,32 @@
+#!/usr/bin/expect -f
+
+# run this script from the trunk of the c++ client library directory
+
+# if no buildstring is specified, this doesn't check the version number
+if { $argc >= 0 } {
+  set buildstring [lindex $argv 0]
+}
+
+set timeout 150
+proc abort {} {
+  # temporary file cleanup goes here, if any
+  exit 1
+}
+
+cd ../../build-centos/trunk/examples/voter
+spawn ant catalog server
+set server_id $spawn_id
+expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
+expect -i $server_id eof abort timeout abort "Server completed initialization."
+# wait for server to really be ready
+sleep 1
+
+cd ../../../../cpp-clients/trunk
+spawn ./clientvoter
+set client_id $spawn_id
+# this app doesn't really do much
+expect -i $client_id eof abort timeout abort "Successfully connected and initialized the database."
+expect -i $client_id timeout abort eof
+
+close -i $server_id
+exit 0
