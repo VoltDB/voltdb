@@ -65,12 +65,14 @@ public class LatencyStats extends SiteStatsSource {
 
     /**
      * Latency buckets to store overall latency distribution. It's divided into
-     * 11 buckets, each stores 5ms latency range invocation info. The last
-     * bucket covers invocations with latencies larger than 50ms.
+     * 26 buckets, each stores 10ms latency range invocation info. The last
+     * bucket covers invocations with latencies larger than 250ms.
      */
-    private final long[] m_latencyBuckets = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l};
+    private final long[] m_latencyBuckets = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
+                                             0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
+                                             0l, 0l, 0l, 0l, 0l, 0l};
     private long m_max = (m_latencyBuckets.length - 1) * BUCKET_RANGE;
-    private static final long BUCKET_RANGE = 5; // 25ms
+    private static final long BUCKET_RANGE = 10; // 10ms
 
     public LatencyStats(String name, int siteId) {
         super(name, siteId, false);
