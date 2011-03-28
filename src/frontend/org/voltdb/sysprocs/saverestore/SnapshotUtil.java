@@ -132,7 +132,8 @@ public class SnapshotUtil {
         VoltFile directoryWithDigest = new VoltFile(path);
         ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
         for (File f : directoryWithDigest.listFiles()) {
-            if (f.getName().startsWith(nonce + "-host_") && f.getName().endsWith(".digest")) {
+            if ( f.getName().equals(nonce + ".digest") || //old style digest name
+                    (f.getName().startsWith(nonce + "-host_") && f.getName().endsWith(".digest"))) {//new style
                 digests.add(CRCCheck(f));
             }
         }
@@ -306,7 +307,8 @@ public class SnapshotUtil {
             }
 
             for (String snapshotName : snapshotNames) {
-                if (pathname.getName().startsWith(snapshotName + "-")) {
+                if (pathname.getName().startsWith(snapshotName + "-")  ||
+                        pathname.getName().equals(snapshotName + ".digest")) {
                     return true;
                 }
             }
