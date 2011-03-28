@@ -443,10 +443,10 @@ public class ExportManager
         }
     }
 
-    public void truncateExportToTxnId(long snapshotTxnId,
-            int correspondingPartitionId) {
+    public void truncateExportToTxnId(long snapshotTxnId) {
+        exportLog.info("Truncating export data after txnId " + snapshotTxnId);
         for (ExportGeneration generation : m_generations.get().values()) {
-            generation.truncateExportToTxnId( snapshotTxnId, correspondingPartitionId);
+            generation.truncateExportToTxnId( snapshotTxnId);
         }
     }
 }

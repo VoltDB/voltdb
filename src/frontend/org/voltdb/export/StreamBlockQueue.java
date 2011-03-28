@@ -20,6 +20,7 @@ import java.util.ArrayDeque;
 import java.util.Iterator;
 
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.PersistentBinaryDeque;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.VoltFile;
@@ -27,6 +28,7 @@ import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.DBBPool.BBContainer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * A customized queue for StreamBlocks that contain export data. The queue is able to
@@ -52,8 +54,11 @@ public class StreamBlockQueue {
      */
     private final BinaryDeque m_persistentDeque;
 
+    private final String m_nonce;
+
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path));
+        m_nonce = nonce;
     }
 
     public boolean isEmpty() throws IOException {
@@ -252,6 +257,7 @@ public class StreamBlockQueue {
 
     public void close() throws IOException {
         sync(true);
+        m_memoryDeque.clear();
         m_persistentDeque.close();
     }
 
@@ -264,7 +270,59 @@ public class StreamBlockQueue {
         }
     }
 
-    public void truncateToTxnId(long txnId) {
+    public void truncateToTxnId(final long txnId, final int nullArrayLength) throws IOException {
+        assert(m_memoryDeque.isEmpty());
+        m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
+        @Override
+        public ByteBuffer parse(ByteBuffer b) {
+            b.order(ByteOrder.LITTLE_ENDIAN);
+            try {
+                b.position(b.position() + 8);//Don't need the USO
+                while (b.hasRemaining()) {
+                    int rowLength = b.getInt();
+                    b.position(b.position() + nullArrayLength);
+                    long rowTxnId = b.getLong();
+                    exportLog.trace("Evaluating row with txnId " + rowTxnId + " for truncation");
+                    if (rowTxnId > txnId) {
+                        exportLog.debug(
+                                "Export stream " + m_nonce + " found export data to truncate at txn " + rowTxnId);
+                        //The txnid of this row is the greater then the truncation txnid.
+                        //Don't want this row, but want to preserve all rows before it.
+                        //Move back before the row length prefix and txnId
+                        b.position(b.position() - (12 + nullArrayLength));
+
+                        //If the truncation point was the first row in the block, the entire block is to be discard
+                        //We know it is the first row if the position before the row is after the uso (8 bytes)
+                        if (b.position() == 8) {
+                            return ByteBuffer.allocate(0);
+                        } else {
+                            //Return everything in the block before the truncation point.
+                            //Indicate this is the end of the interesting data.
+                            b.limit(b.position());
+                            b.position(0);
+                            return b;
+                        }
+                    } else {
+                        //Not the row we are looking to truncate at. Skip past it keeping in mind
+                        //we read the first 8 bytes for the txn id, and the null array which
+                        //is included in the length prefix
+                        b.position(b.position() + (rowLength - (8 + nullArrayLength)));
+                    }
+                }
+            } finally {
+                b.order(ByteOrder.BIG_ENDIAN);
+            }
+            return null;
+        }
+        });
+    }
+
+
+    @Override
+    public void finalize() {
+        if (!m_memoryDeque.isEmpty()) {
+            exportLog.error("Finalized StreamBlockQueue with items in the memory deque");
+        }
     }
 }

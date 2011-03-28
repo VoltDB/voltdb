@@ -30,6 +30,7 @@ import java.util.ArrayList;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -174,6 +175,39 @@ public class TestExportSuite extends RegressionSuite {
                 System.err.println(clientResponse.getException());
             }
         }
+    }
+
+    /**
+     * Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
+     * when the snapshot is restored
+     * @throws Exception
+     */
+    public void testExportSnapshotTruncatesExportData() throws Exception {
+        Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow( m_tester.m_generationsSeen.first(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
+        for (int i=10; i < 20; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        quiesce(client);
+
+        m_config.shutDown();
+        m_config.startUp(false);
+
+        client = getClient();
+
+        client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
+
+        // must still be able to verify the export data.
+        quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
     }
 
   //

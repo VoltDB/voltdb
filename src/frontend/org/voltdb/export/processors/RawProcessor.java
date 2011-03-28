@@ -438,6 +438,9 @@ public class RawProcessor implements ExportDataProcessor {
     }
 
     ExportDataSource getDataSourceFor(int partitionId, String signature) {
+        if (m_generation == null) {
+            return null;
+        }
         HashMap<String, ExportDataSource> partmap = m_generation.m_dataSourcesByPartition.get(partitionId);
         if (partmap == null) {
             return null;

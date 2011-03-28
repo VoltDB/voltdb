@@ -26,11 +26,13 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -62,6 +64,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
+
+    private int m_nullArrayLength;
 
     /**
      * Create a new data source.
@@ -135,7 +139,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         fos.write(fs.getBytes());
         fos.getFD().sync();
         fos.close();
-            }
+
+        // compute the number of bytes necessary to hold one bit per
+        // schema column
+        m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
+    }
 
     public ExportDataSource(Runnable onDrain, File adFile) throws IOException {
         /*
@@ -162,15 +170,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         int numColumns = fds.readInt();
         for (int ii=0; ii < numColumns; ++ii) {
             m_columnNames.add(fds.readString());
-            m_columnTypes.add(fds.readInt());
+            int columnType = fds.readInt();
+            m_columnTypes.add(columnType);
         }
 
         String nonce = m_signature + "_" + m_siteId + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
-        final StreamBlock sb = m_committedBuffers.peek();
-        if (sb != null) {
-            m_firstUnpolledUso = sb.uso();
-        }
+
+        // compute the number of bytes necessary to hold one bit per
+        // schema column
+        m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
     }
 
     private void resetPollMarker() throws IOException {
@@ -220,10 +229,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         //Assemble a list of blocks to delete so that they can be deleted
         //outside of the m_committedBuffers critical section
         ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
-
-        if (m_partitionId == 2 && m_tableName.equals("NO_NULLS")) {
-            System.out.println("Recevied " + m + " for no nulls");
-        }
 
         boolean hitEndOfStreamWithNoRunnable = false;
         try {
@@ -480,6 +485,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void truncateExportToTxnId(long txnId) {
-        m_committedBuffers.truncateToTxnId(txnId);
+        try {
+            synchronized (m_committedBuffers) {
+                m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
+                if (m_committedBuffers.isEmpty() && m_endOfStream) {
+                    try {
+                        m_onDrain.run();
+                    } finally {
+                        m_onDrain = null;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            exportLog.fatal(e);
+            VoltDB.crashVoltDB();
+        }
     }
 }

@@ -291,8 +291,12 @@ public class TestStreamBlockQueue {
         m_sbq.sync(true);
 
         m_sbq.close();
+        m_sbq = null;
+        System.gc();
+        System.runFinalization();
         m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE);
-
+        System.gc();
+        System.runFinalization();
         StreamBlock sb = null;
         long uso = 1024 * 1024 * 6;
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
@@ -310,7 +314,8 @@ public class TestStreamBlockQueue {
             }
             ii++;
         }
-
+        System.gc();
+        System.runFinalization();
         boolean threw = false;
         try {
             m_sbq.pop();
@@ -324,7 +329,8 @@ public class TestStreamBlockQueue {
         }
         assertEquals(m_sbq.sizeInBytes(), 0);
         assertTrue(m_sbq.isEmpty());
-
+        System.gc();
+        System.runFinalization();
     }
 
     /**

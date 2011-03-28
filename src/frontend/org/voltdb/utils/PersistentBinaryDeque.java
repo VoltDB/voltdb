@@ -20,7 +20,9 @@ import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
@@ -229,6 +231,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             return new BBContainer( resultBuffer, 0L) {
                 private boolean discarded = false;
+
+                private final Throwable t = new Throwable();
                 @Override
                 public void discard() {
                     if (!discarded) {
@@ -249,9 +253,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                 @Override
                 public void finalize() {
-                    if (!discarded) {
+                    if (!discarded && !m_closed) {
                         exportLog.error(m_file + " had a buffer that was finalized without being discarded");
-                        assert(false);
+                        StringWriter sw  = new StringWriter();
+                        PrintWriter pw = new PrintWriter(sw);
+                        t.printStackTrace(pw);
+                        exportLog.error(sw.toString());
                         discard();
                     }
                 }
@@ -313,6 +320,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
     //Index of the segment being polled
     private Long m_currentPollSegmentIndex = 0L;
 
+    private volatile boolean m_closed = false;
+
     /**
      * Create a persistent binary deque with the specified nonce and storage back at the specified path.
      * Existing files will
@@ -337,6 +346,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
             public boolean accept(File pathname) {
                 String name = pathname.getName();
                 if (name.startsWith(nonce) && name.endsWith(".pbd")) {
+                    if (pathname.length() == 4) {
+                        //Doesn't have any objects, just the object count
+                        pathname.delete();
+                        return false;
+                    }
                     Long index = Long.valueOf(name.substring( nonce.length() + 1, name.length() - 4));
                     DequeSegment ds = new DequeSegment( index, pathname);
                     m_finishedSegments.put( index, ds);
@@ -520,6 +534,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (DequeSegment segment : m_finishedSegments.values()) {
             segment.close();
         }
+        m_closed = true;
     }
 
     @Override
@@ -555,6 +570,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
+        if (m_finishedSegments.isEmpty()) {
+            exportLog.debug("PBD " + m_nonce + " has no finished segments");
+            return;
+        }
         //+16 because I am not sure if the max chunk size is enforced right
         ByteBuffer readBuffer = ByteBuffer.allocateDirect(DequeSegment.m_chunkSize + 16);
 
@@ -585,6 +604,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                 //Get the number of objects and then iterator over them
                 int numObjects = readBuffer.getInt();
+                exportLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
                 for (int ii = 0; ii < numObjects; ii++) {
                     final int nextObjectLength = readBuffer.getInt();
                     //Copy the next object into a separate heap byte buffer
@@ -663,6 +683,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         /*
+         * If it was found that no truncation is necessary, lastSegmentIndex will be null.
+         * Return and the parseAndTruncate is a noop.
+         */
+        if (lastSegmentIndex == null)  {
+            return;
+        }
+        /*
          * Now truncate all the segments after the truncation point
          */
         Iterator<Map.Entry<Long, DequeSegment>> iterator = m_finishedSegments.entrySet().iterator();
@@ -683,6 +710,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
          * Reset the poll and write segments
          */
         //Find the first and last segment for polling and writing (after)
+        m_currentPollSegmentIndex = 0L;
         Long writeSegmentIndex = 0L;
         try {
             m_currentPollSegmentIndex = m_finishedSegments.firstKey();
@@ -695,6 +723,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
         m_writeSegment.open();
         m_writeSegment.initNumEntries();
-
+        if (m_finishedSegments.isEmpty()) {
+            assert(m_writeSegment.m_index.equals(m_currentPollSegmentIndex));
+        }
     }
 }

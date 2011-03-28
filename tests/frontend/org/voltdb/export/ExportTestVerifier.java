@@ -73,6 +73,22 @@ class ExportTestVerifier extends ExportDecoderBase
 
         // no data found - an ERROR.
         if (srcdata == null) {
+            try {
+                Object[] decoded = decodeRow(rowData);
+                StringBuilder sb = new StringBuilder();
+                boolean first = true;
+                for (Object obj : decoded) {
+                    if (!first) {
+                        sb.append(", ");
+                    } else {
+                        first = false;
+                    }
+                    sb.append(obj);
+                }
+                System.out.println(sb);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             System.out.println("No source data. Rows remaining: " + m_data.size() +
                                " received: " + rowData.length + " bytes to verify.");
             m_rowFailed = true;

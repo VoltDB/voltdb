@@ -267,8 +267,16 @@ public class SnapshotRestore extends VoltSystemProcedure
             VoltTable result = new VoltTable(new VoltTable.ColumnInfo("RESULT", VoltType.STRING));
             long snapshotTxnId = ((Long)params.toArray()[1]).longValue();
 
+            // Choose the lowest site ID on this host to truncate export data
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
             ExportManager.instance().
-                truncateExportToTxnId(snapshotTxnId, context.getExecutionSite().getCorrespondingPartitionId());
+                truncateExportToTxnId(snapshotTxnId);
+            }
             try {
                 ByteArrayInputStream bais = new ByteArrayInputStream((byte[])params.toArray()[0]);
                 ObjectInputStream ois = new ObjectInputStream(bais);
@@ -1188,7 +1196,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             else
             {
-                if (table.getMaterializer() == null)
+                if (table.getMaterializer() == null && !CatalogUtil.isTableExportOnly(m_database, table))
                 {
                     HOST_LOG.info("Table: " + table.getTypeName() + " does not have " +
                                   "any savefile data and so will not be loaded " +
