@@ -3,6 +3,9 @@ if [ $# != 1 ]; then
     exit 1
 fi
 
+# check that the directory is empty
+ls * > /dev/null && exit 1
+
 OS=`uname -s | tr [a-z] [A-Z] | sed 's/DARWIN/MAC/'`
 
 rm -rf doc eng pro
