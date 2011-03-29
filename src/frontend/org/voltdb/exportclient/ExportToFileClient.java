@@ -124,7 +124,10 @@ public class ExportToFileClient extends ExportClientBase {
             m_lastWriterCreation = null;
             m_generation = generation;
             m_tableName = tableName;
-            m_sdf = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss:SSS:");
+            // ODBC Datetime Format
+            // if you need microseconds, you'll have to change this code or
+            //  export a bigint representing microseconds since an epoch
+            m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
             m_firstfield = firstfield;
 
             // Create the output file for this table
