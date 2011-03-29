@@ -354,9 +354,12 @@ public class ExportManager
     }
 
     public void shutdown() {
-        ExportDataProcessor proc = m_processor.get();
+        ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
             proc.shutdown();
+        }
+        for (ExportGeneration generation : m_generations.get().values()) {
+            generation.close();
         }
     }
 

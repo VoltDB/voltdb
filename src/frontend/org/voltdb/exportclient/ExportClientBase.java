@@ -156,6 +156,10 @@ public abstract class ExportClientBase {
             retval = new ExportConnection(m_username, m_password, addr, m_sinks);
             retval.openExportConnection();
 
+            if (!retval.isConnected()) {
+                return null;
+            }
+
             for (String hostname : retval.hosts) {
                 assert(hostname.contains(":"));
                 /*String[] parts = hostname.split(":");

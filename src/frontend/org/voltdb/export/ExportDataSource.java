@@ -501,4 +501,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             VoltDB.crashVoltDB();
         }
     }
+
+    public void close() {
+        synchronized(m_committedBuffers) {
+            try {
+                m_committedBuffers.close();
+            } catch (IOException e) {
+                exportLog.error(e);
+            }
+        }
+    }
 }

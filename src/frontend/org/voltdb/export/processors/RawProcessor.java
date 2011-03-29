@@ -490,7 +490,6 @@ public class RawProcessor implements ExportDataProcessor {
                 }
             }
             m_generation = null;
-            m_shouldContinue.set(true);
             m_thread = null;
         }
         if (m_currentConnection != null) {

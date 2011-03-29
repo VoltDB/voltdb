@@ -297,4 +297,12 @@ public class ExportGeneration {
             }
         }
     }
+
+    public void close() {
+        for (HashMap<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : sources.values()) {
+                source.close();
+            }
+        }
+    }
 }

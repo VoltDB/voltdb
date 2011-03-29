@@ -1142,6 +1142,8 @@ public class RealVoltDB implements VoltDBInterface
             // The network iterates this list. Clear it after network's done.
             m_clientInterfaces.clear();
 
+            ExportManager.instance().shutdown();
+
             // probably unnecessary
             System.gc();
             m_isRunning = false;
