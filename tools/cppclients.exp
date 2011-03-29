@@ -13,15 +13,22 @@ proc abort {} {
   exit 1
 }
 
-cd ../../build-centos/trunk/examples/voter
-spawn ant catalog server
-set server_id $spawn_id
-expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
-expect -i $server_id eof abort timeout abort "Server completed initialization."
-# wait for server to really be ready
-sleep 1
+proc start_server { buildstring } {
+  puts $buildstring
+  spawn ant catalog server
+  set id $spawn_id
+  expect -i $id eof abort timeout abort "INFO HOST: $buildstring"
+  expect -i $id eof abort timeout abort "Server completed initialization."
+  # wait for server to really be ready
+  sleep 1
+  return $id
+}
 
-cd ../../../../cpp-clients/trunk
+cd ../../build-centos/trunk/examples/voter
+set server_id [ start_server $buildstring ]
+cd ../../../../
+
+cd cpp-clients/trunk
 spawn ./clientvoter
 set client_id $spawn_id
 # this app doesn't really do much
@@ -29,4 +36,32 @@ expect -i $client_id eof abort timeout abort "Successfully connected and initial
 expect -i $client_id timeout abort eof
 
 close -i $server_id
+cd ../../
+
+cd build-centos/trunk/examples/helloworld
+set server_id [ start_server $buildstring ]
+cd ../../../../
+
+cd cpp-clients/trunk/HelloWorld
+spawn ./HelloWorld
+set client_id $spawn_id
+expect -i $client_id eof abort timeout abort "Column names: HELLO, WORLD"
+expect -i $client_id eof abort timeout abort "\"Hola\", \"Mundo\""
+expect -i $client_id timeout abort eof
+
+close -i $server_id
+cd ../../../
+
+cd build-centos/trunk/examples/helloworld
+set server_id [ start_server $buildstring ]
+cd ../../../../
+
+cd cpp-clients/trunk/AsyncHelloWorld
+spawn ./AsyncHelloWorld
+set client_id $spawn_id
+expect -i $client_id timeout abort eof
+
+close -i $server_id
+cd ../../../
+
 exit 0
