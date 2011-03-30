@@ -76,6 +76,9 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
     @Override
     public void testBadChangeAttributeTypes() {}
 
+    @Override
+    public void testRestore12Snapshot() {}
+
     /**
      * Build a list of the tests to be run. Use the regression suite
      * helpers to allow multiple back ends.
