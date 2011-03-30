@@ -54,7 +54,7 @@ public abstract class ExportDecoderBase {
      */
     abstract public boolean processRow(int rowSize, byte[] rowData);
 
-    abstract public void sourceNoLongerAdvertised();
+    abstract public void sourceNoLongerAdvertised(AdvertisedDataSource source);
 
     /**
      * Finalize operation upon block completion - provides a means for a

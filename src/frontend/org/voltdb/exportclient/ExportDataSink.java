@@ -25,6 +25,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 
 import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 
 /**
@@ -188,7 +189,7 @@ public class ExportDataSink {
         m_txQueues.clear();
     }
 
-    public void sourceNoLongerAdvertised() {
+    public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
         m_logger.debug("ExportDataSink generation " + m_generation +
                 " signature " + m_tableSignature + " partition " + partitionId + " is no longer advertised");
         /*
@@ -209,6 +210,6 @@ public class ExportDataSink {
         /*
          * Notify the decoder that no more data will come
          */
-        m_decoder.sourceNoLongerAdvertised();
+        m_decoder.sourceNoLongerAdvertised(source);
     }
 }

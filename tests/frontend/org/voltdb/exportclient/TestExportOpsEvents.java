@@ -47,7 +47,7 @@ public class TestExportOpsEvents extends TestCase {
                 return true;
             }
             @Override
-            public void sourceNoLongerAdvertised() {
+            public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
                 // TODO Auto-generated method stub
 
             }

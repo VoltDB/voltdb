@@ -47,7 +47,7 @@ public class TestExportDecoderBase extends TestCase
         }
 
         @Override
-        public void sourceNoLongerAdvertised() {
+        public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             // TODO Auto-generated method stub
 
         }
@@ -62,7 +62,11 @@ public class TestExportDecoderBase extends TestCase
      VoltType.BIGINT, VoltType.FLOAT, VoltType.TIMESTAMP,
      VoltType.STRING, VoltType.DECIMAL};
 
-    AdvertisedDataSource constructTestSource()
+    static AdvertisedDataSource constructTestSource() {
+        return constructTestSource(0);
+    }
+
+    static AdvertisedDataSource constructTestSource(int partition)
     {
         ArrayList<String> col_names = new ArrayList<String>();
         ArrayList<VoltType> col_types = new ArrayList<VoltType>();
@@ -72,7 +76,7 @@ public class TestExportDecoderBase extends TestCase
             col_types.add(COLUMN_TYPES[i]);
         }
         AdvertisedDataSource source =
-            new AdvertisedDataSource(0, "foo", "yankeelover", 0, 32,
+            new AdvertisedDataSource(partition, "foo", "yankeelover", 0, 32,
                                      col_names, col_types);
         return source;
     }

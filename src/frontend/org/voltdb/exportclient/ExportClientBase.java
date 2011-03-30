@@ -306,7 +306,7 @@ public abstract class ExportClientBase {
             if (gen_map.isEmpty()) {
                 m_sinks.remove(source.m_generation);
             }
-            sink.sourceNoLongerAdvertised();
+            sink.sourceNoLongerAdvertised(source);
         }
         m_knownDataSources.clear();
         m_knownDataSources.addAll(foundSources);

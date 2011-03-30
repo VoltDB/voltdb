@@ -47,7 +47,7 @@ public class TestExportDataSink extends TestCase {
         }
 
         @Override
-        public void sourceNoLongerAdvertised() {
+        public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             // TODO Auto-generated method stub
 
         }

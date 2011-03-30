@@ -26,6 +26,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
@@ -73,6 +74,7 @@ public class ExportToFileClient extends ExportClientBase {
         protected final int m_firstfield;
         private final long m_generation;
         private final String m_tableName;
+        private final HashSet<AdvertisedDataSource> m_sources = new HashSet<AdvertisedDataSource>();
 
         private void EnsureFileStream() {
 
@@ -218,20 +220,25 @@ public class ExportToFileClient extends ExportClientBase {
         }
 
         @Override
-        public void sourceNoLongerAdvertised() {
-            if (m_Writer != null) {
-                try {
-                    m_Writer.flush();
-                    m_Writer.close();
-                } catch (Exception e) {
-                    m_logger.error(e.getMessage());
-                    throw new RuntimeException();
+        public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
+            m_sources.remove(source);
+            if (m_sources.isEmpty()) {
+                if (m_Writer != null) {
+                    try {
+                        m_Writer.flush();
+                        m_Writer.close();
+                    } catch (Exception e) {
+                        m_logger.error(e.getMessage());
+                        throw new RuntimeException();
+                    }
                 }
-            }
-            HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
-            decoders.remove(m_tableName);
-            if (decoders.isEmpty()) {
-                m_tableDecoders.remove(m_generation);
+                HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
+                if (decoders != null) {
+                    decoders.remove(m_tableName);
+                    if (decoders.isEmpty()) {
+                        m_tableDecoders.remove(m_generation);
+                    }
+                }
             }
         }
 
@@ -255,7 +262,7 @@ public class ExportToFileClient extends ExportClientBase {
     }
 
     @Override
-    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
+    public ExportToFileDecoder constructExportDecoder(AdvertisedDataSource source) {
         // For every source that provides part of a table, use the same
         // export decoder.
         String table_name = source.tableName;
@@ -264,10 +271,13 @@ public class ExportToFileClient extends ExportClientBase {
             decoders = new HashMap<String, ExportToFileDecoder>();
             m_tableDecoders.put(source.m_generation, decoders);
         }
-        if (!decoders.containsKey(table_name)) {
-            decoders.put(table_name, new ExportToFileDecoder(source, table_name, m_nonce, m_outDir, m_escaper,
-                    m_period, m_dateformat, m_firstfield, source.m_generation));
+        ExportToFileDecoder decoder = decoders.get(table_name);
+        if (decoder == null) {
+            decoder = new ExportToFileDecoder(source, table_name, m_nonce, m_outDir, m_escaper,
+                    m_period, m_dateformat, m_firstfield, source.m_generation);
+            decoders.put(table_name, decoder);
         }
+        decoder.m_sources.add(source);
         return decoders.get(table_name);
     }
 

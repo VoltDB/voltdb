@@ -704,7 +704,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             }
 
             @Override
-            public void sourceNoLongerAdvertised() {
+            public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
                 // TODO Auto-generated method stub
 
             }
