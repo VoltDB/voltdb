@@ -1,6 +1,13 @@
+#!/bin/sh
+
 if [ $# != 1 ]; then
     echo "usage: $0 <tag>"
     exit 1
+fi
+
+TAG=$1
+if [ $1 != "trunk" ]; then
+    TAG=tags/${TAG}
 fi
 
 # check that the directory is empty
@@ -10,9 +17,9 @@ OS=`uname -s | tr [a-z] [A-Z] | sed 's/DARWIN/MAC/'`
 
 rm -rf doc eng pro
 
-svn co https://svn.voltdb.com/doc/tags/$1 doc
-svn co https://svn.voltdb.com/eng/tags/$1 eng
-svn co https://svn.voltdb.com/pro/tags/$1 pro
+svn co https://svn.voltdb.com/doc/$TAG doc
+svn co https://svn.voltdb.com/eng/$TAG eng
+svn co https://svn.voltdb.com/pro/$TAG pro
 
 mkdir -p ~/releases/`cat eng/version.txt`
 cd eng
