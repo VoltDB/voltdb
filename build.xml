@@ -704,6 +704,13 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
+    <!-- Compressed resources for tests -->
+    <copy flatten='false' todir='${build.test.dir}'>
+        <fileset dir="${src.test.dir}">
+            <include name="**/*.tar.gz"/>
+        </fileset>
+    </copy>
+
     <!-- copy file containing workloads for voltdbfat.jar -->
     <copy flatten='false' todir='${build.test.dir}'>
         <fileset dir="${src.test.dir}">
