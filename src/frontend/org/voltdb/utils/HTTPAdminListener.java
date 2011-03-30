@@ -138,10 +138,12 @@ public class HTTPAdminListener {
 
                 // get memory usage
                 SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
-                double used = d.rss / (double) SystemStatsCollector.memorysize;
+                double totalmemory = SystemStatsCollector.memorysize;
+                double used = d.rss / (double) (SystemStatsCollector.memorysize * 1024 * 1024);
+                double javaclaimed = d.javatotalheapmem + d.javatotalsysmem;
                 double javaused = d.javausedheapmem + d.javausedsysmem;
-                double javaunused = d.javatotalheapmem + d.javatotalsysmem - javaused;
-                double risk = (d.rss + javaunused) / SystemStatsCollector.memorysize;
+                double javaunused = SystemStatsCollector.javamaxheapmem - d.javatotalheapmem;
+                double risk = (d.rss + javaunused) / (SystemStatsCollector.memorysize * 1024 * 1024);
 
                 // get csvfilename
                 String csvFilename = String.format("memstats-%s-%s.csv", hostname, new Date(System.currentTimeMillis()).toString());
@@ -160,11 +162,13 @@ public class HTTPAdminListener {
                 params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
                 params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
 
+                params.put("totalmemory", String.format("%.1f", totalmemory));
                 params.put("used", String.format("%.1f", used * 100.0));
                 params.put("risk", String.format("%.1f", risk * 100.0));
                 params.put("rss", String.format("%.1f", d.rss / 1024.0 / 1024.0));
-                params.put("java", String.format("%.1f", javaused / 1024.0 / 1024.0));
-                params.put("unusedjava", String.format("%.1f", javaunused / 1024.0 / 1024.0));
+                params.put("usedjava", String.format("%.1f", javaused / 1024.0 / 1024.0));
+                params.put("claimedjava", String.format("%.1f", javaclaimed / 1024.0 / 1024.0));
+                params.put("javamaxheap", String.format("%.1f", SystemStatsCollector.javamaxheapmem / 1024.0 / 1024.0));
 
                 String msg = getHTMLForAdminPage(params);
 

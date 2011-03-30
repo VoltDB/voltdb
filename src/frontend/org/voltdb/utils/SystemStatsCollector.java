@@ -282,6 +282,8 @@ public class SystemStatsCollector {
      * best way to get the RSS on an ongoing basis.
      */
     private static synchronized void initialize() {
+        PlatformProperties pp = PlatformProperties.getPlatformProperties();
+
         String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
         String pidString = processName.substring(0, processName.indexOf('@'));
         pid = Integer.valueOf(pidString);
@@ -292,9 +294,7 @@ public class SystemStatsCollector {
         assert(psdata.rss > 0);
 
         // figure out how much memory this thing has
-        long memorysizeTemp = Math.round(psdata.rss / psdata.pmem / 1024 / 1024 / 1024);
-        memorysizeTemp *= 1024 * 1024 * 1024;
-        memorysize = memorysizeTemp;
+        memorysize = pp.ramInMegabytes;
 
         // now try to figure out the best way to get the rss size
         long rss = -1;
@@ -437,8 +437,8 @@ public class SystemStatsCollector {
         for (Datum d : history) {
             if (d.timestamp < cropts) continue;
 
-            double javaused = d.javausedheapmem + d.javausedsysmem;
-            double javaunused = d.javatotalheapmem + d.javatotalsysmem - javaused;
+            double javaused = d.javatotalheapmem + d.javatotalsysmem;
+            double javaunused = SystemStatsCollector.javamaxheapmem - d.javatotalheapmem;
             javaused /= 1204 * 1024;
             javaunused /= 1204 * 1024;
             double rss = d.rss / 1024 / 1024;

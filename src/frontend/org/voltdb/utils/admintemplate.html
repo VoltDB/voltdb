@@ -30,11 +30,13 @@
 <td>
 Stats:
 <ul>
+<li>System has #TOTALMEMORY# mb of memory.</li>
 <li>Using #USED#% of system memory for VoltDB</li>
 <li>#RISK#% of system memory has been reserved for VoltDB</li>
 <li>Rss: #RSS#mb</li>
-<li>Java: #JAVA#mb</li>
-<li>Unused Java #UNUSEDJAVA#mb</li>
+<li>Java Max Heap #JAVAMAXHEAP#mb</li>
+<li>Java Used: #USEDJAVA#mb</li>
+<li>Java Claimed: #CLAIMEDJAVA#mb</li>
 </ul>
 <table border='0' width='100%'><tr><td>
 <a href='/memorycsv/#CSVFILENAME#'>Download Data (CSV)</a>
@@ -47,9 +49,9 @@ Format:
 timestamp (ms since epoch),<br/>
 rss (bytes),<br/>
 usedajavaheap (bytes),<br/>
-totaljavaheap (bytes),<br/>
+claimedjavaheap (bytes),<br/>
 usedjavasys (bytes),<br/>
-totaljavasys (bytes),<br/>
+claimedjavasys (bytes),<br/>
 maxjavaheap (bytes)</small>
 </td>
 </tr></table>
@@ -81,8 +83,9 @@ maxjavaheap (bytes)</small>
 Chart Explanation:
 <ul>
 <li>The pink area is the memory used by the JVM.</li>
-<li>The red area is the RSS for the process and includes the JVM memory usage.</li>
-<li>The dotted yellow line represents the amount of memory reserved for the JVM, but not yet claimed by the JVM.<br/>
+<li>The red area is the RSS used by VoltDB outside of the JVM, but within the process.</li>
+<li>Note the red and pink areas are stacked, and together represent RSS.</li>
+<li>The dotted yellow line represents the amount of memory reserved for the JVM (including memory reserved but unused), plus non-Java memory in use by VoltDB.<br/>
 If the JVM were to use all of the memory it was permitted to use, the RSS would reach the yellow line.</li>
 </ul>
 </small>
