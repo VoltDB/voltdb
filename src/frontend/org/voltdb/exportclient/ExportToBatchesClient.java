@@ -27,9 +27,12 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
@@ -53,7 +56,10 @@ import org.voltdb.utils.DelimitedDataWriterUtil.DelimitedDataWriter;
 public class ExportToBatchesClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportToFileClient");
 
+    // These get put in from of the batch folders
+    // active means the folder is being written to
     private static final String ACTIVE_PREFIX = "active-";
+    // dirty is rare, but means the folder wasn't cleanly closed
     private static final String DIRTY_PREFIX = "dirty-";
 
     // ODBC Datetime Format
@@ -61,24 +67,40 @@ public class ExportToBatchesClient extends ExportClientBase {
     //  export a bigint representing microseconds since an epoch
     protected final SimpleDateFormat m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
+    // Batches only supports CSV
     protected final DelimitedDataWriter m_escaper = new CSVWriter();
     protected final String m_nonce;
+
+    // outDir is the folder that will contain the batch folders
     protected final File m_outDir;
+    // the set of active decoders
     protected final HashMap<Long, HashMap<String, ExportToBatchDecoder>> m_tableDecoders;
+    // how often to roll batches
     protected final int m_period;
 
+    // whether to skip the initial metadata in the output
     protected final int m_firstfield;
+    // timer used to roll batches
     protected final Timer m_timer = new Timer();
 
+    /**
+     * Represents all of the export data (and accompanying schema)
+     * for the export client for the specified rolling period.
+     *
+     * Each instance is responsible for a single dated folder of
+     * export data.
+     *
+     */
     static class ExportBatch {
         protected final static SimpleDateFormat m_dateformat = new SimpleDateFormat("yyyyMMddHHmmss");
         static private ExportBatch m_current = null;
 
-        final String pathToDirectory;
-        final String nonce;
-        final Date start;
-        Date end = null;
-        HashSet<ExportToBatchDecoder> m_decoders = new HashSet<ExportToBatchDecoder>();
+        protected final String pathToDirectory;
+        protected final String nonce;
+        protected final Date start;
+        protected Date end = null;
+        protected HashSet<ExportToBatchDecoder> m_decoders = new HashSet<ExportToBatchDecoder>();
+        protected final Set<String> m_schemasWritten = new HashSet<String>();
 
         HashMap<String, BufferedWriter> m_writers = new HashMap<String, BufferedWriter>();
         boolean m_hasClosed = false;
@@ -94,7 +116,7 @@ public class ExportToBatchesClient extends ExportClientBase {
             this.nonce = nonce;
 
             File dirForBatch = new File(getDirPath(ACTIVE_PREFIX));
-            System.out.printf("Creating dir for batch at %s\n", dirForBatch.getPath());
+            m_logger.trace(String.format("Creating dir for batch at %s", dirForBatch.getPath()));
             boolean created = dirForBatch.mkdirs();
             assert(created);
         }
@@ -108,14 +130,24 @@ public class ExportToBatchesClient extends ExportClientBase {
             return m_current;
         }
 
+        /**
+         * Deprecate the current batch and create a new one. The old one will still
+         * be active until all writers have finished writing their current blocks
+         * to it.
+         */
         synchronized static void roll(Date rollTime) {
-            System.out.println("Rolling batch.");
+            m_logger.trace("Rolling batch.");
             m_current.end = rollTime;
             if (m_current.m_decoders.size() == 0)
                 m_current.closeAllWriters(true);
             m_current = new ExportBatch(m_current.pathToDirectory, m_current.nonce, rollTime);
         }
 
+        /**
+         * Release a hold on the batch. When all holds are done
+         * and the roll time has passed, the batch can move out
+         * of the active state.
+         */
         void decref(ExportToBatchDecoder decoder) {
             synchronized (getClass()) {
                 m_decoders.remove(decoder);
@@ -125,6 +157,17 @@ public class ExportToBatchesClient extends ExportClientBase {
             }
         }
 
+        /**
+         * Flush and close all active writers, allowing the batch to
+         * move from the active state into the finished state. This is
+         * done as part of the roll process, or as part of the
+         * unexpected shutdown process.
+         *
+         * Note this method is idempotent.
+         *
+         * @param clean True if we expect all writer have finished. False
+         * if we just need to be done.
+         */
         private void closeAllWriters(boolean clean) {
             // only need to run this once per batch
             if (m_hasClosed)
@@ -150,7 +193,7 @@ public class ExportToBatchesClient extends ExportClientBase {
             m_hasClosed = true;
 
             // rename the file appropriately
-            System.out.println("Renaming batch.");
+            m_logger.trace("Renaming batch.");
 
             String oldPath = getDirPath(ACTIVE_PREFIX);
             String newPath = clean ? getDirPath("") : getDirPath(DIRTY_PREFIX);
@@ -188,6 +231,31 @@ public class ExportToBatchesClient extends ExportClientBase {
             return writer;
         }
 
+        void writeSchema(String filename, String schema) {
+            // only write the schema once per batch
+            if (m_schemasWritten.contains(filename))
+                return;
+            String path = getDirPath(ACTIVE_PREFIX) + File.separator + filename;
+            File newFile = new File(path);
+            try {
+                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, true), "UTF-8");
+                BufferedWriter writer = new BufferedWriter(osw, 1048576);
+                writer.write(schema);
+                writer.flush();
+                writer.close();
+                m_schemasWritten.add(filename);
+            } catch (Exception e) {
+                m_logger.error(e.getMessage());
+                m_logger.error("Error: Failed to create output file: " + path);
+                throw new RuntimeException();
+            }
+        }
+
+        /**
+         * Try to ensure file descriptors are closed.
+         * This probably only really is useful for the crl-c case.
+         * Still, it's not very well tested.
+         */
         @Override
         protected void finalize() throws Throwable {
             synchronized (getClass()) {
@@ -197,19 +265,15 @@ public class ExportToBatchesClient extends ExportClientBase {
         }
     }
 
-    class BatchRoll extends TimerTask {
-        @Override
-        public void run() {
-            ExportBatch.roll(new Date());
-        }
-    }
-
-    // This class outputs exported rows converted to CSV or TSV values
-    // for the table named in the constructor's AdvertisedDataSource
+    /**
+     * This class outputs, using the ExportBatch class, exported rows
+     * converted to CSV for the table named in the constructor's AdvertisedDataSource
+     */
     class ExportToBatchDecoder extends ExportDecoderBase {
         protected String m_filename;
         private final long m_generation;
         private final String m_tableName;
+        protected String m_schemaString = "ERROR SERIALIZING SCHEMA";
 
         // transient per-block state
         protected ExportBatch m_batch = null;
@@ -221,12 +285,46 @@ public class ExportToBatchesClient extends ExportClientBase {
             m_tableName = tableName;
             // Create the output file for this table
             m_filename = source.tableName + "-" + String.valueOf(m_generation) + "." + m_escaper.getExtension();
+
+            setSchemaForSource(source);
+        }
+
+        /**
+         * Given the data source, construct a JSON serialization
+         * of its schema to be written to disk with the export
+         * data.
+         */
+        void setSchemaForSource(AdvertisedDataSource source) {
+            try {
+                JSONStringer json = new JSONStringer();
+                json.object();
+                json.key("table name").value(source.tableName);
+                json.key("generation id").value(source.m_generation);
+                json.key("columns").array();
+
+                for (int i = 0; i < source.columnNames.size(); i++) {
+                    json.object();
+                    json.key("name").value(source.columnNames.get(i));
+                    json.key("type").value(source.columnTypes.get(i).name());
+                    json.endObject();
+                }
+
+                json.endArray();
+                json.endObject();
+
+                // get the json string
+                m_schemaString = json.toString();
+                // the next two lines pretty print the json string
+                JSONObject jsonObj = new JSONObject(m_schemaString);
+                m_schemaString = jsonObj.toString(4);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
         public boolean processRow(int rowSize, byte[] rowData) {
-            System.out.println("Processing a row");
-
             // Grab the data row
             Object[] row = null;
             try {
@@ -262,6 +360,10 @@ public class ExportToBatchesClient extends ExportClientBase {
             return true;
         }
 
+        /**
+         * Get and hold the current batch folder.
+         * Ask the batch object for a stream to write to.
+         */
         @Override
         public void onBlockStart() {
             // get the current batch
@@ -276,8 +378,14 @@ public class ExportToBatchesClient extends ExportClientBase {
                 m_logger.error("NULL writer object from batch.");
                 throw new RuntimeException("NULL writer object from batch.");
             }
+
+            String schemaPath = m_tableName + "-" + String.valueOf(m_generation) + "-schema.json";
+            m_batch.writeSchema(schemaPath, m_schemaString);
         }
 
+        /**
+         * Release the current batch folder.
+         */
         @Override
         public void onBlockCompletion() {
             try {
@@ -367,6 +475,7 @@ public class ExportToBatchesClient extends ExportClientBase {
         m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
     }
 
+
     protected static void printHelpAndQuit(int code) {
         System.out
                 .println("java -cp <classpath> org.voltdb.exportclient.ExportToSqClient "
@@ -384,6 +493,12 @@ public class ExportToBatchesClient extends ExportClientBase {
         System.exit(code);
     }
 
+    /**
+     * Get the decoder for the table described by source and add this partition
+     * to it, creating a decoder if necessary.
+     *
+     * @param source AdvertisedDataSource sent over the wire to this client.
+     */
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         // For every source that provides part of a table, use the same
@@ -551,10 +666,5 @@ public class ExportToBatchesClient extends ExportClientBase {
             e.printStackTrace();
             System.exit(-1);
         }
-    }
-
-    @Override
-    public void run() throws ExportClientException {
-        super.run();
     }
 }
