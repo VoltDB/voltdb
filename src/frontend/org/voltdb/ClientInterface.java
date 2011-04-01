@@ -268,7 +268,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                     }
                     catch (IOException ioe)
                     {
-                        if (ioe.getMessage().contains("Too many open files"))
+                        if (ioe.getMessage() != null &&
+                            ioe.getMessage().contains("Too many open files"))
                         {
                             networkLog.warn("Rejected accepting new connection due to too many open files");
                             continue;
