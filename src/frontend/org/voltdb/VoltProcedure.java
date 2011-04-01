@@ -1403,10 +1403,8 @@ public abstract class VoltProcedure {
     private ClientResponseImpl getErrorResponse(byte status, String msg, SerializableException e) {
 
         StringBuilder msgOut = new StringBuilder();
-        msgOut.append("\n===============================================================================\n");
         msgOut.append("VOLTDB ERROR: ");
         msgOut.append(msg);
-        msgOut.append("\n===============================================================================\n");
 
         log.trace(msgOut);
 
