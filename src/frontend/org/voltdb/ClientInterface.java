@@ -261,7 +261,23 @@ public class ClientInterface implements DumpManager.Dumpable {
         public void run() {
             try {
                 do {
-                    final SocketChannel socket = m_serverSocket.accept();
+                    final SocketChannel socket;
+                    try
+                    {
+                        socket = m_serverSocket.accept();
+                    }
+                    catch (IOException ioe)
+                    {
+                        if (ioe.getMessage().contains("Too many open files"))
+                        {
+                            networkLog.warn("Rejected accepting new connection due to too many open files");
+                            continue;
+                        }
+                        else
+                        {
+                            throw ioe;
+                        }
+                    }
 
                     /*
                      * Enforce a limit on the maximum number of connections
