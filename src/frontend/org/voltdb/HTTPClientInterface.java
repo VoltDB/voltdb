@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet_voltpatches.http.HttpServletResponse;
 
@@ -40,6 +41,7 @@ public class HTTPClientInterface {
     AuthenticatedConnectionCache m_connections = null;
     MessageDigest m_md = null;
     static final int CACHE_TARGET_SIZE = 10;
+    private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
     class JSONProcCallback implements ProcedureCallback {
 
@@ -99,6 +101,16 @@ public class HTTPClientInterface {
         continuation.suspend(response);
 
         try {
+            // first check for a catalog update and purge the cached connections
+            // if one has happened since we were here last
+            if (m_shouldUpdateCatalog.compareAndSet(true, false))
+            {
+                m_connections.closeAll();
+                // Just null the old object so we'll create a new one with
+                // updated state below
+                m_connections = null;
+            }
+
             if (m_connections == null) {
                 int port = VoltDB.instance().getConfig().m_port;
                 int adminPort = VoltDB.instance().getConfig().m_adminPort;
@@ -220,5 +232,10 @@ public class HTTPClientInterface {
                 }
             }
         }
+    }
+
+    public void notifyOfCatalogUpdate()
+    {
+        m_shouldUpdateCatalog.set(true);
     }
 }

@@ -461,7 +461,7 @@ public class TestJSONInterface extends TestCase {
         String simpleSchema =
             "CREATE TABLE HELLOWORLD (\n" +
             "    HELLO VARCHAR(15),\n" +
-            "    WORLD VARCHAR(15),\n" +
+            "    WORLD VARCHAR(20),\n" +
             "    DIALECT VARCHAR(15) NOT NULL,\n" +
             "    PRIMARY KEY (DIALECT)\n" +
             ");";
@@ -559,6 +559,48 @@ public class TestJSONInterface extends TestCase {
         response = callProcOverJSONRaw(varString, 200);
         r = responseFromJSON(response);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+
+        // ENG-963 below here
+        // do enough to get a new deployment file
+        VoltProjectBuilder builder2 = new VoltProjectBuilder();
+        builder2.addSchema(schemaPath);
+        builder2.addPartitionInfo("HELLOWORLD", "DIALECT");
+
+        // Same groups
+        builder2.addGroups(new GroupInfo[] { gi } );
+
+        // create same 15 users, hack the last 14 passwords
+        ui = new UserInfo[15];
+        ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[] { "foo" } );
+        for (int i = 1; i < ui.length; i++) {
+            ui[i] = new UserInfo("USER" + String.valueOf(i),
+                                 "welcomehackers" + String.valueOf(i),
+                                 new String[] { "foo" } );
+        }
+        builder2.addUsers(ui);
+
+        builder2.setSecurityEnabled(true);
+        builder2.addProcedures(pi);
+        builder2.setHTTPDPort(8095);
+
+        success = builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar"));
+        assertTrue(success);
+
+        pset = new ParameterSet();
+        pset.setParameters(config.m_pathToCatalog, builder2.getPathToDeployment());
+        response = callProcOverJSON("@UpdateApplicationCatalog", pset,
+                                    ui[0].name, ui[0].password, true);
+        r = responseFromJSON(response);
+        assertEquals(ClientResponse.SUCCESS, r.status);
+
+        // retest the good auths above
+        for (UserInfo user : ui) {
+            ParameterSet ps = new ParameterSet();
+            ps.setParameters(user.name + "-X3", user.password + "-X3", user.name + "-X3");
+            String respstr = callProcOverJSON("Insert", ps, user.name, user.password, false);
+            Response resp = responseFromJSON(respstr);
+            assertEquals(ClientResponse.SUCCESS, resp.status);
+        }
 
         server.shutdown();
         server.join();

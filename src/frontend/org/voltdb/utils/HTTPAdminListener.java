@@ -260,4 +260,9 @@ public class HTTPAdminListener {
         try { m_server.destroy(); } catch (Exception e2) {}
         m_server = null;
     }
+
+    public void notifyOfCatalogUpdate()
+    {
+        httpClientInterface.notifyOfCatalogUpdate();
+    }
 }

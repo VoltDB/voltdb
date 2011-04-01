@@ -130,7 +130,7 @@ public class VoltProjectBuilder {
 
     public static final class UserInfo {
         public final String name;
-        public final String password;
+        public String password;
         private final String groups[];
 
         public UserInfo (final String name, final String password, final String groups[]){

@@ -160,6 +160,26 @@ public class AuthenticatedConnectionCache {
         attemptToShrinkPoolIfNeeded();
     }
 
+    public synchronized void closeAll()
+    {
+        if (m_unauthClient != null)
+        {
+            try {
+                m_unauthClient.close();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException("Unable to close unauthenticated client.", ex);
+            }
+        }
+        for (Entry<String, Connection> e : m_connections.entrySet())
+        {
+            try {
+                e.getValue().client.close();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException("Unable to close client from pool.", ex);
+            }
+        }
+    }
+
     /**
      * If the size of the pool > target size, see if any
      * connections can be closed and removed.
