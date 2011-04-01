@@ -49,6 +49,7 @@ public class TestAdminMode extends RegressionSuite
         builder.addPartitionInfo("T", "A1");
         builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
         builder.addStmtProcedure("CountA", "SELECT COUNT(*) FROM T");
+        builder.addStmtProcedure("SelectA", "SELECT * FROM T");
         return builder;
     }
 
@@ -174,9 +175,10 @@ public class TestAdminMode extends RegressionSuite
             results = adminclient.callProcedure("@Resume").getResults();
             System.out.println(results[0].toString());
             // queue up a bunch of invocations but don't read the responses
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 1000; i++)
             {
-                ConnectionUtil.sendInvocation(channel, "InsertA", i, 10000 + i);
+                ConnectionUtil.sendInvocation(channel, "InsertA", i, 1000 + i);
+                ConnectionUtil.sendInvocation(channel, "SelectA");
             }
             results = adminclient.callProcedure("@Statistics",
                                                 "LIVECLIENTS",
@@ -189,16 +191,17 @@ public class TestAdminMode extends RegressionSuite
             assertTrue((results[0].getLong("OUTSTANDING_RESPONSE_MESSAGES") +
                         results[0].getLong("OUTSTANDING_TRANSACTIONS")) > 0);
             Thread.sleep(6000);
-            channel.close();
+            // ENG-998 - get rid of the channel.close() here and force
+            // Volt to kill the misbehaving connection itself.
             // make sure there's only one connection in the list
+            // Check the proper results below
             results = adminclient.callProcedure("@Statistics",
                                                 "LIVECLIENTS",
                                                 0).getResults();
-            // Izzy told me to comment out the two below assertions
-            //assertEquals(1, results[0].getRowCount());
-            results[0].advanceRow();
-            //assertEquals(1, results[0].getLong("ADMIN"));
             System.out.println(results[0].toString());
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong("ADMIN"));
         }
         finally {
             channel.close();
