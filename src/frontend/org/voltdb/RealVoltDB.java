@@ -1169,7 +1169,8 @@ public class RealVoltDB implements VoltDBInterface
         else if (currentTxnId < lastNodeRejoinPrepare_txnId) {
             throw new RuntimeException("Trying to rejoin (prepare) with an old transaction.");
         }
-        System.out.printf("Rejoining node with host id: %d at txnid: %d\n", rejoinHostId, currentTxnId);
+        recoveryLog.info("Rejoining node with host id: " + rejoinHostId +
+                         " at txnid: " + currentTxnId);
         lastNodeRejoinPrepare_txnId = currentTxnId;
 
         HostMessenger messenger = getHostMessenger();
@@ -1200,7 +1201,8 @@ public class RealVoltDB implements VoltDBInterface
         else if (currentTxnId < lastNodeRejoinFinish_txnId) {
             throw new RuntimeException("Trying to rejoin (commit/rollback) with an old transaction.");
         }
-        System.out.printf("Rejoining commit node with txnid: %d lastNodeRejoinFinish_txnId: %d\n", currentTxnId, lastNodeRejoinFinish_txnId);
+        recoveryLog.info("Rejoining commit node with txnid: " + currentTxnId +
+                         " lastNodeRejoinFinish_txnId: " + lastNodeRejoinFinish_txnId);
         HostMessenger messenger = getHostMessenger();
         if (commit) {
             // put the foreign host into the set of active ones
@@ -1265,7 +1267,7 @@ public class RealVoltDB implements VoltDBInterface
             // clean up any connections made
             messenger.rejoinForeignHostRollback();
         }
-        System.out.printf("Setting lastNodeRejoinFinish_txnId to: %d\n", currentTxnId);
+        recoveryLog.info("Setting lastNodeRejoinFinish_txnId to: " + currentTxnId);
         lastNodeRejoinFinish_txnId = currentTxnId;
 
         return null;

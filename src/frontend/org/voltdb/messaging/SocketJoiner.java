@@ -571,7 +571,7 @@ public class SocketJoiner extends Thread {
                 if (hostsFound == null) {
                     hostsFound = hosts;
                     m_expectedHosts = hostsFound.size() + 1;
-                    System.out.println(hostsFound.toString());
+                    recoveryLog.info("Hosts found: " + hostsFound.toString());
                 } else if (!hostsFound.equals(hosts)) {
                     recoveryLog.fatal("Inconsistent live host set during rejoin");
                     VoltDB.crashVoltDB();
@@ -809,7 +809,7 @@ public class SocketJoiner extends Thread {
 
             // read the confirmation command
             long maxDiffMS = in.readLong();
-            System.out.printf("Re-joining node reports %d ms skew.\n", maxDiffMS);
+            recoveryLog.info("Re-joining node reports " + maxDiffMS + " ms skew.");
             command = in.readInt();
             if (command == COMMAND_COMPLETE)
                 return remoteConnection;
