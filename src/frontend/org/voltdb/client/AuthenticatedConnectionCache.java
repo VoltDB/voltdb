@@ -82,15 +82,27 @@ public class AuthenticatedConnectionCache {
         // ADMIN MODE
         if (admin) {
             ClientImpl adminClient = null;
-            adminClient = (ClientImpl) ClientFactory.createClient();
-            if ((userName == null) || (userName == "")) {
-                if ((hashedPassword != null) && (hashedPassword.length > 0)) {
-                    throw new IOException("Username was null but password was not.");
+            try
+            {
+                adminClient = (ClientImpl) ClientFactory.createClient();
+                if ((userName == null) || (userName == "")) {
+                    if ((hashedPassword != null) && (hashedPassword.length > 0)) {
+                        throw new IOException("Username was null but password was not.");
+                    }
+                    adminClient.createConnection(m_hostname, m_adminPort);
                 }
-                adminClient.createConnection(m_hostname, m_adminPort);
+                else {
+                    adminClient.createConnectionWithHashedCredentials(m_hostname, m_adminPort, userName, hashedPassword);
+                }
             }
-            else {
-                adminClient.createConnectionWithHashedCredentials(m_hostname, m_adminPort, userName, hashedPassword);
+            catch (IOException ioe)
+            {
+                try {
+                    adminClient.close();
+                } catch (InterruptedException ex) {
+                    throw new IOException("Unable to close rejected admin client connection", ex);
+                }
+                throw ioe;
             }
 
             return adminClient;
@@ -108,6 +120,11 @@ public class AuthenticatedConnectionCache {
                 }
             }
             catch (IOException e) {
+                try {
+                    m_unauthCient.close();
+                } catch (InterruptedException ex) {
+                    throw new IOException("Unable to close rejected unauthenticated client connection", ex);
+                }
                 m_unauthCient = null;
                 throw e;
             }
@@ -135,7 +152,20 @@ public class AuthenticatedConnectionCache {
             conn.hashedPassword = Arrays.copyOf(hashedPassword, hashedPassword.length);
             conn.user = userName;
             conn.client = (ClientImpl) ClientFactory.createClient();
-            conn.client.createConnectionWithHashedCredentials(m_hostname, m_port, userName, hashedPassword);
+            try
+            {
+                conn.client.createConnectionWithHashedCredentials(m_hostname, m_port, userName, hashedPassword);
+            }
+            catch (IOException ioe)
+            {
+                try {
+                    conn.client.close();
+                } catch (InterruptedException ex) {
+                    throw new IOException("Unable to close rejected authenticated client connection.", ex);
+                }
+                conn = null;
+                throw ioe;
+            }
             m_connections.put(userName, conn);
             attemptToShrinkPoolIfNeeded();
         }
