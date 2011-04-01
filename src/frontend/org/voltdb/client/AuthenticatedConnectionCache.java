@@ -58,7 +58,7 @@ public class AuthenticatedConnectionCache {
     // The set of active connections.
     Map<String, Connection> m_connections = new TreeMap<String, Connection>();
     // The optional unauthenticated clients which should only work if auth is off
-    ClientImpl m_unauthCient = null;
+    ClientImpl m_unauthClient = null;
 
     public AuthenticatedConnectionCache(int targetSize) {
         this(targetSize, "localhost");
@@ -114,23 +114,23 @@ public class AuthenticatedConnectionCache {
                 throw new IOException("Username was null but password was not.");
             }
             try {
-                if (m_unauthCient == null) {
-                    m_unauthCient = (ClientImpl) ClientFactory.createClient();
-                    m_unauthCient.createConnection(m_hostname, m_port);
+                if (m_unauthClient == null) {
+                    m_unauthClient = (ClientImpl) ClientFactory.createClient();
+                    m_unauthClient.createConnection(m_hostname, m_port);
                 }
             }
             catch (IOException e) {
                 try {
-                    m_unauthCient.close();
+                    m_unauthClient.close();
                 } catch (InterruptedException ex) {
                     throw new IOException("Unable to close rejected unauthenticated client connection", ex);
                 }
-                m_unauthCient = null;
+                m_unauthClient = null;
                 throw e;
             }
 
-            assert(m_unauthCient != null);
-            return m_unauthCient;
+            assert(m_unauthClient != null);
+            return m_unauthClient;
         }
 
         // AUTHENTICATED
