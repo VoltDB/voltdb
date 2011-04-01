@@ -932,6 +932,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // this tests some other mumbo jumbo as well like ENG-999 and ENG-1001
         ClientResponse response = client.callProcedure("Eng993Insert", 5, 5.5);
         assertTrue(response.getStatus() == ClientResponse.SUCCESS);
+        // Verify ENG-999 (Literal string 'NULL' round-trips as literal string
+        // and doesn't transform into a SQL NULL value)
+        response = client.callProcedure("@AdHoc", "select DESC from P1 where ID = 6");
+        VoltTable result = response.getResults()[0];
+        assertEquals("NULL", result.fetchRow(0).get(0, VoltType.STRING));
+
         // this is the actual bug
         try {
             client.callProcedure("@AdHoc", "insert into P1 (ID,DESC,NUM,RATIO) VALUES('?',?,?,?);");
