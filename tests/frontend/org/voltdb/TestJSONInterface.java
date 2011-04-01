@@ -560,6 +560,28 @@ public class TestJSONInterface extends TestCase {
         r = responseFromJSON(response);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
+        // test back-to-back rejections, unknown user
+        // partial ENG-954 test (make sure the rejection timeout works)
+        pset = new ParameterSet();
+        pset.setParameters(u.name + "-X4", u.password + "-X4", u.name + "-X4");
+        response = callProcOverJSON("Insert", pset, "rando", "ick", true);
+        r = responseFromJSON(response);
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+        assertTrue(r.statusString.contains("Authentication rejected"));
+        System.out.println(r.statusString);
+        response = callProcOverJSON("Insert", pset, "rando", "ick", true);
+        r = responseFromJSON(response);
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+        assertTrue(r.statusString.contains("rejected due to too many recent rejected attempts"));
+        System.out.println(r.statusString);
+        // Rejection timeout is 1 second, sleep for slightly more and make sure we get the first error
+        Thread.sleep(1100);
+        response = callProcOverJSON("Insert", pset, "rando", "ick", true);
+        r = responseFromJSON(response);
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+        assertTrue(r.statusString.contains("Authentication rejected"));
+        System.out.println(r.statusString);
+
         // ENG-963 below here
         // do enough to get a new deployment file
         VoltProjectBuilder builder2 = new VoltProjectBuilder();

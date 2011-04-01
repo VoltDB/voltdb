@@ -24,6 +24,7 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import org.voltdb.VoltDB;
+import org.voltdb.utils.EstTime;
 
 /**
  * Maintain a set of the last N recently used credentials and
@@ -60,6 +61,34 @@ public class AuthenticatedConnectionCache {
     // The optional unauthenticated clients which should only work if auth is off
     ClientImpl m_unauthClient = null;
 
+    final static Long REJECT_TIMEOUT_S = 1L;
+    Long m_lastRejectTime = null;
+
+    // Check whether we're still blocking client connection attempts
+    // due to a server rejection.  Resets the timeout automagically if it
+    // has expired.
+    private boolean checkRejectHold()
+    {
+        boolean retval = false;
+        if (m_lastRejectTime != null)
+        {
+            if ((EstTime.currentTimeMillis() - m_lastRejectTime) < (REJECT_TIMEOUT_S * 1000))
+            {
+                retval = true;
+            }
+            else
+            {
+                m_lastRejectTime = null;
+            }
+        }
+        return retval;
+    }
+
+    private void setRejectHold()
+    {
+        m_lastRejectTime = EstTime.currentTimeMillis();
+    }
+
     public AuthenticatedConnectionCache(int targetSize) {
         this(targetSize, "localhost");
     }
@@ -82,6 +111,11 @@ public class AuthenticatedConnectionCache {
         // ADMIN MODE
         if (admin) {
             ClientImpl adminClient = null;
+            if (checkRejectHold())
+            {
+                throw new IOException("Admin connection was rejected due to too many recent rejected attempts. " +
+                                      "Wait " + REJECT_TIMEOUT_S + " seconds and try again.");
+            }
             try
             {
                 adminClient = (ClientImpl) ClientFactory.createClient();
@@ -97,6 +131,7 @@ public class AuthenticatedConnectionCache {
             }
             catch (IOException ioe)
             {
+                setRejectHold();
                 try {
                     adminClient.close();
                 } catch (InterruptedException ex) {
@@ -113,20 +148,28 @@ public class AuthenticatedConnectionCache {
             if ((hashedPassword != null) && (hashedPassword.length > 0)) {
                 throw new IOException("Username was null but password was not.");
             }
-            try {
-                if (m_unauthClient == null) {
+            if (m_unauthClient == null)
+            {
+                if (checkRejectHold())
+                {
+                    throw new IOException("Unauthenticated connection was rejected due to too many recent rejected attempts. " +
+                                          "Wait " + REJECT_TIMEOUT_S + " seconds and try again.");
+                }
+                try {
                     m_unauthClient = (ClientImpl) ClientFactory.createClient();
                     m_unauthClient.createConnection(m_hostname, m_port);
                 }
-            }
-            catch (IOException e) {
-                try {
-                    m_unauthClient.close();
-                } catch (InterruptedException ex) {
-                    throw new IOException("Unable to close rejected unauthenticated client connection", ex);
+                catch (IOException e) {
+                    setRejectHold();
+                    try {
+                        m_unauthClient.close();
+                    } catch (InterruptedException ex) {
+                        throw new IOException("Unable to close rejected unauthenticated client connection", ex);
+                    }
+                    m_unauthClient = null;
+                    throw e;
+
                 }
-                m_unauthClient = null;
-                throw e;
             }
 
             assert(m_unauthClient != null);
@@ -146,6 +189,12 @@ public class AuthenticatedConnectionCache {
             conn.refCount++;
         }
         else {
+            if (checkRejectHold())
+            {
+                throw new IOException("Authenticated connection for user " + userName +
+                                      " was rejected due to too many recent rejected attempts. " +
+                                      "Wait " + REJECT_TIMEOUT_S + " seconds and try again.");
+            }
             conn = new Connection();
             conn.refCount = 1;
             conn.passHash = passHash;
@@ -158,6 +207,7 @@ public class AuthenticatedConnectionCache {
             }
             catch (IOException ioe)
             {
+                setRejectHold();
                 try {
                     conn.client.close();
                 } catch (InterruptedException ex) {
