@@ -68,7 +68,7 @@ public class TestClusterCompiler extends TestCase
         }
         catch (RuntimeException e)
         {
-            if (e.getMessage().contains("Insufficient hosts"))
+            if (e.getMessage().contains("servers required"))
             {
                 caught = true;
             }

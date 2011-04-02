@@ -944,7 +944,7 @@ public abstract class ClientMain {
             String localhostName =  ConnectionUtil.getHostnameOrAddress();
             final SSHTools ssh = new SSHTools(m_username);
             if (!hostName.equals("localhost") && !hostName.equals(localhostName)) {
-                if (!ssh.copyFromRemote(file, hostName, file.getPath())) {
+                if (!ssh.copyFromRemote(file.getPath(), hostName, file.getPath())) {
                     System.err.println("Failed to copy the snapshot file " + file.getPath()
                                        + " from host "
                                        + hostName);

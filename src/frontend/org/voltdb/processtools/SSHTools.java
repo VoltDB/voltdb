@@ -98,7 +98,7 @@ public class SSHTools {
         return sb.toString();
     }
 
-    public boolean copyFromLocal(File src, String hostNameTo, String pathTo) {
+    public boolean copyFromLocal(String src, String hostNameTo, String pathTo) {
         // scp -r -i identity -q src.getPath remoteUser@hostNameTo:/pathTo
         int len = 1;
         if (m_keyFile != null)
@@ -110,7 +110,7 @@ public class SSHTools {
         command[i++] = "scp";
         i = buildArgs(command);
         command[i++] = "-r";
-        command[i++] = src.getPath();
+        command[i++] = src;
         command[i++] = createUrl(hostNameTo, pathTo);
         assert(i == len);
         String output = ShellTools.cmd(null, command, generatePasswordScript());
@@ -122,7 +122,7 @@ public class SSHTools {
         return true;
     }
 
-    public boolean copyFromRemote(File dst, String hostNameFrom, String pathFrom) {
+    public boolean copyFromRemote(String dst, String hostNameFrom, String pathFrom) {
         // scp -r -i identity -q fromhost:path tohost:path
         int len = 1;
         if (m_keyFile != null)
@@ -135,7 +135,7 @@ public class SSHTools {
         i = buildArgs(command);
         command[i++] = "-r";
         command[i++] = createUrl(hostNameFrom, pathFrom);
-        command[i++] = dst.getPath();
+        command[i++] = dst;
         assert(i == len);
         String output = ShellTools.cmd(null, command, generatePasswordScript());
         if (output.length() > 1) {

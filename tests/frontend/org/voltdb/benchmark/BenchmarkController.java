@@ -317,7 +317,7 @@ public class BenchmarkController {
         if (m_config.localmode == false) {
             for (String filename : jarFileNames) {
                 for (InetSocketAddress host : m_config.hosts) {
-                    status = ssh.copyFromLocal(new File(filename),
+                    status = ssh.copyFromLocal(filename,
                                                host.getHostName(),
                                                m_config.remotePath);
                     if(!status)
@@ -329,7 +329,7 @@ public class BenchmarkController {
             }
             for (File file : pushFiles) {
                 for (String client : m_config.clients) {
-                    status = ssh.copyFromLocal(file,
+                    status = ssh.copyFromLocal(file.getPath(),
                                                client,
                                                m_config.remotePath);
                     if(!status)
@@ -341,7 +341,7 @@ public class BenchmarkController {
 
             // copy the deployment file to the servers (clients don't need it)
             for (InetSocketAddress host : m_config.hosts) {
-                status = ssh.copyFromLocal(new File(m_pathToDeployment),
+                status = ssh.copyFromLocal(m_pathToDeployment,
                                            host.getHostName(),
                                            m_config.remotePath);
                 if (!status) {
