@@ -31,11 +31,11 @@
   <!--  <project> -->
   <xsd:element name="project" type="projectType"/>
   <xsd:complexType name="projectType">
-    <xsd:sequence>
+    <xsd:all>
       <xsd:element name="info" minOccurs='0' maxOccurs='1' type="infoType"/>
       <xsd:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xsd:element name="database" minOccurs="1" maxOccurs="1" type="databaseType"/>
-    </xsd:sequence>
+    </xsd:all>
   </xsd:complexType>
 
   <!-- <info> -->
@@ -140,7 +140,7 @@
 
   <!-- <exports> -->
   <xsd:complexType name="exportType">
-    <xsd:sequence>
+    <xsd:all>
       <!-- <tables> -->
       <xsd:element name="tables" minOccurs="0" maxOccurs="1">
         <xsd:complexType>
@@ -154,7 +154,7 @@
           </xsd:sequence>
         </xsd:complexType>
       </xsd:element>
-    </xsd:sequence>
+    </xsd:all>
     <xsd:attribute name="groups" type="xsd:string"/>
   </xsd:complexType>
 
