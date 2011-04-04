@@ -128,7 +128,10 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     int64_t tupleCount = m_table->activeTupleCount();
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
     int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1024;
-    int64_t occupied_tuple_mem_kb = m_table->occupiedTupleMemory() / 1024;
+    int64_t occupied_tuple_mem_kb = 0;
+    if (!m_table->isExport()) {
+        occupied_tuple_mem_kb = m_table->occupiedTupleMemory() / 1024;
+    }
     int64_t string_data_mem_kb = m_table->nonInlinedMemorySize() / 1024;
 
     if (interval()) {

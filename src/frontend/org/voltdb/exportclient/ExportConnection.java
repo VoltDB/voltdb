@@ -101,13 +101,17 @@ public class ExportConnection {
 
         while (m_state == CONNECTING) {
             ExportProtoMessage m = nextMessage();
-            if (m != null && m.isOpenResponse())
-            {
-                Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>> advertisement;
-                advertisement = m.getAdvertisedDataSourcesAndNodes();
-                dataSources.addAll(advertisement.getFirst());
-                hosts.addAll(advertisement.getSecond());
-                m_state = CONNECTED;
+            if (m != null) {
+                if(m.isOpenResponse())
+                {
+                    Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>> advertisement;
+                    advertisement = m.getAdvertisedDataSourcesAndNodes();
+                    dataSources.addAll(advertisement.getFirst());
+                    hosts.addAll(advertisement.getSecond());
+                    m_state = CONNECTED;
+                } else if (m.isError()) {
+                   throw new IOException("Open response was an error message");
+                }
             }
         }
     }

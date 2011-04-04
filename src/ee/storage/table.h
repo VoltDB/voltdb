@@ -164,7 +164,7 @@ class Table {
      * Includes tuples that are pending any kind of delete.
      * Used by iterators to determine how many tupels to expect while scanning
      */
-    int64_t activeTupleCount() const {
+    virtual int64_t activeTupleCount() const {
         return m_tupleCount;
     }
 
@@ -310,6 +310,10 @@ class Table {
      * of the current export generation
      */
     virtual void setSignatureAndGeneration(std::string signature, int64_t generation) {
+    }
+
+    virtual bool isExport() {
+        return false;
     }
 
 protected:

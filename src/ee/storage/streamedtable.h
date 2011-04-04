@@ -84,6 +84,16 @@ class StreamedTable : public Table {
      */
     void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed);
 
+    virtual bool isExport() {
+        return true;
+    }
+
+    /*
+     * For an export table return the sequence number
+     */
+    virtual int64_t activeTupleCount() const {
+        return m_sequenceNo;
+    }
   protected:
     // Stats
     voltdb::StreamedTableStats stats_;

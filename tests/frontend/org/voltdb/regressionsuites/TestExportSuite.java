@@ -38,6 +38,9 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.utils.MiscUtils;
@@ -144,6 +147,8 @@ public class TestExportSuite extends RegressionSuite {
     @Override
     public void setUp() throws Exception
     {
+        m_username = "default";
+        m_password = "password";
         VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
@@ -151,6 +156,7 @@ public class TestExportSuite extends RegressionSuite {
 
         callbackSucceded = true;
         m_tester = new ExportTestClient(getServerConfig().getNodeCount());
+        m_tester.addCredentials("export", "export");
         try {
             m_tester.connect();
         } catch (ExportClientException e) {
@@ -182,9 +188,145 @@ public class TestExportSuite extends RegressionSuite {
      * when the snapshot is restored
      * @throws Exception
      */
+    public void testExportEnterExitAdminMode() throws Exception {
+        m_username = "admin";
+        m_password = "admin";
+        final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+        Client client = getClient();
+        for (int i=0; i < 40; i++) {
+            m_tester.addRow( m_tester.m_generationsSeen.first(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        quiesce(client);
+
+        VoltTable stats = client.callProcedure("@Statistics", "table", (byte)0).getResults()[0];
+        while (stats.advanceRow()) {
+            if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
+                if (stats.getLong("PARTITION_ID") == 0) {
+                    assertEquals(14, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else if (stats.getLong("PARTITION_ID") == 1) {
+                    assertEquals(13, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else if (stats.getLong("PARTITION_ID") == 2) {
+                    assertEquals(13, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else {
+                    fail();
+                }
+            }
+        }
+
+        ExportToFileClient exportClient =
+          new ExportToFileClient(
+              new CSVWriter(),
+              "testnonce",
+              new File("/tmp/" + System.getProperty("user.name")),
+              60,
+              new SimpleDateFormat("yyyyMMddHHmmss"),
+              0,
+              false);
+        exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+        exportClient.addCredentials("export", "export");
+        final Thread currentThread = Thread.currentThread();
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1000);
+                    currentThread.interrupt();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+
+        boolean threwException = false;
+        try {
+            exportClient.run();
+        } catch (ExportClientException e) {
+            assertTrue(e.getCause() instanceof InterruptedException);
+            threwException = true;
+        }
+        assertTrue(threwException);
+
+        final Client adminClient = org.voltdb.client.ClientFactory.createClient();
+        adminClient.createConnection("localhost", VoltDB.DEFAULT_ADMIN_PORT, "admin", "admin");
+        adminClient.callProcedure("@Pause");
+
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(2000);
+                    adminClient.callProcedure("@Resume");
+                    Thread.sleep(1000);
+                    currentThread.interrupt();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+
+        threwException = false;
+        try {
+            exportClient.run();
+        } catch (ExportClientException e) {
+            assertTrue(e.getCause() instanceof InterruptedException);
+            threwException = true;
+        }
+        assertTrue(threwException);
+
+        File tempDir = new File("/tmp/" + System.getProperty("user.name"));
+        File outfile = null;
+        for (File f : tempDir.listFiles()) {
+            if (f.getName().contains("testnonce") && f.getName().endsWith(".csv")) {
+                outfile = f;
+                break;
+            }
+        }
+        assertNotNull(outfile);
+
+        FileInputStream fis = new FileInputStream(outfile);
+        InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
+        BufferedReader br = new BufferedReader(isr);
+
+        ArrayList<String> lines = new ArrayList<String>();
+
+        String nextLine = null;
+        while ((nextLine = br.readLine()) != null) {
+            lines.add(nextLine);
+        }
+
+        assertEquals(lines.size(), 40);
+
+        ArrayList<String[]> splitLines = new ArrayList<String[]>();
+
+        for (String line : lines) {
+            line.split(",");
+        }
+
+        for (String split[] : splitLines) {
+            assertEquals(12, split.length);
+            assertTrue(Integer.valueOf(split[2]) < 4);
+            assertTrue(Integer.valueOf(split[3]) < 3);
+            Integer siteId = Integer.valueOf(split[4]);
+            assertTrue(siteId == 101 || siteId == 102 ||
+                    siteId == 201 || siteId == 202 || siteId == 301 || siteId == 302);
+            assertTrue(split[split.length - 1].equals(rowdata[rowdata.length -1].toString()));
+        }
+    }
+
+    /**
+     * Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
+     * when the snapshot is restored
+     * @throws Exception
+     */
     public void testExportSnapshotTruncatesExportData() throws Exception {
         Client client = getClient();
-        for (int i=0; i < 10; i++) {
+        for (int i=0; i < 40; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
             m_tester.addRow( m_tester.m_generationsSeen.first(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
@@ -192,7 +334,26 @@ public class TestExportSuite extends RegressionSuite {
         }
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
-        for (int i=10; i < 20; i++) {
+
+        VoltTable stats = client.callProcedure("@Statistics", "table", (byte)0).getResults()[0];
+        while (stats.advanceRow()) {
+            if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
+                if (stats.getLong("PARTITION_ID") == 0) {
+                    assertEquals(14, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else if (stats.getLong("PARTITION_ID") == 1) {
+                    assertEquals(13, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else if (stats.getLong("PARTITION_ID") == 2) {
+                    assertEquals(13, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else {
+                    fail();
+                }
+            }
+        }
+
+        for (int i=40; i < 50; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
@@ -208,6 +369,24 @@ public class TestExportSuite extends RegressionSuite {
 
         // must still be able to verify the export data.
         quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
+
+        stats = client.callProcedure("@Statistics", "table", (byte)0).getResults()[0];
+        while (stats.advanceRow()) {
+            if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
+                if (stats.getLong("PARTITION_ID") == 0) {
+                    assertEquals(0, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(0, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else if (stats.getLong("PARTITION_ID") == 1) {
+                    assertEquals(0, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(0, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else if (stats.getLong("PARTITION_ID") == 2) {
+                    assertEquals(0, stats.getLong("TUPLE_COUNT"));
+                    assertEquals(0, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                } else {
+                    fail();
+                }
+            }
+        }
     }
 
   //
@@ -233,6 +412,7 @@ public class TestExportSuite extends RegressionSuite {
               0,
               false);
       exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+      exportClient.addCredentials("export", "export");
       final Thread currentThread = Thread.currentThread();
       new Thread() {
           @Override
@@ -377,7 +557,7 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(threwException);
 
         //Reconnect, then do work and expect failure, after a recovery
-        ((LocalCluster)m_config).recoverOne(1, null, "localhost");
+        ((LocalCluster)m_config).recoverOne(1, null, "admin:admin@localhost");
         Thread.sleep(500);
         threwException = false;
         try {
@@ -424,7 +604,7 @@ public class TestExportSuite extends RegressionSuite {
             modifiedTimes[ii++] = f.lastModified();
         }
 
-        ((LocalCluster)m_config).recoverOne(1, null, "localhost");
+        ((LocalCluster)m_config).recoverOne(1, null, "admin:admin@localhost");
         Thread.sleep(500);
         File filesAfterRejoin[] = exportOverflowDir.listFiles();
         ii = 0;
@@ -843,23 +1023,34 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
+    static final GroupInfo GROUPS[] = new GroupInfo[] {
+        new GroupInfo("export", false, false),
+        new GroupInfo("proc", true, true),
+        new GroupInfo("admin", true, true)
+    };
+
+    static final UserInfo[] USERS = new UserInfo[] {
+        new UserInfo("export", "export", new String[]{"export"}),
+        new UserInfo("default", "password", new String[]{"proc"}),
+        new UserInfo("admin", "admin", new String[]{"proc", "admin"})
+    };
 
     /*
      * Test suite boilerplate
      */
-    static final Class<?>[] PROCEDURES = {
-        Insert.class,
-        InsertBase.class,
-        RollbackInsert.class,
-        Update_Export.class
+    static final ProcedureInfo[] PROCEDURES = {
+        new ProcedureInfo( new String[]{"proc"}, Insert.class),
+        new ProcedureInfo( new String[]{"proc"}, InsertBase.class),
+        new ProcedureInfo( new String[]{"proc"}, RollbackInsert.class),
+        new ProcedureInfo( new String[]{"proc"}, Update_Export.class)
     };
 
-    static final Class<?>[] PROCEDURES2 = {
-        Update_Export.class
+    static final ProcedureInfo[] PROCEDURES2 = {
+        new ProcedureInfo( new String[]{"proc"}, Update_Export.class)
     };
 
-    static final Class<?>[] PROCEDURES3 = {
-        InsertAddedTable.class
+    static final ProcedureInfo[] PROCEDURES3 = {
+        new ProcedureInfo( new String[]{"proc"}, InsertAddedTable.class)
     };
 
     public TestExportSuite(final String name) {
@@ -878,11 +1069,14 @@ public class TestExportSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestExportSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
+        project.setSecurityEnabled(true);
+        project.addGroups(GROUPS);
+        project.addUsers(USERS);
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true  /*enabled*/,
-                null  /* authGroups (off) */);
+                java.util.Arrays.asList(new String[]{"export"}));
         // "WITH_DEFAULTS" is a non-exported persistent table
         project.setTableAsExportOnly("ALLOW_NULLS");
         project.setTableAsExportOnly("NO_NULLS");
@@ -921,10 +1115,12 @@ public class TestExportSuite extends RegressionSuite {
         config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true);
         project = new VoltProjectBuilder();
+        project.addGroups(GROUPS);
+        project.addUsers(USERS);
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true,  //enabled
-                null); // authGroups (off)
+                java.util.Arrays.asList(new String[]{"export"}));
         // "WITH_DEFAULTS" is a non-exported persistent table
         project.setTableAsExportOnly("ALLOW_NULLS");
 
@@ -947,12 +1143,14 @@ public class TestExportSuite extends RegressionSuite {
         config = new LocalCluster("export-ddl-addedtable.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true);
         project = new VoltProjectBuilder();
+        project.addGroups(GROUPS);
+        project.addUsers(USERS);
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-addedtable-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true  /*enabled*/,
-                null  /* authGroups (off) */);
+                java.util.Arrays.asList(new String[]{"export"}));
         // "WITH_DEFAULTS" is a non-exported persistent table
         project.setTableAsExportOnly("ALLOW_NULLS");   // persistent table
         project.setTableAsExportOnly("ADDED_TABLE");   // persistent table
