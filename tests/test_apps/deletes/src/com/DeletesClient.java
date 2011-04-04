@@ -485,9 +485,9 @@ public class DeletesClient
             SnapshotVerifier.main(args);
             ps.flush();
             String reportString = baos.toString("UTF-8");
-            //System.err.println(reportString);
             if (reportString.startsWith("Snapshot corrupted"))
             {
+                System.err.println(reportString);
                 System.exit(-1);
             }
         } catch (UnsupportedEncodingException e) {}
