@@ -252,10 +252,21 @@ public class RealVoltDB implements VoltDBInterface
             {
                 m_siteObj.run();
             }
+            catch (OutOfMemoryError e)
+            {
+                // Even though OOM should be caught by the Throwable section below,
+                // it sadly needs to be handled seperately. The goal here is to make
+                // sure VoltDB crashes.
+
+                String errmsg = "ExecutionSite: " + m_siteId + " ran out of Java memory. " +
+                    "This node will shut down.";
+                hostLog.fatal(errmsg, e);
+                VoltDB.crashVoltDB();
+            }
             catch (Throwable t)
             {
                 String errmsg = "ExecutionSite: " + m_siteId + " encountered an " +
-                "unexpected error and will die, taking this VoltDB node down.";
+                    "unexpected error and will die, taking this VoltDB node down.";
                 System.err.println(errmsg);
                 t.printStackTrace();
                 hostLog.fatal(errmsg, t);

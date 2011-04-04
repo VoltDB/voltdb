@@ -370,12 +370,20 @@ public class VoltDB {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
         Configuration config = new Configuration(args);
 
-        if (!config.validate()) {
-            config.usage();
-            System.exit(-1);
-        } else {
-            initialize(config);
-            instance().run();
+        try {
+            if (!config.validate()) {
+                config.usage();
+                System.exit(-1);
+            } else {
+                initialize(config);
+                instance().run();
+            }
+        }
+        catch (OutOfMemoryError e) {
+            String errmsg = "VoltDB Main thread: ran out of Java memory. This node will shut down.";
+            VoltLogger hostLog = new VoltLogger("HOST");
+            hostLog.fatal(errmsg, e);
+            VoltDB.crashVoltDB();
         }
     }
 
