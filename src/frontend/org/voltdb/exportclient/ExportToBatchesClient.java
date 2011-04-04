@@ -23,9 +23,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Timer;
@@ -54,7 +56,7 @@ import org.voltdb.utils.DelimitedDataWriterUtil.DelimitedDataWriter;
  *
  */
 public class ExportToBatchesClient extends ExportClientBase {
-    private static final VoltLogger m_logger = new VoltLogger("ExportToFileClient");
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     // These get put in from of the batch folders
     // active means the folder is being written to
@@ -82,6 +84,9 @@ public class ExportToBatchesClient extends ExportClientBase {
     protected final int m_firstfield;
     // timer used to roll batches
     protected final Timer m_timer = new Timer();
+
+    // record the original command line args for servers
+    protected final List<String> m_commandLineServerArgs = new ArrayList<String>();
 
     /**
      * Represents all of the export data (and accompanying schema)
@@ -475,6 +480,43 @@ public class ExportToBatchesClient extends ExportClientBase {
         m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
     }
 
+    protected void logConfigurationInfo() {
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Address for ").append(m_commandLineServerArgs.size());
+        sb.append(" given as command line arguments:");
+        for (String server : m_commandLineServerArgs) {
+            sb.append("\n  ").append(server);
+        }
+        m_logger.info(sb.toString());
+
+        m_logger.info(String.format("Connecting to cluster on %s ports",
+                m_useAdminPorts ? "admin" : "client"));
+        if ((m_username != null) && (m_username.length() > 0)) {
+            m_logger.info("Connecting as user " + m_username);
+        }
+        else {
+            m_logger.info("Connecting anonymously");
+        }
+
+        if (m_outDir == null) {
+            m_logger.info("Discarding all export data.");
+        }
+        else {
+            m_logger.info(String.format("Prepending export data folders with nonce: %s",
+                    m_nonce));
+            m_logger.info(String.format("Rotate export batches every %d minute%s",
+                    m_period, m_period == 1 ? "" : "s"));
+            m_logger.info(String.format("Writing export batches to dir: %s",
+                    m_outDir));
+            if (m_firstfield == 0) {
+                m_logger.info("Including VoltDB export metadata");
+            }
+            else {
+                m_logger.info("Not including VoltDB export metadata");
+            }
+        }
+    }
 
     protected static void printHelpAndQuit(int code) {
         System.out
@@ -490,6 +532,9 @@ public class ExportToBatchesClient extends ExportClientBase {
                         + "[--skipinternals] "
                         + "[--user export_username] "
                         + "[--password export_password]");
+        System.out.println("Note that server hostnames may be appended with a specific port:");
+        System.out.println("  --servers server1:port1[,server2:port2,...,serverN:portN]");
+
         System.exit(code);
     }
 
@@ -666,5 +711,11 @@ public class ExportToBatchesClient extends ExportClientBase {
             e.printStackTrace();
             System.exit(-1);
         }
+    }
+
+    @Override
+    public void run() throws ExportClientException {
+        logConfigurationInfo();
+        super.run();
     }
 }

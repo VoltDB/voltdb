@@ -154,7 +154,7 @@ public class PlanAssembler {
     }
 
     /**
-     * Return true if tableList includes at least one export-only table.
+     * Return true if tableList includes at least one export table.
      */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
         // the single well-known connector
@@ -201,7 +201,7 @@ public class PlanAssembler {
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                 throw new RuntimeException(
-                "Illegal to read an export-only table.");
+                "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             subAssembler =
@@ -220,7 +220,7 @@ public class PlanAssembler {
             } else if (parsedStmt instanceof ParsedUpdateStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
-                    "Illegal to update an export-only table.");
+                    "Illegal to update an export table.");
                 }
                 m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
                 subAssembler =
@@ -228,7 +228,7 @@ public class PlanAssembler {
             } else if (parsedStmt instanceof ParsedDeleteStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
-                    "Illegal to delete from an export-only table.");
+                    "Illegal to delete from an export table.");
                 }
                 m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
                 subAssembler =

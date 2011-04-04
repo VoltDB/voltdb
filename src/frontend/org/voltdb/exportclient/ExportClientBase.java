@@ -21,9 +21,9 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.HashSet;
 
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
@@ -41,18 +41,21 @@ public abstract class ExportClientBase {
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
-    private final List<InetSocketAddress> m_servers;
-    protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections;
+    protected final List<InetSocketAddress> m_servers
+        = new ArrayList<InetSocketAddress>();
+    protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections
+        = new HashMap<InetSocketAddress, ExportConnection>();
 
     protected final boolean m_useAdminPorts;
 
     // First hash by table signature, second by partition
-    private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks;
+    private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks
+        = new HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>>();
 
     private final HashSet<AdvertisedDataSource> m_knownDataSources = new HashSet<AdvertisedDataSource>();
 
     // credentials
-    private String m_username = "", m_password = "";
+    protected String m_username = "", m_password = "";
 
     public ExportClientBase() {
         this(false);
@@ -60,9 +63,6 @@ public abstract class ExportClientBase {
 
     public ExportClientBase(boolean useAdminPorts)
     {
-        m_sinks = new HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>>();
-        m_exportConnections = new HashMap<InetSocketAddress, ExportConnection>();
-        m_servers = new ArrayList<InetSocketAddress>();
         m_useAdminPorts = useAdminPorts;
     }
 

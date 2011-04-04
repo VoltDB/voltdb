@@ -816,13 +816,13 @@ public class VoltCompiler {
                 if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
                     compilerLog.error("While configuring export, table " + tablename + " is a source table " +
                             "for a materialized view. Export only tables do not support views.");
-                    throw new VoltCompilerException("Export-only table configured with materialized view.");
+                    throw new VoltCompilerException("Export table configured with materialized view.");
                 }
                 if (tableref.getMaterializer() != null)
                 {
                     compilerLog.error("While configuring export, table " + tablename + " is a " +
-                                                "materialized view.  A view cannot be an export-only table.");
-                    throw new VoltCompilerException("View configured as an export-only table");
+                                                "materialized view.  A view cannot be an export table.");
+                    throw new VoltCompilerException("View configured as an export table");
                 }
                 if (tableref.getIsreplicated()) {
                     // if you don't specify partition columns, make

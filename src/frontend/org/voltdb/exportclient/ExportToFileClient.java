@@ -23,10 +23,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
@@ -48,7 +50,7 @@ import org.voltdb.utils.DelimitedDataWriterUtil.TSVWriter;
  */
 
 public class ExportToFileClient extends ExportClientBase {
-    private static final VoltLogger m_logger = new VoltLogger("ExportToFileClient");
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     protected final DelimitedDataWriter m_escaper;
     protected final String m_nonce;
@@ -57,6 +59,7 @@ public class ExportToFileClient extends ExportClientBase {
     protected final int m_period;
     protected final SimpleDateFormat m_dateformat;
     protected final int m_firstfield;
+    protected final List<String> m_commandLineServerArgs = new ArrayList<String>();
 
     // This class outputs exported rows converted to CSV or TSV values
     // for the table named in the constructor's AdvertisedDataSource
@@ -212,8 +215,10 @@ public class ExportToFileClient extends ExportClientBase {
                     m_Writer.flush();
                     m_Writer.close();
                 } catch (Exception e) {
-                    m_logger.error(e.getMessage());
-                    throw new RuntimeException();
+                    String msg = e.getMessage();
+                    // ignore the boring "stream closed" error
+                    if (msg.compareToIgnoreCase("stream closed") == 0)
+                        m_logger.error(e.getMessage());
                 }
             }
             super.finalize();
@@ -281,6 +286,46 @@ public class ExportToFileClient extends ExportClientBase {
         return decoders.get(table_name);
     }
 
+    protected void logConfigurationInfo() {
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Address for ").append(m_commandLineServerArgs.size());
+        sb.append(" given as command line arguments:");
+        for (String server : m_commandLineServerArgs) {
+            sb.append("\n  ").append(server);
+        }
+        m_logger.info(sb.toString());
+
+        m_logger.info(String.format("Connecting to cluster on %s ports",
+                m_useAdminPorts ? "admin" : "client"));
+        if ((m_username != null) && (m_username.length() > 0)) {
+            m_logger.info("Connecting as user " + m_username);
+        }
+        else {
+            m_logger.info("Connecting anonymously");
+        }
+
+        if (m_outDir == null) {
+            m_logger.info("Discarding all export data.");
+        }
+        else {
+            m_logger.info(String.format("Writing to disk in %s format",
+                    (m_escaper instanceof CSVWriter) ? "CSV" : "TSV"));
+            m_logger.info(String.format("Prepending export data files with nonce: %s",
+                    m_nonce));
+            m_logger.info(String.format("Rotate export files every %d minute%s",
+                    m_period, m_period == 1 ? "" : "s"));
+            m_logger.info(String.format("Writing export files to dir: %s",
+                    m_outDir));
+            if (m_firstfield == 0) {
+                m_logger.info("Including VoltDB export metadata");
+            }
+            else {
+                m_logger.info("Not including VoltDB export metadata");
+            }
+        }
+    }
+
     protected static void printHelpAndQuit(int code) {
         System.out
                 .println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
@@ -302,6 +347,9 @@ public class ExportToFileClient extends ExportClientBase {
                         + "[--skipinternals] "
                         + "[--user export_username] "
                         + "[--password export_password]");
+        System.out.println("Note that server hostnames may be appended with a specific port:");
+        System.out.println("  --servers server1:port1[,server2:port2,...,serverN:portN]");
+
         System.exit(code);
     }
 
@@ -427,6 +475,10 @@ public class ExportToFileClient extends ExportClientBase {
                     printHelpAndQuit(-1);
                 }
                 period = Integer.parseInt(args[ii + 1]);
+                if (period < 1) {
+                    System.err.println("Error: Specified value for --period must be >= 1.");
+                    printHelpAndQuit(-1);
+                }
                 ii++;
             }
             else if (arg.equals("--dateformat")) {
@@ -483,8 +535,11 @@ public class ExportToFileClient extends ExportClientBase {
                                                            connect == 'a');
 
         // add all of the servers specified
-        for (String server : volt_servers)
+        for (String server : volt_servers) {
+            server = server.trim();
+            client.m_commandLineServerArgs.add(server);
             client.addServerInfo(server, connect == 'a');
+        }
 
         // add credentials (default blanks used if none specified)
         client.addCredentials(user, password);
@@ -501,6 +556,7 @@ public class ExportToFileClient extends ExportClientBase {
 
     @Override
     public void run() throws ExportClientException {
+        logConfigurationInfo();
         super.run();
     }
 }

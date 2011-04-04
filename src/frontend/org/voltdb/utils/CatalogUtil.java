@@ -371,11 +371,11 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Return true if a table is a streamed / export-only table
+     * Return true if a table is a streamed / export table
      * This function is duplicated in CatalogUtil.h
      * @param database
      * @param table
-     * @return true if a table is export-only or false otherwise
+     * @return true if a table is export or false otherwise
      */
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
                                             org.voltdb.catalog.Table table)

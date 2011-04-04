@@ -23,16 +23,24 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
@@ -43,16 +51,16 @@ import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.exportclient.ExportClientException;
+import org.voltdb.exportclient.ExportToFileClient;
+import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.VoltFile;
-import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
-import org.voltdb.exportclient.ExportToFileClient;
 
 /**
  *  End to end Export tests using the RawProcessor and the ExportSinkServer.
@@ -252,8 +260,9 @@ public class TestExportSuite extends RegressionSuite {
         }
         assertTrue(threwException);
 
-        final Client adminClient = org.voltdb.client.ClientFactory.createClient();
-        adminClient.createConnection("localhost", VoltDB.DEFAULT_ADMIN_PORT, "admin", "admin");
+        ClientConfig adminConfig = new ClientConfig("admin", "admin");
+        final Client adminClient = org.voltdb.client.ClientFactory.createClient(adminConfig);
+        adminClient.createConnection("localhost", VoltDB.DEFAULT_ADMIN_PORT);
         adminClient.callProcedure("@Pause");
 
         new Thread() {
@@ -909,7 +918,7 @@ public class TestExportSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Update NO_NULLS SET A_TINYINT=0 WHERE PKEY=0;");
         }
         catch (final ProcCallException e) {
-            if (e.getMessage().contains("Illegal to update an export-only table.")) {
+            if (e.getMessage().contains("Illegal to update an export table.")) {
                 passed = true;
             }
         }
@@ -926,7 +935,7 @@ public class TestExportSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Select PKEY from NO_NULLS WHERE PKEY=0;");
         }
         catch (final ProcCallException e) {
-            if (e.getMessage().contains("Illegal to read an export-only table.")) {
+            if (e.getMessage().contains("Illegal to read an export table.")) {
                 passed = true;
             }
         }
@@ -943,7 +952,7 @@ public class TestExportSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "DELETE from NO_NULLS WHERE PKEY=0;");
         }
         catch (final ProcCallException e) {
-            if (e.getMessage().contains("Illegal to delete from an export-only table.")) {
+            if (e.getMessage().contains("Illegal to delete from an export table.")) {
                 passed = true;
             }
         }
