@@ -30,7 +30,7 @@ cd ../pro
 svn status
 ant -f mmt.xml clean
 VOLTCORE=../eng ant -f mmt.xml dist.pro
-cp obj/pro/voltdb-ent-* ~/releases/`cat ../eng/version.txt`/
+cp obj/pro/voltdb-ent-*.tar.gz ~/releases/`cat ../eng/version.txt`/
 cd ../doc
 mv pdfs/enterprise_releasenotes.pdf ~/releases/`cat ../eng/version.txt`/`cat ../eng/version.txt`-enterprise_releasenotes.pdf
 mv pdfs `cat ../eng/version.txt`-docs_pdf
