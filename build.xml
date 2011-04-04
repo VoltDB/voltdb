@@ -476,6 +476,10 @@ DISTRIBUTION
         </fileset>
     </chmod>
 
+    <!-- add the Project and Deployment file schemas to the dist -->
+    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
+    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
+
     <!-- copy licenses -->
     <copy todir="${dist.dir}" file="LICENSE"/>
     <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
