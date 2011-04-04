@@ -198,7 +198,14 @@ public class AuthenticatedConnectionCache {
             conn = new Connection();
             conn.refCount = 1;
             conn.passHash = passHash;
-            conn.hashedPassword = Arrays.copyOf(hashedPassword, hashedPassword.length);
+            if (hashedPassword != null)
+            {
+                conn.hashedPassword = Arrays.copyOf(hashedPassword, hashedPassword.length);
+            }
+            else
+            {
+                conn.hashedPassword = null;
+            }
             conn.user = userName;
             conn.client = (ClientImpl) ClientFactory.createClient();
             try
