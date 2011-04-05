@@ -278,6 +278,23 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             RecoveryTable table = m_tables.remove(tableId);
             recoveryLog.info("Received completion message at site " + m_siteId +
                     " for table " + table.m_name );//+ " with export info (" + seqNo +
+            if (m_tables.isEmpty()) {
+                /*
+                 * Send ack for the last thing, but if the other side is gone, no worries
+                 */
+                while(ackMessage.hasRemaining()) {
+                    int written = 0;
+                    try {
+                        written = m_sc.write(ackMessage);
+                    } catch (IOException e) {
+                        break;
+                    }
+                    if (written == -1) {
+                        break;
+                    }
+                }
+                return;
+            }
 //                    "," + bytesUsed + ")");
 //            if (seqNo >= 0) {
 //                m_engine.exportAction( true, bytesUsed, seqNo, m_partitionId, signature);

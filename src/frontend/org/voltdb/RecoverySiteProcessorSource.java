@@ -658,8 +658,12 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                         }
                     }
                 }
+                /*
+                 * Extended timeout to 60 seconds. With 2 servers on one node
+                 * with a lot of load this timeout was problematic at 5 seconds.
+                 */
                 final long startWait = System.currentTimeMillis();
-                while (m_inThread.isAlive() && System.currentTimeMillis() - startWait < 5000) {
+                while (m_inThread.isAlive() && System.currentTimeMillis() - startWait < 60000) {
                     /*
                      * Process mailbox messages as part of this loop. This is necessary to ensure the txn
                      * ordering and heartbeat process moves forward at the recovering partition.
