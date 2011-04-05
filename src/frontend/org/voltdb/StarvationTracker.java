@@ -100,28 +100,47 @@ public class StarvationTracker extends SiteStatsSource {
             final long count = m_count - m_lastCount;
             final long totalStarvedTime = m_totalTime - m_lastTotalTime;
             final long sumOfSquares = m_sumOfSquares - m_lastSumOfSquares;
+            final long uSecs = totalStarvedTime / 1000;
             m_lastStartTime = now;
             m_lastSumOfSquares = m_sumOfSquares;
             m_lastTotalTime = m_totalTime;
             m_lastCount = m_count;
-            rowValues[columnNameToIndex.get("COUNT")] = count;
-            rowValues[columnNameToIndex.get("PERCENT")] = totalStarvedTime / (totalTime / 100.0);
-            long uSecs = totalStarvedTime / 1000;
-            rowValues[columnNameToIndex.get("AVG")] = (totalStarvedTime / count) / 1000;
-            rowValues[columnNameToIndex.get("MIN")] = m_lastMin;
-            rowValues[columnNameToIndex.get("MAX")] = m_lastMax;
             m_lastMax = 0;
             m_lastMin = Long.MAX_VALUE;
-            rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(sumOfSquares / count - uSecs * uSecs);
+            if (count > 0) {
+                rowValues[columnNameToIndex.get("COUNT")] = count;
+                rowValues[columnNameToIndex.get("PERCENT")] = totalStarvedTime / (totalTime / 100.0);
+                rowValues[columnNameToIndex.get("AVG")] = (totalStarvedTime / count) / 1000;
+                rowValues[columnNameToIndex.get("MIN")] = m_lastMin;
+                rowValues[columnNameToIndex.get("MAX")] = m_lastMax;
+                rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(sumOfSquares / count - uSecs * uSecs);
+            } else {
+                rowValues[columnNameToIndex.get("COUNT")] = 0L;
+                rowValues[columnNameToIndex.get("PERCENT")] = 0L;
+                rowValues[columnNameToIndex.get("AVG")] = 0L;
+                rowValues[columnNameToIndex.get("MIN")] = 0L;
+                rowValues[columnNameToIndex.get("MAX")] = 0L;
+                rowValues[columnNameToIndex.get("STDDEV")] = 0L;
+            }
         } else {
             final long totalTime = System.nanoTime() - m_startTime;
-            rowValues[columnNameToIndex.get("COUNT")] = m_count;
-            rowValues[columnNameToIndex.get("PERCENT")] = m_totalTime / (totalTime / 100.0);
-            long uSecs = m_count > 0 ? (m_totalTime / m_count) / 1000 : 0l;
-            rowValues[columnNameToIndex.get("AVG")] = uSecs;
-            rowValues[columnNameToIndex.get("MIN")] = m_min;
-            rowValues[columnNameToIndex.get("MAX")] = m_max;
-            rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(m_sumOfSquares / m_count - uSecs * uSecs);
+            if (m_count > 0) {
+                final long uSecs = (m_totalTime / m_count) / 1000;
+                rowValues[columnNameToIndex.get("COUNT")] = m_count;
+                rowValues[columnNameToIndex.get("PERCENT")] = m_totalTime / (totalTime / 100.0);
+                rowValues[columnNameToIndex.get("AVG")] = uSecs;
+                rowValues[columnNameToIndex.get("MIN")] = m_min;
+                rowValues[columnNameToIndex.get("MAX")] = m_max;
+                rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(m_sumOfSquares / m_count - uSecs * uSecs);
+            }
+            else {
+                rowValues[columnNameToIndex.get("COUNT")] = 0L;
+                rowValues[columnNameToIndex.get("PERCENT")] = 0L;
+                rowValues[columnNameToIndex.get("AVG")] = 0L;
+                rowValues[columnNameToIndex.get("MIN")] = 0L;
+                rowValues[columnNameToIndex.get("MAX")] = 0L;
+                rowValues[columnNameToIndex.get("STDDEV")] = 0L;
+            }
         }
         super.updateStatsRow(rowKey, rowValues);
     }
