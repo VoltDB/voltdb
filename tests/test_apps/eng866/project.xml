@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='twitter-ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.eng866.Insert' />
+            <procedure class='com.eng866.Select' />
+            <procedure class='com.eng866.Delete' />
+            <procedure class='InsertTweet' partitioninfo='tweets.username: 0' >
+                <sql>INSERT INTO tweets VALUES (?, ?);</sql>
+            </procedure>
+        </procedures>
+        <partitions>
+            <partition table='hashtags' column='hashtag' />
+            <partition table='tweets' column='username' />
+        </partitions>
+        <export>
+          <tables>
+            <table name="tweets"/>
+          </tables>
+        </export>
+    </database>
+</project>
