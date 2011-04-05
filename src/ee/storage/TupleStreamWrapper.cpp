@@ -128,8 +128,7 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
 {
     if (currentTxnId < m_openTransactionId)
     {
-        throwFatalException("Active transactions moving backwards: m_openTransactionId: %ld, currentTxnId: %ld",
-                            m_openTransactionId, currentTxnId);
+        throwFatalException("Active transactions moving backwards");
     }
 
     // more data for an ongoing transaction with no new committed data
@@ -361,8 +360,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     // should always be moving forward in time.
     if (txnId < m_openTransactionId)
     {
-        throwFatalException("Active transactions moving backwards: m_openTransactionId: %ld, txnId: %ld",
-                            m_openTransactionId, txnId);
+        throwFatalException("Active transactions moving backwards");
     }
 
     commit(lastCommittedTxnId, txnId);
