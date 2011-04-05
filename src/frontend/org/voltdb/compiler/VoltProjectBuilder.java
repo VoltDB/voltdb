@@ -219,12 +219,13 @@ public class VoltProjectBuilder {
      * @param length
      * @param kFactor
      * @param string
+     * @param voltRoot  where to put the compiled catalogs
      * @return a list of jar filenames that were compiled. The benchmark will
      * be started using the filename at index 0.
      */
     public String[] compileAllCatalogs(
             int sitesPerHost, int length,
-            int kFactor, String string)
+            int kFactor, String string, String voltRoot)
     {
         throw new NotImplementedException("This project builder does not support compileAllCatalogs");
     }
@@ -413,18 +414,35 @@ public class VoltProjectBuilder {
     }
 
     public boolean compile(final String jarPath) {
-        return compile(jarPath, 1, 1, 0, "localhost");
+        return compile(jarPath, 1, 1, 0, "localhost", null);
     }
 
-    public boolean compile(final String jarPath, final int sitesPerHost, final int replication) {
-        return compile(jarPath, sitesPerHost, 1, replication, "localhost");
+    public boolean compile(final String jarPath,
+                           final int sitesPerHost,
+                           final int replication) {
+        return compile(jarPath, sitesPerHost, 1,
+                       replication, "localhost", null);
     }
 
-    public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount, final int replication,
+    public boolean compile(final String jarPath,
+                           final int sitesPerHost,
+                           final int hostCount,
+                           final int replication,
                            final String leaderAddress) {
+        return compile(jarPath, sitesPerHost, hostCount,
+                       replication, leaderAddress, null);
+    }
+
+    public boolean compile(final String jarPath,
+                           final int sitesPerHost,
+                           final int hostCount,
+                           final int replication,
+                           final String leaderAddress,
+                           final String voltRoot) {
         VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                       null, false, null, "none", false, 0, false);
+        return compile(compiler, jarPath, sitesPerHost, hostCount,
+                       replication, leaderAddress, voltRoot,
+                       false, null, "none", false, 0, false);
     }
 
     public boolean compile(

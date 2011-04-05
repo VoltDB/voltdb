@@ -103,7 +103,7 @@ public class AppUpdate extends ClientMain {
          */
         @Override
         public String[] compileAllCatalogs(int sitesPerHost, int length,
-                int kFactor, String leader) {
+                int kFactor, String leader, String voltRoot) {
             String tableA = "CREATE TABLE A (PID INTEGER NOT NULL, I INTEGER, PAYLOAD VARCHAR(128));";
             String tableB = "CREATE TABLE B (PID INTEGER NOT NULL, S VARCHAR(6), PAYLOAD VARCHAR(128));";
             String tableFK = "CREATE TABLE FK (I INTEGER, S VARCHAR(6), PAYLOAD VARCHAR(128));";

@@ -299,7 +299,9 @@ public class BenchmarkController {
                 m_config.sitesPerHost,
                 m_config.hosts.length,
                 m_config.k_factor,
-                m_config.hosts[0].getHostName());
+                m_config.hosts[0].getHostName(),
+                m_config.voltRoot
+        );
         m_jarFileName = jarFileNames[0];
         m_pathToDeployment = m_projectBuilder.getPathToDeployment();
 

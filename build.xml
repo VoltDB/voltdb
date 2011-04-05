@@ -1530,6 +1530,7 @@ BENCHMARKS
         <arg value="DURATION=${duration}" />
         <arg value="REMOTEPATH=${remotepath}" />
         <arg value="REMOTEUSER=${remoteuser}"/>
+        <arg value="VOLTROOT=${voltroot}" />
         <arg value="HOST=${manualhost1}" />
         <arg value="HOST=${manualhost2}" />
         <arg value="HOST=${manualhost3}" />
@@ -1619,6 +1620,7 @@ BENCHMARKS
         <param name="local" value="false"/>
         <param name="client" value="${env.BMCLIENT}"/>
         <param name="remotepath" value="${env.VOLTBIN}"/>
+        <param name="voltroot" value="${env.VOLTROOT}"/>
 
         <param name="hostcount" value="${env.BMHOSTCOUNT}"/>
         <param name="sitesperhost" value="${env.BMSITESPERHOST}"/>

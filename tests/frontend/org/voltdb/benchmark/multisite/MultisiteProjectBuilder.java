@@ -51,11 +51,14 @@ public class MultisiteProjectBuilder extends VoltProjectBuilder {
     private static final String m_jarFileName = "multisite.jar";
 
     @Override
-    public String[] compileAllCatalogs(
-            int sitesPerHost, int length, int kFactor, String leader)
-     {
+    public String[] compileAllCatalogs(int sitesPerHost,
+                                       int length,
+                                       int kFactor,
+                                       String leader,
+                                       String voltRoot) {
         addAllDefaults();
-        boolean compile = compile(m_jarFileName, sitesPerHost, length, kFactor, leader);
+        boolean compile = compile(m_jarFileName, sitesPerHost,
+                                  length, kFactor, leader, voltRoot);
         if (!compile) {
             throw new RuntimeException("Bingo project builder failed app compilation.");
         }
