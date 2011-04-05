@@ -20,17 +20,16 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package org.voltdb.exportclient;
+
 import java.io.File;
-import java.text.SimpleDateFormat;
 
 import junit.framework.TestCase;
 
-import org.voltdb.exportclient.ExportToFileClient;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportToFileClient.ExportToFileDecoder;
 import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
-import org.voltdb.utils.DelimitedDataWriterUtil.DelimitedDataWriter;
-import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 
 public class TestExportToFileClient extends TestCase {
 
@@ -41,7 +40,7 @@ public class TestExportToFileClient extends TestCase {
                 "testnonce",
                 new File("/tmp/" + System.getProperty("user.name")),
                 60,
-                new SimpleDateFormat("yyyyMMddHHmmss"),
+                "yyyyMMddHHmmss",
                 0,
                 false);
         AdvertisedDataSource source0 = TestExportDecoderBase.constructTestSource(0);

@@ -60,6 +60,7 @@ public class ExportToFileClient extends ExportClientBase {
     protected final SimpleDateFormat m_dateformat;
     protected final int m_firstfield;
     protected final List<String> m_commandLineServerArgs = new ArrayList<String>();
+    protected final String m_dateFormatOriginalString;
 
     // This class outputs exported rows converted to CSV or TSV values
     // for the table named in the constructor's AdvertisedDataSource
@@ -253,7 +254,7 @@ public class ExportToFileClient extends ExportClientBase {
                               String nonce,
                               File outdir,
                               int period,
-                              SimpleDateFormat dateformat,
+                              String dateformatString,
                               int firstfield,
                               boolean useAdminPorts) {
         super(useAdminPorts);
@@ -262,7 +263,8 @@ public class ExportToFileClient extends ExportClientBase {
         m_outDir = outdir;
         m_tableDecoders = new HashMap<Long, HashMap<String, ExportToFileDecoder>>();
         m_period = period;
-        m_dateformat = dateformat;
+        m_dateformat = new SimpleDateFormat(dateformatString);
+        m_dateFormatOriginalString = dateformatString;
         m_firstfield = firstfield;
     }
 
@@ -313,6 +315,8 @@ public class ExportToFileClient extends ExportClientBase {
                     (m_escaper instanceof CSVWriter) ? "CSV" : "TSV"));
             m_logger.info(String.format("Prepending export data files with nonce: %s",
                     m_nonce));
+            m_logger.info(String.format("Using date format for file names: %s",
+                    m_dateFormatOriginalString));
             m_logger.info(String.format("Rotate export files every %d minute%s",
                     m_period, m_period == 1 ? "" : "s"));
             m_logger.info(String.format("Writing export files to dir: %s",
@@ -334,7 +338,9 @@ public class ExportToFileClient extends ExportClientBase {
                 .println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
                         + "--servers server1[,server2,...,serverN] "
                         + "--connect (admin|client) "
-                        + "--discard");
+                        + "--discard "
+                        + "[--user export_username] "
+                        + "[--password export_password]");
         System.out
                 .println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
                         + "--servers server1[,server2,...,serverN] "
@@ -364,7 +370,9 @@ public class ExportToFileClient extends ExportClientBase {
         int firstfield = 0;
         int period = 60;
         char connect = ' '; // either ' ', 'c' or 'a'
-        SimpleDateFormat dateformat = new SimpleDateFormat("yyyyMMddHHmmss");
+        String dateformatString = "yyyyMMddHHmmss";
+        SimpleDateFormat dateformat = new SimpleDateFormat(dateformatString);
+
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -486,7 +494,7 @@ public class ExportToFileClient extends ExportClientBase {
                     System.err.println("Error: Not enough args following --dateformat");
                     printHelpAndQuit(-1);
                 }
-                dateformat = new SimpleDateFormat(args[ii + 1]);
+                dateformatString = args[ii + 1].trim();
                 ii++;
             }
         }
@@ -530,7 +538,7 @@ public class ExportToFileClient extends ExportClientBase {
                                                            nonce,
                                                            outdir,
                                                            period,
-                                                           dateformat,
+                                                           dateformatString,
                                                            firstfield,
                                                            connect == 'a');
 

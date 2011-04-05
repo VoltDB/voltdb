@@ -32,7 +32,6 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import org.voltdb.BackendTarget;
@@ -233,7 +232,7 @@ public class TestExportSuite extends RegressionSuite {
               "testnonce",
               new File("/tmp/" + System.getProperty("user.name")),
               60,
-              new SimpleDateFormat("yyyyMMddHHmmss"),
+              "yyyyMMddHHmmss",
               0,
               false);
         exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
@@ -417,7 +416,7 @@ public class TestExportSuite extends RegressionSuite {
               "testnonce",
               new File("/tmp/" + System.getProperty("user.name")),
               60,
-              new SimpleDateFormat("yyyyMMddHHmmss"),
+              "yyyyMMddHHmmss",
               0,
               false);
       exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
