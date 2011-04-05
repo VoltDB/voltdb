@@ -196,7 +196,7 @@ public class SystemStatsCollector {
             sb.append(String.format("%dms:\n", timestamp));
             sb.append(String.format("  SYS: %dM RSS, %dM Total\n",
                     rss / 1024 /1024,
-                    memorysize / 1024 / 1024));
+                    memorysize));
             sb.append(String.format("  JAVA: HEAP(%d/%d/%dM) SYS(%d/%dM)\n",
                     javausedheapmem / 1024 / 1024,
                     javatotalheapmem / 1024 / 1024,
@@ -295,6 +295,7 @@ public class SystemStatsCollector {
 
         // figure out how much memory this thing has
         memorysize = pp.ramInMegabytes;
+        assert(memorysize > 0);
 
         // now try to figure out the best way to get the rss size
         long rss = -1;
@@ -437,8 +438,8 @@ public class SystemStatsCollector {
         for (Datum d : history) {
             if (d.timestamp < cropts) continue;
 
-            double javaused = d.javatotalheapmem + d.javatotalsysmem;
-            double javaunused = SystemStatsCollector.javamaxheapmem - d.javatotalheapmem;
+            double javaused = d.javausedheapmem + d.javausedsysmem;
+            double javaunused = SystemStatsCollector.javamaxheapmem - d.javausedheapmem;
             javaused /= 1204 * 1024;
             javaunused /= 1204 * 1024;
             double rss = d.rss / 1024 / 1024;

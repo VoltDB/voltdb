@@ -194,7 +194,11 @@ public class HTTPAdminListener {
         try {
             String template = m_htmlTemplates.get("admintemplate.html");
             for (Entry<String, String> e : params.entrySet()) {
-                template = template.replace("#" + e.getKey().toUpperCase() + "#", e.getValue());
+                String key = e.getKey().toUpperCase();
+                String value = e.getValue();
+                if (key == null) continue;
+                if (value == null) value = "NULL";
+                template = template.replace("#" + key + "#", value);
             }
             return template;
         }
