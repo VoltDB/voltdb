@@ -128,8 +128,8 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
 {
     if (currentTxnId < m_openTransactionId)
     {
-        //std::cout << currentTxnId << ", " << m_openTransactionId << std::endl;
-        throwFatalException("Transactions moving backwards");
+        throwFatalException("Active transactions moving backwards: m_openTransactionId: %ld, currentTxnId: %ld",
+                            m_openTransactionId, currentTxnId);
     }
 
     // more data for an ongoing transaction with no new committed data
@@ -317,8 +317,26 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
             m_lastFlush = timeInMillis;
         }
 
+        // ENG-866
+        //
+        // Due to tryToSneakInASinglePartitionProcedure (and probable
+        // speculative execution in the future), the EE is not
+        // guaranteed to see all transactions in transaction ID order.
+        // periodicFlush is handed whatever the most recent txnId
+        // executed is, whether or not that txnId is relevant to this
+        // export stream.  commit() is enforcing the invariants that
+        // the TupleStreamWrapper needs to see for relevant
+        // transaction IDs; we choose whichever of currentTxnId or
+        // m_openTransactionId here will allow commit() to continue
+        // operating correctly.
+        int64_t txnId = currentTxnId;
+        if (m_openTransactionId > currentTxnId)
+        {
+            txnId = m_openTransactionId;
+        }
+
         extendBufferChain(0);
-        commit(lastCommittedTxnId, currentTxnId, timeInMillis < 0 ? true : false);
+        commit(lastCommittedTxnId, txnId, timeInMillis < 0 ? true : false);
     }
 }
 
@@ -339,7 +357,14 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     size_t rowHeaderSz = 0;
     size_t tupleMaxLength = 0;
 
-    assert(txnId >= m_openTransactionId);
+    // Transaction IDs for transactions applied to this tuple stream
+    // should always be moving forward in time.
+    if (txnId < m_openTransactionId)
+    {
+        throwFatalException("Active transactions moving backwards: m_openTransactionId: %ld, txnId: %ld",
+                            m_openTransactionId, txnId);
+    }
+
     commit(lastCommittedTxnId, txnId);
 
     // Compute the upper bound on bytes required to serialize tuple.
@@ -415,8 +440,3 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
 
     return *rowHeaderSz + metadataSz + dataSz;
 }
-
-
-
-
-
