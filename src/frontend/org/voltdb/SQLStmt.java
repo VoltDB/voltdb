@@ -47,7 +47,7 @@ public class SQLStmt {
      *
      * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
      * place holders.
-     * @param sqlText , separated list of tables used by the query specifying the order they should be joined in
+     * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
         this.sqlText = sqlText;

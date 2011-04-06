@@ -1087,7 +1087,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
 
     /**
      * I heart commutativity
-     * @return
+     * @return the cheesy checksum of this VoltTable
      */
     private final long cheesyCheckSum() {
         final int mypos = m_buffer.position();
