@@ -1535,6 +1535,17 @@ public class RealVoltDB implements VoltDBInterface
     @Override
     public void setAdminMode(boolean inAdminMode)
     {
+        if (m_inAdminMode != inAdminMode)
+        {
+            if (inAdminMode)
+            {
+                hostLog.info("Server is entering admin mode and pausing.");
+            }
+            else
+            {
+                hostLog.info("Server is exiting admin mode and resuming operation.");
+            }
+        }
         m_inAdminMode = inAdminMode;
     }
 

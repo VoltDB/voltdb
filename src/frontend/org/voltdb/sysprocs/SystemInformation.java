@@ -90,6 +90,18 @@ public class SystemInformation extends VoltSystemProcedure {
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
                   "DEPLOYMENT", path);
 
+        String cluster_state = null;
+        if (VoltDB.instance().inAdminMode())
+        {
+            cluster_state = "Paused";
+        }
+        else
+        {
+            cluster_state = "Running";
+        }
+        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
+                  "CLUSTERSTATE", cluster_state);
+
         return vt;
     }
 

@@ -29,6 +29,7 @@ import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -51,6 +52,21 @@ public class TestAdminMode extends RegressionSuite
         builder.addStmtProcedure("CountA", "SELECT COUNT(*) FROM T");
         builder.addStmtProcedure("SelectA", "SELECT * FROM T");
         return builder;
+    }
+
+    void checkSystemInformationClusterState(VoltTable sysinfo, String state)
+    {
+        for (int i = 0; i < sysinfo.getRowCount(); i++)
+        {
+            sysinfo.advanceRow();
+            if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE"))
+            {
+                assertEquals(state,
+                             sysinfo.get("VALUE", VoltType.STRING));
+                return;
+            }
+        }
+        fail("Failed to find CLUSTERSTATE key in SystemInformation results");
     }
 
     // Check that we can start in admin mode, access the DB only from the admin
@@ -91,12 +107,19 @@ public class TestAdminMode extends RegressionSuite
             results = adminclient.callProcedure("CountA").getResults();
             assertEquals(100, results[0].asScalarLong());
 
+            // Verify that @SystemInformation tells us the right thing
+            results = adminclient.callProcedure("@SystemInformation").getResults();
+            checkSystemInformationClusterState(results[0], "Paused");
+
             // exit admin mode and get busy from both ports
             adminclient.callProcedure("@Resume");
             results = client.callProcedure("CountA").getResults();
             assertEquals(100, results[0].asScalarLong());
             results = adminclient.callProcedure("CountA").getResults();
             assertEquals(100, results[0].asScalarLong());
+            // Verify that @SystemInformation tells us the right thing
+            results = adminclient.callProcedure("@SystemInformation").getResults();
+            checkSystemInformationClusterState(results[0], "Running");
 
             // verify admin mode sysprocs not available on production port
             boolean admin_failed = false;
@@ -153,6 +176,9 @@ public class TestAdminMode extends RegressionSuite
                        admin_reentered);
             results = adminclient.callProcedure("CountA").getResults();
             assertEquals(100, results[0].asScalarLong());
+            // Verify that @SystemInformation tells us the right thing
+            results = adminclient.callProcedure("@SystemInformation").getResults();
+            checkSystemInformationClusterState(results[0], "Paused");
         }
         finally {
             adminclient.close();
