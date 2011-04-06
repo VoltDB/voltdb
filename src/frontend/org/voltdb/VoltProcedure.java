@@ -1019,12 +1019,24 @@ public abstract class VoltProcedure {
             if (m_currentStartTime > 0) {
                 final long endTime = System.nanoTime();
                 final long delta = endTime - m_currentStartTime;
-                m_totalTimedExecutionTime += delta;
-                m_timedInvocations++;
-                m_minExecutionTime = Math.min( delta, m_minExecutionTime);
-                m_maxExecutionTime = Math.max( delta, m_maxExecutionTime);
-                m_lastMinExecutionTime = Math.min( delta, m_lastMinExecutionTime);
-                m_lastMaxExecutionTime = Math.max( delta, m_lastMaxExecutionTime);
+                if (delta < 0)
+                {
+                    if (Math.abs(delta) > 1000000000)
+                    {
+                        log.info("Procedure: " + m_catProc.getTypeName() +
+                                 " recorded a negative execution time larger than one second: " +
+                                 delta);
+                    }
+                }
+                else
+                {
+                    m_totalTimedExecutionTime += delta;
+                    m_timedInvocations++;
+                    m_minExecutionTime = Math.min( delta, m_minExecutionTime);
+                    m_maxExecutionTime = Math.max( delta, m_maxExecutionTime);
+                    m_lastMinExecutionTime = Math.min( delta, m_lastMinExecutionTime);
+                    m_lastMaxExecutionTime = Math.max( delta, m_lastMaxExecutionTime);
+                }
                 m_currentStartTime = -1;
             }
             if (aborted) {
