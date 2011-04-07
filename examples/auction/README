@@ -1,33 +1,54 @@
 The auction example is a VERY simple on-line auction simulation.
 
 The auction-ddl.sql file describes the following tables:
+
 - Category (types of things that can be auctioned)
-- Item (actual things that are auctioned)
-- User (buyers and sellers)
-- Auction (one record per auction, including a start time equal to the creation time of the record and an end time 2 minutes later)
+- Item (actual things that are auctioned) - User (buyers and sellers)
+- Auction (one record per auction, including a start time equal to the
+  creation time of the record and an end time 2 minutes later)
 - Bid (all of the bids for all of the auctions)
 
 A client is provided that runs various Java stored procedure files to:
-- Load categories, users, and items from the category,txt, user.txt, and item.txt datafiles into the appropriate tables.
-- Load 4 auctions from the auctions.txt file into the auction table and initiate the auctions.
-- Provide bids by various users for each auction, using an algorithm for creating a new bid price based on the previous bid for the item adjusted by an increase based on the starting price and a random Gaussian function. Each auction completes within 1 to 2 minutes after the auction starts. 
-- Provide periodic status on each auction.
-- Provide the results of each auction after close.
 
-Export
-------
-The auction example is also set up to demonstrate the ability for VoltDB to export live data from a running database. To run the auction example with export enabled, you must do the following:
+- Load categories, users, and items from the category,txt, user.txt, and
+  item.txt datafiles into the appropriate tables.
+- Load 4 auctions from the auctions.txt file into the auction table and
+  initiate the auctions.
+- Provide bids by various users for each auction, using an algorithm for
+  creating a new bid price based on the previous bid for the item adjusted
+  by an increase based on the starting price and a random Gaussian
+  function. Each auction completes within 1 to 2 minutes after the auction
+  starts.
+- Provide periodic status on each auction. - Provide the results
+  of each auction after close.
 
-1. Edit deployment.xml and change enabled="false" to enabled="true" in the <export> tag.
+Export ------
 
-2. Start three terminal windows.
+The auction example is also set up to demonstrate the
+ability for VoltDB to export live data from a running database. To run
+the auction example with export enabled, you must do the following:
 
-3. In the first terminal window, issue the "ant server" command to start the auction database server.
+1. Edit deployment.xml and change enabled="false" to enabled="true" in
+   the <export> tag.
 
-4. In the second terminal window, issue the "ant export" command to start the export receiver.
+2. Start three terminal windows in the auction directory.
 
-5. In the third terminal window, issue the "ant client" command to start the auction client application.
+3. In the first terminal window, issue the "ant build" command to compile
+   the Java source code and build the VoltDB application catalog jar for 
+   the aution example.
 
-When you perform these actions, the auction client will run as usual. At the same time, the export receiver will write all of the BID and ITEM records to comma-separated files in the default directory.
+4. In the first terminal window, issue the "ant server" command to start
+   the auction database server.
 
-When the auction example finishes running CTRL-C in the server window and the server and export receiver processes will stop.
+5. In the second terminal window, issue the "ant export" command to
+   start the export receiver.
+
+6. In the third terminal window, issue the "ant client" command to start
+   the auction client application.
+
+When you perform these actions, the auction client will run as usual. At
+the same time, the export receiver will write all of the BID and ITEM
+records to comma-separated files in the default directory.
+
+When the auction example finishes running CTRL-C in the server window
+and the server and export receiver processes will stop.
