@@ -2,9 +2,10 @@
 
 # Parameters to pass/auto-discover
 LICENSE_SOURCE_DIRECTORY="/home/sebc/svndev/pro.trunk/licensedata"
-ACTIVE_VERSION="1.2.1.06"
+ACTIVE_VERSION="1.3.01"
 
 # Working variables
+#LICENSE_SOURCE=$LICENSE_SOURCE_DIRECTORY/trial_2011-05-12.xml #`date +"trial_%Y-%m-%d.xml"`
 LICENSE_SOURCE=$LICENSE_SOURCE_DIRECTORY/`date +"trial_%Y-%m-%d.xml"`
 
 # Setup a clean working area
@@ -18,7 +19,7 @@ tar -xzf voltdb-ent-$ACTIVE_VERSION.tar.gz
 rm voltdb-ent-$ACTIVE_VERSION.tar.gz
 
 # Copy the license file & rebuild archive
-cp $LICENSE_SOURCE_DIRECTORY/`date +"trial_%Y-%m-%d.xml"` voltdb-ent-$ACTIVE_VERSION/management/license.xml
+cp $LICENSE_SOURCE voltdb-ent-$ACTIVE_VERSION/management/license.xml
 ls voltdb-ent-$ACTIVE_VERSION/management
 tar -czf voltdb-ent-$ACTIVE_VERSION.tar.gz voltdb-ent-$ACTIVE_VERSION
 
@@ -26,5 +27,5 @@ tar -czf voltdb-ent-$ACTIVE_VERSION.tar.gz voltdb-ent-$ACTIVE_VERSION
 ## scp voltdb-ent-$ACTIVE_VERSION.tar.gz root@community.voltdb.com:/var/www/drupal/sites/default/files/archive/$ACTIVE_VERSION
 
 # Cleanup
-rm -rf /tmp/trialkitbuilder/
+#rm -rf /tmp/trialkitbuilder/
 
