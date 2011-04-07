@@ -9,13 +9,13 @@ if { $argc >= 0 } {
 
 set timeout 150
 proc abort {} {
-  exec mv project.xml.bak project.xml
+  exec mv deployment.xml.bak deployment.xml
   exit 1
 }
 
 exec rm -f EXPORTDEMO-BID.csv  EXPORTDEMO-ITEM.csv
 
-spawn ant catalog server
+spawn ant clean build server
 set server_id $spawn_id
 expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
@@ -44,22 +44,22 @@ expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
 expect -i $client_id timeout abort eof
 close -i $server_id
 
-exec mv project.xml project.xml.bak
-exec sed s/false/true/g project.xml.bak > project.xml
+exec mv deployment.xml deployment.xml.bak
+exec sed s/false/true/g deployment.xml.bak > deployment.xml
 
-spawn ant clean catalog server
+spawn ant clean build server
 set server_id $spawn_id
 expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
 # wait for server to really be ready
 sleep 1
-
-spawn ant client
-set client_id $spawn_id
 
 spawn ant export
 set export_id $spawn_id
 
+spawn ant client
+set client_id $spawn_id
+
 expect -i $client_id eof abort timeout abort "Welcome to Bobbi's Awesome Auctions"
 expect -i $client_id eof abort timeout abort "Loading ITEM Table"
 expect -i $client_id eof abort timeout abort "4"
@@ -78,8 +78,7 @@ expect -i $client_id eof abort timeout abort "Where do ghosts shop?"
 expect -i $client_id eof abort timeout abort "In Boo-tiques!"
 expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
 expect -i $client_id timeout abort eof
+close -i $export_id
 close -i $server_id
 
-expect -i $export_id timeout abort eof
-
-exec mv project.xml.bak project.xml
+exec mv deployment.xml.bak deployment.xml
