@@ -789,7 +789,7 @@ public abstract class CatalogUtil {
      */
     private static void setSnapshotInfo(Catalog catalog, SnapshotType snapshotSettings) {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        if (snapshotSettings != null) {
+        if (snapshotSettings != null && snapshotSettings.isEnabled()) {
             SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
             String frequency = snapshotSettings.getFrequency();
             if (!frequency.endsWith("s") &&

@@ -228,4 +228,35 @@ public class TestCatalogUtil extends TestCase {
         crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpBoom.getPath());
         assertEquals(-1, crcDep);
     }
+
+    public void testAutoSnapshotEnabledFlag() throws Exception
+    {
+        final String depOff =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"false\"/>" +
+            "</deployment>";
+
+        final String depOn =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"true\"/>" +
+            "</deployment>";
+
+        final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath());
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(db.getSnapshotschedule().isEmpty());
+
+        setUp();
+        final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath());
+        db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        assertFalse(db.getSnapshotschedule().isEmpty());
+        assertEquals(10, db.getSnapshotschedule().get("default").getRetain());
+    }
 }
