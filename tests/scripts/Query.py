@@ -81,6 +81,10 @@ class VoltQueryClient(cmd.Cmd):
 
         self.systeminformation = VoltProcedure(self.fs, "@SystemInformation")
 
+        self.updatecatalog = VoltProcedure(self.fs, "@UpdateApplicationCatalog",
+                                             [FastSerializer.VOLTTYPE_STRING,
+                                              FastSerializer.VOLTTYPE_STRING])
+
         self.quiesce = VoltProcedure(self.fs, "@Quiesce")
 
         self.pause = VoltProcedure(self.fs, "@Pause")
@@ -305,6 +309,26 @@ class VoltQueryClient(cmd.Cmd):
     def help_sysinfo(self):
         self.safe_print("Get system information")
         self.safe_print("\tsysinfo")
+
+    def do_updatecatalog(self, command):
+        if self.fs == None:
+            return
+        if not command:
+            return self.help_updatecatalog()
+
+        args = command.split()
+        if len(args) != 2:
+            return self.help_updatecatalog()
+
+        self.safe_print("Updating the application catalog")
+        self.response = self.__safe_call(self.updatecatalog,
+                                         [args[0], args[1]],
+                                         timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_updatecatalog(self):
+        self.safe_print("Update the application catalog:")
+        self.safe_print("\tupdatecatalog catalogjarfile deploymentfile")
 
     def do_quiesce(self, command):
         if self.fs == None:
