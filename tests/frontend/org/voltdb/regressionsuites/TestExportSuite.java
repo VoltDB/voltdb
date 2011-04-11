@@ -196,6 +196,7 @@ public class TestExportSuite extends RegressionSuite {
      * @throws Exception
      */
     public void testExportEnterExitAdminMode() throws Exception {
+        System.out.println("testExportEnterExitAdminMode");
         m_username = "admin";
         m_password = "admin";
         final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -333,6 +334,7 @@ public class TestExportSuite extends RegressionSuite {
      * @throws Exception
      */
     public void testExportSnapshotTruncatesExportData() throws Exception {
+        System.out.println("testExportSnapshotTruncatesExportData");
         Client client = getClient();
         for (int i=0; i < 40; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -401,6 +403,7 @@ public class TestExportSuite extends RegressionSuite {
   //  Test that the file client can actually works
   //
   public void testExportToFileClient() throws Exception {
+      System.out.println("testExportToFileClient");
       final Client client = getClient();
       final Object[] rowdata = TestSQLTypesSuite.m_midValues;
       for (int i=0; i < 10; i++) {
@@ -484,6 +487,7 @@ public class TestExportSuite extends RegressionSuite {
   }
 
     public void testExportSnapshotPreservesSequenceNumber() throws Exception {
+        System.out.println("testExportSnapshotPreservesSequenceNumber");
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -537,6 +541,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     public void testExportClientIsBootedAfterRejoin() throws Exception {
+        System.out.println("testExportClientIsBootedAfterRejoin");
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -592,6 +597,7 @@ public class TestExportSuite extends RegressionSuite {
     //  drain the dropped table. IE, drop table doesn't lose Export data.
     //
     public void testExportAndThenRejoinClearsExportOverflow() throws Exception {
+        System.out.println("testExportAndThenRejoinClearsExportOverflow");
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -631,6 +637,7 @@ public class TestExportSuite extends RegressionSuite {
     //  drain the dropped table. IE, drop table doesn't lose Export data.
     //
     public void testExportAndDroppedTableThenShutdown() throws Exception {
+        System.out.println("testExportAndDroppedTableThenShutdown");
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -692,6 +699,7 @@ public class TestExportSuite extends RegressionSuite {
     // Test Export of an ADDED table.
     //
     public void testExportAndAddedTable() throws Exception {
+        System.out.println("testExportAndAddedTable");
         final Client client = getClient();
 
         // add a new table
@@ -722,6 +730,7 @@ public class TestExportSuite extends RegressionSuite {
     //  drain the dropped table. IE, drop table doesn't lose Export data.
     //
     public void testExportAndDroppedTable() throws Exception {
+        System.out.println("testExportAndDroppedTable");
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -750,12 +759,14 @@ public class TestExportSuite extends RegressionSuite {
      */
     public void testExportSafeStartup() throws Exception
     {
+        System.out.println("testExportSafeStartup");
         final Client client = getClient();
         quiesceAndVerify(client, m_tester);
     }
 
     public void testExportLocalServerTooMany() throws Exception
     {
+        System.out.println("testExportLocalServerTooMany");
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -767,6 +778,7 @@ public class TestExportSuite extends RegressionSuite {
 
     public void testExportLocalServerTooMany2() throws Exception
     {
+        System.out.println("testExportLocalServerTooMany2");
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -785,6 +797,7 @@ public class TestExportSuite extends RegressionSuite {
     /** Verify test infrastructure fails a test that sends too few rows */
     public void testExportLocalServerTooFew() throws Exception
     {
+        System.out.println("testExportLocalServerTooFew");
         final Client client = getClient();
 
         for (int i=0; i < 10; i++) {
@@ -803,6 +816,7 @@ public class TestExportSuite extends RegressionSuite {
     /** Verify test infrastructure fails a test that sends mismatched data */
     public void testExportLocalServerBadData() throws Exception
     {
+        System.out.println("testExportLocalServerBadData");
         final Client client = getClient();
 
         for (int i=0; i < 10; i++) {
@@ -822,6 +836,7 @@ public class TestExportSuite extends RegressionSuite {
      */
     public void testExportRoundTripStreamedTable() throws Exception
     {
+        System.out.println("testExportRoundTripStreamedTable");
         final Client client = getClient();
 
         for (int i=0; i < 10; i++) {
@@ -838,6 +853,7 @@ public class TestExportSuite extends RegressionSuite {
     /** Test that a table w/o Export enabled does not produce Export content */
     public void testThatTablesOptIn() throws Exception
     {
+        System.out.println("testThatTablesOptIn");
         final Client client = getClient();
 
         final Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
@@ -863,6 +879,7 @@ public class TestExportSuite extends RegressionSuite {
      * Tests that streams are correct in the face of rollback.
      */
     public void testExportRollback() throws Exception {
+        System.out.println("testExportRollback");
         final Client client = getClient();
 
         final double rollbackPerc = 0.15;
@@ -911,6 +928,7 @@ public class TestExportSuite extends RegressionSuite {
      * Verify that planner rejects updates to append-only tables
      */
     public void testExportUpdateAppendOnly() throws IOException {
+        System.out.println("testExportUpdateAppendOnly");
         final Client client = getClient();
         boolean passed = false;
         try {
@@ -928,6 +946,7 @@ public class TestExportSuite extends RegressionSuite {
      * Verify that planner rejects reads of append-only tables.
      */
     public void testExportSelectAppendOnly() throws IOException {
+        System.out.println("testExportSelectAppendOnly");
         final Client client = getClient();
         boolean passed = false;
         try {
@@ -945,6 +964,7 @@ public class TestExportSuite extends RegressionSuite {
      *  Verify that planner rejects deletes of append-only tables
      */
     public void testExportDeleteAppendOnly() throws IOException {
+        System.out.println("testExportDeleteAppendOnly");
         final Client client = getClient();
         boolean passed = false;
         try {
@@ -963,6 +983,7 @@ public class TestExportSuite extends RegressionSuite {
      */
     public void testExportMultiTable() throws Exception
     {
+        System.out.println("testExportMultiTable");
         final Client client = getClient();
 
         for (int i=0; i < 10; i++) {
@@ -987,6 +1008,7 @@ public class TestExportSuite extends RegressionSuite {
      * Verify that snapshot can be enabled with a streamed table present
      */
     public void testExportPlusSnapshot() throws Exception {
+        System.out.println("testExportPlusSnapshot");
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
             // add data to a first (persistent) table

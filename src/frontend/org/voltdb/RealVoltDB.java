@@ -442,7 +442,7 @@ public class RealVoltDB implements VoltDBInterface
             catalog.execute(serializedCatalog);
 
             // note if this fails it will print an error first
-            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_config.m_pathToDeployment);
+            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_config.m_pathToDeployment, true);
             if (depCRC < 0)
                 System.exit(-1);
 

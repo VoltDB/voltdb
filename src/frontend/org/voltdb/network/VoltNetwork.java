@@ -328,10 +328,18 @@ public class VoltNetwork implements Runnable
 
         acquireRegistrationLock();
         try {
-            SelectionKey key = channel.register (m_selector, interestOps, port);
+            SelectionKey key = channel.register (m_selector, interestOps, null);
 
             port.setKey (key);
             port.registered();
+
+            //Fix a bug witnessed on the mini where the registration lock and the selector wakeup contained
+            //within was not enough to prevent the selector from returning the port after it was registered,
+            //but before setKey was called. Suspect a bug in the selector.wakeup() or register() implementation
+            //on the mac.
+            //The null check in invokeCallbacks will catch the null attachment, continue, and do the work
+            //next time through the selection loop
+            key.attach(port);
 
             return port;
         } finally {
@@ -557,10 +565,11 @@ public class VoltNetwork implements Runnable
         final Set<SelectionKey> selectedKeys = m_selector.selectedKeys();
         final ArrayList<Runnable> generatedTasks = new ArrayList<Runnable>();
         for(SelectionKey key : selectedKeys) {
-            final VoltPort port = (VoltPort) key.attachment();
-            if (port == null) {
+            final Object obj = key.attachment();
+            if (obj == null) {
                 continue;
             }
+            final VoltPort port = (VoltPort) key.attachment();
             try {
                 port.lockForHandlingWork();
                 key.interestOps(0);

@@ -421,7 +421,7 @@ public abstract class CatalogUtil {
      * @param deploymentURL Path to the deployment.xml file.
      * @return CRC of the deployment contents (>0) or -1 on failure.
      */
-    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL) {
+    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL, boolean crashOnFailedValidation) {
         DeploymentType deployment = parseDeployment(deploymentURL);
 
         // wasn't a valid xml deployment file
@@ -441,7 +441,7 @@ public abstract class CatalogUtil {
         setSnapshotInfo( catalog, deployment.getSnapshot());
 
         //set path and path overrides
-        setPathsInfo(catalog, deployment.getPaths());
+        setPathsInfo(catalog, deployment.getPaths(), crashOnFailedValidation);
 
         // set the users info
         setUsersInfo(catalog, deployment.getUsers());
@@ -724,26 +724,32 @@ public abstract class CatalogUtil {
         }
     }
 
-    private static void validateDirectory(String type, File path) {
-        if (!path.exists()) {
-            hostLog.fatal("Specified " + type + " \"" + path + "\" does not exist");
-            VoltDB.crashVoltDB();
-        }
-        if (!path.isDirectory()) {
-            hostLog.fatal("Specified " + type + " \"" + path + "\" is not a directory");
-            VoltDB.crashVoltDB();
-        }
-        if (!path.canRead()) {
-            hostLog.fatal("Specified " + type + " \"" + path + "\" is not readable");
-            VoltDB.crashVoltDB();
-        }
-        if (!path.canWrite()) {
-            hostLog.fatal("Specified " + type + " \"" + path + "\" is not writable");
-            VoltDB.crashVoltDB();
-        }
-        if (!path.canExecute()) {
-            hostLog.fatal("Specified " + type + " \"" + path + "\" is not executable");
-            VoltDB.crashVoltDB();
+    private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {
+        String error = null;
+        do {
+            if (!path.exists()) {
+                error = "Specified " + type + " \"" + path + "\" does not exist"; break;
+            }
+            if (!path.isDirectory()) {
+                error = "Specified " + type + " \"" + path + "\" is not a directory"; break;
+            }
+            if (!path.canRead()) {
+                error = "Specified " + type + " \"" + path + "\" is not readable"; break;
+            }
+            if (!path.canWrite()) {
+                error = "Specified " + type + " \"" + path + "\" is not writable"; break;
+            }
+            if (!path.canExecute()) {
+                error = "Specified " + type + " \"" + path + "\" is not executable"; break;
+            }
+        } while(false);
+        if (error != null) {
+            if (crashOnFailedValidation) {
+                hostLog.fatal(error);
+                VoltDB.crashVoltDB();
+            } else {
+                hostLog.warn(error);
+            }
         }
     }
 
@@ -845,7 +851,7 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param paths A reference to the <paths> element of the deployment.xml file.
      */
-    private static void setPathsInfo(Catalog catalog, PathsType paths) {
+    private static void setPathsInfo(Catalog catalog, PathsType paths, boolean crashOnFailedValidation) {
         File voltDbRoot;
 
         // Handle default voltdbroot (and completely missing "paths" element).
@@ -861,7 +867,7 @@ public abstract class CatalogUtil {
             voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
         }
 
-        validateDirectory("volt root", voltDbRoot);
+        validateDirectory("volt root", voltDbRoot, crashOnFailedValidation);
         hostLog.info("Using \"" + voltDbRoot.getAbsolutePath() + "\" for voltdbroot directory.");
 
         File snapshotPath;
@@ -876,7 +882,7 @@ public abstract class CatalogUtil {
             snapshotPath = new VoltFile(paths.getSnapshots().getPath());
         }
 
-        validateDirectory("snapshot path", snapshotPath);
+        validateDirectory("snapshot path", snapshotPath, crashOnFailedValidation);
 
         File ppdSnapshotPath;
         if (paths == null || paths.getPartitiondetectionsnapshot() == null) {
@@ -891,7 +897,7 @@ public abstract class CatalogUtil {
             ppdSnapshotPath = new VoltFile(paths.getPartitiondetectionsnapshot().getPath());
         }
 
-        validateDirectory("partition detection snapshot path", ppdSnapshotPath);
+        validateDirectory("partition detection snapshot path", ppdSnapshotPath, crashOnFailedValidation);
 
         File exportOverflowPath;
         if (paths == null || paths.getExportoverflow() == null) {
@@ -906,7 +912,7 @@ public abstract class CatalogUtil {
             exportOverflowPath = new VoltFile(paths.getExportoverflow().getPath());
         }
 
-        validateDirectory("export overflow", exportOverflowPath);
+        validateDirectory("export overflow", exportOverflowPath, crashOnFailedValidation);
 
         //Set the volt root in the catalog
         catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());

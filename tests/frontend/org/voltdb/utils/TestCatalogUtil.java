@@ -220,12 +220,12 @@ public class TestCatalogUtil extends TestCase {
         final File tmpDep = VoltProjectBuilder.writeStringToTempFile(dep);
         final File tmpBoom = VoltProjectBuilder.writeStringToTempFile(boom);
 
-        long crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDep.getPath());
+        long crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDep.getPath(), true);
 
         assertEquals(30, catalog.getClusters().get("cluster").getHeartbeattimeout());
 
         // This returns -1 on schema violation
-        crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpBoom.getPath());
+        crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpBoom.getPath(), true);
         assertEquals(-1, crcDep);
     }
 
@@ -248,13 +248,13 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath());
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath(), true);
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertTrue(db.getSnapshotschedule().isEmpty());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath());
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath(), true);
         db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertFalse(db.getSnapshotschedule().isEmpty());
         assertEquals(10, db.getSnapshotschedule().get("default").getRetain());

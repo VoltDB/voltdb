@@ -313,7 +313,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             // If VoltProjectBuilder was used, work.deploymentURL will be null. No deployment.xml file was
             // given to the server in this case because its deployment info has already been added to the catalog.
             if (work.deploymentURL != null) {
-                retval.deploymentCRC = CatalogUtil.compileDeploymentAndGetCRC(newCatalog, work.deploymentURL);
+                retval.deploymentCRC = CatalogUtil.compileDeploymentAndGetCRC(newCatalog, work.deploymentURL, false);
                 if (retval.deploymentCRC < 0) {
                     retval.errorMsg = "Unable to read from deployment file at: " + work.deploymentURL;
                     return retval;

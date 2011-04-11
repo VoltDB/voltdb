@@ -135,26 +135,109 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             m_config.createDirectory(new File("/tmp/snapshotdir1"));
             m_config.createDirectory(new File("/tmp/snapshotdir2"));
             Client client = getClient();
+
+            /*
+             * Test that we can enable snapshots
+             */
             String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
             String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
             VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(5000);
+
+            /*
+             * Make sure snapshot files are generated
+             */
             for (File f : m_config.listFiles(new File("/tmp/snapshotdir1"))) {
                 assertTrue(f.getName().startsWith("foo1"));
             }
+
+            /*
+             * Test that we can change settings like the path
+             */
             newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.jar");
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml");
             results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(5000);
+
+            /*
+             * Check that files are made in the new path
+             */
             for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
                 assertTrue(f.getName().startsWith("foo2"));
             }
+
+            /*
+             * Change the snapshot path to something that doesn't exist, no crashes
+             */
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+
+            System.out.println("Waiting for failed snapshots");
+            Thread.sleep(5000);
+
+            /*
+             * Change it back
+             */
             newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
             results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
             assertTrue(results.length == 1);
+            Thread.sleep(5000);
+
+            /*
+             * Make sure snapshots resume
+             */
+            for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
+                assertTrue(f.getName().startsWith("foo2"));
+            }
+
+            /*
+             * Make sure you can disable snapshots
+             */
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
+                f.delete();
+            }
+
+            Thread.sleep(5000);
+
+            /*
+             * Make sure you can reenable snapshot files
+             */
+            assertEquals( 0, m_config.listFiles(new File("/tmp/snapshotdir2")).size());
+
+            /*
+             * Test that we can enable snapshots
+             */
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            Thread.sleep(5000);
+
+            /*
+             * Make sure snapshot files are generated
+             */
+            for (File f : m_config.listFiles(new File("/tmp/snapshotdir1"))) {
+                assertTrue(f.getName().startsWith("foo1"));
+            }
+
+            /*
+             * Turn snapshots off so that we can clean up
+             */
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            Thread.sleep(1000);
+
             m_config.deleteDirectory(new File("/tmp/snapshotdir1"));
             m_config.deleteDirectory(new File("/tmp/snapshotdir2"));
             m_config.createDirectory(new File("/tmp/snapshotdir1"));
@@ -634,6 +717,18 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml"));
+
+        //Another catalog change to modify the schedule
+        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
 
         return builder;
     }

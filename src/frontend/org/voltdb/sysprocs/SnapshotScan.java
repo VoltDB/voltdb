@@ -441,7 +441,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             assert(r.getString("RESULT").equals("SUCCESS"));
             assert(m_totalPartitions == (int)r.getLong("TOTAL_PARTITIONS"));
             assert(m_createTime == r.getLong("CREATED"));
-            assert("TRUE".equals(r.getString("RESULT")));
+            assert("SUCCESS".equals(r.getString("RESULT")));
             assert("TRUE".equals(r.getString("COMPLETED")));
             m_size += r.getLong("SIZE");
             String partitions[] = r.getString("PARTITIONS").split(",");

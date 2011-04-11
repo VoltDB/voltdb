@@ -782,7 +782,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)0);
 
-        Thread.sleep(700);
+        /*
+         * Increased timeout from .7 to 1.2 seconds for the mini. It might not
+         * finished the non-blocking snapshot in time.
+         */
+        Thread.sleep(1200);
 
         /*
          * Check that snapshot status returns a reasonable result
