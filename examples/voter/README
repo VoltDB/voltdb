@@ -62,6 +62,8 @@ ant server          : start the server
 
 ant client          : start the client, more than 1 client is permitted
 
+ant sync-client     : start the synchronous client, more than 1 client is permitted.
+
 ant catalog         : build the catalog
 
 ant clean           : remove compiled files

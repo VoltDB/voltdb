@@ -22,4 +22,17 @@
     </invoke-java>
 </target>
 
+<target name="sync-client" description="Start the synchronous voter client application.">
+    <invoke-java  classname="com.SyncClientVoter">
+        <arg value="6"/>                                <!-- total number of contestants (maximum 12) -->
+        <arg value="2"/>                                <!-- number of votes allowed per phone number -->
+        <arg value="5000"/>                             <!-- maximum number of votes per second this client can generate -->
+        <arg value="5"/>                                <!-- client application feedback interval (seconds) -->
+        <arg value="120"/>                              <!-- client application duration (seconds) -->
+        <arg value="3"/>                                <!-- number of seconds to wait before recording latency information -->
+        <arg value="localhost"/>                        <!-- comma separated list of servers to connect to -->
+
+    </invoke-java>
+</target>
+
 </project>
