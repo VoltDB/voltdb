@@ -26,3 +26,13 @@ CREATE TABLE O3 (
  );
 
  CREATE INDEX O3_TREE ON O3 (I3 DESC);
+
+create table a
+(
+  a integer not null
+);
+create table b
+(
+  a integer not null
+);
+

@@ -18,8 +18,6 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map.Entry;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
@@ -47,7 +45,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         public boolean groupBy = false;
     }
 
-    public HashMap<String, ParsedColInfo> allColumns = new HashMap<String, ParsedColInfo>();
     public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression having = null;
@@ -121,9 +118,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.tableName = "VOLT_TEMP_TABLE";
                 col.columnName = "";
             }
-            col.index = allColumns.size();
+            // This index calculation is only used for sanity checking
+            // materialized views (which use the parsed select statement but
+            // don't go through the planner pass that does more involved
+            // column index resolution).
+            col.index = displayColumns.size();
             displayColumns.add(col);
-            allColumns.put(col.alias, col);
         }
     }
 
@@ -210,27 +210,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         NamedNodeMap childAttrs = child.getAttributes();
         // Cases:
         // inner child could be columnref, in which case it's just a normal
-        // column, so we try to look it up the the columns we've already
-        // parsed and if we don't find it, we create a new column.
-        //
+        // column.  Just make a ParsedColInfo object for it and the planner
+        // will do the right thing later
         if (child.getNodeName().equals("columnref"))
         {
             String alias = childAttrs.getNamedItem("alias").getNodeValue();
             // create the orderby column
-            ParsedColInfo col = allColumns.get(alias);
-            if (col == null) {
-                col = new ParsedColInfo();
-                col.alias = alias;
-                col.expression = parseExpressionTree(child, db);
-                ExpressionUtil.assignLiteralConstantTypesRecursively(col.expression);
-                ExpressionUtil.assignOutputValueTypesRecursively(col.expression);
-                col.index = allColumns.size();
-                col.columnName =
-                    childAttrs.getNamedItem("column").getNodeValue();
-                col.tableName =
+            ParsedColInfo col = new ParsedColInfo();
+            col.alias = alias;
+            col.expression = parseExpressionTree(child, db);
+            ExpressionUtil.assignLiteralConstantTypesRecursively(col.expression);
+            ExpressionUtil.assignOutputValueTypesRecursively(col.expression);
+            col.columnName =
+                childAttrs.getNamedItem("column").getNodeValue();
+            col.tableName =
                     childAttrs.getNamedItem("table").getNodeValue();
-                allColumns.put(alias, col);
-            }
             col.orderBy = true;
             col.ascending = !descending;
             orderColumns.add(col);
@@ -246,13 +240,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             order_col.tableName = "VOLT_TEMP_TABLE";
             AbstractExpression order_exp = parseExpressionTree(child, db);
             // 2) It's a simplecolumn operation.  This means that the alias that
-            //    we have should refer to a column that we compute somewhere else.
-            //    Look up that column in the allColumns list, and then create a
-            //    new order by column with a magic TVE
+            //    we have should refer to a column that we compute
+            //    somewhere else (like an aggregate, mostly).
+            //    Look up that column in the displayColumns list,
+            //    and then create a new order by column with a magic TVE.  This
+            //    means that we can only ORDER BY a pre-computed expression
+            //    that is also in the display columns, but I'm not sure there's
+            //    a way to not do that that is valid SQL
             if (order_exp instanceof TupleValueExpression)
             {
                 String alias = childAttrs.getNamedItem("alias").getNodeValue();
-                ParsedColInfo orig_col = allColumns.get(alias);
+                ParsedColInfo orig_col = null;
+                for (ParsedColInfo col : displayColumns)
+                {
+                    if (col.alias.equals(alias))
+                    {
+                        orig_col = col;
+                    }
+                }
                 // We need the original column expression so we can extract
                 // the value size and type for our TVE that refers back to it
                 if (orig_col == null)
@@ -277,8 +282,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // 1) it's an actual complex expression, which we will (for now)
             //    compute in the order by node.  Create a new column, hand it the
             //    parsed expression, and stick it in the order by columns.
-            //    Disavow any knowledge of it for allColumns, since it's not
-            //    (yet) an output column
             else
             {
                 ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
@@ -300,12 +303,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         retval += "LIMIT " + String.valueOf(limit) + "\n";
         retval += "OFFSET " + String.valueOf(limit) + "\n";
 
-        retval += "ALL COLUMNS:\n";
-        for (Entry<String, ParsedColInfo> col : allColumns.entrySet()) {
-            retval += "\tColumn: " + col.getKey() + ": ";
-            retval += col.getValue().expression.toString() + "\n";
-        }
-
         retval += "DISPLAY COLUMNS:\n";
         for (ParsedColInfo col : displayColumns) {
             retval += "\tColumn: " + col.alias + ": ";
@@ -314,7 +311,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         retval += "ORDER COLUMNS:\n";
         for (ParsedColInfo col : orderColumns) {
-            retval += "\tColumn: " + col.alias + ": " + col.ascending;
+            retval += "\tColumn: " + col.alias + ": ASC?: " + col.ascending + ": ";
             retval += col.expression.toString() + "\n";
         }
 

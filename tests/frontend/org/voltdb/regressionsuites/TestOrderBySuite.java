@@ -540,6 +540,23 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
+    public void testEng1133() throws Exception
+    {
+        Client client = getClient();
+        for(int a=0; a < 5; a++)
+        {
+            client.callProcedure("InsertA", a);
+            client.callProcedure("InsertB", a);
+        }
+        VoltTable vt = client.callProcedure("@AdHoc", "select a.a, b.a from a, b where b.a >= 3 order by a.a, b.a").
+                              getResults()[0];
+        System.out.println(vt.toString());
+        for (int i = 0; i < 10; i++)
+        {
+            assertEquals(i/2, vt.fetchRow(i).getLong(0));
+        }
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -556,6 +573,9 @@ public class TestOrderBySuite extends RegressionSuite {
 
         project.addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"));
         project.addPartitionInfo("O1", "PKEY");
+        project.addPartitionInfo("a", "a");
+        project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?);");
+        project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?);");
         project.addProcedures(PROCEDURES);
 
         config = new LocalSingleProcessServer("testorderby-onesite.jar",
