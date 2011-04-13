@@ -23,7 +23,9 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
+import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.InMemoryJarfile;
 
 public class CatalogContext {
@@ -159,5 +161,45 @@ public class CatalogContext {
 
         // look in the catalog for the file
         return m_jarfile.getLoader().loadClass(procedureClassName);
+    }
+
+    // Generate helpful status messages based on configuration present in the
+    // catalog.  Used to generated these messages at startup and after an
+    // @UpdateApplicationCatalog
+    void logDebuggingInfoFromCatalog()
+    {
+        VoltLogger hostLog = new VoltLogger("HOST");
+        if (cluster.getSecurityenabled()) {
+            hostLog.info("Client authentication is enabled.");
+        }
+        else {
+            hostLog.info("Client authentication is not enabled. Anonymous clients accepted.");
+        }
+
+        // auto snapshot info
+        SnapshotSchedule ssched = database.getSnapshotschedule().get("default");
+        if (ssched == null) {
+            hostLog.info("No schedule set for automated snapshots.");
+        }
+        else {
+            final String frequencyUnitString = ssched.getFrequencyunit().toLowerCase();
+            final char frequencyUnit = frequencyUnitString.charAt(0);
+            String msg = "[unknown frequency]";
+            switch (frequencyUnit) {
+            case 's':
+                msg = String.valueOf(ssched.getFrequencyvalue()) + " seconds";
+                break;
+            case 'm':
+                msg = String.valueOf(ssched.getFrequencyvalue()) + " minutes";
+                break;
+            case 'h':
+                msg = String.valueOf(ssched.getFrequencyvalue()) + " hours";
+                break;
+            }
+            hostLog.info("Automatic snapshots enabled, saved to " + ssched.getPath() +
+                         " and named with prefix '" + ssched.getPrefix() + "'.");
+            hostLog.info("Database will retain a history of " + ssched.getRetain() +
+                         " snapshots, generated every " + msg + ".");
+        }
     }
 }

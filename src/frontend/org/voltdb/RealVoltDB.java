@@ -47,7 +47,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Site;
-import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -943,12 +942,6 @@ public class RealVoltDB implements VoltDBInterface
         else {
             hostLog.info("Json API disabled.");
         }
-        if (m_catalogContext.cluster.getSecurityenabled()) {
-            hostLog.info("Client authentication is enabled.");
-        }
-        else {
-            hostLog.info("Client authentication is not enabled. Anonymous clients accepted.");
-        }
 
         // replay command line args that we can see
         List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
@@ -963,28 +956,7 @@ public class RealVoltDB implements VoltDBInterface
         javamaxheapmem /= (1024 * 1024);
         hostLog.info(String.format("Maximum usable Java heap set to %d mb.", javamaxheapmem));
 
-        // auto snapshot info
-        SnapshotSchedule sshed = m_catalogContext.database.getSnapshotschedule().get("default");
-        if (sshed == null) {
-            hostLog.info("No schedule set for automated snapshots.");
-        }
-        else {
-            final String frequencyUnitString = sshed.getFrequencyunit().toLowerCase();
-            final char frequencyUnit = frequencyUnitString.charAt(0);
-            String msg = "[unknown frequency]";
-            switch (frequencyUnit) {
-            case 's':
-                msg = String.valueOf(sshed.getFrequencyvalue()) + " seconds";
-                break;
-            case 'm':
-                msg = String.valueOf(sshed.getFrequencyvalue()) + " minutes";
-                break;
-            case 'h':
-                msg = String.valueOf(sshed.getFrequencyvalue()) + " hours";
-                break;
-            }
-            hostLog.info("Automatic snapshots enabled every " + msg + " to " + sshed.getPath());
-        }
+        m_catalogContext.logDebuggingInfoFromCatalog();
 
         // print out a bunch of useful system info
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
@@ -1359,6 +1331,7 @@ public class RealVoltDB implements VoltDBInterface
             m_catalogContext =
                 m_catalogContext.update(currentTxnId, newCatalogURL, diffCommands, true, deploymentCRC);
             m_txnIdToContextTracker.put(currentTxnId, new ContextTracker(m_catalogContext));
+            m_catalogContext.logDebuggingInfoFromCatalog();
 
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext);
