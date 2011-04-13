@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.Pair;
 
 /**
  * Provides an extensible base class for writing Export clients
@@ -169,7 +170,9 @@ public abstract class ExportClientBase {
 
             constructExportDataSinks(retval);
         }
-        catch (IOException e) {}
+        catch (IOException e) {
+            m_logger.warn("Error connecting to export server " + addr, e);
+        }
 
         return retval;
     }
@@ -225,6 +228,8 @@ public abstract class ExportClientBase {
         // each AdvertisedDataSource list, and create data sinks for every
         // table/partition pair.
         boolean foundOneActiveServer = false;
+        ArrayList<Pair<Exception, InetSocketAddress>> connectErrors =
+            new ArrayList<Pair<Exception, InetSocketAddress>>();
         for (InetSocketAddress serverAddr : m_servers) {
             ExportConnection exportConnection = null;
             try {
@@ -255,6 +260,8 @@ public abstract class ExportClientBase {
                 if (e.getMessage().contains("Authentication")) {
                     throw new ExportClientException(ExportClientException.Type.AUTH_FAILURE,
                             "Authentication failure", e);
+                } else {
+                    connectErrors.add(Pair.of((Exception)e, serverAddr));
                 }
                 // ignore non-auth errors
             }
@@ -266,6 +273,11 @@ public abstract class ExportClientBase {
         }
 
         if (!foundOneActiveServer) {
+            for (Pair<Exception, InetSocketAddress> p : connectErrors) {
+                m_logger.error("Error connecting to server " + p.getSecond() + " while discovering cluster topology",
+                        p.getFirst());
+            }
+            m_logger.error("Unable to connect to a server to discover the cluster topology");
             return false;
         }
 
