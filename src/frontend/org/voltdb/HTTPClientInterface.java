@@ -200,10 +200,10 @@ public class HTTPClientInterface {
             }
         }
         catch (Exception e) {
-            e.printStackTrace();
             msg = e.getMessage();
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("JSON interface: " + msg);
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-            //e.printStackTrace();
             msg = rimpl.toJSONString();
             response.setStatus(HttpServletResponse.SC_OK);
             request.setHandled(true);
