@@ -59,6 +59,7 @@ public class TestExportOpsEvents extends TestCase {
     }
 
     public void testConnectingToNothing() throws ExportClientException {
+        System.out.println("testConnectToNothing");
         NullExportClient client = new NullExportClient();
         client.addServerInfo(new InetSocketAddress("localhost", 21212));
 
@@ -72,6 +73,7 @@ public class TestExportOpsEvents extends TestCase {
     }
 
     public void testConnectingToLateServer() throws Exception {
+        System.out.println("testConnectingToLateServer");
         NullExportClient client = new NullExportClient();
         client.addServerInfo(new InetSocketAddress("localhost", 21212));
 
@@ -87,6 +89,7 @@ public class TestExportOpsEvents extends TestCase {
     }
 
     public void testConnectingToFailingCluster() throws Exception {
+        System.out.println("testConnectingToFailingCluster");
         NullExportClient client = new NullExportClient();
         client.addServerInfo(new InetSocketAddress("localhost", 21212));
 
@@ -113,13 +116,49 @@ public class TestExportOpsEvents extends TestCase {
 
         client.disconnect();
 
-        assertTrue(client.connect());
+        /*
+         * Debug code added to make sure the server is listening on the client port.
+         * On the mini we were seeing that the export client couldn't reconnect
+         * and got connection refused which doesn't make any sense. Adding this
+         * debug output changed the timing so it wouldn't show up. Leave it in to make
+         * the test pass more consistently, and give us more info if it does end up failing again.
+         */
+        {
+            Process p = Runtime.getRuntime().exec("lsof -i");
+            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+            java.io.BufferedReader br = new java.io.BufferedReader(reader);
+            String str = null;
+            while((str = br.readLine()) != null) {
+                if (str.contains("LISTEN")) {
+                    System.out.println(str);
+                }
+            }
+        }
+
+        boolean connected = client.connect();
+        if (!connected) {
+            System.out.println("Couldn't reconnect");
+            /*
+             * Do the debug output a 2nd time to see if the status changes after the failure/time passes
+             */
+            Process p = Runtime.getRuntime().exec("lsof -i");
+            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+            java.io.BufferedReader br = new java.io.BufferedReader(reader);
+            String str = null;
+            while((str = br.readLine()) != null) {
+                if (str.contains("LISTEN")) {
+                    System.out.println(str);
+                }
+            }
+        }
+        assertTrue(connected);
         client.disconnect();
 
         VoltDBFickleCluster.stop();
     }
 
     public void testConnectingToRejoiningCluster() throws Exception {
+        System.out.println("testConnectingToRejoiningCluster");
         NullExportClient expClient = new NullExportClient();
         expClient.addServerInfo(new InetSocketAddress("localhost", 21212));
 
@@ -180,8 +219,5 @@ public class TestExportOpsEvents extends TestCase {
 
         VoltDBFickleCluster.stop();
     }
-
-
-
 
 }
