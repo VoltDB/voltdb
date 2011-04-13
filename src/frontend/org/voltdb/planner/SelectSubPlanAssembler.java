@@ -359,7 +359,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * of sets of specific ways to access each table in a join order. It is called recursively.
      *
      * @param joinOrder The list of tables in this sub-select in a particular order.
-     * @param accessPathOptions The list of ways to access each table for this sub-select.
      * @return A list of lists of lists (ugh). For a given table, an access path is a list of indexes
      * which might be empty. Given a join order, a complete access path for that join order is an
      * array (one slot per table) of access paths. The list of all possible complete access paths is

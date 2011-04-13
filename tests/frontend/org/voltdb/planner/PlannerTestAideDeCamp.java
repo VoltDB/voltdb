@@ -26,6 +26,7 @@ package org.voltdb.planner;
 import java.io.PrintStream;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -93,12 +94,12 @@ public class PlannerTestAideDeCamp {
         return catalog;
     }
 
-    public AbstractPlanNode compile(String sql, int paramCount)
+    public List<AbstractPlanNode> compile(String sql, int paramCount)
     {
         return compile(sql, paramCount, false);
     }
 
-    public AbstractPlanNode compile(String sql, int paramCount, boolean singlePartition) {
+    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {
         return compile(sql, paramCount, singlePartition, null);
     }
     /**
@@ -106,7 +107,7 @@ public class PlannerTestAideDeCamp {
      * @param sql
      * @param paramCount
      */
-    public AbstractPlanNode compile(String sql, int paramCount, boolean singlePartition, String joinOrder)
+    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
@@ -176,11 +177,14 @@ public class PlannerTestAideDeCamp {
             index++;
         }
 
-        CompiledPlan.Fragment fragment = plan.fragments.get(0);
-        PlanNodeList nodeList = new PlanNodeList(fragment.planGraph);
+        List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
+        for (CompiledPlan.Fragment fragment : plan.fragments) {
+            PlanNodeList nodeList = new PlanNodeList(fragment.planGraph);
+            nodeLists.add(nodeList);
+        }
 
         //Store the list of parameters types and indexes in the plan node list.
-        List<Pair<Integer, VoltType>> parameters = nodeList.getParameters();
+        List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
         for (ParameterInfo param : plan.parameters) {
             Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(param.index, param.type);
             parameters.add(parameter);
@@ -192,7 +196,7 @@ public class PlannerTestAideDeCamp {
 
         String json = null;
         try {
-            JSONObject jobj = new JSONObject(nodeList.toJSONString());
+            JSONObject jobj = new JSONObject(nodeLists.get(0).toJSONString());
             json = jobj.toString(4);
         } catch (JSONException e2) {
             // TODO Auto-generated catch block
@@ -211,13 +215,18 @@ public class PlannerTestAideDeCamp {
 
             PrintStream plansDOTOut = BuildDirectoryUtils.getDebugOutputPrintStream(
                      "statement-plans", name + ".dot");
-            plansDOTOut.print(nodeList.toDOTString("name"));
+            plansDOTOut.print(nodeLists.get(0).toDOTString("name"));
             plansDOTOut.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        return nodeList.getRootPlanNode();
+        List<AbstractPlanNode> plannodes = new ArrayList<AbstractPlanNode>();
+        for (PlanNodeList nodeList : nodeLists) {
+            plannodes.add(nodeList.getRootPlanNode());
+        }
+
+        return plannodes;
     }
 
 }

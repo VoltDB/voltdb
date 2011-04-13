@@ -23,6 +23,8 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import junit.framework.TestCase;
 import org.voltdb.benchmark.tpcc.TPCCClient;
 import org.voltdb.plannodes.*;
@@ -34,7 +36,7 @@ public class TestPlansTPCC extends TestCase {
 
     /** A helper here where the junit test can assert on success */
     private AbstractPlanNode compile(String sql, int paramCount) {
-        AbstractPlanNode pn = null;
+        List<AbstractPlanNode> pn = null;
         try {
             pn =  aide.compile(sql, paramCount);
         }
@@ -47,7 +49,9 @@ public class TestPlansTPCC extends TestCase {
             fail();
         }
         assertTrue(pn != null);
-        return pn;
+        assertFalse(pn.isEmpty());
+        assertTrue(pn.get(0) != null);
+        return pn.get(0);
     }
 
 

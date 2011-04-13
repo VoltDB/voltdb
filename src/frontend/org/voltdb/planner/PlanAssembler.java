@@ -860,18 +860,24 @@ public class PlanAssembler {
 
         if (containsAggregateExpression) {
             aggNode = new HashAggregatePlanNode();
+            HashAggregatePlanNode topAggNode = new HashAggregatePlanNode();
 
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns) {
                 aggNode.addGroupByExpression(col.expression);
+                topAggNode.addGroupByExpression(col.expression);
             }
 
             int outputColumnIndex = 0;
+            int topOutputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
+            NodeSchema topAggSchema = new NodeSchema();
+            boolean onlyCountStar = true;
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns)
             {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
+                SchemaColumn topSchemaCol = null;
                 ExpressionType agg_expression_type = rootExpr.getExpressionType();
                 if (rootExpr.getExpressionType() == ExpressionType.AGGREGATE_SUM ||
                     rootExpr.getExpressionType() == ExpressionType.AGGREGATE_MIN ||
@@ -929,6 +935,51 @@ public class PlanAssembler {
                                                   "",
                                                   col.alias,
                                                   tve);
+
+                    /*
+                     * Special case count(*) to push it down to each partition.
+                     * It will do the push-down if the select columns only
+                     * contains count(*) and other group-by columns. If the
+                     * select columns includes any other aggregates, it will not
+                     * do the push-down. - nshi
+                     */
+                    if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR) {
+                        /*
+                         * For count(*), the pushed-down aggregate node doesn't
+                         * change. An extra sum() aggregate node is added to the
+                         * coordinator to sum up the counts from all the
+                         * partitions. The input schema and the output schema of
+                         * the sum() aggregate node is the same as the output
+                         * schema of the count(*) aggregate node.
+                         */
+
+                        // Output column for the sum() aggregate node
+                        TupleValueExpression topOutputExpr = new TupleValueExpression();
+                        topOutputExpr.setValueType(rootExpr.getValueType());
+                        topOutputExpr.setValueSize(rootExpr.getValueSize());
+                        topOutputExpr.setColumnIndex(topOutputColumnIndex);
+                        topOutputExpr.setColumnName("");
+                        topOutputExpr.setColumnAlias(col.alias);
+                        topOutputExpr.setTableName("VOLT_TEMP_TABLE");
+                        /*
+                         * Input column of the sum() aggregate node is the
+                         * output column of the count(*) aggregate node
+                         */
+                        topAggNode.addAggregate(ExpressionType.AGGREGATE_SUM,
+                                                false,
+                                                outputColumnIndex,
+                                                tve);
+                        topSchemaCol = new SchemaColumn("VOLT_TEMP_TABLE",
+                                                        "",
+                                                        col.alias,
+                                                        topOutputExpr);
+                    } else {
+                        /*
+                         * If there are other aggregates in the select columns,
+                         * don't do any push-down.
+                         */
+                        onlyCountStar = false;
+                    }
                 }
                 else
                 {
@@ -943,13 +994,56 @@ public class PlanAssembler {
                                                   col.alias,
                                                   col.expression);
                 }
+
+                if (topSchemaCol == null) {
+                    /*
+                     * If we didn't set the column schema for the top node, it
+                     * means either it's not a count(*) aggregate or it's a
+                     * pass-through column. So just copy it.
+                     */
+                    topSchemaCol = new SchemaColumn(schema_col.getTableName(),
+                                                    schema_col.getColumnName(),
+                                                    schema_col.getColumnAlias(),
+                                                    schema_col.getExpression());
+                }
+
                 agg_schema.addColumn(schema_col);
+                topAggSchema.addColumn(topSchemaCol);
                 outputColumnIndex++;
+                topOutputColumnIndex++;
             }
+
+            /*
+             * Push this aggregation node down to partition if it's distributed.
+             * First remove the send/receive pair, add the aggregate node, then
+             * put the send/receive pair back on top of the aggregate node,
+             * followed by another aggregate node at the coordinator.
+             */
+            AbstractPlanNode accessPlanTemp = root;
+            if (onlyCountStar && root instanceof ReceivePlanNode) {
+                root = root.getChild(0).getChild(0);
+                root.clearParents();
+            } else {
+                accessPlanTemp = null;
+            }
+
             aggNode.setOutputSchema(agg_schema);
             aggNode.addAndLinkChild(root);
             aggNode.generateOutputSchema(m_catalogDb);
             root = aggNode;
+
+            // Put the send/receive pair back into place
+            if (accessPlanTemp != null) {
+                accessPlanTemp.getChild(0).clearChildren();
+                accessPlanTemp.getChild(0).addAndLinkChild(root);
+                root = accessPlanTemp;
+
+                // Add the top aggregate node
+                topAggNode.setOutputSchema(agg_schema.clone());
+                topAggNode.addAndLinkChild(root);
+                topAggNode.generateOutputSchema(m_catalogDb);
+                root = topAggNode;
+            }
         }
 
         // handle select distinct a from t - which is planned as an aggregate but

@@ -22,6 +22,8 @@
  */
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
@@ -36,7 +38,7 @@ public class TestColumnTrimmingPlans extends TestCase
     private AbstractPlanNode compile(String sql, int paramCount,
                                      boolean singlePartition)
     {
-        AbstractPlanNode pn = null;
+        List<AbstractPlanNode> pn = null;
         try {
             pn =  aide.compile(sql, paramCount, singlePartition);
         }
@@ -50,7 +52,9 @@ public class TestColumnTrimmingPlans extends TestCase
             fail();
         }
         assertTrue(pn != null);
-        return pn;
+        assertFalse(pn.isEmpty());
+        assertTrue(pn.get(0) != null);
+        return pn.get(0);
     }
 
     @Override

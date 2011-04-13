@@ -23,6 +23,8 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import junit.framework.TestCase;
 
 import org.voltdb.catalog.CatalogMap;
@@ -40,7 +42,7 @@ public class TestCoveringIndexPlans extends TestCase {
     private AbstractPlanNode compile(String sql, int paramCount,
                                      boolean singlePartition)
     {
-        AbstractPlanNode pn = null;
+        List<AbstractPlanNode> pn = null;
         try {
             pn =  aide.compile(sql, paramCount, singlePartition);
         }
@@ -54,7 +56,9 @@ public class TestCoveringIndexPlans extends TestCase {
             fail();
         }
         assertTrue(pn != null);
-        return pn;
+        assertFalse(pn.isEmpty());
+        assertTrue(pn.get(0) != null);
+        return pn.get(0);
     }
 
     @Override

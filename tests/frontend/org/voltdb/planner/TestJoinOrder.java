@@ -23,12 +23,13 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import junit.framework.TestCase;
 
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
-import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.*;
 
 public class TestJoinOrder extends TestCase {
@@ -38,7 +39,7 @@ public class TestJoinOrder extends TestCase {
                                      boolean singlePartition,
                                      String joinOrder)
     {
-        AbstractPlanNode pn = null;
+        List<AbstractPlanNode> pn = null;
         try {
             pn =  aide.compile(sql, paramCount, singlePartition, joinOrder);
         }
@@ -52,7 +53,9 @@ public class TestJoinOrder extends TestCase {
             fail();
         }
         assertTrue(pn != null);
-        return pn;
+        assertFalse(pn.isEmpty());
+        assertTrue(pn.get(0) != null);
+        return pn.get(0);
     }
 
     public void testBasicJoinOrder() {
