@@ -354,10 +354,14 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             SnapshotVerifier.main(args);
             ps.flush();
             String reportString = baos.toString("UTF-8");
+            boolean success = false;
             if (expectSuccess) {
-                assertTrue(reportString.startsWith("Snapshot valid\n"));
+                success = reportString.startsWith("Snapshot valid\n");
             } else {
-                assertTrue(reportString.startsWith("Snapshot corrupted\n"));
+                success = reportString.startsWith("Snapshot corrupted\n");
+            }
+            if (!success) {
+                fail(reportString);
             }
         } catch (UnsupportedEncodingException e) {}
           finally {
