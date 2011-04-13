@@ -244,6 +244,7 @@ public abstract class ExportClientBase {
 
                 // successfully connected to one server, now rebuild the set of servers in the world
                 m_servers.clear();
+                m_logger.info("Discovered topology " + exportConnection.hosts.toString());
                 for (String hostname : exportConnection.hosts) {
                     assert(hostname.contains(":"));
                     String[] parts = hostname.split(":");

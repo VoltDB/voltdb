@@ -239,6 +239,17 @@ public class ClientInterface implements DumpManager.Dumpable {
                 } catch (IOException e) {
                     hostLog.fatal("Client interface failed to bind to port " + m_port);
                     hostLog.fatal("IOException message: \"" + e.getMessage() + "\"");
+                    {
+                        Process p = Runtime.getRuntime().exec("lsof -i");
+                        java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+                        java.io.BufferedReader br = new java.io.BufferedReader(reader);
+                        String str = null;
+                        while((str = br.readLine()) != null) {
+                            if (str.contains("LISTEN")) {
+                                hostLog.fatal(str);
+                            }
+                        }
+                    }
                     System.exit(-1);
                 }
             }
