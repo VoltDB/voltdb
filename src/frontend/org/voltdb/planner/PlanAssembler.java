@@ -871,6 +871,7 @@ public class PlanAssembler {
             int topOutputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
             NodeSchema topAggSchema = new NodeSchema();
+            boolean hasAggregates = false;
             boolean onlyCountStar = true;
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns)
             {
@@ -887,6 +888,7 @@ public class PlanAssembler {
                     rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR)
                 {
                     agg_input_expr = rootExpr.getLeft();
+                    hasAggregates = true;
 
                     // count(*) hack.  we're not getting AGGREGATE_COUNT_STAR
                     // expression types from the parsing, so we have
@@ -1020,7 +1022,7 @@ public class PlanAssembler {
              * followed by another aggregate node at the coordinator.
              */
             AbstractPlanNode accessPlanTemp = root;
-            if (onlyCountStar && root instanceof ReceivePlanNode) {
+            if (hasAggregates && onlyCountStar && root instanceof ReceivePlanNode) {
                 root = root.getChild(0).getChild(0);
                 root.clearParents();
             } else {

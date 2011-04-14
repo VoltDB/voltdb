@@ -31,6 +31,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.types.PlanNodeType;
+
 import junit.framework.TestCase;
 
 public class TestPushDownAggregates extends TestCase {
@@ -96,6 +98,12 @@ public class TestPushDownAggregates extends TestCase {
     public void testCountStarWithOtherAggregates() {
         List<AbstractPlanNode> pn = compile("SELECT count(*), max(A1) FROM T1", 0, false);
         checkPushedDown(pn, true, false);
+    }
+
+    public void testGroupByWithoutAggregates() {
+        List<AbstractPlanNode> pn = compile("SELECT A1 FROM T1 GROUP BY A1", 0, false);
+        assertFalse(pn.get(0).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
+        assertTrue(pn.get(1).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
     }
 
     private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
