@@ -555,10 +555,10 @@ public class ClientKV {
                         String last_tuning_warning = "";
                         if ((new_transactions_per_second <= 1000) || (new_transactions_per_second == transactions_per_second)) {
                             use_auto_tuning = false;
-                            last_tuning_warning = " | WARNING: Minimum load boundary reached.  Auto-Tuning De-activated";
+                            last_tuning_warning = " | WARNING: Minimum load boundary reached.";
                         }
 
-                        m_logger.info(String.format("[%s] Auto-Tuning | Observed: %,.2f TPS | Latency: min = %d | max = %d | avg = %.2f | Adjusting to %,d TPS%s"
+                        m_logger.info(String.format("[%s] Auto-Tuning | Observed: %,.2f TPS | Latency: min = %d | max = %d | avg = %.2f | Adjusting DOWN: %,d TPS%s"
                                                    , new Date().toString()
                                                    , (cycle_num_sp_calls / cycle_elapsedTimeSec2)
                                                    , cycle_min_execution_milliseconds
@@ -570,6 +570,24 @@ public class ClientKV {
                                      );
                         transactions_per_second = new_transactions_per_second;
                         transactions_per_milli = transactions_per_second/1000l;
+                    }
+                    else if (((double) cycle_tot_execution_milliseconds / (double) cycle_tot_executions_latency) < 0.9d*auto_tuning_target_latency_millis)
+                    {
+                        long new_transactions_per_second = ((long)Math.max(1.05d*transactions_per_second, (double)(cycle_num_sp_calls / cycle_elapsedTimeSec2))/1000l) *1000l;
+                        if (new_transactions_per_second > transactions_per_second_requested)
+                            new_transactions_per_second = transactions_per_second_requested;
+                        if (new_transactions_per_second > transactions_per_second)
+                        {
+                            System.out.printf("Auto-Tuning | Observed: %,.2f TPS | Latency: min = %d | max = %d | avg = %.2f | Adjusting UP: %,d TPS\n"
+                                             , (cycle_num_sp_calls / cycle_elapsedTimeSec2)
+                                             , cycle_min_execution_milliseconds
+                                             , cycle_max_execution_milliseconds
+                                             , ((double) cycle_tot_execution_milliseconds / (double) cycle_tot_executions_latency)
+                                             , new_transactions_per_second
+                                             );
+                            transactions_per_second = new_transactions_per_second;
+                            transactions_per_milli = transactions_per_second/1000l;
+                        }
                     }
 
                     cycle_num_sp_calls = 0;
