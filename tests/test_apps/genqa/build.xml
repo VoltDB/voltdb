@@ -94,6 +94,7 @@
     </macrodef>
     
     <target name="default" depends="srccompile, proccompile, catalog, server" description="Compile and start server."/>
+    <target name="build" depends="srccompile, proccompile, catalog" description="Compile everything."/>
     
     <target name="clean" depends="config" description="Remove compilation artifacts">
         <delete failonerror="false" includeemptydirs="true">
@@ -147,13 +148,29 @@
     
     <target name="jiggle" description="Start the voter multi-threaded SyncClient application.">
         <invoke-java-client classname="com.JiggleClient">
-            <arg value="--pool=10000"/>
-            <arg value="--procedure=JiggleSinglePartition"/>
+            <arg value="--pool=50000000"/>
+            <arg value="--procedure=${proc}"/>
             <arg value="--threads=1"/>
-            <arg value="--rate=3000"/>
+            <arg value="--rate=200000"/>
             <arg value="--async"/>
             <arg value="--share-connection"/>
-            <arg value="--duration=30"/>
+            <arg value="--duration=3000"/>
+            <arg value="--servers=volt3f"/>
+            <arg value="--port=21312"/>
+        </invoke-java-client>
+    </target>
+
+    <target name="latcheck" description="Start the voter multi-threaded SyncClient application.">
+        <invoke-java-client classname="com.FixedLatencyClient">
+            <arg value="--wait=30"/>
+            <arg value="--procedure=WaitSinglePartition"/>
+            <arg value="--threads=1"/>
+            <arg value="--rate=200000"/>
+            <arg value="--async"/>
+            <arg value="--share-connection"/>
+            <arg value="--duration=120"/>
+            <arg value="--servers=volt5a"/>
+            <arg value="--port=21212"/>
         </invoke-java-client>
     </target>
 
@@ -164,6 +181,23 @@
     <target name="wait-m" description="Start the WaitClient application (Multi-Partition Wait).">
         <invoke-java-client classname="com.WaitClient">
             <arg value="--multi"/>
+        </invoke-java-client>
+    </target>
+
+    <target name="export" description="Start the export client.">
+        <invoke-java-client classname="org.voltdb.exportclient.ExportToFileClient">
+            <arg value="--connect"/>
+            <arg value="client"/>
+            <arg value="--servers"/>
+            <arg value="volt7a"/>
+            <arg value="--type"/>
+            <arg value="csv"/>
+            <arg value="--outdir"/>
+            <arg value="/tmp"/>
+            <arg value="--nonce"/>
+            <arg value="export"/>
+            <arg value="--period"/>
+            <arg value="2"/>
         </invoke-java-client>
     </target>
 

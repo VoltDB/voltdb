@@ -19,6 +19,9 @@
             <procedure class='com.procedures.WaitSinglePartition' />
             <procedure class='com.procedures.WaitMultiPartition' />
         </procedures>
+        <classdependencies>
+            <classdependency class="com.procedures.SampleRecord" />
+        </classdependencies>
         <partitions>
             <partition table='partitioned_table' column='rowid' />
             <partition table='export_partitioned_table' column='rowid' />
