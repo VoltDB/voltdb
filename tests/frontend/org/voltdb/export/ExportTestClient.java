@@ -130,13 +130,6 @@ public class ExportTestClient extends ExportClientBase
                 }
             }
         }
-        for (ExportConnection connection : m_exportConnections.values())
-        {
-            if (!connection.isConnected())
-            {
-                retval = true;
-            }
-        }
         return retval;
     }
 

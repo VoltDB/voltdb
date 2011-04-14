@@ -35,6 +35,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.export.processors.RawProcessor;
+import org.voltdb.export.processors.RawProcessor.ExportStateBlock;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 
 public class TestExportDataSource extends TestCase {
@@ -132,66 +133,74 @@ public class TestExportDataSource extends TestCase {
         assertEquals( 96, s.sizeInBytes());
 
         ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
-        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
+        final AtomicReference<ExportProtoMessage> ref = new AtomicReference<ExportProtoMessage>();
+        ExportStateBlock esb = new ExportStateBlock() {
+            @Override
+            public void event(ExportProtoMessage m) {
+                ref.set(m);
+            }
+        };
+        ExportInternalMessage pair = new ExportInternalMessage(esb, m);
 
-        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
-        ExportManager.setInstanceForTest(new ExportManager() {
-           @Override
-           public void queueMessage(ExportInternalMessage mbp) {
-               ref.set(mbp);
-           }
-        });
         m.poll();
         s.exportAction(pair);
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 96, s.sizeInBytes());
-        ExportInternalMessage mbp = ref.get();
+        m = ref.get();
 
-        assertEquals(m_part, mbp.m_m.m_partitionId);
-        assertEquals(table.getSignature(), mbp.m_m.m_signature);
-        assertEquals( 43, mbp.m_m.m_offset);
+        assertEquals(m_part, m.m_partitionId);
+        assertEquals(table.getSignature(), m.m_signature);
+        assertEquals( 43, m.m_offset);
         foo = ByteBuffer.allocate(24);
         foo.order(ByteOrder.LITTLE_ENDIAN);
         foo.putInt(20);
         foo.position(0);
-        assertEquals( foo, mbp.m_m.m_data);
+        assertEquals( foo, m.m_data);
 
         m.ack(43);
+        m.poll();
+        pair = new ExportInternalMessage(esb, m);
+
         s.exportAction(pair);
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 96, s.sizeInBytes());
-        mbp = ref.get();
+        m = ref.get();
 
-        assertEquals(m_part, mbp.m_m.m_partitionId);
-        assertEquals(table.getSignature(), mbp.m_m.m_signature);
-        assertEquals( 63, mbp.m_m.m_offset);
-        assertEquals( foo, mbp.m_m.m_data);
+        assertEquals(m_part, m.m_partitionId);
+        assertEquals(table.getSignature(), m.m_signature);
+        assertEquals( 63, m.m_offset);
+        assertEquals( foo, m.m_data);
 
         m.ack(63);
+        m.poll();
+
+        pair = new ExportInternalMessage(esb, m);
         s.exportAction(pair);
         //The two buffers pushed into a file at the head are now gone
         //One file with a single buffer remains.
         assertEquals( 32, s.sizeInBytes());
-        mbp = ref.get();
+        m = ref.get();
 
-        assertEquals(m_part, mbp.m_m.m_partitionId);
-        assertEquals(table.getSignature(), mbp.m_m.m_signature);
-        assertEquals( 83, mbp.m_m.m_offset);
-        assertEquals( foo, mbp.m_m.m_data);
+        assertEquals(m_part, m.m_partitionId);
+        assertEquals(table.getSignature(), m.m_signature);
+        assertEquals( 83, m.m_offset);
+        assertEquals( foo, m.m_data);
 
         m.ack(83);
+        m.poll();
+        pair = new ExportInternalMessage(esb, m);
         s.exportAction(pair);
         //4-bytes remain, this is the number of entries in the write segment
         assertEquals( 0, s.sizeInBytes());
         System.out.println(s.sizeInBytes());
-        mbp = ref.get();
+        m = ref.get();
 
-        assertEquals(m_part, mbp.m_m.m_partitionId);
-        assertEquals(table.getSignature(), mbp.m_m.m_signature);
-        assertEquals( 83, mbp.m_m.m_offset);
-        assertEquals( 0, mbp.m_m.m_data.getInt());
+        assertEquals(m_part, m.m_partitionId);
+        assertEquals(table.getSignature(), m.m_signature);
+        assertEquals( 83, m.m_offset);
+        assertEquals( 0, m.m_data.getInt());
     }
 
     /**
@@ -215,21 +224,21 @@ public class TestExportDataSource extends TestCase {
 
         // we get nothing with no data
         ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
-        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
+        final AtomicReference<ExportProtoMessage> ref = new AtomicReference<ExportProtoMessage>();
+        ExportStateBlock esb = new ExportStateBlock() {
+            @Override
+            public void event(ExportProtoMessage m) {
+                ref.set(m);
+            }
+        };
+        ExportInternalMessage pair = new ExportInternalMessage(esb, m);
 
-        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
-        ExportManager.setInstanceForTest(new ExportManager() {
-           @Override
-           public void queueMessage(ExportInternalMessage mbp) {
-               ref.set(mbp);
-           }
-        });
         m.poll();
         s.exportAction(pair);
 
-        ExportInternalMessage mbp = ref.get();
-        assertEquals(mbp.m_m.getAckOffset(), 0);
-        assertEquals(mbp.m_m.m_data.getInt(), 0);
+        m = ref.get();
+        assertEquals(m.getAckOffset(), 0);
+        assertEquals(m.m_data.getInt(), 0);
 
         ByteBuffer firstBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 9);
         s.pushExportBuffer(0, 0, firstBuffer, false, false);
@@ -241,12 +250,13 @@ public class TestExportDataSource extends TestCase {
         m.ack(MAGIC_TUPLE_SIZE * 9);
         m.poll();
         ref.set(null);
+        pair = new ExportInternalMessage(esb, m);
         s.exportAction(pair);
 
         // now get the second
-        mbp = ref.get();
-        assertEquals(MAGIC_TUPLE_SIZE * 19, mbp.m_m.getAckOffset());
-        assertEquals(MAGIC_TUPLE_SIZE * 10, mbp.m_m.m_data.remaining() - 4);
+        m = ref.get();
+        assertEquals(MAGIC_TUPLE_SIZE * 19, m.getAckOffset());
+        assertEquals(MAGIC_TUPLE_SIZE * 10, m.m_data.remaining() - 4);
     }
 
     /**
@@ -270,62 +280,67 @@ public class TestExportDataSource extends TestCase {
 
         // we get nothing with no data
         ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
-        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
+        final AtomicReference<ExportProtoMessage> ref = new AtomicReference<ExportProtoMessage>();
+        ExportStateBlock esb = new ExportStateBlock() {
+            @Override
+            public void event(ExportProtoMessage m) {
+                ref.set(m);
+            }
+        };
+        ExportInternalMessage pair = new ExportInternalMessage(esb, m);
 
-        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
-        ExportManager.setInstanceForTest(new ExportManager() {
-           @Override
-           public void queueMessage(ExportInternalMessage mbp) {
-               ref.set(mbp);
-           }
-        });
         m.poll();
         s.exportAction(pair);
 
-        ExportInternalMessage mbp = ref.get();
-        assertEquals(mbp.m_m.getAckOffset(), 0);
-        assertEquals(mbp.m_m.m_data.getInt(), 0);
+        m = ref.get();
+        assertEquals(m.getAckOffset(), 0);
+        assertEquals(m.m_data.getInt(), 0);
 
         ByteBuffer firstBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 3);
         s.pushExportBuffer(0, 0, firstBuffer, false, false);
 
         // release part of the committed data
         m.ack(MAGIC_TUPLE_SIZE * 2);
+        m.poll();
+        pair = new ExportInternalMessage(esb, m);
         s.exportAction(pair);
 
         //Verify the release was done correctly, should only get one tuple back
         m.close();
+        pair = new ExportInternalMessage(esb, m);
         s.exportAction(pair);
-        mbp = ref.get();
-        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 3);
-        mbp.m_m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
-        assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE);
+        m = ref.get();
+        assertEquals(m.getAckOffset(), MAGIC_TUPLE_SIZE * 3);
+        m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        assertEquals(m.m_data.getInt(), MAGIC_TUPLE_SIZE);
 
         //Reset close flag
         m = new ExportProtoMessage( 0, m_part, table.getSignature());
         m.poll();
-        pair = new RawProcessor.ExportInternalMessage(null, m);
+        pair = new ExportInternalMessage(esb, m);
 
         // now try to release past committed data
         m.ack(MAGIC_TUPLE_SIZE * 10);
         s.exportAction(pair);
 
         //verify that we have moved to the end of the committed data
-        mbp = ref.get();
-        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 3);
-        assertEquals(mbp.m_m.m_data.getInt(), 0);
+        m = ref.get();
+        assertEquals(m.getAckOffset(), MAGIC_TUPLE_SIZE * 3);
+        assertEquals(m.m_data.getInt(), 0);
 
         ByteBuffer secondBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 6);
         s.pushExportBuffer(MAGIC_TUPLE_SIZE * 3, 0, secondBuffer, false, false);
 
         m.ack(MAGIC_TUPLE_SIZE * 3);
+        m.poll();
+        pair = new ExportInternalMessage(esb, m);
         s.exportAction(pair);
 
         // now, more data and make sure we get the all of it
-        mbp = ref.get();
-        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 9);
-        mbp.m_m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
-        assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE * 6);
+        m = ref.get();
+        assertEquals(m.getAckOffset(), MAGIC_TUPLE_SIZE * 9);
+        m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        assertEquals(m.m_data.getInt(), MAGIC_TUPLE_SIZE * 6);
     }
 
     /**
@@ -348,15 +363,14 @@ public class TestExportDataSource extends TestCase {
                                             "/tmp");
 
         ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
-        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
-
-        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
-        ExportManager.setInstanceForTest(new ExportManager() {
-           @Override
-           public void queueMessage(ExportInternalMessage mbp) {
-               ref.set(mbp);
-           }
-        });
+        final AtomicReference<ExportProtoMessage> ref = new AtomicReference<ExportProtoMessage>();
+        ExportStateBlock esb = new ExportStateBlock() {
+            @Override
+            public void event(ExportProtoMessage m) {
+                ref.set(m);
+            }
+        };
+        ExportInternalMessage pair = new ExportInternalMessage(esb, m);
         m.poll();
 
         ByteBuffer firstBuffer = ByteBuffer.allocate(MAGIC_TUPLE_SIZE * 9);
@@ -369,21 +383,23 @@ public class TestExportDataSource extends TestCase {
         m.ack(MAGIC_TUPLE_SIZE * 4);
         s.exportAction(pair);
 
-        ExportInternalMessage mbp = ref.get();
+        m = ref.get();
 
         // get the first buffer and make sure we get the remainder
-        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 9);
-        mbp.m_m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
-        assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE * 5);
+        assertEquals(m.getAckOffset(), MAGIC_TUPLE_SIZE * 9);
+        m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        assertEquals(m.m_data.getInt(), MAGIC_TUPLE_SIZE * 5);
 
         //Now get the second buffer
         m.ack(MAGIC_TUPLE_SIZE * 9);
+        m.poll();
+        pair = new ExportInternalMessage(esb, m);
         s.exportAction(pair);
 
-        mbp = ref.get();
-        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 19);
-        mbp.m_m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
-        assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE * 10);
+        m = ref.get();
+        assertEquals(m.getAckOffset(), MAGIC_TUPLE_SIZE * 19);
+        m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        assertEquals(m.m_data.getInt(), MAGIC_TUPLE_SIZE * 10);
     }
 
 //    /**

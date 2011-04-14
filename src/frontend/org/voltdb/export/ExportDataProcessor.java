@@ -49,7 +49,7 @@ public interface ExportDataProcessor  {
     /**
      * Queue a work message to the processor's mailbox.
      */
-    public void queueMessage(ExportInternalMessage m);
+    public void queueWork(Runnable r);
 
     /**
      * A client has connected. Create an InputHandler for it.

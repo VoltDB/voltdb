@@ -91,33 +91,47 @@ public class ExportManager
     private final Runnable m_onGenerationDrained = new Runnable() {
         @Override
         public void run() {
-            TreeMap<Long, ExportGeneration> generations = new TreeMap<Long, ExportGeneration>(m_generations.get());
-            ExportGeneration generation = generations.firstEntry().getValue();
-            generations.remove(generations.firstEntry().getKey());
-            exportLog.info("Finished draining generation " + generation.m_timestamp);
-            m_generations.set(generations);
-
-            exportLog.info("Creating connector " + m_loaderClass);
-            ExportDataProcessor newProcessor = null;
-            try {
-                final Class<?> loaderClass = Class.forName(m_loaderClass);
-                newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-                newProcessor.addLogger(exportLog);
-                newProcessor.setExportGeneration(generations.firstEntry().getValue());
-                newProcessor.readyForData();
-            } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
-                exportLog.error(e);
-            } catch (IllegalAccessException e) {
-                exportLog.error(e);
+            /*
+             * Do all the work to switch to a new generation in the thread for the processor
+             * of the old generation
+             */
+            ExportDataProcessor proc = m_processor.get();
+            if (proc == null) {
+                VoltDB.crashVoltDB();
             }
+            proc.queueWork(new Runnable() {
+                @Override
+                public void run() {
+                    TreeMap<Long, ExportGeneration> generations =
+                        new TreeMap<Long, ExportGeneration>(m_generations.get());
+                    ExportGeneration generation = generations.firstEntry().getValue();
+                    generations.remove(generations.firstEntry().getKey());
+                    exportLog.info("Finished draining generation " + generation.m_timestamp);
+                    m_generations.set(generations);
 
-            m_processor.getAndSet(newProcessor).shutdown();
-            try {
-                generation.closeAndDelete();
-            } catch (IOException e) {
-                e.printStackTrace();
-                exportLog.error(e);
-            }
+                    exportLog.info("Creating connector " + m_loaderClass);
+                    ExportDataProcessor newProcessor = null;
+                    try {
+                        final Class<?> loaderClass = Class.forName(m_loaderClass);
+                        newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+                        newProcessor.addLogger(exportLog);
+                        newProcessor.setExportGeneration(generations.firstEntry().getValue());
+                        newProcessor.readyForData();
+                    } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
+                        exportLog.error(e);
+                    } catch (IllegalAccessException e) {
+                        exportLog.error(e);
+                    }
+
+                    m_processor.getAndSet(newProcessor).shutdown();
+                    try {
+                        generation.closeAndDelete();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        exportLog.error(e);
+                    }
+                }
+            });
         }
     };
 
@@ -330,27 +344,6 @@ public class ExportManager
         //        };
         //
         //        m_processors.peek().setOnAllSourcesDrained(switchToNextGeneration);
-    }
-
-    /**
-     * Add a message to the processor "mailbox".
-     * @param mbp
-     */
-    public void queueMessage(ExportInternalMessage mbp) {
-        /*
-         * Processor will be null while export generation is changing.
-         * It is possible for messages to be delivered to the processor
-         * from a connection that is going to be closed in a second.
-         * It is okay to drop the message based on the asusmption the connection
-         * is going to be closed. The export client will reconnect and resend
-         * this message.
-         */
-        // TODO: supporting multiple processors requires slicing the
-        // data buffer so each processor gets a readonly buffer.
-        ExportDataProcessor proc = m_processor.get();
-        if (proc != null) {
-            proc.queueMessage(mbp);
-        }
     }
 
     public void shutdown() {

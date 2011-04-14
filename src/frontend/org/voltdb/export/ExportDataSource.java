@@ -240,9 +240,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     try {
                         releaseExportBytes(message.getAckOffset(), blocksToDelete);
                     } catch (IOException e) {
-                        exportLog.error(e);
-                        result.error();
-                        ExportManager.instance().queueMessage(mbp);
+                        exportLog.error("Error attempting to release export bytes", e);
+                        VoltDB.crashVoltDB();
                         return;
                     }
                 }
@@ -291,9 +290,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 } catch (RuntimeException e) {
                     if (e.getCause() instanceof IOException) {
-                        exportLog.error(e);
-                        result.error();
-                        ExportManager.instance().queueMessage(mbp);
+                        exportLog.error("Error attempting to find unpolled export data", e);
+                        VoltDB.crashVoltDB();
                     } else {
                         throw e;
                     }
@@ -311,7 +309,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 ByteBuffer buf = ByteBuffer.allocate(4);
                 buf.putInt(0).flip();
                 result.pollResponse(m_firstUnpolledUso, buf);
-                ExportManager.instance().queueMessage(mbp);
+                mbp.m_sb.event(result);
             }
         }
 
@@ -328,7 +326,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         first_unpolled_block.uso() + first_unpolled_block.totalUso(),
                         first_unpolled_block.unreleasedBuffer());
             }
-            ExportManager.instance().queueMessage(mbp);
+            mbp.m_sb.event(result);
         }
     }
 

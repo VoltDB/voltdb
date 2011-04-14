@@ -83,7 +83,7 @@ public class ExportConnection {
      */
     public void openExportConnection() throws IOException
     {
-        m_logger.info("Starting EL Client socket to: " + name);
+        m_logger.info("Starting EL Client socket to: " + serverAddr);
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(m_password);
         Object[] cxndata =
             ConnectionUtil.
@@ -93,7 +93,7 @@ public class ExportConnection {
                                              serverAddr.getPort());
 
         m_socket = (SocketChannel) cxndata[0];
-
+        m_logger.info("Opened socket from " + m_socket.socket().getLocalSocketAddress() + " to " + m_socket.socket().getRemoteSocketAddress());
         if (m_state == CLOSED) {
             open();
             m_state = CONNECTING;

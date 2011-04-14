@@ -66,8 +66,8 @@ public class RawProcessor implements ExportDataProcessor {
      * Work messages are queued and polled from this mailbox. All work
      * done by the processor thread is serialized through this mailbox.
      */
-    private final LinkedBlockingDeque<ExportInternalMessage> m_mailbox =
-        new LinkedBlockingDeque<ExportInternalMessage>();
+    private final LinkedBlockingDeque<Runnable> m_mailbox =
+        new LinkedBlockingDeque<Runnable>();
 
     private ExportGeneration m_generation = null;
 
@@ -93,12 +93,12 @@ public class RawProcessor implements ExportDataProcessor {
     private final Runnable m_runLoop = new Runnable() {
         @Override
         public void run() {
-            ExportInternalMessage p;
+            Runnable r;
             while (m_shouldContinue.get() == true) {
                 try {
-                    p = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);
-                    if (p != null) {
-                        p.m_sb.event(p.m_m);
+                    r = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);
+                    if (r != null) {
+                        r.run();
                     }
                 }
                 catch (InterruptedException e) {
@@ -110,13 +110,17 @@ public class RawProcessor implements ExportDataProcessor {
 
     private Thread m_thread = null;
 
+    public interface ExportStateBlock {
+        public void event(ExportProtoMessage message);
+    }
+
     /**
      * State for an individual Export protocol connection. This could probably be
      * integrated with the PollingProtocolHandler but that object is pretty
      * exclusively called by the network threadpool. Separating this makes it
      * easier to think about concurrency.
      */
-    class ProtoStateBlock {
+    public class ProtoStateBlock implements ExportStateBlock {
         ProtoStateBlock(Connection c, boolean isAdmin) {
             m_c = c;
             m_isAdmin = isAdmin;
@@ -173,7 +177,7 @@ public class RawProcessor implements ExportDataProcessor {
             closeConnection();
         }
 
-        void event(final ExportProtoMessage m)
+        public void event(final ExportProtoMessage m)
         {
             if (m.isError()) {
                 protocolError(m, "Internal error message. May indicate that an invalid ack offset was requested.");
@@ -314,10 +318,10 @@ public class RawProcessor implements ExportDataProcessor {
      * meaningless, to satisfy ExecutionSite mailbox requirements.
      */
     public static class ExportInternalMessage extends VoltMessage {
-        public final ProtoStateBlock m_sb;
+        public final ExportStateBlock m_sb;
         public final ExportProtoMessage m_m;
 
-        public ExportInternalMessage(ProtoStateBlock sb, ExportProtoMessage m) {
+        public ExportInternalMessage(ExportStateBlock sb, ExportProtoMessage m) {
             m_sb = sb;
             m_m = m;
         }
@@ -375,8 +379,13 @@ public class RawProcessor implements ExportDataProcessor {
          */
         @Override
         public void stopping(Connection c) {
-            m_currentConnection = null;
-            m_sb.closeConnection();
+            m_mailbox.add(new Runnable() {
+                @Override
+                public void run() {
+                    m_currentConnection = null;
+                    m_sb.closeConnection();
+                }
+            });
         }
 
         @Override
@@ -395,8 +404,13 @@ public class RawProcessor implements ExportDataProcessor {
         public void handleMessage(final ByteBuffer message, final Connection c) {
             try {
                 FastDeserializer fds = new FastDeserializer(message);
-                ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
-                m_mailbox.add(new ExportInternalMessage(m_sb, m));
+                final ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
+                m_mailbox.add(new Runnable() {
+                    @Override
+                    public void run() {
+                        m_sb.event(m);
+                    }
+                });
             }
             catch (IOException e) {
                 throw new RuntimeException(e);
@@ -462,8 +476,8 @@ public class RawProcessor implements ExportDataProcessor {
     }
 
     @Override
-    public void queueMessage(ExportInternalMessage m) {
-        m_mailbox.add(m);
+    public void queueWork(Runnable r) {
+        m_mailbox.add(r);
     }
 
     @Override
@@ -489,12 +503,9 @@ public class RawProcessor implements ExportDataProcessor {
                     m_logger.error("Interruption not expected", e);
                 }
             }
-            m_generation = null;
-            m_thread = null;
         }
         if (m_currentConnection != null) {
             m_currentConnection.unregister();
-            m_currentConnection = null;
         }
     }
 

@@ -1234,17 +1234,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         else if (message instanceof RawProcessor.ExportInternalMessage) {
             RawProcessor.ExportInternalMessage exportm =
                 (RawProcessor.ExportInternalMessage) message;
-            ExportProtoMessage response =
-                ee.exportAction(exportm.m_m.isSync(),
+            ee.exportAction(exportm.m_m.isSync(),
                                 exportm.m_m.getAckOffset(),
                                 0,
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
-            // not all actions generate a response
-            if (response != null) {
-                ExportInternalMessage mbp = new ExportInternalMessage(exportm.m_sb, response);
-                ExportManager.instance().queueMessage(mbp);
-            }
         } else if (message instanceof PotentialSnapshotWorkMessage) {
             m_snapshotter.doSnapshotWork(ee);
         }
