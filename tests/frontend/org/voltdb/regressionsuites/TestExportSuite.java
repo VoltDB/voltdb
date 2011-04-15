@@ -243,7 +243,7 @@ public class TestExportSuite extends RegressionSuite {
             @Override
             public void run() {
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(3000);
                     currentThread.interrupt();
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -271,7 +271,7 @@ public class TestExportSuite extends RegressionSuite {
                 try {
                     Thread.sleep(2000);
                     adminClient.callProcedure("@Resume");
-                    Thread.sleep(1000);
+                    Thread.sleep(3000);
                     currentThread.interrupt();
                 } catch (Exception e) {
                     e.printStackTrace();

@@ -328,7 +328,9 @@ public class ClientInterface implements DumpManager.Dumpable {
                                     final InputHandler handler = authenticate(socket);
                                     if (handler != null) {
                                         socket.configureBlocking(false);
-                                        socket.socket().setTcpNoDelay(false);
+                                        if (handler instanceof ClientInputHandler) {
+                                            socket.socket().setTcpNoDelay(false);
+                                        }
                                         socket.socket().setKeepAlive(true);
 
                                         if (handler instanceof ClientInputHandler) {

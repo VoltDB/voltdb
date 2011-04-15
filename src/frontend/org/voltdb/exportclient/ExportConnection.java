@@ -93,6 +93,7 @@ public class ExportConnection {
                                              serverAddr.getPort());
 
         m_socket = (SocketChannel) cxndata[0];
+        m_socket.socket().setTcpNoDelay(true);
         m_logger.info("Opened socket from " + m_socket.socket().getLocalSocketAddress() + " to " + m_socket.socket().getRemoteSocketAddress());
         if (m_state == CLOSED) {
             open();

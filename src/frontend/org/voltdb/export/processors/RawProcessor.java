@@ -491,8 +491,8 @@ public class RawProcessor implements ExportDataProcessor {
 
     @Override
     public void shutdown() {
+        m_shouldContinue.set(false);
         if (m_thread != null) {
-            m_shouldContinue.set(false);
             //Don't interrupt me while I'm talking
             if (m_thread != Thread.currentThread()) {
                 m_thread.interrupt();

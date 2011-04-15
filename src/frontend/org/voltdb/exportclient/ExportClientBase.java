@@ -151,10 +151,9 @@ public abstract class ExportClientBase {
         }
     }
 
-    private ExportConnection connectToServer(InetSocketAddress addr) {
-        ExportConnection retval = null;
+    private ExportConnection connectToServer(InetSocketAddress addr) throws InterruptedException {
         try {
-            retval = new ExportConnection(m_username, m_password, addr, m_sinks);
+            ExportConnection retval = new ExportConnection(m_username, m_password, addr, m_sinks);
             retval.openExportConnection();
 
             if (!retval.isConnected()) {
@@ -169,12 +168,16 @@ public abstract class ExportClientBase {
             }
 
             constructExportDataSinks(retval);
+            return retval;
         }
         catch (IOException e) {
             m_logger.warn("Error connecting to export server " + addr, e);
+            if (e instanceof java.nio.channels.ClosedByInterruptException) {
+                throw new InterruptedException(e.getMessage());
+            }
         }
 
-        return retval;
+        return null;
     }
 
     /**
@@ -258,6 +261,9 @@ public abstract class ExportClientBase {
                 break;
             }
             catch (IOException e) {
+                if (e instanceof java.nio.channels.ClosedByInterruptException) {
+                    return false;
+                }
                 if (e.getMessage().contains("Authentication")) {
                     throw new ExportClientException(ExportClientException.Type.AUTH_FAILURE,
                             "Authentication failure", e);
@@ -288,7 +294,13 @@ public abstract class ExportClientBase {
         for (int tryCount = 0; tryCount < 3; tryCount++) {
             for (InetSocketAddress addr : m_servers) {
                 if (m_exportConnections.containsKey(addr)) continue;
-                ExportConnection connection = connectToServer(addr);
+                ExportConnection connection;
+                try {
+                    connection = connectToServer(addr);
+                } catch (InterruptedException e) {
+                    disconnect();
+                    return false;
+                }
                 if (connection != null) {
                     m_exportConnections.put(addr, connection);
                     foundSources.addAll(connection.dataSources);
@@ -301,6 +313,12 @@ public abstract class ExportClientBase {
 
             // sleep for 1/4 second
             try { Thread.sleep(250); } catch (InterruptedException e) {}
+        }
+
+        // check for non-complete connection and roll back if so
+        if (m_servers.size() != m_exportConnections.size()) {
+            disconnect();
+            return false;
         }
 
         /*
@@ -323,12 +341,6 @@ public abstract class ExportClientBase {
         }
         m_knownDataSources.clear();
         m_knownDataSources.addAll(foundSources);
-
-        // check for non-complete connection and roll back if so
-        if (m_servers.size() != m_exportConnections.size()) {
-            disconnect();
-            return false;
-        }
 
         m_connected.set(true);
         return true;
