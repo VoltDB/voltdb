@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -35,7 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
@@ -76,6 +76,15 @@ import org.voltdb.utils.Pair;
  *
  */
 public class ClientInterface implements DumpManager.Dumpable {
+
+    // reasons a connection can fail
+    public static final byte AUTHENTICATION_FAILURE = -1;
+    public static final byte MAX_CONNECTIONS_LIMIT_ERROR = 1;
+    public static final byte WIRE_PROTOCOL_TIMEOUT_ERROR = 2;
+    public static final byte WIRE_PROTOCOL_FORMAT_ERROR = 3;
+    public static final byte AUTHENTICATION_FAILURE_DUE_TO_REJOIN = 4;
+    public static final byte EXPORT_DISABLED_REJECTION = 5;
+
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -302,7 +311,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                          * Send rejection message with reason code
                          */
                         final ByteBuffer b = ByteBuffer.allocate(1);
-                        b.put((byte)1);
+                        b.put(MAX_CONNECTIONS_LIMIT_ERROR);
                         b.flip();
                         socket.configureBlocking(true);
                         for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
@@ -430,7 +439,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                 authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                               "): wire protocol violation (timeout reading message length).");
                 //Send negative response
-                responseBuffer.put((byte)2).flip();
+                responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -442,7 +451,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (message length " + messageLength + " is negative).");
                 //Send negative response
-                responseBuffer.put((byte)3).flip();
+                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -451,7 +460,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                   authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                                "): wire protocol violation (message length " + messageLength + " is too large).");
                   //Send negative response
-                  responseBuffer.put((byte)3).flip();
+                  responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                   socket.write(responseBuffer);
                   socket.close();
                   return null;
@@ -476,7 +485,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
-                responseBuffer.put((byte)2).flip();
+                responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -504,7 +513,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                                  "): user " + username + " failed authentication.");
                     //Send negative response
-                    responseBuffer.put((byte)-1).flip();
+                    responseBuffer.put(AUTHENTICATION_FAILURE).flip();
                     socket.write(responseBuffer);
                     socket.close();
                     return null;
@@ -513,7 +522,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                         "): user " + username + " because this node is rejoining.");
                 //Send negative response
-                responseBuffer.put((byte)-1).flip();
+                responseBuffer.put(AUTHENTICATION_FAILURE_DUE_TO_REJOIN).flip();
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -533,29 +542,31 @@ public class ClientInterface implements DumpManager.Dumpable {
                             m_isAdmin);
             }
             else {
+                String strUser = "ANONYMOUS";
+                if ((username != null) && (username.length() > 0)) strUser = username;
+
                 // If no processor can handle this service, null is returned.
                 String connectorClassName = ExportManager.instance().getConnectorForService(service);
                 if (connectorClassName == null) {
                     //Send negative response
-                    responseBuffer.put((byte)-1).flip();
+                    responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
                     socket.write(responseBuffer);
                     socket.close();
-                    authLog.warn("Failure to authorize user " + username +
+                    authLog.warn("Failure to authorize user " + strUser +
                                  " for disabled or unconfigured service " +
                                  service + ".");
                     return null;
                 }
                 if (!user.authorizeConnector(connectorClassName)) {
                     //Send negative response
-                    responseBuffer.put((byte)-1).flip();
+                    responseBuffer.put(AUTHENTICATION_FAILURE).flip();
                     socket.write(responseBuffer);
                     socket.close();
-                    authLog.warn("Failure to authorize user " + username + " for service " + service + ".");
+                    authLog.warn("Failure to authorize user " + strUser + " for service " + service + ".");
                     return null;
                 }
 
-                handler = ExportManager.instance().createInputHandler(service,
-                                                                      m_isAdmin);
+                handler = ExportManager.instance().createInputHandler(service, m_isAdmin);
             }
 
             if (handler != null) {
@@ -579,7 +590,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): user " + username + " failed authentication.");
                 // Send negative response
-                responseBuffer.put((byte)-1).flip();
+                responseBuffer.put(AUTHENTICATION_FAILURE).flip();
                 socket.write(responseBuffer);
                 socket.close();
                 return null;

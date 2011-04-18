@@ -28,7 +28,12 @@ import java.util.concurrent.CountDownLatch;
 
 import junit.framework.TestCase;
 
+import org.voltdb.ServerThread;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
+import org.voltdb.utils.MiscUtils;
 
 public class TestExportOpsEvents extends TestCase {
 
@@ -70,6 +75,42 @@ public class TestExportOpsEvents extends TestCase {
         // now run for a while...
         // it should run for 1.5 seconds without failing, but also without connecting
         client.run(1500);
+    }
+
+    public void testConnectingToExportDisabledServer() throws Exception {
+        System.out.println("testConnectingToExportDisabledServer");
+
+        // compile a trivial voltdb catalog/deployment (no export)
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("create table blah (ival bigint default 0 not null, PRIMARY KEY(ival));");
+        builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("disabled-export.jar"), 1, 1, 0, "localhost");
+        assert(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("disabled-export.xml"));
+
+        // start voltdb server (no export)
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("disabled-export.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("disabled-export.xml");
+        ServerThread localServer = new ServerThread(config);
+        localServer.start();
+        localServer.waitForInitialization();
+
+        NullExportClient client = new NullExportClient();
+        client.addServerInfo(new InetSocketAddress("localhost", 21212));
+
+        // the first connect should return false, but shouldn't
+        // throw and exception
+        try {
+            client.connect();
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().contains("Export is not enabled"));
+        }
+
+        localServer.shutdown();
+        localServer.join();
     }
 
     public void testConnectingToLateServer() throws Exception {
@@ -116,13 +157,11 @@ public class TestExportOpsEvents extends TestCase {
 
         client.disconnect();
 
-        /*
-         * Debug code added to make sure the server is listening on the client port.
-         * On the mini we were seeing that the export client couldn't reconnect
-         * and got connection refused which doesn't make any sense. Adding this
-         * debug output changed the timing so it wouldn't show up. Leave it in to make
-         * the test pass more consistently, and give us more info if it does end up failing again.
-         */
+        // Debug code added to make sure the server is listening on the client port.
+        // On the mini we were seeing that the export client couldn't reconnect
+        // and got connection refused which doesn't make any sense. Adding this
+        // debug output changed the timing so it wouldn't show up. Leave it in to make
+        // the test pass more consistently, and give us more info if it does end up failing again.
         {
             Process p = Runtime.getRuntime().exec("lsof -i");
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
@@ -138,9 +177,8 @@ public class TestExportOpsEvents extends TestCase {
         boolean connected = client.connect();
         if (!connected) {
             System.out.println("Couldn't reconnect");
-            /*
-             * Do the debug output a 2nd time to see if the status changes after the failure/time passes
-             */
+
+            // Do the debug output a 2nd time to see if the status changes after the failure/time passes
             Process p = Runtime.getRuntime().exec("lsof -i");
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
             java.io.BufferedReader br = new java.io.BufferedReader(reader);

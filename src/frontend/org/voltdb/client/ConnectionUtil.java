@@ -40,6 +40,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -277,7 +278,8 @@ public class ConnectionUtil {
                     throw new IOException("Unable to write authentication info to serer");
                 }
                 throw new IOException("Authentication rejected");
-            } else {
+            }
+            else {
                 loginResponse.flip();
                 loginResponse.position(1);
                 loginResponseCode = loginResponse.get();
@@ -286,11 +288,17 @@ public class ConnectionUtil {
             if (loginResponseCode != 0) {
                 aChannel.close();
                 switch (loginResponseCode) {
-                case 1:
+                case ClientInterface.MAX_CONNECTIONS_LIMIT_ERROR:
                     throw new IOException("Server has too many connections");
-                case 2:
+                case ClientInterface.WIRE_PROTOCOL_TIMEOUT_ERROR:
                     throw new IOException("Connection timed out during authentication. " +
                             "The VoltDB server may be overloaded.");
+                case ClientInterface.EXPORT_DISABLED_REJECTION:
+                    throw new IOException("Export not enabled for server");
+                case ClientInterface.WIRE_PROTOCOL_FORMAT_ERROR:
+                    throw new IOException("Wire protocol format violation error");
+                case ClientInterface.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
+                    throw new IOException("Failed to authenticate to rejoining node");
                 default:
                     throw new IOException("Authentication rejected");
                 }

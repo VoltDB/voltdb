@@ -264,7 +264,11 @@ public abstract class ExportClientBase {
                 if (e instanceof java.nio.channels.ClosedByInterruptException) {
                     return false;
                 }
-                if (e.getMessage().contains("Authentication")) {
+                if (e.getMessage().contains("Export")) {
+                    throw new ExportClientException(ExportClientException.Type.AUTH_FAILURE,
+                            "Export is not enabled on this server.", e);
+                }
+                else if (e.getMessage().contains("Authentication")) {
                     throw new ExportClientException(ExportClientException.Type.AUTH_FAILURE,
                             "Authentication failure", e);
                 } else {
