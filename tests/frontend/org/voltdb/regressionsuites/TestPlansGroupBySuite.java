@@ -167,7 +167,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         loaderNxN(client, 0);
 
         vt = client.callProcedure("@AdHoc",
-        "select count(A1) from T1 group by A1").getResults()[0];
+        "select count(A1), A1 from T1 group by A1").getResults()[0];
         System.out.println("testSelectCountAGroupbyA result: " + vt);
         assertTrue(vt.getRowCount() == 11);
 

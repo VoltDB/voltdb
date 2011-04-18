@@ -117,7 +117,14 @@ public class TestPlansTPCC extends TestCase {
         AbstractPlanNode node = null;
         node = compile("SELECT D_NEXT_O_ID FROM DISTRICT WHERE D_W_ID = ? AND D_ID = ?;", 2);
         assertTrue(node != null);
-        node = compile("SELECT COUNT(OL_I_ID) FROM ORDER_LINE, STOCK WHERE OL_W_ID = ? AND OL_D_ID = ? AND OL_O_ID < ? AND OL_O_ID >= ? AND S_W_ID = ? AND S_I_ID = OL_I_ID AND S_QUANTITY < ? GROUP BY OL_I_ID;", 6);
+        node = compile("SELECT COUNT(DISTINCT(OL_I_ID)) FROM ORDER_LINE, STOCK " +
+                       "WHERE OL_W_ID = ? AND " +
+                       "OL_D_ID = ? AND " +
+                       "OL_O_ID < ? AND " +
+                       "OL_O_ID >= ? AND " +
+                       "S_W_ID = ? AND " +
+                       "S_I_ID = OL_I_ID AND " +
+                       "S_QUANTITY < ?;", 6);
         assertTrue(node != null);
     }
 

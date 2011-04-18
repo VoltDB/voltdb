@@ -85,7 +85,7 @@ public class TestPlansGroupBy extends TestCase {
 
     public void testCountA1GroupByA1() {
         AbstractPlanNode pn = null;
-        pn = compile("SELECT count(A1) from T1 group by A1", 0);
+        pn = compile("SELECT A1, count(A1) from T1 group by A1", 0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }

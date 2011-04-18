@@ -31,6 +31,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 import junit.framework.TestCase;
@@ -46,9 +47,7 @@ public class TestPushDownAggregates extends TestCase {
             pn = aide.compile(sql, paramCount, singlePartition);
         }
         catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
+            throw ex;
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -82,22 +81,99 @@ public class TestPushDownAggregates extends TestCase {
 
     public void testCountStarOnReplicatedTable() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from D1", 0, true);
-        checkPushedDown(pn, false, false);
+        checkPushedDown(pn, false,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
+                        null);
     }
 
     public void testCountStarOnPartitionedTable() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-        checkPushedDown(pn, true, true);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
+    }
+
+    public void testCountOnPartitionedTable() {
+        List<AbstractPlanNode> pn = compile("SELECT count(A1) from T1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
+    }
+
+    public void testSumOnPartitionedTable() {
+        List<AbstractPlanNode> pn = compile("SELECT sum(A1) from T1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
+    }
+
+    public void testMinOnPartitionedTable() {
+        List<AbstractPlanNode> pn = compile("SELECT MIN(A1) from T1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_MIN},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_MIN});
+    }
+
+    public void testMaxOnPartitionedTable() {
+        List<AbstractPlanNode> pn = compile("SELECT MAX(A1) from T1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_MAX},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_MAX});
+    }
+
+    public void testAvgOnPartitionedTable() {
+        List<AbstractPlanNode> pn = compile("SELECT AVG(A1) from T1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_AVG},
+                        null);
     }
 
     public void testCountStarWithGroupBy() {
         List<AbstractPlanNode> pn = compile("SELECT A1, count(*) FROM T1 GROUP BY A1", 0, false);
-        checkPushedDown(pn, true, true);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
-    public void testCountStarWithOtherAggregates() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*), max(A1) FROM T1", 0, false);
-        checkPushedDown(pn, true, false);
+    public void testAllPushDownAggregates() {
+        List<AbstractPlanNode> pn =
+            compile("SELECT A1, count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY)" +
+                    " FROM T1 GROUP BY A1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
+                                              ExpressionType.AGGREGATE_COUNT,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX});
+    }
+
+    public void testAllAggregates() {
+        List<AbstractPlanNode> pn =
+            compile("SELECT count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY), avg(PKEY)" +
+                    " FROM T1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
+                                              ExpressionType.AGGREGATE_COUNT,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_AVG},
+                        null);
+    }
+
+    public void testGroupByNotInDisplayColumn() {
+        try {
+            compile("SELECT count(A1) FROM T1 GROUP BY A1", 0, false);
+        } catch (NullPointerException e) {
+            // There shouldn't be any plan
+            return;
+        }
+        fail("This statement should not generate any plan.");
     }
 
     public void testGroupByWithoutAggregates() {
@@ -106,16 +182,51 @@ public class TestPushDownAggregates extends TestCase {
         assertTrue(pn.get(1).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
     }
 
+    public void testCountDistinct() {
+        List<AbstractPlanNode> pn = compile("SELECT count(distinct A1) from T1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT},
+                        null);
+    }
+
+    public void testSumDistinct() {
+        List<AbstractPlanNode> pn = compile("SELECT sum(distinct A1) from T1", 0, false);
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM},
+                        null);
+    }
+
+    /**
+     * Check if the aggregate node is pushed-down in the given plan. If the
+     * pushDownTypes is null, it assumes that the aggregate node should NOT be
+     * pushed-down.
+     *
+     * @param pn
+     *            The generated plan
+     * @param isMultiPart
+     *            Whether or not the plan is distributed
+     * @param aggTypes
+     *            The expected aggregate types for the original aggregate node.
+     * @param pushDownTypes
+     *            The expected aggregate types for the top aggregate node after
+     *            pushing the original aggregate node down.
+     */
     private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
-                                 boolean isPushedDown) {
+                                 ExpressionType[] aggTypes, ExpressionType[] pushDownTypes) {
         assertTrue(pn.size() > 0);
 
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof HashAggregatePlanNode);
-        if (isPushedDown) {
-            assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"AGGREGATE_SUM\""));
+        if (pushDownTypes != null) {
+            for (ExpressionType type : pushDownTypes) {
+                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
+                                                     type.toString() + "\""));
+            }
         } else {
-            assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"AGGREGATE_COUNT_STAR\""));
+            for (ExpressionType type : aggTypes) {
+                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
+                                                     type.toString() + "\""));
+            }
         }
 
         if (isMultiPart) {
@@ -125,9 +236,12 @@ public class TestPushDownAggregates extends TestCase {
             p = p.getChild(0);
         }
 
-        if (isPushedDown) {
+        if (pushDownTypes != null) {
             assertTrue(p instanceof HashAggregatePlanNode);
-            assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"AGGREGATE_COUNT_STAR\""));
+            for (ExpressionType type : aggTypes) {
+                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
+                                                     type.toString() + "\""));
+            }
         } else {
             assertTrue(p instanceof AbstractScanPlanNode);
         }
