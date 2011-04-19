@@ -40,6 +40,10 @@ public abstract class ExportClientBase {
 
     protected AtomicBoolean m_connected = new AtomicBoolean(false);
 
+    // object used to synchronize on so the shutdown hook can behave
+    final Object m_atomicWorkLock = new Object();
+    final ShutdownHook m_shutdownHook = new ShutdownHook();
+
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     protected final List<InetSocketAddress> m_servers
@@ -57,6 +61,27 @@ public abstract class ExportClientBase {
 
     // credentials
     protected String m_username = "", m_password = "";
+
+    /**
+     * Shutdown hook that waits until work is done and then kills the JVM
+     * BE AFRAID...
+     */
+    class ShutdownHook extends Thread {
+        @Override
+        public void run() {
+            final VoltLogger log = new VoltLogger("ExportClient");
+            log.info("Received request to shutdown.");
+
+            // the ExportClientBase.work() holds this lock during
+            // each iteration of its work
+            synchronized (m_atomicWorkLock) {
+                log.info("Work lock aquired. About to shutdown.");
+
+                // DIE DIE DIE (faster and harder than System.exit(0))
+                Runtime.getRuntime().halt(0);
+            }
+        }
+    }
 
     public ExportClientBase() {
         this(false);
@@ -356,37 +381,42 @@ public abstract class ExportClientBase {
      * Override if the specific client has strange workflow/termination conditions.
      * Largely for Export clients used for test.
      */
-    protected int work() throws ExportClientException
-    {
-        int offeredMsgs = 0;
+    protected int work() throws ExportClientException {
+        // hold this lock while doing one unit of work
+        // the shutdown hook won't let the system die until
+        // the lock is released (except via kill -9)
+        synchronized (m_atomicWorkLock) {
 
-        assert(m_connected.get());
+            int offeredMsgs = 0;
 
-        // work all the ExportDataSinks.
-        // process incoming data and generate outgoing ack/polls
-        for (HashMap<String, HashMap<Integer, ExportDataSink>> gen_map : m_sinks.values()) {
-            for (HashMap<Integer, ExportDataSink> part_map : gen_map.values()) {
-                for (ExportDataSink sink : part_map.values()) {
-                    sink.work();
+            assert(m_connected.get());
+
+            // work all the ExportDataSinks.
+            // process incoming data and generate outgoing ack/polls
+            for (HashMap<String, HashMap<Integer, ExportDataSink>> gen_map : m_sinks.values()) {
+                for (HashMap<Integer, ExportDataSink> part_map : gen_map.values()) {
+                    for (ExportDataSink sink : part_map.values()) {
+                        sink.work();
+                    }
                 }
             }
-        }
 
-        // drain all the received connection messages into the
-        // RX queues for the ExportDataSinks and push all acks/polls
-        // to the network.
-        for (ExportConnection connection : m_exportConnections.values()) {
-            offeredMsgs += connection.work();
-        }
+            // drain all the received connection messages into the
+            // RX queues for the ExportDataSinks and push all acks/polls
+            // to the network.
+            for (ExportConnection connection : m_exportConnections.values()) {
+                offeredMsgs += connection.work();
+            }
 
-        // make sure still connected
-        if (!checkConnections()) {
-            disconnect();
-            throw new ExportClientException(ExportClientException.Type.DISCONNECT_UNEXPECTED,
-                    "Disconnected from one or more export servers");
-        }
+            // make sure still connected
+            if (!checkConnections()) {
+                disconnect();
+                throw new ExportClientException(ExportClientException.Type.DISCONNECT_UNEXPECTED,
+                        "Disconnected from one or more export servers");
+            }
 
-        return offeredMsgs;
+            return offeredMsgs;
+        }
     }
 
     protected long getNextPollDuration(long currentDuration,
@@ -421,85 +451,94 @@ public abstract class ExportClientBase {
 
     protected void run(long timeout) throws ExportClientException {
 
-        // current wait time between polls
-        long pollTimeMS = 0;
+        try {
+            // add the shutdown hook that insulates the process from crtl-c a bit
+            Runtime.getRuntime().addShutdownHook(m_shutdownHook);
 
-        long now = System.currentTimeMillis();
+            // current wait time between polls
+            long pollTimeMS = 0;
 
-        // run until the timeout
-        // runs forever if timeout == 0
-        while ((timeout == 0) || ((System.currentTimeMillis() - now) < timeout)) {
+            long now = System.currentTimeMillis();
 
-            // use the variables to decide how long to wait at the end of the loop
-            boolean connected = m_connected.get();
-            int offeredMsgs = 0;
-            boolean disconnectedWithError = false;
-            boolean disconnectedForUpdate = false;
+            // run until the timeout
+            // runs forever if timeout == 0
+            while ((timeout == 0) || ((System.currentTimeMillis() - now) < timeout)) {
 
-            // if not connected, take a stab at it
-            if (!connected) {
-                try {
-                    connected = connect();
-                } catch (ExportClientException e) {
-                    m_logger.warn(e.getMessage(), e);
-                    e.printStackTrace();
+                // use the variables to decide how long to wait at the end of the loop
+                boolean connected = m_connected.get();
+                int offeredMsgs = 0;
+                boolean disconnectedWithError = false;
+                boolean disconnectedForUpdate = false;
 
-                    // handle the problem and decide whether
-                    // to continue or to punt up a stack frame
-                    switch (e.type) {
-                    case AUTH_FAILURE:
-                        disconnectedWithError = true;
-                        break;
-                    case DISCONNECT_UNEXPECTED:
-                        disconnectedWithError = true;
-                        break;
-                    case DISCONNECT_UPDATE:
-                        disconnectedForUpdate = true;
-                        break;
-                    case USER_ERROR:
-                        throw e;
+                // if not connected, take a stab at it
+                if (!connected) {
+                    try {
+                        connected = connect();
+                    } catch (ExportClientException e) {
+                        m_logger.warn(e.getMessage(), e);
+                        e.printStackTrace();
+
+                        // handle the problem and decide whether
+                        // to continue or to punt up a stack frame
+                        switch (e.type) {
+                        case AUTH_FAILURE:
+                            disconnectedWithError = true;
+                            break;
+                        case DISCONNECT_UNEXPECTED:
+                            disconnectedWithError = true;
+                            break;
+                        case DISCONNECT_UPDATE:
+                            disconnectedForUpdate = true;
+                            break;
+                        case USER_ERROR:
+                            throw e;
+                        }
+                    }
+                }
+
+                // if connected, try to actually do some export work
+                if (connected) {
+                    // suck down some export data (if available)
+                    try {
+                        offeredMsgs = work();
+                    }
+                    catch (ExportClientException e) {
+                        m_logger.warn(e.getMessage(), e);
+                        e.printStackTrace();
+
+                        // handle the problem and decide whether
+                        // to continue or to punt up a stack frame
+                        switch (e.type) {
+                        case AUTH_FAILURE:
+                            assert(false);
+                            break;
+                        case DISCONNECT_UNEXPECTED:
+                            disconnectedWithError = true;
+                            break;
+                        case DISCONNECT_UPDATE:
+                            disconnectedForUpdate = true;
+                            break;
+                        case USER_ERROR:
+                            throw e;
+                        }
+                    }
+                }
+
+                // pause for the right amount of time
+                pollTimeMS = getNextPollDuration(pollTimeMS, offeredMsgs == 0,
+                        disconnectedWithError, disconnectedForUpdate);
+                if (pollTimeMS > 0) {
+                    m_logger.trace(String.format("Sleeping for %d ms due to inactivity or no connection.", pollTimeMS));
+                    try { Thread.sleep(pollTimeMS); }
+                    catch (InterruptedException e) {
+                        throw new ExportClientException(e);
                     }
                 }
             }
-
-            // if connected, try to actually do some export work
-            if (connected) {
-                // suck down some export data (if available)
-                try {
-                    offeredMsgs = work();
-                }
-                catch (ExportClientException e) {
-                    m_logger.warn(e.getMessage(), e);
-                    e.printStackTrace();
-
-                    // handle the problem and decide whether
-                    // to continue or to punt up a stack frame
-                    switch (e.type) {
-                    case AUTH_FAILURE:
-                        assert(false);
-                        break;
-                    case DISCONNECT_UNEXPECTED:
-                        disconnectedWithError = true;
-                        break;
-                    case DISCONNECT_UPDATE:
-                        disconnectedForUpdate = true;
-                        break;
-                    case USER_ERROR:
-                        throw e;
-                    }
-                }
-            }
-
-            // pause for the right amount of time
-            pollTimeMS = getNextPollDuration(pollTimeMS, offeredMsgs == 0,
-                    disconnectedWithError, disconnectedForUpdate);
-            if (pollTimeMS > 0) {
-                m_logger.trace(String.format("Sleeping for %d ms due to inactivity or no connection.", pollTimeMS));
-                try { Thread.sleep(pollTimeMS); }
-                catch (InterruptedException e) {
-                    throw new ExportClientException(e);
-                }
-            }
+        }
+        finally {
+            // ensure the shutdown hook is removed when not doing work
+            Runtime.getRuntime().removeShutdownHook(m_shutdownHook);
         }
     }
 }
