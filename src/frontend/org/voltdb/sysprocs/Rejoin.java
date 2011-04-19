@@ -20,7 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.HashSet;
+import java.util.Set;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
@@ -87,7 +87,7 @@ public class Rejoin extends VoltSystemProcedure {
             int rejoinHostId,
             String rejoiningHostname,
             int portToConnect,
-            HashSet<Integer> liveHosts) {
+            Set<Integer> liveHosts) {
         // verify valid hostId
 
         // connect
@@ -291,7 +291,7 @@ public class Rejoin extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String rejoiningHostname, int portToConnect) {
 
         // pick a hostid to replace
-        HashSet<Integer> downHosts =VoltDB.instance().getCatalogContext().siteTracker.getAllDownHosts();
+        Set<Integer> downHosts = VoltDB.instance().getCatalogContext().siteTracker.getAllDownHosts();
         // if there are no down hosts from the point of view of this node
         if (downHosts.isEmpty()) {
             throw new VoltAbortException("Unable to find down node to replace.");

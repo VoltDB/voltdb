@@ -17,8 +17,8 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
@@ -90,7 +90,7 @@ public interface VoltDBInterface
             int rejoinHostId,
             String rejoiningHostname,
             int portToConnect,
-            HashSet<Integer> liveHosts);
+            Set<Integer> liveHosts);
 
     /**
      * Either integrate the created forign host for the rejoining node into

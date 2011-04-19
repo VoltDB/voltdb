@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -455,7 +456,7 @@ public class HostMessenger implements Messenger {
                                          InetSocketAddress addr,
                                          long catalogCRC,
                                          long deploymentCRC,
-                                         HashSet<Integer> liveHosts,
+                                         Set<Integer> liveHosts,
                                          int catalogVersionNumber,
                                          long catalogTxnId) throws Exception {
         if (hostId < 0)

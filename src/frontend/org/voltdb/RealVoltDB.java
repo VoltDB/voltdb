@@ -964,6 +964,18 @@ public class RealVoltDB implements VoltDBInterface
         for (String line : lines) {
             hostLog.info(line.trim());
         }
+
+        // print out cluster membership
+        hostLog.info("About to list cluster interfaces for all nodes with format ip:client-port:admin-port:http-port");
+        for (int hostId : m_catalogContext.siteTracker.getAllLiveHosts()) {
+            if (hostId == m_messenger.getHostId()) {
+                hostLog.info(String.format("  Host id: %d with interfaces: %s [SELF]", hostId, getLocalMetadata()));
+            }
+            else {
+                String hostMeta = m_clusterMetadata.get(hostId);
+                hostLog.info(String.format("  Host id: %d with interfaces: %s [PEER]", hostId, hostMeta));
+            }
+        }
     }
 
     public static String[] extractBuildInfo() {
@@ -1143,7 +1155,7 @@ public class RealVoltDB implements VoltDBInterface
             int rejoinHostId,
             String rejoiningHostname,
             int portToConnect,
-            HashSet<Integer> liveHosts)
+            Set<Integer> liveHosts)
     {
         // another site already did this work.
         if (currentTxnId == lastNodeRejoinPrepare_txnId) {
@@ -1152,14 +1164,20 @@ public class RealVoltDB implements VoltDBInterface
         else if (currentTxnId < lastNodeRejoinPrepare_txnId) {
             throw new RuntimeException("Trying to rejoin (prepare) with an old transaction.");
         }
+
+        // connect to the joining node, build a foreign host
+        InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
+        String ipAddr = addr.getAddress().getHostAddress();
+
         recoveryLog.info("Rejoining node with host id: " + rejoinHostId +
+                         ", hostname: " + rejoiningHostname +
+                         " and ip: " + ipAddr +
                          " at txnid: " + currentTxnId);
         lastNodeRejoinPrepare_txnId = currentTxnId;
 
         HostMessenger messenger = getHostMessenger();
 
         // connect to the joining node, build a foreign host
-        InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
         try {
             messenger.rejoinForeignHostPrepare(rejoinHostId, addr, m_catalogContext.catalogCRC,
                     m_catalogContext.deploymentCRC, liveHosts,

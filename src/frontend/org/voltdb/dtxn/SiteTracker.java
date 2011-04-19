@@ -23,8 +23,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Site;
@@ -50,10 +51,10 @@ public class SiteTracker {
     // a map of site ids (index) to partition ids (value)
     Map<Integer, Integer> m_sitesToPartitions = new HashMap<Integer, Integer>();
 
-    HashMap<Integer, ArrayList<Integer>> m_partitionsToSites =
+    Map<Integer, ArrayList<Integer>> m_partitionsToSites =
         new HashMap<Integer, ArrayList<Integer>>();
 
-    HashMap<Integer, ArrayList<Integer>> m_partitionsToLiveSites =
+    Map<Integer, ArrayList<Integer>> m_partitionsToLiveSites =
         new HashMap<Integer, ArrayList<Integer>>();
 
     Map<Integer, ArrayList<Integer>> m_hostsToSites =
@@ -65,11 +66,11 @@ public class SiteTracker {
     // records the timestamp of the last message sent to each sites
     HashMap<Integer, Long> m_lastHeartbeatTime = new HashMap<Integer, Long>();
 
-    HashSet<Integer> m_liveSiteIds = new HashSet<Integer>();
+    Set<Integer> m_liveSiteIds = new TreeSet<Integer>();
 
-    HashSet<Integer> m_liveHostIds = new HashSet<Integer>();
+    Set<Integer> m_liveHostIds = new TreeSet<Integer>();
 
-    HashSet<Integer> m_downHostIds = new HashSet<Integer>();
+    Set<Integer> m_downHostIds = new TreeSet<Integer>();
 
     // scratch value used to compute the out of date sites
     // note: this makes
@@ -147,15 +148,15 @@ public class SiteTracker {
         }
     }
 
-    public HashSet<Integer> getAllLiveSites() {
+    public Set<Integer> getAllLiveSites() {
         return m_liveSiteIds;
     }
 
-    public HashSet<Integer> getAllLiveHosts() {
+    public Set<Integer> getAllLiveHosts() {
         return m_liveHostIds;
     }
 
-    public HashSet<Integer> getAllDownHosts() {
+    public Set<Integer> getAllDownHosts() {
         return m_downHostIds;
     }
 

@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -752,7 +753,7 @@ public class SocketJoiner extends Thread {
             InetSocketAddress address,
             long catalogCRC,
             long deploymentCRC,
-            HashSet<Integer> liveHosts,
+            Set<Integer> liveHosts,
             int catalogVersionNumber,
             long catalogTxnId) throws Exception {
         SocketChannel remoteConnection = null;

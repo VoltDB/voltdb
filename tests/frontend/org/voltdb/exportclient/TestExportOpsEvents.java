@@ -167,7 +167,7 @@ public class TestExportOpsEvents extends TestCase {
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
             java.io.BufferedReader br = new java.io.BufferedReader(reader);
             String str = null;
-            while((str = br.readLine()) != null) {
+            while ((str = br.readLine()) != null) {
                 if (str.contains("LISTEN")) {
                     System.out.println(str);
                 }
@@ -183,7 +183,7 @@ public class TestExportOpsEvents extends TestCase {
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
             java.io.BufferedReader br = new java.io.BufferedReader(reader);
             String str = null;
-            while((str = br.readLine()) != null) {
+            while ((str = br.readLine()) != null) {
                 if (str.contains("LISTEN")) {
                     System.out.println(str);
                 }
