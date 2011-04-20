@@ -281,7 +281,8 @@ public class SnapshotSave extends VoltSystemProcedure
             String path, String nonce, long block) throws VoltAbortException
     {
         final long startTime = System.currentTimeMillis();
-        HOST_LOG.info("Saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
+        String async = (block == 0) ? "Asynchronously" : "Synchronously";
+        HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
 
         if (path == null || path.equals("")) {
             ColumnInfo[] result_columns = new ColumnInfo[1];
