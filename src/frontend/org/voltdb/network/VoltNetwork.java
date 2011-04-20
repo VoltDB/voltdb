@@ -505,9 +505,15 @@ public class VoltNetwork implements Runnable
                         port.lockForHandlingWork();
                         port.getKey().interestOps(0);
                     } catch (java.nio.channels.CancelledKeyException e) {
-                        networkLog.warn(
-                                "Had a cancelled key exception while processing queued runnables for port "
-                                + port.m_remoteHost, e);
+                        // only print out the stack trace in "trace" mode
+                        if (networkLog.isTraceEnabled()) {
+                            networkLog.trace("Had a cancelled key exception while processing queued runnables for port "
+                                            + port.m_remoteHost, e);
+                        }
+                        else {
+                            networkLog.warn("Had a cancelled key exception while processing queued runnables for port "
+                                    + port.m_remoteHost);
+                        }
                     }
                     m_selector.selectedKeys().remove(port.getKey());
                     Runnable r = getPortCallRunnable(port);

@@ -310,10 +310,12 @@ public abstract class ExportClientBase {
 
         if (!foundOneActiveServer) {
             for (Pair<Exception, InetSocketAddress> p : connectErrors) {
-                m_logger.error("Error connecting to server " + p.getSecond() + " while discovering cluster topology",
-                        p.getFirst());
+                m_logger.warn("Failed to connect to server " +
+                              p.getSecond() +
+                              " with error: " +
+                              p.getFirst().getMessage());
             }
-            m_logger.error("Unable to connect to a server to discover the cluster topology");
+            m_logger.warn("Unable to connect to a given server to discover the cluster topology");
             return false;
         }
 
@@ -475,19 +477,26 @@ public abstract class ExportClientBase {
                     try {
                         connected = connect();
                     } catch (ExportClientException e) {
-                        m_logger.warn(e.getMessage(), e);
-                        e.printStackTrace();
+
+                        //e.printStackTrace();
 
                         // handle the problem and decide whether
                         // to continue or to punt up a stack frame
                         switch (e.type) {
                         case AUTH_FAILURE:
-                            disconnectedWithError = true;
-                            break;
+                            throw e;
                         case DISCONNECT_UNEXPECTED:
+                            if (m_logger.isTraceEnabled())
+                                m_logger.warn(e.getMessage(), e);
+                            else
+                                m_logger.warn(e.getMessage());
                             disconnectedWithError = true;
                             break;
                         case DISCONNECT_UPDATE:
+                            if (m_logger.isTraceEnabled())
+                                m_logger.info(e.getMessage(), e);
+                            else
+                                m_logger.info(e.getMessage());
                             disconnectedForUpdate = true;
                             break;
                         case USER_ERROR:
@@ -503,19 +512,27 @@ public abstract class ExportClientBase {
                         offeredMsgs = work();
                     }
                     catch (ExportClientException e) {
-                        m_logger.warn(e.getMessage(), e);
-                        e.printStackTrace();
+                        m_logger.info(e.getMessage(), e);
+                        //e.printStackTrace();
 
                         // handle the problem and decide whether
                         // to continue or to punt up a stack frame
                         switch (e.type) {
                         case AUTH_FAILURE:
-                            assert(false);
-                            break;
+                            m_logger.fatal(e.getMessage(), e);
+                            throw new RuntimeException("Got a unexpect auth error from connected server", e);
                         case DISCONNECT_UNEXPECTED:
+                            if (m_logger.isTraceEnabled())
+                                m_logger.warn(e.getMessage(), e);
+                            else
+                                m_logger.warn(e.getMessage());
                             disconnectedWithError = true;
                             break;
                         case DISCONNECT_UPDATE:
+                            if (m_logger.isTraceEnabled())
+                                m_logger.info(e.getMessage(), e);
+                            else
+                                m_logger.info(e.getMessage());
                             disconnectedForUpdate = true;
                             break;
                         case USER_ERROR:
