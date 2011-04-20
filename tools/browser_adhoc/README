@@ -1,5 +1,4 @@
-The browser_adhoc application is an adhoc query tool that runs from a web browser.  When running, the "server" will accept adhoc query requests for a single
-VoltDB database from all client machines.
+The browser_adhoc application is an adhoc query tool that runs from a web browser.  When running, the "server" will accept adhoc query requests for a single VoltDB database from all client machines.
 
 This example requires Python.
 
@@ -24,6 +23,3 @@ To run the application execute the following:
 
 To stop the application press Control-C in the terminal window where the above command was executed.
 
-
-This content is available at
-https://hzproject.com/svn/repos/build/newtrunk/examples/browser_adhoc/README.
