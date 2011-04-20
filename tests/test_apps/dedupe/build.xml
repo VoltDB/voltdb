@@ -9,7 +9,7 @@ PATHS AND PROPERTIES
 
 <property environment="env"/>
 
-<property name='volt.dir'              location='/home/tcallaghan/voltdb-1.3.01/voltdb' />
+<property name='volt.dir'              location='./voltdb-1.3.01/voltdb' />
 <property name='build.dir'             location='obj/' />
 <property name='src.dir'               location='src/' />
 <property name='debugoutput.dir'       location='debugoutput/' />
