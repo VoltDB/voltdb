@@ -552,8 +552,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                     responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
                     socket.write(responseBuffer);
                     socket.close();
-                    authLog.warn("Failure to authorize user " + strUser +
-                                 " for disabled or unconfigured service " +
+                    authLog.warn("Rejected user " + strUser +
+                                 " attempting to use disabled or unconfigured service " +
                                  service + ".");
                     return null;
                 }
