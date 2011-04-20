@@ -1,0 +1,9 @@
+#!/bin/bash
+
+source /home/tcallaghan/.bashrc
+cd temp/long7
+ant client-delete
+
+#uncomment the next line to dump environment settings for the cron task to a file
+#env > /home/tcallaghan/temp/long7/yoohoo.txt
+
