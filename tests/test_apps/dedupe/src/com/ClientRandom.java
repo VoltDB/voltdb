@@ -1,3 +1,26 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2011 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package com;
 
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -50,7 +73,7 @@ public class ClientRandom {
                 }
             }
         }
-        
+
         protected void pClientCallback(VoltTable[] vtResults, int clientRoundtrip) {
             long execution_time = (long) clientRoundtrip;
 
@@ -110,18 +133,18 @@ public class ClientRandom {
         long transactions_this_second = 0;
         long last_millisecond = System.currentTimeMillis();
         long this_millisecond = System.currentTimeMillis();
-  
+
         long milliseconds_offset = day_offset * 1000l * 60 * 60 * 24;
 
         AsyncCallback callBack = new AsyncCallback();
 
-        // create generic client  
+        // create generic client
         final org.voltdb.client.Client voltclient = ClientFactory.createClient();
         // create HEAVYWEIGHT client with expected message size of 128 bytes
 //        final org.voltdb.client.Client voltclient = ClientFactory.createClient(128,null,true,null);
-  
+
         String[] voltServers = serverList.split(",");
-  
+
         for (String thisServer : voltServers) {
             try {
                 thisServer = thisServer.trim();
@@ -132,7 +155,7 @@ public class ClientRandom {
                 System.exit(-1);
             }
         }
-  
+
         // make random object totally random (set my milliseconds) so we can have multiple clients running simultaneously
         java.util.Random rand = new java.util.Random();
 
@@ -174,7 +197,7 @@ public class ClientRandom {
 
                     m_logger.info(String.format("hourOfDay = %d : minuteOfHour = %d : hourLimitedMaxPlayerId = %d",hourOfDay,minuteOfHour,timeLimitedMaxPlayerId));
                 }
-            }                
+            }
 
             playerId = (long) rand.nextInt(timeLimitedMaxPlayerId);
             field1 = (long) rand.nextInt(max_field1);
@@ -188,7 +211,7 @@ public class ClientRandom {
                 m_logger.error(e.toString());
                 System.exit(-1);
             }
-          
+
             transactions_this_second++;
             if (transactions_this_second >= transactions_per_milli) {
                 this_millisecond = System.currentTimeMillis();
