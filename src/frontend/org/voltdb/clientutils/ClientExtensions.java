@@ -42,4 +42,21 @@ public class ClientExtensions
         return client;
     }
 
+    public static Client GetClient(ClientConfig config, String[] servers, int port)
+    {
+        final Client client = ClientFactory.createClient(config);
+
+        for (String server : servers)
+        {
+            try
+            {
+                client.createConnection(server.trim(), port);
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+            }
+        }
+        return client;
+    }
 }
