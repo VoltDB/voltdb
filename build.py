@@ -166,6 +166,7 @@ CTX.INPUT['catalog'] = """
  constraint.cpp
  constraintref.cpp
  database.cpp
+ deployment.cpp
  group.cpp
  groupref.cpp
  host.cpp

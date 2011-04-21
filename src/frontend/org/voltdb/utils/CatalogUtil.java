@@ -54,6 +54,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
@@ -434,6 +435,9 @@ public abstract class CatalogUtil {
             return -1;
         }
 
+        // add our hacky Deployment to the catalog
+        catalog.getClusters().get("cluster").getDeployment().add("deployment");
+
         // set the cluster info
         setClusterInfo(catalog, deployment);
 
@@ -441,6 +445,10 @@ public abstract class CatalogUtil {
         setSnapshotInfo( catalog, deployment.getSnapshot());
 
         //set path and path overrides
+        // NOTE: this must be called *AFTER* setClusterInfo and setSnapshotInfo
+        // because path locations for snapshots and partition detection don't
+        // exist in the catalog until after those portions of the deployment
+        // file are handled.
         setPathsInfo(catalog, deployment.getPaths(), crashOnFailedValidation);
 
         // set the users info
@@ -685,8 +693,13 @@ public abstract class CatalogUtil {
             hostLog.error(config.getErrorMsg());
         } else {
             ClusterCompiler.compile(catalog, config);
-            // copy partition detection configuration from xml to catalog
             Cluster catCluster = catalog.getClusters().get("cluster");
+            // copy the deployment info that is currently not recorded anywhere else
+            Deployment catDeploy = catCluster.getDeployment().get("deployment");
+            catDeploy.setHostcount(hostCount);
+            catDeploy.setSitesperhost(sitesPerHost);
+            catDeploy.setKfactor(kFactor);
+            // copy partition detection configuration from xml to catalog
             if (deployment.getPartitionDetection() != null && deployment.getPartitionDetection().isEnabled()) {
                 catCluster.setNetworkpartition(true);
                 CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();

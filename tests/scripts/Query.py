@@ -79,7 +79,8 @@ class VoltQueryClient(cmd.Cmd):
                                               FastSerializer.VOLTTYPE_STRING])
         self.snapshotstatus = VoltProcedure(self.fs, "@SnapshotStatus")
 
-        self.systeminformation = VoltProcedure(self.fs, "@SystemInformation")
+        self.systeminformation = VoltProcedure(self.fs, "@SystemInformation",
+                                               [FastSerializer.VOLTTYPE_STRING])
 
         self.updatecatalog = VoltProcedure(self.fs, "@UpdateApplicationCatalog",
                                              [FastSerializer.VOLTTYPE_STRING,
@@ -289,6 +290,7 @@ class VoltQueryClient(cmd.Cmd):
     def do_snapshotstatus(self, command):
         if self.fs == None:
             return
+
         self.safe_print("Getting snapshot status")
         self.response = self.__safe_call(self.snapshotstatus,
                                          timeout = self.__timeout)
@@ -301,14 +303,19 @@ class VoltQueryClient(cmd.Cmd):
     def do_sysinfo(self, command):
         if self.fs == None:
             return
+        selector = "OVERVIEW"
+        if command:
+            selector = command
+
         self.safe_print("Getting system information")
         self.response = self.__safe_call(self.systeminformation,
+                                         [selector],
                                          timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_sysinfo(self):
         self.safe_print("Get system information")
-        self.safe_print("\tsysinfo")
+        self.safe_print("\tsysinfo {OVERVIEW|DEPLOYMENT}")
 
     def do_updatecatalog(self, command):
         if self.fs == None:

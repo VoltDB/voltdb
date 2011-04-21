@@ -102,10 +102,6 @@ public class SysProcFragmentId
     // @StartSampler
     public static final long PF_startSampler = 80;
 
-    // @SystemInformation
-    public static final long PF_systemInformation_distribute = 90;
-    public static final long PF_systemInformation_aggregate = 91;
-
     // @Quiesce
     public static final long PF_quiesce_sites = 100;
     public static final long PF_quiesce_processed_sites = 101;
@@ -138,4 +134,10 @@ public class SysProcFragmentId
     public static final long PF_rejoinCommit = 172;
     public static final long PF_rejoinRollback = 173;
     public static final long PF_rejoinAggregate = 174;
+
+    // @SystemInformation
+    public static final long PF_systemInformationDeployment = 190;
+    public static final long PF_systemInformationAggregate = 191;
+    public static final long PF_systemInformationOverview = 192;
+    public static final long PF_systemInformationOverviewAggregate = 193;
 }

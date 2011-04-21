@@ -209,6 +209,9 @@ public class VoltProjectBuilder {
     private String m_pathToDeployment = null;
     private String m_voltRootPath = null;
 
+    private boolean m_ppdEnabled = false;
+    private String m_ppdPath = null;
+    private String m_ppdPrefix = "none";
 
     /**
      * Produce all catalogs this project builder knows how to produce.
@@ -384,6 +387,12 @@ public class VoltProjectBuilder {
         m_snapshotPath = path;
     }
 
+    public void setPartitionDetectionSettings(final String ppdPath, final String ppdPrefix)
+    {
+        m_ppdEnabled = true;
+        m_ppdPath = ppdPath;
+        m_ppdPrefix = ppdPrefix;
+    }
 
     public void addExport(final String loader, boolean enabled, List<String> groups) {
         m_elloader = loader;
@@ -442,7 +451,7 @@ public class VoltProjectBuilder {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount,
                        replication, leaderAddress, voltRoot,
-                       false, null, "none", false, 0, false);
+                       m_ppdEnabled, m_ppdPath, m_ppdPrefix, false, 0, false);
     }
 
     public boolean compile(
@@ -461,14 +470,14 @@ public class VoltProjectBuilder {
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                       null, false, null, "none", true, adminPort, adminOnStartup);
+                       null, m_ppdEnabled, m_ppdPath, m_ppdPrefix, true, adminPort, adminOnStartup);
     }
 
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
                            final int hostCount, final int replication, final String leaderAddress,
                            String voltRoot, final boolean ppdEnabled,
                            final String ppdPath, final String ppdPrefix,
-                           final boolean adminEnabled, final int adminPort,
+                           final boolean useCustomAdmin, final int adminPort,
                            final boolean adminOnStartup)
     {
         assert(jarPath != null);
@@ -566,7 +575,7 @@ public class VoltProjectBuilder {
             m_pathToDeployment = writeDeploymentFile(
                     hostCount, sitesPerHost, leaderAddress,
                     replication, voltRoot, ppdEnabled,
-                    ppdPath, ppdPrefix, adminEnabled, adminPort, adminOnStartup);
+                    ppdPath, ppdPrefix, useCustomAdmin, adminPort, adminOnStartup);
         } catch (Exception e) {
             System.out.println("Failed to create deployment file in testcase.");
             e.printStackTrace();
@@ -578,7 +587,7 @@ public class VoltProjectBuilder {
             System.out.println("ppdEnabled: " + ppdEnabled);
             System.out.println("ppdPath: " + ppdPath);
             System.out.println("ppdPrefix: " + ppdPrefix);
-            System.out.println("adminEnabled: " + adminEnabled);
+            System.out.println("adminEnabled: " + useCustomAdmin);
             System.out.println("adminPort: " + adminPort);
             System.out.println("adminOnStartup: " + adminOnStartup);
 
@@ -794,7 +803,7 @@ public class VoltProjectBuilder {
     private String writeDeploymentFile(
             int hostCount, int sitesPerHost, String leader, int kFactor, String voltRoot,
             boolean ppdEnabled, String ppdPath, String ppdPrefix,
-            boolean adminEnabled, int adminPort, boolean adminOnStartup) throws IOException, JAXBException
+            boolean useCustomAdmin, int adminPort, boolean adminOnStartup) throws IOException, JAXBException
     {
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
@@ -850,7 +859,7 @@ public class VoltProjectBuilder {
         // can't be disabled, but only write out the non-default config if
         // requested by a test. otherwise, take the implied defaults (or
         // whatever local cluster overrides on the command line).
-        if (adminEnabled) {
+        if (useCustomAdmin) {
             AdminModeType admin = factory.createAdminModeType();
             deployment.setAdminMode(admin);
             admin.setPort(adminPort);

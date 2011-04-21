@@ -1024,6 +1024,17 @@ public class ClientInterface implements DumpManager.Dumpable {
                     return;
                 }
             }
+            else if (task.procName.equals("@SystemInformation"))
+            {
+                task.buildParameterSet();
+                // hacky: support old @SystemInformation behavior by
+                // filling in a missing selector to get the overview key/value info
+                if (task.params.m_params.length == 0)
+                {
+                    task.params.m_params = new Object[1];
+                    task.params.m_params[0] = new String("OVERVIEW");
+                }
+            }
         } else if (!user.hasPermission(catProc)) {
             authLog.l7dlog(Level.INFO,
                            LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),

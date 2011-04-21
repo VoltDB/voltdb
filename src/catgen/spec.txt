@@ -7,6 +7,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   Host* hosts           "The set of host that belong to this cluster"
   Site* sites           "The set of physical execution contexts executing on this cluster"
   Partition* partitions "The set of logical partitions in this cluster"
+  Deployment* deployment "Storage for settings passed in on deployment"
   string leaderaddress  "The ip or hostname of the cluster 'leader' - see docs for details"
   int localepoch        "The number of seconds since the epoch that we're calling our local epoch"
   bool securityEnabled  "Whether security and authentication should be enabled/disabled"
@@ -19,6 +20,12 @@ begin Cluster           "A set of connected hosts running one or more database a
   int adminport         "The port number of the admin port"
   bool adminstartup     "Does the server start in admin mode?"
   int heartbeatTimeout  "How long to wait, in seconds, between messages before deciding a host is dead"
+end
+
+begin Deployment   "Run-time deployment settings"
+  int hostcount    "The number of hosts in the cluster"
+  int kfactor      "The required k-safety factor"
+  int sitesperhost "The number of execution sites per host"
 end
 
 begin Host      "A single host participating in the cluster"
