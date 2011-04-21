@@ -29,7 +29,7 @@ Body:
 -------------------------------------------------------
 The latest PRO Kit (CentOS build) is available at:
 
- ${hostname}:/tmp/voltdb-ent-$VERSION.tar.gz
+ ${HOSTNAME}:/tmp/voltdb-ent-$VERSION.tar.gz
 
 SVN Revisions for this build:
  - "`cat ~/.svncos.build.log | grep ' revision ' | awk 'NR == 1 {print "voltdb/eng/trunk :: "$0};'`"
@@ -47,7 +47,7 @@ Note: previously installed version will be removed.
 
 rm -rf ~/Downloads/voltdb-ent-$VERSION*
 cd ~/Downloads
-scp ${hostname}:/tmp/voltdb-ent-$VERSION.tar.gz 
+scp ${HOSTNAME}:/tmp/voltdb-ent-$VERSION.tar.gz 
 tar -xzf voltdb-ent-$VERSION.tar.gz
 rm voltdb-ent-$VERSION.tar.gz
 
@@ -56,7 +56,7 @@ rm voltdb-ent-$VERSION.tar.gz
 
 # Send mail
 # msmtp -t < ~/.svncos.mail
-mail -f "QA PRO Kit Update" volt-dev@voltdb.com < ~/.svncos.mail
+cat ~/.svncos.mail | mail -s "QA PRO Kit Update" volt-dev@voltdb.com 
 
 # Cleanup
 rm ~/.svncos.mail
