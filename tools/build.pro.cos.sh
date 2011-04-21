@@ -55,7 +55,8 @@ rm voltdb-ent-$VERSION.tar.gz
 " > ~/.svncos.mail
 
 # Send mail
-msmtp -t < ~/.svncos.mail
+# msmtp -t < ~/.svncos.mail
+mail -f "QA PRO Kit Update" volt-dev@voltdb.com < ~/.svncos.mail
 
 # Cleanup
 rm ~/.svncos.mail

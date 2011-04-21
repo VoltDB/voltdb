@@ -25,7 +25,7 @@ cd $BUILD_TARGET/$DIST_NAME/examples/twitter
 ant build
 cd $BUILD_TARGET/$DIST_NAME/examples/voter
 ant build
-cp $BUILD_ROOT/license.xml $BUILD_TARGET/$DIST_NAME/management
+cp $BUILD_BRANCH/pro/tests/mocktests/license.xml $BUILD_TARGET/$DIST_NAME/management
 cd $BUILD_TARGET
 rm -rf $DIST_NAME.tar.gz
 tar -czf $DIST_NAME.tar.gz $DIST_NAME 
