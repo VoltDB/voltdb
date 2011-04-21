@@ -1297,11 +1297,6 @@ public class RealVoltDB implements VoltDBInterface
         }
     }
 
-
-
-    /** Last transaction ID at which the catalog updated. */
-    private static long lastCatalogUpdate_txnId = 0;
-
     /** Struct to associate a context with a counter of served sites */
     private static class ContextTracker {
         ContextTracker(CatalogContext context) {
@@ -1326,7 +1321,7 @@ public class RealVoltDB implements VoltDBInterface
     {
         synchronized(m_catalogUpdateLock) {
             // A site is catching up with catalog updates
-            if (currentTxnId <= lastCatalogUpdate_txnId) {
+            if (currentTxnId <= m_catalogContext.m_transactionId) {
                 ContextTracker contextTracker = m_txnIdToContextTracker.get(currentTxnId);
                 // This 'dispensed' concept is a little crazy fragile. Maybe it would be better
                 // to keep a rolling N catalogs? Or perhaps to keep catalogs for N minutes? Open
@@ -1345,7 +1340,6 @@ public class RealVoltDB implements VoltDBInterface
             }
 
             // 0. A new catalog! Update the global context and the context tracker
-            lastCatalogUpdate_txnId = currentTxnId;
             m_catalogContext =
                 m_catalogContext.update(currentTxnId, newCatalogURL, diffCommands, true, deploymentCRC);
             m_txnIdToContextTracker.put(currentTxnId, new ContextTracker(m_catalogContext));
