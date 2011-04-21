@@ -364,6 +364,10 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
                   "CLUSTERSTATE", cluster_state);
 
+        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
+                  "LASTCATALOGUPDATETXNID",
+                  Long.toString(VoltDB.instance().getCatalogContext().m_transactionId));
+
         return vt;
     }
 
