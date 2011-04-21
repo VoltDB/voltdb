@@ -32,8 +32,8 @@ The latest PRO Kit (CentOS build) is available at:
  ${HOSTNAME}:/tmp/voltdb-ent-$VERSION.tar.gz
 
 SVN Revisions for this build:
- - "`cat ~/.svncos.build.log | grep ' revision ' | awk 'NR == 1 {print "voltdb/eng/trunk :: "$0};'`"
- - "`cat ~/.svncos.build.log | grep ' revision ' | awk 'NR == 2 {print "voltdb/pro/rest  :: "$0};'`"
+ - "`cat ~/.svncos.build.log | grep 'Revision: ' | awk 'NR == 1 {print "voltdb/eng/trunk :: "$2};'`"
+ - "`cat ~/.svncos.build.log | grep 'Revision: ' | awk 'NR == 2 {print "voltdb/pro/rest  :: "$2};'`"
 
 A valid  license is  pre-installed, so you  can run VEM
 out-of-the-box,  and all  sample  application  catalogs

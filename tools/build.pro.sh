@@ -5,10 +5,10 @@ DIST_NAME=voltdb-ent-`cat $BUILD_BRANCH/eng/version.txt`
 
 rm -rf $BUILD_TARGET
 cd $BUILD_BRANCH/eng
-svn update
+svn info
 ant clean
 cd $BUILD_BRANCH/pro
-svn update
+svn info
 ant -f mmt.xml clean
 VOLTCORE=$BUILD_BRANCH/eng ant -f mmt.xml dist.pro
 cd $BUILD_TARGET/$DIST_NAME/examples/auction
