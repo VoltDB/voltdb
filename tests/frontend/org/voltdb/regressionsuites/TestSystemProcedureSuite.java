@@ -143,13 +143,26 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         VoltTable stats = results[0];
         stats.advanceRow();
         // Check for overflow
-        assertTrue((Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT) > 0);
-        assertTrue((Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT) > 0);
-        assertTrue((Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT) > 0);
+        long min_time = (Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT);
+        long max_time = (Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT);
+        long avg_time = (Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT);
+        assertTrue("Failed MIN_EXECUTION_TIME > 0, value was: " + min_time,
+                   min_time > 0);
+        assertTrue("Failed MAX_EXECUTION_TIME > 0, value was: " + max_time,
+                   max_time > 0);
+        assertTrue("Failed AVG_EXECUTION_TIME > 0, value was: " + avg_time,
+                   avg_time > 0);
+
         // check for reasonable values
-        assertTrue((Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT) > 3000000000L);
-        assertTrue((Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT) > 3000000000L);
-        assertTrue((Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT) > 3000000000L);
+        assertTrue("Failed MIN_EXECUTION_TIME > 2,400,000,000ns, value was: " +
+                   min_time,
+                   min_time > 2400000000L);
+        assertTrue("Failed MAX_EXECUTION_TIME > 2,400,000,000ns, value was: " +
+                   max_time,
+                   max_time > 2400000000L);
+        assertTrue("Failed AVG_EXECUTION_TIME > 2,400,000,000ns, value was: " +
+                   avg_time,
+                   avg_time > 2400000000L);
     }
 
     public void testStatistics_iostats() throws Exception {
