@@ -253,37 +253,41 @@ public class ConnectionUtil {
                 writeException = e;
             }
 
+            int read = 0;
             ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            int read = aChannel.read(lengthBuffer);
-            if (read == -1) {
-                if (writeException != null) {
-                    throw writeException;
+            while (lengthBuffer.hasRemaining()) {
+                read = aChannel.read(lengthBuffer);
+                if (read == -1) {
+                    if (writeException != null) {
+                        throw writeException;
+                    }
+                    if (!successfulWrite) {
+                        throw new IOException("Unable to write authentication info to serer");
+                    }
+                    throw new IOException("Authentication rejected");
                 }
-                if (!successfulWrite) {
-                    throw new IOException("Unable to write authentication info to serer");
-                }
-                throw new IOException("Authentication rejected");
-            } else {
-                lengthBuffer.flip();
             }
+            lengthBuffer.flip();
 
-            ByteBuffer loginResponse = ByteBuffer.allocate(lengthBuffer.getInt());//Read version and length etc.
-            read = aChannel.read(loginResponse);
-            byte loginResponseCode = 0;
-            if (read == -1) {
-                if (writeException != null) {
-                    throw writeException;
+            int len = lengthBuffer.getInt();
+            ByteBuffer loginResponse = ByteBuffer.allocate(len);//Read version and length etc.
+
+            while (loginResponse.hasRemaining()) {
+                read = aChannel.read(loginResponse);
+
+                if (read == -1) {
+                    if (writeException != null) {
+                        throw writeException;
+                    }
+                    if (!successfulWrite) {
+                        throw new IOException("Unable to write authentication info to serer");
+                    }
+                    throw new IOException("Authentication rejected");
                 }
-                if (!successfulWrite) {
-                    throw new IOException("Unable to write authentication info to serer");
-                }
-                throw new IOException("Authentication rejected");
             }
-            else {
-                loginResponse.flip();
-                loginResponse.position(1);
-                loginResponseCode = loginResponse.get();
-            }
+            loginResponse.flip();
+            loginResponse.position(1);
+            byte loginResponseCode = loginResponse.get();
 
             if (loginResponseCode != 0) {
                 aChannel.close();
