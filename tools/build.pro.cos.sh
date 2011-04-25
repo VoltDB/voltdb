@@ -29,7 +29,7 @@ Body:
 -------------------------------------------------------
 The latest PRO Kit (CentOS build) is available at:
 
- ${HOSTNAME}:/tmp/voltdb-ent-$VERSION.tar.gz
+ ${HOSTNAME}:/tmp/voltdb-ent-$VERSION.tar.gz .
 
 SVN Revisions for this build:
  - "`cat ~/.svncos.build.log | grep 'Revision: ' | awk 'NR == 1 {print "voltdb/eng/trunk :: "$2};'`"
