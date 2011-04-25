@@ -384,13 +384,12 @@ public abstract class ExportClientBase {
      * Largely for Export clients used for test.
      */
     protected int work() throws ExportClientException {
+        int offeredMsgs = 0;
+
         // hold this lock while doing one unit of work
         // the shutdown hook won't let the system die until
         // the lock is released (except via kill -9)
         synchronized (m_atomicWorkLock) {
-
-            int offeredMsgs = 0;
-
             assert(m_connected.get());
 
             // work all the ExportDataSinks.
@@ -416,9 +415,14 @@ public abstract class ExportClientBase {
                 throw new ExportClientException(ExportClientException.Type.DISCONNECT_UNEXPECTED,
                         "Disconnected from one or more export servers");
             }
-
-            return offeredMsgs;
         }
+
+        // give the shutdown hook thread a chance to acquire the lock
+        // because java locks are not fair
+        try { Thread.sleep(1); } catch (InterruptedException e) {}
+
+        // return the amount of work effectively done
+        return offeredMsgs;
     }
 
     protected long getNextPollDuration(long currentDuration,
