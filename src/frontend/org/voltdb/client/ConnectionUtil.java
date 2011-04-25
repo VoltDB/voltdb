@@ -262,7 +262,7 @@ public class ConnectionUtil {
                         throw writeException;
                     }
                     if (!successfulWrite) {
-                        throw new IOException("Unable to write authentication info to serer");
+                        throw new IOException("Unable to write authentication info to server");
                     }
                     throw new IOException("Authentication rejected");
                 }
@@ -280,7 +280,7 @@ public class ConnectionUtil {
                         throw writeException;
                     }
                     if (!successfulWrite) {
-                        throw new IOException("Unable to write authentication info to serer");
+                        throw new IOException("Unable to write authentication info to server");
                     }
                     throw new IOException("Authentication rejected");
                 }
