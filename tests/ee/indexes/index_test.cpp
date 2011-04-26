@@ -917,6 +917,68 @@ TEST_F(IndexTest, TupleKeyUnique) {
     delete[] searchkey.address();
 }
 
+TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
+    TableTuple *tuple = new TableTuple(schema);
+    char *data = new char[tuple->tupleLength()];
+    memset(data, 0, tuple->tupleLength());
+    tuple->move(data);
+
+    tuple->setNValue(0, ValueFactory::getBigIntValue(10));
+    return tuple;
+}
+
+TEST_F(IndexTest, ENG1193) {
+    TableIndex *index = NULL;
+    vector<int> columnIndices;
+    vector<ValueType> columnTypes;
+    vector<int32_t> columnLengths;
+    vector<bool> columnAllowNull;
+
+    columnIndices.push_back(0);
+    columnTypes.push_back(VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    columnAllowNull.push_back(false);
+
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
+                                                         columnLengths,
+                                                         columnAllowNull,
+                                                         true);
+
+    TableIndexScheme scheme("test_index", HASH_TABLE_INDEX, columnIndices,
+                            columnTypes, false, true, schema);
+    index = TableIndexFactory::getInstance(scheme);
+
+    TableTuple *tuple1 = newTuple(schema, 0, 10);
+    index->addEntry(tuple1);
+    TableTuple *tuple2 = newTuple(schema, 0, 11);
+    index->addEntry(tuple2);
+    TableTuple *tuple3 = newTuple(schema, 0, 12);
+    index->addEntry(tuple3);
+
+    TableTuple *tuple4 = newTuple(schema, 0, 10);
+    EXPECT_TRUE(index->replaceEntryNoKeyChange(tuple1, tuple4));
+
+    EXPECT_TRUE(index->exists(tuple2));
+    EXPECT_TRUE(index->exists(tuple3));
+    EXPECT_TRUE(index->exists(tuple4));
+
+    EXPECT_TRUE(index->moveToKey(tuple4));
+    TableTuple tmp = TableTuple(schema);
+    while(!(tmp = index->nextValueAtKey()).isNullTuple()) {
+        EXPECT_TRUE(tuple4->equals(tmp));
+    }
+
+    delete index;
+    TupleSchema::freeTupleSchema(schema);
+    delete[] tuple1->address();
+    delete tuple1;
+    delete[] tuple2->address();
+    delete tuple2;
+    delete[] tuple3->address();
+    delete tuple3;
+    delete[] tuple4->address();
+    delete tuple4;
+}
 
 int main()
 {
