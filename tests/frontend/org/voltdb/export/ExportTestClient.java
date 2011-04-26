@@ -20,15 +20,15 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package org.voltdb.export;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayDeque;
 import java.util.HashMap;
-import java.util.TreeSet;
-import java.util.TreeMap;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;

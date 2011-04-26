@@ -77,6 +77,9 @@ public abstract class ExportClientBase {
             synchronized (m_atomicWorkLock) {
                 log.info("Work lock aquired. About to shutdown.");
 
+                // for tests only (noop otherwise)
+                testHookShutdownWork();
+
                 // DIE DIE DIE (faster and harder than System.exit(0))
                 Runtime.getRuntime().halt(0);
             }
@@ -377,6 +380,11 @@ public abstract class ExportClientBase {
         return true;
     }
 
+    // HOOKS FOR TEST THAT ARE USUALLY NOOPS
+    protected void testHookStartWork() {}
+    protected void testHookEndWork() {}
+    protected void testHookShutdownWork() {}
+
     /**
      * Perform one iteration of Export Client work.
      * Connect if not connected.
@@ -390,6 +398,9 @@ public abstract class ExportClientBase {
         // the shutdown hook won't let the system die until
         // the lock is released (except via kill -9)
         synchronized (m_atomicWorkLock) {
+            // noop if not running test code
+            testHookStartWork();
+
             assert(m_connected.get());
 
             // work all the ExportDataSinks.
@@ -415,6 +426,9 @@ public abstract class ExportClientBase {
                 throw new ExportClientException(ExportClientException.Type.DISCONNECT_UNEXPECTED,
                         "Disconnected from one or more export servers");
             }
+
+            // noop if not running test code
+            testHookEndWork();
         }
 
         // give the shutdown hook thread a chance to acquire the lock
