@@ -101,8 +101,8 @@ public class RealVoltDB implements VoltDBInterface
                 VoltDB.instance().getCatalogContext().
                 siteTracker.getAllSitesForHost(node_fault.getHostId());
             Collections.sort(dead_sites);
-            hostLog.error("Host failed, hostname: " + node_fault.getHostname());
-            hostLog.error("  Host ID: " + node_fault.getHostId());
+            hostLog.error("Host failed, host id: " + node_fault.getHostId() +
+                    " hostname: " + node_fault.getHostname());
             hostLog.error("  Removing sites from cluster: " + dead_sites);
             StringBuilder sb = new StringBuilder();
             for (int site_id : dead_sites)
@@ -1167,11 +1167,10 @@ public class RealVoltDB implements VoltDBInterface
 
         // connect to the joining node, build a foreign host
         InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
-        String ipAddr = addr.getAddress().getHostAddress();
+        String ipAddr = addr.getAddress().toString();
 
         recoveryLog.info("Rejoining node with host id: " + rejoinHostId +
-                         ", hostname: " + rejoiningHostname +
-                         " and ip: " + ipAddr +
+                         ", hostname: " + ipAddr +
                          " at txnid: " + currentTxnId);
         lastNodeRejoinPrepare_txnId = currentTxnId;
 
@@ -1239,9 +1238,8 @@ public class RealVoltDB implements VoltDBInterface
             newIds.setLength(newIds.length() - 1);
 
             // change the catalog to reflect this change
-            hostLog.error("Host joined, hostname: " + joinNodeInfo.hostName);
-            hostLog.error("  Host ID: " + joinNodeInfo.hostId);
-            hostLog.error("  Adding sites to cluster: " + newIds);
+            hostLog.info("Host joined, host id: " + joinNodeInfo.hostId + " hostname: " + joinNodeInfo.hostName);
+            hostLog.info("  Adding sites to cluster: " + newIds);
             StringBuilder sb = new StringBuilder();
             for (int siteId : rejoiningSiteIds)
             {

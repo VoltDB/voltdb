@@ -487,7 +487,7 @@ public class HostMessenger implements Messenger {
 
         JoiningNodeInfo retval = new JoiningNodeInfo();
         retval.hostId = m_tempNewHostId;
-        retval.hostName = "NEWNODETEMPNAME";
+        retval.hostName = m_tempNewFH.inetAddrString();
 
         m_tempNewFH = null;
         m_tempNewHostId = -1;

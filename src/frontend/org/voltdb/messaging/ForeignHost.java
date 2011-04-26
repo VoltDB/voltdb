@@ -314,6 +314,10 @@ public class ForeignHost {
         return m_remoteHostname;
     }
 
+    String inetAddrString() {
+        return m_ipAddress.toString();
+    }
+
     /** Deliver a deserialized message from the network to a local mailbox */
     private void deliverMessage(int siteId, int mailboxId, VoltMessage message) {
         // get the site and print an error if it can't be gotten
