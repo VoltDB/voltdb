@@ -18,10 +18,10 @@ SELECT (_variable + 5) AS NUMSUM FROM @from_tables ORDER BY NUMSUM
 SELECT * FROM @from_tables WHERE _variable _cmp _value[float]
 SELECT * FROM @from_tables WHERE _variable _cmp _value[string]
 SELECT * FROM @from_tables WHERE _variable _cmp (_variable _math _value[int:0,1000])
-SELECT _variable, _variable FROM @from_tables LIMIT _value[int:1,10]
+SELECT _variable[@order] FROM @from_tables ORDER BY _variable[@order] LIMIT _value[int:1,10]
 
 -- combine where and limit
-SELECT _variable, _variable FROM @from_tables WHERE _variable _cmp _variable LIMIT _value[int:1,100]
+SELECT _variable[@order] FROM @from_tables WHERE _variable _cmp _variable ORDER BY _variable[@order] LIMIT _value[int:1,100]
 -- compare more columns
 SELECT _variable FROM @from_tables WHERE (_variable _cmp _variable) _logic (_variable _cmp _variable)
 

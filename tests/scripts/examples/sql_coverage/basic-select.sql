@@ -40,7 +40,7 @@ SELECT _variable FROM @from_tables GROUP BY _variable
 -- test ORDER BY
 SELECT _variable[@order], _variable FROM @from_tables ORDER BY _variable[@order] _sortorder
 -- test LIMIT (with ORDER BY)
-SELECT * FROM @from_tables ORDER BY _variable LIMIT _value[int:1,10]
+SELECT _variable[@order] FROM @from_tables ORDER BY _variable[@order] LIMIT _value[int:1,10]
 -- test GROUP BY count(*)
 SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@order]
 -- test GROUP BY ORDER BY COUNT(*) with LIMIT
