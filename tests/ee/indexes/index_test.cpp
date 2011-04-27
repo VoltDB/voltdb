@@ -923,7 +923,7 @@ TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
     memset(data, 0, tuple->tupleLength());
     tuple->move(data);
 
-    tuple->setNValue(0, ValueFactory::getBigIntValue(10));
+    tuple->setNValue(idx, ValueFactory::getBigIntValue(value));
     return tuple;
 }
 
@@ -962,10 +962,10 @@ TEST_F(IndexTest, ENG1193) {
     EXPECT_TRUE(index->exists(tuple3));
     EXPECT_TRUE(index->exists(tuple4));
 
-    EXPECT_TRUE(index->moveToKey(tuple4));
+    EXPECT_TRUE(index->moveToTuple(tuple4));
     TableTuple tmp = TableTuple(schema);
     while(!(tmp = index->nextValueAtKey()).isNullTuple()) {
-        EXPECT_TRUE(tuple4->equals(tmp));
+        EXPECT_EQ(tmp.address(), tuple4->address());
     }
 
     delete index;
