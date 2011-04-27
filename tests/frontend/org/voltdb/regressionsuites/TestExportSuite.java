@@ -130,9 +130,7 @@ public class TestExportSuite extends RegressionSuite {
             try {
                 tester.work();
             } catch (ExportClientException e) {
-                tester.disconnect();
-                tester.reserveVerifiers();
-                boolean success = tester.connect();
+                boolean success = reconnect(tester);
                 assertTrue(success);
                 System.out.println(e.toString());
                 continue;
@@ -188,6 +186,16 @@ public class TestExportSuite extends RegressionSuite {
                 System.err.println(clientResponse.getException());
             }
         }
+    }
+
+    private boolean reconnect(ExportTestClient client) throws ExportClientException {
+        for (int ii = 0; ii < 3; ii++) {
+            m_tester.disconnect();
+            m_tester.reserveVerifiers();
+            boolean success = client.connect();
+            if (success) return true;
+        }
+        return false;
     }
 
     /**
@@ -429,7 +437,7 @@ public class TestExportSuite extends RegressionSuite {
           @Override
           public void run() {
               try {
-                  Thread.sleep(1000);
+                  Thread.sleep(3000);
                   currentThread.interrupt();
               } catch (Exception e) {
                   e.printStackTrace();
@@ -516,9 +524,7 @@ public class TestExportSuite extends RegressionSuite {
             try {
                 m_tester.work(1000);
             } catch (ExportClientException e) {
-                m_tester.disconnect();
-                m_tester.reserveVerifiers();
-                boolean success = m_tester.connect();
+                boolean success = reconnect(m_tester);
                 assertTrue(success);
                 System.out.println(e.toString());
                 threwException = true;
@@ -560,9 +566,7 @@ public class TestExportSuite extends RegressionSuite {
         try {
             m_tester.work(1000);
         } catch (ExportClientException e) {
-            m_tester.disconnect();
-            m_tester.reserveVerifiers();
-            boolean success = m_tester.connect();
+            boolean success = reconnect(m_tester);
             assertTrue(success);
             System.out.println(e.toString());
             threwException = true;
@@ -576,9 +580,7 @@ public class TestExportSuite extends RegressionSuite {
         try {
             m_tester.work(1000);
         } catch (ExportClientException e) {
-            m_tester.disconnect();
-            m_tester.reserveVerifiers();
-            boolean success = m_tester.connect();
+            boolean success = reconnect(m_tester);
             assertTrue(success);
             System.out.println(e.toString());
             threwException = true;
@@ -672,9 +674,7 @@ public class TestExportSuite extends RegressionSuite {
             try {
                 m_tester.work(1000);
             } catch (ExportClientException e) {
-                m_tester.disconnect();
-                m_tester.reserveVerifiers();
-                boolean success = m_tester.connect();
+                boolean success = reconnect(m_tester);
                 assertTrue(success);
                 System.out.println(e.toString());
                 threwException = true;
