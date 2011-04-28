@@ -8,6 +8,10 @@ fi
 TAG=$1
 if [ $1 != "trunk" ]; then
     TAG=tags/${TAG}
+    PROTAG=tags/${TAG}
+else
+    TAG=trunk
+    PROTAG=branches/rest
 fi
 
 # check that the directory is empty
@@ -19,7 +23,7 @@ rm -rf doc eng pro
 
 svn co https://svn.voltdb.com/doc/$TAG doc
 svn co https://svn.voltdb.com/eng/$TAG eng
-svn co https://svn.voltdb.com/pro/$TAG pro
+svn co https://svn.voltdb.com/pro/$PROTAG pro
 
 mkdir -p ~/releases/`cat eng/version.txt`
 cd eng
@@ -49,7 +53,9 @@ echo "" >> ~/releases/`cat version.txt`/checksums.txt
 echo "SHA1 checksums:" >> ~/releases/`cat version.txt`/checksums.txt
 echo "" >> ~/releases/`cat version.txt`/checksums.txt
 sha1sum ~/releases/`cat version.txt`/*.gz >> ~/releases/`cat version.txt`/checksums.txt
-scp -r ~/releases/`cat version.txt` root@community.voltdb.com:/var/www/drupal/sites/default/files/archive
+
+#scp -r ~/releases/`cat version.txt` root@community.voltdb.com:/var/www/drupal/sites/default/files/archive
+
 mkdir -p ~/releases/`cat version.txt`/other
 cp obj/release/voltdb-`cat version.txt`.sym ~/releases/`cat version.txt`/other/
 cd ..
