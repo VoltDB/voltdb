@@ -36,11 +36,11 @@ ant -f mmt.xml clean
 VOLTCORE=../eng ant -f mmt.xml dist.pro
 cp obj/pro/voltdb-ent-*.tar.gz ~/releases/`cat ../eng/version.txt`/
 cd ../doc
-mv pdfs/enterprise_releasenotes.pdf ~/releases/`cat ../eng/version.txt`/`cat ../eng/version.txt`-enterprise_releasenotes.pdf
+# we do not include EE release notes in the documentation zip file
+rm pdfs/enterprise_releasenotes.pdf
 mv pdfs `cat ../eng/version.txt`-docs_pdf
 zip ~/releases/`cat ../eng/version.txt`/`cat ../eng/version.txt`-docs_pdf.zip `cat ../eng/version.txt`-docs_pdf/*.pdf
 mv `cat ../eng/version.txt`-docs_pdf pdfs
-cp ~/releases/`cat ../eng/version.txt`/`cat ../eng/version.txt`-enterprise_releasenotes.pdf pdfs/enterprise_releasenotes.pdf
 cd ../eng
 echo "CRC checksums:" > ~/releases/`cat version.txt`/checksums.txt
 echo "" >> ~/releases/`cat version.txt`/checksums.txt
