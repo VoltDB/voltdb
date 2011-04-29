@@ -1,12 +1,13 @@
 #!/bin/bash -e
 
 # Parameters to pass/auto-discover
-LICENSE_SOURCE_DIRECTORY="/home/sebc/svndev/pro.trunk/licensedata"
-ACTIVE_VERSION="1.3.01"
+LICENSE_SOURCE_DIRECTORY="/home/test/workspace/pro-trunk/licensedata"
+ACTIVE_VERSION="1.3.1"
 
 # Working variables
-#LICENSE_SOURCE=$LICENSE_SOURCE_DIRECTORY/trial_2011-05-12.xml #`date +"trial_%Y-%m-%d.xml"`
-LICENSE_SOURCE=$LICENSE_SOURCE_DIRECTORY/`date +"trial_%Y-%m-%d.xml"`
+
+# Create a license that lasts 45 days (30 days from 2 weeks out)
+LICENSE_SOURCE=$LICENSE_SOURCE_DIRECTORY/`date --date='14 days' +"trial_%Y-%m-%d.xml"`
 
 # Setup a clean working area
 rm -rf /tmp/trialkitbuilder
@@ -14,7 +15,8 @@ mkdir -p /tmp/trialkitbuilder
 cd /tmp/trialkitbuilder
 
 # Grab the source & extract - assuming here that we grab the kit from the community site and push it right back
-scp root@community.voltdb.com:/var/www/drupal/sites/default/files/archive/$ACTIVE_VERSION/voltdb-ent-$ACTIVE_VERSION.tar.gz .
+#scp root@community.voltdb.com:/var/www/drupal/sites/default/files/archive/$ACTIVE_VERSION/voltdb-ent-$ACTIVE_VERSION.tar.gz .
+cp /tmp/$ACTIVE_VERSION-candidate/voltdb-ent-$ACTIVE_VERSION.tar.gz .
 tar -xzf voltdb-ent-$ACTIVE_VERSION.tar.gz
 rm voltdb-ent-$ACTIVE_VERSION.tar.gz
 
@@ -28,4 +30,3 @@ tar -czf voltdb-ent-$ACTIVE_VERSION.tar.gz voltdb-ent-$ACTIVE_VERSION
 
 # Cleanup
 #rm -rf /tmp/trialkitbuilder/
-
