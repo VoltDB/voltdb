@@ -114,7 +114,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * Size in bytes of the maximum length for a VoltDB tuple.
      * This value is counted from byte 0 of the header size to the end of row data.
      */
-    public static final int MAX_SERIALIZED_TABLE_LENGTH = 10 * 1024 * 1024;
+    public static final int MAX_SERIALIZED_TABLE_LENGTH = 100 * 1024 * 1024;
     public static final String MAX_SERIALIZED_TABLE_LENGTH_STR =
         String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
 
@@ -904,45 +904,47 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 case BIGINT:
                     long lval = r.getLong(i);
                     if (r.wasNull())
-                        buffer.append("NULL, ");
+                        buffer.append("NULL");
                     else
-                        buffer.append(lval + ", ");
+                        buffer.append(lval);
                     break;
                 case FLOAT:
                     double dval = r.getDouble(i);
                     if (r.wasNull())
-                        buffer.append("NULL, ");
+                        buffer.append("NULL");
                     else
-                        buffer.append(dval + ", ");
+                        buffer.append(dval);
                     break;
                 case TIMESTAMP:
                     TimestampType tstamp = r.getTimestampAsTimestamp(i);
                     if (r.wasNull()) {
-                        buffer.append("NULL, ");
+                        buffer.append("NULL");
                         assert (tstamp == null);
                     } else {
-                        buffer.append(tstamp + ", ");
+                        buffer.append(tstamp);
                     }
                     break;
                 case STRING:
                     String string = r.getString(i);
                     if (r.wasNull()) {
-                        buffer.append("NULL, ");
+                        buffer.append("NULL");
                         assert (string == null);
                     } else {
-                        buffer.append(string + ", ");
+                        buffer.append(string);
                     }
                     break;
                 case DECIMAL:
                     BigDecimal bd = r.getDecimalAsBigDecimal(i);
                     if (r.wasNull()) {
-                        buffer.append("NULL, ");
+                        buffer.append("NULL");
                         assert (bd == null);
                     } else {
-                        buffer.append(bd.toString() + ", ");
+                        buffer.append(bd.toString());
                     }
                     break;
                 }
+                if (i < m_colCount - 1)
+                    buffer.append(",");
             }
             buffer.append("\n");
         }
