@@ -208,9 +208,11 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print(self.response)
 
     def help_stat(self):
-        self.safe_print("Get the statistics:")
-        self.safe_print("\tstat procedure")
-        self.safe_print("\treset counters")
+        self.safe_print(
+            """
+Get the statistics:
+\tstat {table|index|procedure|starvation|initiator|partitioncount|iostats|memory|liveclients|management} {0|1}
+""")
 
     def do_snapshotsave(self, command):
         if self.fs == None:
