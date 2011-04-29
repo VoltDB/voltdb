@@ -2,10 +2,11 @@
 
 # run this script from the tools directory of the unpacked kit under test
 
-set buildstring "Build: 1.2.01 https://svn.voltdb.com/eng/trunk?revision=1149"
-if { $argc >= 0 } {
-  set buildstring [lindex $argv 0]
+if { $argc != 1 } {
+  puts "Please pass the build string as one single argument"
+  exit 1
 }
+set buildstring [lindex $argv 0]
 
 set timeout 150
 proc abort {} { exit 1 }

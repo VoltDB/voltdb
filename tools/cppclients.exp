@@ -3,9 +3,11 @@
 # run this script from the trunk of the c++ client library directory
 
 # if no buildstring is specified, this doesn't check the version number
-if { $argc >= 0 } {
-  set buildstring [lindex $argv 0]
+if { $argc != 1 } {
+  puts "Please pass the build string as one single argument"
+  exit 1
 }
+set buildstring [lindex $argv 0]
 
 set timeout 150
 proc abort {} {
