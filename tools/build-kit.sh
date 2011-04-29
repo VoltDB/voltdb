@@ -5,13 +5,15 @@ if [ $# != 1 ]; then
     exit 1
 fi
 
-TAG=$1
+PARAM1=$1
 if [ $1 != "trunk" ]; then
-    TAG=tags/${TAG}
-    PROTAG=tags/${TAG}
+    ENGTAG=tags/${PARAM1}
+    PROTAG=tags/${PARAM1}
+    DOCTAG=tags/${PARAM1}
 else
-    TAG=trunk
+    ENGTAG=trunk
     PROTAG=branches/rest
+    DOCTAG=trunk
 fi
 
 # check that the directory is empty
@@ -21,8 +23,8 @@ OS=`uname -s | tr [a-z] [A-Z] | sed 's/DARWIN/MAC/'`
 
 rm -rf doc eng pro
 
-svn co https://svn.voltdb.com/doc/$TAG doc
-svn co https://svn.voltdb.com/eng/$TAG eng
+svn co https://svn.voltdb.com/doc/$DOCTAG doc
+svn co https://svn.voltdb.com/eng/$ENGTAG eng
 svn co https://svn.voltdb.com/pro/$PROTAG pro
 
 mkdir -p ~/releases/`cat eng/version.txt`
