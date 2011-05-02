@@ -209,47 +209,4 @@ public class TestPartitionDetection extends TestCase
             client.close();
         }
     }
-
-    public void testBlessedHost() throws Exception {
-        final Semaphore rateLimit = new Semaphore(10);
-        Client client = ClientFactory.createClient();
-
-        VoltProjectBuilder builder = getBuilderForTest();
-        // choose a partitionable cluster: 2 sites / 2 hosts / k-factor 1.
-        // use a separate process for each host.
-        LocalCluster cluster = new LocalCluster("partition-detection2.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(false);
-        boolean success = cluster.compileWithPartitiondDetection(builder, TMPDIR, TESTNONCE);
-        assertTrue(success);
-        cluster.startUp();
-        client.createConnection("localhost");
-
-        // add several tuples
-        for (int i=0; i < 100; i++) {
-            rateLimit.acquire();
-            client.callProcedure(new Callback(rateLimit), "InsertA", i, 1000+i);
-        }
-        client.drain();
-        client.close();
-
-        // kill the non-blessed. the blessed host should continue.
-        int blessed = cluster.getBlessedPartitionDetectionProcId();
-        if (blessed == 0) {
-            cluster.shutDownSingleHost(1);
-        } else {
-            cluster.shutDownSingleHost(0);
-        }
-
-        client = ClientFactory.createClient();
-        client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + blessed);
-        for (int i=100; i < 200; i++) {
-            rateLimit.acquire();
-            client.callProcedure(new Callback(rateLimit), "InsertA", i, 1000+i);
-        }
-        client.drain();
-        client.close();
-
-        // all callbacks succeeded
-        assertTrue(CallbackGood.allOk.get());
-    }
 }
