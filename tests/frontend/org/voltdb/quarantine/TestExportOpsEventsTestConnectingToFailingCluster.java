@@ -21,21 +21,19 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.exportclient;
+package org.voltdb.quarantine;
 
 import java.net.InetSocketAddress;
-import java.util.concurrent.CountDownLatch;
 
 import junit.framework.TestCase;
 
-import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.exportclient.ExportClientException;
+import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.VoltDBFickleCluster;
 
-public class TestExportOpsEvents extends TestCase {
+public class TestExportOpsEventsTestConnectingToFailingCluster extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
@@ -77,55 +75,69 @@ public class TestExportOpsEvents extends TestCase {
         client.run(1500);
     }
 
-    public void testConnectingToExportDisabledServer() throws Exception {
-        System.out.println("testConnectingToExportDisabledServer");
-
-        // compile a trivial voltdb catalog/deployment (no export)
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("create table blah (ival bigint default 0 not null, PRIMARY KEY(ival));");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("disabled-export.jar"), 1, 1, 0, "localhost");
-        assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("disabled-export.xml"));
-
-        // start voltdb server (no export)
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("disabled-export.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("disabled-export.xml");
-        ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
-
+    public void testConnectingToFailingCluster() throws Exception {
+        System.out.println("testConnectingToFailingCluster");
         NullExportClient client = new NullExportClient();
         client.addServerInfo(new InetSocketAddress("localhost", 21212));
-
-        // the first connect should return false, but shouldn't
-        // throw and exception
-        try {
-            client.connect();
-            fail();
-        }
-        catch (Exception e) {
-            assertTrue(e.getMessage().contains("Export is not enabled"));
-        }
-
-        localServer.shutdown();
-        localServer.join();
-    }
-
-    public void testConnectingToLateServer() throws Exception {
-        System.out.println("testConnectingToLateServer");
-        NullExportClient client = new NullExportClient();
-        client.addServerInfo(new InetSocketAddress("localhost", 21212));
-
-        // the first connect should return false, but shouldn't
-        // throw and exception
-        assertFalse(client.connect());
 
         VoltDBFickleCluster.start();
 
         assertTrue(client.connect());
+
+        VoltDBFickleCluster.killNode();
+
+        // work for 10 seconds, or until the connection is dropped
+        long now = System.currentTimeMillis();
+        boolean success = false;
+        while ((System.currentTimeMillis() - now) < 10000) {
+            try {
+                client.work();
+            }
+            catch (ExportClientException e) {
+                // this is supposed to happen
+                success = true;
+                break;
+            }
+        }
+        assertTrue(success);
+
         client.disconnect();
+
+        // Debug code added to make sure the server is listening on the client port.
+        // On the mini we were seeing that the export client couldn't reconnect
+        // and got connection refused which doesn't make any sense. Adding this
+        // debug output changed the timing so it wouldn't show up. Leave it in to make
+        // the test pass more consistently, and give us more info if it does end up failing again.
+        {
+            Process p = Runtime.getRuntime().exec("lsof -i");
+            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+            java.io.BufferedReader br = new java.io.BufferedReader(reader);
+            String str = null;
+            while ((str = br.readLine()) != null) {
+                if (str.contains("LISTEN")) {
+                    System.out.println(str);
+                }
+            }
+        }
+
+        boolean connected = client.connect();
+        if (!connected) {
+            System.out.println("Couldn't reconnect");
+
+            // Do the debug output a 2nd time to see if the status changes after the failure/time passes
+            Process p = Runtime.getRuntime().exec("lsof -i");
+            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+            java.io.BufferedReader br = new java.io.BufferedReader(reader);
+            String str = null;
+            while ((str = br.readLine()) != null) {
+                if (str.contains("LISTEN")) {
+                    System.out.println(str);
+                }
+            }
+        }
+        assertTrue(connected);
+        client.disconnect();
+
         VoltDBFickleCluster.stop();
     }
 }

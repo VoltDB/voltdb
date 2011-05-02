@@ -391,7 +391,7 @@ public abstract class ExportClientBase {
      * Override if the specific client has strange workflow/termination conditions.
      * Largely for Export clients used for test.
      */
-    protected int work() throws ExportClientException {
+    public int work() throws ExportClientException {
         int offeredMsgs = 0;
 
         // hold this lock while doing one unit of work
@@ -469,7 +469,7 @@ public abstract class ExportClientBase {
         run(0);
     }
 
-    protected void run(long timeout) throws ExportClientException {
+    public void run(long timeout) throws ExportClientException {
 
         try {
             // add the shutdown hook that insulates the process from crtl-c a bit
