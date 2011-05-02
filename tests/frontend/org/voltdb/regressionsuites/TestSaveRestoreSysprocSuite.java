@@ -883,6 +883,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
 
+        // hacky, need to sleep long enough so the internal server tick
+        // updates the memory stats
+        Thread.sleep(1000);
+
         VoltTable final_mem = null;
         try
         {
@@ -1099,6 +1103,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             ex.printStackTrace();
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
+
+        // hacky, need to sleep long enough so the internal server tick
+        // updates the memory stats
+        Thread.sleep(1000);
 
         VoltTable final_mem = null;
         try

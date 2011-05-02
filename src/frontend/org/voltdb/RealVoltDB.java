@@ -1427,6 +1427,11 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     @Override
+    public MemoryStats getMemoryStatsSource() {
+        return m_memoryStats;
+    }
+
+    @Override
     public FaultDistributorInterface getFaultDistributor()
     {
         return m_faultManager;

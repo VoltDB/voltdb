@@ -16,15 +16,9 @@
  */
 package org.voltdb;
 
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.TreeMap;
-
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.utils.SystemStatsCollector;
 
 /**
  * Agent responsible for collecting stats on this host.
@@ -35,9 +29,6 @@ public class StatsAgent {
         new HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>>();
 
     private final HashSet<SysProcSelector> handledSelectors = new HashSet<SysProcSelector>();
-
-    private static int m_hostId = -1;
-    private static String m_hostName = null;
 
     public StatsAgent() {
         SysProcSelector selectors[] = SysProcSelector.values();
@@ -123,104 +114,4 @@ public class StatsAgent {
         }
         return resultTable;
     }
-
-    /////////////////////////////////////////////
-    // STATIC STUFF FOR ROLLUP GOES HERE
-
-    static class PartitionMemRow {
-        long tupleCount = 0;
-        int tupleDataMem = 0;
-        int tupleAllocatedMem = 0;
-        int indexMem = 0;
-        int stringMem = 0;
-        long pooledMem = 0;
-    }
-    static Map<Integer, PartitionMemRow> m_memoryStats = new TreeMap<Integer, PartitionMemRow>();
-
-    static synchronized void eeUpdateMemStats(int siteId,
-                                              long tupleCount,
-                                              int tupleDataMem,
-                                              int tupleAllocatedMem,
-                                              int indexMem,
-                                              int stringMem,
-                                              long pooledMemory) {
-        PartitionMemRow pmr = new PartitionMemRow();
-        pmr.tupleCount = tupleCount;
-        pmr.tupleDataMem = tupleDataMem;
-        pmr.tupleAllocatedMem = tupleAllocatedMem;
-        pmr.indexMem = indexMem;
-        pmr.stringMem = stringMem;
-        pmr.pooledMem = pooledMemory;
-        m_memoryStats.put(siteId, pmr);
-    }
-
-    public static VoltTable getEmptyNodeMemStatsTable() {
-        // create a table with the right schema
-        VoltTable t = new VoltTable(new ColumnInfo[] {
-                new ColumnInfo("HOSTID", VoltType.INTEGER),
-                new ColumnInfo("HOSTNAME", VoltType.STRING),
-                new ColumnInfo("RSS", VoltType.INTEGER),
-                new ColumnInfo("JAVAUSED", VoltType.INTEGER),
-                new ColumnInfo("JAVAUNUSED", VoltType.INTEGER),
-                new ColumnInfo("TUPLEDATA", VoltType.INTEGER),
-                new ColumnInfo("TUPLEALLOCATED", VoltType.INTEGER),
-                new ColumnInfo("INDEXMEMORY", VoltType.INTEGER),
-                new ColumnInfo("STRINGMEMORY", VoltType.INTEGER),
-                new ColumnInfo("TUPLECOUNT", VoltType.BIGINT),
-                new ColumnInfo("POOLEDMEMORY", VoltType.BIGINT)
-        });
-        return t;
-    }
-
-    public static synchronized VoltTable getMemoryStatsTable() {
-        // get the host id and hostname once
-        if (m_hostId == -1) {
-            m_hostId = VoltDB.instance().getHostMessenger().getHostId();
-            // get the hostname, but fail gracefully
-            m_hostName = "&lt;unknownhost&gt;";
-            try {
-                InetAddress addr = InetAddress.getLocalHost();
-                m_hostName = addr.getHostName();
-            }
-            catch (Exception e) {
-                try {
-                    InetAddress addr = InetAddress.getLocalHost();
-                    m_hostName = addr.getHostAddress();
-                }
-                catch (Exception e2) {}
-            }
-        }
-
-        // create a table with the right schema
-        VoltTable t = getEmptyNodeMemStatsTable();
-
-        // sum up all of the site statistics
-        PartitionMemRow totals = new PartitionMemRow();
-        for (PartitionMemRow pmr : m_memoryStats.values()) {
-            totals.tupleCount += pmr.tupleCount;
-            totals.tupleDataMem += pmr.tupleDataMem;
-            totals.tupleAllocatedMem += pmr.tupleAllocatedMem;
-            totals.indexMem += pmr.indexMem;
-            totals.stringMem += pmr.stringMem;
-            totals.pooledMem += pmr.pooledMem;
-        }
-
-        // get system statistics
-        int rss = 0; int javaused = 0; int javaunused = 0;
-        SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
-        if (d != null) {
-            rss = (int) (d.rss / 1024);
-            double javausedFloat = d.javausedheapmem + d.javausedsysmem;
-            javaused = (int) (javausedFloat / 1024);
-            javaunused = (int) ((d.javatotalheapmem + d.javatotalsysmem - javausedFloat) / 1024);
-        }
-
-        // create the row and return it
-        t.addRow(m_hostId, m_hostName, rss, javaused, javaunused,
-                 totals.tupleDataMem, totals.tupleAllocatedMem,
-                 totals.indexMem, totals.stringMem, totals.tupleCount, totals.pooledMem / 1024);
-        assert(t.getRowCount() == 1);
-        return t;
-    }
-
 }

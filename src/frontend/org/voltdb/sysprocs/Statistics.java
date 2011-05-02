@@ -32,7 +32,6 @@ import org.voltdb.LiveClientStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -265,19 +264,30 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_initiatorAggregator, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_nodeMemory) {
+            assert(params.toArray().length == 2);
+            final boolean interval =
+                ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
+            final Long now = (Long)params.toArray()[1];
+            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
+            catalogIds.add(0);
+            VoltTable result =
+                VoltDB.instance().getStatsAgent().getStats(SysProcSelector.MEMORY,
+                                                           catalogIds,
+                                                           interval,
+                                                           now);
+
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
             int hostId = context.getExecutionSite().getCorrespondingHostId();
             Integer lowestSiteId =
                 VoltDB.instance().getCatalogContext().siteTracker.
                 getLowestLiveExecSiteIdForHost(hostId);
-            VoltTable result = null;
             if (context.getExecutionSite().getSiteId() == lowestSiteId) {
-                result = StatsAgent.getMemoryStatsTable();
                 assert(result.getRowCount() == 1);
             }
             else {
-                result = StatsAgent.getEmptyNodeMemStatsTable();
+                // Hacky way to generate an empty table with the correct schema
+                result.clearRowData();
                 assert(result.getRowCount() == 0);
             }
             return new DependencyPair(DEP_nodeMemory, result);
@@ -413,7 +423,7 @@ public class Statistics extends VoltSystemProcedure {
         final long now = System.currentTimeMillis();
         if ((selector.toUpperCase().equals(SysProcSelector.MEMORY.name())) ||
             (selector.toUpperCase().equals("NODEMEMORY"))) {
-            results = getMemoryData();
+            results = getMemoryData(interval, now);
             assert(results.length == 1);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
@@ -441,7 +451,7 @@ public class Statistics extends VoltSystemProcedure {
             results = getLiveClientData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.MANAGEMENT.name())) {
-            VoltTable[] memoryResults = getMemoryData();
+            VoltTable[] memoryResults = getMemoryData(interval, now);
             VoltTable[] tableResults = getTableData(interval, now);
             VoltTable[] indexResults = getIndexData(interval, now);
             VoltTable[] procedureResults = getProcedureData(interval, now);
@@ -539,7 +549,7 @@ public class Statistics extends VoltSystemProcedure {
         return results;
     }
 
-    private VoltTable[] getMemoryData() {
+    private VoltTable[] getMemoryData(long interval, final long now) {
         VoltTable[] results;
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
         // create a work fragment to gather node memory data
@@ -549,7 +559,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
         pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters();
+        pfs[1].parameters.setParameters((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.

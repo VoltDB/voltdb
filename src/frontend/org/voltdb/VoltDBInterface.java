@@ -70,6 +70,7 @@ public interface VoltDBInterface
     public Map<Integer, ExecutionSite> getLocalSites();
     public VoltNetwork getNetwork();
     public StatsAgent getStatsAgent();
+    public MemoryStats getMemoryStatsSource();
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();

@@ -19,10 +19,23 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.TreeMap;
 
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.utils.SystemStatsCollector;
 
 public class MemoryStats extends StatsSource {
+    static class PartitionMemRow {
+        long tupleCount = 0;
+        int tupleDataMem = 0;
+        int tupleAllocatedMem = 0;
+        int indexMem = 0;
+        int stringMem = 0;
+        long pooledMem = 0;
+    }
+    Map<Integer, PartitionMemRow> m_memoryStats = new TreeMap<Integer, PartitionMemRow>();
+
     public MemoryStats(String name) {
         super(name, false);
     }
@@ -65,22 +78,58 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("INDEXMEMORY", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("STRINGMEMORY", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("TUPLECOUNT", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("POOLEDMEMORY", VoltType.BIGINT));
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        VoltTable t = StatsAgent.getMemoryStatsTable();
-        t.advanceRow();
+    protected synchronized void updateStatsRow(Object rowKey, Object[] rowValues) {
+        // sum up all of the site statistics
+        PartitionMemRow totals = new PartitionMemRow();
+        for (PartitionMemRow pmr : m_memoryStats.values()) {
+            totals.tupleCount += pmr.tupleCount;
+            totals.tupleDataMem += pmr.tupleDataMem;
+            totals.tupleAllocatedMem += pmr.tupleAllocatedMem;
+            totals.indexMem += pmr.indexMem;
+            totals.stringMem += pmr.stringMem;
+            totals.pooledMem += pmr.pooledMem;
+        }
 
-        rowValues[columnNameToIndex.get("RSS")] = t.getLong("RSS");
-        rowValues[columnNameToIndex.get("JAVAUSED")] = t.getLong("JAVAUSED");
-        rowValues[columnNameToIndex.get("JAVAUNUSED")] = t.getLong("JAVAUNUSED");
-        rowValues[columnNameToIndex.get("TUPLEDATA")] = t.getLong("TUPLEDATA");
-        rowValues[columnNameToIndex.get("TUPLEALLOCATED")] = t.getLong("TUPLEALLOCATED");
-        rowValues[columnNameToIndex.get("INDEXMEMORY")] = t.getLong("INDEXMEMORY");
-        rowValues[columnNameToIndex.get("STRINGMEMORY")] = t.getLong("STRINGMEMORY");
-        rowValues[columnNameToIndex.get("TUPLECOUNT")] = t.getLong("TUPLECOUNT");
+        // get system statistics
+        int rss = 0; int javaused = 0; int javaunused = 0;
+        SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
+        if (d != null) {
+            rss = (int) (d.rss / 1024);
+            double javausedFloat = d.javausedheapmem + d.javausedsysmem;
+            javaused = (int) (javausedFloat / 1024);
+            javaunused = (int) ((d.javatotalheapmem + d.javatotalsysmem - javausedFloat) / 1024);
+        }
+
+        rowValues[columnNameToIndex.get("RSS")] = rss;
+        rowValues[columnNameToIndex.get("JAVAUSED")] = javaused;
+        rowValues[columnNameToIndex.get("JAVAUNUSED")] = javaunused;
+        rowValues[columnNameToIndex.get("TUPLEDATA")] = totals.tupleDataMem;
+        rowValues[columnNameToIndex.get("TUPLEALLOCATED")] = totals.tupleAllocatedMem;
+        rowValues[columnNameToIndex.get("INDEXMEMORY")] = totals.indexMem;
+        rowValues[columnNameToIndex.get("STRINGMEMORY")] = totals.stringMem;
+        rowValues[columnNameToIndex.get("TUPLECOUNT")] = totals.tupleCount;
+        rowValues[columnNameToIndex.get("POOLEDMEMORY")] = totals.pooledMem / 1024;
         super.updateStatsRow(rowKey, rowValues);
     }
 
+    public synchronized void eeUpdateMemStats(int siteId,
+                                              long tupleCount,
+                                              int tupleDataMem,
+                                              int tupleAllocatedMem,
+                                              int indexMem,
+                                              int stringMem,
+                                              long pooledMemory) {
+        PartitionMemRow pmr = new PartitionMemRow();
+        pmr.tupleCount = tupleCount;
+        pmr.tupleDataMem = tupleDataMem;
+        pmr.tupleAllocatedMem = tupleAllocatedMem;
+        pmr.indexMem = indexMem;
+        pmr.stringMem = stringMem;
+        pmr.pooledMem = pooledMemory;
+        m_memoryStats.put(siteId, pmr);
+    }
 }

@@ -54,10 +54,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.export.ExportManager;
-import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
@@ -600,15 +597,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_indexStats.setStatsTable(stats);
             }
 
-            // update the rolled up statistics
-            StatsAgent.eeUpdateMemStats(
-                    m_siteId,
-                    tupleCount,
-                    tupleDataMem,
-                    tupleAllocatedMem,
-                    indexMem,
-                    stringMem,
-                    ee.getThreadLocalPoolAllocations());
+            // update the rolled up memory statistics
+            MemoryStats memoryStats = VoltDB.instance().getMemoryStatsSource();
+            if (memoryStats != null) {
+                memoryStats.eeUpdateMemStats(m_siteId,
+                                             tupleCount,
+                                             tupleDataMem,
+                                             tupleAllocatedMem,
+                                             indexMem,
+                                             stringMem,
+                                             ee.getThreadLocalPoolAllocations());
+            }
         }
     }
 

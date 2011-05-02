@@ -277,6 +277,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public MemoryStats getMemoryStatsSource() {
+        return null;
+    }
+
+    @Override
     public String getVersionString()
     {
         // TODO Auto-generated method stub
