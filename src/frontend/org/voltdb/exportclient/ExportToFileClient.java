@@ -218,7 +218,7 @@ public class ExportToFileClient extends ExportClientBase {
                 } catch (Exception e) {
                     String msg = e.getMessage();
                     // ignore the boring "stream closed" error
-                    if (msg.compareToIgnoreCase("stream closed") == 0)
+                    if (msg.compareToIgnoreCase("stream closed") != 0)
                         m_logger.error(e.getMessage());
                 }
             }
