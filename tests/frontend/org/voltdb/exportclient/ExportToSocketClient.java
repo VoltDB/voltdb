@@ -76,27 +76,25 @@ public class ExportToSocketClient extends ExportClientBase
 
     @Override
     protected void testHookStartWork() {
-        System.out.println("Starting a block");
+        //System.out.println("Starting a block");
         try {
             m_debugOut.write(1);
             m_debugOut.flush();
         }
         catch (IOException e) {
             e.printStackTrace();
-            System.exit(-1);
         }
     }
 
     @Override
     protected void testHookEndWork() {
-        System.out.println("Finishing a block");
+        //System.out.println("Finishing a block");
         try {
             m_debugOut.write(0);
             m_debugOut.flush();
         }
         catch (IOException e) {
             e.printStackTrace();
-            System.exit(-1);
         }
     }
 
@@ -109,7 +107,6 @@ public class ExportToSocketClient extends ExportClientBase
         }
         catch (IOException e) {
             e.printStackTrace();
-            System.exit(-1);
         }
     }
 

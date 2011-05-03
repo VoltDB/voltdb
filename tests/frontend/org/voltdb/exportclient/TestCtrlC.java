@@ -57,47 +57,34 @@ public class TestCtrlC extends TestCase {
 
         @Override
         public void run() {
-            ServerSocket accept = null;
             try {
-                accept = new ServerSocket(9999);
-                Socket sock = accept.accept();
-                assert(sock.isConnected());
-                accepted.set(true);
-                InputStream in = sock.getInputStream();
-
-                while (sock.isConnected() && allIsGo.get()) {
-                    try {
-                        if (in.available() >= 1) {
-                            int realLastByteRead = in.read();
-                            if (realLastByteRead != -1)
-                                lastByteRead = realLastByteRead;
+                ServerSocket accept = null;
+                Socket sock = null;
+                try {
+                    accept = new ServerSocket(9999);
+                    sock = accept.accept();
+                } finally {
+                    if (accept != null) {
+                        try { accept.close(); } catch (IOException e) {
+                            e.printStackTrace();
                         }
-                        else {
-                            Thread.sleep(50);
-                        }
-                    }
-                    catch (InterruptedException e) {
-                        // no op
-                        System.out.println("Stopping Socket Reader Thread (1)");
-                        break;
-                    }
-                    catch (InterruptedIOException e) {
-                        // no op
-                        System.out.println("Stopping Socket Reader Thread (2)");
-                        break;
-                    }
-                    catch (IOException e) {
-                        e.printStackTrace();
                     }
                 }
 
+                try {
+                    assert(sock.isConnected());
+                    accepted.set(true);
+                    InputStream in = sock.getInputStream();
+                    int realLastByteRead = 0;
+                    while ((realLastByteRead = in.read()) != -1) {
+                        lastByteRead = realLastByteRead;
+                    }
+                } finally {
+                    sock.close();
+                }
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
-            }
-            finally {
-                if (accept != null)
-                    try { accept.close(); } catch (IOException e) {}
             }
         }
     }
@@ -231,7 +218,6 @@ public class TestCtrlC extends TestCase {
             // wait for everything to stop
             allIsGo.set(false);
             voltClient.interrupt();
-            socketEndpoint.interrupt();
             System.out.println("Joining Export Client Process");
             m_clientProcess.waitFor();
             System.out.println("Joining Socket Thread");
@@ -240,6 +226,7 @@ public class TestCtrlC extends TestCase {
             voltClient.join();
             System.out.println("Joining Server Thread");
             VoltDBFickleCluster.stop();
+
 
             // make sure the last byte sent over the socket was a zero
             assertEquals(0, lastByteRead);
