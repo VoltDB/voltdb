@@ -883,7 +883,7 @@ public class TestExportSuite extends RegressionSuite {
         final Client client = getClient();
 
         final double rollbackPerc = 0.15;
-        long seed = (long)Math.random();
+        long seed = 0;
         System.out.println("TestExportRollback seed " + seed);
         java.util.Random r = new java.util.Random(seed);
 
