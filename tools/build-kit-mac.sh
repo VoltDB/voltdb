@@ -24,5 +24,6 @@ cd eng
 svn status
 ant clean default dist
 cp obj/release/voltdb-`cat version.txt`.tar.gz ~/releases/`cat version.txt`/${OS}-voltdb-`cat version.txt`.tar.gz
+scp obj/release/voltdb-`cat version.txt`.tar.gz test@volt5f:~/releases/`cat version.txt`/${OS}-voltdb-`cat version.txt`.tar.gz
 
 cd ..
