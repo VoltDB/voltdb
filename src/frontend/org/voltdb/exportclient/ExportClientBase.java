@@ -41,7 +41,8 @@ public abstract class ExportClientBase {
     protected AtomicBoolean m_connected = new AtomicBoolean(false);
 
     // object used to synchronize on so the shutdown hook can behave
-    final Object m_atomicWorkLock = new Object();
+    final java.util.concurrent.locks.ReentrantLock m_atomicWorkLock =
+        new java.util.concurrent.locks.ReentrantLock(true);
     final ShutdownHook m_shutdownHook = new ShutdownHook();
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
@@ -74,14 +75,14 @@ public abstract class ExportClientBase {
 
             // the ExportClientBase.work() holds this lock during
             // each iteration of its work
-            synchronized (m_atomicWorkLock) {
+            m_atomicWorkLock.lock();
+            try {
                 log.info("Work lock aquired. About to shutdown.");
 
                 // for tests only (noop otherwise)
                 testHookShutdownWork();
-
-                // DIE DIE DIE (faster and harder than System.exit(0))
-                Runtime.getRuntime().halt(0);
+            } finally {
+                m_atomicWorkLock.unlock();
             }
         }
     }
@@ -397,7 +398,8 @@ public abstract class ExportClientBase {
         // hold this lock while doing one unit of work
         // the shutdown hook won't let the system die until
         // the lock is released (except via kill -9)
-        synchronized (m_atomicWorkLock) {
+        m_atomicWorkLock.lock();
+        try {
             // noop if not running test code
             testHookStartWork();
 
@@ -429,11 +431,9 @@ public abstract class ExportClientBase {
 
             // noop if not running test code
             testHookEndWork();
+        } finally {
+            m_atomicWorkLock.unlock();
         }
-
-        // give the shutdown hook thread a chance to acquire the lock
-        // because java locks are not fair
-        try { Thread.sleep(1); } catch (InterruptedException e) {}
 
         // return the amount of work effectively done
         return offeredMsgs;
