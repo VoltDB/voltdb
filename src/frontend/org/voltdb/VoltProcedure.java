@@ -875,7 +875,38 @@ public abstract class VoltProcedure {
         }
 
         if (slowPath) {
-            return slowPath(batchSize, batchStmts, batchArgs, finalTask);
+            /*
+             * No fancy footwork if there is only one statement
+             */
+            if (batchSize == 1) {
+                return slowPath(batchSize, batchStmts, batchArgs, finalTask);
+            }
+
+            /*
+             * Determine if reads and writes are mixed. Can't mix reads and writes
+             * because the order of execution is wrong when replicated tables are involved
+             * due to ENG-1232
+             */
+            boolean hasRead = false;
+            boolean hasWrite = false;
+            for (int i = 0; i < batchSize; ++i) {
+                final SQLStmt stmt = batchStmts[i];
+                if (stmt.catStmt.getReadonly()) {
+                    hasRead = true;
+                } else {
+                    hasWrite = true;
+                }
+            }
+            /*
+             * If they are all reads or all writes then we can use the batching slow path
+             * Otherwise the order of execution will be interleaved incorrectly so we have to do
+             * each statement individually.
+             */
+            if ((hasRead && !hasWrite) || (!hasRead && hasWrite)) {
+                return slowPath(batchSize, batchStmts, batchArgs, finalTask);
+            } else {
+                return executeQueriesInIndividualBatches(batchSize, batchStmts, batchArgs, finalTask);
+            }
         }
 
         VoltTable[] results = null;
@@ -1235,6 +1266,15 @@ public abstract class VoltProcedure {
             assert(numFrags > 0);
             assert(numFrags <= 2);
 
+            /*
+             * This numfrags == 1 code is for routing multi-partition reads of a
+             * replicated table to the local site. This was a broken performance optimization.
+             * see https://issues.voltdb.com/browse/ENG-1232
+             * The problem is that the fragments for the replicated read are not correctly interleaved with the
+             * distributed writes to the replicated table that might be in the same batch of SQL statements.
+             * We do end up doing the replicated read locally but we break up the batches in the face of mixed
+             * reads and writes
+             */
             if (numFrags == 1) {
                 for (PlanFragment frag : stmt.catStmt.getFragments()) {
                     assert(frag != null);

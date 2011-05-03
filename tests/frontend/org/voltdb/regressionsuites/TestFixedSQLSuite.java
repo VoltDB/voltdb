@@ -33,6 +33,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
+import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
+import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 
 /**
  * Actual regression tests for SQL that I found that was broken and
@@ -43,7 +45,28 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 public class TestFixedSQLSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
+    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class };
+
+
+    public void testTicketENG1232() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "insert into test_eng1232 VALUES(9);");
+
+        VoltTable result[] = client.callProcedure("TestENG1232", 9).getResults();
+        assertTrue(result[0].advanceRow());
+        assertEquals(9, result[0].getLong(0));
+        assertTrue(result[1].advanceRow());
+        assertEquals(1, result[1].getLong(0));
+
+
+        client.callProcedure("@AdHoc", "insert into test_eng1232 VALUES(9);");
+
+        result = client.callProcedure("TestENG1232_2", 9).getResults();
+        assertTrue(result[0].advanceRow());
+        assertEquals(1, result[0].getLong(0));
+        assertFalse(result[1].advanceRow());
+    }
 
     public void testInsertNullPartitionString() throws IOException, ProcCallException
     {

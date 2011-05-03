@@ -73,3 +73,8 @@ CREATE TABLE STRINGPART (
   PRIMARY KEY(VAL1)
 );
 
+CREATE TABLE test_ENG1232 (
+    id bigint NOT NULL,
+    PRIMARY KEY (id)
+);
+
