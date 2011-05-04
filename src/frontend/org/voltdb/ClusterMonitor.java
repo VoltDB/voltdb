@@ -385,10 +385,10 @@ public class ClusterMonitor {
                 try {
                     while (true) {
                         VoltTable stats[] = m_client.callProcedure("@Statistics", "management", (byte)1).getResults();
-                        final VoltTable initiatorResults = stats[0];
-                        final VoltTable procedureResults = stats[1];
-                        final VoltTable ioResults = stats[2];
-                        final VoltTable tableResults = stats[3];
+                        final VoltTable initiatorResults = stats[1];
+                        final VoltTable procedureResults = stats[2];
+                        final VoltTable ioResults = stats[3];
+                        final VoltTable tableResults = stats[4];
                         sendInitiatorResults(initiatorResults);
                         sendProcedureResults(procedureResults);
                         sendIOResults(ioResults);
