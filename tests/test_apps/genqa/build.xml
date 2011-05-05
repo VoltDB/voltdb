@@ -20,7 +20,7 @@
     <property name="internalport" value="3021"/>
     <property name="adminport" value="6667"/>
     <property name="deployment" location="deployment.xml"/>
-    <property name="log4j.configuration" location="${voltdb.dir}/log4j.properties"/>
+    <property name="log4j.configuration" location="log4j.properties"/>
 
     <!-- Horrible hack: I don't want my voltroot to be /tmp because I want those files segregated, but if the folder
          doesn't exist, the server start will fail!  So we ensure the directory is created on-demand when the server
@@ -155,8 +155,8 @@
             <arg value="--async"/>
             <arg value="--share-connection"/>
             <arg value="--duration=3000"/>
-            <arg value="--servers=volt3f"/>
-            <arg value="--port=21312"/>
+            <arg value="--servers=localhost"/>
+            <arg value="--port=21212"/>
         </invoke-java-client>
     </target>
 
@@ -184,12 +184,37 @@
         </invoke-java-client>
     </target>
 
+    <target name="waitex" description="Start the WaitEx client.">
+        <invoke-java-client classname="com.WaitExClient">
+            <arg value="--wait=0"/>
+            <arg value="--threads=8"/>
+            <arg value="--rate=200000"/>
+            <arg value="--share-connection"/>
+            <arg value="--duration=120"/>
+            <arg value="--servers=localhost"/>
+            <arg value="--port=21212"/>
+        </invoke-java-client>
+    </target>
+
+    <target name="lat" description="Start the latency checker.">
+        <invoke-java-client classname="com.FixedLatencyClient">
+            <arg value="--wait=1"/>
+            <arg value="--procedure=WaitSinglePartition"/>
+            <arg value="--threads=50"/>
+            <arg value="--rate=200000"/>
+            <arg value="--share-connection"/>
+            <arg value="--duration=10"/>
+            <arg value="--servers=localhost"/>
+            <arg value="--port=21212"/>
+        </invoke-java-client>
+    </target>
+
     <target name="export" description="Start the export client.">
         <invoke-java-client classname="org.voltdb.exportclient.ExportToFileClient">
             <arg value="--connect"/>
             <arg value="client"/>
             <arg value="--servers"/>
-            <arg value="volt7a"/>
+            <arg value="localhost"/>
             <arg value="--type"/>
             <arg value="csv"/>
             <arg value="--outdir"/>

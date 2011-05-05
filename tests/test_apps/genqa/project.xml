@@ -18,6 +18,7 @@
             <procedure class='com.procedures.JiggleExportMultiPartition' />
             <procedure class='com.procedures.WaitSinglePartition' />
             <procedure class='com.procedures.WaitMultiPartition' />
+            <procedure class='com.procedures.WaitEx' />
         </procedures>
         <classdependencies>
             <classdependency class="com.procedures.SampleRecord" />
