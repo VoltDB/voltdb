@@ -120,7 +120,7 @@ PlanNodeFragment::fromJSONObject(json_spirit::Object &obj,
     for (int ii = 0; ii < planNodesArray.size(); ii++) {
         AbstractPlanNode *node = NULL;
         try {
-            node = AbstractPlanNode::fromJSONObject(planNodesArray[ii].get_obj(), catalog_db);
+            node = AbstractPlanNode::fromJSONObject(planNodesArray[ii].get_obj());
         }
         catch (SerializableEEException &ex) {
             delete pnf;

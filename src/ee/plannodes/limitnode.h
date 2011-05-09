@@ -103,7 +103,6 @@ class LimitPlanNode : public AbstractPlanNode {
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
-        friend AbstractPlanNode* AbstractPlanNode::fromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
         virtual void loadFromJSONObject(json_spirit::Object &obj);
         int limit;
         int offset;

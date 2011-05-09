@@ -135,8 +135,7 @@ public:
     // UTILITY METHODS
     // ------------------------------------------------------------------
     static AbstractPlanNode*
-    fromJSONObject(json_spirit::Object& obj,
-                   const catalog::Database* catalog_db);
+    fromJSONObject(json_spirit::Object& obj);
 
     // Debugging convenience methods
     std::string debug() const;

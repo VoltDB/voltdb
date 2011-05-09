@@ -257,7 +257,7 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls)
 //  Serialization Functions
 // ----------------------------------------------------
 AbstractPlanNode*
-AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_db) {
+AbstractPlanNode::fromJSONObject(Object &obj) {
 
     Value typeValue = find_value(obj, "PLAN_NODE_TYPE");
     if (typeValue == Value::null)
@@ -295,7 +295,7 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
         AbstractPlanNode* newNode = NULL;
         try {
             Object obj = inlineNodes[ii].get_obj();
-            newNode = AbstractPlanNode::fromJSONObject(obj, catalog_db);
+            newNode = AbstractPlanNode::fromJSONObject(obj);
         }
         catch (SerializableEEException &ex) {
             delete newNode;

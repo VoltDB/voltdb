@@ -68,7 +68,6 @@ class AbstractOperationPlanNode : public AbstractPlanNode {
         virtual std::string debugInfo(const std::string &spacer) const;
 
     protected:
-        friend AbstractPlanNode* AbstractPlanNode::fromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
         virtual void loadFromJSONObject(json_spirit::Object &obj);
         AbstractOperationPlanNode(int32_t id) : AbstractPlanNode(id) {
             target_table = NULL;

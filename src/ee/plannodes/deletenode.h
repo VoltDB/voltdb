@@ -68,7 +68,6 @@ class DeletePlanNode : public AbstractOperationPlanNode {
         void setTruncate(bool truncate) { this->truncate = truncate; }
 
     protected:
-        friend AbstractPlanNode* AbstractPlanNode::fromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
         virtual void loadFromJSONObject(json_spirit::Object &obj);
         /** true if all tuples are deleted. */
         bool truncate;
