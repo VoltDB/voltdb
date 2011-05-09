@@ -61,8 +61,7 @@ class AbstractExecutor {
     virtual ~AbstractExecutor();
 
     /** Executors are initialized once when the catalog is loaded */
-    bool init(VoltDBEngine*, const catalog::Database* catalog_db,
-              int* tempTableMemoryInBytes);
+    bool init(VoltDBEngine*, int* tempTableMemoryInBytes);
 
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray& params);

@@ -54,7 +54,6 @@ using namespace std;
 using namespace voltdb;
 
 bool AbstractExecutor::init(VoltDBEngine* engine,
-                            const catalog::Database* catalog_db,
                             int* tempTableMemoryInBytes)
 {
     assert (m_abstractNode);

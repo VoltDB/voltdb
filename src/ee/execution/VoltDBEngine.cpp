@@ -920,7 +920,7 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
     }
 
     // Now use the executor to initialize the plannode for execution later on
-    if (!executor->init(this, m_database, tempTableMemoryInBytes)) {
+    if (!executor->init(this, tempTableMemoryInBytes)) {
         VOLT_ERROR("The Executor failed to initialize PlanNode '%s' for"
                    " PlanFragment '%jd'", node->debug().c_str(),
                    (intmax_t)fragId);
