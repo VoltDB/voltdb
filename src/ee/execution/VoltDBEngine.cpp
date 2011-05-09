@@ -43,16 +43,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <iostream>
-#include <stdio.h>
-#include <fstream>
-#include <errno.h>
-#include <sstream>
-#include <unistd.h>
-#include <locale>
-#ifdef LINUX
-#include <malloc.h>
-#endif // LINUX
 #include "boost/shared_array.hpp"
 #include "boost/scoped_array.hpp"
 #include "boost/foreach.hpp"
@@ -103,6 +93,17 @@
 #include "stats/StatsAgent.h"
 #include "voltdbipc.h"
 #include "common/FailureInjection.h"
+
+#include <iostream>
+#include <stdio.h>
+#include <fstream>
+#include <errno.h>
+#include <sstream>
+#include <unistd.h>
+#include <locale>
+#ifdef LINUX
+#include <malloc.h>
+#endif // LINUX
 
 using namespace std;
 namespace voltdb {
