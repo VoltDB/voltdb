@@ -121,8 +121,7 @@ OrderByPlanNode::debugInfo(const string& spacer) const
 }
 
 void
-OrderByPlanNode::loadFromJSONObject(json_spirit::Object& obj,
-                                    const catalog::Database* catalog_db)
+OrderByPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
     json_spirit::Value sortColumnsValue =
         json_spirit::find_value(obj, "SORT_COLUMNS");

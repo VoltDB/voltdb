@@ -69,7 +69,7 @@ class AbstractOperationPlanNode : public AbstractPlanNode {
 
     protected:
         friend AbstractPlanNode* AbstractPlanNode::fromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
-        virtual void loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
+        virtual void loadFromJSONObject(json_spirit::Object &obj);
         AbstractOperationPlanNode(int32_t id) : AbstractPlanNode(id) {
             target_table = NULL;
             target_table_name = "NOT_SPECIFIED";

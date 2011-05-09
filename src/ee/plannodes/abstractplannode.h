@@ -155,8 +155,7 @@ public:
     }
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj,
-                                    const catalog::Database *catalog_db) = 0;
+    virtual void loadFromJSONObject(json_spirit::Object& obj) = 0;
     AbstractPlanNode(int32_t plannode_id);
     AbstractPlanNode();
 

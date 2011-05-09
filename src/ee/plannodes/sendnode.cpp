@@ -56,7 +56,7 @@ std::string SendPlanNode::debugInfo(const std::string &spacer) const {
     return (buffer.str());
 }
 
-void SendPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
+void SendPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
 }
 
 }

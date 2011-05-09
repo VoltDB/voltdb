@@ -52,8 +52,8 @@
 
 namespace voltdb {
 
-void UpdatePlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
-    AbstractOperationPlanNode::loadFromJSONObject(obj, catalog_db);
+void UpdatePlanNode::loadFromJSONObject(json_spirit::Object &obj) {
+    AbstractOperationPlanNode::loadFromJSONObject(obj);
     json_spirit::Value updatesIndexesValue = json_spirit::find_value( obj, "UPDATES_INDEXES");
     if (updatesIndexesValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

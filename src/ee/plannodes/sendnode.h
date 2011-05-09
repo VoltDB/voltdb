@@ -70,7 +70,7 @@ class SendPlanNode : public AbstractPlanNode {
 
     protected:
         friend AbstractPlanNode* AbstractPlanNode::fromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
-        virtual void loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
+        virtual void loadFromJSONObject(json_spirit::Object &obj);
 };
 
 }

@@ -105,8 +105,7 @@ string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 }
 
 void
-AbstractJoinPlanNode::loadFromJSONObject(Object& obj,
-                                         const catalog::Database* catalog_db)
+AbstractJoinPlanNode::loadFromJSONObject(Object& obj)
 {
     Value joinTypeValue = find_value(obj, "JOIN_TYPE");
     if (joinTypeValue == Value::null)

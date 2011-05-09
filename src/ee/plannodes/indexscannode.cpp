@@ -146,8 +146,8 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     return (buffer.str());
 }
 
-void IndexScanPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
-    AbstractScanPlanNode::loadFromJSONObject(obj, catalog_db);
+void IndexScanPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
+    AbstractScanPlanNode::loadFromJSONObject(obj);
 
     json_spirit::Value keyIterateValue = json_spirit::find_value( obj, "KEY_ITERATE");
     if (keyIterateValue == json_spirit::Value::null) {

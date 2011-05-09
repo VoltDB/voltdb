@@ -92,8 +92,7 @@ DistinctPlanNode::debugInfo(const string &spacer) const
 }
 
 void
-DistinctPlanNode::loadFromJSONObject(json_spirit::Object& obj,
-                                     const catalog::Database* catalog_db)
+DistinctPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
     json_spirit::Value distinctExpressionValue =
         find_value(obj, "DISTINCT_EXPRESSION");

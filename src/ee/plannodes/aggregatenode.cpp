@@ -146,8 +146,7 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
 }
 
 void
-AggregatePlanNode::loadFromJSONObject(Object &obj,
-                                      const catalog::Database *catalog_db)
+AggregatePlanNode::loadFromJSONObject(Object &obj)
 {
     Value aggregateColumnsValue = find_value(obj, "AGGREGATE_COLUMNS");
     if (aggregateColumnsValue == Value::null)

@@ -120,8 +120,7 @@ AbstractScanPlanNode::debugInfo(const string &spacer) const
 }
 
 void
-AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj,
-                                         const catalog::Database* catalog_db)
+AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
     json_spirit::Value targetTableNameValue =
         json_spirit::find_value(obj, "TARGET_TABLE_NAME");

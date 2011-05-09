@@ -82,7 +82,7 @@ class MaterializePlanNode : public ProjectionPlanNode {
         void setBatched(bool batched) { this->batched = batched; }
     protected:
         friend AbstractPlanNode* AbstractPlanNode::fromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
-        virtual void loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
+        virtual void loadFromJSONObject(json_spirit::Object &obj);
         bool batched;
 };
 

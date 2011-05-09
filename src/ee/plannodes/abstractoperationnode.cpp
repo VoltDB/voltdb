@@ -81,7 +81,7 @@ string AbstractOperationPlanNode::debugInfo(const string &spacer) const {
     return (buffer.str());
 }
 
-void AbstractOperationPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
+void AbstractOperationPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     json_spirit::Value targetTableNameValue = json_spirit::find_value( obj, "TARGET_TABLE_NAME");
     if (targetTableNameValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

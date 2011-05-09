@@ -112,7 +112,7 @@ std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
     return (buffer.str());
 }
 
-void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
+void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     json_spirit::Value limitValue = json_spirit::find_value( obj, "LIMIT");
     if (limitValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

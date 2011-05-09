@@ -171,8 +171,7 @@ ProjectionPlanNode::debugInfo(const string& spacer) const
 
 
 void
-ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj,
-                                       const catalog::Database *catalog_db)
+ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
     // XXX-IZZY move this to init at some point
     for (int ii = 0; ii < getOutputSchema().size(); ii++)

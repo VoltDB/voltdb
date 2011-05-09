@@ -91,8 +91,7 @@ ReceivePlanNode::debugInfo(const string& spacer) const
 }
 
 void
-ReceivePlanNode::loadFromJSONObject(json_spirit::Object& obj,
-                                    const catalog::Database *catalog_db)
+ReceivePlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
     // This space intentionally left blank.
 }

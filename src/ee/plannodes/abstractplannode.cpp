@@ -359,7 +359,7 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
     }
 
     try {
-        node->loadFromJSONObject(obj, catalog_db);
+        node->loadFromJSONObject(obj);
     }
     catch (SerializableEEException &ex) {
         delete node;
