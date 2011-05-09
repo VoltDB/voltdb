@@ -127,9 +127,9 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, int* tempTableMemor
             }
         }
     }
-    assert(m_inputTargetMap.size() == (targettable_column_names.size() - 1));
-    m_inputTargetMapSize = (int)m_inputTargetMap.size();
 
+    assert(m_inputTargetMap.size() == (output_column_names.size() - 1));
+    m_inputTargetMapSize = (int)m_inputTargetMap.size();
     m_inputTuple = TableTuple(m_inputTable->schema());
     m_targetTuple = TableTuple(m_targetTable->schema());
 
