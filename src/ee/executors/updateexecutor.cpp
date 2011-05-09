@@ -62,9 +62,6 @@
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
-#include "catalog/catalogmap.h"
-#include "catalog/table.h"
-#include "catalog/column.h"
 
 using namespace std;
 using namespace voltdb;
@@ -116,31 +113,21 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
     }
 
     vector<string> output_column_names = proj_node->getOutputColumnNames();
-
-    string targetTableName = m_node->getTargetTableName();
-    catalog::Table *targetTable = NULL;
-    catalog::CatalogMap<catalog::Table> tables = catalog_db->tables();
-    for ( catalog::CatalogMap<catalog::Table>::field_map_iter i = tables.begin(); i != tables.end(); i++) {
-        catalog::Table *table = (*i).second;
-        if (table->name().compare(targetTableName) == 0) {
-            targetTable = table;
-            break;
-        }
-    }
-    assert(targetTable != NULL);
-
-    catalog::CatalogMap<catalog::Column> columns = targetTable->columns();
+    vector<string> targettable_column_names = m_targetTable->getColumnNames();
 
     /*
      * The first output column is the tuple address expression and it isn't part of our output so we skip
      * it when generating the map from input columns to the target table columns.
      */
     for (int ii = 1; ii < output_column_names.size(); ii++) {
-        string outputColumnName = output_column_names[ii];
-        catalog::Column *column = columns.get(outputColumnName);
-        assert (column != NULL);
-        m_inputTargetMap.push_back(pair<int, int>( ii, column->index()));
+        for (int jj=0; jj < targettable_column_names.size(); ++jj) {
+            if (targettable_column_names[jj].compare(output_column_names[ii]) == 0) {
+                m_inputTargetMap.push_back(pair<int,int>(ii, jj));
+                break;
+            }
+        }
     }
+    assert(m_inputTargetMap.size() == (targettable_column_names.size() - 1));
     m_inputTargetMapSize = (int)m_inputTargetMap.size();
 
     m_inputTuple = TableTuple(m_inputTable->schema());
