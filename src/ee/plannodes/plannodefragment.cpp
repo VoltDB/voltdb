@@ -89,8 +89,7 @@ PlanNodeFragment::~PlanNodeFragment() {
 }
 
 PlanNodeFragment *
-PlanNodeFragment::createFromCatalog(const string hex_string,
-                                    const catalog::Database *catalog_db)
+PlanNodeFragment::createFromCatalog(const string hex_string)
 {
     //cout << "PlanNodeFragment::createFromCatalog: hex_string.size() == " << hex_string.size() << endl;
     assert (hex_string.size() % 2 == 0);
@@ -101,12 +100,11 @@ PlanNodeFragment::createFromCatalog(const string hex_string,
     json_spirit::Value value;
     json_spirit::read( bufferString, value );
 
-    return PlanNodeFragment::fromJSONObject(value.get_obj(), catalog_db);
+    return PlanNodeFragment::fromJSONObject(value.get_obj());
 }
 
 PlanNodeFragment *
-PlanNodeFragment::fromJSONObject(json_spirit::Object &obj,
-                                 const catalog::Database *catalog_db)
+PlanNodeFragment::fromJSONObject(json_spirit::Object &obj)
 {
     json_spirit::Value planNodesValue = json_spirit::find_value( obj, "PLAN_NODES");
     if (planNodesValue == json_spirit::Value::null) {

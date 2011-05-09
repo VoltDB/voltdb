@@ -854,8 +854,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
     }
 
     // catalog method plannodetree returns PlanNodeList.java
-    PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree,
-                                                                m_database);
+    PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree);
     m_planFragments.push_back(pnf);
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
     assert(pnf->getRootNode());
