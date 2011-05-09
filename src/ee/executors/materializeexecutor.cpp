@@ -57,7 +57,7 @@
 
 namespace voltdb {
 
-bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Materialize Executor");
     assert(tempTableMemoryInBytes);
 

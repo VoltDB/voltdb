@@ -63,7 +63,6 @@
 namespace voltdb {
 
 bool SendExecutor::p_init(AbstractPlanNode *abstractNode,
-                          const catalog::Database* catalog_db,
                           int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Send Executor");
 

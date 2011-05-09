@@ -89,7 +89,7 @@ public:
     ~NestLoopIndexExecutor();
 
 protected:
-    bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
+    bool p_init(AbstractPlanNode*, int* tempTableMemoryInBytes);
     bool p_execute(const NValueArray &params);
 
     NestLoopIndexPlanNode* node;

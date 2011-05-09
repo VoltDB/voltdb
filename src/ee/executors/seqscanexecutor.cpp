@@ -61,7 +61,6 @@
 using namespace voltdb;
 
 bool SeqScanExecutor::p_init(AbstractPlanNode *abstract_node,
-                             const catalog::Database* catalog_db,
                              int* tempTableMemoryInBytes) {
     VOLT_TRACE("init SeqScan Executor");
 

@@ -65,7 +65,7 @@
 using namespace std;
 using namespace voltdb;
 
-bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Insert Executor");
 
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);

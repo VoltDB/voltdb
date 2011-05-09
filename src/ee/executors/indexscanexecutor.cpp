@@ -66,8 +66,7 @@
 
 using namespace voltdb;
 
-bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
-                               const catalog::Database* catalogDb, int* tempTableMemoryInBytes)
+bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode, int* tempTableMemoryInBytes)
 {
     VOLT_TRACE("init IndexScan Executor");
 

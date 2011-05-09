@@ -62,7 +62,7 @@
 using namespace std;
 using namespace voltdb;
 
-bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Delete Executor");
 
     m_node = dynamic_cast<DeletePlanNode*>(abstract_node);

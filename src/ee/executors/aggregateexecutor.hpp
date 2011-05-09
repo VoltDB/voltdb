@@ -389,8 +389,7 @@ public:
     ~AggregateExecutor();
 
 protected:
-    bool p_init(AbstractPlanNode* abstract_node,
-                const catalog::Database *catalog_db, int* tempTableMemoryInBytes);
+    bool p_init(AbstractPlanNode* abstract_node, int* tempTableMemoryInBytes);
     bool p_execute(const NValueArray &params);
 
     /*
@@ -839,7 +838,6 @@ private:
 template<PlanNodeType aggregateType>
 bool
 AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
-                                         const catalog::Database *catalog_db,
                                          int* tempTableMemoryInBytes)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(abstract_node);

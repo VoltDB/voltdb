@@ -161,7 +161,6 @@ namespace
 }
 
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
-                              const catalog::Database* catalog_db,
                               int* tempTableMemoryInBytes)
 {
     VOLT_TRACE("init NestLoop Executor");

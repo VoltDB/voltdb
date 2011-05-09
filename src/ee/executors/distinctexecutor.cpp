@@ -59,7 +59,7 @@
 
 using namespace voltdb;
 
-bool DistinctExecutor::p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool DistinctExecutor::p_init(AbstractPlanNode*, int* tempTableMemoryInBytes) {
     VOLT_DEBUG("init Distinct Executor");
 
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);

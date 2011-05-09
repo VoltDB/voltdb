@@ -125,7 +125,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
 
     // Call the p_init() method on our derived class
     try {
-        if (!p_init(m_abstractNode, catalog_db, tempTableMemoryInBytes))
+        if (!p_init(m_abstractNode, tempTableMemoryInBytes))
             return false;
     } catch (exception& err) {
         char message[128];

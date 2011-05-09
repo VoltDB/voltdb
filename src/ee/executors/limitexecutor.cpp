@@ -56,8 +56,7 @@
 using namespace voltdb;
 
 bool
-LimitExecutor::p_init(AbstractPlanNode* abstract_node,
-                      const catalog::Database* catalog_db, int* tempTableMemoryInBytes)
+LimitExecutor::p_init(AbstractPlanNode* abstract_node, int* tempTableMemoryInBytes)
 {
     VOLT_TRACE("init limit Executor");
 

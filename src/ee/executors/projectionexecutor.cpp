@@ -58,7 +58,6 @@
 namespace voltdb {
 
 bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
-                                const catalog::Database* catalog_db,
                                 int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Projection Executor");
     assert(tempTableMemoryInBytes);

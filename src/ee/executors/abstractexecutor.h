@@ -87,8 +87,7 @@ class AbstractExecutor {
     }
 
     /** Concrete executor classes implement initialization in p_init() */
-    virtual bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db,
-                        int* tempTableMemoryInBytes) = 0;
+    virtual bool p_init(AbstractPlanNode*, int* tempTableMemoryInBytes) = 0;
 
     /** Concrete executor classes impelmenet execution in p_execute() */
     virtual bool p_execute(const NValueArray& params) = 0;

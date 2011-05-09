@@ -161,7 +161,6 @@ namespace
 }
 
 bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
-                                   const catalog::Database* catalog_db,
                                    int* tempTableMemoryInBytes)
 {
     VOLT_TRACE("init NLIJ Executor");

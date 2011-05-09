@@ -66,7 +66,7 @@
 using namespace std;
 using namespace voltdb;
 
-bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Update Executor");
 
     m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);
