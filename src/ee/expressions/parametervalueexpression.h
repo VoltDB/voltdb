@@ -57,13 +57,7 @@
 
 namespace voltdb {
 
-class ParameterValueExpressionMarker {
-public:
-        virtual ~ParameterValueExpressionMarker(){}
-        virtual int getParameterId() const = 0;
-};
-
-class ParameterValueExpression : public AbstractExpression, public ParameterValueExpressionMarker {
+class ParameterValueExpression : public AbstractExpression {
 public:
 
     ParameterValueExpression(int value_idx)

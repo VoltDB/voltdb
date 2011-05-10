@@ -476,8 +476,8 @@ convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressi
     size_t cnt = expressions.size();
     boost::shared_array<int> ret(new int[cnt]);
     for (int i = 0; i < cnt; ++i) {
-        voltdb::TupleValueExpressionMarker* casted=
-          dynamic_cast<voltdb::TupleValueExpressionMarker*>(expressions[i]);
+        voltdb::TupleValueExpression* casted=
+          dynamic_cast<voltdb::TupleValueExpression*>(expressions[i]);
         if (casted == NULL) {
             return boost::shared_array<int>();
         }
@@ -492,8 +492,8 @@ convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expr
     size_t cnt = expressions.size();
     boost::shared_array<int> ret(new int[cnt]);
     for (int i = 0; i < cnt; ++i) {
-        voltdb::ParameterValueExpressionMarker *casted =
-          dynamic_cast<voltdb::ParameterValueExpressionMarker*>(expressions[i]);
+        voltdb::ParameterValueExpression *casted =
+          dynamic_cast<voltdb::ParameterValueExpression*>(expressions[i]);
         if (casted == NULL) {
             return boost::shared_array<int>();
         }

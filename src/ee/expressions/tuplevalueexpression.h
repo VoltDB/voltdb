@@ -57,13 +57,7 @@ namespace voltdb {
 class SerializeInput;
 class SerializeOutput;
 
-class TupleValueExpressionMarker {
-public:
-        virtual ~TupleValueExpressionMarker(){}
-        virtual int getColumnId() const = 0;
-};
-
-class TupleValueExpression : public AbstractExpression, public TupleValueExpressionMarker {
+class TupleValueExpression : public AbstractExpression {
   public:
     TupleValueExpression(int value_idx, std::string tableName, std::string colName)
         : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE)
