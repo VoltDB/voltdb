@@ -45,7 +45,7 @@
 
 #include "aggregatenode.h"
 
-#include "expressions/expressionutil.h"
+#include "common/types.h"
 #include "storage/table.h"
 
 #include <sstream>
@@ -122,7 +122,7 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
          ctr < cnt; ctr++)
     {
         buffer << spacer << "type="
-               << expressionutil::getTypeName(m_aggregates[ctr]) << "\n";
+               << expressionToString(m_aggregates[ctr]) << "\n";
         buffer << spacer << "distinct="
                << m_distinctAggregates[ctr] << "\n";
         buffer << spacer << "outcol="

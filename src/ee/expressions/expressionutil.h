@@ -77,8 +77,6 @@ AbstractExpression *conjunctionFactory(ExpressionType, AbstractExpression*, Abst
 
 namespace expressionutil {
 
-std::string getTypeName(voltdb::ExpressionType type);
-
 /** If the passed vector contains only TupleValueExpression, it
  * returns ColumnIds of them, otherwise NULL.*/
 boost::shared_array<int>

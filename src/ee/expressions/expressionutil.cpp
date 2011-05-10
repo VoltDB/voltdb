@@ -86,7 +86,7 @@ getGeneral(ExpressionType c,
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
                 " for ComparisonExpression",
-                expressionutil::getTypeName(c).c_str());
+                expressionToString(c).c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 }
@@ -114,7 +114,7 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"
-                " ComparisonExpression", expressionutil::getTypeName(c).c_str());
+                " ComparisonExpression",expressionToString(c).c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 }
@@ -456,7 +456,7 @@ expressionFactory(json_spirit::Object &obj,
     default:
         char message[256];
         snprintf(message,256, "Invalid ExpressionType '%s' requested from factory",
-                expressionutil::getTypeName(et).c_str());
+                expressionToString(et).c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
@@ -500,110 +500,6 @@ convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expr
         ret[i] = casted->getParameterId();
     }
     return ret;
-}
-
-
-/** return a descriptive string for each typename. could just
-    as easily be a lookup table */
-std::string
-getTypeName(voltdb::ExpressionType type)
-{
-    std::string ret;
-    switch (type) {
-        case (voltdb::EXPRESSION_TYPE_OPERATOR_PLUS):
-            ret = "OPERATOR_PLUS";
-            break;
-        case (voltdb::EXPRESSION_TYPE_OPERATOR_MINUS):
-            ret = "OPERATOR_MINUS";
-            break;
-        case (voltdb::EXPRESSION_TYPE_OPERATOR_MULTIPLY):
-            ret = "OPERATOR_MULTIPLY";
-            break;
-        case (voltdb::EXPRESSION_TYPE_OPERATOR_DIVIDE):
-            ret = "OPERATOR_DIVIDE";
-            break;
-        case (voltdb::EXPRESSION_TYPE_OPERATOR_CONCAT):
-            ret = "OPERATOR_CONCAT";
-            break;
-        case (voltdb::EXPRESSION_TYPE_OPERATOR_MOD):
-            ret = "OPERATOR_MOD";
-            break;
-        case (voltdb::EXPRESSION_TYPE_OPERATOR_CAST):
-            ret = "OPERATOR_CAST";
-            break;
-        case (voltdb::EXPRESSION_TYPE_OPERATOR_NOT):
-            ret = "OPERATOR_NOT";
-            break;
-        case (voltdb::EXPRESSION_TYPE_COMPARE_EQUAL):
-            ret = "COMPARE_EQUAL";
-            break;
-        case (voltdb::EXPRESSION_TYPE_COMPARE_NOTEQUAL):
-            ret = "COMPARE_NOTEQUAL";
-            break;
-        case (voltdb::EXPRESSION_TYPE_COMPARE_LESSTHAN):
-            ret = "COMPARE_LESSTHAN";
-            break;
-        case (voltdb::EXPRESSION_TYPE_COMPARE_GREATERTHAN):
-            ret = "COMPARE_GREATERTHAN";
-            break;
-        case (voltdb::EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
-            ret = "COMPARE_LESSTHANOREQUALTO";
-            break;
-        case (voltdb::EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
-            ret = "COMPARE_GREATERTHANOREQUALTO";
-            break;
-        case (voltdb::EXPRESSION_TYPE_COMPARE_LIKE):
-            ret = "COMPARE_LIKE";
-            break;
-        case (voltdb::EXPRESSION_TYPE_CONJUNCTION_AND):
-            ret = "CONJUNCTION_AND";
-            break;
-        case (voltdb::EXPRESSION_TYPE_CONJUNCTION_OR):
-            ret = "CONJUNCTION_OR";
-            break;
-        case (voltdb::EXPRESSION_TYPE_VALUE_CONSTANT):
-            ret = "VALUE_CONSTANT";
-            break;
-        case (voltdb::EXPRESSION_TYPE_VALUE_PARAMETER):
-            ret = "VALUE_PARAMETER";
-            break;
-        case (voltdb::EXPRESSION_TYPE_VALUE_TUPLE):
-            ret = "VALUE_TUPLE";
-            break;
-        case (voltdb::EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
-            ret = "VALUE_TUPLE_ADDRESS";
-            break;
-        case (voltdb::EXPRESSION_TYPE_VALUE_NULL):
-            ret = "VALUE_NULL";
-            break;
-        case (voltdb::EXPRESSION_TYPE_AGGREGATE_COUNT):
-            ret = "AGGREGATE_COUNT";
-            break;
-        case (voltdb::EXPRESSION_TYPE_AGGREGATE_COUNT_STAR):
-            ret = "AGGREGATE_COUNT_STAR";
-            break;
-        case (voltdb::EXPRESSION_TYPE_AGGREGATE_SUM):
-            ret = "AGGREGATE_SUM";
-            break;
-        case (voltdb::EXPRESSION_TYPE_AGGREGATE_MIN):
-            ret = "AGGREGATE_MIN";
-            break;
-        case (voltdb::EXPRESSION_TYPE_AGGREGATE_MAX):
-            ret = "AGGREGATE_MAX";
-            break;
-        case (voltdb::EXPRESSION_TYPE_AGGREGATE_AVG):
-            ret = "AGGREGATE_AVG";
-            break;
-        case (voltdb::EXPRESSION_TYPE_INVALID):
-            ret = "INVALID";
-            break;
-        default: {
-            char buffer[32];
-            snprintf(buffer, 32, "UNKNOWN[%d]", type);
-            ret = buffer;
-        }
-    }
-    return (ret);
 }
 
 }
