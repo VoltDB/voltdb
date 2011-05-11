@@ -246,9 +246,4 @@ public class FragmentResponseMessage extends VoltMessage {
         ms.toSiteId = m_destinationSiteId;
         return ms;
     }
-
-    @Override
-    protected boolean requiresDurabilityP() {
-        return false;
-    }
 }

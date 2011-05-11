@@ -17,8 +17,6 @@
 
 package org.voltdb.messaging;
 
-import org.voltdb.CommitLog;
-
 /**
  * The interface to the global VoltDB messaging system.
  *
@@ -32,10 +30,9 @@ public interface Messenger {
      * @param siteId The id of the site this new mailbox will be attached
      * to.
      * @param mailboxId The requested id of the new mailbox.
-     * @param CommitLog commit log to be used by the generated mailbox
      * @return A new Mailbox instance or null based on success.
      */
-    public abstract Mailbox createMailbox(int siteId, int mailboxId, CommitLog commitLog);
+    public abstract Mailbox createMailbox(int siteId, int mailboxId);
 
     /**
      * Create a new mailbox for the site specified with a specific id and

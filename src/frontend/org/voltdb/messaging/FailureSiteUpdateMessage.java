@@ -118,10 +118,4 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     public byte getSubject() {
         return Subject.FAILURE_SITE_UPDATE.getId();
     }
-
-
-    @Override
-    protected boolean requiresDurabilityP() {
-        return false;
-    }
 }

@@ -26,8 +26,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
@@ -41,9 +43,12 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.SiteMailbox;
 import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
@@ -139,6 +144,20 @@ public class MockVoltDB implements VoltDBInterface
         getDatabase().getTables().add(tableName);
         getTable(tableName).setIsreplicated(isReplicated);
         getTable(tableName).setSignature(tableName);
+    }
+
+    public void configureLogging(boolean enabled, boolean sync,
+            int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
+        org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("");
+        if (logConfig == null) {
+            logConfig = getCluster().getLogconfig().add("");
+        }
+        logConfig.setEnabled(enabled);
+        logConfig.setSynchronous(sync);
+        logConfig.setFsyncinterval(fsyncInterval);
+        logConfig.setMaxtxns(maxTxns);
+        logConfig.setLogpath(logPath);
+        logConfig.setInternalsnapshotpath(snapshotPath);
     }
 
     public void addColumnToTable(String tableName, String columnName,
@@ -390,16 +409,27 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public CommitLog getCommitLog() {
-        return new CommitLog() {
+    public CommandLog getCommandLog() {
+        return new CommandLog() {
             @Override
-            public void logMessage(VoltMessage message, SiteMailbox mailbox) {
-                message.setDurable();
-                mailbox.deliver(message);
+            public void shutdown() throws InterruptedException {
             }
 
             @Override
-            public void shutdown() throws InterruptedException {
+            public void init(CatalogContext context) {
+                // TODO Auto-generated method stub
+
+            }
+
+            @Override
+            public void log(InitiateTaskMessage message) {
+                // TODO Auto-generated method stub
+
+            }
+
+            @Override
+            public Semaphore logFault(Set<Integer> failedSites, List<Long> faultedTxns) {
+                return new Semaphore(1);
             }
         };
     }

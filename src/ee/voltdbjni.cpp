@@ -754,6 +754,20 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getBufferCRC32
 }
 
 /*
+ * Class:     org_voltdb_utils_DBBPool
+ * Method:    getBufferCRC32
+ * Signature: (Ljava/nio/ByteBuffer;II)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getCRC32
+  (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
+    char *address = reinterpret_cast<char*>(ptr);
+    assert(address);
+    boost::crc_32_type crc;
+    crc.process_bytes(address + offset, length);
+    return static_cast<jint>(crc.checksum());
+}
+
+/*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeTick
  * Signature: (JJJ)V

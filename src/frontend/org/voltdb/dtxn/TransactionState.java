@@ -97,6 +97,8 @@ public abstract class TransactionState implements Comparable<TransactionState> {
 
     public abstract boolean hasTransactionalWork();
 
+    public abstract boolean isDurable();
+
     public abstract boolean doWork(boolean recovering);
 
     public boolean shouldResumeProcedure() {

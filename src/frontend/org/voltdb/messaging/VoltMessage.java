@@ -231,10 +231,4 @@ public abstract class VoltMessage {
     public ByteBuffer getBuffer() {
         return m_buffer;
     }
-
-    public boolean requiresDurability() {
-        return requiresDurabilityP() && !m_isDurable;
-    }
-
-    protected abstract boolean requiresDurabilityP();
 }

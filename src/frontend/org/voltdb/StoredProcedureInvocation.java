@@ -160,4 +160,12 @@ public class StoredProcedureInvocation implements FastSerializable {
             sb.append("null");
         sb.append(")");
     }
+
+    public ByteBuffer getSerializedParams() {
+        return unserializedParams.duplicate();
+    }
+
+    public void setSerializedParams(ByteBuffer serializedParams) {
+        unserializedParams = serializedParams;
+    }
 }

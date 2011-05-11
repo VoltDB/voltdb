@@ -18,7 +18,7 @@
 package org.voltdb.messaging;
 
 import java.util.HashMap;
-import org.voltdb.CommitLog;
+import org.voltdb.CommandLog;
 
 class MessengerSite {
 
@@ -31,11 +31,11 @@ class MessengerSite {
         m_siteId = siteId;
     }
 
-    public synchronized Mailbox createMailbox(int mailboxId, CommitLog commitLog) {
+    public synchronized Mailbox createMailbox(int mailboxId) {
         SiteMailbox mbox = (SiteMailbox)getMailbox(mailboxId);
         if (mbox != null) return null;
 
-        SiteMailbox newMbox = new SiteMailbox(m_hostMessenger, m_siteId, mailboxId, commitLog);
+        SiteMailbox newMbox = new SiteMailbox(m_hostMessenger, m_siteId, mailboxId);
         m_mailboxes.put(mailboxId, newMbox);
         return newMbox;
     }

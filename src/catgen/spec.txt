@@ -19,6 +19,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   SnapshotSchedule* faultSnapshots "Configuration for snapshots generated in response to faults."
   int adminport         "The port number of the admin port"
   bool adminstartup     "Does the server start in admin mode?"
+  CommandLog* logconfig "Command log configuration"
   int heartbeatTimeout  "How long to wait, in seconds, between messages before deciding a host is dead"
 end
 
@@ -52,6 +53,15 @@ begin Database          "A set of schema, procedures and other metadata that tog
   Procedure* procedures "The set of stored procedures/transactions for this database"
   Connector* connectors  "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
+end
+
+begin CommandLog "Configuration for a command log"
+bool enabled "Is command logging enabled"
+bool synchronous "Should commands be executed only once durable"
+int fsyncInterval "How often commands should be written to disk"
+int maxTxns "How many txns waiting to go to disk should trigger a flush"
+string logPath "Directory to store log files"
+string internalSnapshotPath "Directory to store internal snapshots for the command log"
 end
 
 begin ConnectorTableInfo      "Per-export connector table configuration"

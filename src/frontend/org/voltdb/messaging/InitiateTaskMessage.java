@@ -19,9 +19,11 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.utils.DBBPool;
+
 
 /**
  * Message from an initiator to an execution site, instructing the
@@ -34,6 +36,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
     boolean m_isSinglePartition;
     StoredProcedureInvocation m_invocation;
     long m_lastSafeTxnID; // this is the largest txn acked by all partitions running the java for it
+    AtomicBoolean m_isDurable;
 
     /** Empty constructor for de-serialization */
     InitiateTaskMessage() {
@@ -87,6 +90,18 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     public long getLastSafeTxnId() {
         return m_lastSafeTxnID;
+    }
+
+    public AtomicBoolean getDurabilityFlag() {
+        assert(!m_isReadOnly);
+        if (m_isDurable == null) {
+            m_isDurable = new AtomicBoolean();
+        }
+        return m_isDurable;
+    }
+
+    public AtomicBoolean getDurabilityFlagIfItExists() {
+        return m_isDurable;
     }
 
     @Override
@@ -172,8 +187,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         return sb.toString();
     }
 
-    @Override
-    protected boolean requiresDurabilityP() {
-        return true;
+    public ByteBuffer getSerializedParams() {
+        return m_invocation.getSerializedParams();
     }
 }

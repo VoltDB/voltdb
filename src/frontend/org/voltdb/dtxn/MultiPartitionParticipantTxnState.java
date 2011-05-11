@@ -56,6 +56,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     private InitiateResponseMessage m_response;
     private HashSet<Integer> m_outstandingAcks = null;
+    private final java.util.concurrent.atomic.AtomicBoolean m_durabilityFlag;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -79,11 +80,14 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         {
             m_isCoordinator = true;
             InitiateTaskMessage task = (InitiateTaskMessage) notice;
+            m_durabilityFlag = task.getDurabilityFlagIfItExists();
             SiteTracker tracker = site.getSiteTracker();
             m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_siteId);
             m_readyWorkUnits.add(new WorkUnit( tracker, task,
                                               null, m_siteId,
                                               null, false));
+        } else {
+            m_durabilityFlag = null;
         }
     }
 
@@ -698,6 +702,11 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         catch (MessagingException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public boolean isDurable() {
+        return m_durabilityFlag == null ? true : m_durabilityFlag.get();
     }
 
 }

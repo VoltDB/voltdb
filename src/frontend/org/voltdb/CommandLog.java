@@ -16,13 +16,19 @@
  */
 package org.voltdb;
 
-import org.voltdb.messaging.SiteMailbox;
-import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Semaphore;
 
-public interface CommitLog {
+public interface CommandLog {
 
-    public abstract void logMessage(VoltMessage message, SiteMailbox mailbox);
+    public abstract void init(CatalogContext context);
+
+    public abstract void log(InitiateTaskMessage message);
 
     public abstract void shutdown() throws InterruptedException;
+
+    public abstract Semaphore logFault(Set<Integer> failedSites, List<Long> faultedTxns);
 
 }

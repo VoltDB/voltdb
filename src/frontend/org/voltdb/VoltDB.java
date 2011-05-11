@@ -124,12 +124,6 @@ public class VoltDB {
 
         public final File m_commitLogDir = new File("/tmp");
 
-        public final int m_commitInterval = 1000;
-
-        public final boolean m_waitForCommit = false;
-
-        public final boolean m_useCommitLog = false;
-
         /**
          * How much (ms) to skew the timestamp generation for
          * the TransactionIdManager. Should be ZERO except for tests.

@@ -21,7 +21,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 
-import org.voltdb.CommitLog;
+import org.voltdb.CommandLog;
+import org.voltdb.VoltDB;
 import org.voltdb.debugstate.MailboxHistory;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
 
@@ -34,6 +35,7 @@ public class SiteMailbox implements Mailbox {
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
     final int m_siteId;
+    final CommandLog m_log = VoltDB.instance().getCommandLog();
 
     // deques to store recent inter-site messages
     private final int MESSAGE_HISTORY_SIZE;
@@ -42,16 +44,13 @@ public class SiteMailbox implements Mailbox {
     ArrayDeque<VoltMessage> m_lastTenMembershipNotices = new ArrayDeque<VoltMessage>();
     ArrayDeque<VoltMessage> m_lastTenHeartbeats = new ArrayDeque<VoltMessage>();
 
-    private final CommitLog m_commitLog;
-
-    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, CommitLog commitLog) {
+    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId) {
         this.m_hostMessenger = hostMessenger;
         this.m_siteId = siteId;
         MESSAGE_HISTORY_SIZE = 0;
         for (Subject s : Subject.values()) {
             m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
         }
-        m_commitLog = commitLog;
     }
 
     @Override
@@ -61,15 +60,22 @@ public class SiteMailbox implements Mailbox {
 
     @Override
     public void deliver(VoltMessage message) {
-        if (message.requiresDurability()) {
-            m_commitLog.logMessage(message, this);
-        } else {
-            deliver(message, false);
-        }
+        deliver(message, false);
     }
 
     public void deliver(VoltMessage message, final boolean toFront) {
         assert(message != null);
+        /*
+         * Doing delivery here so that the delivery thread is the one interacting with the
+         * log instead of the receiver. This way only the network threads contend for the log.
+         */
+        if (message instanceof InitiateTaskMessage) {
+            InitiateTaskMessage msg = (InitiateTaskMessage)message;
+            if (!msg.isReadOnly()) {
+                m_log.log(msg);
+            }
+        }
+
         final Deque<VoltMessage> dq = m_messages.get(message.getSubject());
         synchronized (this) {
             if (toFront) {

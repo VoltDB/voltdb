@@ -63,10 +63,9 @@ import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.SiteMailbox;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
@@ -227,7 +226,7 @@ public class RealVoltDB implements VoltDBInterface
         @Override
         public void run() {
             Mailbox mailbox = VoltDB.instance().getMessenger()
-            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, VoltDB.instance().getCommitLog());
+            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID);
 
             m_siteObj =
                 new ExecutionSite(VoltDB.instance(),
@@ -321,7 +320,24 @@ public class RealVoltDB implements VoltDBInterface
 
     private long m_recoveryStartTime = System.currentTimeMillis();
 
-    private CommitLog m_commitLog;
+    private CommandLog m_commandLog = new CommandLog() {
+
+        @Override
+        public void init(CatalogContext context) {}
+
+        @Override
+        public void log(InitiateTaskMessage message) {}
+
+        @Override
+        public void shutdown() throws InterruptedException {}
+
+        @Override
+        public Semaphore logFault(Set<Integer> failedSites,
+                List<Long> faultedTxns) {
+            return new Semaphore(1);
+        }
+
+    };
 
     private volatile boolean m_inAdminMode = false;
 
@@ -354,26 +370,6 @@ public class RealVoltDB implements VoltDBInterface
             // than a second
             PlatformProperties.fetchPlatformProperties();
 
-            if (config.m_useCommitLog) {
-                try {
-                    m_commitLog = new CommitLogImpl( config.m_commitLogDir, config.m_commitInterval, config.m_waitForCommit);
-                } catch (IOException e) {
-                    hostLog.fatal("Unable to intialize commit log", e);
-                    System.exit(-1);
-                }
-            } else {
-                m_commitLog = new CommitLog() {
-                    @Override
-                    public void logMessage(VoltMessage message, SiteMailbox mailbox) {
-                        message.setDurable();
-                        mailbox.deliver(message);
-                    }
-
-                    @Override
-                    public void shutdown() throws InterruptedException {
-                    }
-                };
-            }
             if (m_pidFile == null) {
                 String name = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
                 String pidString = name.substring(0, name.indexOf('@'));
@@ -450,6 +446,24 @@ public class RealVoltDB implements VoltDBInterface
             m_catalogContext = new CatalogContext(
                     0,
                     catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
+
+//            if (m_catalogContext.cluster.getLogconfig().get("").getEnabled()) {
+//                try {
+//                    @SuppressWarnings("rawtypes")
+//                    Class loggerClass = Class.forName("org.voltdb.CommandLogImpl");
+//                    m_commandLog = (CommandLog)loggerClass.newInstance();
+//                    m_commandLog.init(m_catalogContext);
+//                } catch (ClassNotFoundException e) {
+//                    hostLog.warn("Can't enable command logging with the community version of VoltDB." +
+//                            " Logging is disabled.");
+//                } catch (InstantiationException e) {
+//                    hostLog.fatal("Unable to instantiate command log", e);
+//                    VoltDB.crashVoltDB();
+//                } catch (IllegalAccessException e) {
+//                    hostLog.fatal("Unable to instantiate command log", e);
+//                    VoltDB.crashVoltDB();
+//                }
+//            }
 
             // See if we should bring the server up in admin mode
             m_inAdminMode = false;
@@ -652,8 +666,7 @@ public class RealVoltDB implements VoltDBInterface
                 new ExecutionSite(VoltDB.instance(),
                                   VoltDB.instance().getMessenger().createMailbox(
                                           siteId,
-                                          VoltDB.DTXN_MAILBOX_ID,
-                                          m_commitLog),
+                                          VoltDB.DTXN_MAILBOX_ID),
                                   siteId,
                                   serializedCatalog,
                                   null,
@@ -1510,8 +1523,8 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     @Override
-    public CommitLog getCommitLog() {
-        return m_commitLog;
+    public CommandLog getCommandLog() {
+        return m_commandLog;
     }
 
     @Override

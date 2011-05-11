@@ -34,7 +34,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.voltdb.CommitLog;
+import org.voltdb.CommandLog;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.SiteTracker;
@@ -299,13 +299,13 @@ public class HostMessenger implements Messenger {
     }
 
     @Override
-    public Mailbox createMailbox(int siteId, int mailboxId, CommitLog commitLog) {
+    public Mailbox createMailbox(int siteId, int mailboxId) {
         assert(m_initialized);
         int localSiteId = siteId % VoltDB.SITES_TO_HOST_DIVISOR;
         MessengerSite site = m_messengerSites[localSiteId];
         if (site == null) return null;
 
-        return site.createMailbox(mailboxId, commitLog);
+        return site.createMailbox(mailboxId);
     }
 
     public void send(final int siteId, final int mailboxId, final VoltMessage message)

@@ -184,6 +184,7 @@ CTX.INPUT['catalog'] = """
  user.cpp
  userref.cpp
  snapshotschedule.cpp
+ commandlog.cpp
 """
 
 CTX.INPUT['structures'] = """

@@ -144,7 +144,11 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         TransactionState retval = null;
         updateQueueState();
         if (m_state == QueueState.UNBLOCKED) {
-            retval = super.poll();
+            retval = super.peek();
+            if (!retval.isDurable()) {
+                return null;
+            }
+            super.poll();
             m_txnsPopped++;
             // not BLOCKED_EMPTY
             assert(retval != null);
@@ -161,6 +165,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         updateQueueState();
         if (m_state == QueueState.UNBLOCKED) {
             retval = super.peek();
+            if (!retval.isDurable()) {
+                return null;
+            }
             // not BLOCKED_EMPTY
             assert(retval != null);
         }

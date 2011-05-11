@@ -92,10 +92,4 @@ public class HeartbeatResponseMessage extends VoltMessage {
 
         return sb.toString();
     }
-
-    @Override
-    protected boolean requiresDurabilityP() {
-        return false;
-    }
-
 }

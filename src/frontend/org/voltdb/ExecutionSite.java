@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.ArrayList;
 
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
@@ -262,11 +263,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             return Subject.FAILURE.getId();
         }
 
-        @Override
-        protected boolean requiresDurabilityP() {
-            return false;
-        }
-
         long m_roadblockTransactionId;
     }
 
@@ -290,11 +286,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         public byte getSubject() {
             return Subject.FAILURE.getId();
         }
-
-        @Override
-        protected boolean requiresDurabilityP() {
-            return false;
-        }
     }
 
     /**
@@ -311,10 +302,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         @Override
         public byte getSubject() {
             return Subject.DEFAULT.getId();
-        }
-        @Override
-        protected boolean requiresDurabilityP() {
-            return false;
         }
     }
 
@@ -333,11 +320,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
         @Override
         protected void initFromBuffer() {} // can be empty if only used locally
-
-        @Override
-        protected boolean requiresDurabilityP() {
-            return false;
-        }
     }
 
     private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler
@@ -1655,6 +1637,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
         }
 
+        /*
+         * List of txns that were not initiated or rolled back.
+         * This will be synchronously logged to the command log
+         * so they can be skipped at replay time.
+         */
+        ArrayList<Long> faultedTxns = new ArrayList<Long>();
+
         // Correct transaction state internals and commit
         // or remove affected transactions from RPQ and txnId hash.
         Iterator<Long> it = m_transactionsById.keySet().iterator();
@@ -1670,6 +1659,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             {
                 m_recoveryLog.info("Faulting non-globally initiated transaction " + ts.txnId);
                 it.remove();
+                if (!ts.isReadOnly()) {
+                    faultedTxns.add(ts.txnId);
+                }
                 m_transactionQueue.faultTransaction(ts);
             }
 
@@ -1698,6 +1690,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             "the global multi-part commit point");
                     CompleteTransactionMessage ft =
                         mpts.createCompleteTransactionMessage(true, false);
+                    if (!ts.isReadOnly()) {
+                        faultedTxns.add(ts.txnId);
+                    }
                     m_mailbox.deliverFront(ft);
                 }
                 else
@@ -1705,6 +1700,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     m_recoveryLog.info("Faulting multi-part transaction " + ts.txnId +
                             " because the coordinator was on a failed node");
                     it.remove();
+                    if (!ts.isReadOnly()) {
+                        faultedTxns.add(ts.txnId);
+                    }
                     m_transactionQueue.faultTransaction(ts);
                 }
             }
@@ -1724,6 +1722,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
         if (m_recoveryProcessor != null) {
             m_recoveryProcessor.handleSiteFaults( failedSites, m_context.siteTracker);
+        }
+        try {
+            //Log it and acquire the completion permit from the semaphore
+            VoltDB.instance().getCommandLog().logFault( failedSites, faultedTxns).acquire();
+        } catch (InterruptedException e) {
+            hostLog.fatal("Interrupted while attempting to log a fault", e);
+            VoltDB.crashVoltDB();
         }
     }
 

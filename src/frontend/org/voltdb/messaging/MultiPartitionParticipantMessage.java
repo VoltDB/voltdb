@@ -69,10 +69,4 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
 
         return sb.toString();
     }
-
-    @Override
-    protected boolean requiresDurabilityP() {
-        return true;
-    }
-
 }

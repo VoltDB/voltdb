@@ -146,4 +146,10 @@ public class SinglePartitionTxnState extends TransactionState {
     public void handleSiteFaults(HashSet<Integer> failedSites) {
         // nothing to be done here.
     }
+
+    @Override
+    public boolean isDurable() {
+        java.util.concurrent.atomic.AtomicBoolean durableFlag = m_task.getDurabilityFlagIfItExists();
+        return durableFlag == null ? true : durableFlag.get();
+    }
 }
