@@ -148,9 +148,9 @@ public class MockVoltDB implements VoltDBInterface
 
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
-        org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("");
+        org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");
         if (logConfig == null) {
-            logConfig = getCluster().getLogconfig().add("");
+            logConfig = getCluster().getLogconfig().add("log");
         }
         logConfig.setEnabled(enabled);
         logConfig.setSynchronous(sync);

@@ -18,6 +18,9 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.HashMap;
@@ -2125,17 +2128,35 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
         else {
             try {
-                if (wrapper instanceof VoltSystemProcedure) {
-                    Object[] callerParams = itask.getParameters();
-                    Object[] combinedParams = new Object[callerParams.length + 1];
-                    combinedParams[0] = m_systemProcedureContext;
-                    for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                    final ClientResponseImpl cr = wrapper.call(txnState, combinedParams);
-                    response.setResults(cr, itask);
+                Object[] callerParams = null;
+                /*
+                 * Parameters are lazily deserialized. We may not find out until now
+                 * that the parameter set is corrupt
+                 */
+                try {
+                    callerParams = itask.getParameters();
+                } catch (RuntimeException e) {
+                    Writer result = new StringWriter();
+                    PrintWriter pw = new PrintWriter(result);
+                    e.printStackTrace(pw);
+                    response.setResults(
+                            new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                                   new VoltTable[] {},
+                                                   "Exception while deserializing procedure params\n" +
+                                                   result.toString()));
                 }
-                else {
-                    final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
-                    response.setResults(cr, itask);
+                if (callerParams != null) {
+                    if (wrapper instanceof VoltSystemProcedure) {
+                        final Object[] combinedParams = new Object[callerParams.length + 1];
+                        combinedParams[0] = m_systemProcedureContext;
+                        for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
+                        final ClientResponseImpl cr = wrapper.call(txnState, combinedParams);
+                        response.setResults(cr, itask);
+                    }
+                    else {
+                        final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
+                        response.setResults(cr, itask);
+                    }
                 }
             }
             catch (final ExpectedProcedureException e) {

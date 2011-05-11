@@ -53,7 +53,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         super(initiatorSiteId, coordinatorSiteId, txnId, isReadOnly);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
-        m_invocation.buildParameterSet();
         m_lastSafeTxnID = lastSafeTxnID;
     }
 
@@ -77,11 +76,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         if (m_invocation.getParams() == null)
             return 0;
         return m_invocation.getParams().toArray().length;
-    }
-
-    public Object getParameter(int index) {
-        assert(m_invocation != null);
-        return m_invocation.getParams().toArray()[index];
     }
 
     public Object[] getParameters() {
@@ -149,7 +143,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         FastDeserializer fds = new FastDeserializer(m_buffer);
         try {
             m_invocation = fds.readObject(StoredProcedureInvocation.class);
-            m_invocation.buildParameterSet();
         } catch (IOException e) {
             e.printStackTrace();
             assert(false);

@@ -19,7 +19,13 @@ package org.voltdb;
 
 import java.io.IOException;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.Callable;
+
 import java.nio.ByteBuffer;
+
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.*;
 
 /**
@@ -28,10 +34,11 @@ import org.voltdb.messaging.*;
  *
  */
 public class StoredProcedureInvocation implements FastSerializable {
-
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     String procName = null;
-    ParameterSet params = null;
     ByteBuffer unserializedParams = null;
+
+    FutureTask<ParameterSet> params;
 
     /** A descriptor provided by the client, opaque to the server,
         returned to the client in the ClientResponse */
@@ -59,10 +66,16 @@ public class StoredProcedureInvocation implements FastSerializable {
         procName = name;
     }
 
-    public void setParams(Object... parameters) {
+    public void setParams(final Object... parameters) {
         // convert the params to the expected types
-        params = new ParameterSet();
-        params.setParameters(parameters);
+        params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+            @Override
+            public ParameterSet call() {
+                ParameterSet params = new ParameterSet();
+                params.setParameters(parameters);
+                return params;
+            }
+        });
         unserializedParams = null;
     }
 
@@ -71,7 +84,16 @@ public class StoredProcedureInvocation implements FastSerializable {
     }
 
     public ParameterSet getParams() {
-        return params;
+        params.run();
+        try {
+            return params.get();
+        } catch (InterruptedException e) {
+            hostLog.fatal("Interrupted while deserializing a parameter set");
+            VoltDB.crashVoltDB();
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+        return null;
     }
 
     public void setClientHandle(int aHandle) {
@@ -80,26 +102,6 @@ public class StoredProcedureInvocation implements FastSerializable {
 
     public long getClientHandle() {
         return clientHandle;
-    }
-
-    /**
-     * If created from ClientInterface within a single host,
-     * will still need to deserialize the parameter set. This
-     * optimization is not performed for multi-site transactions
-     * (which require concurrent access to the task).
-     */
-     public void buildParameterSet() {
-        if (unserializedParams != null) {
-            assert (params == null);
-            try {
-                FastDeserializer fds = new FastDeserializer(unserializedParams);
-                params = fds.readObject(ParameterSet.class);
-                unserializedParams = null;
-            }
-            catch (IOException ex) {
-                throw new RuntimeException("Invalid ParameterSet in Stored Procedure Invocation.");
-            }
-        }
     }
 
     /** Read into an unserialized parameter buffer to extract a single parameter */
@@ -119,7 +121,13 @@ public class StoredProcedureInvocation implements FastSerializable {
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
         unserializedParams = in.remainder();
-        params = null;
+        params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+            @Override
+            public ParameterSet call() throws Exception {
+                FastDeserializer fds = new FastDeserializer(unserializedParams);
+                return fds.readObject(ParameterSet.class);
+            }
+        });
     }
 
     @Override
@@ -129,17 +137,19 @@ public class StoredProcedureInvocation implements FastSerializable {
         out.write(0);//version
         out.writeString(procName);
         out.writeLong(clientHandle);
-        if (params != null)
-            out.writeObject(params);
-        else if (unserializedParams != null)
+        if (unserializedParams != null)
             out.write(unserializedParams.array(),
                       unserializedParams.position() + unserializedParams.arrayOffset(),
                       unserializedParams.remaining());
+        else if (params != null) {
+            out.writeObject(getParams());
+        }
     }
 
     @Override
     public String toString() {
         String retval = "Invocation: " + procName + "(";
+        ParameterSet params = getParams();
         if (params != null)
             for (Object o : params.toArray()) {
                 retval += o.toString() + ", ";
@@ -152,6 +162,7 @@ public class StoredProcedureInvocation implements FastSerializable {
 
     public void getDumpContents(StringBuilder sb) {
         sb.append("Invocation: ").append(procName).append("(");
+        ParameterSet params = getParams();
         if (params != null)
             for (Object o : params.toArray()) {
                 sb.append(o.toString()).append(", ");
@@ -162,7 +173,7 @@ public class StoredProcedureInvocation implements FastSerializable {
     }
 
     public ByteBuffer getSerializedParams() {
-        return unserializedParams.duplicate();
+        return unserializedParams;
     }
 
     public void setSerializedParams(ByteBuffer serializedParams) {

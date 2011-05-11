@@ -18,6 +18,9 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -36,6 +39,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.Callable;
 
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
@@ -941,17 +946,32 @@ public class ClientInterface implements DumpManager.Dumpable {
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
-                task.buildParameterSet();
-                if (task.params.m_params.length != 1) {
+                ParameterSet params = null;
+                try {
+                    params = task.getParams();
+                } catch (RuntimeException e) {
+                    Writer result = new StringWriter();
+                    PrintWriter pw = new PrintWriter(result);
+                    e.printStackTrace(pw);
                     final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                               new VoltTable[0],
+                                               "Exception while deserializing procedure params\n" +
+                                               result.toString(),
+                                               task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
+                if (params.m_params.length != 1) {
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                                                new VoltTable[0],
                                                "Adhoc system procedure requires exactly one parameter, the SQL statement to execute.",
                                                task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
-                String sql = (String) task.params.m_params[0];
+                String sql = (String) params.m_params[0];
                 m_asyncCompilerWorkThread.planSQL(
                                                   sql,
                                                   task.clientHandle,
@@ -980,10 +1000,25 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             // Updating a catalog needs to divert to the catalog processing thread
             if (task.procName.equals("@UpdateApplicationCatalog")) {
-                task.buildParameterSet();
-                if (task.params.m_params.length != 2 ||
-                    task.params.m_params[0] == null ||
-                    task.params.m_params[1] == null)
+                ParameterSet params = null;
+                try {
+                    params = task.getParams();
+                } catch (RuntimeException e) {
+                    Writer result = new StringWriter();
+                    PrintWriter pw = new PrintWriter(result);
+                    e.printStackTrace(pw);
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                               new VoltTable[0],
+                                               "Exception while deserializing procedure params\n" +
+                                               result.toString(),
+                                               task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
+                if (params.m_params.length != 2 ||
+                    params.m_params[0] == null ||
+                    params.m_params[1] == null)
                 {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -995,8 +1030,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
-                String catalogURL = (String) task.params.m_params[0];
-                String deploymentURL = (String) task.params.m_params[1];
+                String catalogURL = (String) params.m_params[0];
+                String deploymentURL = (String) params.m_params[1];
                 m_asyncCompilerWorkThread.prepareCatalogUpdate(catalogURL,
                                                                deploymentURL,
                                                                task.clientHandle,
@@ -1026,14 +1061,31 @@ public class ClientInterface implements DumpManager.Dumpable {
             }
             else if (task.procName.equals("@SystemInformation"))
             {
-                task.buildParameterSet();
+                ParameterSet params = null;
+                try {
+                    params = task.getParams();
+                } catch (RuntimeException e) {
+                    Writer result = new StringWriter();
+                    PrintWriter pw = new PrintWriter(result);
+                    e.printStackTrace(pw);
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                               new VoltTable[0],
+                                               "Exception while deserializing procedure params\n" +
+                                               result.toString(),
+                                               task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
                 // hacky: support old @SystemInformation behavior by
                 // filling in a missing selector to get the overview key/value info
-                if (task.params.m_params.length == 0)
+                if (params.m_params.length == 0)
                 {
-                    task.params.m_params = new Object[1];
-                    task.params.m_params[0] = new String("OVERVIEW");
+                    params.m_params = new Object[1];
+                    params.m_params[0] = new String("OVERVIEW");
                 }
+                //So that the modified version is reserialized, null out the lazy copy
+                task.unserializedParams = null;
             }
         } else if (!user.hasPermission(catProc)) {
             authLog.l7dlog(Level.INFO,
@@ -1052,11 +1104,9 @@ public class ClientInterface implements DumpManager.Dumpable {
             int[] involvedPartitions = null;
             if (catProc.getEverysite() == true) {
                 involvedPartitions = m_allPartitions;
-                task.buildParameterSet();
             }
             else if (catProc.getSinglepartition() == false) {
                 involvedPartitions = m_allPartitions;
-                task.buildParameterSet();
             }
             else {
                 // break out the Hashinator and calculate the appropriate partition
@@ -1110,7 +1160,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         while ((result = m_asyncCompilerWorkThread.getPlannedStmt()) != null) {
             if (result.errorMsg == null) {
                 if (result instanceof AdHocPlannedStmt) {
-                    AdHocPlannedStmt plannedStmt = (AdHocPlannedStmt) result;
+                    final AdHocPlannedStmt plannedStmt = (AdHocPlannedStmt) result;
                     if (plannedStmt.catalogVersion != m_catalogContext.get().catalogVersion) {
                          /* The adhoc planner learns of catalog updates after the EE and the
                             rest of the system. If the adhoc sql was planned against an
@@ -1126,11 +1176,16 @@ public class ClientInterface implements DumpManager.Dumpable {
                         // create the execution site task
                         StoredProcedureInvocation task = new StoredProcedureInvocation();
                         task.procName = "@AdHoc";
-                        task.params = new ParameterSet();
-                        task.params.m_params = new Object[] {
-                                                             plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                                                             plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0
-                        };
+                        task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+                            @Override
+                            public ParameterSet call() {
+                                ParameterSet params = new ParameterSet();
+                                params.m_params = new Object[] {
+                                        plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                                        plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0};
+                                return params;
+                            }
+                        });
                         task.clientHandle = plannedStmt.clientHandle;
 
                         // initiate the transaction
@@ -1142,16 +1197,22 @@ public class ClientInterface implements DumpManager.Dumpable {
                     }
                 }
                 else if (result instanceof CatalogChangeResult) {
-                    CatalogChangeResult changeResult = (CatalogChangeResult) result;
+                    final CatalogChangeResult changeResult = (CatalogChangeResult) result;
                     // create the execution site task
                     StoredProcedureInvocation task = new StoredProcedureInvocation();
                     task.procName = "@UpdateApplicationCatalog";
-                    task.params = new ParameterSet();
-                    task.params.m_params = new Object[] {
-                            changeResult.encodedDiffCommands, changeResult.catalogURL,
-                            changeResult.expectedCatalogVersion, changeResult.deploymentURL,
-                            changeResult.deploymentCRC
-                    };
+                    task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+                        @Override
+                        public ParameterSet call() {
+                            ParameterSet params = new ParameterSet();
+                            params.m_params = new Object[] {
+                                    changeResult.encodedDiffCommands, changeResult.catalogURL,
+                                    changeResult.expectedCatalogVersion, changeResult.deploymentURL,
+                                    changeResult.deploymentCRC
+                            };
+                            return params;
+                        }
+                    });
                     task.clientHandle = changeResult.clientHandle;
 
                     // initiate the transaction. These hard-coded values from catalog
@@ -1292,7 +1353,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         return context;
     }
 
-    private void initiateSnapshotDaemonWork(Pair<String, Object[]> invocation) {
+    private void initiateSnapshotDaemonWork(final Pair<String, Object[]> invocation) {
         if (invocation != null) {
             // get procedure from the catalog
            final Procedure catProc = m_catalogContext.get().procedures.get(invocation.getFirst());
@@ -1307,8 +1368,14 @@ public class ClientInterface implements DumpManager.Dumpable {
            }
            StoredProcedureInvocation spi = new StoredProcedureInvocation();
            spi.procName = invocation.getFirst();
-           spi.params = new ParameterSet();
-           spi.params.setParameters(invocation.getSecond());
+           spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+               @Override
+               public ParameterSet call() {
+                   ParameterSet params = new ParameterSet();
+                   params.setParameters(invocation.getSecond());
+                   return params;
+               }
+           });
            // initiate the transaction
            m_initiator.createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
                                          spi, catProc.getReadonly(),

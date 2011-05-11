@@ -437,9 +437,15 @@ public class RealVoltDB implements VoltDBInterface
             catalog.execute(serializedCatalog);
 
             // note if this fails it will print an error first
-            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_config.m_pathToDeployment, true);
-            if (depCRC < 0)
+            long depCRC = -1;
+            try {
+                depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_config.m_pathToDeployment, true);
+                if (depCRC < 0)
+                    System.exit(-1);
+            } catch (Exception e) {
+                hostLog.fatal("Error parsing deployment file", e);
                 System.exit(-1);
+            }
 
             serializedCatalog = catalog.serialize();
 
@@ -447,23 +453,23 @@ public class RealVoltDB implements VoltDBInterface
                     0,
                     catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
 
-//            if (m_catalogContext.cluster.getLogconfig().get("").getEnabled()) {
-//                try {
-//                    @SuppressWarnings("rawtypes")
-//                    Class loggerClass = Class.forName("org.voltdb.CommandLogImpl");
-//                    m_commandLog = (CommandLog)loggerClass.newInstance();
-//                    m_commandLog.init(m_catalogContext);
-//                } catch (ClassNotFoundException e) {
-//                    hostLog.warn("Can't enable command logging with the community version of VoltDB." +
-//                            " Logging is disabled.");
-//                } catch (InstantiationException e) {
-//                    hostLog.fatal("Unable to instantiate command log", e);
-//                    VoltDB.crashVoltDB();
-//                } catch (IllegalAccessException e) {
-//                    hostLog.fatal("Unable to instantiate command log", e);
-//                    VoltDB.crashVoltDB();
-//                }
-//            }
+            if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
+                try {
+                    @SuppressWarnings("rawtypes")
+                    Class loggerClass = Class.forName("org.voltdb.CommandLogImpl");
+                    m_commandLog = (CommandLog)loggerClass.newInstance();
+                    m_commandLog.init(m_catalogContext);
+                } catch (ClassNotFoundException e) {
+                    hostLog.warn("Can't enable command logging with the community version of VoltDB." +
+                            " Logging is disabled.");
+                } catch (InstantiationException e) {
+                    hostLog.fatal("Unable to instantiate command log", e);
+                    VoltDB.crashVoltDB();
+                } catch (IllegalAccessException e) {
+                    hostLog.fatal("Unable to instantiate command log", e);
+                    VoltDB.crashVoltDB();
+                }
+            }
 
             // See if we should bring the server up in admin mode
             m_inAdminMode = false;

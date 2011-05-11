@@ -74,6 +74,8 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
@@ -460,7 +462,47 @@ public abstract class CatalogUtil {
 
         setExportInfo( catalog, deployment.getExport());
 
+        setCommandLogInfo( catalog, deployment.getCommandlog());
         return getDeploymentCRC(deployment);
+    }
+
+    /*
+     * Command log element is created in setPathsInfo
+     */
+    private static void setCommandLogInfo(Catalog catalog, CommandLogType commandlog) {
+        int fsyncInterval = 200;
+        int maxTxnsBeforeFsync = Integer.MAX_VALUE;
+        boolean enabled = false;
+        boolean sync = false;
+        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
+        if (commandlog != null) {
+            String mode = commandlog.getMode();
+            if (mode.equalsIgnoreCase("sync")) {
+                sync = true;
+            } else if (mode.equalsIgnoreCase("async")) {
+                sync = false;
+            } else {
+                throw new RuntimeException("Invalid command log mode \"" + mode + "\" specified in deployment file");
+            }
+            enabled = commandlog.isEnabled();
+            Frequency freq = commandlog.getFrequency();
+            if (freq != null) {
+                maxTxnsBeforeFsync = freq.getMaxTxnsBeforeFsync().intValue();
+                if (maxTxnsBeforeFsync < 1) {
+                    throw new RuntimeException("Invalid command log max txns before fsync (" + maxTxnsBeforeFsync
+                            + ") specified. Supplied value must be between 1 and 2^31 txns");
+                }
+                fsyncInterval = freq.getFsyncInterval().intValue();
+                if (fsyncInterval < 1 | fsyncInterval > 5000) {
+                    throw new RuntimeException("Invalid command log fsync interval(" + fsyncInterval
+                            + ") specified. Supplied value must be between 1 and 5000 milliseconds");
+                }
+            }
+        }
+        config.setEnabled(enabled);
+        config.setSynchronous(sync);
+        config.setFsyncinterval(fsyncInterval);
+        config.setMaxtxns(maxTxnsBeforeFsync);
     }
 
     public static long getDeploymentCRC(String deploymentURL) {
@@ -866,7 +908,7 @@ public abstract class CatalogUtil {
      */
     private static void setPathsInfo(Catalog catalog, PathsType paths, boolean crashOnFailedValidation) {
         File voltDbRoot;
-
+        final Cluster cluster = catalog.getClusters().get("cluster");
         // Handle default voltdbroot (and completely missing "paths" element).
         if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null) {
             voltDbRoot = new VoltFile("voltdbroot");
@@ -927,24 +969,57 @@ public abstract class CatalogUtil {
 
         validateDirectory("export overflow", exportOverflowPath, crashOnFailedValidation);
 
+        File commandLogPath;
+        if (paths == null || paths.getCommandlog() == null) {
+            commandLogPath = new VoltFile(voltDbRoot, "command_log");
+            if (!commandLogPath.exists()) {
+                if (!commandLogPath.mkdir()) {
+                    hostLog.fatal("Failed to create command log directory \""
+                            + commandLogPath + "\"");
+                }
+            }
+        } else {
+            commandLogPath = new VoltFile(paths.getCommandlog().getPath());
+        }
+        validateDirectory("command log", commandLogPath, crashOnFailedValidation);
+
+        File commandLogSnapshotPath;
+        if (paths == null || paths.getCommandlogsnapshot() == null) {
+            commandLogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");
+            if (!commandLogSnapshotPath.exists()) {
+                if (!commandLogSnapshotPath.mkdir()) {
+                    hostLog.fatal("Failed to create command log snapshot directory \""
+                            + commandLogSnapshotPath + "\"");
+                }
+            }
+        } else {
+            commandLogSnapshotPath = new VoltFile(paths.getCommandlogsnapshot().getPath());
+        }
+        validateDirectory("command log snapshot", commandLogSnapshotPath, crashOnFailedValidation);
+
         //Set the volt root in the catalog
         catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());
 
         //Set the auto-snapshot schedule path if there are auto-snapshots
-        SnapshotSchedule schedule = catalog.getClusters().get("cluster").getDatabases().
+        SnapshotSchedule schedule = cluster.getDatabases().
             get("database").getSnapshotschedule().get("default");
         if (schedule != null) {
             schedule.setPath(snapshotPath.getPath());
         }
 
         //Update the path in the schedule for ppd
-        schedule = catalog.getClusters().get("cluster").getFaultsnapshots().get("CLUSTER_PARTITION");
+        schedule = cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
         if (schedule != null) {
             schedule.setPath(ppdSnapshotPath.getPath());
         }
 
         //Also set the export overflow directory
-        catalog.getClusters().get("cluster").setExportoverflow(exportOverflowPath.getPath());
+        cluster.setExportoverflow(exportOverflowPath.getPath());
+
+        //Set the command log paths, also creates the command log entry in the catalog
+        final org.voltdb.catalog.CommandLog commandLogConfig = cluster.getLogconfig().add("log");
+        commandLogConfig.setInternalsnapshotpath(commandLogSnapshotPath.getPath());
+        commandLogConfig.setLogpath(commandLogPath.getPath());
     }
 
     /**

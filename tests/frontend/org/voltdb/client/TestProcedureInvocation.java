@@ -203,7 +203,6 @@ public class TestProcedureInvocation extends TestCase{
         StoredProcedureInvocation spi = null;
         try {
             spi = fds.readObject(StoredProcedureInvocation.class);
-            spi.buildParameterSet();
         } catch (IOException e) {
             e.printStackTrace();
             fail();
@@ -219,7 +218,6 @@ public class TestProcedureInvocation extends TestCase{
             fs.writeObject(pi);
             FastDeserializer fd = new FastDeserializer(fs.getBytes());
             spi = fd.readObject(StoredProcedureInvocation.class);
-            spi.buildParameterSet();
         } catch (IOException e) {
             e.printStackTrace();
             fail();
@@ -246,7 +244,6 @@ public class TestProcedureInvocation extends TestCase{
         StoredProcedureInvocation spi = null;
         try {
             spi = fds.readObject(StoredProcedureInvocation.class);
-            spi.buildParameterSet();
         } catch (IOException e) {
             e.printStackTrace();
             fail();

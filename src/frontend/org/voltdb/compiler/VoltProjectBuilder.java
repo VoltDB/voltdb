@@ -34,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.math.BigInteger;
 
 import javax.xml.bind.*;
 import javax.xml.parsers.DocumentBuilder;
@@ -212,6 +213,23 @@ public class VoltProjectBuilder {
     private boolean m_ppdEnabled = false;
     private String m_ppdPath = null;
     private String m_ppdPrefix = "none";
+
+    private String m_internalSnapshotPath;
+    private String m_commandLogPath;
+    private Boolean m_commandLogSync;
+    private Boolean m_commandLogEnabled;
+    private Integer m_commandLogFsyncInterval;
+    private Integer m_commandLogMaxTxnsBeforeFsync;
+
+    public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
+            Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync) {
+        m_internalSnapshotPath = internalSnapshotPath;
+        m_commandLogPath = commandLogPath;
+        m_commandLogSync = commandLogSync;
+        m_commandLogEnabled = commandLogEnabled;
+        m_commandLogFsyncInterval = fsyncInterval;
+        m_commandLogMaxTxnsBeforeFsync = maxTxnsBeforeFsync;
+    }
 
     /**
      * Produce all catalogs this project builder knows how to produce.
@@ -839,12 +857,50 @@ public class VoltProjectBuilder {
             paths.setSnapshots(snapshotPathElement);
         }
 
+        if (m_commandLogPath != null) {
+            PathEntry commandLogPathElement = factory.createPathEntry();
+            commandLogPathElement.setPath(m_commandLogPath);
+            paths.setCommandlog(commandLogPathElement);
+        }
+
+        if (m_internalSnapshotPath != null) {
+            PathEntry commandLogSnapshotPathElement = factory.createPathEntry();
+            commandLogSnapshotPathElement.setPath(m_internalSnapshotPath);
+            paths.setCommandlogsnapshot(commandLogSnapshotPathElement);
+        }
+
         if (m_snapshotPrefix != null) {
             SnapshotType snapshot = factory.createSnapshotType();
             deployment.setSnapshot(snapshot);
             snapshot.setFrequency(m_snapshotFrequency);
             snapshot.setPrefix(m_snapshotPrefix);
             snapshot.setRetain(m_snapshotRetain);
+        }
+
+        if (m_commandLogSync != null || m_commandLogEnabled != null ||
+                m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
+            CommandLogType commandLogType = factory.createCommandLogType();
+            if (m_commandLogSync != null) {
+                if (m_commandLogSync.booleanValue()) {
+                    commandLogType.setMode("sync");
+                } else {
+                    commandLogType.setMode("async");
+                }
+            }
+            if (m_commandLogEnabled != null) {
+                commandLogType.setEnabled(m_commandLogEnabled);
+            }
+
+            if (m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
+                CommandLogType.Frequency frequency = factory.createCommandLogTypeFrequency();
+                if (m_commandLogFsyncInterval != null) {
+                    frequency.setFsyncInterval(new BigInteger(Integer.toString(m_commandLogFsyncInterval)));
+                }
+                if (m_commandLogMaxTxnsBeforeFsync != null) {
+                    frequency.setMaxTxnsBeforeFsync(new BigInteger(Integer.toString(m_commandLogMaxTxnsBeforeFsync)));
+                }
+            }
+            deployment.setCommandlog(commandLogType);
         }
 
         // <partition-detection>/<snapshot>
