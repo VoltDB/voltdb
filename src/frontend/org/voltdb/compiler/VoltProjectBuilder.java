@@ -899,6 +899,7 @@ public class VoltProjectBuilder {
                 if (m_commandLogMaxTxnsBeforeFsync != null) {
                     frequency.setMaxTxnsBeforeFsync(new BigInteger(Integer.toString(m_commandLogMaxTxnsBeforeFsync)));
                 }
+                commandLogType.setFrequency(frequency);
             }
             deployment.setCommandlog(commandLogType);
         }
