@@ -634,68 +634,6 @@ public class TestExportSuite extends RegressionSuite {
         }
     }
 
-    //  Test Export of a DROPPED table.  Queues some data to a table.
-    //  Then drops the table and restarts the server. Verifies that Export can successfully
-    //  drain the dropped table. IE, drop table doesn't lose Export data.
-    //
-    public void testExportAndDroppedTableThenShutdown() throws Exception {
-        System.out.println("testExportAndDroppedTableThenShutdown");
-        Client client = getClient();
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow( m_tester.m_generationsSeen.first(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
-
-        // now drop the no-nulls table
-        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
-        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
-                deploymentURL);
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-
-        quiesce(client);
-
-        m_config.shutDown();
-        m_config.startUp(false);
-
-        client = getClient();
-
-        /**
-         * There will be 3 disconnects. Once for the shutdown, once for first generation,
-         * another for the 2nd generation created by the catalog change. The predicate is a complex
-         * way of saying make sure that the tester has created verifiers for
-         */
-        for (int ii = 0; m_tester.m_generationsSeen.size() < 3 ||
-                m_tester.m_verifiers.get(m_tester.m_generationsSeen.last()).size() < 6; ii++) {
-            Thread.sleep(500);
-            boolean threwException = false;
-            try {
-                m_tester.work(1000);
-            } catch (ExportClientException e) {
-                boolean success = reconnect(m_tester);
-                assertTrue(success);
-                System.out.println(e.toString());
-                threwException = true;
-            }
-            if (ii < 3) {
-                assertTrue(threwException);
-            }
-        }
-
-        for (int i=10; i < 20; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow( m_tester.m_generationsSeen.last(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
-        client.drain();
-
-        // must still be able to verify the export data.
-        quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
-    }
-
     // Test Export of an ADDED table.
     //
     public void testExportAndAddedTable() throws Exception {

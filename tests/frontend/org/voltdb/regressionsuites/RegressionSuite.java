@@ -47,7 +47,7 @@ import org.voltdb.sysprocs.SnapshotRestore;
  */
 public class RegressionSuite extends TestCase {
 
-    VoltServerConfig m_config;
+    protected VoltServerConfig m_config;
     protected String m_username = "default";
     protected String m_password = "password";
     private final ArrayList<Client> m_clients = new ArrayList<Client>();
