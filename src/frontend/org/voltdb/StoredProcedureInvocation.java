@@ -121,10 +121,11 @@ public class StoredProcedureInvocation implements FastSerializable {
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
         unserializedParams = in.remainder();
+        final ByteBuffer duplicate = unserializedParams.duplicate();
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
-                FastDeserializer fds = new FastDeserializer(unserializedParams);
+                FastDeserializer fds = new FastDeserializer(duplicate);
                 return fds.readObject(ParameterSet.class);
             }
         });

@@ -469,6 +469,8 @@ public class RealVoltDB implements VoltDBInterface
                     hostLog.fatal("Unable to instantiate command log", e);
                     VoltDB.crashVoltDB();
                 }
+            } else {
+                hostLog.info("Command logging is disabled");
             }
 
             // See if we should bring the server up in admin mode
