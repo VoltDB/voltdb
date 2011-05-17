@@ -122,11 +122,34 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_offBackPressure = offBackPressure;
     }
 
+
     @Override
     public synchronized void createTransaction(
                                   final long connectionId,
                                   final String connectionHostname,
                                   final boolean adminConnection,
+                                  final StoredProcedureInvocation invocation,
+                                  final boolean isReadOnly,
+                                  final boolean isSinglePartition,
+                                  final boolean isEveryPartition,
+                                  final int partitions[],
+                                  final int numPartitions,
+                                  final Object clientData,
+                                  final int messageSize,
+                                  final long now)
+    {
+        long txnId = m_idManager.getNextUniqueTransactionId();
+        createTransaction(connectionId, connectionHostname, adminConnection, txnId,
+                          invocation, isReadOnly, isSinglePartition, isEveryPartition,
+                          partitions, numPartitions, clientData, messageSize, now);
+    }
+
+    @Override
+    public synchronized void createTransaction(
+                                  final long connectionId,
+                                  final String connectionHostname,
+                                  final boolean adminConnection,
+                                  final long txnId,
                                   final StoredProcedureInvocation invocation,
                                   final boolean isReadOnly,
                                   final boolean isSinglePartition,
@@ -144,14 +167,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         if (isSinglePartition || isEveryPartition)
         {
             createSinglePartitionTxn(connectionId, connectionHostname, adminConnection,
-                                     invocation, isReadOnly,
+                                     txnId, invocation, isReadOnly,
                                      partitions, clientData, messageSize, now);
             return;
         }
         else
         {
-            long txnId = m_idManager.getNextUniqueTransactionId();
-
             // store only partitions that are NOT the coordinator
             // this is a bit too slow
             int[] allSiteIds =
@@ -236,6 +257,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     createSinglePartitionTxn(long connectionId,
                              final String connectionHostname,
                              boolean adminConnection,
+                             long txnId,
                              StoredProcedureInvocation invocation,
                              boolean isReadOnly,
                              int[] partitions,
@@ -243,8 +265,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              int messageSize,
                              long now)
     {
-        long txnId = m_idManager.getNextUniqueTransactionId();
-
         ArrayList<Integer> siteIds;
 
         // Special case the common 1 partition case -- cheap via SiteTracker

@@ -221,6 +221,23 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
+        public void createTransaction(long connectionId,
+                                      String connectionHostname,
+                                      boolean adminConnection,
+                                      long txnId,
+                                      StoredProcedureInvocation invocation,
+                                      boolean isReadOnly,
+                                      boolean isSinglePartition,
+                                      boolean isEverySite,
+                                      int[] partitions,
+                                      int numPartitions,
+                                      Object clientData,
+                                      int messageSize,
+                                      long now)
+        {
+        }
+
+        @Override
         public long getMostRecentTxnId()
         {
             return 0;

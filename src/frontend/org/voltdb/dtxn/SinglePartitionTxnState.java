@@ -152,4 +152,8 @@ public class SinglePartitionTxnState extends TransactionState {
         java.util.concurrent.atomic.AtomicBoolean durableFlag = m_task.getDurabilityFlagIfItExists();
         return durableFlag == null ? true : durableFlag.get();
     }
+
+    public InitiateTaskMessage getInitiateTaskMessage() {
+        return m_task;
+    }
 }

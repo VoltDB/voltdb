@@ -67,6 +67,53 @@ public abstract class TransactionInitiator {
             long now);
 
     /**
+     * <p>
+     * Create a new transaction with a specified transaction ID, which will
+     * result in one or more <code>WorkUnit</code>'s being generated for worker
+     * partitions.
+     * </p>
+     *
+     * <p>
+     * Does not need to be synchronized as the scheduler will ensure that only
+     * one thread is ever accepting connections at a time.
+     * </p>
+     *
+     * @param connectionId
+     *            A unique integer identifying which TCP/IP connection spawned
+     *            this transaction.
+     * @param connectionHostname
+     *            hostname associated with this connection
+     * @param txnId
+     *            The transaction ID to assign to this initiation
+     * @param invocation
+     *            The data describing the work to be done.
+     * @param partitions
+     *            The partitions (from the catalog) involved in this transaction
+     *            (Errs on the side of too many).
+     * @param numPartitions
+     *            Number of relevant partitions in the array (allows for the
+     *            array to be oversized).
+     * @param clientData
+     *            Client data returned with the completed transaction
+     * @param messageSize
+     *            Size in bytes of the message that created this invocation
+     */
+    public abstract void createTransaction(
+            long connectionId,
+            final String connectionHostname,
+            boolean adminConnection,
+            long txnId,
+            StoredProcedureInvocation invocation,
+            boolean isReadOnly,
+            boolean isSinglePartition,
+            boolean isEverySite,
+            int partitions[],
+            int numPartitions,
+            Object clientData,
+            int messageSize,
+            long now);
+
+    /**
      * This method should be called every X ms or so, where X is probably
      * about 5, but that's somewhat fungible. The goal is to let the initiator
      * evaluate whether it's been too long since it's had contact with any

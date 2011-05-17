@@ -57,6 +57,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     private InitiateResponseMessage m_response;
     private HashSet<Integer> m_outstandingAcks = null;
     private final java.util.concurrent.atomic.AtomicBoolean m_durabilityFlag;
+    private final InitiateTaskMessage m_task;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -79,14 +80,15 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         if (notice instanceof InitiateTaskMessage)
         {
             m_isCoordinator = true;
-            InitiateTaskMessage task = (InitiateTaskMessage) notice;
-            m_durabilityFlag = task.getDurabilityFlagIfItExists();
+            m_task = (InitiateTaskMessage) notice;
+            m_durabilityFlag = m_task.getDurabilityFlagIfItExists();
             SiteTracker tracker = site.getSiteTracker();
             m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_siteId);
-            m_readyWorkUnits.add(new WorkUnit( tracker, task,
+            m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
                                               null, m_siteId,
                                               null, false));
         } else {
+            m_task = null;
             m_durabilityFlag = null;
         }
     }
@@ -638,6 +640,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return m_previousStackFrameDropDependencies;
     }
 
+    public InitiateTaskMessage getInitiateTaskMessage() {
+        return m_task;
+    }
 
     /**
      * Clean up internal state in response to a set of failed sites.

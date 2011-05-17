@@ -66,6 +66,10 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_isSinglePartition;
     }
 
+    public StoredProcedureInvocation getStoredProcedureInvocation() {
+        return m_invocation;
+    }
+
     public String getStoredProcedureName() {
         assert(m_invocation != null);
         return m_invocation.getProcName();
