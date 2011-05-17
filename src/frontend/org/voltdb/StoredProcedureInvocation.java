@@ -36,6 +36,11 @@ import org.voltdb.messaging.*;
 public class StoredProcedureInvocation implements FastSerializable {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     String procName = null;
+
+    /*
+     * This ByteBuffer is accessed from multiple threads concurrently.
+     * Always duplicate it before reading
+     */
     ByteBuffer unserializedParams = null;
 
     FutureTask<ParameterSet> params;
@@ -174,7 +179,7 @@ public class StoredProcedureInvocation implements FastSerializable {
     }
 
     public ByteBuffer getSerializedParams() {
-        return unserializedParams;
+        return unserializedParams.duplicate();
     }
 
     public void setSerializedParams(ByteBuffer serializedParams) {
