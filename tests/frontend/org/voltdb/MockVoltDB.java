@@ -431,6 +431,12 @@ public class MockVoltDB implements VoltDBInterface
             public Semaphore logFault(Set<Integer> failedSites, List<Long> faultedTxns) {
                 return new Semaphore(1);
             }
+
+            @Override
+            public void logHeartbeat(long txnId) {
+                // TODO Auto-generated method stub
+
+            }
         };
     }
 

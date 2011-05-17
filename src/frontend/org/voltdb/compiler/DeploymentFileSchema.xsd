@@ -88,8 +88,8 @@
     <xs:all>
         <xs:element name="frequency" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="fsyncInterval" type="xs:integer" default="200" use="optional"></xs:attribute>
-                <xs:attribute name="maxTxnsBeforeFsync" type="xs:integer" default="2147483648" use="optional"></xs:attribute>
+                <xs:attribute name="fsyncinterval" type="xs:integer" default="200" use="optional"></xs:attribute>
+                <xs:attribute name="maxtransactions" type="xs:integer" default="2147483647" use="optional"></xs:attribute>
             </xs:complexType>
         </xs:element>
     </xs:all>

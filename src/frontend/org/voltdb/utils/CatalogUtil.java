@@ -487,12 +487,13 @@ public abstract class CatalogUtil {
             enabled = commandlog.isEnabled();
             Frequency freq = commandlog.getFrequency();
             if (freq != null) {
-                maxTxnsBeforeFsync = freq.getMaxTxnsBeforeFsync().intValue();
-                if (maxTxnsBeforeFsync < 1) {
+                long maxTxnsBeforeFsyncTemp = freq.getMaxtransactions().longValue();
+                if (maxTxnsBeforeFsyncTemp < 1 || maxTxnsBeforeFsyncTemp > Integer.MAX_VALUE) {
                     throw new RuntimeException("Invalid command log max txns before fsync (" + maxTxnsBeforeFsync
-                            + ") specified. Supplied value must be between 1 and 2^31 txns");
+                            + ") specified. Supplied value must be between 1 and (2^31 - 1) txns");
                 }
-                fsyncInterval = freq.getFsyncInterval().intValue();
+                maxTxnsBeforeFsync = (int)maxTxnsBeforeFsyncTemp;
+                fsyncInterval = freq.getFsyncinterval().intValue();
                 if (fsyncInterval < 1 | fsyncInterval > 5000) {
                     throw new RuntimeException("Invalid command log fsync interval(" + fsyncInterval
                             + ") specified. Supplied value must be between 1 and 5000 milliseconds");

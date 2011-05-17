@@ -31,4 +31,6 @@ public interface CommandLog {
 
     public abstract Semaphore logFault(Set<Integer> failedSites, List<Long> faultedTxns);
 
+    public abstract void logHeartbeat(final long txnId);
+
 }

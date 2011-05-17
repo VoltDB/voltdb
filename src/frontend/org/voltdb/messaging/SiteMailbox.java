@@ -74,6 +74,9 @@ public class SiteMailbox implements Mailbox {
             if (!msg.isReadOnly()) {
                 m_log.log(msg);
             }
+        } else if (message instanceof HeartbeatMessage) {
+            HeartbeatMessage msg = (HeartbeatMessage)message;
+            m_log.logHeartbeat(msg.getTxnId());
         }
 
         final Deque<VoltMessage> dq = m_messages.get(message.getSubject());
