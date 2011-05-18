@@ -894,10 +894,10 @@ public class VoltProjectBuilder {
             if (m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
                 CommandLogType.Frequency frequency = factory.createCommandLogTypeFrequency();
                 if (m_commandLogFsyncInterval != null) {
-                    frequency.setFsyncinterval(new BigInteger(Integer.toString(m_commandLogFsyncInterval)));
+                    frequency.setTime(new BigInteger(Integer.toString(m_commandLogFsyncInterval)));
                 }
                 if (m_commandLogMaxTxnsBeforeFsync != null) {
-                    frequency.setMaxtransactions(new BigInteger(Integer.toString(m_commandLogMaxTxnsBeforeFsync)));
+                    frequency.setTransactions(new BigInteger(Integer.toString(m_commandLogMaxTxnsBeforeFsync)));
                 }
                 commandLogType.setFrequency(frequency);
             }
