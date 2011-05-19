@@ -1645,7 +1645,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
          * This will be synchronously logged to the command log
          * so they can be skipped at replay time.
          */
-        ArrayList<Long> faultedTxns = new ArrayList<Long>();
+        Set<Long> faultedTxns = new HashSet<Long>();
 
         // Correct transaction state internals and commit
         // or remove affected transactions from RPQ and txnId hash.

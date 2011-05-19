@@ -428,7 +428,7 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public Semaphore logFault(Set<Integer> failedSites, List<Long> faultedTxns) {
+            public Semaphore logFault(Set<Integer> failedSites, Set<Long> faultedTxns) {
                 return new Semaphore(1);
             }
 
@@ -437,6 +437,14 @@ public class MockVoltDB implements VoltDBInterface
                 // TODO Auto-generated method stub
 
             }
+
+            @Override
+            public void setFaultSequenceNumber(long sequenceNumber,
+                    Set<Integer> failedSites) {
+                // TODO Auto-generated method stub
+
+            }
+
         };
     }
 

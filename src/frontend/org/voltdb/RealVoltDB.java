@@ -334,12 +334,19 @@ public class RealVoltDB implements VoltDBInterface
 
         @Override
         public Semaphore logFault(Set<Integer> failedSites,
-                List<Long> faultedTxns) {
+                Set<Long> faultedTxns) {
             return new Semaphore(1);
         }
 
         @Override
         public void logHeartbeat(final long txnId) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void setFaultSequenceNumber(long sequenceNumber,
+                Set<Integer> failedSites) {
             // TODO Auto-generated method stub
 
         }
