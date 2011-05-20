@@ -860,6 +860,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = m_context.database.getProcedures();
         for (final Procedure proc : catalogProcedures) {
+
+            // Sysprocs used to be in the catalog. Now they aren't. Ignore
+            // sysprocs found in old catalog versions. (PRO-365)
+            if (proc.getTypeName().startsWith("@")) {
+                continue;
+            }
+
             VoltProcedure wrapper = null;
             if (proc.getHasjava()) {
                 final String className = proc.getClassname();
