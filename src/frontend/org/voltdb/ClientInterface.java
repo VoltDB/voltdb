@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.Callable;
 
+import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
@@ -906,8 +907,9 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
-        final Procedure catProc = catalogContext.procedures.get(task.procName);
         AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
+        final Procedure catProc = catalogContext.procedures.get(task.procName);
+        Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
 
         if (user == null) {
             final ClientResponseImpl errorResponse =
@@ -920,21 +922,37 @@ public class ClientInterface implements DumpManager.Dumpable {
             return;
         }
 
-        /*
-         * @TODO This ladder stinks. An SPI when deserialized here should be
-         * able to determine if the task is permitted by calling a method that
-         * provides an AuthUser object.
-         */
-        if (task.procName.startsWith("@")) {
-            if (task.procName.equals("@ping")) {
-                final ClientResponseImpl pingResponse =
-                    new ClientResponseImpl(ClientResponseImpl.SUCCESS,
-                                           new VoltTable[0],
-                                           "pong",
-                                           task.clientHandle);
-                c.writeStream().enqueue(pingResponse);
+        if (catProc == null && sysProc == null) {
+            String errorMessage = "Procedure " + task.procName + " was not found";
+            authLog.l7dlog( Level.WARN, LogKeys.auth_ClientInterface_ProcedureNotFound.name(), new Object[] { task.procName }, null);
+            final ClientResponseImpl errorResponse =
+                new ClientResponseImpl(
+                        ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0], errorMessage, task.clientHandle);
+            c.writeStream().enqueue(errorResponse);
+            return;
+        }
+
+        //
+        // evaluate user permissions
+        //
+
+        if (sysProc == null) {
+            if (!user.hasPermission(catProc)) {
+                authLog.l7dlog(Level.INFO,
+                        LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),
+                        new String[] { user.m_name, task.procName }, null);
+                final ClientResponseImpl errorResponse =
+                    new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0],
+                            "User does not have permission to invoke " + task.procName,
+                            task.clientHandle);
+                c.writeStream().enqueue(errorResponse);
                 return;
-            } else if (task.procName.equals("@AdHoc")) {
+            }
+        }
+        else {
+            if (task.procName.equals("@AdHoc")) {
                 // AdHoc requires unique permission. Then has to plan in a separate thread.
                 if (!user.hasAdhocPermission()) {
                     final ClientResponseImpl errorResponse =
@@ -981,9 +999,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                                                   c);
                 return;
             }
-
-            // All other sysprocs require the sysproc permission
-            if (!user.hasSystemProcPermission()) {
+            else if (!user.hasSystemProcPermission()) {
                 authLog.l7dlog(Level.INFO,
                                LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
                                new String[] { user.m_name, task.procName },
@@ -997,6 +1013,10 @@ public class ClientInterface implements DumpManager.Dumpable {
                 c.writeStream().enqueue(errorResponse);
                 return;
             }
+
+            //
+            // Horrible, hackish, stupid sysproc special casing...
+            //
 
             // Updating a catalog needs to divert to the catalog processing thread
             if (task.procName.equals("@UpdateApplicationCatalog")) {
@@ -1045,7 +1065,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
-            if (task.procName.equals("@Pause") ||
+            else if (task.procName.equals("@Pause") ||
                 task.procName.equals("@Resume"))
             {
                 if (!handler.isAdmin())
@@ -1087,25 +1107,12 @@ public class ClientInterface implements DumpManager.Dumpable {
                 //So that the modified version is reserialized, null out the lazy copy
                 task.unserializedParams = null;
             }
-        } else if (!user.hasPermission(catProc)) {
-            authLog.l7dlog(Level.INFO,
-                           LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),
-                           new String[] { user.m_name, task.procName }, null);
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                       new VoltTable[0],
-                                       "User does not have permission to invoke " + task.procName,
-                                       task.clientHandle);
-            c.writeStream().enqueue(errorResponse);
-            return;
         }
 
+        // dispatch a user procedure
         if (catProc != null) {
             int[] involvedPartitions = null;
-            if (catProc.getEverysite() == true) {
-                involvedPartitions = m_allPartitions;
-            }
-            else if (catProc.getSinglepartition() == false) {
+            if (catProc.getSinglepartition() == false) {
                 involvedPartitions = m_allPartitions;
             }
             else {
@@ -1126,9 +1133,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     c.writeStream().enqueue(errorResponse);
                 }
             }
-
             if (involvedPartitions != null) {
-                // initiate the transaction
                 m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
                                               handler.isAdmin(),
                                               task,
@@ -1140,15 +1145,18 @@ public class ClientInterface implements DumpManager.Dumpable {
                                               now);
             }
         }
-        else {
-            // No such procedure: log and tell the client
-            String errorMessage = "Procedure " + task.procName + " was not found";
-            authLog.l7dlog( Level.WARN, LogKeys.auth_ClientInterface_ProcedureNotFound.name(), new Object[] { task.procName }, null);
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(
-                        ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0], errorMessage, task.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+        // dispatch a sysproc
+        else if (sysProc != null) {
+            int[] involvedPartitions = m_allPartitions;
+            m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                    handler.isAdmin(),
+                    task,
+                    sysProc.getReadonly(),
+                    sysProc.getSinglepartition(),
+                    sysProc.getEverysite(),
+                    involvedPartitions, involvedPartitions.length,
+                    c, buf.capacity(),
+                    now);
         }
     }
 

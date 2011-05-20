@@ -142,6 +142,9 @@ public class AuthSystem {
          * @return true if the user has permission and false otherwise
          */
         public boolean hasPermission(Procedure proc) {
+            if (proc == null) {
+                return false;
+            }
             return m_authorizedProcedures.contains(proc);
         }
 

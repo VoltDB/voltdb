@@ -22,13 +22,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.ByteBuffer;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -36,6 +31,7 @@ import java.util.ArrayList;
 
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
+import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -707,7 +703,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_transactionQueue =
             (transactionQueue != null) ? transactionQueue : initializeTransactionQueue(siteId);
 
-        loadProceduresFromCatalog(voltdb.getBackendTargetType());
+        loadProcedures(voltdb.getBackendTargetType());
+
         m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
             @Override
             public void run() {
@@ -842,7 +839,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
         m_context = context;
-        loadProceduresFromCatalog(VoltDB.getEEBackendType());
+        loadProcedures(VoltDB.getEEBackendType());
+
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         ee.quiesce(lastCommittedTxnId);
@@ -851,9 +849,14 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         return true;
     }
 
-    void loadProceduresFromCatalog(BackendTarget backendTarget) {
-        m_registeredSysProcPlanFragments.clear();
+    void loadProcedures(BackendTarget backendTarget) {
         procs.clear();
+        m_registeredSysProcPlanFragments.clear();
+        loadProceduresFromCatalog(backendTarget);
+        loadSystemProcedures(backendTarget);
+    }
+
+    private void loadProceduresFromCatalog(BackendTarget backendTarget) {
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = m_context.database.getProcedures();
         for (final Procedure proc : catalogProcedures) {
@@ -865,6 +868,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     procClass = m_context.classForProcedure(className);
                 }
                 catch (final ClassNotFoundException e) {
+
                     hostLog.l7dlog(
                             Level.WARN,
                             LogKeys.host_ExecutionSite_GenericException.name(),
@@ -893,6 +897,50 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             procs.put(proc.getTypeName(), wrapper);
         }
     }
+
+    private void loadSystemProcedures(BackendTarget backendTarget) {
+        Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
+        for (Entry<String, Config> entry : entrySet) {
+            Config sysProc = entry.getValue();
+            Procedure proc = sysProc.asCatalogProcedure();
+
+            VoltProcedure wrapper = null;
+            final String className = sysProc.getClassname();
+            Class<?> procClass = null;
+            try {
+                procClass = m_context.classForProcedure(className);
+            }
+            catch (final ClassNotFoundException e) {
+                // TODO: check community/pro condition here.
+                if (sysProc.commercial) {
+                    continue;
+                }
+                hostLog.l7dlog(
+                        Level.WARN,
+                        LogKeys.host_ExecutionSite_GenericException.name(),
+                        new Object[] { getSiteId(), siteIndex },
+                        e);
+                VoltDB.crashVoltDB();
+            }
+
+            try {
+                wrapper = (VoltProcedure) procClass.newInstance();
+            }
+            catch (final InstantiationException e) {
+                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                        new Object[] { getSiteId(), siteIndex }, e);
+            }
+            catch (final IllegalAccessException e) {
+                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                        new Object[] { getSiteId(), siteIndex }, e);
+            }
+
+            wrapper.init(m_context.cluster.getPartitions().size(),
+                         this, proc, backendTarget, hsql, m_context.cluster);
+            procs.put(entry.getKey(), wrapper);
+        }
+    }
+
 
     /**
      * Primary run method that is invoked a single time when the thread is started.
