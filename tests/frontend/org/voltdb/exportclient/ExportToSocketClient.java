@@ -75,7 +75,7 @@ public class ExportToSocketClient extends ExportClientBase
     }
 
     @Override
-    protected void testHookStartWork() {
+    protected void startWorkHook() {
         //System.out.println("Starting a block");
         try {
             m_debugOut.write(1);
@@ -87,7 +87,7 @@ public class ExportToSocketClient extends ExportClientBase
     }
 
     @Override
-    protected void testHookEndWork() {
+    protected void endWorkHook() {
         //System.out.println("Finishing a block");
         try {
             m_debugOut.write(0);
@@ -99,7 +99,7 @@ public class ExportToSocketClient extends ExportClientBase
     }
 
     @Override
-    protected void testHookShutdownWork() {
+    protected void extraShutdownHookWork() {
         System.out.println("Shutdown test hook");
         try {
             if (m_socket != null)

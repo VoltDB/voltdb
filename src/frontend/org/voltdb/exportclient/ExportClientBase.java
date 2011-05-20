@@ -76,14 +76,10 @@ public abstract class ExportClientBase {
             // the ExportClientBase.work() holds this lock during
             // each iteration of its work
             m_atomicWorkLock.lock();
-            try {
-                log.info("Work lock aquired. About to shutdown.");
+            log.info("Work lock aquired. About to shutdown.");
 
-                // for tests only (noop otherwise)
-                testHookShutdownWork();
-            } finally {
-                m_atomicWorkLock.unlock();
-            }
+            // for tests only (noop otherwise)
+            extraShutdownHookWork();
         }
     }
 
@@ -381,10 +377,11 @@ public abstract class ExportClientBase {
         return true;
     }
 
-    // HOOKS FOR TEST THAT ARE USUALLY NOOPS
-    protected void testHookStartWork() {}
-    protected void testHookEndWork() {}
-    protected void testHookShutdownWork() {}
+    // HOOKS FOR TEST/SUBCLASSES THAT ARE USUALLY NOOPS
+    protected void preWorkHook() {}
+    protected void startWorkHook() {}
+    protected void endWorkHook() {}
+    protected void extraShutdownHookWork() {}
 
     /**
      * Perform one iteration of Export Client work.
@@ -395,13 +392,15 @@ public abstract class ExportClientBase {
     public int work() throws ExportClientException {
         int offeredMsgs = 0;
 
+        preWorkHook();
+
         // hold this lock while doing one unit of work
         // the shutdown hook won't let the system die until
         // the lock is released (except via kill -9)
         m_atomicWorkLock.lock();
         try {
             // noop if not running test code
-            testHookStartWork();
+            startWorkHook();
 
             assert(m_connected.get());
 
@@ -430,7 +429,7 @@ public abstract class ExportClientBase {
             }
 
             // noop if not running test code
-            testHookEndWork();
+            endWorkHook();
         } finally {
             m_atomicWorkLock.unlock();
         }

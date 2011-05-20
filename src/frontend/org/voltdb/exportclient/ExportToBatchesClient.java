@@ -88,6 +88,16 @@ public class ExportToBatchesClient extends ExportClientBase {
     // record the original command line args for servers
     protected final List<String> m_commandLineServerArgs = new ArrayList<String>();
 
+    protected final static SimpleDateFormat m_dateformat = new SimpleDateFormat("yyyyMMddHHmmss");
+    static private ExportBatch m_current = null;
+
+    /**
+     *
+     */
+    public void notifyBatchIsDone(File batch) {
+
+    }
+
     /**
      * Represents all of the export data (and accompanying schema)
      * for the export client for the specified rolling period.
@@ -96,10 +106,7 @@ public class ExportToBatchesClient extends ExportClientBase {
      * export data.
      *
      */
-    static class ExportBatch {
-        protected final static SimpleDateFormat m_dateformat = new SimpleDateFormat("yyyyMMddHHmmss");
-        static private ExportBatch m_current = null;
-
+    class ExportBatch {
         protected final String pathToDirectory;
         protected final String nonce;
         protected final Date start;
@@ -109,11 +116,6 @@ public class ExportToBatchesClient extends ExportClientBase {
 
         HashMap<String, BufferedWriter> m_writers = new HashMap<String, BufferedWriter>();
         boolean m_hasClosed = false;
-
-        static void init(String pathToDirectory, String nonce) {
-            assert(m_current == null);
-            m_current = new ExportBatch(pathToDirectory, nonce, new Date());
-        }
 
         ExportBatch(String pathToDirectory, String nonce, Date batchStart) {
             start = batchStart;
@@ -128,24 +130,6 @@ public class ExportToBatchesClient extends ExportClientBase {
 
         String getDirPath(String prefix) {
             return pathToDirectory + File.separator + prefix + nonce + "-" + m_dateformat.format(start);
-        }
-
-        synchronized static ExportBatch getCurrentBatchAndAddref(ExportToBatchDecoder decoder) {
-            m_current.m_decoders.add(decoder);
-            return m_current;
-        }
-
-        /**
-         * Deprecate the current batch and create a new one. The old one will still
-         * be active until all writers have finished writing their current blocks
-         * to it.
-         */
-        synchronized static void roll(Date rollTime) {
-            m_logger.trace("Rolling batch.");
-            m_current.end = rollTime;
-            if (m_current.m_decoders.size() == 0)
-                m_current.closeAllWriters(true);
-            m_current = new ExportBatch(m_current.pathToDirectory, m_current.nonce, rollTime);
         }
 
         /**
@@ -211,6 +195,7 @@ public class ExportToBatchesClient extends ExportClientBase {
             if (oldDir.listFiles().length > 0) {
                 File newDir = new File(newPath);
                 oldDir.renameTo(newDir);
+                notifyBatchIsDone(newDir);
             }
             else {
                 oldDir.delete();
@@ -372,7 +357,7 @@ public class ExportToBatchesClient extends ExportClientBase {
         @Override
         public void onBlockStart() {
             // get the current batch
-            m_batch = ExportBatch.getCurrentBatchAndAddref(this);
+            m_batch = getCurrentBatchAndAddref(this);
             if (m_batch == null) {
                 m_logger.error("NULL batch object found.");
                 throw new RuntimeException("NULL batch object found.");
@@ -468,13 +453,14 @@ public class ExportToBatchesClient extends ExportClientBase {
         m_firstfield = firstfield;
 
         // init the batch system with the first batch
-        ExportBatch.init(outdir.getPath(), m_nonce);
+        assert(m_current == null);
+        m_current = new ExportBatch(outdir.getPath(), m_nonce, new Date());
 
         // schedule rotations every m_period minutes
         TimerTask rotateTask = new TimerTask() {
             @Override
             public void run() {
-                ExportBatch.roll(new Date());
+                roll(new Date());
             }
         };
         m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
@@ -536,6 +522,24 @@ public class ExportToBatchesClient extends ExportClientBase {
         System.out.println("  --servers server1:port1[,server2:port2,...,serverN:portN]");
 
         System.exit(code);
+    }
+
+    synchronized ExportBatch getCurrentBatchAndAddref(ExportToBatchDecoder decoder) {
+        m_current.m_decoders.add(decoder);
+        return m_current;
+    }
+
+    /**
+     * Deprecate the current batch and create a new one. The old one will still
+     * be active until all writers have finished writing their current blocks
+     * to it.
+     */
+    synchronized void roll(Date rollTime) {
+        m_logger.trace("Rolling batch.");
+        m_current.end = rollTime;
+        if (m_current.m_decoders.size() == 0)
+            m_current.closeAllWriters(true);
+        m_current = new ExportBatch(m_current.pathToDirectory, m_current.nonce, rollTime);
     }
 
     /**
