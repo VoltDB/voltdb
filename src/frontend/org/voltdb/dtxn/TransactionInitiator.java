@@ -133,8 +133,8 @@ public abstract class TransactionInitiator {
      *
      * @param messageSize
      */
-    abstract void increaseBackpressure(int messageSize);
-    abstract void reduceBackpressure(int messageSize);
+    protected abstract void increaseBackpressure(int messageSize);
+    protected abstract void reduceBackpressure(int messageSize);
 
     /**
      * Called to notify an initiator that it is safe to send work

@@ -83,7 +83,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             m_task = (InitiateTaskMessage) notice;
             m_durabilityFlag = m_task.getDurabilityFlagIfItExists();
             SiteTracker tracker = site.getSiteTracker();
-            m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_siteId);
+            // Add this check for tests which use a mock execution site
+            if (tracker != null) {
+                m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_siteId);
+            }
             m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
                                               null, m_siteId,
                                               null, false));

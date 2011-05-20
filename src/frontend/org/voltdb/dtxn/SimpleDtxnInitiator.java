@@ -364,7 +364,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     }
 
     @Override
-    void increaseBackpressure(int messageSize)
+    protected void increaseBackpressure(int messageSize)
     {
         m_pendingTxnBytes += messageSize;
         m_pendingTxnCount++;
@@ -378,7 +378,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     }
 
     @Override
-    void reduceBackpressure(int messageSize)
+    protected void reduceBackpressure(int messageSize)
     {
         m_pendingTxnBytes -= messageSize;
         m_pendingTxnCount--;

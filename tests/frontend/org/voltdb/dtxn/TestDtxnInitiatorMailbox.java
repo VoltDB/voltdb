@@ -244,12 +244,12 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        void increaseBackpressure(int messageSize)
+        protected void increaseBackpressure(int messageSize)
         {
         }
 
         @Override
-        void reduceBackpressure(int messageSize)
+        protected void reduceBackpressure(int messageSize)
         {
             m_reduceCount++;
             m_reduceSize += messageSize;
