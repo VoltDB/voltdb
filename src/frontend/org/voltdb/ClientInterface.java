@@ -1363,17 +1363,12 @@ public class ClientInterface implements DumpManager.Dumpable {
 
     private void initiateSnapshotDaemonWork(final Pair<String, Object[]> invocation) {
         if (invocation != null) {
-            // get procedure from the catalog
-           final Procedure catProc = m_catalogContext.get().procedures.get(invocation.getFirst());
-           if (catProc == null) {
+           final Config sysProc = SystemProcedureCatalog.listing.get(invocation.getFirst());
+           if (sysProc == null) {
                throw new RuntimeException("SnapshotDaemon attempted to invoke " + invocation.getFirst() +
                        " which is not a known procedure");
            }
-
-           if (!catProc.getSystemproc()) {
-               throw new RuntimeException("SnapshotDaemon attempted to invoke " + invocation.getFirst() +
-                       " which is not a system procedure");
-           }
+           Procedure catProc = sysProc.asCatalogProcedure();
            StoredProcedureInvocation spi = new StoredProcedureInvocation();
            spi.procName = invocation.getFirst();
            spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
