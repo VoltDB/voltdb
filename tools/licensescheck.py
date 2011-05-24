@@ -23,7 +23,8 @@ prunelist = ('hsqldb19b3',
              'deploymentfile',
              'xml',
              'helloworld',
-             'CSVReader.java')
+             'CSVReader.java',
+             'jaxb')
 
 def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
     if f.endswith('.py'):
