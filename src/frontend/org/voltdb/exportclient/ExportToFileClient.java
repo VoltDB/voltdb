@@ -34,9 +34,8 @@ import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
-import org.voltdb.utils.DelimitedDataWriterUtil.DelimitedDataWriter;
-import org.voltdb.utils.DelimitedDataWriterUtil.TSVWriter;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 /**
  * Uses the Export feature of VoltDB to write exported tables to files.
@@ -48,11 +47,10 @@ import org.voltdb.utils.DelimitedDataWriterUtil.TSVWriter;
  * added to each new rolling file}
  *
  */
-
 public class ExportToFileClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
-    protected final DelimitedDataWriter m_escaper;
+    protected final char m_delimiter;
     protected final String m_nonce;
     protected final File m_outDir;
     protected final HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
@@ -65,55 +63,53 @@ public class ExportToFileClient extends ExportClientBase {
     // This class outputs exported rows converted to CSV or TSV values
     // for the table named in the constructor's AdvertisedDataSource
     class ExportToFileDecoder extends ExportDecoderBase {
-        protected final DelimitedDataWriter m_escaper;
         protected String m_currentFilename;
         protected String m_extension;
         protected String m_prefix;
-        protected boolean m_discard;
         protected SimpleDateFormat m_dateformat;
         protected int m_period;
         protected Date m_lastWriterCreation;
-        protected BufferedWriter m_Writer;
+        protected CSVWriter m_writer;
         protected final SimpleDateFormat m_sdf;
         protected final int m_firstfield;
+        protected final char m_delimiter;
         private final long m_generation;
         private final String m_tableName;
         private final HashSet<AdvertisedDataSource> m_sources = new HashSet<AdvertisedDataSource>();
 
         private void EnsureFileStream() {
 
-            if (m_discard) {
+            Calendar calendar = Calendar.getInstance();
+            Date now = calendar.getTime();
+            calendar.add(Calendar.MINUTE, -m_period);
+            Date periodCheck = calendar.getTime();
+            if ((m_lastWriterCreation != null) && m_lastWriterCreation.after(periodCheck)) {
+                return;
+            }
+            String filename = m_prefix + m_dateformat.format(now) + m_extension;
+            if (filename == m_currentFilename) {
                 return;
             } else {
-                Calendar calendar = Calendar.getInstance();
-                Date now = calendar.getTime();
-                calendar.add(Calendar.MINUTE, -m_period);
-                Date periodCheck = calendar.getTime();
-                if ((m_lastWriterCreation != null) && m_lastWriterCreation.after(periodCheck)) {
-                    return;
-                }
-                String filename = m_prefix + m_dateformat.format(now) + m_extension;
-                if (filename == m_currentFilename) {
-                    return;
-                } else {
-                    if (m_Writer != null) {
-                        try {
-                            m_Writer.flush();
-                            m_Writer.close();
-                        } catch (Exception e) {
-                            m_logger.error(e.getMessage());
-                            throw new RuntimeException();
-                        }
+                if (m_writer != null) {
+                    try {
+                        m_writer.flush();
+                        m_writer.close();
+                    } catch (Exception e) {
+                        m_logger.error(e.getMessage());
+                        throw new RuntimeException();
                     }
-                    m_currentFilename = filename;
-                    m_lastWriterCreation = now;
                 }
+                m_currentFilename = filename;
+                m_lastWriterCreation = now;
             }
 
             m_logger.info("Opening filename " + m_currentFilename);
             try {
-                m_Writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(m_currentFilename, true), "UTF-8"),
-                        1048576);
+                m_writer = new CSVWriter(
+                        new BufferedWriter(
+                                new OutputStreamWriter(new FileOutputStream(m_currentFilename, true), "UTF-8"),
+                                1048576),
+                        m_delimiter);
             } catch (Exception e) {
                 m_logger.error(e.getMessage());
                 m_logger.error("Error: Failed to create output file: " + m_currentFilename);
@@ -122,11 +118,11 @@ public class ExportToFileClient extends ExportClientBase {
         }
 
         public ExportToFileDecoder(AdvertisedDataSource source, String tableName, String nonce, File outdir,
-                DelimitedDataWriter escaper, int period, SimpleDateFormat dateformat, int firstfield, long generation) {
+                char delimiter, int period, SimpleDateFormat dateformat, int firstfield, long generation) {
             super(source);
-            m_escaper = escaper;
+            m_delimiter = delimiter;
             m_currentFilename = "";
-            m_Writer = null;
+            m_writer = null;
             m_lastWriterCreation = null;
             m_generation = generation;
             m_tableName = tableName;
@@ -137,24 +133,15 @@ public class ExportToFileClient extends ExportClientBase {
             m_firstfield = firstfield;
 
             // Create the output file for this table
-            if (outdir != null) {
-                m_period = period;
-                m_dateformat = dateformat;
-                m_prefix = outdir.getPath() +
-                            File.separator + m_generation + "-" + nonce + "-" + source.tableName + ".";
-                m_extension = "." + escaper.getExtension();
-                m_discard = false;
-            } else {
-                m_logger.error("--discard provided, data will be dumped to /dev/null");
-                m_discard = true;
-            }
+            m_period = period;
+            m_dateformat = dateformat;
+            m_prefix = outdir.getPath() +
+                        File.separator + m_generation + "-" + nonce + "-" + source.tableName + ".";
+            m_extension = m_delimiter == ',' ? ".csv" : ".tsv";
         }
 
         @Override
         public boolean processRow(int rowSize, byte[] rowData) {
-            // Return immediately if we're in discard mode
-            if (m_discard) return true;
-
             // Grab the data row
             Object[] row = null;
             try {
@@ -165,25 +152,24 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             try {
+                String[] fields = new String[m_tableSchema.size()];
+
                 for (int i = m_firstfield; i < m_tableSchema.size(); i++) {
                     if (row[i] == null) {
-                        m_escaper.writeRawField(m_Writer, "NULL", i > m_firstfield);
+                        fields[i] = "NULL";
                     } else if (m_tableSchema.get(i) == VoltType.STRING) {
-                        m_escaper.writeEscapedField(m_Writer, (String) row[i], i > m_firstfield);
+                        fields[i] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType) row[i];
-                        m_escaper.writeRawField(m_Writer, m_sdf.format(timestamp.asApproximateJavaDate()),
-                                i > m_firstfield);
-                        m_escaper.writeRawField(m_Writer, String.valueOf(timestamp.getUSec()), false);
+                        fields[i] = m_sdf.format(timestamp.asApproximateJavaDate());
+                        fields[i] += String.valueOf(timestamp.getUSec());
                     } else {
-                        m_escaper.writeRawField(m_Writer, row[i].toString(), i > m_firstfield);
+                        fields[i] = row[i].toString();
                     }
                 }
-                m_Writer.write("\n");
-            } catch (IOException e) {
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            } catch (Exception x) {
+                m_writer.writeNext(fields);
+            }
+            catch (Exception x) {
                 x.printStackTrace();
                 return false;
             }
@@ -199,9 +185,9 @@ public class ExportToFileClient extends ExportClientBase {
 
         @Override
         public void onBlockCompletion() {
-            if (m_Writer != null) {
+            if (m_writer != null) {
                 try {
-                    m_Writer.flush();
+                    m_writer.flush();
                 } catch (Exception e) {
                     m_logger.error(e.getMessage());
                     throw new RuntimeException();
@@ -211,10 +197,10 @@ public class ExportToFileClient extends ExportClientBase {
 
         @Override
         protected void finalize() throws Throwable {
-            if (m_Writer != null) {
+            if (m_writer != null) {
                 try {
-                    m_Writer.flush();
-                    m_Writer.close();
+                    m_writer.flush();
+                    m_writer.close();
                 } catch (Exception e) {
                     String msg = e.getMessage();
                     // ignore the boring "stream closed" error
@@ -229,10 +215,10 @@ public class ExportToFileClient extends ExportClientBase {
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             m_sources.remove(source);
             if (m_sources.isEmpty()) {
-                if (m_Writer != null) {
+                if (m_writer != null) {
                     try {
-                        m_Writer.flush();
-                        m_Writer.close();
+                        m_writer.flush();
+                        m_writer.close();
                     } catch (Exception e) {
                         m_logger.error(e.getMessage());
                         throw new RuntimeException();
@@ -250,7 +236,7 @@ public class ExportToFileClient extends ExportClientBase {
 
     }
 
-    public ExportToFileClient(DelimitedDataWriter escaper,
+    public ExportToFileClient(char delimiter,
                               String nonce,
                               File outdir,
                               int period,
@@ -258,7 +244,7 @@ public class ExportToFileClient extends ExportClientBase {
                               int firstfield,
                               boolean useAdminPorts) {
         super(useAdminPorts);
-        m_escaper = escaper;
+        m_delimiter = delimiter;
         m_nonce = nonce;
         m_outDir = outdir;
         m_tableDecoders = new HashMap<Long, HashMap<String, ExportToFileDecoder>>();
@@ -280,7 +266,7 @@ public class ExportToFileClient extends ExportClientBase {
         }
         ExportToFileDecoder decoder = decoders.get(table_name);
         if (decoder == null) {
-            decoder = new ExportToFileDecoder(source, table_name, m_nonce, m_outDir, m_escaper,
+            decoder = new ExportToFileDecoder(source, table_name, m_nonce, m_outDir, m_delimiter,
                     m_period, m_dateformat, m_firstfield, source.m_generation);
             decoders.put(table_name, decoder);
         }
@@ -307,42 +293,28 @@ public class ExportToFileClient extends ExportClientBase {
             m_logger.info("Connecting anonymously");
         }
 
-        if (m_outDir == null) {
-            m_logger.info("Discarding all export data.");
+        m_logger.info(String.format("Writing to disk in %s format",
+                (m_delimiter == ',') ? "CSV" : "TSV"));
+        m_logger.info(String.format("Prepending export data files with nonce: %s",
+                m_nonce));
+        m_logger.info(String.format("Using date format for file names: %s",
+                m_dateFormatOriginalString));
+        m_logger.info(String.format("Rotate export files every %d minute%s",
+                m_period, m_period == 1 ? "" : "s"));
+        m_logger.info(String.format("Writing export files to dir: %s",
+                m_outDir));
+        if (m_firstfield == 0) {
+            m_logger.info("Including VoltDB export metadata");
         }
         else {
-            m_logger.info(String.format("Writing to disk in %s format",
-                    (m_escaper instanceof CSVWriter) ? "CSV" : "TSV"));
-            m_logger.info(String.format("Prepending export data files with nonce: %s",
-                    m_nonce));
-            m_logger.info(String.format("Using date format for file names: %s",
-                    m_dateFormatOriginalString));
-            m_logger.info(String.format("Rotate export files every %d minute%s",
-                    m_period, m_period == 1 ? "" : "s"));
-            m_logger.info(String.format("Writing export files to dir: %s",
-                    m_outDir));
-            if (m_firstfield == 0) {
-                m_logger.info("Including VoltDB export metadata");
-            }
-            else {
-                m_logger.info("Not including VoltDB export metadata");
-            }
+            m_logger.info("Not including VoltDB export metadata");
         }
     }
 
     protected static void printHelpAndQuit(int code) {
-        System.out
-                .println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
+        System.out.println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
                         + "--help");
-        System.out
-                .println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
-                        + "--servers server1[,server2,...,serverN] "
-                        + "--connect (admin|client) "
-                        + "--discard "
-                        + "[--user export_username] "
-                        + "[--password export_password]");
-        System.out
-                .println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
+        System.out.println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
                         + "--servers server1[,server2,...,serverN] "
                         + "--connect (admin|client) "
                         + "--type (csv|tsv) "
@@ -364,15 +336,12 @@ public class ExportToFileClient extends ExportClientBase {
         String user = null;
         String password = null;
         String nonce = null;
-        DelimitedDataWriter escaper = null;
+        char delimiter = '\0';
         File outdir = null;
-        boolean discard = false;
         int firstfield = 0;
         int period = 60;
         char connect = ' '; // either ' ', 'c' or 'a'
         String dateformatString = "yyyyMMddHHmmss";
-        SimpleDateFormat dateformat = new SimpleDateFormat(dateformatString);
-
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -380,7 +349,9 @@ public class ExportToFileClient extends ExportClientBase {
                 printHelpAndQuit(0);
             }
             else if (arg.equals("--discard")) {
-                discard = true;
+                System.err.println("Option \"--discard\" is no longer supported.");
+                System.err.println("Try org.voltdb.exportclient.DiscardingExportClient.");
+                printHelpAndQuit(-1);
             }
             else if (arg.equals("--skipinternals")) {
                 firstfield = 6;
@@ -416,9 +387,9 @@ public class ExportToFileClient extends ExportClientBase {
                 }
                 String type = args[ii + 1];
                 if (type.equalsIgnoreCase("csv")) {
-                    escaper = new CSVWriter();
+                    delimiter = ',';
                 } else if (type.equalsIgnoreCase("tsv")) {
-                    escaper = new TSVWriter();
+                    delimiter = '\t';
                 } else {
                     System.err.println("Error: --type must be one of CSV or TSV");
                     printHelpAndQuit(-1);
@@ -514,27 +485,20 @@ public class ExportToFileClient extends ExportClientBase {
         if (password == null) {
             password = "";
         }
-        if (!discard) {
-            if (nonce == null) {
-                System.err
-                        .println("ExportToFile: must provide a filename nonce");
-                printHelpAndQuit(-1);
-            }
-            if (outdir == null) {
-                outdir = new File(".");
-            }
-        } else {
-            outdir = null;
-            nonce = null;
-            escaper = new CSVWriter();
+        if (nonce == null) {
+            System.err.println("ExportToFile: must provide a filename nonce");
+            printHelpAndQuit(-1);
         }
-        if (escaper == null) {
+        if (outdir == null) {
+            outdir = new File(".");
+        }
+        if (delimiter == '\0') {
             System.err.println("ExportToFile: must provide an output type");
             printHelpAndQuit(-1);
         }
 
         // create the export to file client
-        ExportToFileClient client = new ExportToFileClient(escaper,
+        ExportToFileClient client = new ExportToFileClient(delimiter,
                                                            nonce,
                                                            outdir,
                                                            period,

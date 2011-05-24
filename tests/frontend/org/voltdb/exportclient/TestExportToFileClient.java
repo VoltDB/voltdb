@@ -29,14 +29,13 @@ import junit.framework.TestCase;
 
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportToFileClient.ExportToFileDecoder;
-import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
 
 public class TestExportToFileClient extends TestCase {
 
     public void testEng1088() throws Exception {
         ExportToFileClient exportClient =
             new ExportToFileClient(
-                new CSVWriter(),
+                ',',
                 "testnonce",
                 new File("/tmp/" + System.getProperty("user.name")),
                 60,

@@ -29,7 +29,6 @@ import java.net.InetSocketAddress;
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB;
-import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
 
 public class ExportClientSuddenDeathTest extends TestCase {
 
@@ -41,7 +40,7 @@ public class ExportClientSuddenDeathTest extends TestCase {
             }
         };
         t.start();
-        ExportToFileClient etfc = new ExportToFileClient(new CSVWriter(),
+        ExportToFileClient etfc = new ExportToFileClient(',',
                                                          "N",
                                                          new File("."),
                                                          1,

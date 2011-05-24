@@ -16,10 +16,10 @@
  */
 package org.voltdb;
 
-import org.voltdb.messaging.InitiateTaskMessage;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
+
+import org.voltdb.messaging.InitiateTaskMessage;
 
 public interface CommandLog {
 

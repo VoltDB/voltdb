@@ -29,7 +29,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
-import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;

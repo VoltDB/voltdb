@@ -31,9 +31,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
-import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
-import org.voltdb.utils.DelimitedDataWriterUtil.DelimitedDataWriter;
-import org.voltdb.utils.DelimitedDataWriterUtil.TSVWriter;
 
 public class SnapshotConverter {
 
@@ -46,7 +43,7 @@ public class SnapshotConverter {
         ArrayList<String> tables = new ArrayList<String>();
         File outdir = null;
         String type = null;
-        DelimitedDataWriter escaper = null;
+        char delimiter = '\0';
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
             if (arg.equals("--help")) {
@@ -117,9 +114,9 @@ public class SnapshotConverter {
                 }
                 type = args[ii + 1];
                 if (type.equalsIgnoreCase("csv")) {
-                    escaper = new CSVWriter();
+                    delimiter = ',';
                 } else if (type.equalsIgnoreCase("tsv")) {
-                    escaper = new TSVWriter();
+                    delimiter = '\t';
                 } else {
                     System.err.println("Error: --type must be one of CSV or TSV");
                     printHelpAndQuit(-1);
@@ -280,7 +277,7 @@ public class SnapshotConverter {
                     }
                 }
                 try {
-                    CSVTableSaveFile.convertTableSaveFile(escaper, partitions, outfile, infile);
+                    CSVTableSaveFile.convertTableSaveFile(delimiter, partitions, outfile, infile);
                 } catch (Exception e) {
                     System.err.println(e.getMessage());
                     System.err.println("Error: Failed to convert " + infile.getPath() + " to " + outfile.getPath());

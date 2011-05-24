@@ -23,9 +23,9 @@
 
 package org.voltdb.export;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.io.File;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -34,9 +34,8 @@ import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
-import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.export.processors.RawProcessor.ExportStateBlock;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
+import org.voltdb.export.processors.RawProcessor.ExportStateBlock;
 
 public class TestExportDataSource extends TestCase {
 

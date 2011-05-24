@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.io.SyncFailedException;
 import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
@@ -35,9 +36,8 @@ import org.voltdb.VoltType;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
-import org.voltdb.utils.DelimitedDataWriterUtil.DelimitedDataWriter;
-import org.voltdb.utils.DelimitedDataWriterUtil.TSVWriter;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 public class CSVTableSaveFile {
     private final AtomicInteger m_availableBytes = new AtomicInteger(0);
@@ -50,12 +50,12 @@ public class CSVTableSaveFile {
     private final AtomicInteger m_activeConverters = new AtomicInteger(Runtime
             .getRuntime().availableProcessors());
     private final TableSaveFile m_saveFile;
-    private final DelimitedDataWriter m_escaper;
+    private final char m_delimiter;
     private final SimpleDateFormat m_sdf;
 
-    public CSVTableSaveFile(File saveFile, DelimitedDataWriter escaper,
+    public CSVTableSaveFile(File saveFile, char delimiter,
             Integer partitions[]) throws IOException {
-        m_escaper = escaper;
+        m_delimiter = delimiter;
         m_sdf = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss:SSS:");
         final FileInputStream fis = new FileInputStream(saveFile);
         m_saveFile = new TableSaveFile(fis.getChannel(), 10, partitions);
@@ -119,34 +119,42 @@ public class CSVTableSaveFile {
                 try {
                     final int size = c.b.remaining();
                     final VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, true);
-                    StringBuilder sb = new StringBuilder(size * 2);
+                    StringWriter sw = new StringWriter(size * 2);
+                    CSVWriter csv;
+                    if (m_delimiter == '\t')
+                        csv = CSVWriter.getStrictTSVWriter(sw);
+                    else
+                        csv = new CSVWriter(sw, m_delimiter);
+                    String[] fields = new String[vt.getColumnCount()];
+
                     while (vt.advanceRow()) {
                         for (int ii = 0; ii < vt.getColumnCount(); ii++) {
                             final VoltType type = vt.getColumnType(ii);
                             if (vt.wasNull()) {
-                                m_escaper.writeRawField(sb, "NULL", ii > 0);
+                                fields[ii] = "NULL";
                             } else if (type == VoltType.BIGINT
                                     || type == VoltType.INTEGER
                                     || type == VoltType.SMALLINT
                                     || type == VoltType.TINYINT) {
-                                m_escaper.writeRawField(sb, String.valueOf(vt.getLong(ii)), ii > 0);
+                                fields[ii] = String.valueOf(vt.getLong(ii));
                             } else if (type == VoltType.FLOAT) {
-                                m_escaper.writeRawField(sb, String.valueOf(vt.getDouble(ii)), ii > 0);
+                                fields[ii] = String.valueOf(vt.getDouble(ii));
                             } else if (type == VoltType.DECIMAL) {
-                                m_escaper.writeRawField(sb, vt.getDecimalAsBigDecimal(ii).toString(), ii > 0);
+                                fields[ii] = vt.getDecimalAsBigDecimal(ii).toString();
                             } else if (type == VoltType.STRING) {
-                                m_escaper.writeEscapedField(sb, vt.getString(ii), ii > 0);
+                                fields[ii] = vt.getString(ii);
                             } else if (type == VoltType.TIMESTAMP) {
                                 final TimestampType timestamp = vt.getTimestampAsTimestamp(ii);
-                                m_escaper.writeRawField(sb, m_sdf.format(timestamp.asApproximateJavaDate()), ii > 0);
-                                m_escaper.writeRawField(sb, String.valueOf(timestamp.getUSec()), false);
+                                fields[ii] = m_sdf.format(timestamp.asApproximateJavaDate());
+                                fields[ii] += String.valueOf(timestamp.getUSec());
                             }
                         }
-                        sb.append('\n');
+                        csv.writeNext(fields);
                     }
+                    csv.flush();
                     byte bytes[] = null;
                     try {
-                        bytes = sb.toString().getBytes("UTF-8");
+                        bytes = sw.toString().getBytes("UTF-8");
                     } catch (UnsupportedEncodingException e) {
                         e.printStackTrace();
                         return;
@@ -185,7 +193,7 @@ public class CSVTableSaveFile {
             System.exit(-1);
         }
 
-        DelimitedDataWriter escaper = null;
+        char delimiter = '\0';
         Integer partitions[] = null;
         if (args[0].equals("--partitions")) {
             if (args.length < 2) {
@@ -201,9 +209,9 @@ public class CSVTableSaveFile {
         }
 
         if (args[0].endsWith(".tsv")) {
-            escaper = new TSVWriter();
+            delimiter = '\t';
         } else if (args[0].endsWith(".csv")) {
-            escaper = new CSVWriter();
+            delimiter = ',';
         } else {
             System.err
                     .println("Output filename must end in .csv or .tsv to indicate format");
@@ -230,17 +238,17 @@ public class CSVTableSaveFile {
             System.exit(-1);
         }
 
-        convertTableSaveFile(escaper, partitions, outfile, infile);
+        convertTableSaveFile(delimiter, partitions, outfile, infile);
     }
 
-    public static void convertTableSaveFile(DelimitedDataWriter escaper,
+    public static void convertTableSaveFile(char delimiter,
             Integer[] partitions, final File outfile, final File infile)
             throws FileNotFoundException, IOException, InterruptedException,
             SyncFailedException {
         final FileOutputStream fos = new FileOutputStream(outfile, true);
         try {
             final CSVTableSaveFile converter = new CSVTableSaveFile(infile,
-                    escaper, partitions);
+                    delimiter, partitions);
             try {
                 while (true) {
                     final byte bytes[] = converter.read();

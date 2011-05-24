@@ -39,8 +39,8 @@ import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
-import org.voltdb.utils.DelimitedDataWriterUtil.DelimitedDataWriter;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 /**
  * Uses the Export feature of VoltDB to write exported tables to files in format for easy consumption by
@@ -70,7 +70,6 @@ public class ExportToBatchesClient extends ExportClientBase {
     protected final SimpleDateFormat m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
     // Batches only supports CSV
-    protected final DelimitedDataWriter m_escaper = new CSVWriter();
     protected final String m_nonce;
 
     // outDir is the folder that will contain the batch folders
@@ -114,7 +113,7 @@ public class ExportToBatchesClient extends ExportClientBase {
         protected HashSet<ExportToBatchDecoder> m_decoders = new HashSet<ExportToBatchDecoder>();
         protected final Set<String> m_schemasWritten = new HashSet<String>();
 
-        HashMap<String, BufferedWriter> m_writers = new HashMap<String, BufferedWriter>();
+        HashMap<String, CSVWriter> m_writers = new HashMap<String, CSVWriter>();
         boolean m_hasClosed = false;
 
         ExportBatch(String pathToDirectory, String nonce, Date batchStart) {
@@ -163,8 +162,8 @@ public class ExportToBatchesClient extends ExportClientBase {
                 return;
 
             // flush and close any files that are open
-            for (Entry<String, BufferedWriter> entry : m_writers.entrySet()) {
-                BufferedWriter writer = entry.getValue();
+            for (Entry<String, CSVWriter> entry : m_writers.entrySet()) {
+                CSVWriter writer = entry.getValue();
                 if (writer == null) continue;
                 try {
                     writer.flush();
@@ -202,8 +201,8 @@ public class ExportToBatchesClient extends ExportClientBase {
             }
         }
 
-        BufferedWriter getWriter(String filename) {
-            BufferedWriter writer = m_writers.get(filename);
+        CSVWriter getWriter(String filename) {
+            CSVWriter writer = m_writers.get(filename);
             if (writer != null)
                 return writer;
 
@@ -211,7 +210,7 @@ public class ExportToBatchesClient extends ExportClientBase {
             File newFile = new File(path);
             try {
                 OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, true), "UTF-8");
-                writer = new BufferedWriter(osw, 1048576);
+                writer = new CSVWriter(new BufferedWriter(osw, 1048576));
             } catch (Exception e) {
                 m_logger.error(e.getMessage());
                 m_logger.error("Error: Failed to create output file: " + path);
@@ -267,14 +266,14 @@ public class ExportToBatchesClient extends ExportClientBase {
 
         // transient per-block state
         protected ExportBatch m_batch = null;
-        protected BufferedWriter m_writer = null;
+        protected CSVWriter m_writer = null;
 
         public ExportToBatchDecoder(AdvertisedDataSource source, String tableName) {
             super(source);
             m_generation = source.m_generation;
             m_tableName = tableName;
             // Create the output file for this table
-            m_filename = source.tableName + "-" + String.valueOf(m_generation) + "." + m_escaper.getExtension();
+            m_filename = source.tableName + "-" + String.valueOf(m_generation) + ".csv";
 
             setSchemaForSource(source);
         }
@@ -324,26 +323,27 @@ public class ExportToBatchesClient extends ExportClientBase {
                 return false;
             }
 
+
+
             try {
+                String[] fields = new String[m_tableSchema.size()];
+
                 for (int i = m_firstfield; i < m_tableSchema.size(); i++) {
                     if (row[i] == null) {
-                        m_escaper.writeRawField(m_writer, "NULL", i > m_firstfield);
+                        fields[i] = "NULL";
                     } else if (m_tableSchema.get(i) == VoltType.STRING) {
-                        m_escaper.writeEscapedField(m_writer, (String) row[i], i > m_firstfield);
+                        fields[i] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType) row[i];
-                        m_escaper.writeRawField(m_writer, m_sdf.format(timestamp.asApproximateJavaDate()),
-                                i > m_firstfield);
-                        m_escaper.writeRawField(m_writer, String.valueOf(timestamp.getUSec()), false);
+                        fields[i] = m_sdf.format(timestamp.asApproximateJavaDate());
+                        fields[i] += String.valueOf(timestamp.getUSec());
                     } else {
-                        m_escaper.writeRawField(m_writer, row[i].toString(), i > m_firstfield);
+                        fields[i] = row[i].toString();
                     }
                 }
-                m_writer.write("\n");
-            } catch (IOException e) {
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            } catch (Exception x) {
+                m_writer.writeNext(fields);
+            }
+            catch (Exception x) {
                 x.printStackTrace();
                 return false;
             }

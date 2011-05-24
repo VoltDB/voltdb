@@ -42,13 +42,16 @@ public class ExportToBatchesClientTest {
 
         // compile a voltdb app
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("create table blah (ival bigint not null);");
+        builder.addLiteralSchema("create table blah (ival bigint not null, sval varchar(255) not null);");
         builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);", "blah.ival: 0");
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", "blah.ival: 0");
         builder.setTableAsExportOnly("blah");
         builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("sqexport.jar"), 1, 1, 0, "localhost");
-        assert(success);
+        if (!success) {
+            System.err.println("Failed to compile");
+            System.exit(-1);
+        }
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("sqexport.xml"));
 
         // start a voltdb server
@@ -71,7 +74,9 @@ public class ExportToBatchesClientTest {
             public void run() {
                 try {
                     System.out.printf("Inserting a tuple from the client with value %d\n", counter + 1);
-                    ClientResponse response = client.callProcedure("Insert", counter++);
+                    String second = "你好";
+                    if ((counter % 2) == 0) second = "newline\nnewline";
+                    ClientResponse response = client.callProcedure("Insert", counter++, second);
                     assert(response.getStatus() == ClientResponse.SUCCESS);
                 }
                 catch (Exception e) { e.printStackTrace(); System.exit(-1); }
@@ -82,7 +87,10 @@ public class ExportToBatchesClientTest {
         // start the voltdb export client for sq
         File dir = new File(System.getProperty("user.dir") + File.separator + "00_exportout");
         System.out.printf("Working dir is %s\n", dir.getPath());
-        ExportToBatchesClient exportClient = new ExportToBatchesClient("testy", dir, 1, 0, false);
+        //ExportToBatchesClient exportClient = new ExportToBatchesClient("testy", dir, 1, 0, false);
+        ExportToFileClient exportClient = new ExportToFileClient(
+                ',',
+                "testy", dir, 1, "yyyyMMddHHmmss", 0, false);
         exportClient.addServerInfo("localhost", false);
         exportClient.addCredentials("", "");
 

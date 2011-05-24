@@ -41,16 +41,23 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.CRC32;
 
-import org.voltdb.VoltDB;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.catalog.*;
+import org.voltdb.VoltDB;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Host;
+import org.voltdb.catalog.Partition;
+import org.voltdb.catalog.Site;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.logging.VoltLoggerFactory;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltFile;
-import org.json_voltpatches.*;
 
 public class SnapshotUtil {
 

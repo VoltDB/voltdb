@@ -24,7 +24,6 @@
 package org.voltdb.exportclient;
 
 import java.net.InetSocketAddress;
-import java.util.concurrent.CountDownLatch;
 
 import junit.framework.TestCase;
 

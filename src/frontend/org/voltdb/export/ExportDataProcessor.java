@@ -17,7 +17,6 @@
 
 package org.voltdb.export;
 
-import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
 

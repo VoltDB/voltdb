@@ -22,9 +22,9 @@
  */
 
 package org.voltdb.regressionsuites;
+
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.channels.SocketChannel;
 
 import junit.framework.Test;
 
@@ -33,10 +33,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ConnectionUtil;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestDecimalDefaults extends RegressionSuite

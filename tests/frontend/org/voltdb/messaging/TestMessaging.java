@@ -38,7 +38,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase;
 
-import org.voltdb.CommandLog;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;

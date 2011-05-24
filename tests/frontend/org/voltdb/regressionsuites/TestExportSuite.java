@@ -51,7 +51,6 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportToFileClient;
-import org.voltdb.utils.DelimitedDataWriterUtil.CSVWriter;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.VoltFile;
@@ -237,7 +236,7 @@ public class TestExportSuite extends RegressionSuite {
 
         ExportToFileClient exportClient =
           new ExportToFileClient(
-              new CSVWriter(),
+              ',',
               "testnonce",
               new File("/tmp/" + System.getProperty("user.name")),
               60,
@@ -423,7 +422,7 @@ public class TestExportSuite extends RegressionSuite {
       quiesce(client);
       ExportToFileClient exportClient =
           new ExportToFileClient(
-              new CSVWriter(),
+              ',',
               "testnonce",
               new File("/tmp/" + System.getProperty("user.name")),
               60,
