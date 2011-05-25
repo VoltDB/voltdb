@@ -17,12 +17,15 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.util.ArrayList;
+
+import javax.management.*;
 
 public interface StatsManager {
     // Global constant
     public static final int POLL_INTERVAL = 500; // 500ms
 
-    public void initialize(ArrayList<Integer> localSiteIds);
+    public void initialize(ArrayList<Integer> localSiteIds) throws JMException,  IOException;
     public void sendNotification();
 }
