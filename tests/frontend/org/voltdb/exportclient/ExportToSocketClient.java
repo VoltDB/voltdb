@@ -69,8 +69,7 @@ public class ExportToSocketClient extends ExportClientBase
     }
 
     @Override
-    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
-    {
+    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         return new SocketDecoder(source);
     }
 

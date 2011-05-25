@@ -506,10 +506,10 @@ public class ExportToBatchesClient extends ExportClientBase {
 
     protected static void printHelpAndQuit(int code) {
         System.out
-                .println("java -cp <classpath> org.voltdb.exportclient.ExportToSqClient "
+                .println("java -cp <classpath> org.voltdb.exportclient.ExportToBatchesClient "
                         + "--help");
         System.out
-                .println("java -cp <classpath> org.voltdb.exportclient.ExportToSqClient "
+                .println("java -cp <classpath> org.voltdb.exportclient.ExportToBatchesClient "
                         + "--servers server1[,server2,...,serverN] "
                         + "--connect (admin|client) "
                         + "--nonce file_prefix "
@@ -669,11 +669,11 @@ public class ExportToBatchesClient extends ExportClientBase {
         }
         // Check args for validity
         if (volt_servers == null || volt_servers.length < 1) {
-            System.err.println("ExportToFile: must provide at least one VoltDB server");
+            System.err.println("ExportToBatchesClient: must provide at least one VoltDB server");
             printHelpAndQuit(-1);
         }
         if (connect == ' ') {
-            System.err.println("ExportToFile: must specify connection type as admin or client using --connect argument");
+            System.err.println("ExportToBatchesClient: must specify connection type as admin or client using --connect argument");
             printHelpAndQuit(-1);
         }
         assert ((connect == 'c') || (connect == 'a'));
@@ -685,7 +685,7 @@ public class ExportToBatchesClient extends ExportClientBase {
         }
         if (nonce == null) {
             System.err
-                    .println("ExportToSq: must provide a filename nonce");
+                    .println("ExportToBatchesClient: must provide a filename nonce");
             printHelpAndQuit(-1);
         }
         if (outdir == null) {

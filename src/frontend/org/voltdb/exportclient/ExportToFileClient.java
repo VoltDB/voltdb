@@ -105,11 +105,19 @@ public class ExportToFileClient extends ExportClientBase {
 
             m_logger.info("Opening filename " + m_currentFilename);
             try {
-                m_writer = new CSVWriter(
-                        new BufferedWriter(
+                if (m_delimiter == '\t') {
+                    // tsv format escapes differently
+                    m_writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(
+                            new OutputStreamWriter(new FileOutputStream(m_currentFilename, true), "UTF-8"),
+                            1048576));
+                }
+                else {
+                    // csv is very standard with nice quotes around everything
+                    m_writer = new CSVWriter(new BufferedWriter(
                                 new OutputStreamWriter(new FileOutputStream(m_currentFilename, true), "UTF-8"),
                                 1048576),
-                        m_delimiter);
+                            m_delimiter);
+                }
             } catch (Exception e) {
                 m_logger.error(e.getMessage());
                 m_logger.error("Error: Failed to create output file: " + m_currentFilename);
