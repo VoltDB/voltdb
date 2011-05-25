@@ -32,6 +32,8 @@ import java.util.Random;
 import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
 
+import au.com.bytecode.opencsv_voltpatches.CSVReader;
+
 /**
  * Loader class contains a set of static methods that
  * load data from CSV files into the server database. It
