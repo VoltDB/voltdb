@@ -229,8 +229,7 @@ public abstract class ExportClientBase {
         boolean retval = true;
         for (ExportConnection connection : m_exportConnections.values()) {
             if (!connection.isConnected()) {
-                m_logger.error("Lost connection: " + connection.name +
-                               ", Closing...");
+                m_logger.warn("Lost connection: " + connection.name + ", Closing...");
                 retval = false;
             }
         }
@@ -529,9 +528,6 @@ public abstract class ExportClientBase {
                         offeredMsgs = work();
                     }
                     catch (ExportClientException e) {
-                        m_logger.info(e.getMessage(), e);
-                        //e.printStackTrace();
-
                         // handle the problem and decide whether
                         // to continue or to punt up a stack frame
                         switch (e.type) {

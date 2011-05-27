@@ -30,8 +30,10 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
@@ -119,7 +121,15 @@ public class MockExportSource {
             assert(m.isPoll());
 
             // send half of a block
-
+            VoltTable t = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.INTEGER));
+            t.addRow(5);
+            ByteBuffer buf = ExportEncoder.getEncodedTable(t);
+            m = new ExportProtoMessage(0, 0, "i");
+            m.pollResponse(0, buf);
+            fs = new FastSerializer();
+            m.writeToFastSerializer(fs);
+            byte[] pollResponseBytes = fs.getBytes();
+            out.write(pollResponseBytes);
 
             // sleep until the socket closes
             while(socket.isConnected())

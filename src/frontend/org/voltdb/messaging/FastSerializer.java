@@ -28,8 +28,8 @@ import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.Encoder;
 
 
 /**
@@ -105,7 +105,7 @@ public class FastSerializer implements DataOutput {
            m_pool = pool;
            buffer = pool.acquire(initialAllocation);
         } else if (isDirect) {
-            assert(pool == null);
+           assert(pool == null);
            m_pool = null;
            buffer = DBBPool.allocateDirect(initialAllocation);
         } else {
@@ -114,6 +114,7 @@ public class FastSerializer implements DataOutput {
            assert(pool == null);
         }
         this.callback = callback;
+        //buffer.b.order(bigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
         assert(buffer.b.order() == ByteOrder.BIG_ENDIAN);
     }
 
