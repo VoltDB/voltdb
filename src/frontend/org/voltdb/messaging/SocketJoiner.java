@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.logging.Level;
@@ -578,7 +579,8 @@ public class SocketJoiner extends Thread {
                     VoltDB.crashVoltDB();
                 }
                 // set the admin mode here, not in the local deployment file for rejoining nodes
-                VoltDB.instance().setAdminMode(in.readBoolean());
+                VoltDB.instance().setStartMode(in.readBoolean() ? OperationMode.PAUSED
+                                                                : OperationMode.RUNNING);
                 readClusterPublicMetadata(in);
                 m_sockets.put(hostId, socket);
                 recoveryLog.info("Have " + m_sockets.size() + " of " + (m_expectedHosts - 1) + " with hostId " + hostId);
@@ -776,7 +778,7 @@ public class SocketJoiner extends Thread {
                 out.writeInt(site);
             }
             // send the admin mode here, don't use local deployment file for rejoining nodes
-            out.writeBoolean(VoltDB.instance().inAdminMode());
+            out.writeBoolean(VoltDB.instance().getMode() == OperationMode.PAUSED);
             writeClusterPublicMetadata(out);
             out.flush();
 

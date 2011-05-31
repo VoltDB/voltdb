@@ -31,6 +31,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.*;
@@ -326,14 +327,14 @@ public class TestRawProcessor extends TestCase {
     // when admin mode switches off
     public void testFSM_adminmode()
     {
-        MockExportDataSource.m_mockVoltDB.setAdminMode(true);
+        MockExportDataSource.m_mockVoltDB.setMode(OperationMode.PAUSED);
         sb.m_state = RawProcessor.CONNECTED;
         sb.event(m.poll().ack(1000));
         assertErrResponse();
         assertEquals(RawProcessor.CLOSED, sb.m_state);
         sb.event(m_postadmin.open());
         assertErrResponse();
-        MockExportDataSource.m_mockVoltDB.setAdminMode(false);
+        MockExportDataSource.m_mockVoltDB.setMode(OperationMode.RUNNING);
         sb.event(m_postadmin.open());
         ExportProtoMessage r = pollWriteStream();
         assertTrue(r.isOpenResponse());

@@ -39,14 +39,12 @@ public class InitiateResponseMessage extends VoltMessage {
     private boolean m_commit;
     private boolean m_recovering;
     private ClientResponseImpl m_response;
-    private long m_lastReceivedTxnId; // this is the largest txn acked by all partitions running the java for it
 
     /** Empty constructor for de-serialization */
     InitiateResponseMessage()
     {
         m_initiatorSiteId = -1;
         m_coordinatorSiteId = -1;
-        m_lastReceivedTxnId = -1;
         m_subject = Subject.DEFAULT.getId();
     }
 
@@ -65,10 +63,6 @@ public class InitiateResponseMessage extends VoltMessage {
 
     public void setClientHandle(long clientHandle) {
         m_response.setClientHandle(clientHandle);
-    }
-
-    public void setLastReceivedTxnId(long lastReceivedTxnId) {
-        m_lastReceivedTxnId = lastReceivedTxnId;
     }
 
     public long getTxnId() {
@@ -108,10 +102,6 @@ public class InitiateResponseMessage extends VoltMessage {
         m_response = r;
     }
 
-    public long getLastReceivedTxnId() {
-        return m_lastReceivedTxnId;
-    }
-
     @Override
     protected void flattenToBuffer(final DBBPool pool) {
         // stupid lame flattening of the client response
@@ -137,7 +127,6 @@ public class InitiateResponseMessage extends VoltMessage {
         m_buffer.put(INITIATE_RESPONSE_ID);
 
         m_buffer.putLong(m_txnId);
-        m_buffer.putLong(m_lastReceivedTxnId);
         m_buffer.putInt(m_initiatorSiteId);
         m_buffer.putInt(m_coordinatorSiteId);
         m_buffer.put((byte) (m_recovering == true ? 1 : 0));
@@ -149,7 +138,6 @@ public class InitiateResponseMessage extends VoltMessage {
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
         m_txnId = m_buffer.getLong();
-        m_lastReceivedTxnId = m_buffer.getLong();
         m_initiatorSiteId = m_buffer.getInt();
         m_coordinatorSiteId = m_buffer.getInt();
         m_recovering = m_buffer.get() == 1;

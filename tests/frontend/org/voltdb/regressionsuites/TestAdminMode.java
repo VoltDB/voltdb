@@ -61,8 +61,8 @@ public class TestAdminMode extends RegressionSuite
             sysinfo.advanceRow();
             if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE"))
             {
-                assertEquals(state,
-                             sysinfo.get("VALUE", VoltType.STRING));
+                assertTrue(state.equalsIgnoreCase((String) sysinfo.get("VALUE",
+                                                                       VoltType.STRING)));
                 return;
             }
         }

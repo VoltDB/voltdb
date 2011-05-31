@@ -203,8 +203,6 @@ public class DtxnInitiatorMailbox implements Mailbox
             // only valid messages are this and heartbeatresponse
             assert(message instanceof InitiateResponseMessage);
             final InitiateResponseMessage r = (InitiateResponseMessage) message;
-            // update the state of seen txnids for each executor
-            m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId(), false);
 
             state = m_pendingTxns.get(r.getTxnId());
 

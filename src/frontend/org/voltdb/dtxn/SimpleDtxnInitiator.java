@@ -84,6 +84,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      */
     private boolean m_hadBackPressure = false;
 
+    /*
+     * Whether or not to send heartbeats. It's set to false by default, this
+     * will be set to true once command-log replay has finished.
+     */
+    private volatile boolean m_sendHeartbeats = false;
+
     // If an initiator handles a full node, it processes approximately 50,000 txns/sec.
     // That's about 50 txns/ms. Try not to keep more than 5 ms of work? Seems like a really
     // small number. On the other hand, backPressure() is just a hint to the ClientInterface.
@@ -219,6 +225,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         final long txnId = m_idManager.getNextUniqueTransactionId();
         final long now = m_idManager.getLastUsedTime();
 
+        if (m_sendHeartbeats) {
+            sendHeartbeat(txnId);
+        }
+
+        m_lastTickTime = now;
+        return now;
+    }
+
+    @Override
+    public void sendHeartbeat(final long txnId) {
         // SEMI-HACK: this list can become incorrect if there's a node
         // failure in between here and the Heartbeat transmission loop below.
         // Rather than add another synchronization point, we'll just make
@@ -243,9 +259,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
-
-        m_lastTickTime = now;
-        return now;
     }
 
     @Override
@@ -432,5 +445,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public synchronized Map<Long, long[]> getOutstandingTxnStats()
     {
         return m_mailbox.getOutstandingTxnStats();
+    }
+
+    @Override
+    public void setSendHeartbeats(boolean val) {
+        m_sendHeartbeats = val;
     }
 }

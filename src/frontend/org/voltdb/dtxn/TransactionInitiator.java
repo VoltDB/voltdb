@@ -145,4 +145,13 @@ public abstract class TransactionInitiator {
 
     public abstract Map<Long, long[]> getOutstandingTxnStats();
 
+    /**
+     * Whether or not to send out heartbeats
+     *
+     * @param val
+     *            true to send, false to stop sending
+     */
+    public abstract void setSendHeartbeats(boolean val);
+
+    public abstract void sendHeartbeat(long txnId);
 }

@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
@@ -45,10 +44,6 @@ import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.messaging.SiteMailbox;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
@@ -61,7 +56,7 @@ public class MockVoltDB implements VoltDBInterface
     int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = null;
-    private boolean m_adminMode = false;
+    private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata = "0.0.0.0:0:0:0";
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
@@ -455,15 +450,15 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean inAdminMode()
+    public OperationMode getMode()
     {
-        return m_adminMode;
+        return m_mode;
     }
 
     @Override
-    public void setAdminMode(boolean inAdminMode)
+    public void setMode(OperationMode mode)
     {
-        m_adminMode = inAdminMode;
+        m_mode = mode;
     }
 
     @Override
@@ -474,5 +469,17 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Map<Integer, String> getClusterMetadataMap() {
         return m_clusterMetadata;
+    }
+
+    @Override
+    public void onReplayCompletion() {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void setStartMode(OperationMode mode) {
+        // TODO Auto-generated method stub
+
     }
 }

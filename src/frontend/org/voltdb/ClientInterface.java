@@ -895,7 +895,8 @@ public class ClientInterface implements DumpManager.Dumpable {
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
 
         // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().inAdminMode() && !handler.isAdmin())
+        VoltDBInterface instance = VoltDB.instance();
+        if (instance.getMode() != OperationMode.RUNNING && !handler.isAdmin())
         {
             final ClientResponseImpl errorResponse =
                 new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,

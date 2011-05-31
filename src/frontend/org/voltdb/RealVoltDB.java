@@ -27,6 +27,8 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
@@ -71,6 +73,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.LogReader;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltSampler;
 
@@ -352,7 +355,22 @@ public class RealVoltDB implements VoltDBInterface
 
     };
 
-    private volatile boolean m_inAdminMode = false;
+    private CommandLogReinitiator m_commandLogReplay = new CommandLogReinitiator() {
+        @Override
+        public void skipPartitions(Set<Integer> partitions) {}
+        @Override
+        public void skipMultiPartitionTxns(boolean val) {}
+        @Override
+        public void replay() {
+            // Shortcut to enable the cluster for normal operation
+            onReplayCompletion();
+        }
+        @Override
+        public void join() throws InterruptedException {}
+    };
+
+    private volatile OperationMode m_mode = OperationMode.RUNNING;
+    private OperationMode m_startMode = null;
 
     // metadata is currently of the format:
     // IP:CIENTPORT:ADMINPORT:HTTPPORT
@@ -471,7 +489,6 @@ public class RealVoltDB implements VoltDBInterface
                     @SuppressWarnings("rawtypes")
                     Class loggerClass = Class.forName("org.voltdb.CommandLogImpl");
                     m_commandLog = (CommandLog)loggerClass.newInstance();
-                    m_commandLog.init(m_catalogContext);
                 } catch (ClassNotFoundException e) {
                     hostLog.warn("Can't enable command logging with the community version of VoltDB." +
                             " Logging is disabled.");
@@ -487,11 +504,17 @@ public class RealVoltDB implements VoltDBInterface
             }
 
             // See if we should bring the server up in admin mode
-            m_inAdminMode = false;
             if (m_catalogContext.cluster.getAdminstartup())
             {
-                m_inAdminMode = true;
+                m_startMode = OperationMode.PAUSED;
             }
+
+            /*
+             * Set the server in replay mode now, it will be set to the proper
+             * mode when replay finishes
+             */
+            m_mode = OperationMode.INITIALIZING;
+
             // set the adminPort from the deployment file
             int adminPort = m_catalogContext.cluster.getAdminport();
             // but allow command line override
@@ -812,7 +835,56 @@ public class RealVoltDB implements VoltDBInterface
                 hostLog.warn("Running without redundancy (k=0) is not recommended for production use.");
             }
 
-            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+            // TODO: disable replay until the UI is in place
+            boolean replay = false;
+            if (!isRejoin && replay) {
+                // Load command log reader
+                LogReader reader = null;
+                try {
+                    String logpath = m_catalogContext.cluster.getLogconfig().get("log").getLogpath();
+                    File path = new File(logpath);
+
+                    Class<?> readerClass = Class.forName("org.voltdb.utils.LogReaderImpl");
+                    Constructor<?> constructor = readerClass.getConstructor(File.class);
+                    reader = (LogReader) constructor.newInstance(path);
+                } catch (ClassNotFoundException e) {
+                    hostLog.warn("Cannot load command log module in VoltDB community edition." +
+                                 " Skipping command log replay.");
+                } catch (InvocationTargetException e) {
+                    hostLog.info("Unable to instantiate command log reader: " +
+                                 e.getTargetException().getMessage());
+                } catch (Exception e) {
+                    hostLog.fatal("Unable to instantiate command log reader", e);
+                    VoltDB.crashVoltDB();
+                }
+
+                // Load command log reinitiator
+                try {
+                    Class<?> replayClass = Class.forName("org.voltdb.CommandLogReinitiatorImpl");
+                    Constructor<?> constructor = replayClass.getConstructor(LogReader.class,
+                                                                            long.class,
+                                                                            TransactionInitiator.class,
+                                                                            CatalogContext.class);
+
+                    if (reader != null && !reader.isEmpty()) {
+                        assert(m_clientInterfaces.size() > 0);
+                        ClientInterface ci = m_clientInterfaces.get(0);
+                        TransactionInitiator initiator = ci.getInitiator();
+                        m_commandLogReplay =
+                            (CommandLogReinitiator) constructor.newInstance(reader,
+                                                                            0,
+                                                                            initiator,
+                                                                            m_catalogContext);
+                    } else {
+                        hostLog.info("No command log to replay");
+                    }
+                } catch (ClassNotFoundException e) {
+                    hostLog.warn("Running community edition, skipping command log replay");
+                } catch (Exception e) {
+                    hostLog.fatal("Unable to instantiate command log reinitiator", e);
+                    VoltDB.crashVoltDB();
+                }
+            }
         }
     }
 
@@ -959,7 +1031,7 @@ public class RealVoltDB implements VoltDBInterface
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
         hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", adminPort));
 
-        if (m_inAdminMode) {
+        if (m_mode == OperationMode.PAUSED) {
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
         }
         if (httpPortExtraLogMessage != null)
@@ -1065,6 +1137,10 @@ public class RealVoltDB implements VoltDBInterface
                 r.notifyAll();
             }
         }
+
+        // start command log replay
+        m_commandLogReplay.replay();
+
         // start one site in the current thread
         Thread.currentThread().setName("ExecutionSiteAndVoltDB");
         m_isRunning = true;
@@ -1549,26 +1625,31 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean inAdminMode()
+    public OperationMode getMode()
     {
-        return m_inAdminMode;
+        return m_mode;
     }
 
     @Override
-    public void setAdminMode(boolean inAdminMode)
+    public void setMode(OperationMode mode)
     {
-        if (m_inAdminMode != inAdminMode)
+        if (m_mode != mode)
         {
-            if (inAdminMode)
+            if (mode == OperationMode.PAUSED)
             {
                 hostLog.info("Server is entering admin mode and pausing.");
             }
-            else
+            else if (m_mode == OperationMode.PAUSED)
             {
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
         }
-        m_inAdminMode = inAdminMode;
+        m_mode = mode;
+    }
+
+    @Override
+    public void setStartMode(OperationMode mode) {
+        m_startMode = mode;
     }
 
     /**
@@ -1591,5 +1672,26 @@ public class RealVoltDB implements VoltDBInterface
     @Override
     public String getLocalMetadata() {
         return m_localMetadata;
+    }
+
+    @Override
+    public void onReplayCompletion() {
+        // Enable the initiator to send normal heartbeats
+        for (ClientInterface ci : m_clientInterfaces) {
+            ci.getInitiator().setSendHeartbeats(true);
+        }
+
+        // TODO: init a snapshot to truncate the logs
+
+        // Initialize command logger
+        m_commandLog.init(m_catalogContext);
+
+        if (m_startMode != null) {
+            m_mode = m_startMode;
+        } else {
+            // Shouldn't be here, but to be safe
+            m_mode = OperationMode.RUNNING;
+        }
+        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
     }
 }

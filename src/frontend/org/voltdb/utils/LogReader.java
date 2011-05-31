@@ -35,29 +35,36 @@ public interface LogReader {
     public int getPartitionCount();
 
     /**
-     * Get the site ID -> partition ID mapping of all alive sites.
+     * Get the site ID -> partition ID mapping of all alive sites. Can be null
+     * if the log is empty
      *
      * @return
      */
     public Map<Integer, Integer> getPartitionMap();
 
     /**
-     * Get the initiator IDs
+     * Get the initiator IDs. Can be null if the log is empty
      * @return
      */
     public int[] getInitiatorIds();
 
     /**
-     * Get the set of failed sites
+     * Get the set of failed sites. Can be null if the log is empty
      * @return
      */
     public Set<Integer> getFailedSites();
 
     /**
-     * Get the set of failed transaction IDs
+     * Get the set of failed transaction IDs. Can be null if the log is empty
      * @return
      */
     public Set<Long> getFailedTxns();
+
+    /**
+     * Whether or not the log is empty
+     * @return
+     */
+    public boolean isEmpty();
 
     /**
      * Get the iterator that iterates through the filtered log

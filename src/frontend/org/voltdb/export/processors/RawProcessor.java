@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.CatalogContext;
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
@@ -189,7 +190,7 @@ public class RawProcessor implements ExportDataProcessor {
                 return;
             }
 
-            else if (VoltDB.instance().inAdminMode() && !m_isAdmin)
+            else if (VoltDB.instance().getMode() == OperationMode.PAUSED && !m_isAdmin)
             {
                 protocolError(m, "Server currently unavailable for export connections on this port");
                 return;

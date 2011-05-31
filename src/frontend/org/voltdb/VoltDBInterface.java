@@ -145,13 +145,29 @@ public interface VoltDBInterface
     void onRecoveryCompletion(long transferred);
 
     /**
-     * Set the admin mode status of this server.
-     * @param inAdminMode true to enter admin mode, false to exit admin mode
+     * Set the operational mode this server should be in once it has finished
+     * initialization. It's not set immediately because command log replay might
+     * be in progress. But it will be set to the specified mode once replay has
+     * finished. This method shouldn't be used once the server has finished
+     * initialization.
+     *
+     * @param mode
      */
-    public void setAdminMode(boolean inAdminMode);
+    public void setStartMode(OperationMode mode);
 
     /**
-     * @return whether or not this server is in admin mode
+     * Set the operation mode of this server.
+     * @param mode the operational mode to enter
      */
-    public boolean inAdminMode();
+    public void setMode(OperationMode mode);
+
+    /**
+     * @return The operational mode this server is in
+     */
+    public OperationMode getMode();
+
+    /**
+     * Notify RealVoltDB that command log replay is complete
+     */
+    public void onReplayCompletion();
 }

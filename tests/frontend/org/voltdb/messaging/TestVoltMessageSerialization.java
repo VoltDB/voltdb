@@ -97,7 +97,6 @@ public class TestVoltMessageSerialization extends TestCase {
         InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse, pool);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
-        assertEquals(iresponse.getLastReceivedTxnId(), iresponse2.getLastReceivedTxnId());
         iresponse.discard();
         iresponse2.discard();
         pool.clear();

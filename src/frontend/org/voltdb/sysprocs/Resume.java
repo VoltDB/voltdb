@@ -23,6 +23,7 @@ import java.util.List;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
+import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SiteProcedureConnection;
@@ -68,7 +69,7 @@ public class Resume extends VoltSystemProcedure
             getLowestLiveExecSiteIdForHost(host_id);
         if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
         {
-            VoltDB.instance().setAdminMode(false);
+            VoltDB.instance().setMode(OperationMode.RUNNING);
         }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

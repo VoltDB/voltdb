@@ -274,6 +274,17 @@ public class TestDtxnInitiatorMailbox extends TestCase
             return null;
         }
 
+        @Override
+        public void setSendHeartbeats(boolean val) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void sendHeartbeat(long txnId) {
+            // TODO Auto-generated method stub
+
+        }
     }
 
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,

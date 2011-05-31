@@ -684,7 +684,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         Thread.sleep(1000);
 
-        assertTrue(VoltDB.instance().inAdminMode());
+        assertTrue(VoltDB.instance().getMode() == OperationMode.PAUSED);
 
         localServer.shutdown();
         cluster.shutDown();
