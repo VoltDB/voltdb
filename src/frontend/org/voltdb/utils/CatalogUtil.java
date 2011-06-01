@@ -940,21 +940,6 @@ public abstract class CatalogUtil {
 
         validateDirectory("snapshot path", snapshotPath, crashOnFailedValidation);
 
-        File ppdSnapshotPath;
-        if (paths == null || paths.getPartitiondetectionsnapshot() == null) {
-            ppdSnapshotPath = new VoltFile(voltDbRoot, "partition_detection_snapshot");
-            if (!ppdSnapshotPath.exists()) {
-                if (!ppdSnapshotPath.mkdir()) {
-                    hostLog.fatal("Failed to create partition detection snapshot directory \""
-                            + ppdSnapshotPath + "\"");
-                }
-            }
-        } else {
-            ppdSnapshotPath = new VoltFile(paths.getPartitiondetectionsnapshot().getPath());
-        }
-
-        validateDirectory("partition detection snapshot path", ppdSnapshotPath, crashOnFailedValidation);
-
         File exportOverflowPath;
         if (paths == null || paths.getExportoverflow() == null) {
             exportOverflowPath = new VoltFile(voltDbRoot, "export_overflow");
@@ -1011,7 +996,7 @@ public abstract class CatalogUtil {
         //Update the path in the schedule for ppd
         schedule = cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
         if (schedule != null) {
-            schedule.setPath(ppdSnapshotPath.getPath());
+            schedule.setPath(snapshotPath.getPath());
         }
 
         //Also set the export overflow directory

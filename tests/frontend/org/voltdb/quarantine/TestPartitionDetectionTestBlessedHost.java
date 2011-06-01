@@ -108,7 +108,7 @@ public class TestPartitionDetectionTestBlessedHost extends TestCase
         // use a separate process for each host.
         LocalCluster cluster = new LocalCluster("partition-detection2.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         cluster.setHasLocalServer(false);
-        boolean success = cluster.compileWithPartitiondDetection(builder, TMPDIR, TESTNONCE);
+        boolean success = cluster.compileWithPartitionDetection(builder, TMPDIR, TESTNONCE);
         assertTrue(success);
         cluster.startUp();
         client.createConnection("localhost");

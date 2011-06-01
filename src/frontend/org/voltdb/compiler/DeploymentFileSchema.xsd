@@ -70,7 +70,6 @@
             </xs:complexType>
         </xs:element>
         <xs:element name="snapshots" type="pathEntry" minOccurs="0" maxOccurs="1"/>
-        <xs:element name="partitiondetectionsnapshot" type="pathEntry" minOccurs="0" maxOccurs="1"/>
         <xs:element name="exportoverflow" type="pathEntry" minOccurs="0" maxOccurs="1"/>
         <xs:element name="commandlog" type="pathEntry" minOccurs="0" maxOccurs="1"/>
         <xs:element name="commandlogsnapshot" type="pathEntry" minOccurs="0" maxOccurs="1"/>
@@ -82,7 +81,7 @@
     <xs:attribute name="port" type="xs:int" default="21211"/>
     <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
-  
+
     <!-- <command log> -->
   <xs:complexType name="commandLogType">
     <xs:all>

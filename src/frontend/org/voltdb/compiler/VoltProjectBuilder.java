@@ -211,7 +211,6 @@ public class VoltProjectBuilder {
     private String m_voltRootPath = null;
 
     private boolean m_ppdEnabled = false;
-    private String m_ppdPath = null;
     private String m_ppdPrefix = "none";
 
     private String m_internalSnapshotPath;
@@ -405,10 +404,10 @@ public class VoltProjectBuilder {
         m_snapshotPath = path;
     }
 
-    public void setPartitionDetectionSettings(final String ppdPath, final String ppdPrefix)
+    public void setPartitionDetectionSettings(final String snapshotPath, final String ppdPrefix)
     {
         m_ppdEnabled = true;
-        m_ppdPath = ppdPath;
+        m_snapshotPath = snapshotPath;
         m_ppdPrefix = ppdPrefix;
     }
 
@@ -469,17 +468,17 @@ public class VoltProjectBuilder {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount,
                        replication, leaderAddress, voltRoot,
-                       m_ppdEnabled, m_ppdPath, m_ppdPrefix, false, 0, false);
+                       m_ppdEnabled, m_snapshotPath, m_ppdPrefix, false, 0, false);
     }
 
     public boolean compile(
             final String jarPath, final int sitesPerHost,
             final int hostCount, final int replication, final String leaderAddress,
-            final String voltRoot, final boolean ppdEnabled, final String ppdPath, final String ppdPrefix)
+            final String voltRoot, final boolean ppdEnabled, final String snapshotPath, final String ppdPrefix)
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                       voltRoot, ppdEnabled, ppdPath, ppdPrefix, false, 0, false);
+                       voltRoot, ppdEnabled, snapshotPath, ppdPrefix, false, 0, false);
     }
 
     public boolean compile(final String jarPath, final int sitesPerHost,
@@ -488,13 +487,13 @@ public class VoltProjectBuilder {
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                       null, m_ppdEnabled, m_ppdPath, m_ppdPrefix, true, adminPort, adminOnStartup);
+                       null, m_ppdEnabled, m_snapshotPath, m_ppdPrefix, true, adminPort, adminOnStartup);
     }
 
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
                            final int hostCount, final int replication, final String leaderAddress,
                            String voltRoot, final boolean ppdEnabled,
-                           final String ppdPath, final String ppdPrefix,
+                           final String snapshotPath, final String ppdPrefix,
                            final boolean useCustomAdmin, final int adminPort,
                            final boolean adminOnStartup)
     {
@@ -592,8 +591,8 @@ public class VoltProjectBuilder {
         try {
             m_pathToDeployment = writeDeploymentFile(
                     hostCount, sitesPerHost, leaderAddress,
-                    replication, voltRoot, ppdEnabled,
-                    ppdPath, ppdPrefix, useCustomAdmin, adminPort, adminOnStartup);
+                    replication, voltRoot,
+                    useCustomAdmin, adminPort, adminOnStartup);
         } catch (Exception e) {
             System.out.println("Failed to create deployment file in testcase.");
             e.printStackTrace();
@@ -603,7 +602,7 @@ public class VoltProjectBuilder {
             System.out.println("replication: " + replication);
             System.out.println("voltRoot: " + voltRoot);
             System.out.println("ppdEnabled: " + ppdEnabled);
-            System.out.println("ppdPath: " + ppdPath);
+            System.out.println("snapshotPath: " + snapshotPath);
             System.out.println("ppdPrefix: " + ppdPrefix);
             System.out.println("adminEnabled: " + useCustomAdmin);
             System.out.println("adminPort: " + adminPort);
@@ -820,7 +819,6 @@ public class VoltProjectBuilder {
      */
     private String writeDeploymentFile(
             int hostCount, int sitesPerHost, String leader, int kFactor, String voltRoot,
-            boolean ppdEnabled, String ppdPath, String ppdPrefix,
             boolean useCustomAdmin, int adminPort, boolean adminOnStartup) throws IOException, JAXBException
     {
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
@@ -844,12 +842,6 @@ public class VoltProjectBuilder {
         Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
         paths.setVoltdbroot(voltdbroot);
         voltdbroot.setPath(voltRoot);
-
-        if (ppdPath != null) {
-            PathEntry ppdPathElement = factory.createPathEntry();
-            paths.setPartitiondetectionsnapshot(ppdPathElement);
-            ppdPathElement.setPath(ppdPath);
-        }
 
         if (m_snapshotPath != null) {
             PathEntry snapshotPathElement = factory.createPathEntry();
@@ -907,10 +899,10 @@ public class VoltProjectBuilder {
         // <partition-detection>/<snapshot>
         PartitionDetectionType ppd = factory.createPartitionDetectionType();
         deployment.setPartitionDetection(ppd);
-        ppd.setEnabled(ppdEnabled);
+        ppd.setEnabled(m_ppdEnabled);
         Snapshot ppdsnapshot = factory.createPartitionDetectionTypeSnapshot();
         ppd.setSnapshot(ppdsnapshot);
-        ppdsnapshot.setPrefix(ppdPrefix);
+        ppdsnapshot.setPrefix(m_ppdPrefix);
 
         // <admin-mode>
         // can't be disabled, but only write out the non-default config if
