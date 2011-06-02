@@ -33,7 +33,7 @@ public class MockExportSourceTest extends TestCase {
         new Thread() {
             @Override
             public void run() {
-                MockExportSource.run();
+                MockExportSource.run(1, 1);
             }
         }.start();
 

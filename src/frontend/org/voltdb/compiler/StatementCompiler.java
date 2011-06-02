@@ -194,8 +194,7 @@ public abstract class StatementCompiler {
 
             // Place serialized version of PlanNodeTree into a PlanFragment
             try {
-                // C++ needs little-endian
-                FastSerializer fs = new FastSerializer(false, false);
+                FastSerializer fs = new FastSerializer(true, false);
                 fs.write(json.getBytes());
                 String hexString = fs.getHexEncodedBytes();
                 planFragment.setPlannodetree(hexString);

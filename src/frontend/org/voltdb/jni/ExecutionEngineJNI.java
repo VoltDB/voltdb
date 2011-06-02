@@ -109,7 +109,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     hostId,
                     hostname);
         checkErrorCode(errorCode);
-        fsForParameterSet = new FastSerializer(false, new BufferGrowCallback() {
+        fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
             @Override
             public void onBufferGrow(final FastSerializer obj) {
                 LOG.trace("Parameter buffer has grown. re-setting to EE..");

@@ -19,10 +19,10 @@ package org.voltdb.utils;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Random;
 import java.util.logging.Logger;
-import java.util.ArrayList;
 
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -269,6 +269,14 @@ public abstract class VoltTypeUtil {
     public static String getSignatureForTable(String name, ArrayList<VoltType> schema) {
         StringBuilder sb = new StringBuilder();
         sb.append(name);
+        for (VoltType t : schema) {
+            sb.append(t.getSignatureChar());
+        }
+        return sb.toString();
+    }
+
+    public static String getSignatureForTable(ArrayList<VoltType> schema) {
+        StringBuilder sb = new StringBuilder();
         for (VoltType t : schema) {
             sb.append(t.getSignatureChar());
         }

@@ -36,7 +36,7 @@ public class ExportClientSuddenDeathTest extends TestCase {
         Thread t = new Thread() {
             @Override
             public void run() {
-                MockExportSource.run();
+                MockExportSource.run(1, 1);
             }
         };
         t.start();

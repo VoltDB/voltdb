@@ -114,8 +114,7 @@ public class FastSerializer implements DataOutput {
            assert(pool == null);
         }
         this.callback = callback;
-        //buffer.b.order(bigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
-        assert(buffer.b.order() == ByteOrder.BIG_ENDIAN);
+        buffer.b.order(bigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
     }
 
     public int size() {

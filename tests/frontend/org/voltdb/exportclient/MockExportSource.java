@@ -23,21 +23,31 @@
 
 package org.voltdb.exportclient;
 
+import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.VoltTypeUtil;
+
+import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 public class MockExportSource {
 
@@ -58,7 +68,7 @@ public class MockExportSource {
         return m;
     }
 
-    public final static void acceptThread(Socket socket) throws IOException {
+    public final static void acceptThread(Socket socket, DataGenerator dataGen) throws IOException {
         try {
             DataInputStream in = new DataInputStream(socket.getInputStream());
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
@@ -92,18 +102,23 @@ public class MockExportSource {
             assert(m.isOpen());
 
             // send the open response message
+            VoltTable schema = dataGen.tableForSchema();
+
             FastSerializer fs = new FastSerializer();
             // serialize an array of DataSources that are locally available
             fs.writeInt(1); // source count
             // BEGIN TABLE 1
             fs.writeLong(0); // generation
             fs.writeInt(0); // partition id
-            fs.writeString("i"); // table signature
-            fs.writeString("DUMMY"); // table name
+            String signature = dataGen.getSignature();
+            fs.writeString(signature); // table signature
+            fs.writeString("unnamed table"); // table name
             fs.writeLong(ManagementFactory.getRuntimeMXBean().getStartTime());
-            fs.writeInt(1); // number of columns
-            fs.writeString("A"); // column 1 name
-            fs.writeInt(VoltType.INTEGER.getValue()); // column 1 type
+            fs.writeInt(schema.getColumnCount()); // number of columns
+            for (int i = 0; i < schema.getColumnCount(); i++) {
+                fs.writeString(schema.getColumnName(i)); // column name
+                fs.writeInt(schema.getColumnType(i).getValue()); // column type
+            }
             // END TABLE 1
             // serialize the makup of the cluster
             fs.writeInt(1); // number of hosts
@@ -116,20 +131,29 @@ public class MockExportSource {
             byte[] openResponseBytes = fs.getBytes();
             out.write(openResponseBytes);
 
-            // get the ack/poll message
-            m = getNextExportMessage(in);
-            assert(m.isPoll());
+            while ((dataGen.eof() == false) && socket.isConnected()) {
+                System.out.println("Starting the mock export loop");
 
-            // send half of a block
-            VoltTable t = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.INTEGER));
-            t.addRow(5);
-            ByteBuffer buf = ExportEncoder.getEncodedTable(t);
-            m = new ExportProtoMessage(0, 0, "i");
-            m.pollResponse(0, buf);
-            fs = new FastSerializer();
-            m.writeToFastSerializer(fs);
-            byte[] pollResponseBytes = fs.getBytes();
-            out.write(pollResponseBytes);
+                // get the ack/poll message
+                m = getNextExportMessage(in);
+                assert(m.isPoll());
+                System.out.println("Got ack");
+
+                // send  a block
+                VoltTable t = dataGen.nextBlock();
+                System.out.printf("exported: %s\n", t.toJSONString());
+                // an empty table means no more csv
+                if (t.getRowCount() == 0)
+                    break;
+                ByteBuffer buf = ExportEncoder.getEncodedTable(t);
+                m = new ExportProtoMessage(0, 0, dataGen.getSignature());
+                m.pollResponse(0, buf);
+                fs = new FastSerializer();
+                m.writeToFastSerializer(fs);
+                byte[] pollResponseBytes = fs.getBytes();
+                out.write(pollResponseBytes);
+                System.out.println("Sent block");
+            }
 
             // sleep until the socket closes
             while(socket.isConnected())
@@ -147,13 +171,24 @@ public class MockExportSource {
         }
     }
 
-    public final static void run() {
+    public final static void run(int  delay, int blockSize) {
+        run(delay, blockSize, null, null);
+    }
+
+    public final static void run(int delay, int blockSize, File csv, File schema) {
         try {
             ServerSocket listener = new ServerSocket(VoltDB.DEFAULT_PORT);
 
             while (true) {
                 Socket sock = listener.accept();
-                acceptThread(sock);
+
+                DataGenerator generator;
+                if (csv != null)
+                    generator = new DataGenerator(delay, blockSize, csv, schema);
+                else
+                    generator = new DataGenerator(delay, blockSize);
+
+                acceptThread(sock, generator);
             }
         }
         catch (Exception e) {
@@ -162,11 +197,181 @@ public class MockExportSource {
         }
     }
 
+    static class DataGenerator {
+        final int m_blockSize;
+        final int m_delay;
+        final VoltTable m_schema;
+        final CSVReader m_csv;
+        long m_rowCounter = 0;
+
+        public DataGenerator(int delay, int blockSize) {
+            m_delay = delay;
+            m_blockSize = blockSize;
+
+            m_schema = new VoltTable(
+                    new VoltTable.ColumnInfo("foo", VoltType.BIGINT),
+                    new VoltTable.ColumnInfo("bar", VoltType.STRING));
+
+            m_csv = null;
+        }
+
+        public DataGenerator(int delay, int blockSize, File csvdata, File schema) {
+            m_delay = delay;
+            m_blockSize = blockSize;
+
+            VoltTable schemaTemp = null;
+            CSVReader csvTemp = null;
+
+            try {
+                FileReader fr = new FileReader(schema);
+
+                BufferedReader reader = new BufferedReader(fr);
+                StringBuilder content = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    content.append(line);
+                }
+                fr.close();
+                JSONObject jsonObj = new JSONObject(content.toString());
+                JSONArray columns = jsonObj.getJSONArray("columns");
+                VoltTable.ColumnInfo[] colInfo = new VoltTable.ColumnInfo[columns.length()];
+                for (int i = 0; i < columns.length(); i++) {
+                    JSONObject column = columns.getJSONObject(i);
+                    assert(column != null);
+                    String columnName = column.getString("name");
+                    String columnType = column.getString("type");
+                    VoltType vtype = VoltType.typeFromString(columnType);
+                    colInfo[i] = new VoltTable.ColumnInfo(columnName, vtype);
+                }
+                schemaTemp = new VoltTable(colInfo);
+
+                csvTemp = new CSVReader(new FileReader(csvdata));
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.exit(-1);
+            }
+
+            m_schema = schemaTemp;
+            m_csv = csvTemp;
+        }
+
+        public VoltTable tableForSchema() {
+            return m_schema;
+        }
+
+        boolean addRow(VoltTable t) {
+            if (m_csv != null) {
+                try {
+                    Object[] row = new Object[m_schema.getColumnCount()];
+                    String[] values = m_csv.readNext();
+                    if (values == null) return false;
+                    for (int i = 0; i < m_schema.getColumnCount(); i++) {
+                        VoltType type = m_schema.getColumnType(i);
+                        if (type.isInteger()) {
+                            row[i] = Long.parseLong(values[i]);
+                        }
+                        else if (type == VoltType.FLOAT) {
+                            row[i] = Double.parseDouble(values[i]);
+                        }
+                        else if (type == VoltType.STRING) {
+                            row[i] = values[i];
+                        }
+                        else if (type == VoltType.DECIMAL) {
+                            row[i] = VoltDecimalHelper.deserializeBigDecimalFromString(values[i]);
+                        }
+                        else {
+                            assert(false);
+                            System.exit(-1);
+                        }
+                    }
+
+                    // actually add the csv row
+                    t.addRow(row);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
+            }
+            else {
+                if ((m_rowCounter % 2) == 0) {
+                    t.addRow(m_rowCounter, "你好");
+                }
+                else {
+                    t.addRow(m_rowCounter, String.valueOf(m_rowCounter));
+                }
+            }
+            m_rowCounter++;
+            return true;
+        }
+
+        public String getSignature() {
+            ArrayList<VoltType> colTypes = new ArrayList<VoltType>();
+            for (int i = 0; i < m_schema.getColumnCount(); i++) {
+                colTypes.add(m_schema.getColumnType(i));
+            }
+            String signature = VoltTypeUtil.getSignatureForTable(colTypes);
+            return signature;
+        }
+
+        public boolean eof() {
+            return false;
+        }
+
+        public VoltTable nextBlock() {
+            try {
+                Thread.sleep(m_delay);
+            }
+            catch (InterruptedException e) {}
+
+            VoltTable next = m_schema.clone(2048 * 1024);
+
+            for (int i = 0; i < m_blockSize; i++) {
+                if (!addRow(next))
+                    return next;
+            }
+
+            return next;
+        }
+    }
+
     /**
      * @param args
      */
     public static void main(String[] args) {
-        run();
+        int blockSize = 5; // tuples / block
+        File csv = null;
+        File schema = null;
+        int delay = 1000;
+
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equals("--schema")) {
+                i++;
+                assert(args[i].startsWith("--") == false);
+                schema = new File(args[i]);
+            }
+            else if (args[i].equals("--data")) {
+                i++;
+                assert(args[i].startsWith("--") == false);
+                csv = new File(args[i]);
+            }
+            else if (args[i].equals("--delay")) {
+                i++;
+                assert(args[i].startsWith("--") == false);
+                delay = Integer.parseInt(args[i]);
+            }
+            else if (args[i].equals("--blocksize")) {
+                i++;
+                assert(args[i].startsWith("--") == false);
+                blockSize = Integer.parseInt(args[i]);
+            }
+            else {
+                System.err.println("Error, only --schema, --data, --blocksize and --delay are supported.\n");
+                System.exit(-1);
+            }
+        }
+
+        run(delay, blockSize, csv, schema);
     }
 
 }
