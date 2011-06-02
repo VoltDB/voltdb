@@ -34,7 +34,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.voltdb.CommandLog;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.SiteTracker;

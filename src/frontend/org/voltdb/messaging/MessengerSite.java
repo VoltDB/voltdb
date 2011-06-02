@@ -18,7 +18,6 @@
 package org.voltdb.messaging;
 
 import java.util.HashMap;
-import org.voltdb.CommandLog;
 
 class MessengerSite {
 

@@ -1214,7 +1214,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.flip();
             m_connection.write();
 
-            ByteBuffer data = null;
             ByteBuffer results = ByteBuffer.allocate(8);
             while (results.remaining() > 0)
                 m_connection.m_socketChannel.read(results);

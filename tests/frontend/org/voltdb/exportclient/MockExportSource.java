@@ -132,16 +132,12 @@ public class MockExportSource {
             out.write(openResponseBytes);
 
             while ((dataGen.eof() == false) && socket.isConnected()) {
-                System.out.println("Starting the mock export loop");
-
                 // get the ack/poll message
                 m = getNextExportMessage(in);
                 assert(m.isPoll());
-                System.out.println("Got ack");
 
                 // send  a block
                 VoltTable t = dataGen.nextBlock();
-                System.out.printf("exported: %s\n", t.toJSONString());
                 // an empty table means no more csv
                 if (t.getRowCount() == 0)
                     break;
@@ -152,7 +148,6 @@ public class MockExportSource {
                 m.writeToFastSerializer(fs);
                 byte[] pollResponseBytes = fs.getBytes();
                 out.write(pollResponseBytes);
-                System.out.println("Sent block");
             }
 
             // sleep until the socket closes
@@ -161,8 +156,6 @@ public class MockExportSource {
 
         }
         catch (EOFException e){
-            System.out.println("Connection closed");
-            System.out.flush();
             return;
         }
         catch (Exception e) {
@@ -171,11 +164,15 @@ public class MockExportSource {
         }
     }
 
-    public final static void run(int  delay, int blockSize) {
-        run(delay, blockSize, null, null);
+    public final static void run(int  delay, int blockSize, int tupleCount) {
+        runInternal(delay, blockSize, tupleCount, null, null);
     }
 
     public final static void run(int delay, int blockSize, File csv, File schema) {
+        runInternal(delay, blockSize, 0, csv, schema);
+    }
+
+    private final static void runInternal(int delay, int blockSize, int tupleCount, File csv, File schema) {
         try {
             ServerSocket listener = new ServerSocket(VoltDB.DEFAULT_PORT);
 
@@ -186,7 +183,7 @@ public class MockExportSource {
                 if (csv != null)
                     generator = new DataGenerator(delay, blockSize, csv, schema);
                 else
-                    generator = new DataGenerator(delay, blockSize);
+                    generator = new DataGenerator(delay, blockSize, tupleCount);
 
                 acceptThread(sock, generator);
             }
@@ -203,10 +200,12 @@ public class MockExportSource {
         final VoltTable m_schema;
         final CSVReader m_csv;
         long m_rowCounter = 0;
+        final int m_tupleCount;
 
-        public DataGenerator(int delay, int blockSize) {
+        public DataGenerator(int delay, int blockSize, int tupleCount) {
             m_delay = delay;
             m_blockSize = blockSize;
+            m_tupleCount = tupleCount;
 
             m_schema = new VoltTable(
                     new VoltTable.ColumnInfo("foo", VoltType.BIGINT),
@@ -218,6 +217,7 @@ public class MockExportSource {
         public DataGenerator(int delay, int blockSize, File csvdata, File schema) {
             m_delay = delay;
             m_blockSize = blockSize;
+            m_tupleCount = 0;
 
             VoltTable schemaTemp = null;
             CSVReader csvTemp = null;
@@ -294,6 +294,10 @@ public class MockExportSource {
                 }
             }
             else {
+                // stop if we've done enough tuples
+                if ((m_tupleCount > 0) && (m_rowCounter == m_tupleCount))
+                    return false;
+
                 if ((m_rowCounter % 2) == 0) {
                     t.addRow(m_rowCounter, "你好");
                 }

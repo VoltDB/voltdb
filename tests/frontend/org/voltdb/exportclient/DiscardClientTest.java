@@ -23,34 +23,24 @@
 
 package org.voltdb.exportclient;
 
-import java.io.File;
-import java.net.InetSocketAddress;
-
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB;
+public class DiscardClientTest extends TestCase {
 
-public class ExportClientSuddenDeathTest extends TestCase {
-
-    public void testDeath() throws ExportClientException {
-        Thread t = new Thread() {
+    public void testSimple() throws ExportClientException {
+        new Thread() {
             @Override
             public void run() {
-                MockExportSource.run(1, 1, 0);
+                MockExportSource.run(0, 10, 0);
             }
-        };
-        t.start();
-        ExportToFileClient etfc = new ExportToFileClient(',',
-                                                         "N",
-                                                         new File("."),
-                                                         1,
-                                                         "yyyyMMddHHmmss",
-                                                         0,
-                                                         false);
+        }.start();
 
-        InetSocketAddress addr = new InetSocketAddress("127.0.0.1", VoltDB.DEFAULT_PORT);
-        etfc.addServerInfo(addr);
-        etfc.run();
+        // start the voltdb discarding export client
+        DiscardingExportClient exportClient = new DiscardingExportClient(false);
+        exportClient.addServerInfo("localhost", false);
+        exportClient.addCredentials("", "");
+
+        exportClient.run();
     }
 
 }
