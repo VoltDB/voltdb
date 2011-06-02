@@ -619,7 +619,7 @@ JAR BUILDING
             <include name="org/voltdb/**" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/eclipse/jetty_voltpatches/**" />
-            <include name="org/hsqldb_voltpatches/**" />
+            <include name="org/opencsv_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
         </fileset>
