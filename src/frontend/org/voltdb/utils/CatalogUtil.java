@@ -929,13 +929,13 @@ public abstract class CatalogUtil {
         File snapshotPath;
         if (paths == null || paths.getSnapshots() == null) {
             snapshotPath = new VoltFile(voltDbRoot, "snapshots");
-            if (!snapshotPath.exists()) {
-                if (!snapshotPath.mkdir()) {
-                    hostLog.fatal("Failed to create snapshot directory \"" + snapshotPath + "\"");
-                }
-            }
         } else {
             snapshotPath = new VoltFile(paths.getSnapshots().getPath());
+        }
+        if (!snapshotPath.exists()) {
+            if (!snapshotPath.mkdirs()) {
+                hostLog.fatal("Failed to create snapshot directory \"" + snapshotPath + "\"");
+            }
         }
 
         validateDirectory("snapshot path", snapshotPath, crashOnFailedValidation);
@@ -943,14 +943,14 @@ public abstract class CatalogUtil {
         File exportOverflowPath;
         if (paths == null || paths.getExportoverflow() == null) {
             exportOverflowPath = new VoltFile(voltDbRoot, "export_overflow");
-            if (!exportOverflowPath.exists()) {
-                if (!exportOverflowPath.mkdir()) {
-                    hostLog.fatal("Failed to create export overflow directory \""
-                            + exportOverflowPath + "\"");
-                }
-            }
         } else {
             exportOverflowPath = new VoltFile(paths.getExportoverflow().getPath());
+        }
+        if (!exportOverflowPath.exists()) {
+            if (!exportOverflowPath.mkdirs()) {
+                hostLog.fatal("Failed to create export overflow directory \""
+                              + exportOverflowPath + "\"");
+            }
         }
 
         validateDirectory("export overflow", exportOverflowPath, crashOnFailedValidation);
