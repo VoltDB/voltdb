@@ -1048,7 +1048,7 @@ public class RealVoltDB implements VoltDBInterface
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
         hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", adminPort));
 
-        if (m_mode == OperationMode.PAUSED) {
+        if (m_startMode == OperationMode.PAUSED) {
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
         }
         if (httpPortExtraLogMessage != null)

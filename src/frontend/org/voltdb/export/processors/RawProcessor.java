@@ -196,6 +196,12 @@ public class RawProcessor implements ExportDataProcessor {
                 return;
             }
 
+            else if (VoltDB.instance().getMode() == OperationMode.INITIALIZING)
+            {
+                protocolError(m, "Server has not finished initialization");
+                return;
+            }
+
             else if (m.isOpen()) {
                 if (m_state != RawProcessor.CLOSED) {
                     protocolError(m, "Client must not open an already opened connection.");
