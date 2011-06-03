@@ -20,6 +20,12 @@ package org.voltdb;
 import java.util.Set;
 
 public interface CommandLogReinitiator {
+    public interface Callback {
+        public void onReplayCompletion();
+    }
+
+    public void setCallback(Callback callback);
+
     /**
      * Start replaying the log. Two threads will be started, one for reading the
      * log and transforming them into task messages, the other one for reading
@@ -46,4 +52,10 @@ public interface CommandLogReinitiator {
      * @param val true to skip
      */
     public void skipMultiPartitionTxns(boolean val);
+
+    /**
+     * Whether or not there were SPIs replayed
+     * @return true if there were at least one SPI replayed
+     */
+    public boolean hasReplayed();
 }

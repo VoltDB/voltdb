@@ -316,6 +316,8 @@ public class RealVoltDB implements VoltDBInterface
 
     private final VoltDBNodeFailureFaultHandler m_faultHandler = new VoltDBNodeFailureFaultHandler();
 
+    private RestoreAgent m_restoreAgent = null;
+
     private volatile boolean m_isRunning = false;
 
     @Override
@@ -356,6 +358,8 @@ public class RealVoltDB implements VoltDBInterface
     };
 
     private CommandLogReinitiator m_commandLogReplay = new CommandLogReinitiator() {
+        private Callback m_callback = null;
+
         @Override
         public void skipPartitions(Set<Integer> partitions) {}
         @Override
@@ -363,10 +367,20 @@ public class RealVoltDB implements VoltDBInterface
         @Override
         public void replay() {
             // Shortcut to enable the cluster for normal operation
-            onReplayCompletion();
+            if (m_callback != null) {
+                m_callback.onReplayCompletion();
+            }
         }
         @Override
         public void join() throws InterruptedException {}
+        @Override
+        public void setCallback(Callback callback) {
+            m_callback = callback;
+        }
+        @Override
+        public boolean hasReplayed() {
+            return false;
+        }
     };
 
     private volatile OperationMode m_mode = OperationMode.RUNNING;
@@ -835,6 +849,9 @@ public class RealVoltDB implements VoltDBInterface
                 hostLog.warn("Running without redundancy (k=0) is not recommended for production use.");
             }
 
+            assert(m_clientInterfaces.size() > 0);
+            ClientInterface ci = m_clientInterfaces.get(0);
+            TransactionInitiator initiator = ci.getInitiator();
             // TODO: disable replay until the UI is in place
             boolean replay = false;
             if (!isRejoin && replay) {
@@ -867,9 +884,6 @@ public class RealVoltDB implements VoltDBInterface
                                                                             CatalogContext.class);
 
                     if (reader != null && !reader.isEmpty()) {
-                        assert(m_clientInterfaces.size() > 0);
-                        ClientInterface ci = m_clientInterfaces.get(0);
-                        TransactionInitiator initiator = ci.getInitiator();
                         m_commandLogReplay =
                             (CommandLogReinitiator) constructor.newInstance(reader,
                                                                             0,
@@ -885,6 +899,9 @@ public class RealVoltDB implements VoltDBInterface
                     VoltDB.crashVoltDB();
                 }
             }
+
+            m_restoreAgent = new RestoreAgent(m_catalogContext, initiator,
+                                              m_commandLogReplay);
         }
     }
 
@@ -1138,8 +1155,8 @@ public class RealVoltDB implements VoltDBInterface
             }
         }
 
-        // start command log replay
-        m_commandLogReplay.replay();
+        // start restore process
+        m_restoreAgent.restore();
 
         // start one site in the current thread
         Thread.currentThread().setName("ExecutionSiteAndVoltDB");
@@ -1675,13 +1692,11 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onReplayCompletion() {
+    public void onRestoreCompletion() {
         // Enable the initiator to send normal heartbeats
         for (ClientInterface ci : m_clientInterfaces) {
             ci.getInitiator().setSendHeartbeats(true);
         }
-
-        // TODO: init a snapshot to truncate the logs
 
         // Initialize command logger
         m_commandLog.init(m_catalogContext);

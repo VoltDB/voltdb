@@ -169,5 +169,5 @@ public interface VoltDBInterface
     /**
      * Notify RealVoltDB that command log replay is complete
      */
-    public void onReplayCompletion();
+    public void onRestoreCompletion();
 }

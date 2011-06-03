@@ -472,7 +472,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onReplayCompletion() {
+    public void onRestoreCompletion() {
         // TODO Auto-generated method stub
 
     }
