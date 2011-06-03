@@ -505,11 +505,11 @@ public class RealVoltDB implements VoltDBInterface
             if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
                 try {
                     @SuppressWarnings("rawtypes")
-                    Class loggerClass = Class.forName("org.voltdb.CommandLogImpl");
-                    m_commandLog = (CommandLog)loggerClass.newInstance();
-                } catch (ClassNotFoundException e) {
-                    hostLog.warn("Can't enable command logging with the community version of VoltDB." +
-                            " Logging is disabled.");
+                    Class loggerClass = loadProClass("org.voltdb.CommandLogImpl",
+                                                     "Command logging", false);
+                    if (loggerClass != null) {
+                        m_commandLog = (CommandLog)loggerClass.newInstance();
+                    }
                 } catch (InstantiationException e) {
                     hostLog.fatal("Unable to instantiate command log", e);
                     VoltDB.crashVoltDB();
@@ -865,12 +865,12 @@ public class RealVoltDB implements VoltDBInterface
                     String logpath = m_catalogContext.cluster.getLogconfig().get("log").getLogpath();
                     File path = new File(logpath);
 
-                    Class<?> readerClass = Class.forName("org.voltdb.utils.LogReaderImpl");
-                    Constructor<?> constructor = readerClass.getConstructor(File.class);
-                    reader = (LogReader) constructor.newInstance(path);
-                } catch (ClassNotFoundException e) {
-                    hostLog.warn("Cannot load command log module in VoltDB community edition." +
-                                 " Skipping command log replay.");
+                    Class<?> readerClass = loadProClass("org.voltdb.utils.LogReaderImpl",
+                                                        null, true);
+                    if (readerClass != null) {
+                        Constructor<?> constructor = readerClass.getConstructor(File.class);
+                        reader = (LogReader) constructor.newInstance(path);
+                    }
                 } catch (InvocationTargetException e) {
                     hostLog.info("Unable to instantiate command log reader: " +
                                  e.getTargetException().getMessage());
@@ -881,23 +881,25 @@ public class RealVoltDB implements VoltDBInterface
 
                 // Load command log reinitiator
                 try {
-                    Class<?> replayClass = Class.forName("org.voltdb.CommandLogReinitiatorImpl");
-                    Constructor<?> constructor = replayClass.getConstructor(LogReader.class,
-                                                                            long.class,
-                                                                            TransactionInitiator.class,
-                                                                            CatalogContext.class);
+                    Class<?> replayClass = loadProClass("org.voltdb.CommandLogReinitiatorImpl",
+                                                        "Command log replay", false);
+                    if (replayClass != null) {
+                        Constructor<?> constructor =
+                            replayClass.getConstructor(LogReader.class,
+                                                       long.class,
+                                                       TransactionInitiator.class,
+                                                       CatalogContext.class);
 
-                    if (reader != null && !reader.isEmpty()) {
-                        m_commandLogReplay =
-                            (CommandLogReinitiator) constructor.newInstance(reader,
-                                                                            0,
-                                                                            initiator,
-                                                                            m_catalogContext);
-                    } else {
-                        hostLog.info("No command log to replay");
+                        if (reader != null && !reader.isEmpty()) {
+                            m_commandLogReplay =
+                                (CommandLogReinitiator) constructor.newInstance(reader,
+                                                                                0,
+                                                                                initiator,
+                                                                                m_catalogContext);
+                        } else {
+                            hostLog.info("No command log to replay");
+                        }
                     }
-                } catch (ClassNotFoundException e) {
-                    hostLog.warn("Running community edition, skipping command log replay");
                 } catch (Exception e) {
                     hostLog.fatal("Unable to instantiate command log reinitiator", e);
                     VoltDB.crashVoltDB();
@@ -906,6 +908,28 @@ public class RealVoltDB implements VoltDBInterface
 
             m_restoreAgent = new RestoreAgent(m_catalogContext, initiator,
                                               m_commandLogReplay);
+        }
+    }
+
+    /**
+     * Try to load a PRO class. If it's running the community edition, an error
+     * message will be logged and null will be returned.
+     *
+     * @param classname The class name of the PRO class
+     * @param feature The name of the feature
+     * @param suppress true to suppress the log message
+     * @return null if running the community edition
+     */
+    private static Class<?> loadProClass(String classname, String feature, boolean suppress) {
+        try {
+            Class<?> klass = Class.forName(classname);
+            return klass;
+        } catch (ClassNotFoundException e) {
+            if (!suppress) {
+                hostLog.warn("Cannot load " + classname + " in VoltDB community edition. " +
+                             feature + " will be disabled.");
+            }
+            return null;
         }
     }
 
