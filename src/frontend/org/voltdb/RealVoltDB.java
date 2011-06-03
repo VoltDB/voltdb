@@ -381,6 +381,10 @@ public class RealVoltDB implements VoltDBInterface
         public boolean hasReplayed() {
             return false;
         }
+        @Override
+        public long getMinLastSeenTxn() {
+            return 0;
+        }
     };
 
     private volatile OperationMode m_mode = OperationMode.RUNNING;

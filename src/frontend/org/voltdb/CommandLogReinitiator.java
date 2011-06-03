@@ -58,4 +58,12 @@ public interface CommandLogReinitiator {
      * @return true if there were at least one SPI replayed
      */
     public boolean hasReplayed();
+
+    /**
+     * Get the minimum transaction ID among the last seen transactions across
+     * all initiators in the previous segment.
+     *
+     * @return
+     */
+    public long getMinLastSeenTxn();
 }

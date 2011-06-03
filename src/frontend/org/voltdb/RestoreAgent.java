@@ -215,7 +215,19 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
         TreeMap<Long, Snapshot> snapshots = getSnapshots();
         TreeMap<Long, SnapshotInfo> snapshotInfos = new TreeMap<Long, SnapshotInfo>();
 
+        final long minLastSeenTxn = m_replayAgent.getMinLastSeenTxn();
         for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
+            /*
+             * If the txn of the snapshot is before the earliest txn among
+             * the last seen txns across all initiators when the log starts,
+             * there is a gap in between the snapshot was taken and the
+             * beginning of the log. So the snapshot is not viable for
+             * replay.
+             */
+            if (e.getKey() < minLastSeenTxn) {
+                continue;
+            }
+
             Snapshot s = e.getValue();
             File digest = s.m_digests.get(0);
             SnapshotInfo info = new SnapshotInfo(e.getKey(), digest.getPath(),

@@ -28,6 +28,14 @@ public interface LogReader {
     public interface LogIterator extends Iterator<LogEntry> {}
 
     /**
+     * Get the minimum transaction ID among the last seen transactions across
+     * all initiators in the previous segment.
+     *
+     * @return
+     */
+    public long getMinLastSeenTxn();
+
+    /**
      * Get the total number of partitions that were in the database.
      *
      * @return The partition count
