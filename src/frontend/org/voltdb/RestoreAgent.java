@@ -17,7 +17,17 @@
 
 package org.voltdb;
 
+import java.io.File;
+import java.io.FileFilter;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
@@ -31,6 +41,9 @@ import org.voltdb.messaging.FastSerializable;
 import org.voltdb.network.Connection;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.EstTime;
@@ -154,6 +167,24 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
         }
     }
 
+    /**
+     * Information about the local files of a specific snapshot that will be
+     * used to generate a restore plan
+     */
+    private static class SnapshotInfo {
+        public final long txnId;
+        public final String path;
+        public final String nonce;
+        // All the partitions in the local snapshot file
+        public final Map<String, Set<Integer>> partitions = new TreeMap<String, Set<Integer>>();
+
+        public SnapshotInfo(long txnId, String path, String nonce) {
+            this.txnId = txnId;
+            this.path = path;
+            this.nonce = nonce;
+        }
+    }
+
     public RestoreAgent(CatalogContext context, TransactionInitiator initiator,
                         CommandLogReinitiator replay) {
         m_context = context;
@@ -173,9 +204,34 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
      * snapshot, then replay the logs, followed by a snapshot to truncate the
      * logs.
      */
+    @SuppressWarnings("unused")
     public void restore() {
+        // TODO: disable restore for now. Agreement service is still a work in progress
+        VoltDB.instance().onRestoreCompletion();
+
+        if (false) {
         // Transaction ID of the restore sysproc
         final long txnId = 1l;
+        TreeMap<Long, Snapshot> snapshots = getSnapshots();
+        TreeMap<Long, SnapshotInfo> snapshotInfos = new TreeMap<Long, SnapshotInfo>();
+
+        for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
+            Snapshot s = e.getValue();
+            File digest = s.m_digests.get(0);
+            SnapshotInfo info = new SnapshotInfo(e.getKey(), digest.getPath(),
+                                                 parseDigestFilename(digest.getName()));
+            for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
+                TableFiles tableFile = te.getValue();
+                HashSet<Integer> ids = new HashSet<Integer>();
+                for (Set<Integer> idSet : tableFile.m_validPartitionIds) {
+                    ids.addAll(idSet);
+                }
+                info.partitions.put(te.getKey(), ids);
+            }
+            snapshotInfos.put(e.getKey(), info);
+        }
+
+        // TODO: negotiate with other hosts on which snapshot to restore
 
         // If this is null, it must be running test
         if (VoltDB.instance().getHostMessenger() != null) {
@@ -213,6 +269,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
                 }
             }
         }).start();
+        }
     }
 
     /**
@@ -350,12 +407,52 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
     }
 
     /**
-     * Finds the last snapshot in all the places we know of which could possibly
+     * Finds all the snapshots in all the places we know of which could possibly
      * store snapshots, like command log snapshots, auto snapshots, etc.
      *
-     * @return The path and nonce of the last snapshot
+     * @return All snapshots
      */
-    private Pair<String, String> getLastSnapshot() {
-        return null;
+    private TreeMap<Long, Snapshot> getSnapshots() {
+        Comparator<Long> comparator = new Comparator<Long>() {
+            @Override
+            public int compare(Long arg0, Long arg1) {
+                return -arg0.compareTo(arg1);
+            }
+        };
+
+        /*
+         * Use the individual snapshot directories instead of voltroot, because
+         * they can be set individually
+         */
+        List<String> paths = new ArrayList<String>();
+        paths.add(m_context.cluster.getLogconfig().get("log").getInternalsnapshotpath());
+        paths.add(m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath());
+        paths.add(m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPath());
+        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>(comparator);
+        FileFilter filter = new SnapshotUtil.SnapshotFilter();
+
+        for (String path : paths) {
+            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, 0, true);
+        }
+
+        return snapshots;
+    }
+
+    /**
+     * Get the nonce from the filename of the digest file.
+     * @param filename The filename of the digest file
+     * @return The nonce
+     */
+    private static String parseDigestFilename(String filename) {
+        if (filename == null || !filename.endsWith(".digest")) {
+            throw new IllegalArgumentException();
+        }
+
+        String nonce = filename.substring(0, filename.indexOf(".digest"));
+        if (nonce.contains("-host_")) {
+            nonce = nonce.substring(0, nonce.indexOf("-host_"));
+        }
+
+        return nonce;
     }
 }
