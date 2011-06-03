@@ -50,7 +50,7 @@ import org.voltdb.utils.Pair;
 public class RestoreAgent implements CommandLogReinitiator.Callback {
     private final static VoltLogger LOG = new VoltLogger("RESTORE");
     // TODO: Nonce for command-log snapshots, TBD
-    public final static String CL_NONCE = "command-log";
+    public final static String CL_NONCE = "command_log";
 
     private final CatalogContext m_context;
     private final TransactionInitiator m_initiator;
@@ -174,6 +174,9 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
      * logs.
      */
     public void restore() {
+        // Transaction ID of the restore sysproc
+        final long txnId = 1l;
+
         // If this is null, it must be running test
         if (VoltDB.instance().getHostMessenger() != null) {
             /*
@@ -183,8 +186,14 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             int lowestHost = m_context.siteTracker.getHostForSite(lowestSite);
             if (VoltDB.instance().getHostMessenger().getHostId() == lowestHost) {
                 String path = m_context.cluster.getLogconfig().get("log").getInternalsnapshotpath();
-                initSnapshotWork(1l, Pair.of("@SnapshotRestore",
-                                             new Object[] {path, CL_NONCE}));
+                initSnapshotWork(txnId, Pair.of("@SnapshotRestore",
+                                                new Object[] {path, CL_NONCE}));
+            } else {
+                /*
+                 * Hosts that are not initiating the restore should change state
+                 * immediately
+                 */
+                changeState();
             }
         }
 
@@ -196,7 +205,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             @Override
             public void run() {
                 while (m_state == State.RESTORE) {
-                    m_initiator.sendHeartbeat(2);
+                    m_initiator.sendHeartbeat(txnId + 1);
 
                     try {
                         Thread.sleep(500);
@@ -259,11 +268,42 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
                           res.getStatusString());
                 VoltDB.crashVoltDB();
             }
+        } else {
+            // Check the result of the snapshot save
+            VoltTable[] results = res.getResults();
+            if (results.length != 1) {
+                LOG.fatal("Snapshot response doesn't contain any results");
+                VoltDB.crashVoltDB();
+            }
+
+            while (results[0].advanceRow()) {
+                String err = results[0].getString("ERR_MSG");
+                if (!err.isEmpty()) {
+                    LOG.fatal(err);
+                    VoltDB.crashVoltDB();
+                }
+
+                String result = results[0].getString("RESULT");
+                if (!result.equalsIgnoreCase("success")) {
+                    String host = results[0].getString("HOSTNAME");
+                    LOG.fatal(host + " failed: " + result);
+                    VoltDB.crashVoltDB();
+                }
+            }
         }
 
+        changeState();
+    }
+
+    /**
+     * Change the state of the restore agent based on the current state.
+     */
+    private void changeState() {
         if (m_state == State.RESTORE) {
             m_replayAgent.replay();
             m_state = State.REPLAY;
+        } else if (m_state == State.REPLAY) {
+            m_state = State.TRUNCATE;
         } else if (m_state == State.TRUNCATE) {
             VoltDB.instance().onRestoreCompletion();
         }
@@ -285,13 +325,37 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
                         m_context.cluster.getLogconfig().get("log").getInternalsnapshotpath();
                     initSnapshotWork(null, Pair.of("@SnapshotSave",
                                                    new Object[] {path, CL_NONCE, 1}));
+                } else {
+                    /*
+                     * For hosts that are not initiating this snapshot save,
+                     * needs agreement among all nodes before going into normal
+                     * mode.
+                     */
+                    // TODO: agreement. For now, let's just change state to truncate and call it done
+                    m_state = State.TRUNCATE;
                 }
-
             }
 
-            m_state = State.TRUNCATE;
+            changeState();
         } else {
-            VoltDB.instance().onRestoreCompletion();
+            /*
+             * Needs global agreement on whether the command log truncation has
+             * finished or not.
+             */
+
+            // TODO: agreement
+            m_state = State.TRUNCATE;
+            changeState();
         }
+    }
+
+    /**
+     * Finds the last snapshot in all the places we know of which could possibly
+     * store snapshots, like command log snapshots, auto snapshots, etc.
+     *
+     * @return The path and nonce of the last snapshot
+     */
+    private Pair<String, String> getLastSnapshot() {
+        return null;
     }
 }

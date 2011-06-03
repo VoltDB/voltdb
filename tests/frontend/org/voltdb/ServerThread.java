@@ -67,7 +67,8 @@ public class ServerThread extends Thread {
 
     public void waitForInitialization() {
         // Wait until the server has actually started running.
-        while (!VoltDB.instance().isRunning()) {
+        while (!VoltDB.instance().isRunning() ||
+               VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
             Thread.yield();
         }
     }
