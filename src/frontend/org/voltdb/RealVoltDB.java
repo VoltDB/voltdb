@@ -603,7 +603,7 @@ public class RealVoltDB implements VoltDBInterface
                 }
 
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
-                hostLog.info(String.format("Beginning inter-node communicaton on port %d.", config.m_internalPort));
+                hostLog.info(String.format("Beginning inter-node communication on port %d.", config.m_internalPort));
                 m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, m_catalogContext.catalogCRC, depCRC, hostLog);
                 Object retval[] = m_messenger.waitForGroupJoin();
                 m_instanceId = new Object[] { retval[0], retval[1] };
@@ -945,7 +945,7 @@ public class RealVoltDB implements VoltDBInterface
             rejoinPort = Integer.parseInt(rejoinHostAddressString.substring(colonIndex + 1).trim());
         }
 
-        hostLog.info(String.format("Inter-node communicaton will use port %d.", config.m_internalPort));
+        hostLog.info(String.format("Inter-node communication will use port %d.", config.m_internalPort));
         ServerSocketChannel listener = null;
         try {
             listener = ServerSocketChannel.open();
