@@ -24,12 +24,19 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.TreeMap;
 
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
@@ -50,102 +57,368 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 public class ExportToFileClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
+    // These get put in from of the batch folders
+    // active means the folder is being written to
+    private static final String ACTIVE_PREFIX = "active-";
+
+    // ODBC Datetime Format
+    // if you need microseconds, you'll have to change this code or
+    //  export a bigint representing microseconds since an epoch
+    protected final SimpleDateFormat m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+
+    // Batches only supports CSV or TSV
     protected final char m_delimiter;
+    protected final String m_extension;
     protected final String m_nonce;
+    // outDir is the folder that will contain the raw files or batch folders
     protected final File m_outDir;
+    // the set of active decoders
     protected final HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
+    // how often to roll batches / files
     protected final int m_period;
     protected final SimpleDateFormat m_dateformat;
     protected final int m_firstfield;
+
+    // timer used to roll batches
+    protected final Timer m_timer = new Timer();
+
+    // record the original command line args for servers
     protected final List<String> m_commandLineServerArgs = new ArrayList<String>();
+
     protected final String m_dateFormatOriginalString;
 
-    // This class outputs exported rows converted to CSV or TSV values
-    // for the table named in the constructor's AdvertisedDataSource
-    class ExportToFileDecoder extends ExportDecoderBase {
-        protected String m_currentFilename;
-        protected String m_extension;
-        protected String m_prefix;
-        protected SimpleDateFormat m_dateformat;
-        protected int m_period;
-        protected Date m_lastWriterCreation;
-        protected CSVWriter m_writer;
-        protected final SimpleDateFormat m_sdf;
-        protected final int m_firstfield;
-        protected final char m_delimiter;
-        private final long m_generation;
-        private final String m_tableName;
-        private final HashSet<AdvertisedDataSource> m_sources = new HashSet<AdvertisedDataSource>();
+    protected final Set<String> m_globalSchemasWritten = new HashSet<String>();
 
-        private void EnsureFileStream() {
+    protected PeriodicExportContext m_current = null;
 
-            Calendar calendar = Calendar.getInstance();
-            Date now = calendar.getTime();
-            calendar.add(Calendar.MINUTE, -m_period);
-            Date periodCheck = calendar.getTime();
-            if ((m_lastWriterCreation != null) && m_lastWriterCreation.after(periodCheck)) {
-                return;
-            }
-            String filename = m_prefix + m_dateformat.format(now) + m_extension;
-            if (filename == m_currentFilename) {
-                return;
-            } else {
-                if (m_writer != null) {
-                    try {
-                        m_writer.flush();
-                        m_writer.close();
-                    } catch (Exception e) {
-                        m_logger.error(e.getMessage());
-                        throw new RuntimeException();
-                    }
-                }
-                m_currentFilename = filename;
-                m_lastWriterCreation = now;
+    protected final boolean m_batched;
+    protected final boolean m_withSchema;
+
+    /**
+    *
+    */
+    public void notifyRollIsComplete(File[] files) {}
+
+    class PeriodicExportContext {
+        final File m_dirContainingFiles;
+        final Map<FileHandle, CSVWriter> m_writers = new TreeMap<FileHandle, CSVWriter>();
+        boolean m_hasClosed = false;
+        protected final Date start;
+        protected Date end = null;
+        protected HashSet<ExportToFileDecoder> m_decoders = new HashSet<ExportToFileDecoder>();
+        protected final Set<String> m_batchSchemasWritten = new HashSet<String>();
+
+        class FileHandle implements Comparable<FileHandle> {
+            final String tableName;
+            final long generation;
+
+            FileHandle(String tableName, long generation) {
+                this.tableName = tableName;
+                this.generation = generation;
             }
 
-            m_logger.info("Opening filename " + m_currentFilename);
-            try {
-                if (m_delimiter == '\t') {
-                    // tsv format escapes differently
-                    m_writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(
-                            new OutputStreamWriter(new FileOutputStream(m_currentFilename, true), "UTF-8"),
-                            1048576));
+            String getPath(String prefix) {
+                if (m_batched) {
+                    return m_dirContainingFiles.getPath() +
+                           File.separator +
+                           generation +
+                           "-" +
+                           tableName +
+                           m_extension;
                 }
                 else {
-                    // csv is very standard with nice quotes around everything
-                    m_writer = new CSVWriter(new BufferedWriter(
-                                new OutputStreamWriter(new FileOutputStream(m_currentFilename, true), "UTF-8"),
-                                1048576),
-                            m_delimiter);
+                    return m_dirContainingFiles.getPath() +
+                           File.separator +
+                           prefix +
+                           m_nonce +
+                           "-" +
+                           generation +
+                           "-" +
+                           tableName +
+                           "-" +
+                           m_dateformat.format(start) +
+                           m_extension;
+                }
+            }
+
+            String getPathForSchema() {
+                if (m_batched) {
+                    return m_dirContainingFiles.getPath() +
+                           File.separator +
+                           generation +
+                           "-" +
+                           tableName +
+                           "-schema.json";
+                }
+                else {
+                    return m_dirContainingFiles.getPath() +
+                           File.separator +
+                           m_nonce +
+                           "-" +
+                           generation +
+                           "-" +
+                           tableName +
+                           "-schema.json";
+                }
+            }
+
+            @Override
+            public int compareTo(FileHandle obj) {
+                int first = tableName.compareTo(obj.tableName);
+                if (first != 0) return first;
+                long second = generation - obj.generation;
+                if (second > 0) return 1;
+                if (second < 0) return -1;
+                return 0;
+            }
+        }
+
+        PeriodicExportContext(Date batchStart) {
+            start = batchStart;
+
+            if (m_batched) {
+                m_dirContainingFiles = new File(getPathOfBatchDir(ACTIVE_PREFIX));
+                m_logger.trace(String.format("Creating dir for batch at %s", m_dirContainingFiles.getPath()));
+                boolean created = m_dirContainingFiles.mkdirs();
+                assert(created);
+            }
+            else {
+                m_dirContainingFiles = m_outDir;
+            }
+        }
+
+        String getPathOfBatchDir(String prefix) {
+            assert(m_batched);
+            return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.format(start);
+        }
+
+        /**
+         * Release a hold on the batch. When all holds are done
+         * and the roll time has passed, the batch can move out
+         * of the active state.
+         */
+        void decref(ExportToFileDecoder decoder) {
+            synchronized (getClass()) {
+                m_decoders.remove(decoder);
+                if ((end != null) && (m_decoders.size() == 0)) {
+                    closeAllWriters();
+                }
+            }
+        }
+
+        /**
+         * Flush and close all active writers, allowing the batch to
+         * move from the active state into the finished state. This is
+         * done as part of the roll process, or as part of the
+         * unexpected shutdown process.
+         *
+         * Note this method is idempotent.
+         *
+         * @param clean True if we expect all writer have finished. False
+         * if we just need to be done.
+         */
+        void closeAllWriters() {
+            // only need to run this once per batch
+            if (m_hasClosed) return;
+
+            // flush and close any files that are open
+            for (Entry<FileHandle, CSVWriter> entry : m_writers.entrySet()) {
+                CSVWriter writer = entry.getValue();
+                if (writer == null) continue;
+                try {
+                    writer.flush();
+                    writer.close();
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+
+            if (m_batched)
+                closeBatch();
+            else
+                closeFiles();
+
+            // empty the writer set (probably not needed)
+            m_writers.clear();
+
+            // note that we're closed now
+            m_hasClosed = true;
+        }
+
+        void closeBatch() {
+            // rename the file appropriately
+            m_logger.trace("Renaming batch.");
+
+            String oldPath = getPathOfBatchDir(ACTIVE_PREFIX);
+            String newPath = getPathOfBatchDir("");
+
+            File oldDir = new File(oldPath);
+            assert(oldDir.exists());
+            assert(oldDir.isDirectory());
+            assert(oldDir.canWrite());
+
+            if (oldDir.listFiles().length > 0) {
+                File newDir = new File(newPath);
+                oldDir.renameTo(newDir);
+                notifyRollIsComplete(new File[] { newDir });
+            }
+            else {
+                oldDir.delete();
+            }
+        }
+
+        void closeFiles() {
+            File[] notifySet = new File[m_writers.size()];
+
+            int i = 0;
+            for (Entry<FileHandle, CSVWriter> e : m_writers.entrySet()) {
+                FileHandle handle = e.getKey();
+
+                String oldPath = handle.getPath(ACTIVE_PREFIX);
+                String newPath = handle.getPath("");
+
+                File oldFile = new File(oldPath);
+                assert(oldFile.exists());
+                assert(oldFile.isFile());
+                assert(oldFile.canWrite());
+
+                File newFile = new File(newPath);
+                assert(!newFile.exists());
+                oldFile.renameTo(newFile);
+
+                notifySet[i] = newFile;
+                i++;
+            }
+
+            notifyRollIsComplete(notifySet);
+        }
+
+        CSVWriter getWriter(String tableName, long generation) {
+            FileHandle handle = new FileHandle(tableName, generation);
+            CSVWriter writer = m_writers.get(handle);
+            if (writer != null)
+                return writer;
+
+            String path = handle.getPath(ACTIVE_PREFIX);
+            File newFile = new File(path);
+            try {
+                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, true), "UTF-8");
+                writer = new CSVWriter(new BufferedWriter(osw, 1048576));
+            } catch (Exception e) {
+                m_logger.error(e.getMessage());
+                m_logger.error("Error: Failed to create output file: " + path);
+                throw new RuntimeException();
+            }
+            m_writers.put(handle, writer);
+            return writer;
+        }
+
+        void writeSchema(String tableName, long generation, String schema) {
+            // if no schema's enabled pretend like this worked
+            if (!m_withSchema) return;
+
+            FileHandle handle = new FileHandle(tableName, generation);
+            String path = handle.getPathForSchema();
+
+            // only write the schema once per batch
+            if (m_batched) {
+                if (m_batchSchemasWritten.contains(path)) {
+                    return;
+                }
+            }
+            else {
+                if (m_globalSchemasWritten.contains(path)) {
+                    return;
+                }
+            }
+
+            File newFile = new File(path);
+            try {
+                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, true), "UTF-8");
+                BufferedWriter writer = new BufferedWriter(osw, 1048576);
+                writer.write(schema);
+                writer.flush();
+                writer.close();
+                if (m_batched) {
+                    m_batchSchemasWritten.add(path);
+                }
+                else {
+                    m_globalSchemasWritten.add(path);
                 }
             } catch (Exception e) {
                 m_logger.error(e.getMessage());
-                m_logger.error("Error: Failed to create output file: " + m_currentFilename);
+                m_logger.error("Error: Failed to create output file: " + path);
                 throw new RuntimeException();
             }
         }
 
-        public ExportToFileDecoder(AdvertisedDataSource source, String tableName, String nonce, File outdir,
-                char delimiter, int period, SimpleDateFormat dateformat, int firstfield, long generation) {
+        /**
+         * Try to ensure file descriptors are closed.
+         * This probably only really is useful for the crl-c case.
+         * Still, it's not very well tested.
+         */
+        @Override
+        protected void finalize() throws Throwable {
+            synchronized (getClass()) {
+                closeAllWriters();
+            }
+            super.finalize();
+        }
+    }
+
+    // This class outputs exported rows converted to CSV or TSV values
+    // for the table named in the constructor's AdvertisedDataSource
+    class ExportToFileDecoder extends ExportDecoderBase {
+        private final long m_generation;
+        private final String m_tableName;
+        protected String m_schemaString = "ERROR SERIALIZING SCHEMA";
+        private final HashSet<AdvertisedDataSource> m_sources = new HashSet<AdvertisedDataSource>();
+
+        // transient per-block state
+        protected PeriodicExportContext m_context = null;
+        protected CSVWriter m_writer = null;
+
+        public ExportToFileDecoder(AdvertisedDataSource source, String tableName, long generation) {
             super(source);
-            m_delimiter = delimiter;
-            m_currentFilename = "";
-            m_writer = null;
-            m_lastWriterCreation = null;
             m_generation = generation;
             m_tableName = tableName;
-            // ODBC Datetime Format
-            // if you need microseconds, you'll have to change this code or
-            //  export a bigint representing microseconds since an epoch
-            m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-            m_firstfield = firstfield;
 
-            // Create the output file for this table
-            m_period = period;
-            m_dateformat = dateformat;
-            m_prefix = outdir.getPath() +
-                        File.separator + m_generation + "-" + nonce + "-" + source.tableName + ".";
-            m_extension = m_delimiter == ',' ? ".csv" : ".tsv";
+            setSchemaForSource(source);
+        }
+
+        /**
+         * Given the data source, construct a JSON serialization
+         * of its schema to be written to disk with the export
+         * data.
+         */
+        void setSchemaForSource(AdvertisedDataSource source) {
+            try {
+                JSONStringer json = new JSONStringer();
+                json.object();
+                json.key("table name").value(source.tableName);
+                json.key("generation id").value(source.m_generation);
+                json.key("columns").array();
+
+                for (int i = 0; i < source.columnNames.size(); i++) {
+                    json.object();
+                    json.key("name").value(source.columnNames.get(i));
+                    json.key("type").value(source.columnTypes.get(i).name());
+                    json.endObject();
+                }
+
+                json.endArray();
+                json.endObject();
+
+                // get the json string
+                m_schemaString = json.toString();
+                // the next two lines pretty print the json string
+                JSONObject jsonObj = new JSONObject(m_schemaString);
+                m_schemaString = jsonObj.toString(4);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
@@ -184,64 +457,94 @@ public class ExportToFileClient extends ExportClientBase {
             return true;
         }
 
+        /**
+         * Get and hold the current batch folder.
+         * Ask the batch object for a stream to write to.
+         */
         @Override
         public void onBlockStart() {
-            // Ensure we have a valid file stream to push data to - no
-            // try/catch: a failure there is final
-            EnsureFileStream();
+            // get the current batch
+            m_context = getCurrentContextAndAddref(this);
+            if (m_context == null) {
+                m_logger.error("NULL context object found.");
+                throw new RuntimeException("NULL context object found.");
+            }
+
+            m_writer = m_context.getWriter(m_tableName, m_generation);
+            if (m_writer == null) {
+                m_logger.error("NULL writer object from context.");
+                throw new RuntimeException("NULL writer object from context.");
+            }
+
+            m_context.writeSchema(m_tableName, m_generation, m_schemaString);
         }
 
+        /**
+         * Release the current batch folder.
+         */
         @Override
         public void onBlockCompletion() {
-            if (m_writer != null) {
-                try {
+            try {
+                if (m_writer != null)
                     m_writer.flush();
-                } catch (Exception e) {
-                    m_logger.error(e.getMessage());
-                    throw new RuntimeException();
+            }
+            catch (Exception e) {
+                m_logger.error(e.getMessage());
+                throw new RuntimeException();
+            }
+            finally {
+                if (m_context != null) {
+                    m_context.decref(this);
                 }
+                m_context = null;
             }
         }
 
         @Override
         protected void finalize() throws Throwable {
-            if (m_writer != null) {
-                try {
+            try {
+                if (m_writer != null) {
                     m_writer.flush();
                     m_writer.close();
-                } catch (Exception e) {
-                    String msg = e.getMessage();
-                    // ignore the boring "stream closed" error
-                    if (msg.compareToIgnoreCase("stream closed") != 0)
-                        m_logger.error(e.getMessage());
+                    m_writer = null;
                 }
+            }
+            catch (Exception e) {
+                m_logger.error(e.getMessage());
+                throw new RuntimeException();
+            }
+            finally {
+                if (m_context != null)
+                    m_context.decref(this);
             }
             super.finalize();
         }
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-            m_sources.remove(source);
-            if (m_sources.isEmpty()) {
+            try {
                 if (m_writer != null) {
-                    try {
-                        m_writer.flush();
-                        m_writer.close();
-                    } catch (Exception e) {
-                        m_logger.error(e.getMessage());
-                        throw new RuntimeException();
-                    }
+                    m_writer.flush();
+                    m_writer.close();
+                    m_writer = null;
                 }
-                HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
-                if (decoders != null) {
-                    decoders.remove(m_tableName);
-                    if (decoders.isEmpty()) {
-                        m_tableDecoders.remove(m_generation);
-                    }
+            }
+            catch (Exception e) {
+                m_logger.error(e.getMessage());
+                throw new RuntimeException();
+            }
+            finally {
+                if (m_context != null)
+                    m_context.decref(this);
+            }
+            HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
+            if (decoders != null) {
+                decoders.remove(m_tableName);
+                if (decoders.isEmpty()) {
+                    m_tableDecoders.remove(m_generation);
                 }
             }
         }
-
     }
 
     public ExportToFileClient(char delimiter,
@@ -250,9 +553,12 @@ public class ExportToFileClient extends ExportClientBase {
                               int period,
                               String dateformatString,
                               int firstfield,
-                              boolean useAdminPorts) {
+                              boolean useAdminPorts,
+                              boolean batched,
+                              boolean withSchema) {
         super(useAdminPorts);
         m_delimiter = delimiter;
+        m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
         m_outDir = outdir;
         m_tableDecoders = new HashMap<Long, HashMap<String, ExportToFileDecoder>>();
@@ -260,6 +566,26 @@ public class ExportToFileClient extends ExportClientBase {
         m_dateformat = new SimpleDateFormat(dateformatString);
         m_dateFormatOriginalString = dateformatString;
         m_firstfield = firstfield;
+        m_batched = batched;
+        m_withSchema = withSchema;
+
+        // init the batch system with the first batch
+        assert(m_current == null);
+        m_current = new PeriodicExportContext(new Date());
+
+        // schedule rotations every m_period minutes
+        TimerTask rotateTask = new TimerTask() {
+            @Override
+            public void run() {
+                roll(new Date());
+            }
+        };
+        m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
+    }
+
+    synchronized PeriodicExportContext getCurrentContextAndAddref(ExportToFileDecoder decoder) {
+        m_current.m_decoders.add(decoder);
+        return m_current;
     }
 
     @Override
@@ -274,12 +600,24 @@ public class ExportToFileClient extends ExportClientBase {
         }
         ExportToFileDecoder decoder = decoders.get(table_name);
         if (decoder == null) {
-            decoder = new ExportToFileDecoder(source, table_name, m_nonce, m_outDir, m_delimiter,
-                    m_period, m_dateformat, m_firstfield, source.m_generation);
+            decoder = new ExportToFileDecoder(source, table_name, source.m_generation);
             decoders.put(table_name, decoder);
         }
         decoder.m_sources.add(source);
         return decoders.get(table_name);
+    }
+
+    /**
+     * Deprecate the current batch and create a new one. The old one will still
+     * be active until all writers have finished writing their current blocks
+     * to it.
+     */
+    synchronized void roll(Date rollTime) {
+        m_logger.trace("Rolling batch.");
+        m_current.end = rollTime;
+        if (m_current.m_decoders.size() == 0)
+            m_current.closeAllWriters();
+        m_current = new PeriodicExportContext(rollTime);
     }
 
     protected void logConfigurationInfo() {
@@ -327,6 +665,8 @@ public class ExportToFileClient extends ExportClientBase {
                         + "--connect (admin|client) "
                         + "--type (csv|tsv) "
                         + "--nonce file_prefix "
+                        + "[--batched] "
+                        + "[--with-schema] "
                         + "[--period rolling_period_in_minutes] "
                         + "[--dateformat date_pattern_for_file_name] "
                         + "[--outdir target_directory] "
@@ -350,6 +690,8 @@ public class ExportToFileClient extends ExportClientBase {
         int period = 60;
         char connect = ' '; // either ' ', 'c' or 'a'
         String dateformatString = "yyyyMMddHHmmss";
+        boolean batched = false;
+        boolean withSchema = false;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -476,6 +818,12 @@ public class ExportToFileClient extends ExportClientBase {
                 dateformatString = args[ii + 1].trim();
                 ii++;
             }
+            else if (arg.equals("--batched")) {
+                batched = true;
+            }
+            else if (arg.equals("--with-schema")) {
+                withSchema = true;
+            }
         }
         // Check args for validity
         if (volt_servers == null || volt_servers.length < 1) {
@@ -512,7 +860,9 @@ public class ExportToFileClient extends ExportClientBase {
                                                            period,
                                                            dateformatString,
                                                            firstfield,
-                                                           connect == 'a');
+                                                           connect == 'a',
+                                                           batched,
+                                                           withSchema);
 
         // add all of the servers specified
         for (String server : volt_servers) {

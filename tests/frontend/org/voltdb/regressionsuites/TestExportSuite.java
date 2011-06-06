@@ -242,6 +242,8 @@ public class TestExportSuite extends RegressionSuite {
               60,
               "yyyyMMddHHmmss",
               0,
+              false,
+              false,
               false);
         exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
         exportClient.addCredentials("export", "export");
@@ -428,6 +430,8 @@ public class TestExportSuite extends RegressionSuite {
               60,
               "yyyyMMddHHmmss",
               0,
+              false,
+              false,
               false);
       exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
       exportClient.addCredentials("export", "export");

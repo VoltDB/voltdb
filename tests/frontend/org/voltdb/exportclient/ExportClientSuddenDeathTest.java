@@ -46,6 +46,8 @@ public class ExportClientSuddenDeathTest extends TestCase {
                                                          1,
                                                          "yyyyMMddHHmmss",
                                                          0,
+                                                         false,
+                                                         false,
                                                          false);
 
         InetSocketAddress addr = new InetSocketAddress("127.0.0.1", VoltDB.DEFAULT_PORT);

@@ -87,7 +87,7 @@ public class ExportToBatchesClientTest {
         // start the voltdb export client for sq
         File dir = new File(System.getProperty("user.dir") + File.separator + "00_exportout");
         System.out.printf("Working dir is %s\n", dir.getPath());
-        ExportToBatchesClient exportClient = new ExportToBatchesClient("testy", dir, 1, 0, false);
+        ExportToFileClient exportClient = new ExportToFileClient(',', "testy", dir, 1, "yyyyMMddHHmmss", 0, false, true, true);
         //ExportToFileClient exportClient = new ExportToFileClient(',', "testy", dir, 1, "yyyyMMddHHmmss", 0, false);
         //DiscardingExportClient exportClient = new DiscardingExportClient(false);
         exportClient.addServerInfo("localhost", false);

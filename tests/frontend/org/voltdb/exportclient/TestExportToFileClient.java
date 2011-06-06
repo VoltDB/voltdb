@@ -41,6 +41,8 @@ public class TestExportToFileClient extends TestCase {
                 60,
                 "yyyyMMddHHmmss",
                 0,
+                false,
+                false,
                 false);
         AdvertisedDataSource source0 = TestExportDecoderBase.constructTestSource(0);
         AdvertisedDataSource source1 = TestExportDecoderBase.constructTestSource(1);
