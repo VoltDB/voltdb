@@ -933,6 +933,7 @@ public abstract class CatalogUtil {
             snapshotPath = new VoltFile(paths.getSnapshots().getPath());
         }
         if (!snapshotPath.exists()) {
+            hostLog.info("Creating snapshot directory: " + snapshotPath.getAbsolutePath());
             if (!snapshotPath.mkdirs()) {
                 hostLog.fatal("Failed to create snapshot directory \"" + snapshotPath + "\"");
             }
@@ -947,6 +948,8 @@ public abstract class CatalogUtil {
             exportOverflowPath = new VoltFile(paths.getExportoverflow().getPath());
         }
         if (!exportOverflowPath.exists()) {
+            hostLog.info("Creating export overflow directory: " +
+                         exportOverflowPath.getAbsolutePath());
             if (!exportOverflowPath.mkdirs()) {
                 hostLog.fatal("Failed to create export overflow directory \""
                               + exportOverflowPath + "\"");
