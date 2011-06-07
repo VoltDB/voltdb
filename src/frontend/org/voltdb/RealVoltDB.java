@@ -591,7 +591,7 @@ public class RealVoltDB implements VoltDBInterface
             try {
                 addr = InetAddress.getLocalHost();
             } catch (UnknownHostException e1) {
-                hostLog.fatal("Unable to discover local IP address. Usually a java permissions failure.");
+                hostLog.fatal("Unable to discover local IP address by invoking Java's InetAddress.getLocalHost() method. Usually this is because the hostname of this node fails to resolve (for example \"ping `hostname`\" would fail). VoltDB requires that the hostname of every node resolves correctly at that node as well as every other node.");
                 VoltDB.crashVoltDB();
             }
             String localMetadata = addr.getHostAddress();

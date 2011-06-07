@@ -210,7 +210,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="licensecheck,compile, voltdbipc, ee"
+    depends="compile, licensecheck, voltdbipc, ee"
     description="Run Java and C++ JNI testcases and test plan fragments." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
