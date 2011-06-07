@@ -114,7 +114,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * Size in bytes of the maximum length for a VoltDB tuple.
      * This value is counted from byte 0 of the header size to the end of row data.
      */
-    public static final int MAX_SERIALIZED_TABLE_LENGTH = 100 * 1024 * 1024;
+    public static final int MAX_SERIALIZED_TABLE_LENGTH = 10 * 1024 * 1024;
     public static final String MAX_SERIALIZED_TABLE_LENGTH_STR =
         String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
 
