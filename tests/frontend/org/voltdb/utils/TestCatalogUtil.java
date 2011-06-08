@@ -259,4 +259,44 @@ public class TestCatalogUtil extends TestCase {
         assertFalse(db.getSnapshotschedule().isEmpty());
         assertEquals(10, db.getSnapshotschedule().get("default").getRetain());
     }
+
+    // XXX Need to add command log paths here when command logging
+    // gets tweaked to create directories if they don't exist
+    public void testRelativePathsToVoltDBRoot() throws Exception
+    {
+        final String voltdbroot = "/tmp/" + System.getProperty("user.name");
+        final String snappath = "test_snapshots";
+        final String exportpath = "test_export_overflow";
+
+        File voltroot = new File(voltdbroot);
+        for (File f : voltroot.listFiles())
+        {
+            f.delete();
+        }
+
+        final String deploy =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <paths>" +
+            "       <voltdbroot path=\"" + voltdbroot + "\" />" +
+            "       <snapshots path=\"" + snappath + "\"/>" +
+            "       <exportoverflow path=\"" + exportpath + "\"/>" +
+            "   </paths>" +
+            "</deployment>";
+
+        final File tmpDeploy = VoltProjectBuilder.writeStringToTempFile(deploy);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDeploy.getPath(), true);
+
+        File snapdir = new File(voltdbroot, snappath);
+        assertTrue("snapshot directory: " + snapdir.getAbsolutePath() + " does not exist",
+                   snapdir.exists());
+        assertTrue("snapshot directory: " + snapdir.getAbsolutePath() + " is not a directory",
+                   snapdir.isDirectory());
+        File exportdir = new File(voltdbroot, exportpath);
+        assertTrue("export overflow directory: " + exportdir.getAbsolutePath() + " does not exist",
+                   exportdir.exists());
+        assertTrue("export overflow directory: " + exportdir.getAbsolutePath() + " is not a directory",
+                   exportdir.isDirectory());
+    }
 }

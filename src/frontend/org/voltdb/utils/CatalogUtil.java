@@ -931,6 +931,10 @@ public abstract class CatalogUtil {
             snapshotPath = new VoltFile(voltDbRoot, "snapshots");
         } else {
             snapshotPath = new VoltFile(paths.getSnapshots().getPath());
+            if (!snapshotPath.isAbsolute())
+            {
+                snapshotPath = new VoltFile(voltDbRoot, paths.getSnapshots().getPath());
+            }
         }
         if (!snapshotPath.exists()) {
             hostLog.info("Creating snapshot directory: " + snapshotPath.getAbsolutePath());
@@ -946,6 +950,10 @@ public abstract class CatalogUtil {
             exportOverflowPath = new VoltFile(voltDbRoot, "export_overflow");
         } else {
             exportOverflowPath = new VoltFile(paths.getExportoverflow().getPath());
+            if (!exportOverflowPath.isAbsolute())
+            {
+                exportOverflowPath = new VoltFile(voltDbRoot, paths.getExportoverflow().getPath());
+            }
         }
         if (!exportOverflowPath.exists()) {
             hostLog.info("Creating export overflow directory: " +
@@ -969,6 +977,10 @@ public abstract class CatalogUtil {
             }
         } else {
             commandLogPath = new VoltFile(paths.getCommandlog().getPath());
+            if (!commandLogPath.isAbsolute())
+            {
+                commandLogPath = new VoltFile(voltDbRoot, paths.getCommandlog().getPath());
+            }
         }
         validateDirectory("command log", commandLogPath, crashOnFailedValidation);
 
@@ -983,6 +995,11 @@ public abstract class CatalogUtil {
             }
         } else {
             commandLogSnapshotPath = new VoltFile(paths.getCommandlogsnapshot().getPath());
+            if (!commandLogSnapshotPath.isAbsolute())
+            {
+                commandLogSnapshotPath =
+                    new VoltFile(voltDbRoot, paths.getCommandlogsnapshot().getPath());
+            }
         }
         validateDirectory("command log snapshot", commandLogSnapshotPath, crashOnFailedValidation);
 
