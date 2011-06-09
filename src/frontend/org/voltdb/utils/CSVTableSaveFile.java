@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.SyncFailedException;
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -130,23 +131,45 @@ public class CSVTableSaveFile {
                     while (vt.advanceRow()) {
                         for (int ii = 0; ii < vt.getColumnCount(); ii++) {
                             final VoltType type = vt.getColumnType(ii);
-                            if (vt.wasNull()) {
-                                fields[ii] = "NULL";
-                            } else if (type == VoltType.BIGINT
+                            if (type == VoltType.BIGINT
                                     || type == VoltType.INTEGER
                                     || type == VoltType.SMALLINT
                                     || type == VoltType.TINYINT) {
-                                fields[ii] = String.valueOf(vt.getLong(ii));
+                                final long value = vt.getLong(ii);
+                                if (vt.wasNull()) {
+                                    fields[ii] = "NULL";
+                                } else {
+                                    fields[ii] = Long.toString(value);
+                                }
                             } else if (type == VoltType.FLOAT) {
-                                fields[ii] = String.valueOf(vt.getDouble(ii));
+                                final double value = vt.getDouble(ii);
+                                if (vt.wasNull()) {
+                                    fields[ii] = "NULL";
+                                } else {
+                                    fields[ii] = Double.toString(value);
+                                }
                             } else if (type == VoltType.DECIMAL) {
-                                fields[ii] = vt.getDecimalAsBigDecimal(ii).toString();
+                                final BigDecimal bd = vt.getDecimalAsBigDecimal(ii);
+                                if (vt.wasNull()) {
+                                    fields[ii] = "NULL";
+                                } else {
+                                    fields[ii] = bd.toString();
+                                }
                             } else if (type == VoltType.STRING) {
-                                fields[ii] = vt.getString(ii);
+                                final String str = vt.getString(ii);
+                                if (vt.wasNull()) {
+                                    fields[ii] = "NULL";
+                                } else {
+                                    fields[ii] = str;
+                                }
                             } else if (type == VoltType.TIMESTAMP) {
                                 final TimestampType timestamp = vt.getTimestampAsTimestamp(ii);
-                                fields[ii] = m_sdf.format(timestamp.asApproximateJavaDate());
-                                fields[ii] += String.valueOf(timestamp.getUSec());
+                                if (vt.wasNull()) {
+                                    fields[ii] = "NULL";
+                                } else {
+                                    fields[ii] = m_sdf.format(timestamp.asApproximateJavaDate());
+                                    fields[ii] += String.valueOf(timestamp.getUSec());
+                                }
                             }
                         }
                         csv.writeNext(fields);
