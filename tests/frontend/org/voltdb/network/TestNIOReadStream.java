@@ -57,7 +57,7 @@ import junit.framework.TestCase;
 import java.io.IOException;
 import org.voltdb.utils.DBBPool;
 
-public class NIOReadStreamTest extends TestCase {
+public class TestNIOReadStream extends TestCase {
     MockReadableByteChannel channel;
     NIOReadStream stream;
     DBBPool pool;

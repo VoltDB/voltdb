@@ -33,7 +33,7 @@ import junit.framework.*;
  * is setting interests - write a short test to verify that functionality.
  */
 
-public class VoltPortTest extends TestCase {
+public class TestVoltPort extends TestCase {
 
     // stub some addToChangeList for test
     private static class MockVoltNetwork extends VoltNetwork {

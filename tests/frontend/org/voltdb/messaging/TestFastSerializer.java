@@ -57,7 +57,7 @@ import org.voltdb.utils.DBBPool;
 
 import junit.framework.TestCase;
 
-public class FastSerializerTest extends TestCase {
+public class TestFastSerializer extends TestCase {
     FastSerializer heapOut;
     FastSerializer directOut;
     FastSerializer poolOut;

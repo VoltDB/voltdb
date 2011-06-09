@@ -59,7 +59,7 @@ import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.EstTimeUpdater;
 
-public class NIOWriteStreamTest extends TestCase {
+public class TestNIOWriteStream extends TestCase {
 
     private static class MockPort extends VoltPort {
 

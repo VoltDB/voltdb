@@ -33,7 +33,7 @@ import java.util.Set;
 import java.util.HashSet;
 import junit.framework.*;
 
-public class VoltNetworkTest extends TestCase {
+public class TestVoltNetwork extends TestCase {
 
 
     private static class MockVoltPort extends VoltPort {

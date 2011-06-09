@@ -30,7 +30,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.utils.DBBPool.BBContainer;
 
-public class DBBPoolTest extends TestCase {
+public class TestDBBPool extends TestCase {
 
     final int NUM_BUFFERS = 10;
     final int INITIAL_ALLOCATION = 8096;
