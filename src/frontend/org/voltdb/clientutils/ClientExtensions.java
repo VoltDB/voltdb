@@ -23,40 +23,22 @@ import org.voltdb.client.ClientFactory;
 public class ClientExtensions
 {
 
-    public static Client GetClient(String[] servers, int port)
+    public static Client GetClient(String[] servers, int port) throws Exception
     {
         final ClientConfig config = new ClientConfig("", "");
         final Client client = ClientFactory.createClient(config);
 
         for (String server : servers)
-        {
-            try
-            {
-                client.createConnection(server.trim(), port);
-            }
-            catch (Exception e)
-            {
-                e.printStackTrace();
-            }
-        }
+            client.createConnection(server.trim(), port);
         return client;
     }
 
-    public static Client GetClient(ClientConfig config, String[] servers, int port)
+    public static Client GetClient(ClientConfig config, String[] servers, int port) throws Exception
     {
         final Client client = ClientFactory.createClient(config);
 
         for (String server : servers)
-        {
-            try
-            {
-                client.createConnection(server.trim(), port);
-            }
-            catch (Exception e)
-            {
-                e.printStackTrace();
-            }
-        }
+            client.createConnection(server.trim(), port);
         return client;
     }
 }
