@@ -36,6 +36,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.GroupRef;
@@ -422,7 +423,7 @@ public class SystemInformation extends VoltSystemProcedure
                 context.getCluster().getFaultsnapshots().get("CLUSTER_PARTITION").getPath();
             String partition_detect_snapshot_prefix =
                 context.getCluster().getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
-            results.addRow("partitiondetectionsnapshotpath",
+            results.addRow("snapshotpath",
                            partition_detect_snapshot_path);
             results.addRow("partitiondetectionsnapshotprefix",
                            partition_detect_snapshot_prefix);
@@ -438,6 +439,31 @@ public class SystemInformation extends VoltSystemProcedure
             adminstartup = "true";
         }
         results.addRow("adminstartup", adminstartup);
+
+        String command_log_enabled = "false";
+        // XXX log name is MAGIC, you knoooow
+        CommandLog command_log = context.getCluster().getLogconfig().get("log");
+        if (command_log.getEnabled())
+        {
+            command_log_enabled = "true";
+            String command_log_mode = "async";
+            if (command_log.getSynchronous())
+            {
+                command_log_mode = "sync";
+            }
+            String command_log_path = command_log.getLogpath();
+            String command_log_snaps = command_log.getInternalsnapshotpath();
+            String command_log_fsync_interval =
+                Integer.toString(command_log.getFsyncinterval());
+            String command_log_max_txns =
+                Integer.toString(command_log.getMaxtxns());
+            results.addRow("commandlogmode", command_log_mode);
+            results.addRow("commandlogfreqtime", command_log_fsync_interval);
+            results.addRow("commandlogfreqtxns", command_log_max_txns);
+            results.addRow("commandlogpath", command_log_path);
+            results.addRow("commandlogsnapshotpath", command_log_snaps);
+        }
+        results.addRow("commandlogenabled", command_log_enabled);
 
         String users = "";
         for (User user : context.getDatabase().getUsers())

@@ -267,6 +267,8 @@ public class TestCatalogUtil extends TestCase {
         final String voltdbroot = "/tmp/" + System.getProperty("user.name");
         final String snappath = "test_snapshots";
         final String exportpath = "test_export_overflow";
+        final String commandlogpath = "test_command_log";
+        final String commandlogsnapshotpath = "test_command_log_snapshot";
 
         File voltroot = new File(voltdbroot);
         for (File f : voltroot.listFiles())
@@ -282,6 +284,8 @@ public class TestCatalogUtil extends TestCase {
             "       <voltdbroot path=\"" + voltdbroot + "\" />" +
             "       <snapshots path=\"" + snappath + "\"/>" +
             "       <exportoverflow path=\"" + exportpath + "\"/>" +
+            "       <commandlog path=\"" + commandlogpath + "\"/>" +
+            "       <commandlogsnapshot path=\"" + commandlogsnapshotpath + "\"/>" +
             "   </paths>" +
             "</deployment>";
 
@@ -298,5 +302,17 @@ public class TestCatalogUtil extends TestCase {
                    exportdir.exists());
         assertTrue("export overflow directory: " + exportdir.getAbsolutePath() + " is not a directory",
                    exportdir.isDirectory());
+        File commandlogdir = new File(voltdbroot, commandlogpath);
+        assertTrue("command log directory: " + commandlogdir.getAbsolutePath() + " does not exist",
+                   commandlogdir.exists());
+        assertTrue("command log directory: " + commandlogdir.getAbsolutePath() + " is not a directory",
+                   commandlogdir.isDirectory());
+        File commandlogsnapshotdir = new File(voltdbroot, commandlogsnapshotpath);
+        assertTrue("command log snapshot directory: " +
+                   commandlogsnapshotdir.getAbsolutePath() + " does not exist",
+                   commandlogsnapshotdir.exists());
+        assertTrue("command log snapshot directory: " +
+                   commandlogsnapshotdir.getAbsolutePath() + " is not a directory",
+                   commandlogsnapshotdir.isDirectory());
     }
 }

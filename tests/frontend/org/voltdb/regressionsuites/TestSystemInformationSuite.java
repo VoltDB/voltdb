@@ -144,14 +144,31 @@ public class TestSystemInformationSuite extends RegressionSuite {
 
         // Add partition detection
         m_expectedVals.put("partitiondetection", "true");
-        m_expectedVals.put("partitiondetectionsnapshotpath", "/tmp");
         m_expectedVals.put("partitiondetectionsnapshotprefix", "/tmp");
-        project.setPartitionDetectionSettings(m_expectedVals.get("partitiondetectionsnapshotpath"),
+        project.setPartitionDetectionSettings(m_expectedVals.get("snapshotpath"),
                                               m_expectedVals.get("partitiondetectionsnapshotprefix"));
 
         // Add export
         m_expectedVals.put("export", "true");
         project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+
+        // Add command logging
+        // XXX currently broken because we can't restart the server
+        // when the command log segment files exist without doing the
+        // work to implement create database on startup rather than recover
+        m_expectedVals.put("commandlogenabled", "false");
+        //m_expectedVals.put("commandlogenabled", "true");
+        //m_expectedVals.put("commandlogmode", "sync");
+        //m_expectedVals.put("commandlogfreqtime", "500");
+        //m_expectedVals.put("commandlogfreqtxns", "50000");
+        //m_expectedVals.put("commandlogpath", "/tmp");
+        //m_expectedVals.put("commandlogsnapshotpath", "/tmp");
+        //project.configureLogging(m_expectedVals.get("commandlogsnapshotpath"),
+        //                         m_expectedVals.get("commandlogpath"),
+        //                         m_expectedVals.get("commandlogmode").equals("sync"),
+        //                         m_expectedVals.get("commandlogenabled").equals("true"),
+        //                         Integer.valueOf(m_expectedVals.get("commandlogfreqtime")),
+        //                         Integer.valueOf(m_expectedVals.get("commandlogfreqtxns")));
 
         // Add other defaults
         m_expectedVals.put("adminport", "21211");
