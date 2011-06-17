@@ -249,6 +249,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
             }
 
             shouldContinue.set(false);
+            rateLimit.release();
             loadThread.join();
 
             lastRejoinThread = new Thread("Last rejoin thread") {

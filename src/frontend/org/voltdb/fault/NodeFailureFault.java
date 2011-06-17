@@ -16,6 +16,9 @@
  */
 package org.voltdb.fault;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class NodeFailureFault extends VoltFault
 {
     public static int NODE_FAILURE_FOREIGN_HOST = 0;
@@ -23,17 +26,22 @@ public class NodeFailureFault extends VoltFault
     public static int NODE_FAILURE_INITIATOR = 2;
     public static int NODE_FAILURE_EXECUTION_SITE = 3;
 
-    public NodeFailureFault(int hostId, String hostname)
+    public NodeFailureFault(int hostId, Set<Integer> failedNonExecSites, String hostname)
     {
         super(FaultType.NODE_FAILURE);
         assert(hostname != null);
         m_hostId = hostId;
         m_hostname = hostname;
+        m_failedNonExecSites = failedNonExecSites;
     }
 
     public int getHostId()
     {
         return m_hostId;
+    }
+
+    public Set<Integer> getFailedNonExecSites() {
+        return m_failedNonExecSites;
     }
 
     public String getHostname()
@@ -69,5 +77,6 @@ public class NodeFailureFault extends VoltFault
     }
 
     private int m_hostId;
+    private Set<Integer> m_failedNonExecSites;
     private String m_hostname;
 }

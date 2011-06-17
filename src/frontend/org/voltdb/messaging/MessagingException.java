@@ -17,6 +17,8 @@
 
 package org.voltdb.messaging;
 
+import java.io.IOException;
+
 /**
  * Generic exception subclass for all messaging problems. This will
  * be extended as needed.
@@ -27,5 +29,9 @@ public class MessagingException extends Exception {
 
     public MessagingException(String string) {
         super(string);
+    }
+
+    public MessagingException(IOException e) {
+        super(e);
     }
 }

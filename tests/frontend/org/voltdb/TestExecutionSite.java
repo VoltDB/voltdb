@@ -294,7 +294,11 @@ public class TestExecutionSite extends TestCase {
             //System.out.println("KILLING SITE: " + m_siteId);
             m_sites[m_siteId].shutdown();
             m_voltdb.killSite(m_siteId);
-            m_voltdb.getFaultDistributor().reportFault(new NodeFailureFault( getHostIdForSiteId(m_siteId), String.valueOf(getHostIdForSiteId(m_siteId))));
+            m_voltdb.getFaultDistributor().reportFault(
+                    new NodeFailureFault(
+                            getHostIdForSiteId(m_siteId),
+                            m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(m_siteId)),
+                            String.valueOf(getHostIdForSiteId(m_siteId))));
             // remove this site from the postoffice
             postoffice.remove(m_siteId);
             // stop/join this site's thread
@@ -499,7 +503,7 @@ public class TestExecutionSite extends TestCase {
         public
         RestrictedPriorityARRR(int[] initiatorSiteIds, int siteId, Mailbox mbox)
         {
-            super(initiatorSiteIds, siteId, mbox);
+            super(initiatorSiteIds, siteId, mbox, VoltDB.DTXN_MAILBOX_ID);
         }
     }
 
@@ -954,7 +958,11 @@ public class TestExecutionSite extends TestCase {
         // push a fault notice to the participant. Must supply the host id
         // corresponding to the coordinator site id.
         m_voltdb.killSite(0);
-        m_voltdb.getFaultDistributor().reportFault(new NodeFailureFault( getHostIdForSiteId(0), String.valueOf(getHostIdForSiteId(0))));
+        m_voltdb.getFaultDistributor().reportFault(
+                new NodeFailureFault(
+                        getHostIdForSiteId(0),
+                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(0)),
+                        String.valueOf(getHostIdForSiteId(0))));
 
         es2.join();
 
@@ -1064,7 +1072,11 @@ public class TestExecutionSite extends TestCase {
         es1.start();
 
         m_voltdb.killSite(1);
-        m_voltdb.getFaultDistributor().reportFault(new NodeFailureFault( getHostIdForSiteId(1), String.valueOf(getHostIdForSiteId(1))));
+        m_voltdb.getFaultDistributor().reportFault(
+                new NodeFailureFault(
+                        getHostIdForSiteId(1),
+                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(1)),
+                        String.valueOf(getHostIdForSiteId(1))));
 
         // the fault data message from the "other surviving" sites
         // (all but the site actually running and the site that failed).
@@ -1074,7 +1086,6 @@ public class TestExecutionSite extends TestCase {
                 failedHosts.add(getHostIdForSiteId(1));
                 m_mboxes[0].deliver(new FailureSiteUpdateMessage
                                     (ss, failedHosts,
-                                     getInitiatorIdForSiteId(1),
                                      tx1_1.txnId, tx1_1.txnId));
             }
         }

@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.util.Set;
 
 public class MiscUtils {
 
@@ -40,5 +41,14 @@ public class MiscUtils {
 
         in.close();
         out.close();
+    }
+
+    public static final int[] toArray(Set<Integer> set) {
+        int retval[] = new int[set.size()];
+        int ii = 0;
+        for (Integer i : set) {
+            retval[ii++] = i;
+        }
+        return retval;
     }
 }

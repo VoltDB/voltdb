@@ -34,51 +34,33 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.ClusterCompiler;
+import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 public class TestHSQLBackend extends TestCase {
 
-    /*public void testMilestoneOneHSQL() throws InterruptedException, IOException, ProcCallException {
+    public void testMilestoneOneHSQL() throws InterruptedException, IOException, ProcCallException {
         String ddl =
             "CREATE TABLE WAREHOUSE (" +
             "W_ID INTEGER DEFAULT '0' NOT NULL, "+
             "W_NAME VARCHAR(16) DEFAULT NULL, " +
             "PRIMARY KEY  (W_ID)" +
             ");";
-        File ddlFile = VoltProjectBuilder.writeStringToTempFile(ddl);
-        String ddlPath = ddlFile.getPath();
 
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + ddlPath + "' /></schemas>" +
-            "<procedures>" +
-            "<procedure class='org.voltdb.compiler.procedures.MilestoneOneInsert' />" +
-            "<procedure class='org.voltdb.compiler.procedures.MilestoneOneSelect' />" +
-            "<procedure class='org.voltdb.compiler.procedures.MilestoneOneCombined' />" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(ddl);
+        builder.addProcedures(
+                org.voltdb.compiler.procedures.MilestoneOneInsert.class,
+                org.voltdb.compiler.procedures.MilestoneOneSelect.class,
+                org.voltdb.compiler.procedures.MilestoneOneCombined.class);
 
-        System.out.println(simpleProject);
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String catalogJar = testDir + File.separator + "milestoneOneHSQLDB.jar";
-
-        VoltCompiler compiler = new VoltCompiler();
-        ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
-
-        boolean success = compiler.compile(projectPath, cluster_config,
-                                           catalogJar, System.out, null);
-
-        assertTrue(success);
+        assertTrue(builder.compile("test.jar"));
 
         // start VoltDB server using hsqlsb backend
-        ServerThread server = new ServerThread( catalogJar, BackendTarget.HSQLDB_BACKEND);
+        ServerThread server = new ServerThread( "test.jar", builder.getPathToDeployment(), BackendTarget.HSQLDB_BACKEND);
         server.start();
         server.waitForInitialization();
 
@@ -87,7 +69,7 @@ public class TestHSQLBackend extends TestCase {
         client.createConnection("localhost", "program", "none");
 
         // call the insert procedure
-        VoltTable[] results = client.callProcedure("MilestoneOneCombined", 99L, "TEST");
+        VoltTable[] results = client.callProcedure("MilestoneOneCombined", 99L, "TEST").getResults();
         // check one table was returned
         assertTrue(results.length == 1);
         // check one tuple was modified
@@ -96,22 +78,22 @@ public class TestHSQLBackend extends TestCase {
         String resultStr = row.getString(0);
         assertTrue(resultStr.equals("TEST"));
 
-        // stop execution
-        VoltDB.instance().shutdown(server);
+        server.shutdown();
+        server.join();
     }
 
     public void testAdHocEmptyQuery() throws InterruptedException, IOException, ProcCallException {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
-        builder.addProcedures(SelectAll.class);
+        builder.addProcedures(org.voltdb.benchmark.tpcc.procedures.SelectAll.class);
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
 
         builder.compile(catalogJar, 1, 1, 0, "localhost");
 
-        ServerThread server = new ServerThread(catalogJar, BackendTarget.HSQLDB_BACKEND);
+        ServerThread server = new ServerThread(catalogJar, builder.getPathToDeployment(), BackendTarget.HSQLDB_BACKEND);
         server.start();
         server.waitForInitialization();
 
@@ -120,17 +102,14 @@ public class TestHSQLBackend extends TestCase {
         client.createConnection("localhost", "program", "none");
 
         // call the insert procedure
-        VoltTable[] results = client.callProcedure("@AdHoc", "select * from WAREHOUSE");
+        VoltTable[] results = client.callProcedure("@AdHoc", "select * from WAREHOUSE").getResults();
         // check one table was returned
         assertTrue(results.length > 0);
         assertTrue(results[0].getRowCount() == 0);
 
         server.shutdown();
         server.join();
-
-        // stop execution
-        VoltDB.instance().shutdown(server);
-    }*/
+    }
 
     public void testDateInsertionAsLong() throws UnknownHostException, IOException, ProcCallException, InterruptedException {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
@@ -162,23 +141,20 @@ public class TestHSQLBackend extends TestCase {
 
         server.shutdown();
         server.join();
-
-        // stop execution
-        VoltDB.instance().shutdown(server);
     }
 
-    /*public void testAdHocDateInsertionAsLong() throws UnknownHostException, IOException, ProcCallException, InterruptedException {
+    public void testAdHocDateInsertionAsLong() throws UnknownHostException, IOException, ProcCallException, InterruptedException {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
-        builder.addProcedures(SelectAll.class);
+        builder.addProcedures(org.voltdb.benchmark.tpcc.procedures.SelectAll.class);
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
 
         builder.compile(catalogJar, 1, 1, 0, "localhost");
 
-        ServerThread server = new ServerThread(catalogJar, BackendTarget.HSQLDB_BACKEND);
+        ServerThread server = new ServerThread(catalogJar, builder.getPathToDeployment(), BackendTarget.HSQLDB_BACKEND);
         server.start();
         server.waitForInitialization();
 
@@ -187,16 +163,13 @@ public class TestHSQLBackend extends TestCase {
         client.createConnection("localhost", "program", "none");
 
         // call the insert procedure
-        VoltTable[] results = client.callProcedure("@AdHoc", "INSERT INTO HISTORY VALUES (5, 5, 5, 5, 5, 100000, 2.5, 'nada');");
+        VoltTable[] results = client.callProcedure("@AdHoc", "INSERT INTO HISTORY VALUES (5, 5, 5, 5, 5, 100000, 2.5, 'nada');").getResults();
         // check one table was returned
         assertTrue(results.length > 0);
         assertTrue(results[0].getRowCount() == 1);
 
         server.shutdown();
         server.join();
-        client.shutdown();
-
-        // stop execution
-        VoltDB.instance().shutdown(server);
-    }*/
+        client.close();
+    }
 }

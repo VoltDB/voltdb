@@ -38,10 +38,7 @@ import org.voltdb.messaging.TransactionInfoBaseMessage;
  * ultimately it will return true from finished().
  *
  */
-public abstract class TransactionState implements Comparable<TransactionState> {
-
-    public final long txnId;
-    public final int initiatorSiteId;
+public abstract class TransactionState extends OrderableTransaction  {
     public final int coordinatorSiteId;
     protected final boolean m_isReadOnly;
     protected int m_nextDepId = 1;
@@ -62,10 +59,9 @@ public abstract class TransactionState implements Comparable<TransactionState> {
                                ExecutionSite site,
                                TransactionInfoBaseMessage notice)
     {
+        super(notice.getTxnId(), notice.getInitiatorSiteId());
         m_mbox = mbox;
         m_site = site;
-        txnId = notice.getTxnId();
-        initiatorSiteId = notice.getInitiatorSiteId();
         coordinatorSiteId = notice.getCoordinatorSiteId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
@@ -96,8 +92,6 @@ public abstract class TransactionState implements Comparable<TransactionState> {
     public abstract boolean isBlocked();
 
     public abstract boolean hasTransactionalWork();
-
-    public abstract boolean isDurable();
 
     public abstract boolean doWork(boolean recovering);
 
@@ -182,14 +176,6 @@ public abstract class TransactionState implements Comparable<TransactionState> {
     public abstract void getDumpContents(StringBuilder sb);
 
     public abstract ExecutorTxnState getDumpContents();
-
-    @Override
-    public int compareTo(TransactionState o) {
-        long x = o.txnId - txnId;
-        if (x < 0) return 1;
-        if (x > 0) return -1;
-        return 0;
-    }
 
     /**
      * Process the failure of failedSites.

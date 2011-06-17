@@ -46,6 +46,8 @@ public abstract class VoltMessage {
     final public static byte RECOVERY_ID = 10;
     final public static byte COMPLETE_TRANSACTION_ID = 11;
     final public static byte COMPLETE_TRANSACTION_RESPONSE_ID = 12;
+    final public static byte AGREEMENT_TASK_ID = 13;
+    final public static byte BINARY_PAYLOAD_ID = 14;
 
     // place holder for destination site ids when using multi-cast
     final public static int SEND_TO_MANY = -2;
@@ -145,6 +147,12 @@ public abstract class VoltMessage {
             break;
         case COMPLETE_TRANSACTION_RESPONSE_ID:
             message = new CompleteTransactionResponseMessage();
+            break;
+        case AGREEMENT_TASK_ID:
+            message = new AgreementTaskMessage();
+            break;
+        case BINARY_PAYLOAD_ID:
+            message = new BinaryPayloadMessage();
             break;
         default:
             Class<? extends VoltMessage> cls = externals.get(messageType);

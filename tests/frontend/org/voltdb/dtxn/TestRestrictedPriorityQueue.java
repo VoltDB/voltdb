@@ -30,6 +30,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
+import org.voltdb.VoltDB;
 import org.voltdb.messaging.InitiateTaskMessage;
 
 public class TestRestrictedPriorityQueue extends TestCase{
@@ -53,7 +54,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         m_initiators = new int[2];
         m_initiators[0] = 0;
         m_initiators[1] = 1;
-        m_queue = new RestrictedPriorityQueue(m_initiators, 0, null);
+        m_queue = new RestrictedPriorityQueue(m_initiators, 0, null, VoltDB.DTXN_MAILBOX_ID);
         m_idManager = new TransactionIdManager(0, 0);
         m_txnIds = new Vector<Long>();
         m_proc = new StoredProcedureInvocation();
@@ -112,13 +113,13 @@ public class TestRestrictedPriorityQueue extends TestCase{
 
     private void checkNextStateNull()
     {
-        TransactionState state = m_queue.poll();
+        TransactionState state = (TransactionState)m_queue.poll();
         assertNull(state);
     }
 
     private void checkNextStateValid(long expectedTxnId)
     {
-        TransactionState state = m_queue.poll();
+        TransactionState state = (TransactionState)m_queue.poll();
         assertNotNull(state);
         assertEquals(state.txnId, expectedTxnId);
     }
@@ -182,9 +183,9 @@ public class TestRestrictedPriorityQueue extends TestCase{
      */
     public void simulateInitiatorFault(int initiatorId, long globalInitiationPoint) {
         m_queue.gotFaultForInitiator(1);
-        Iterator<TransactionState> iterator = m_queue.iterator();
+        Iterator<OrderableTransaction> iterator = m_queue.iterator();
         while (iterator.hasNext()) {
-            TransactionState next = iterator.next();
+            TransactionState next = (TransactionState)iterator.next();
 
             // Execution site does something along these lines
             if (next.txnId > globalInitiationPoint &&
@@ -238,9 +239,9 @@ public class TestRestrictedPriorityQueue extends TestCase{
         }
         assertEquals(m_queue.size(), 6);
 
-        TransactionState peek = m_queue.peek();
+        TransactionState peek = (TransactionState)m_queue.peek();
         simulateInitiatorFault(peek.initiatorSiteId, Long.MIN_VALUE);
-        TransactionState peek2 = m_queue.peek();
+        TransactionState peek2 = (TransactionState)m_queue.peek();
         assertTrue(peek != peek2);
         assertTrue(peek2.txnId > peek.txnId);
 

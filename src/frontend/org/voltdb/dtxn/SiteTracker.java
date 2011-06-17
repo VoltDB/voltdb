@@ -63,6 +63,8 @@ public class SiteTracker {
     Map<Integer, Integer> m_sitesToHost =
         new HashMap<Integer, Integer>();
 
+    Map<Integer, HashSet<Integer>> m_nonExecSitesForHost = new HashMap<Integer, HashSet<Integer>>();
+
     // records the timestamp of the last message sent to each sites
     HashMap<Integer, Long> m_lastHeartbeatTime = new HashMap<Integer, Long>();
 
@@ -71,6 +73,8 @@ public class SiteTracker {
     Set<Integer> m_liveHostIds = new TreeSet<Integer>();
 
     Set<Integer> m_downHostIds = new TreeSet<Integer>();
+
+    private final Site m_allSites[];
 
     // scratch value used to compute the out of date sites
     // note: this makes
@@ -86,11 +90,12 @@ public class SiteTracker {
      */
     public SiteTracker(CatalogMap<Site> clusterSites)
     {
+        ArrayList<Site> allSites = new ArrayList<Site>();
         m_sites = clusterSites;
         for (Site site : clusterSites)
         {
             int siteId = Integer.parseInt(site.getTypeName());
-
+            allSites.add(site);
             int hostId = Integer.parseInt(site.getHost().getTypeName());
             m_sitesToHost.put(siteId, hostId);
             if (!m_hostsToSites.containsKey(hostId))
@@ -98,10 +103,14 @@ public class SiteTracker {
                 m_hostsToSites.put(hostId, new ArrayList<Integer>());
             }
             m_hostsToSites.get(hostId).add(siteId);
+            if (!m_nonExecSitesForHost.containsKey(hostId)) {
+                m_nonExecSitesForHost.put(hostId, new HashSet<Integer>());
+            }
 
             // don't put non-exec (has ee) sites in the list.
             if (site.getIsexec() == false)
             {
+                m_nonExecSitesForHost.get(hostId).add(siteId);
                 if (site.getIsup())
                 {
                     m_liveSiteIds.add(siteId);
@@ -138,7 +147,10 @@ public class SiteTracker {
                 }
             }
         }
-
+        m_allSites = new Site[allSites.size()];
+        for (int ii = 0; ii < m_allSites.length; ii++) {
+            m_allSites[ii] = allSites.get(ii);
+        }
         m_tempOldSitesScratch = new int[m_sites.size()];
 
         for (int siteId : m_sitesToPartitions.keySet()) {
@@ -173,6 +185,10 @@ public class SiteTracker {
     public int getLiveSiteCount()
     {
         return m_liveSiteCount;
+    }
+
+    public Site[] getAllSites() {
+        return m_allSites;
     }
 
     /**
@@ -395,6 +411,10 @@ public class SiteTracker {
             }
         }
         return retval;
+    }
+
+    public HashSet<Integer> getNonExecSitesForHost(int hostId) {
+        return m_nonExecSitesForHost.get(hostId);
     }
 
     /**

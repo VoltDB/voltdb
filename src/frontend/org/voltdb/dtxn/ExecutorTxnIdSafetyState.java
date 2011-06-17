@@ -50,6 +50,42 @@ public class ExecutorTxnIdSafetyState {
 
     final int m_siteId;
 
+    public ExecutorTxnIdSafetyState(int mySiteId, int siteIds[]) {
+        m_siteId = mySiteId;
+        final int partitionId = 0;
+        for (int siteId : siteIds) {
+            m_stateToPartitionMap.put( siteId, partitionId);
+            SiteState ss = new SiteState();
+            ss.siteId = siteId;
+            ss.newestConfirmedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
+            ss.lastSentTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
+            assert(m_stateBySite.get(siteId) == null);
+            m_stateBySite.put( siteId, ss);
+
+            // look for partition state by id
+            PartitionState ps = m_stateByPartition.get(partitionId);
+
+            // create, populate and insert it
+            if (ps == null) {
+                ps = new PartitionState();
+                ps.partitionId = partitionId;
+                ps.newestConfirmedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
+                m_stateByPartition.put(partitionId, ps);
+            }
+
+            // sanity checks
+            assert(ps.partitionId == partitionId);
+            for (SiteState state : ps.sites) {
+                assert(state != null);
+                assert(state.siteId != ss.siteId);
+            }
+
+            // link the partition state and site state
+            ps.sites.add(ss);
+            ss.partition = ps;
+        }
+    }
+
     public ExecutorTxnIdSafetyState(int siteId, SiteTracker tracker) {
         m_siteId = siteId;
 

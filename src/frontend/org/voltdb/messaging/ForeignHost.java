@@ -108,7 +108,10 @@ public class ForeignHost {
             if (!m_closing)
             {
                 VoltDB.instance().getFaultDistributor().
-                reportFault(new NodeFailureFault(m_hostId, m_remoteHostname));
+                reportFault(new NodeFailureFault(
+                        m_hostId,
+                        VoltDB.instance().getCatalogContext().siteTracker.getNonExecSitesForHost(m_hostId),
+                        m_remoteHostname));
             }
         }
 
@@ -268,7 +271,10 @@ public class ForeignHost {
             hostLog.info("\tdelta (millis): " + current_delta);
             hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
             VoltDB.instance().getFaultDistributor().
-            reportFault(new NodeFailureFault(m_hostId, m_remoteHostname));
+            reportFault(new NodeFailureFault(
+                    m_hostId,
+                    VoltDB.instance().getCatalogContext().siteTracker.getNonExecSitesForHost(m_hostId),
+                    m_remoteHostname));
         }
 //        else
 //        {

@@ -741,7 +741,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 initiatorIds[index++] = Integer.parseInt(s.getTypeName());
 
         assert(m_mailbox != null);
-        RestrictedPriorityQueue retval = new RestrictedPriorityQueue(initiatorIds, siteId, m_mailbox);
+        RestrictedPriorityQueue retval = new RestrictedPriorityQueue(
+                initiatorIds,
+                siteId,
+                m_mailbox,
+                VoltDB.DTXN_MAILBOX_ID);
         return retval;
     }
 
@@ -994,7 +998,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     }
                 }
 
-                TransactionState currentTxnState = m_transactionQueue.poll();
+                TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
                 m_currentTransactionState = currentTxnState;
                 if (currentTxnState == null) {
                     // poll the messaging layer for a while as this site has nothing to do
@@ -1049,7 +1053,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      */
     public void runLoop() {
         while (m_shouldContinue) {
-            TransactionState currentTxnState = m_transactionQueue.poll();
+            TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
             if (currentTxnState == null) {
                 // poll the messaging layer for a while as this site has nothing to do
                 // this will likely have a message/several messages immediately in a heavy workload
@@ -1497,7 +1501,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     FailureSiteUpdateMessage srcmsg =
                         new FailureSiteUpdateMessage(m_siteId,
                                                      m_knownFailedSites,
-                                                     site,
                                                      txnId != null ? txnId : Long.MIN_VALUE,
                                                      //txnId,
                                                      lastKnownGloballyCommitedMultiPartTxnId);
@@ -1569,13 +1572,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             if (!m_knownFailedSites.equals(fm.m_failedSiteIds)) {
                 if (!m_knownFailedSites.containsAll(fm.m_failedSiteIds)) {
                     /*
-                     * In this case there is a new failed host we didn't know about. Time to
+                     * In this case there is a new failed site we didn't know about. Time to
                      * start the process again from square 1 with knowledge of the new failed hosts
                      * First fail all the ones we didn't know about.
                      */
                     HashSet<Integer> difference = new HashSet<Integer>(fm.m_failedSiteIds);
                     difference.removeAll(m_knownFailedSites);
-                    HashSet<Integer> differenceHosts = new HashSet<Integer>();
+                    Set<Integer> differenceHosts = new HashSet<Integer>();
                     for (Integer siteId : difference) {
                         differenceHosts.add(m_context.siteTracker.getHostForSite(siteId));
                     }
@@ -1588,7 +1591,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             }
                         }
                         VoltDB.instance().getFaultDistributor().
-                            reportFault(new NodeFailureFault( hostId, hostname));
+                            reportFault(new NodeFailureFault(
+                                    hostId,
+                                    m_context.siteTracker.getNonExecSitesForHost(hostId),
+                                    hostname));
                     }
                     m_recoveryLog.info("Detected a concurrent failure from " +
                             fm.m_sourceSiteId + " with new failed sites " + difference.toString());
@@ -2248,7 +2254,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             return true;
         }
         else {
-            TransactionState nextTxn = m_transactionQueue.peek();
+            TransactionState nextTxn = (TransactionState)m_transactionQueue.peek();
 
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)

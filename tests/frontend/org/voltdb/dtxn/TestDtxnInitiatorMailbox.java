@@ -604,7 +604,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
 
         synchronized (m_testStream) {
-            NodeFailureFault node_failure = new NodeFailureFault(HOST_ID, "localhost");
+            NodeFailureFault node_failure = new NodeFailureFault(
+                    HOST_ID,
+                    m_mockVolt.getCatalogContext().siteTracker.getNonExecSitesForHost(HOST_ID),
+                    "localhost");
             VoltDB.instance().getFaultDistributor().reportFault(node_failure);
             m_testStream.wait(10000);
         }

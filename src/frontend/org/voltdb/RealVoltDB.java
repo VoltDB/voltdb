@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Site;
@@ -288,6 +289,7 @@ public class RealVoltDB implements VoltDBInterface
         new ArrayList<ClientInterface>();
     private Map<Integer, ExecutionSite> m_localSites;
     private VoltNetwork m_network = null;
+    private AgreementSite m_agreementSite;
     private HTTPAdminListener m_adminListener;
     private Map<Integer, Thread> m_siteThreads;
     private ArrayList<ExecutionSiteRunner> m_runners;
@@ -604,6 +606,7 @@ public class RealVoltDB implements VoltDBInterface
             // Prepare the network socket manager for work
             m_network = new VoltNetwork();
             final HashSet<Integer> downHosts = new HashSet<Integer>();
+            final Set<Integer> downNonExecSites = new HashSet<Integer>();
             boolean isRejoin = config.m_rejoinToHostAndPort != null;
             if (!isRejoin) {
                 // Create the intra-cluster mesh
@@ -635,7 +638,12 @@ public class RealVoltDB implements VoltDBInterface
                  * to go through the agreement process.
                  */
                 for (Integer downHost : downHosts) {
-                    m_faultManager.reportFault(new NodeFailureFault( downHost, "UNKNOWN"));
+                    downNonExecSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
+                    m_faultManager.reportFault(
+                            new NodeFailureFault(
+                                downHost,
+                                m_catalogContext.siteTracker.getNonExecSitesForHost(downHost),
+                                "UNKNOWN"));
                 }
                 try {
                     m_faultHandler.m_waitForFaultReported.acquire(downHosts.size());
@@ -650,6 +658,54 @@ public class RealVoltDB implements VoltDBInterface
 
             // Use the host messenger's hostId.
             int myHostId = m_messenger.getHostId();
+
+            /*
+             * Initialize the agreement site with the same site id as the CI/SDTXN,
+             * but a different mailbox.
+             */
+            {
+                int myAgreementSiteId = -1;
+                HashSet<Integer> agreementSiteIds = new HashSet<Integer>();
+                int myAgreementInitiatorId = 0;
+                for (Site site : m_catalogContext.siteTracker.getAllSites()) {
+                    int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
+                    int currSiteId = Integer.parseInt(site.getTypeName());
+
+                    if (sitesHostId == myHostId) {
+                        log.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { currSiteId }, null);
+                        m_messenger.createLocalSite(currSiteId);
+                    }
+                    // Create an agreement site for every initiator
+                    if (site.getIsexec() == false) {
+                        agreementSiteIds.add(currSiteId);
+                        if (sitesHostId == myHostId) {
+                            myAgreementSiteId = currSiteId;
+                            myAgreementInitiatorId = site.getInitiatorid();
+                        }
+                    }
+                }
+
+                assert(m_agreementSite == null);
+                assert(myAgreementSiteId != -1);
+                Mailbox agreementMailbox =
+                    m_messenger.createMailbox(myAgreementSiteId, VoltDB.AGREEMENT_MAILBOX_ID);
+                try {
+                    m_agreementSite =
+                        new AgreementSite(
+                                myAgreementSiteId,
+                                agreementSiteIds,
+                                myAgreementInitiatorId,
+                                downNonExecSites,
+                                agreementMailbox,
+                                new InetSocketAddress(2181),
+                                m_faultManager,
+                                m_recovering);
+                    m_agreementSite.start();
+                } catch (Exception e) {
+                    hostLog.fatal(null, e);
+                    System.exit(-1);
+                }
+            }
 
             // make sure the local entry for metadata is current
             // it's possible it could get overwritten in a rejoin scenario
@@ -696,8 +752,6 @@ public class RealVoltDB implements VoltDBInterface
 
                 // start a local site
                 if (sitesHostId == myHostId) {
-                    log.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { siteId }, null);
-                    m_messenger.createLocalSite(siteId);
                     if (site.getIsexec()) {
                         if (siteForThisThread == null) {
                             siteForThisThread = site;
@@ -1270,6 +1324,8 @@ public class RealVoltDB implements VoltDBInterface
             m_siteThreads = null;
             m_runners = null;
 
+            m_agreementSite.shutdown();
+            m_agreementSite = null;
             // shut down the network/messaging stuff
             // Close the host messenger first, which should close down all of
             // the ForeignHost sockets cleanly
@@ -1362,7 +1418,11 @@ public class RealVoltDB implements VoltDBInterface
         if (commit) {
             // put the foreign host into the set of active ones
             HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
-            m_faultManager.reportFaultCleared(new NodeFailureFault(joinNodeInfo.hostId, joinNodeInfo.hostName));
+            m_faultManager.reportFaultCleared(
+                    new NodeFailureFault(
+                            joinNodeInfo.hostId,
+                            m_catalogContext.siteTracker.getNonExecSitesForHost(joinNodeInfo.hostId),
+                            joinNodeInfo.hostName));
             try {
                 m_faultHandler.m_waitForFaultClear.acquire();
             } catch (InterruptedException e) {

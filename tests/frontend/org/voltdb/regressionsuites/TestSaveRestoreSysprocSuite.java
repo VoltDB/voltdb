@@ -443,10 +443,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         saveTables(client);
         validateSnapshot(true);
 
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-
         releaseClient(client);
+
         // Kill and restart all the execution sites.
         m_config.shutDown();
         m_config.startUp();

@@ -29,8 +29,6 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     /** Site id of the failed sites */
     public HashSet<Integer> m_failedSiteIds = new HashSet<Integer>();
 
-    /** Initiator id corresponding to the m_safeTxnId. */
-    public int m_failedInitiatorId;
 
     /** Greatest 2PC transaction id at source m_sourceSiteId seen from failed initiator */
     public long m_safeTxnId;
@@ -41,13 +39,11 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     public FailureSiteUpdateMessage(
             int sourceSiteId,
             HashSet<Integer> failedSiteIds,
-            int failedInitiatorId,
             long safeTxnId,
             long committedTxnId)
     {
         m_sourceSiteId = sourceSiteId;
         m_failedSiteIds = new HashSet<Integer>(failedSiteIds);
-        m_failedInitiatorId = failedInitiatorId;
         m_safeTxnId = safeTxnId;
         m_committedTxnId = committedTxnId;
     }
@@ -75,7 +71,6 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         for (Integer hostId : m_failedSiteIds) {
             m_buffer.putInt(hostId);
         }
-        m_buffer.putInt(m_failedInitiatorId);
         m_buffer.putLong(m_safeTxnId);
         m_buffer.putLong(m_committedTxnId);
     }
@@ -89,7 +84,6 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         for (int ii = 0; ii < numIds; ii++) {
             m_failedSiteIds.add(m_buffer.getInt());
         }
-        m_failedInitiatorId = m_buffer.getInt();
         m_safeTxnId = m_buffer.getLong();
         m_committedTxnId = m_buffer.getLong();
     }
@@ -101,8 +95,6 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         sb.append("FAILURE_SITE_UPDATE ");
         sb.append(" from site: ");
         sb.append(m_sourceSiteId);
-        sb.append(" for initiator: ");
-        sb.append(m_failedInitiatorId);
         sb.append(" for failed hosts: ");
         for (Integer hostId : m_failedSiteIds) {
             sb.append(hostId).append(' ');

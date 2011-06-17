@@ -45,7 +45,7 @@ import org.voltdb.messaging.VoltMessage;
  *
  * <p>This class manages all that state.</p>
  */
-public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
+public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> {
     private static final long serialVersionUID = 1L;
     private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
 
@@ -123,15 +123,17 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     long m_txnsPopped = 0;
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
+    private final int m_mailboxId;
 
     /**
      * Tell this queue about all initiators. If any initiators
      * are later referenced that aren't in this list, trip
      * an assertion.
      */
-    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId, Mailbox mbox) {
+    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId, Mailbox mbox, int mailboxId) {
         m_siteId = siteId;
         m_mailbox = mbox;
+        m_mailboxId = mailboxId;
         for (int id : initiatorSiteIds)
             m_initiatorData.put(id, new LastInitiatorData());
     }
@@ -140,8 +142,8 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * Only return transaction state objects that are ready to run.
      */
     @Override
-    public TransactionState poll() {
-        TransactionState retval = null;
+    public OrderableTransaction poll() {
+        OrderableTransaction retval = null;
         updateQueueState();
         if (m_state == QueueState.UNBLOCKED) {
             retval = super.peek();
@@ -160,8 +162,8 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * Only return transaction state objects that are ready to run.
      */
     @Override
-    public TransactionState peek() {
-        TransactionState retval = null;
+    public OrderableTransaction peek() {
+        OrderableTransaction retval = null;
         updateQueueState();
         if (m_state == QueueState.UNBLOCKED) {
             retval = super.peek();
@@ -178,7 +180,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * Drop data for unknown initiators. This is the only valid add interface.
      */
     @Override
-    public boolean add(TransactionState txnState) {
+    public boolean add(OrderableTransaction txnState) {
         if (m_initiatorData.containsKey(txnState.initiatorSiteId) == false) {
             return false;
         }
@@ -250,7 +252,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         assert(remove != null);
     }
 
-    public void faultTransaction(TransactionState txnState) {
+    public void faultTransaction(OrderableTransaction txnState) {
         this.remove(txnState);
     }
 
@@ -296,9 +298,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         // get all the queued transactions
         context.queuedTransactions = new ExecutorTxnState[size()];
         int i = 0;
-        for (TransactionState txnState : this) {
+        for (OrderableTransaction txnState : this) {
             assert(txnState != null);
-            context.queuedTransactions[i] = txnState.getDumpContents();
+            context.queuedTransactions[i] = ((TransactionState)txnState).getDumpContents();
             context.queuedTransactions[i].ready = (txnState.txnId <= m_newestCandidateTransaction);
             i++;
         }
@@ -326,7 +328,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
 
     QueueState updateQueueState() {
         QueueState newState = QueueState.UNBLOCKED;
-        TransactionState ts = super.peek();
+        OrderableTransaction ts = super.peek();
         LastInitiatorData lid = null;
 
         // Terminal states (currently only BLOCKED_CLOSED)
@@ -392,7 +394,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         return newState;
     }
 
-    private void executeStateChange(QueueState newState, TransactionState ts,
+    private void executeStateChange(QueueState newState, OrderableTransaction ts,
             LastInitiatorData lid)
     {
         // Execute state changes
@@ -417,14 +419,14 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         }
     }
 
-    private void sendHearbeatResponse(TransactionState ts, LastInitiatorData lid) {
+    private void sendHearbeatResponse(OrderableTransaction ts, LastInitiatorData lid) {
         // mailbox might be null in testing
         if (m_mailbox == null) return;
 
         HeartbeatResponseMessage hbr =
             new HeartbeatResponseMessage(m_siteId, lid.m_lastSeenTxnId, true);
         try {
-            m_mailbox.send(ts.initiatorSiteId, VoltDB.DTXN_MAILBOX_ID, hbr);
+            m_mailbox.send(ts.initiatorSiteId, m_mailboxId, hbr);
         } catch (MessagingException e) {
             // I really hope this doesn't happen
             throw new RuntimeException(e);
@@ -456,7 +458,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
             return null;
         }
 
-        TransactionState next = peek();
+        OrderableTransaction next = peek();
         if (next == null) {
             // no work - have heard from all initiators. use a heartbeat
             if (m_state == QueueState.BLOCKED_EMPTY) {
