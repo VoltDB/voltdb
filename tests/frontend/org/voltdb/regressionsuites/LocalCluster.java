@@ -24,10 +24,13 @@ package org.voltdb.regressionsuites;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -68,6 +71,7 @@ public class LocalCluster implements VoltServerConfig {
     final BackendTarget m_target;
     final String m_buildDir;
     int m_portOffset;
+    int m_zkInterfaceOffset;
     int m_adminPortOffset;
     boolean m_hasLocalServer = true;
     String m_pathToDeployment;
@@ -281,6 +285,8 @@ public class LocalCluster implements VoltServerConfig {
                                            "-classpath",
                                            classPath,
                                            "org.voltdb.VoltDB",
+                                           "zkinterface",
+                                           "-1",
                                            "timestampsalt",
                                            "0",
                                            "catalog",
@@ -294,30 +300,32 @@ public class LocalCluster implements VoltServerConfig {
                                            "rejoinhost",
                                            "-1");
 
+        List<String> command = m_procBuilder.command();
         // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = m_procBuilder.command().size() - 17;
-        m_debugOffset2 = m_procBuilder.command().size() - 16;
+        m_debugOffset1 = command.size() - 17;
+        m_debugOffset2 = command.size() - 16;
         if (m_debug) {
-            m_procBuilder.command().add(m_debugOffset1, "");
-            m_procBuilder.command().add(m_debugOffset1, "");
+            command.add(m_debugOffset1, "");
+            command.add(m_debugOffset1, "");
         }
 
-        m_voltFilePrefixOffset = m_procBuilder.command().size() - 15;
-        m_procBuilder.command().add(m_voltFilePrefixOffset, "");
+        m_voltFilePrefixOffset = command.size() - 15;
+        command.add(m_voltFilePrefixOffset, "");
 
-        m_portOffset = m_procBuilder.command().size() - 5;
-        m_adminPortOffset = m_procBuilder.command().size() - 3;
-        m_pathToDeploymentOffset = m_procBuilder.command().size() - 7;
-        m_rejoinOffset = m_procBuilder.command().size() - 1;
-        m_timestampSaltOffset = m_procBuilder.command().size() - 11;
+        m_zkInterfaceOffset = m_procBuilder.command().size() - 13;
+        m_timestampSaltOffset = command.size() - 11;
+        m_pathToDeploymentOffset = command.size() - 7;
+        m_portOffset = command.size() - 5;
+        m_adminPortOffset = command.size() - 3;
+        m_rejoinOffset = command.size() - 1;
 
         if (m_target.isIPC) {
-            m_procBuilder.command().add("");
-            m_ipcPortOffset1 = m_procBuilder.command().size() - 1;
-            m_procBuilder.command().add("");
-            m_ipcPortOffset2 = m_procBuilder.command().size() - 1;
-            m_procBuilder.command().add("");
-            m_ipcPortOffset3 = m_procBuilder.command().size() - 1;
+            command.add("");
+            m_ipcPortOffset1 = command.size() - 1;
+            command.add("");
+            m_ipcPortOffset2 = command.size() - 1;
+            command.add("");
+            m_ipcPortOffset3 = command.size() - 1;
         }
 
         // set the working directory to obj/release/prod
@@ -556,6 +564,7 @@ public class LocalCluster implements VoltServerConfig {
                 m_procBuilder.command().set(m_ipcPortOffset2, portString);
                 m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
             }
+            m_procBuilder.command().set(m_zkInterfaceOffset, "localhost:" + (2181 + hostId));
 
             //If local directories are being cleared
             //Generate a new subroot, otherwise reuse the existing directory
@@ -586,6 +595,14 @@ public class LocalCluster implements VoltServerConfig {
                 assert(status);
             }
 
+            File dirFile = new VoltFile(testoutputdir);
+            if (dirFile.listFiles() != null) {
+                for (File f : dirFile.listFiles()) {
+                    if (f.getName().startsWith(getName() + "-" + hostId)) {
+                        f.delete();
+                    }
+                }
+            }
             PipeToFile ptf = new PipeToFile(testoutputdir + File.separator +
                     getName() + "-" + hostId + ".txt", proc.getInputStream(),
                     PipeToFile.m_initToken, false);
@@ -667,12 +684,14 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_rejoinOffset, rejoinHost + ":" + String.valueOf(portNoToRejoin));
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
             if (m_debug) {
+                System.out.println("Debug port is " + m_debugPortOffset);
                 m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
                 m_procBuilder.command().set(
                         m_debugOffset2,
                         "-agentlib:jdwp=transport=dt_socket,address="
                         + m_debugPortOffset++ + ",server=y,suspend=n");
             }
+            m_procBuilder.command().set(m_zkInterfaceOffset, "localhost:" + (2181 + hostId));
 
             Process proc = m_procBuilder.start();
             start = System.currentTimeMillis();
@@ -731,6 +750,20 @@ public class LocalCluster implements VoltServerConfig {
         } else {
             System.out.println("Recovering process exited before recovery completed");
             try {
+                File destFile = new File(ptf.m_filename + ".bak");
+                while (destFile.exists()) {
+                    destFile = new File(destFile.getPath() + ".bak");
+                }
+                destFile.createNewFile();
+                FileChannel source = new FileInputStream(new File(ptf.m_filename)).getChannel();
+                FileChannel destination = new FileOutputStream(destFile).getChannel();
+                destination.transferFrom(source, 0, source.size());
+                source.close();
+                destination.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
                 silentShutdownSingleHost(hostId, true);
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -765,14 +798,19 @@ public class LocalCluster implements VoltServerConfig {
         Process proc = null;
         //PipeToFile ptf = null;
         ArrayList<EEProcess> procs = null;
+        PipeToFile ptf;
         synchronized (this) {
            proc = m_cluster.get(hostNum);
            //ptf = m_pipes.get(hostNum);
            m_cluster.set(hostNum, null);
+           ptf = m_pipes.get(hostNum);
            m_pipes.set(hostNum, null);
            procs = m_eeProcs.get(hostNum);
         }
 
+        if (ptf != null && ptf.m_filename != null) {
+            //new File(ptf.m_filename).delete();
+        }
         if (proc != null) {
             proc.destroy();
         }

@@ -57,6 +57,7 @@ public class NodeFailureFault extends VoltFault
         sb.append("NodeFailureFault:\n");
         sb.append("  Host: " + m_hostname + "\n");
         sb.append("  Host Id: " + m_hostId + "\n");
+        sb.append("  Non-exec sites: " + m_failedNonExecSites);
         sb.append(super.toString());
 
         return sb.toString();

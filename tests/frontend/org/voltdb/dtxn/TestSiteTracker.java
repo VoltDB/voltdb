@@ -34,7 +34,7 @@ import org.voltdb.catalog.Site;
 
 public class TestSiteTracker extends TestCase
 {
-    public void testNoReplication()
+    public void testNoReplication() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
 
@@ -72,9 +72,11 @@ public class TestSiteTracker extends TestCase
         assertEquals(1, tracker.getPartitionForSite(2));
         assertEquals(2, tracker.getPartitionForSite(101));
         assertEquals(3, tracker.getPartitionForSite(102));
+
+        helper.shutdown(null);
     }
 
-    public void testEasyReplication()
+    public void testEasyReplication() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
 
@@ -106,9 +108,10 @@ public class TestSiteTracker extends TestCase
         assertEquals(1, tracker.getPartitionForSite(2));
         assertEquals(0, tracker.getPartitionForSite(101));
         assertEquals(1, tracker.getPartitionForSite(102));
+        helper.shutdown(null);
     }
 
-    public void testHostToSites()
+    public void testHostToSites() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
 
@@ -148,9 +151,10 @@ public class TestSiteTracker extends TestCase
         assertFalse(host1.contains(102));
         assertTrue(host1.contains(103));
         assertFalse(host1.contains(1));
+        helper.shutdown(null);
     }
 
-    public void testUpSites()
+    public void testUpSites() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
 
@@ -175,9 +179,10 @@ public class TestSiteTracker extends TestCase
         assertFalse(up_sites.contains(helper.getSite(102)));
 
         assertEquals(2, tracker.getLiveSiteCount());
+        helper.shutdown(null);
     }
 
-    public void testExecutionSiteIds()
+    public void testExecutionSiteIds() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
 
@@ -202,9 +207,11 @@ public class TestSiteTracker extends TestCase
         assertTrue(exec_sites.contains(102));
         assertEquals((Integer) 1, tracker.getLowestLiveExecSiteIdForHost(0));
         assertEquals((Integer) 101, tracker.getLowestLiveExecSiteIdForHost(1));
+
+        helper.shutdown(null);
     }
 
-    public void testLiveSitesForPartitions()
+    public void testLiveSitesForPartitions() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
         helper.addHost(0);
@@ -230,9 +237,11 @@ public class TestSiteTracker extends TestCase
         {
             assertTrue(site == 1 || site == 2);
         }
+
+        helper.shutdown(null);
     }
 
-    public void testClusterViable()
+    public void testClusterViable() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
 
@@ -253,5 +262,7 @@ public class TestSiteTracker extends TestCase
         tracker = helper.getCatalogContext().siteTracker;
         assertEquals(1, tracker.getFailedPartitions().size());
         assertEquals((Integer) 1, tracker.getFailedPartitions().get(0));
+
+        helper.shutdown(null);
     }
 }

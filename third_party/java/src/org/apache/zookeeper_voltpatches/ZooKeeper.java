@@ -114,7 +114,7 @@ public class ZooKeeper {
 
     static {
         LOG = Logger.getLogger(ZooKeeper.class.getName());
-        Environment.logEnv("Client environment:", LOG);
+        //Environment.logEnv("Client environment:", LOG);
     }
 
     private final ZKWatchManager watchManager = new ZKWatchManager();

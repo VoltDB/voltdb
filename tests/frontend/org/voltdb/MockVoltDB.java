@@ -22,15 +22,21 @@
  */
 package org.voltdb;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
@@ -44,6 +50,7 @@ import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.MockMailbox;
 import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
@@ -59,6 +66,9 @@ public class MockVoltDB implements VoltDBInterface
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata = "0.0.0.0:0:0:0";
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
+
+    final AgreementSite m_agreementSite;
+    private final ZooKeeper m_zk;
 
     public MockVoltDB()
     {
@@ -89,6 +99,24 @@ public class MockVoltDB implements VoltDBInterface
         execSite.setPartition(partition);*/
 
         m_statsAgent = new StatsAgent();
+        MockMailbox mailbox = new MockMailbox();
+        MockMailbox.registerMailbox(1, mailbox);
+        try {
+            m_agreementSite =
+                new AgreementSite(
+                    1,
+                    new HashSet<Integer>(Arrays.asList(1)),
+                    1,
+                    new HashSet<Integer>(),
+                    mailbox,
+                    new InetSocketAddress(2181),
+                    null,
+                    false);
+            m_agreementSite.start();
+            m_zk = org.voltdb.utils.ZKUtil.getClient("localhost:2181", 60 * 1000);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public Procedure addProcedureForTest(String name)
@@ -341,8 +369,8 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void shutdown(Thread mainSiteThread) throws InterruptedException
     {
-        // TODO Auto-generated method stub
-
+        m_zk.close();
+        m_agreementSite.shutdown();
     }
 
     @Override
@@ -398,7 +426,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onRecoveryCompletion(long transferred) {
+    public void onExecutionSiteRecoveryCompletion(long transferred) {
         // TODO Auto-generated method stub
 
     }
@@ -481,5 +509,21 @@ public class MockVoltDB implements VoltDBInterface
     public void setStartMode(OperationMode mode) {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public ZooKeeper getZK() {
+        return m_zk;
+    }
+
+    @Override
+    public void onAgreementSiteRecoveryCompletion() {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public AgreementSite getAgreementSite() {
+        return m_agreementSite;
     }
 }

@@ -54,6 +54,11 @@ public class TestPartitionedTableSaveFileState extends TestCase
         m_voltDB.addTable(TABLE_NAME, false);
     }
 
+    @Override
+    public void tearDown() throws Exception {
+        m_voltDB.shutdown(null);
+    }
+
     public void testLoadOperation()
     {
         assertEquals(m_state.getTableName(), TABLE_NAME);

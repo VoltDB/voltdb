@@ -112,7 +112,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
     static boolean skipACL;
     static {
         LOG = Logger.getLogger(ZooKeeperServer.class);
-        Environment.logEnv("Server environment:", LOG);
+        //Environment.logEnv("Server environment:", LOG);
         skipACL = System.getProperty("zookeeper.skipACL", "no").equals("yes");
         if (skipACL) {
             LOG.info("zookeeper.skipACL==\"yes\", ACL checks will be skipped");

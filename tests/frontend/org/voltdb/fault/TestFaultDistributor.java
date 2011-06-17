@@ -104,9 +104,21 @@ public class TestFaultDistributor extends TestCase
         }
     }
 
+    MockVoltDB m_voltdb;
+
+    @Override
+    public void setUp() {
+        m_voltdb = new MockVoltDB();
+    }
+
+    @Override
+    public void tearDown() throws Exception {
+        m_voltdb.shutdown(null);
+    }
+
     public void testBasicDispatch() throws Exception
     {
-        FaultDistributor dut = new FaultDistributor(new MockVoltDB());
+        FaultDistributor dut = new FaultDistributor(m_voltdb);
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.UNKNOWN);
         MockFaultHandler node_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
         dut.registerFaultHandler(1, unk_handler, FaultType.UNKNOWN);
@@ -123,7 +135,7 @@ public class TestFaultDistributor extends TestCase
     // multiple handlers for same type
     public void testMultiHandler() throws Exception
     {
-        FaultDistributor dut = new FaultDistributor(new MockVoltDB());
+        FaultDistributor dut = new FaultDistributor(m_voltdb);
         MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.NODE_FAILURE);
         dut.registerFaultHandler(1, node_handler1, FaultType.NODE_FAILURE);
         MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.NODE_FAILURE);
@@ -138,7 +150,7 @@ public class TestFaultDistributor extends TestCase
     // no handler installed for type
     public void testNoHandler() throws Exception
     {
-        FaultDistributor dut = new FaultDistributor(new MockVoltDB());
+        FaultDistributor dut = new FaultDistributor(m_voltdb);
         // We lie a little bit here to get the NODE_FAILURE routed to UNKNOWN
         // but still set the checking bool correctly
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
@@ -150,7 +162,7 @@ public class TestFaultDistributor extends TestCase
 
     public void testSingleTypeOrder() throws Exception
     {
-        FaultDistributor dut = new FaultDistributor(new MockVoltDB());
+        FaultDistributor dut = new FaultDistributor(m_voltdb);
         OrderTracker order_tracker = new OrderTracker(-1);
         MockFaultHandler node_handler1 =
             new MockFaultHandler(FaultType.NODE_FAILURE, 1, order_tracker);
@@ -185,7 +197,7 @@ public class TestFaultDistributor extends TestCase
 
     public void testFaultClearing() throws Exception
     {
-        FaultDistributor dut = new  FaultDistributor(new MockVoltDB());
+        FaultDistributor dut = new  FaultDistributor(m_voltdb);
         OrderTracker orderTracker = new OrderTracker(-1);
         MockFaultHandler mh1 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
         MockFaultHandler mh2 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
@@ -210,7 +222,7 @@ public class TestFaultDistributor extends TestCase
     public void testPartitionDetectionTrigger() throws Exception
     {
         // need to add live sites and generate a context for mock functionality
-        MockVoltDB voltdb = new MockVoltDB();
+        MockVoltDB voltdb = m_voltdb;
         FaultDistributor dut = new FaultDistributor(voltdb, true);
         voltdb.setFaultDistributor(dut);
         VoltDB.replaceVoltDBInstanceForTest(voltdb);
@@ -244,7 +256,7 @@ public class TestFaultDistributor extends TestCase
     public void testPartitionDetectionNoTrigger() throws Exception
     {
         // need to add live sites and generate a context for mock functionality
-        MockVoltDB voltdb = new MockVoltDB();
+        MockVoltDB voltdb = m_voltdb;
         FaultDistributor dut = new FaultDistributor(voltdb, true);
         voltdb.setFaultDistributor(dut);
         VoltDB.replaceVoltDBInstanceForTest(voltdb);
@@ -278,7 +290,7 @@ public class TestFaultDistributor extends TestCase
     public void testPartitionDetectionDirectoryCheck() throws Exception
     {
         // need to add live sites and generate a context for mock functionality
-        MockVoltDB voltdb = new MockVoltDB();
+        MockVoltDB voltdb = m_voltdb;
         FaultDistributor dut = new FaultDistributor(voltdb, true);
         voltdb.setFaultDistributor(dut);
         VoltDB.replaceVoltDBInstanceForTest(voltdb);

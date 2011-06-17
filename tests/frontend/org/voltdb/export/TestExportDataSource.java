@@ -44,13 +44,14 @@ public class TestExportDataSource extends TestCase {
     }
 
     private static final int MAGIC_TUPLE_SIZE = 94;
-    MockVoltDB m_mockVoltDB = new MockVoltDB();
+    MockVoltDB m_mockVoltDB;
     int m_host = 0;
     int m_site = 1;
     int m_part = 2;
 
     @Override
     public void setUp() {
+        m_mockVoltDB = new MockVoltDB();
         m_mockVoltDB.addHost(m_host);
         m_mockVoltDB.addPartition(m_part);
         m_mockVoltDB.addSite(m_site, m_host, m_part, true);
@@ -67,6 +68,11 @@ public class TestExportDataSource extends TestCase {
                 f.delete();
             }
         }
+    }
+
+    @Override
+    public void tearDown() throws Exception {
+        m_mockVoltDB.shutdown(null);
     }
 
     public void testExportDataSource() throws Exception

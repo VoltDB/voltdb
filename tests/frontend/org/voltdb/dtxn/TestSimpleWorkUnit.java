@@ -104,6 +104,11 @@ public class TestSimpleWorkUnit extends TestCase
         t2.addRow(10);
     }
 
+    @Override
+    public void tearDown() throws Exception {
+        m_voltdb.shutdown(null);
+    }
+
     public void testNoDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
         WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,

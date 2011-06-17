@@ -492,7 +492,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 int remaining = recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
                     ee.toggleProfiler(0);
-                    VoltDB.instance().onRecoveryCompletion(bytesTransferredTotal);
+                    VoltDB.instance().onExecutionSiteRecoveryCompletion(bytesTransferredTotal);
                 }
             } else {
                 m_recoveryLog.info("Source recovery complete for site " + m_siteId +

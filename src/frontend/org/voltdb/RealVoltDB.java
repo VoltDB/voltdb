@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -301,10 +302,15 @@ public class RealVoltDB implements VoltDBInterface
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
     private StatsManager m_statsManager = null;
+    private ZooKeeper m_zk;
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     private volatile boolean m_recovering = false;
+    private boolean m_executionSitesRecovered = false;
+    private boolean m_agreementSiteRecovered = false;
+    private long m_executionSiteRecoveryFinish;
+    private long m_executionSiteRecoveryTransferred;
 
     // Synchronize initialize and shutdown.
     private final Object m_startAndStopLock = new Object();
@@ -697,7 +703,9 @@ public class RealVoltDB implements VoltDBInterface
                                 myAgreementInitiatorId,
                                 downNonExecSites,
                                 agreementMailbox,
-                                new InetSocketAddress(2181),
+                                new InetSocketAddress(
+                                        m_config.m_zkInterface.split(":")[0],
+                                        Integer.parseInt(m_config.m_zkInterface.split(":")[1])),
                                 m_faultManager,
                                 m_recovering);
                     m_agreementSite.start();
@@ -885,6 +893,16 @@ public class RealVoltDB implements VoltDBInterface
                            new Object[] { m_network.threadPoolSize },
                            null);
             m_network.start();
+            try {
+                m_agreementSite.waitForRecovery();
+                m_zk = org.voltdb.utils.ZKUtil.getClient(m_config.m_zkInterface, 60 * 1000);
+                if (m_zk == null) {
+                    throw new Exception("Timed out trying to connect");
+                }
+            } catch (Exception e) {
+                hostLog.fatal("Unable to create a ZK client", e);
+                VoltDB.crashVoltDB();
+            }
 
             // tell other booting nodes that this node is ready. Primary purpose is to publish a hostname
             m_messenger.sendReadyMessage();
@@ -1323,8 +1341,19 @@ public class RealVoltDB implements VoltDBInterface
             m_currentThreadSite = null;
             m_siteThreads = null;
             m_runners = null;
-
+            Thread t = new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        m_zk.close();
+                    } catch (InterruptedException e) {
+                    }
+                }
+            };
+            t.start();
             m_agreementSite.shutdown();
+            t.join();
+
             m_agreementSite = null;
             // shut down the network/messaging stuff
             // Close the host messenger first, which should close down all of
@@ -1405,6 +1434,10 @@ public class RealVoltDB implements VoltDBInterface
     private static Long lastNodeRejoinFinish_txnId = 0L;
     @Override
     public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
+        if (m_recovering) {
+            recoveryLog.fatal("Concurrent rejoins are not supported");
+            VoltDB.crashVoltDB();
+        }
         // another site already did this work.
         if (currentTxnId == lastNodeRejoinFinish_txnId) {
             return null;
@@ -1428,6 +1461,7 @@ public class RealVoltDB implements VoltDBInterface
             } catch (InterruptedException e) {
                 VoltDB.crashVoltDB();//shouldn't happen
             }
+
             ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
             ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
             Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
@@ -1596,6 +1630,11 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     @Override
+    public ZooKeeper getZK() {
+        return m_zk;
+    }
+
+    @Override
     public VoltDB.Configuration getConfig()
     {
         return m_config;
@@ -1709,11 +1748,20 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onRecoveryCompletion(long transferred) {
-        final long now = System.currentTimeMillis();
-        final long delta = ((now - m_recoveryStartTime) / 1000);
-        final long megabytes = transferred / (1024 * 1024);
-        final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
+    public synchronized void onExecutionSiteRecoveryCompletion(long transferred) {
+        m_executionSiteRecoveryFinish = System.currentTimeMillis();
+        m_executionSiteRecoveryTransferred = transferred;
+        m_executionSitesRecovered = true;
+        onRecoveryCompletion();
+    }
+
+    private void onRecoveryCompletion() {
+        if (!m_executionSitesRecovered || !m_agreementSiteRecovered) {
+            return;
+        }
+        final long delta = ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000);
+        final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
+        final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
         m_recovering = false;
         for (ClientInterface intf : getClientInterfaces()) {
             intf.mayActivateSnapshotDaemon();
@@ -1796,5 +1844,16 @@ public class RealVoltDB implements VoltDBInterface
             m_mode = OperationMode.RUNNING;
         }
         hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+    }
+
+    @Override
+    public synchronized void onAgreementSiteRecoveryCompletion() {
+        m_agreementSiteRecovered = true;
+        onRecoveryCompletion();
+    }
+
+    @Override
+    public AgreementSite getAgreementSite() {
+        return m_agreementSite;
     }
 }

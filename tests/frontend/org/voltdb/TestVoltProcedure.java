@@ -274,6 +274,11 @@ public class TestVoltProcedure extends TestCase {
         nullParam.setParameters(new Object[]{null});
     }
 
+    @Override
+    public void tearDown() throws Exception {
+        manager.shutdown(null);
+    }
+
     /**
      * XXX (Ning) I'm not sure this test is still useful since we don't support
      * Java Date object anymore.

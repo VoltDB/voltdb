@@ -274,6 +274,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
                     }
                 }
             };
+            assertFalse(haveFailed.get());
             lastRejoinThread.start();
             System.out.println("Finished iteration " + zz);
         }

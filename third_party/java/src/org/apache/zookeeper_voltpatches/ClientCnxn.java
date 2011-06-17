@@ -1098,26 +1098,28 @@ public class ClientCnxn {
                     if (zooKeeper.state != States.CONNECTED) {
                         to = connectTimeout - idleRecv;
                     }
-                    if (to <= 0) {
-                        throw new SessionTimeoutException(
-                                "Client session timed out, have not heard from server in "
-                                        + idleRecv + "ms" + " for sessionid 0x"
-                                        + Long.toHexString(sessionId));
-                    }
-                    if (zooKeeper.state == States.CONNECTED) {
-                        int timeToNextPing = readTimeout / 2 - idleSend;
-                        if (timeToNextPing <= 0) {
-                            sendPing();
-                            lastSend = now;
-                            enableWrite();
-                        } else {
-                            if (timeToNextPing < to) {
-                                to = timeToNextPing;
-                            }
-                        }
-                    }
+//                    if (to <= 0) {
+//                        throw new SessionTimeoutException(
+//                                "Client session timed out, have not heard from server in "
+//                                + idleRecv + "ms"
+//                                + " for sessionid 0x"
+//                                + Long.toHexString(sessionId));
+//                    }
+//                    if (zooKeeper.state == States.CONNECTED) {
+//                        int timeToNextPing = readTimeout/2 - idleSend;
+//                        if (timeToNextPing <= 0) {
+//                            sendPing();
+//                            lastSend = now;
+//                            enableWrite();
+//                        } else {
+//                            if (timeToNextPing < to) {
+//                                to = timeToNextPing;
+//                            }
+//                        }
+//                    }
 
-                    selector.select(to);
+//                    selector.select(to);
+                    selector.select(20);
                     Set<SelectionKey> selected;
                     synchronized (this) {
                         selected = selector.selectedKeys();

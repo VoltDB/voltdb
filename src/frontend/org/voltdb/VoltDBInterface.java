@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltdb.agreement.AgreementSite;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
@@ -27,6 +29,8 @@ import org.voltdb.network.VoltNetwork;
 
 public interface VoltDBInterface
 {
+
+    public AgreementSite getAgreementSite();
 
     public boolean recovering();
 
@@ -142,7 +146,9 @@ public interface VoltDBInterface
     /**
      * Notify RealVoltDB that recovery is complete
      */
-    void onRecoveryCompletion(long transferred);
+    void onExecutionSiteRecoveryCompletion(long transferred);
+
+    void onAgreementSiteRecoveryCompletion();
 
     /**
      * Set the operational mode this server should be in once it has finished
@@ -170,4 +176,6 @@ public interface VoltDBInterface
      * Notify RealVoltDB that command log replay is complete
      */
     public void onRestoreCompletion();
+
+    ZooKeeper getZK();
 }

@@ -353,6 +353,12 @@ public class TestZK {
                     m_faultDistributor,
                     true));
         m_agreementSites.get(site).start();
+        for (int ii = 0; ii < m_agreementSites.size(); ii++) {
+            if (ii == site) {
+                continue;
+            }
+            m_agreementSites.get(ii).clearFault(site);
+        }
     }
 
     public ZooKeeper getClient(int site) throws Exception {
@@ -434,6 +440,7 @@ public class TestZK {
         ZooKeeper zk = getClient(0);
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         failSite(0);
+        zk.close();
         zk = getClient(1);
         assertEquals(zk.getData("/foo", false, null).length, 0);
         recoverSite(0);

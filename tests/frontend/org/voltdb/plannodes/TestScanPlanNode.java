@@ -45,6 +45,7 @@ public class TestScanPlanNode extends TestCase
 
     MockVoltDB m_voltdb;
 
+    @Override
     protected void setUp()
     {
         m_voltdb = new MockVoltDB();
@@ -54,6 +55,11 @@ public class TestScanPlanNode extends TestCase
             m_voltdb.addColumnToTable(TABLE1, COLS[i], COLTYPES[i], false, "",
                                       COLTYPES[i]);
         }
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        m_voltdb.shutdown(null);
     }
 
     // test that if no scan columns are specified, the output schema of

@@ -24,18 +24,50 @@ import org.voltdb.utils.Base64;
 
 public final class CompressionService {
 
-    private final static class CompressionTools {
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        final Deflater deflater = new Deflater(Deflater.BEST_SPEED);
-        final DeflaterOutputStream defOutputStream = new DeflaterOutputStream(baos, deflater, 4096);
-        final Inflater inflater = new Inflater();
-        final InflaterOutputStream infOutputStream = new InflaterOutputStream(baos, inflater, 4096);
+    private final static class DeflationTool {
+        public DeflationTool(ByteArrayOutputStream baos, int compressionSetting) {
+            this.baos = baos;
+            this.deflater = new Deflater(compressionSetting);
+            this.defOutputStream = new DeflaterOutputStream(baos, deflater, 4096);
+        }
+        final ByteArrayOutputStream baos;
+        final Deflater deflater;
+        final DeflaterOutputStream defOutputStream;
     }
 
-    private static ThreadLocal<CompressionTools> m_tools = new ThreadLocal<CompressionTools>() {
+    private final static class InflationTool {
+        public InflationTool(ByteArrayOutputStream baos) {
+            this.baos = baos;
+            infOutputStream = new InflaterOutputStream(baos, inflater, 4096);
+        }
+        final ByteArrayOutputStream baos;
+        final Inflater inflater = new Inflater();
+        final InflaterOutputStream infOutputStream;
+    }
+
+    private static ThreadLocal<ByteArrayOutputStream> m_baos = new ThreadLocal<ByteArrayOutputStream>() {
         @Override
-        protected CompressionTools initialValue() {
-            return new CompressionTools();
+        protected ByteArrayOutputStream initialValue() {
+            return new ByteArrayOutputStream();
+        }
+    };
+
+    private static ThreadLocal<Map<Integer, DeflationTool>> m_deflationTools = new ThreadLocal<Map<Integer, DeflationTool>>() {
+        @Override
+        protected Map<Integer, DeflationTool> initialValue() {
+            HashMap<Integer, DeflationTool> tools = new HashMap<Integer, DeflationTool>();
+            ByteArrayOutputStream baos = m_baos.get();
+            tools.put(Deflater.BEST_SPEED, new DeflationTool(baos, Deflater.BEST_SPEED));
+            tools.put(Deflater.BEST_COMPRESSION, new DeflationTool(baos, Deflater.BEST_COMPRESSION));
+            tools.put(Deflater.DEFAULT_COMPRESSION, new DeflationTool(baos, Deflater.DEFAULT_COMPRESSION));
+            return tools;
+        }
+    };
+
+    private static ThreadLocal<InflationTool> m_inflationTools = new ThreadLocal<InflationTool>() {
+        @Override
+        protected InflationTool initialValue() {
+            return new InflationTool(m_baos.get());
         }
     };
 
@@ -52,36 +84,48 @@ public final class CompressionService {
         });
 
     public static byte[] compressBytes(byte bytes[]) throws IOException {
-        final CompressionTools tools = m_tools.get();
-        tools.baos.reset();
-        tools.deflater.reset();
-        tools.defOutputStream.write(bytes);
-        tools.defOutputStream.finish();
-        tools.defOutputStream.flush();
-        return tools.baos.toByteArray();
+        return compressBytes(bytes, Deflater.BEST_SPEED);
+    }
+
+    public static byte[] compressBytes(byte bytes[], int setting) throws IOException {
+        final DeflationTool tool = m_deflationTools.get().get(setting);
+        tool.baos.reset();
+        tool.deflater.reset();
+        tool.defOutputStream.write(bytes);
+        tool.defOutputStream.finish();
+        tool.defOutputStream.flush();
+        return tool.baos.toByteArray();
     }
 
     public static byte[] decompressBytes(byte bytes[]) throws IOException {
-        final CompressionTools tools = m_tools.get();
-        tools.baos.reset();
-        tools.inflater.reset();
+        final InflationTool tool = m_inflationTools.get();
+        tool.baos.reset();
+        tool.inflater.reset();
 
-        tools.infOutputStream.write(bytes);
-        tools.infOutputStream.finish();
-        tools.infOutputStream.flush();
-        return tools.baos.toByteArray();
+        tool.infOutputStream.write(bytes);
+        tool.infOutputStream.finish();
+        tool.infOutputStream.flush();
+        return tool.baos.toByteArray();
     }
 
     public static byte[][] compressBytes(byte bytes[][]) throws Exception {
-        return compressBytes(bytes, false);
+        return compressBytes(bytes, Deflater.BEST_SPEED, false);
     }
 
-    public static byte[][] compressBytes(byte bytes[][], final boolean base64Encode) throws Exception {
+    public static byte[][] compressBytes(byte bytes[][], int setting) throws Exception {
+        return compressBytes(bytes, setting, false);
+    }
+
+    public static byte[][] compressBytes(byte bytes[][], boolean base64Encode) throws Exception {
+        return compressBytes(bytes, Deflater.BEST_SPEED, base64Encode);
+    }
+
+    public static byte[][] compressBytes(byte bytes[][],final int setting, final boolean base64Encode) throws Exception {
         if (bytes.length == 1) {
             if (base64Encode) {
-                return new byte[][] {Base64.encodeBytesToBytes(compressBytes(bytes[0]))};
+                return new byte[][] {Base64.encodeBytesToBytes(compressBytes(bytes[0], setting))};
             } else {
-                return new byte[][] {compressBytes(bytes[0])};
+                return new byte[][] {compressBytes(bytes[0], setting)};
             }
         }
         ArrayList<Future<byte[]>> futures = new ArrayList<Future<byte[]>>(bytes.length);
@@ -91,9 +135,9 @@ public final class CompressionService {
                 @Override
                 public byte[] call() throws Exception {
                     if (base64Encode) {
-                        return Base64.encodeBytesToBytes(compressBytes(bts));
+                        return Base64.encodeBytesToBytes(compressBytes(bts, setting));
                     } else {
-                        return compressBytes(bts);
+                        return compressBytes(bts, setting);
                     }
                 }
 

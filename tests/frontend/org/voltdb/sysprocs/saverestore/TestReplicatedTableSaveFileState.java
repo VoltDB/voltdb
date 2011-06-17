@@ -110,7 +110,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
      * Test the easiest possible restore plan: table is replicated before and
      * after save/restore, and every site has a copy of the table
      */
-    public void testEasyRestorePlan()
+    public void testEasyRestorePlan() throws Exception
     {
         MockVoltDB catalog_creator =
             new MockVoltDB();
@@ -163,13 +163,14 @@ public class TestReplicatedTableSaveFileState extends TestCase
         checkPlanDependencies(test_plan);
         assertEquals(test_plan[number_of_sites].parameters.toArray()[0],
                      m_state.getRootDependencyId());
+        catalog_creator.shutdown(null);
     }
 
     /*
      * Test the restore plan when one of the sites doesn't have access to
      * a copy of the table
      */
-    public void testSiteMissingTableRestorePlan()
+    public void testSiteMissingTableRestorePlan() throws Exception
     {
         MockVoltDB catalog_creator = new MockVoltDB();
         VoltDB.replaceVoltDBInstanceForTest(catalog_creator);
@@ -236,6 +237,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         checkPlanDependencies(test_plan);
         assertEquals(test_plan[number_of_sites].parameters.toArray()[0],
                      m_state.getRootDependencyId());
+        catalog_creator.shutdown(null);
     }
 
     private void addHostToTestData(int hostId)

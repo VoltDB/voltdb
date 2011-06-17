@@ -313,11 +313,9 @@ public class TestMessaging extends TestCase {
             joiner3.join();
 
             assertTrue(mockVoltDB.getCrashCount() > 0);
-            return;
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            fail();
         }
-        assertTrue(false);
 
         // test deployment crcs
         try {
@@ -334,11 +332,12 @@ public class TestMessaging extends TestCase {
             joiner3.join();
 
             assertTrue(mockVoltDB.getCrashCount() > 0);
+            mockVoltDB.shutdown(null);
             return;
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            fail();
         }
-        assertTrue(false);
+        fail();
     }
 
     public void testSimple() throws MessagingException, UnknownHostException, InterruptedException {
@@ -638,5 +637,6 @@ public class TestMessaging extends TestCase {
 
         msg1.shutdown();
         network.shutdown();
+        mockvolt.shutdown(null);
     }
 }

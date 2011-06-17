@@ -26,17 +26,22 @@ package org.voltdb;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URLEncoder;
+import java.util.Arrays;
+import java.util.HashSet;
 
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.agreement.AgreementSite;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.Mailbox;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
@@ -165,10 +170,27 @@ public class RejoinTestBase extends TestCase {
         retval.localServer.start();
         host2.waitForGroupJoin();
         network2.start();
+
+        int myHostId = host2.getHostId() * 100;
+        host2.createLocalSite(myHostId);
+        Mailbox mailbox = host2.createMailbox(myHostId, VoltDB.AGREEMENT_MAILBOX_ID);
+        AgreementSite site = new AgreementSite(
+                myHostId,
+                new HashSet<Integer>(Arrays.asList(0, 100)),
+                myHostId == 0 ? 1 : 2,
+                new HashSet<Integer>(),
+                mailbox,
+                new InetSocketAddress(2182),
+                null,
+                false);
+        site.start();
+
         host2.sendReadyMessage();
 
         retval.localServer.waitForInitialization();
         HostMessenger host1 = VoltDB.instance().getHostMessenger();
+
+        site.shutdown();
 
         //int host2id = host2.getHostId();
         host2.closeForeignHostSocket(host1.getHostId());

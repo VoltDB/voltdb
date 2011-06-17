@@ -339,6 +339,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
         VoltDB.replaceVoltDBInstanceForTest(m_mockVolt);
     }
 
+    @Override
+    public void tearDown() throws Exception {
+        m_mockVolt.shutdown(null);
+    }
+
     public void testNonReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();

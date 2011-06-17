@@ -89,6 +89,8 @@ public class VoltDB {
          */
         public boolean m_noLoadLibVOLTDB = false;
 
+        public String m_zkInterface = "localhost:2181";
+
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
 
@@ -189,9 +191,9 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalport ")) {
                     m_internalPort = Integer.parseInt(arg.substring("internalport ".length()));
-                }
-
-                else if (arg.equals("externalinterface")) {
+                } else if (arg.startsWith("zkinterface")) {
+                    m_zkInterface = args[++i];
+                } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
                 else if (arg.startsWith("externalinterface ")) {
