@@ -554,6 +554,8 @@ JAR BUILDING
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/apache/jute/**" />
+            <include name="org/apache/zookeeper_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
