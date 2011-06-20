@@ -178,7 +178,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
     /**
      * Creates a ZooKeeperServer instance. It sets everything up, but doesn't
      * actually start listening for clients until run() is invoked.
-     * 
+     *
      * @param dataDir
      *            the directory to put the data
      * @throws IOException
@@ -215,7 +215,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
 
     /**
      * Default constructor, relies on the config for its agrument values
-     * 
+     *
      * @throws IOException
      */
     public ZooKeeperServer(Callout callout) throws IOException {
@@ -225,7 +225,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
 
     /**
      * get the zookeeper database for this server
-     * 
+     *
      * @return the zookeeper database for this server
      */
     public ZKDatabase getZKDatabase() {
@@ -234,7 +234,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
 
     /**
      * set the zkdatabase for this zookeeper server
-     * 
+     *
      * @param zkDb
      */
     public void setZKDatabase(ZKDatabase zkDb) {
@@ -616,7 +616,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
     /**
      * This method will be called inside the ProcessRequestThread, which is a
      * singleton, so there will be a single thread calling this code.
-     * 
+     *
      * @param request
      */
     public void prepRequest(Request request, long txnId) {
@@ -817,7 +817,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
                 txnHeader.setType(OpCode.error);
                 txn = new ErrorTxn(e.code().intValue());
             }
-            LOG.info("Got user-level KeeperException when processing "
+            LOG.debug("Got user-level KeeperException when processing "
                     + request.toString() + " Error Path:" + e.getPath()
                     + " Error:" + e.getMessage());
             request.setException(e);
@@ -1133,7 +1133,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
      * This method checks out the acl making sure it isn't null or empty, it has
      * valid schemes and ids, and expanding any relative ids that depend on the
      * requestor's authentication information.
-     * 
+     *
      * @param authInfo
      *            list of ACL IDs associated with the client connection
      * @param acl

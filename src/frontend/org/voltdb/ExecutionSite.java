@@ -1859,8 +1859,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
      */
-    public void initiateSnapshots(Deque<SnapshotTableTask> tasks) {
-        m_snapshotter.initiateSnapshots(ee, tasks);
+    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
+        m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts);
     }
 
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {

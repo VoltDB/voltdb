@@ -18,10 +18,16 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.logging.VoltLogger;
@@ -103,6 +109,9 @@ public class SnapshotSiteProcessor {
      * This is polled from until there are no more tasks.
      */
     private ArrayDeque<SnapshotTableTask> m_snapshotTableTasks = null;
+
+    private long m_lastSnapshotTxnId;
+    private int m_lastSnapshotNumHosts;
 
 
     /**
@@ -209,7 +218,9 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    public void initiateSnapshots(ExecutionEngine ee, Deque<SnapshotTableTask> tasks) {
+    public void initiateSnapshots(ExecutionEngine ee, Deque<SnapshotTableTask> tasks, long txnId, int numHosts) {
+        m_lastSnapshotTxnId = txnId;
+        m_lastSnapshotNumHosts = numHosts;
         m_snapshotTableTasks = new ArrayDeque<SnapshotTableTask>(tasks);
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
@@ -322,7 +333,8 @@ public class SnapshotSiteProcessor {
              * sync every file descriptor and that may block for a while.
              */
             if (result == 0) {
-
+                final long txnId = m_lastSnapshotTxnId;
+                final int numHosts = m_lastSnapshotNumHosts;
                 final Thread terminatorThread =
                     new Thread("Snapshot terminator") {
                     @Override
@@ -358,6 +370,7 @@ public class SnapshotSiteProcessor {
                              * that snapshot initiation doesn't wait on the file system
                              */
                             ExecutionSitesCurrentlySnapshotting.decrementAndGet();
+                            logSnapshotCompleteToZK(txnId, numHosts);
                         }
                     }
                 };
@@ -367,6 +380,74 @@ public class SnapshotSiteProcessor {
             }
         }
         return retval;
+    }
+
+
+    private static void logSnapshotCompleteToZK(long txnId, int numHosts) {
+        ZooKeeper zk = VoltDB.instance().getZK();
+
+        try {
+            zk.create("/completed_snapshots", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+        } catch (Exception e) {
+            hostLog.fatal("Unexpected exception logging snapshot completion to ZK", e);
+            VoltDB.crashVoltDB();
+        }
+        ByteBuffer buf = ByteBuffer.allocate(16);
+        buf.putLong(txnId);
+        buf.putInt(numHosts);
+        buf.putInt(1);
+
+        final String snapshotPath = "/completed_snapshots/" + txnId;
+        boolean alreadyExists = false;
+        try {
+            zk.create(snapshotPath, buf.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            alreadyExists = true;
+        } catch (Exception e) {
+            hostLog.fatal("Unexpected exception logging snapshot completion to ZK", e);
+            VoltDB.crashVoltDB();
+        }
+
+        if (!alreadyExists) {
+            return;
+        }
+
+        boolean success = false;
+        while (!success) {
+            Stat stat = new Stat();
+            byte data[] = null;
+            try {
+                data = zk.getData(snapshotPath, false, stat);
+            } catch (Exception e) {
+                hostLog.fatal("This ZK get should never fail", e);
+                VoltDB.crashVoltDB();
+            }
+            if (data == null) {
+                hostLog.fatal("Data should not be null if the node exists");
+                VoltDB.crashVoltDB();
+            }
+
+            buf = ByteBuffer.wrap(data);
+            if (buf.getLong() != txnId) {
+                hostLog.fatal("TxnId should match");
+                VoltDB.crashVoltDB();
+            }
+            if (buf.getInt() != numHosts) {
+                hostLog.fatal("Num hosts should match");
+                VoltDB.crashVoltDB();
+            }
+            int numHostsFinished = buf.getInt() + 1;
+            buf.putInt(12, numHostsFinished);
+            try {
+                zk.setData(snapshotPath, buf.array(), stat.getVersion());
+            } catch (KeeperException.BadVersionException e) {
+            } catch (Exception e) {
+                hostLog.fatal("This ZK call should never fail", e);
+                VoltDB.crashVoltDB();
+            }
+            success = true;
+        }
     }
 
     /*

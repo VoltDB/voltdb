@@ -92,6 +92,7 @@ class SnapshotDaemon {
          * when it completes.
          */
         SNAPSHOTTING,
+
         /*
          * Failure state. This state is entered when a sysproc
          * fails and the snapshot Daemon can't recover. An error is logged

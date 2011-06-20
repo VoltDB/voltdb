@@ -69,6 +69,7 @@ public class MockVoltDB implements VoltDBInterface
 
     final AgreementSite m_agreementSite;
     private final ZooKeeper m_zk;
+    private boolean m_noLoadLib = false;
 
     public MockVoltDB()
     {
@@ -326,8 +327,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getVersionString()
     {
-        // TODO Auto-generated method stub
-        return null;
+        if (m_noLoadLib) {
+            return new RealVoltDB().getVersionString();
+        } else {
+            return null;
+        }
     }
 
     @Override
@@ -341,8 +345,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void initialize(Configuration config)
     {
-        // TODO Auto-generated method stub
-
+        m_noLoadLib = config.m_noLoadLibVOLTDB;
     }
 
     @Override

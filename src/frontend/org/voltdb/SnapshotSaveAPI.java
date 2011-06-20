@@ -114,7 +114,10 @@ public class SnapshotSaveAPI
                 return result;
             } else {
                 assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
-                context.getExecutionSite().initiateSnapshots(m_taskList);
+                context.getExecutionSite().initiateSnapshots(
+                        m_taskList,
+                        txnId,
+                        context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size());
             }
         }
 

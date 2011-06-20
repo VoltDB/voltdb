@@ -481,4 +481,13 @@ public class TestZK {
         zk.delete("/foo2", -1);
         sem.acquire();
     }
+
+    @Test
+    public void testNullVsZeroLengthData() throws Exception {
+        ZooKeeper zk = getClient(0);
+        zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create("/bar", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        assertEquals(null, zk.getData("/bar", false, null));
+        assertTrue(zk.getData("/foo", false, null).length == 0);
+    }
 }
