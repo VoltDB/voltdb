@@ -41,6 +41,7 @@ import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
@@ -91,7 +92,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
     private final CatalogContext m_context;
     private final TransactionInitiator m_initiator;
     private final Callback m_callback;
-    private final String m_recover;
+    private final START_ACTION m_action;
 
     private final ZooKeeper m_zk;
     private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
@@ -104,6 +105,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
     // State of the restore agent
     private volatile State m_state = State.RESTORE;
     private final RestoreAdapter m_restoreAdapter = new RestoreAdapter();
+    private boolean m_hasRestored = false;
 
     private CommandLogReinitiator m_replayAgent = new CommandLogReinitiator() {
         private Callback m_callback;
@@ -419,13 +421,13 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
 
     public RestoreAgent(CatalogContext context, TransactionInitiator initiator,
                         ZooKeeper zk, Callback callback, int hostId,
-                        String recover)
+                        START_ACTION action)
     throws IOException {
         m_hostId = hostId;
         m_context = context;
         m_initiator = initiator;
         m_callback = callback;
-        m_recover = recover;
+        m_action = action;
         m_zk = zk;
 
         zkBarrierNode = RESTORE_BARRIER + "/" + m_hostId;
@@ -447,14 +449,14 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             if (replayClass != null) {
                 Constructor<?> constructor =
                     replayClass.getConstructor(int.class,
-                                               String.class,
+                                               START_ACTION.class,
                                                TransactionInitiator.class,
                                                CatalogContext.class,
                                                ZooKeeper.class);
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
-                                                                    m_recover,
+                                                                    m_action,
                                                                     m_initiator,
                                                                     m_context,
                                                                     m_zk);
@@ -637,7 +639,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
         long clStartTxnId = deserializeRestoreInformation(children, snapshotFragments);
 
         // If we're not recovering, skip the rest
-        if (m_recover == null) {
+        if (m_action == START_ACTION.CREATE) {
             return null;
         }
 
@@ -723,7 +725,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
      */
     private long deserializeRestoreInformation(List<String> children,
                                                Map<Long, Set<SnapshotInfo>> snapshotFragments) {
-        String recover = null;
+        byte recover = m_action != START_ACTION.CREATE ? (byte) 1 : 0;
         long clStartTxnId = 0;
         ByteBuffer buf;
         for (String node : children) {
@@ -741,13 +743,8 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
                 clStartTxnId = minTxnId;
             }
 
-            int recoverStrLen = buf.getInt();
-            byte[] recoverBytes = new byte[recoverStrLen];
-            buf.get(recoverBytes);
-            String recoverStr = new String(recoverBytes);
-            if (recover == null) {
-                recover = recoverStr;
-            } else if (!recoverStr.equals(recover)) {
+            byte recoverByte = buf.get();
+            if (recoverByte != recover) {
                 LOG.fatal("Database actions are not consistent, please enter " +
                           "the same database action on the command-line.");
                 VoltDB.crashVoltDB();
@@ -801,23 +798,16 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
      * @return
      */
     private ByteBuffer serializeRestoreInformation(long min, Set<SnapshotInfo> snapshots) {
-        int len = 0;
-        if (m_recover != null) {
-            len = m_recover.length();
-        }
-
-        int size = 8 + 4 + len + 4;
+        // minTxnId + recover + snapshotCount
+        int size = 8 + 1 + 4;
         for (SnapshotInfo i : snapshots) {
             size += i.size();
         }
 
         ByteBuffer buf = ByteBuffer.allocate(size);
         buf.putLong(min);
-
-        buf.putInt(len);
-        if (m_recover != null) {
-            buf.put(m_recover.getBytes());
-        }
+        // 1 means recover, 0 means to create new DB
+        buf.put(m_action != START_ACTION.CREATE ? (byte) 1 : 0);
 
         buf.putInt(snapshots.size());
         for (SnapshotInfo snapshot : snapshots) {
@@ -910,6 +900,10 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             }
             VoltDB.crashVoltDB();
         } else {
+            if (m_state == State.RESTORE) {
+                m_hasRestored = true;
+            }
+
             changeState();
         }
     }
@@ -949,6 +943,13 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             } else {
                 m_state = State.TRUNCATE;
             }
+        } else if (!m_hasRestored && m_action == START_ACTION.RECOVER) {
+            /*
+             * This means we didn't restore any snapshot, and there's no command
+             * log to replay. But the user asked for recover
+             */
+            LOG.fatal("Nothing to recover from");
+            VoltDB.crashVoltDB();
         } else {
             m_state = State.TRUNCATE;
         }

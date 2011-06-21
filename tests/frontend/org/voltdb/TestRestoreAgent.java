@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.Client;
@@ -294,7 +295,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
                                                      getClient(0),
                                                      this,
-                                                     0, "all");
+                                                     0, START_ACTION.START);
         restoreAgent.restore();
         while (!m_done) {
             try {
@@ -313,7 +314,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         for (int i = 0; i < m_hostCount; i++) {
             agents.add(new RestoreAgent(context, initiator,
                                         getClient(0),
-                                        this, i, "all"));
+                                        this, i, START_ACTION.START));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
@@ -341,7 +342,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         for (int i = 0; i < m_hostCount - 1; i++) {
             agents.add(new RestoreAgent(context, initiator,
                                         getClient(0),
-                                        this, i, "all"));
+                                        this, i, START_ACTION.START));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
@@ -361,7 +362,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         // Start the last restore agent, should be able to reach agreement now
         RestoreAgent agent = new RestoreAgent(context, initiator,
                                               getClient(0),
-                                              this, m_hostCount - 1, "all");
+                                              this, m_hostCount - 1,
+                                              START_ACTION.START);
         agent.restore();
 
         count = 0;
@@ -394,7 +396,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
                                                      getClient(0),
                                                      this,
-                                                     0, "all");
+                                                     0, START_ACTION.START);
         restoreAgent.restore();
         while (!m_done) {
             try {
@@ -429,7 +431,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         for (int i = 0; i < m_hostCount; i++) {
             agents.add(new RestoreAgent(context, initiator,
                                         getClient(0),
-                                        this, i, "all"));
+                                        this, i, START_ACTION.START));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();

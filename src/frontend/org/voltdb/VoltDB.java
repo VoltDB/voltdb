@@ -52,6 +52,10 @@ public class VoltDB {
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
+    public static enum START_ACTION {
+        CREATE, RECOVER, START
+    }
+
     // if VoltDB is running in your process, prepare to us GMT timezone
     public synchronized static void setDefaultTimezone() {
         //System.out.println(TimeZone.getTimeZone("GMT+0").getID());
@@ -109,11 +113,8 @@ public class VoltDB {
         /** information used to rejoin this new node to a cluster */
         public String m_rejoinToHostAndPort = null;
 
-        /**
-         * information used to recover the database, e.g. timestamp=21:15:06.
-         * null means to create a new database. Currently, we only support "all".
-         */
-        public String m_recoverDatabase = "all";
+        /** start up action */
+        public START_ACTION m_startAction = START_ACTION.START;
 
         public boolean listenForDumpRequests = false;
 
@@ -226,19 +227,12 @@ public class VoltDB {
                         m_rejoinToHostAndPort = null;
                 }
 
-                else if ((arg.equals("create") && args[++i].trim().equals("database")) ||
-                         (arg.equals("create database"))) {
-                    m_recoverDatabase = null;
+                else if (arg.equals("create")) {
+                    m_startAction = START_ACTION.CREATE;
                 } else if (arg.equals("recover")) {
-                    m_recoverDatabase = args[++i].trim();
-                    if (m_recoverDatabase.equals("")) {
-                        m_recoverDatabase = "all";
-                    }
-                } else if (arg.startsWith("recover ")) {
-                    m_recoverDatabase = arg.substring("recover ".length()).trim();
-                    if (m_recoverDatabase.equals("")) {
-                        m_recoverDatabase = "all";
-                    }
+                    m_startAction = START_ACTION.RECOVER;
+                } else if (arg.equals("start")) {
+                    m_startAction = START_ACTION.START;
                 }
 
                 // handle timestampsalt
