@@ -47,6 +47,7 @@ import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooKeeper.States;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -78,6 +79,11 @@ import org.voltdb.utils.Pair;
  * to resume normal operation.
  */
 public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
+    // Implement this callback to get notified when restore finishes.
+    public interface Callback {
+        public void onRestoreCompletion();
+    }
+
     private final static VoltLogger LOG = new VoltLogger("RESTORE");
     // TODO: Nonce for command-log snapshots, TBD
     public final static String CL_NONCE_PREFIX = "command_log";
@@ -91,6 +97,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     private final Integer m_hostId;
     private final CatalogContext m_context;
     private final TransactionInitiator m_initiator;
+    private final Callback m_callback;
 
     private final ZooKeeper m_zk;
     private final Semaphore m_flag = new Semaphore(0);
@@ -434,13 +441,14 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     }
 
     public RestoreAgent(CatalogContext context, TransactionInitiator initiator,
-                        int hostId)
+                        Callback callback, int hostId)
     throws IOException {
         m_hostId = hostId;
         m_context = context;
         m_initiator = initiator;
+        m_callback = callback;
 
-        m_zk = new ZooKeeper("ning", 3000, this);
+        m_zk = new ZooKeeper("ning", 30, this);
         zkBarrierNode = RESTORE_BARRIER + "/" + m_hostId;
 
         m_allPartitions = new int[m_context.numberOfPartitions];
@@ -456,14 +464,17 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
         // Load command log reader
         LogReader reader = null;
         try {
-            String logpath = m_context.cluster.getLogconfig().get("log").getLogpath();
-            File path = new File(logpath);
+            CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
+            if (commandLogElement != null) {
+                String logpath = commandLogElement.getLogpath();
+                File path = new File(logpath);
 
-            Class<?> readerClass = MiscUtils.loadProClass("org.voltdb.utils.LogReaderImpl",
-                                                          null, true);
-            if (readerClass != null) {
-                Constructor<?> constructor = readerClass.getConstructor(File.class);
-                reader = (LogReader) constructor.newInstance(path);
+                Class<?> readerClass = MiscUtils.loadProClass("org.voltdb.utils.LogReaderImpl",
+                                                              null, true);
+                if (readerClass != null) {
+                    Constructor<?> constructor = readerClass.getConstructor(File.class);
+                    reader = (LogReader) constructor.newInstance(path);
+                }
             }
         } catch (Exception e) {
             LOG.fatal("Unable to instantiate command log reader", e);
@@ -934,7 +945,9 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
             try {
                 m_zk.close();
             } catch (InterruptedException ignore) {}
-            VoltDB.instance().onRestoreCompletion();
+            if (m_callback != null) {
+                m_callback.onRestoreCompletion();
+            }
         }
     }
 
@@ -945,9 +958,9 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs
              */
-            if (isLowestHost()) {
-                String path =
-                    m_context.cluster.getLogconfig().get("log").getInternalsnapshotpath();
+            CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
+            if (isLowestHost() && commandLogElement != null) {
+                String path = commandLogElement.getInternalsnapshotpath();
                 Date now = new Date(System.currentTimeMillis());
                 String nonce = CL_NONCE_PREFIX + m_dateFormat.format(now);
                 initSnapshotWork(null, Pair.of("@SnapshotSave",
@@ -985,7 +998,10 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
          * they can be set individually
          */
         List<String> paths = new ArrayList<String>();
-        paths.add(m_context.cluster.getLogconfig().get("log").getInternalsnapshotpath());
+        CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
+        if (commandLogElement != null) {
+            paths.add(commandLogElement.getInternalsnapshotpath());
+        }
         if (m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
             paths.add(m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath());
         }

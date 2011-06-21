@@ -77,7 +77,7 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltSampler;
 
-public class RealVoltDB implements VoltDBInterface
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -894,9 +894,11 @@ public class RealVoltDB implements VoltDBInterface
             boolean replay = true;
             if (!isRejoin && replay) {
                 try {
-                    m_restoreAgent = new RestoreAgent(m_catalogContext, initiator, myHostId);
+                    m_restoreAgent = new RestoreAgent(m_catalogContext, initiator,
+                                                      this, myHostId);
                 } catch (IOException e) {
-                    hostLog.fatal("Unable to establish a ZooKeeper connection: " + e.getMessage());
+                    hostLog.fatal("Unable to establish a ZooKeeper connection: " +
+                                  e.getMessage());
                     VoltDB.crashVoltDB();
                 }
             } else {

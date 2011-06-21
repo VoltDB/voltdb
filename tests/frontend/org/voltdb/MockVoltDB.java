@@ -503,12 +503,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onRestoreCompletion() {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public void setStartMode(OperationMode mode) {
         // TODO Auto-generated method stub
 
