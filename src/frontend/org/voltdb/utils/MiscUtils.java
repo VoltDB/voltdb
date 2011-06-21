@@ -22,7 +22,10 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.Set;
 
+import org.voltdb.logging.VoltLogger;
+
 public class MiscUtils {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /**
      * Simple code to copy a file from one place to another...
@@ -50,5 +53,27 @@ public class MiscUtils {
             retval[ii++] = i;
         }
         return retval;
+    }
+
+    /**
+     * Try to load a PRO class. If it's running the community edition, an error
+     * message will be logged and null will be returned.
+     *
+     * @param classname The class name of the PRO class
+     * @param feature The name of the feature
+     * @param suppress true to suppress the log message
+     * @return null if running the community edition
+     */
+    public static Class<?> loadProClass(String classname, String feature, boolean suppress) {
+        try {
+            Class<?> klass = Class.forName(classname);
+            return klass;
+        } catch (ClassNotFoundException e) {
+            if (!suppress) {
+                hostLog.warn("Cannot load " + classname + " in VoltDB community edition. " +
+                             feature + " will be disabled.");
+            }
+            return null;
+        }
     }
 }

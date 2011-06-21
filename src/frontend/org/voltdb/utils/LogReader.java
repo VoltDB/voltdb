@@ -19,54 +19,10 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
 import org.voltdb.LogEntry;
 
 public interface LogReader {
     public interface LogIterator extends Iterator<LogEntry> {}
-
-    /**
-     * Get the minimum transaction ID among the last seen transactions across
-     * all initiators in the previous segment.
-     *
-     * @return
-     */
-    public long getMinLastSeenTxn();
-
-    /**
-     * Get the total number of partitions that were in the database.
-     *
-     * @return The partition count
-     */
-    public int getPartitionCount();
-
-    /**
-     * Get the site ID -> partition ID mapping of all alive sites. Can be null
-     * if the log is empty
-     *
-     * @return
-     */
-    public Map<Integer, Integer> getPartitionMap();
-
-    /**
-     * Get the initiator IDs. Can be null if the log is empty
-     * @return
-     */
-    public int[] getInitiatorIds();
-
-    /**
-     * Get the set of failed sites. Can be null if the log is empty
-     * @return
-     */
-    public Set<Integer> getFailedSites();
-
-    /**
-     * Get the set of failed transaction IDs. Can be null if the log is empty
-     * @return
-     */
-    public Set<Long> getFailedTxns();
 
     /**
      * Whether or not the log is empty

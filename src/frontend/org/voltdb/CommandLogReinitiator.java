@@ -17,12 +17,16 @@
 
 package org.voltdb;
 
-import java.util.Set;
-
 public interface CommandLogReinitiator {
     public interface Callback {
         public void onReplayCompletion();
     }
+
+    /**
+     * Set the snapshot transaction ID that got restored
+     * @param txnId
+     */
+    public void setSnapshotTxnId(long txnId);
 
     public void setCallback(Callback callback);
 
@@ -34,27 +38,23 @@ public interface CommandLogReinitiator {
     public void replay();
 
     /**
+     * Whether or not we have started replaying local command log.
+     *
+     * @return true if it's replaying or it has finished, false if we are still
+     *         waiting for replay plan
+     */
+    public boolean started();
+
+    /**
      * Joins the two threads
      * @throws InterruptedException
      */
     public void join() throws InterruptedException;
 
     /**
-     * Set the partitions to skip when replaying the SPIs.
+     * Whether or not there were SPIs replayed in the cluster. This will return
+     * true even if there were SPIs replayed by other nodes.
      *
-     * @param partitions
-     *            The IDs of the partitions to skip
-     */
-    public void skipPartitions(Set<Integer> partitions);
-
-    /**
-     * Whether or not to skip multi-partition transaction invocations
-     * @param val true to skip
-     */
-    public void skipMultiPartitionTxns(boolean val);
-
-    /**
-     * Whether or not there were SPIs replayed
      * @return true if there were at least one SPI replayed
      */
     public boolean hasReplayed();

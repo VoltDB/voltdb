@@ -27,8 +27,6 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
@@ -75,7 +73,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.LogReader;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltSampler;
 
@@ -365,36 +363,6 @@ public class RealVoltDB implements VoltDBInterface
 
     };
 
-    private CommandLogReinitiator m_commandLogReplay = new CommandLogReinitiator() {
-        private Callback m_callback = null;
-
-        @Override
-        public void skipPartitions(Set<Integer> partitions) {}
-        @Override
-        public void skipMultiPartitionTxns(boolean val) {}
-        @Override
-        public void replay() {
-            // Shortcut to enable the cluster for normal operation
-            if (m_callback != null) {
-                m_callback.onReplayCompletion();
-            }
-        }
-        @Override
-        public void join() throws InterruptedException {}
-        @Override
-        public void setCallback(Callback callback) {
-            m_callback = callback;
-        }
-        @Override
-        public boolean hasReplayed() {
-            return false;
-        }
-        @Override
-        public long getMinLastSeenTxn() {
-            return 0;
-        }
-    };
-
     private volatile OperationMode m_mode = OperationMode.RUNNING;
     private OperationMode m_startMode = null;
 
@@ -513,8 +481,8 @@ public class RealVoltDB implements VoltDBInterface
             if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
                 try {
                     @SuppressWarnings("rawtypes")
-                    Class loggerClass = loadProClass("org.voltdb.CommandLogImpl",
-                                                     "Command logging", false);
+                    Class loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
+                                                               "Command logging", false);
                     if (loggerClass != null) {
                         m_commandLog = (CommandLog)loggerClass.newInstance();
                     }
@@ -663,7 +631,7 @@ public class RealVoltDB implements VoltDBInterface
             assert(m_messenger.getDiscoveredCatalogTxnId() != 0);
 
             // Use the host messenger's hostId.
-            int myHostId = m_messenger.getHostId();
+            final int myHostId = m_messenger.getHostId();
 
             /*
              * Initialize the agreement site with the same site id as the CI/SDTXN,
@@ -929,79 +897,17 @@ public class RealVoltDB implements VoltDBInterface
             ClientInterface ci = m_clientInterfaces.get(0);
             TransactionInitiator initiator = ci.getInitiator();
             // TODO: disable replay until the UI is in place
-            boolean replay = false;
+            boolean replay = true;
             if (!isRejoin && replay) {
-                // Load command log reader
-                LogReader reader = null;
                 try {
-                    String logpath = m_catalogContext.cluster.getLogconfig().get("log").getLogpath();
-                    File path = new File(logpath);
-
-                    Class<?> readerClass = loadProClass("org.voltdb.utils.LogReaderImpl",
-                                                        null, true);
-                    if (readerClass != null) {
-                        Constructor<?> constructor = readerClass.getConstructor(File.class);
-                        reader = (LogReader) constructor.newInstance(path);
-                    }
-                } catch (InvocationTargetException e) {
-                    hostLog.info("Unable to instantiate command log reader: " +
-                                 e.getTargetException().getMessage());
-                } catch (Exception e) {
-                    hostLog.fatal("Unable to instantiate command log reader", e);
+                    m_restoreAgent = new RestoreAgent(m_catalogContext, initiator);
+                } catch (IOException e) {
+                    hostLog.fatal("Unable to establish a ZooKeeper connection: " + e.getMessage());
                     VoltDB.crashVoltDB();
                 }
-
-                // Load command log reinitiator
-                try {
-                    Class<?> replayClass = loadProClass("org.voltdb.CommandLogReinitiatorImpl",
-                                                        "Command log replay", false);
-                    if (replayClass != null) {
-                        Constructor<?> constructor =
-                            replayClass.getConstructor(LogReader.class,
-                                                       long.class,
-                                                       TransactionInitiator.class,
-                                                       CatalogContext.class);
-
-                        if (reader != null && !reader.isEmpty()) {
-                            m_commandLogReplay =
-                                (CommandLogReinitiator) constructor.newInstance(reader,
-                                                                                0,
-                                                                                initiator,
-                                                                                m_catalogContext);
-                        } else {
-                            hostLog.info("No command log to replay");
-                        }
-                    }
-                } catch (Exception e) {
-                    hostLog.fatal("Unable to instantiate command log reinitiator", e);
-                    VoltDB.crashVoltDB();
-                }
+            } else {
+                onRestoreCompletion();
             }
-
-            m_restoreAgent = new RestoreAgent(m_catalogContext, initiator,
-                                              m_commandLogReplay);
-        }
-    }
-
-    /**
-     * Try to load a PRO class. If it's running the community edition, an error
-     * message will be logged and null will be returned.
-     *
-     * @param classname The class name of the PRO class
-     * @param feature The name of the feature
-     * @param suppress true to suppress the log message
-     * @return null if running the community edition
-     */
-    private static Class<?> loadProClass(String classname, String feature, boolean suppress) {
-        try {
-            Class<?> klass = Class.forName(classname);
-            return klass;
-        } catch (ClassNotFoundException e) {
-            if (!suppress) {
-                hostLog.warn("Cannot load " + classname + " in VoltDB community edition. " +
-                             feature + " will be disabled.");
-            }
-            return null;
         }
     }
 
