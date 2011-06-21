@@ -900,7 +900,7 @@ public class RealVoltDB implements VoltDBInterface
             boolean replay = true;
             if (!isRejoin && replay) {
                 try {
-                    m_restoreAgent = new RestoreAgent(m_catalogContext, initiator);
+                    m_restoreAgent = new RestoreAgent(m_catalogContext, initiator, myHostId);
                 } catch (IOException e) {
                     hostLog.fatal("Unable to establish a ZooKeeper connection: " + e.getMessage());
                     VoltDB.crashVoltDB();

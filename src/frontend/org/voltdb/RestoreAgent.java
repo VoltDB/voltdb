@@ -433,13 +433,10 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
         }
     }
 
-    public RestoreAgent(CatalogContext context, TransactionInitiator initiator)
+    public RestoreAgent(CatalogContext context, TransactionInitiator initiator,
+                        int hostId)
     throws IOException {
-        if (VoltDB.instance().getHostMessenger() == null) {
-            m_hostId = null;
-        } else {
-            m_hostId = VoltDB.instance().getHostMessenger().getHostId();
-        }
+        m_hostId = hostId;
         m_context = context;
         m_initiator = initiator;
 
