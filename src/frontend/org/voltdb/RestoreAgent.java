@@ -63,7 +63,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.EstTime;
-import org.voltdb.utils.LogReader;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.Pair;
 
@@ -98,6 +97,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     private final CatalogContext m_context;
     private final TransactionInitiator m_initiator;
     private final Callback m_callback;
+    private final String m_recover;
 
     private final ZooKeeper m_zk;
     private final Semaphore m_flag = new Semaphore(0);
@@ -441,12 +441,13 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     }
 
     public RestoreAgent(CatalogContext context, TransactionInitiator initiator,
-                        Callback callback, int hostId)
+                        Callback callback, int hostId, String recover)
     throws IOException {
         m_hostId = hostId;
         m_context = context;
         m_initiator = initiator;
         m_callback = callback;
+        m_recover = recover;
 
         m_zk = new ZooKeeper("ning", 30, this);
         zkBarrierNode = RESTORE_BARRIER + "/" + m_hostId;
@@ -461,48 +462,24 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     }
 
     private void initialize() {
-        // Load command log reader
-        LogReader reader = null;
-        try {
-            CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
-            if (commandLogElement != null) {
-                String logpath = commandLogElement.getLogpath();
-                File path = new File(logpath);
-
-                Class<?> readerClass = MiscUtils.loadProClass("org.voltdb.utils.LogReaderImpl",
-                                                              null, true);
-                if (readerClass != null) {
-                    Constructor<?> constructor = readerClass.getConstructor(File.class);
-                    reader = (LogReader) constructor.newInstance(path);
-                }
-            }
-        } catch (Exception e) {
-            LOG.fatal("Unable to instantiate command log reader", e);
-            VoltDB.crashVoltDB();
-        }
-
         // Load command log reinitiator
         try {
             Class<?> replayClass = MiscUtils.loadProClass("org.voltdb.CommandLogReinitiatorImpl",
                                                           "Command log replay", false);
             if (replayClass != null) {
                 Constructor<?> constructor =
-                    replayClass.getConstructor(LogReader.class,
-                                               int.class,
+                    replayClass.getConstructor(int.class,
+                                               String.class,
                                                TransactionInitiator.class,
                                                CatalogContext.class,
                                                ZooKeeper.class);
 
-                if (reader != null) {
-                    m_replayAgent =
-                        (CommandLogReinitiator) constructor.newInstance(reader,
-                                                                        m_hostId,
-                                                                        m_initiator,
-                                                                        m_context,
-                                                                        m_zk);
-                } else {
-                    LOG.info("No command log to replay");
-                }
+                m_replayAgent =
+                    (CommandLogReinitiator) constructor.newInstance(m_hostId,
+                                                                    m_recover,
+                                                                    m_initiator,
+                                                                    m_context,
+                                                                    m_zk);
             }
         } catch (Exception e) {
             LOG.fatal("Unable to instantiate command log reinitiator", e);
@@ -681,6 +658,11 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
         TreeMap<Long, Set<SnapshotInfo>> snapshotFragments = new TreeMap<Long, Set<SnapshotInfo>>();
         long clStartTxnId = deserializeRestoreInformation(children, snapshotFragments);
 
+        // If we're not recovering, skip the rest
+        if (m_recover == null) {
+            return null;
+        }
+
         // Filter all snapshots that are not viable
         Iterator<Long> iter = snapshotFragments.keySet().iterator();
         while (iter.hasNext()) {
@@ -763,6 +745,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
      */
     private long deserializeRestoreInformation(List<String> children,
                                                Map<Long, Set<SnapshotInfo>> snapshotFragments) {
+        String recover = null;
         long clStartTxnId = 0;
         ByteBuffer buf;
         for (String node : children) {
@@ -778,6 +761,18 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
             long minTxnId = buf.getLong();
             if (minTxnId > clStartTxnId) {
                 clStartTxnId = minTxnId;
+            }
+
+            int recoverStrLen = buf.getInt();
+            byte[] recoverBytes = new byte[recoverStrLen];
+            buf.get(recoverBytes);
+            String recoverStr = new String(recoverBytes);
+            if (recover == null) {
+                recover = recoverStr;
+            } else if (!recoverStr.equals(recover)) {
+                LOG.fatal("Database actions are not consistent, please enter " +
+                          " the same database action on the command-line.");
+                VoltDB.crashVoltDB();
             }
 
             int count = buf.getInt();
@@ -828,13 +823,24 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
      * @return
      */
     private ByteBuffer serializeRestoreInformation(long min, Set<SnapshotInfo> snapshots) {
-        int size = 8 + 4;
+        int len = 0;
+        if (m_recover != null) {
+            len = m_recover.length();
+        }
+
+        int size = 8 + 4 + len + 4;
         for (SnapshotInfo i : snapshots) {
             size += i.size();
         }
 
         ByteBuffer buf = ByteBuffer.allocate(size);
         buf.putLong(min);
+
+        buf.putInt(len);
+        if (m_recover != null) {
+            buf.put(m_recover.getBytes());
+        }
+
         buf.putInt(snapshots.size());
         for (SnapshotInfo snapshot : snapshots) {
             buf.putLong(snapshot.txnId);

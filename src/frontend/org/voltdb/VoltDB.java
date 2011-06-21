@@ -109,6 +109,12 @@ public class VoltDB {
         /** information used to rejoin this new node to a cluster */
         public String m_rejoinToHostAndPort = null;
 
+        /**
+         * information used to recover the database, e.g. timestamp=21:15:06.
+         * null means to create a new database. Currently, we only support "all".
+         */
+        public String m_recoverDatabase = "all";
+
         public boolean listenForDumpRequests = false;
 
         /**
@@ -217,6 +223,21 @@ public class VoltDB {
                         m_rejoinToHostAndPort = null;
                 }
 
+                else if ((arg.equals("create") && args[++i].trim().equals("database")) ||
+                         (arg.equals("create database"))) {
+                    m_recoverDatabase = null;
+                } else if (arg.equals("recover")) {
+                    m_recoverDatabase = args[++i].trim();
+                    if (m_recoverDatabase.equals("")) {
+                        m_recoverDatabase = "all";
+                    }
+                } else if (arg.startsWith("recover ")) {
+                    m_recoverDatabase = arg.substring("recover ".length()).trim();
+                    if (m_recoverDatabase.equals("")) {
+                        m_recoverDatabase = "all";
+                    }
+                }
+
                 // handle timestampsalt
                 else if (arg.equals("timestampsalt")) {
                     m_timestampTestingSalt = Long.parseLong(args[++i]);
@@ -294,7 +315,7 @@ public class VoltDB {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
-            hostLog.fatal("Usage: org.voltdb.VoltDB catalog <catalog.jar> deployment <deployment.xml>");
+            hostLog.fatal("Usage: org.voltdb.VoltDB catalog <action> <catalog.jar> deployment <deployment.xml>");
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 

@@ -288,7 +288,8 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
         MockInitiator initiator = new MockInitiator(null);
-        RestoreAgent restoreAgent = new RestoreAgent(context, initiator, this, 0);
+        RestoreAgent restoreAgent = new RestoreAgent(context, initiator, this,
+                                                     0, "all");
         restoreAgent.restore();
         while (!m_done) {
             try {
@@ -305,7 +306,7 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount; i++) {
-            agents.add(new RestoreAgent(context, initiator, this, i));
+            agents.add(new RestoreAgent(context, initiator, this, i, "all"));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
@@ -331,7 +332,7 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount - 1; i++) {
-            agents.add(new RestoreAgent(context, initiator, this, i));
+            agents.add(new RestoreAgent(context, initiator, this, i, "all"));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
@@ -350,7 +351,7 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
 
         // Start the last restore agent, should be able to reach agreement now
         RestoreAgent agent = new RestoreAgent(context, initiator, this,
-                                              m_hostCount - 1);
+                                              m_hostCount - 1, "all");
         agent.restore();
 
         count = 0;
@@ -380,7 +381,8 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         HashSet<String> procs = new HashSet<String>();
         procs.add("@SnapshotRestore");
         MockInitiator initiator = new MockInitiator(procs);
-        RestoreAgent restoreAgent = new RestoreAgent(context, initiator, this, 0);
+        RestoreAgent restoreAgent = new RestoreAgent(context, initiator, this,
+                                                     0, "all");
         restoreAgent.restore();
         while (!m_done) {
             try {
@@ -413,7 +415,7 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount; i++) {
-            agents.add(new RestoreAgent(context, initiator, this, i));
+            agents.add(new RestoreAgent(context, initiator, this, i, "all"));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
