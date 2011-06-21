@@ -45,6 +45,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -1052,6 +1053,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
+        String startAction = m_config.m_startAction.toString();
+        String startActionLog = (startAction.substring(0, 1).toUpperCase() +
+                                 startAction.substring(1).toLowerCase() +
+                                 " database.");
+        if (m_config.m_startAction == START_ACTION.START) {
+            startActionLog += " Will create a new database if there is nothing to recover from.";
+        }
+        hostLog.info(startActionLog);
+
         // print out awesome network stuff
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
         hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", adminPort));
