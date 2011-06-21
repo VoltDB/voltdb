@@ -24,7 +24,6 @@ import java.util.LinkedList;
 import java.util.PriorityQueue;
 import java.util.Map.Entry;
 
-import org.voltdb.VoltDB;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.logging.VoltLogger;

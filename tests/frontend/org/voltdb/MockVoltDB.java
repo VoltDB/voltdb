@@ -22,7 +22,6 @@
  */
 package org.voltdb;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -522,5 +521,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public AgreementSite getAgreementSite() {
         return m_agreementSite;
+    }
+
+    @Override
+    public void onRestoreCompletion() {
+        // TODO Auto-generated method stub
+
     }
 }

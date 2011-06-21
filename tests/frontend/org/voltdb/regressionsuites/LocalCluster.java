@@ -109,6 +109,8 @@ public class LocalCluster implements VoltServerConfig {
     private final boolean m_debug;
     private int m_debugPortOffset = 8000;
 
+    private final boolean m_isRejoinTest;
+
 
     /* class pipes a process's output to a file name.
      * Also watches for "Server completed initialization"
@@ -215,13 +217,29 @@ public class LocalCluster implements VoltServerConfig {
             int hostCount, int replication, BackendTarget target) {
         this(jarFileName, siteCount,
             hostCount, replication, target,
-            FailureState.ALL_RUNNING, false);
+            FailureState.ALL_RUNNING, false, false);
+    }
+
+    public LocalCluster(String jarFileName, int siteCount,
+                        int hostCount, int replication, BackendTarget target,
+                        boolean isRejoinTest) {
+                    this(jarFileName, siteCount,
+                        hostCount, replication, target,
+                        FailureState.ALL_RUNNING, false, isRejoinTest);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
                         int hostCount, int replication, BackendTarget target,
                         FailureState failureState,
-                        boolean debug)
+                        boolean debug) {
+        this(jarFileName, siteCount, hostCount, replication, target,
+             failureState, debug, false);
+    }
+
+    public LocalCluster(String jarFileName, int siteCount,
+                        int hostCount, int replication, BackendTarget target,
+                        FailureState failureState,
+                        boolean debug, boolean isRejoinTest)
     {
         System.out.println("Instantiating LocalCluster for " + jarFileName);
         System.out.println("Sites: " + siteCount + " hosts: " + hostCount
@@ -256,6 +274,7 @@ public class LocalCluster implements VoltServerConfig {
         m_replication = replication;
         m_cluster.ensureCapacity(m_hostCount);
         m_debug = debug;
+        m_isRejoinTest = isRejoinTest;
         String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
         if (buildDir == null)
             m_buildDir = System.getProperty("user.dir") + "/obj/release";
@@ -456,6 +475,7 @@ public class LocalCluster implements VoltServerConfig {
                 ports.add(proc.port());
             }
             config.m_ipcPorts = java.util.Collections.synchronizedList(ports);
+            config.m_isRejoinTest = m_isRejoinTest;
 
             m_localServer = new ServerThread(config);
             m_localServer.start();

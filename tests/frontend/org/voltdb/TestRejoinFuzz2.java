@@ -61,7 +61,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false);
+                    false, true);
         cluster.setMaxHeap(64);
         if (cluster.isValgrind()) {
             //Way to much data in this test. Using less data makes it redundant

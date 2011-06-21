@@ -35,17 +35,11 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.KeeperException.Code;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooDefs.Ids;
-import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.ZooKeeper.States;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.Code;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Partition;
@@ -77,7 +71,7 @@ import org.voltdb.utils.Pair;
  * Once all of these tasks have finished successfully, it will call RealVoltDB
  * to resume normal operation.
  */
-public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
+public class RestoreAgent implements CommandLogReinitiator.Callback {
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
         public void onRestoreCompletion();
@@ -100,7 +94,6 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     private final String m_recover;
 
     private final ZooKeeper m_zk;
-    private final Semaphore m_flag = new Semaphore(0);
     private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
 
     private final int[] m_allPartitions;
@@ -145,22 +138,6 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     private Runnable m_restorePlanner = new Runnable() {
         @Override
         public void run() {
-            /*
-             * Wait for at most 3 seconds for the ZK client to establish a
-             * connection
-             */
-            try {
-                m_flag.tryAcquire(3, TimeUnit.SECONDS);
-            } catch (InterruptedException ignore) {}
-
-            if (m_zk.getState() != States.CONNECTED) {
-                LOG.fatal("Failed to establish a ZooKeeper connection");
-                try {
-                    m_zk.close();
-                } catch (InterruptedException e1) {}
-                VoltDB.crashVoltDB();
-            }
-
             createZKDirectory(RESTORE);
             createZKDirectory(RESTORE_BARRIER);
 
@@ -441,15 +418,16 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     }
 
     public RestoreAgent(CatalogContext context, TransactionInitiator initiator,
-                        Callback callback, int hostId, String recover)
+                        ZooKeeper zk, Callback callback, int hostId,
+                        String recover)
     throws IOException {
         m_hostId = hostId;
         m_context = context;
         m_initiator = initiator;
         m_callback = callback;
         m_recover = recover;
+        m_zk = zk;
 
-        m_zk = new ZooKeeper("ning", 30, this);
         zkBarrierNode = RESTORE_BARRIER + "/" + m_hostId;
 
         m_allPartitions = new int[m_context.numberOfPartitions];
@@ -771,7 +749,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
                 recover = recoverStr;
             } else if (!recoverStr.equals(recover)) {
                 LOG.fatal("Database actions are not consistent, please enter " +
-                          " the same database action on the command-line.");
+                          "the same database action on the command-line.");
                 VoltDB.crashVoltDB();
             }
 
@@ -948,9 +926,6 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
         } else if (m_state == State.REPLAY) {
             m_state = State.TRUNCATE;
         } else if (m_state == State.TRUNCATE) {
-            try {
-                m_zk.close();
-            } catch (InterruptedException ignore) {}
             if (m_callback != null) {
                 m_callback.onRestoreCompletion();
             }
@@ -1040,10 +1015,5 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
         }
 
         return nonce;
-    }
-
-    @Override
-    public void process(WatchedEvent event) {
-        m_flag.release();
     }
 }

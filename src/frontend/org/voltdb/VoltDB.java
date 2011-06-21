@@ -139,6 +139,9 @@ public class VoltDB {
          */
         public long m_timestampTestingSalt = 0;
 
+        /** true if we're running the rejoin tests. Not used in production. */
+        public boolean m_isRejoinTest = false;
+
         public Configuration() { }
 
         public Configuration(String args[]) {

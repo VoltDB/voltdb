@@ -890,12 +890,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             assert(m_clientInterfaces.size() > 0);
             ClientInterface ci = m_clientInterfaces.get(0);
             TransactionInitiator initiator = ci.getInitiator();
-            // TODO: disable replay until the UI is in place
-            boolean replay = true;
-            if (!isRejoin && replay) {
+
+            /*
+             * Had to initialize the variable here, some tests reuse VoltDB
+             * instance
+             */
+            m_restoreAgent = null;
+
+            if (!isRejoin && !m_config.m_isRejoinTest) {
                 try {
                     m_restoreAgent = new RestoreAgent(m_catalogContext, initiator,
-                                                      this, myHostId, config.m_recoverDatabase);
+                                                      m_zk, this, myHostId,
+                                                      config.m_recoverDatabase);
                 } catch (IOException e) {
                     hostLog.fatal("Unable to establish a ZooKeeper connection: " +
                                   e.getMessage());
@@ -1157,8 +1163,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        // start restore process
-        m_restoreAgent.restore();
+        if (m_restoreAgent != null) {
+            // start restore process
+            m_restoreAgent.restore();
+        }
 
         // start one site in the current thread
         Thread.currentThread().setName("ExecutionSiteAndVoltDB");

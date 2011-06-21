@@ -50,8 +50,9 @@ import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.zk.ZKTestBase;
 
-public class TestRestoreAgent implements RestoreAgent.Callback {
+public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callback {
     static int uid = 0;
 
     List<File> paths = new ArrayList<File>();
@@ -265,14 +266,15 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
     }
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         m_count.set(0);
         m_done = false;
         m_unexpectedSPIs.clear();
+        setUpZK(1);
     }
 
     @After
-    public void tearDown() throws IOException {
+    public void tearDown() throws Exception {
         String msg = "";
         for (String name : m_unexpectedSPIs) {
             msg += name + ", ";
@@ -281,14 +283,17 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         for (File p : paths) {
             VoltFile.recursivelyDelete(p);
         }
+        tearDownZK();
     }
 
     @Test
-    public void testSingleHostEmptyRestore() throws IOException {
+    public void testSingleHostEmptyRestore() throws Exception {
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
         MockInitiator initiator = new MockInitiator(null);
-        RestoreAgent restoreAgent = new RestoreAgent(context, initiator, this,
+        RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
+                                                     getClient(0),
+                                                     this,
                                                      0, "all");
         restoreAgent.restore();
         while (!m_done) {
@@ -299,14 +304,16 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
     }
 
     @Test
-    public void testMultipleHostEmptyRestore() throws IOException {
+    public void testMultipleHostEmptyRestore() throws Exception {
         m_hostCount = 3;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
         MockInitiator initiator = new MockInitiator(null);
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount; i++) {
-            agents.add(new RestoreAgent(context, initiator, this, i, "all"));
+            agents.add(new RestoreAgent(context, initiator,
+                                        getClient(0),
+                                        this, i, "all"));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
@@ -325,14 +332,16 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
     }
 
     @Test
-    public void testMultipleHostAgreementFailure() throws IOException {
+    public void testMultipleHostAgreementFailure() throws Exception {
         m_hostCount = 3;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
         MockInitiator initiator = new MockInitiator(null);
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount - 1; i++) {
-            agents.add(new RestoreAgent(context, initiator, this, i, "all"));
+            agents.add(new RestoreAgent(context, initiator,
+                                        getClient(0),
+                                        this, i, "all"));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
@@ -350,14 +359,15 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         }
 
         // Start the last restore agent, should be able to reach agreement now
-        RestoreAgent agent = new RestoreAgent(context, initiator, this,
-                                              m_hostCount - 1, "all");
+        RestoreAgent agent = new RestoreAgent(context, initiator,
+                                              getClient(0),
+                                              this, m_hostCount - 1, "all");
         agent.restore();
 
         count = 0;
         while (!m_done && count++ < 10) {
             try {
-                Thread.sleep(200);
+                Thread.sleep(500);
             } catch (InterruptedException e) {}
         }
 
@@ -367,7 +377,7 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
     }
 
     @Test
-    public void testSingleHostSnapshotRestore() throws IOException, InterruptedException {
+    public void testSingleHostSnapshotRestore() throws Exception {
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
         ServerThread server = new ServerThread(context.pathToCatalogJar,
@@ -381,7 +391,9 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         HashSet<String> procs = new HashSet<String>();
         procs.add("@SnapshotRestore");
         MockInitiator initiator = new MockInitiator(procs);
-        RestoreAgent restoreAgent = new RestoreAgent(context, initiator, this,
+        RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
+                                                     getClient(0),
+                                                     this,
                                                      0, "all");
         restoreAgent.restore();
         while (!m_done) {
@@ -395,7 +407,7 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
     }
 
     @Test
-    public void testMultiHostSnapshotRestore() throws IOException, InterruptedException {
+    public void testMultiHostSnapshotRestore() throws Exception {
         m_hostCount = 1;
         String voltroot = newVoltRoot(null);
         buildCatalog(m_hostCount, 8, 0, voltroot);
@@ -415,7 +427,9 @@ public class TestRestoreAgent implements RestoreAgent.Callback {
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount; i++) {
-            agents.add(new RestoreAgent(context, initiator, this, i, "all"));
+            agents.add(new RestoreAgent(context, initiator,
+                                        getClient(0),
+                                        this, i, "all"));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();

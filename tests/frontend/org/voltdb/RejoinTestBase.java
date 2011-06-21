@@ -157,6 +157,7 @@ public class RejoinTestBase extends TestCase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_adminPort = 9998;
+        config.m_isRejoinTest = true;
         retval.localServer = new ServerThread(config);
 
         long deploymentCRC = CatalogUtil.getDeploymentCRC(builder.getPathToDeployment());
