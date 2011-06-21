@@ -889,40 +889,34 @@ public class RestoreAgent implements CommandLogReinitiator.Callback, Watcher {
     }
 
     private void handleResponse(ClientResponse res) {
+        boolean failure = false;
         if (res.getStatus() != ClientResponse.SUCCESS) {
-            // TODO: need a consistent way to detect snapshot restore failure
-            if (m_state == State.RESTORE && res.getStatus() == ClientResponse.USER_ABORT) {
-                // Nothing to restore from, may not be an error, start replay
-            } else {
-                LOG.fatal("Failed to truncate command logs by snapshot: " +
-                          res.getStatusString());
-                VoltDB.crashVoltDB();
-            }
-        } else {
-            // Check the result of the snapshot save
-            VoltTable[] results = res.getResults();
-            if (results.length != 1) {
-                LOG.fatal("Snapshot response doesn't contain any results");
-                VoltDB.crashVoltDB();
-            }
+            failure = true;
+        }
 
-            while (results[0].advanceRow()) {
-                String err = results[0].getString("ERR_MSG");
-                if (!err.isEmpty()) {
-                    LOG.fatal(err);
-                    VoltDB.crashVoltDB();
-                }
-
-                String result = results[0].getString("RESULT");
-                if (!result.equalsIgnoreCase("success")) {
-                    String host = results[0].getString("HOSTNAME");
-                    LOG.fatal(host + " failed: " + result);
-                    VoltDB.crashVoltDB();
-                }
+        VoltTable[] results = res.getResults();
+        if (results == null || results.length != 1) {
+            failure = true;
+        }
+        while (!failure && results[0].advanceRow()) {
+            String resultStatus = results[0].getString("RESULT");
+            if (!resultStatus.equalsIgnoreCase("success")) {
+                failure = true;
             }
         }
 
-        changeState();
+        if (failure) {
+            if (m_state == State.RESTORE) {
+                LOG.fatal("Failed to restore from snapshot: " +
+                          res.getStatusString());
+            } else {
+                LOG.fatal("Failed to truncate command logs by snapshot: " +
+                          res.getStatusString());
+            }
+            VoltDB.crashVoltDB();
+        } else {
+            changeState();
+        }
     }
 
     /**
