@@ -31,10 +31,12 @@ public interface LogReader {
     public boolean isEmpty();
 
     /**
-     * Get the iterator that iterates through the filtered log
+     * Get the iterator that iterates through the filtered log. Only one
+     * iterator can be in use at any time.
      *
      * @return The iterator
-     * @throws IOException if an error occurred
+     * @throws IOException
+     *             if an error occurred
      */
     public LogIterator iterator() throws IOException;
 

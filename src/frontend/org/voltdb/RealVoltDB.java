@@ -827,12 +827,6 @@ public class RealVoltDB implements VoltDBInterface
                                                m_config.m_timestampTestingSalt);
                     portOffset++;
                     m_clientInterfaces.add(ci);
-                    try {
-                        ci.startAcceptingConnections();
-                    } catch (IOException e) {
-                        hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(), e);
-                        VoltDB.crashVoltDB();
-                    }
                 }
             }
 
@@ -1735,9 +1729,20 @@ public class RealVoltDB implements VoltDBInterface
 
     @Override
     public void onRestoreCompletion() {
-        // Enable the initiator to send normal heartbeats
+        /*
+         * Enable the initiator to send normal heartbeats and accept client
+         * connections
+         */
         for (ClientInterface ci : m_clientInterfaces) {
             ci.getInitiator().setSendHeartbeats(true);
+            try {
+                ci.startAcceptingConnections();
+            } catch (IOException e) {
+                hostLog.l7dlog(Level.FATAL,
+                               LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
+                               e);
+                VoltDB.crashVoltDB();
+            }
         }
 
         // Initialize command logger
