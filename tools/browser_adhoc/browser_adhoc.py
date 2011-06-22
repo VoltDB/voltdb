@@ -175,7 +175,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     response = client.execute('stat management %d' % (interval_poll))
                 elif (button_clicked == 'SYSTEMINFO'):
                     self.wfile.write('System Information<br>\n');
-                    response = client.execute('sysinfo %d' % (interval_poll))
+                    response = client.execute('sysinfo %s' % ("overview"))
                 elif (button_clicked == "INITIATE SNAPSHOT"):
                     self.wfile.write("Attempting to initiate snapshot to ")
                     self.wfile.write(snapshot_path)
