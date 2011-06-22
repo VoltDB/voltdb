@@ -27,6 +27,7 @@ import java.io.File;
 
 import junit.framework.TestCase;
 
+import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
@@ -44,6 +45,7 @@ public class TestVoltDB extends TestCase {
         assertEquals(null, blankConfig.m_pathToCatalog);
         assertEquals(null, blankConfig.m_pathToDeployment);
         assertEquals(VoltDB.DEFAULT_PORT, blankConfig.m_port);
+        assertEquals(START_ACTION.START, blankConfig.m_startAction);
 
         String args1[] = { "noloadlib" };
         assertTrue(new VoltDB.Configuration(args1).m_noLoadLibVOLTDB);
@@ -85,6 +87,16 @@ public class TestVoltDB extends TestCase {
         String args13[] = { "port", "5678" };
         VoltDB.Configuration cfg13 = new VoltDB.Configuration(args13);
         assertEquals(5678, cfg13.m_port);
+
+        String args14[] = { "create" };
+        VoltDB.Configuration cfg14 = new VoltDB.Configuration(args14);
+        assertEquals(START_ACTION.CREATE, cfg14.m_startAction);
+        String args15[] = { "recover" };
+        VoltDB.Configuration cfg15 = new VoltDB.Configuration(args15);
+        assertEquals(START_ACTION.RECOVER, cfg15.m_startAction);
+        String args16[] = { "start" };
+        VoltDB.Configuration cfg16 = new VoltDB.Configuration(args16);
+        assertEquals(START_ACTION.START, cfg16.m_startAction);
 
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
