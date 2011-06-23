@@ -4,5 +4,8 @@
     <paths>
         <voltdbroot path="/tmp" />
     </paths>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
     <export enabled="false"/>
 </deployment>
