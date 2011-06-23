@@ -63,7 +63,7 @@ public interface CommandLogReinitiator {
      * Get the minimum transaction ID among the last seen transactions across
      * all initiators in the previous segment.
      *
-     * @return
+     * @return null if the log is empty
      */
-    public long getMinLastSeenTxn();
+    public Long getMinLastSeenTxn();
 }

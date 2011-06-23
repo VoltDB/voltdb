@@ -126,8 +126,8 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             return false;
         }
         @Override
-        public long getMinLastSeenTxn() {
-            return 0;
+        public Long getMinLastSeenTxn() {
+            return null;
         }
         @Override
         public boolean started() {
@@ -150,7 +150,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             TreeMap<Long, Snapshot> snapshots = getSnapshots();
             Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
 
-            final long minLastSeenTxn = m_replayAgent.getMinLastSeenTxn();
+            final Long minLastSeenTxn = m_replayAgent.getMinLastSeenTxn();
             for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
                 /*
                  * If the txn of the snapshot is before the earliest txn
@@ -159,7 +159,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
                  * taken and the beginning of the log. So the snapshot is
                  * not viable for replay.
                  */
-                if (e.getKey() < minLastSeenTxn) {
+                if (minLastSeenTxn != null && e.getKey() < minLastSeenTxn) {
                     continue;
                 }
 
@@ -579,7 +579,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
      * @param snapshots
      *            The information of the local snapshot files.
      */
-    private void sendLocalRestoreInformation(long min, Set<SnapshotInfo> snapshots) {
+    private void sendLocalRestoreInformation(Long min, Set<SnapshotInfo> snapshots) {
         ByteBuffer buf = serializeRestoreInformation(min, snapshots);
 
         String zkNode = RESTORE + "/" + m_hostId;
@@ -636,7 +636,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
         }
 
         TreeMap<Long, Set<SnapshotInfo>> snapshotFragments = new TreeMap<Long, Set<SnapshotInfo>>();
-        long clStartTxnId = deserializeRestoreInformation(children, snapshotFragments);
+        Long clStartTxnId = deserializeRestoreInformation(children, snapshotFragments);
 
         // If we're not recovering, skip the rest
         if (m_action == START_ACTION.CREATE) {
@@ -647,17 +647,19 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
         Iterator<Long> iter = snapshotFragments.keySet().iterator();
         while (iter.hasNext()) {
             Long txnId = iter.next();
-            if (txnId < clStartTxnId) {
+            if (clStartTxnId != null &&
+                (clStartTxnId < 0 || txnId < clStartTxnId)) {
                 iter.remove();
             }
         }
 
-        LOG.debug("There are " + snapshotFragments.size() +
-                  " snapshots available in the cluster");
-        if (clStartTxnId > 0 && snapshotFragments.size() == 0) {
+        if (clStartTxnId != null && clStartTxnId > 0 &&
+            snapshotFragments.size() == 0) {
             LOG.fatal("No viable snapshots to restore");
             VoltDB.crashVoltDB();
         }
+        LOG.debug("There are " + snapshotFragments.size() +
+                  " snapshots available in the cluster");
 
         // Find the last complete snapshot and use it
         HashMap<Long, Map<String, Set<Integer>>> snapshotTablePartitions =
@@ -710,7 +712,8 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             }
         }
 
-        if (clStartTxnId > 0 && snapshotFragments.size() == 0) {
+        if (clStartTxnId != null && clStartTxnId > 0 &&
+            snapshotFragments.size() == 0) {
             LOG.fatal("No viable snapshots to restore");
             VoltDB.crashVoltDB();
         }
@@ -721,12 +724,12 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
     /**
      * @param children
      * @param snapshotFragments
-     * @return
+     * @return null if there is no log to replay in the whole cluster
      */
-    private long deserializeRestoreInformation(List<String> children,
+    private Long deserializeRestoreInformation(List<String> children,
                                                Map<Long, Set<SnapshotInfo>> snapshotFragments) {
         byte recover = m_action != START_ACTION.CREATE ? (byte) 1 : 0;
-        long clStartTxnId = 0;
+        Long clStartTxnId = null;
         ByteBuffer buf;
         for (String node : children) {
             byte[] data = null;
@@ -738,9 +741,13 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
             }
 
             buf = ByteBuffer.wrap(data);
-            long minTxnId = buf.getLong();
-            if (minTxnId > clStartTxnId) {
-                clStartTxnId = minTxnId;
+            // Check if there is log to replay
+            boolean hasLog = buf.get() == 1;
+            if (hasLog) {
+                long minTxnId = buf.getLong();
+                if (clStartTxnId == null || minTxnId > clStartTxnId) {
+                    clStartTxnId = minTxnId;
+                }
             }
 
             byte recoverByte = buf.get();
@@ -797,15 +804,24 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
      * @param snapshots
      * @return
      */
-    private ByteBuffer serializeRestoreInformation(long min, Set<SnapshotInfo> snapshots) {
-        // minTxnId + recover + snapshotCount
-        int size = 8 + 1 + 4;
+    private ByteBuffer serializeRestoreInformation(Long min, Set<SnapshotInfo> snapshots) {
+        // hasLog + recover + snapshotCount
+        int size = 1 + 1 + 4;
+        if (min != null) {
+            // we need to add the size of the min number to the total size
+            size += 8;
+        }
         for (SnapshotInfo i : snapshots) {
             size += i.size();
         }
 
         ByteBuffer buf = ByteBuffer.allocate(size);
-        buf.putLong(min);
+        if (min == null) {
+            buf.put((byte) 0);
+        } else {
+            buf.put((byte) 1);
+            buf.putLong(min);
+        }
         // 1 means recover, 0 means to create new DB
         buf.put(m_action != START_ACTION.CREATE ? (byte) 1 : 0);
 
