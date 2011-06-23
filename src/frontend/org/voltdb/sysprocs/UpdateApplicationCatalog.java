@@ -42,7 +42,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
 
     @Override
-        public void init(int numberOfPartitions, SiteProcedureConnection site,
+    public void init(int numberOfPartitions, SiteProcedureConnection site,
             Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
     {
         super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
