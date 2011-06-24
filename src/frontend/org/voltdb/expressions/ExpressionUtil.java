@@ -24,6 +24,7 @@ import java.util.Stack;
 
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.NotImplementedException;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltTypeUtil;
@@ -529,8 +530,8 @@ public abstract class ExpressionUtil {
             // handle the simple case where the constant is the type we want
             if (cve.getValueType() == neededType) {
 
-                // only worry about strings being too long (someday blobs)
-                if (cve.getValueType() == VoltType.STRING) {
+                // only worry about strings/varbinary being too long
+                if ((cve.getValueType() == VoltType.STRING) || (cve.getValueType() == VoltType.VARBINARY)) {
                     if (cve.getValue().length() > neededSize)
                         throw new StringIndexOutOfBoundsException("Constant VARCHAR value too long for column.");
                 }
@@ -564,6 +565,14 @@ public abstract class ExpressionUtil {
                 if ((cve.getValueType().isExactNumeric()) || (cve.getValueType() == VoltType.FLOAT)) {
                     cve.setValueType(neededType);
                     cve.setValueSize(neededSize);
+                    checkConstantValueTypeSafety(cve);
+                    return;
+                }
+            }
+
+            if (neededType == VoltType.VARBINARY) {
+                if ((cve.getValueType() == VoltType.STRING) && (Encoder.isHexEncodedString(cve.getValue()))) {
+                    cve.setValueType(neededType);
                     checkConstantValueTypeSafety(cve);
                     return;
                 }

@@ -20,14 +20,14 @@ package org.voltdb.client;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
-import java.util.concurrent.Semaphore;
 
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool.BBContainer;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -139,6 +139,7 @@ final class ClientImpl implements Client {
         return m_passwordHashCode;
     }
 
+    @Override
     public void createConnection(String host, String program, String password)
     throws UnknownHostException, IOException
     {
@@ -154,6 +155,7 @@ final class ClientImpl implements Client {
      * @throws UnknownHostException
      * @throws IOException
      */
+    @Override
     public void createConnection(String host, int port, String program, String password)
         throws UnknownHostException, IOException
     {
@@ -186,6 +188,7 @@ final class ClientImpl implements Client {
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
+    @Override
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
@@ -223,6 +226,7 @@ final class ClientImpl implements Client {
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
+    @Override
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
         if (m_isShutdown) {
@@ -306,6 +310,7 @@ final class ClientImpl implements Client {
         }
     }
 
+    @Override
     public void drain() throws NoConnectionsException, InterruptedException {
         if (m_isShutdown) {
             return;
@@ -318,6 +323,7 @@ final class ClientImpl implements Client {
      * all memory resources.
      * @throws InterruptedException
      */
+    @Override
     public void close() throws InterruptedException {
         m_isShutdown = true;
         synchronized (m_backpressureLock) {
@@ -334,6 +340,7 @@ final class ClientImpl implements Client {
         return m_distributer.removeClientStatusListener(listener);
     }
 
+    @Override
     public void backpressureBarrier() throws InterruptedException {
         if (m_isShutdown) {
             return;

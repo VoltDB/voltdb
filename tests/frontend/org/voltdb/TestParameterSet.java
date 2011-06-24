@@ -50,13 +50,13 @@
 
 package org.voltdb;
 
-import org.voltdb.ParameterSet;
-import org.voltdb.messaging.FastSerializableTestUtil;
-
 import junit.framework.TestCase;
+
+import org.voltdb.messaging.FastSerializableTestUtil;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
+    @Override
     public void setUp() {
         params = new ParameterSet();
     }
@@ -82,9 +82,7 @@ public class TestParameterSet extends TestCase {
         ParameterSet out = FastSerializableTestUtil.roundTrip(params);
         assertEquals(1, out.toArray().length);
 
-        // TODO(evanj): It would probably be best to use a byte array as the
-        // "native" string format, and only convert to String where needed.
-        // Hence, this probably should be a byte array.
-        assertEquals("foo", out.toArray()[0]);
+        byte[] bin = (byte[]) out.toArray()[0];
+        assertEquals(bin[0], 'f'); assertEquals(bin[1], 'o'); assertEquals(bin[2], 'o');
     }
 }

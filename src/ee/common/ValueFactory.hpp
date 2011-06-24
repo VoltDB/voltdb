@@ -56,6 +56,19 @@ public:
         return NValue::getNullStringValue();
     }
 
+    static inline NValue getBinaryValue(std::string value) {
+        // uses hex encoding
+        return NValue::getBinaryValue(value);
+    }
+
+    static inline NValue getBinaryValue(unsigned char* value, int32_t len) {
+        return NValue::getBinaryValue(value, len);
+    }
+
+    static inline NValue getNullBinaryValue() {
+        return NValue::getNullBinaryValue();
+    }
+
     /** Returns valuetype = VALUE_TYPE_NULL. Careful with this! */
     static inline NValue getNullValue() {
         return NValue::getNullValue();

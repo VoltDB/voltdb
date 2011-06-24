@@ -24,9 +24,11 @@
 package org.voltdb;
 
 import java.util.Random;
+
+import junit.framework.TestCase;
+
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
-import junit.framework.TestCase;
 
 /**
  * This test verifies that the Java Hashinator behaves
@@ -39,6 +41,44 @@ public class TestTheHashinator extends TestCase {
     @Override
     public void setUp() {
         VoltDB.instance().readBuildInfo();
+    }
+
+    public void testSameLongHash1() {
+        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "");
+
+        int partitionCount = 2;
+        long valueToHash = 0;
+        int eehash = ee.hashinate(valueToHash, partitionCount);
+        int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        if (eehash != javahash) {
+            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+        }
+
+        partitionCount = 2;
+        valueToHash = 1;
+        eehash = ee.hashinate(valueToHash, partitionCount);
+        javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        if (eehash != javahash) {
+            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+        }
+
+        partitionCount = 2;
+        valueToHash = 2;
+        eehash = ee.hashinate(valueToHash, partitionCount);
+        javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        if (eehash != javahash) {
+            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+        }
+        assertEquals(eehash, javahash);
+
+        partitionCount = 2;
+        valueToHash = 3;
+        eehash = ee.hashinate(valueToHash, partitionCount);
+        javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        if (eehash != javahash) {
+            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+        }
+        assertEquals(eehash, javahash);
     }
 
     public void testSameLongHash() {
@@ -54,6 +94,9 @@ public class TestTheHashinator extends TestCase {
             long valueToHash = r.nextLong();
             int eehash = ee.hashinate(valueToHash, partitionCount);
             int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+            if (eehash != javahash) {
+                System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+            }
             assertEquals(eehash, javahash);
             assertTrue(eehash < partitionCount);
             assertTrue(eehash > -1);
@@ -104,8 +147,8 @@ public class TestTheHashinator extends TestCase {
         assertEquals(jHash, cHash);
         System.out.println("jhash " + jHash + " chash " + cHash);
 
-        jHash = TheHashinator.hashToPartition(VoltType.NULL_STRING, 2);
-        cHash = ee.hashinate(VoltType.NULL_STRING, 2);
+        jHash = TheHashinator.hashToPartition(VoltType.NULL_STRING_OR_VARBINARY, 2);
+        cHash = ee.hashinate(VoltType.NULL_STRING_OR_VARBINARY, 2);
         assertEquals(0, jHash);
         assertEquals(jHash, cHash);
         System.out.println("jhash " + jHash + " chash " + cHash);

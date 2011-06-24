@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -37,6 +38,7 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -243,10 +245,23 @@ public class HsqlBackend {
                 Timestamp t = new Timestamp(d.getTime() * 1000);
                 sqlOut.append('\'').append(t.toString()).append('\'');
             } else if (args[i] instanceof byte[]) {
-                if (type != VoltType.STRING)
-                    throw new RuntimeException("Inserting string (bytes) into mismatched column type in HSQL.");
-                // Convert from byte[] -> String; escape single quotes
-                sqlOut.append(sqlEscape(new String((byte[]) args[i])));
+                if (type == VoltType.STRING) {
+                    // Convert from byte[] -> String; escape single quotes
+                    try {
+                        sqlOut.append(sqlEscape(new String((byte[]) args[i], "UTF-8")));
+                    } catch (UnsupportedEncodingException e) {
+                        // should NEVER HAPPEN
+                        System.err.println("FATAL: Your JVM doens't support UTF-&");
+                        System.exit(-1);
+                    }
+                }
+                else if (type == VoltType.VARBINARY) {
+                    // Convert from byte[] -> String; using hex
+                    sqlOut.append(sqlEscape(Encoder.hexEncode((byte[]) args[i])));
+                }
+                else {
+                    throw new RuntimeException("Inserting string/varbinary (bytes) into mismatched column type in HSQL.");
+                }
             } else if (args[i] instanceof String) {
                 if (type != VoltType.STRING)
                     throw new RuntimeException("Inserting string into mismatched column type in HSQL.");

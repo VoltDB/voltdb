@@ -958,6 +958,45 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
+    public void testVarbinary() throws IOException {
+        final String simpleSchema =
+            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<partitions><partition table='books' column='cash'/></partitions> " +
+            "<procedures>" +
+            "<procedure class='get'><sql>select * from books;</sql></procedure>" +
+            "<procedure class='i1'><sql>insert into books values(5, 'AA');</sql></procedure>" +
+            "<procedure class='i2'><sql>insert into books values(5, ?);</sql></procedure>" +
+            "<procedure class='s1'><sql>update books set title = 'bb';</sql></procedure>" +
+            "</procedures>" +
+            //"<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        // final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
+        assertTrue(success);
+        final Catalog c1 = compiler.getCatalog();
+        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final Catalog c2 = new Catalog();
+        c2.execute(catalogContents);
+        assertTrue(c2.serialize().equals(c1.serialize()));
+    }
+
+
     //
     // There are DDL tests a number of places. TestDDLCompiler seems more about
     // verifying HSQL behaviour. Additionally, there are users of PlannerAideDeCamp

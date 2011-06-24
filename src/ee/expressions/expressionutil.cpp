@@ -280,6 +280,10 @@ constantValueFactory(json_spirit::Object &obj,
     case VALUE_TYPE_VARCHAR:
         newvalue = ValueFactory::getStringValue(valueValue.get_str());
         break;
+    case VALUE_TYPE_VARBINARY:
+        // uses hex encoding
+        newvalue = ValueFactory::getBinaryValue(valueValue.get_str());
+        break;
     case VALUE_TYPE_TIMESTAMP:
         newvalue = ValueFactory::getTimestampValue(static_cast<int64_t>(valueValue.get_int64()));
         break;

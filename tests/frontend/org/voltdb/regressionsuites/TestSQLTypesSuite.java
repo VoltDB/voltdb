@@ -117,8 +117,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
             return (d1.compareTo(d2) == 0);
         case STRING:
             //System.out.println("\tComparing " + lhs + " == " + rhs);
-            if ((lhs == null || lhs == VoltType.NULL_STRING) &&
-                (rhs == null || rhs == VoltType.NULL_STRING))
+            if ((lhs == null || lhs == VoltType.NULL_STRING_OR_VARBINARY) &&
+                (rhs == null || rhs == VoltType.NULL_STRING_OR_VARBINARY))
             {
                 return true;
             }
@@ -210,10 +210,10 @@ public class TestSQLTypesSuite extends RegressionSuite {
         VoltType.NULL_BIGINT,
         VoltType.NULL_FLOAT,
         VoltType.NULL_TIMESTAMP,
-        VoltType.NULL_STRING,       // inlined LT ptr size
-        VoltType.NULL_STRING,       // inlined GT ptr size
-        VoltType.NULL_STRING,       // not inlined (1024)
-        VoltType.NULL_STRING,       // not inlined (max length)
+        VoltType.NULL_STRING_OR_VARBINARY,       // inlined LT ptr size
+        VoltType.NULL_STRING_OR_VARBINARY,       // inlined GT ptr size
+        VoltType.NULL_STRING_OR_VARBINARY,       // not inlined (1024)
+        VoltType.NULL_STRING_OR_VARBINARY,       // not inlined (max length)
         VoltType.NULL_DECIMAL
         // UPDATE WHEN ADDING NEW TYPE
     };
@@ -1059,7 +1059,6 @@ public class TestSQLTypesSuite extends RegressionSuite {
         helper_testInvalidParameterSerializations(client, params);
 
         params[6] = new BigDecimal[1];
-        params[7] = new byte[VoltType.MAX_VALUE_LENGTH + 1];
         helper_testInvalidParameterSerializations(client, params);
     }
 

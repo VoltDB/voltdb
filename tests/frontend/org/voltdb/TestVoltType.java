@@ -61,6 +61,7 @@ public class TestVoltType extends TestCase {
         assertEquals(VoltType.STRING, VoltType.typeFromString("CHAR"));
         assertEquals(VoltType.TIMESTAMP, VoltType.typeFromString("TIMESTAMP"));
         assertEquals(VoltType.DECIMAL, VoltType.typeFromString("DECIMAL"));
+        assertEquals(VoltType.VARBINARY, VoltType.typeFromString("VARBINARY"));
 
         boolean caught = false;
         try {
@@ -97,6 +98,7 @@ public class TestVoltType extends TestCase {
         assertEquals("timestamp", VoltType.TIMESTAMP.toSQLString());
         assertEquals("decimal", VoltType.DECIMAL.toSQLString());
         assertEquals("varchar", VoltType.STRING.toSQLString());
+        assertEquals("varbinary", VoltType.VARBINARY.toSQLString());
         assertNull(VoltType.VOLTTABLE.toSQLString());
     }
 
@@ -129,6 +131,7 @@ public class TestVoltType extends TestCase {
         assertEquals(VoltType.typeFromString("STRING"), VoltType.typeFromClass(String.class));
         assertEquals(VoltType.typeFromString("VOLTTABLE"), VoltType.typeFromClass(VoltTable.class));
         assertEquals(VoltType.typeFromString("DECIMAL"), VoltType.typeFromClass(BigDecimal.class));
+        assertEquals(VoltType.typeFromString("VARBINARY"), VoltType.typeFromClass(byte[].class));
     }
 
     /* round trip the constructors */

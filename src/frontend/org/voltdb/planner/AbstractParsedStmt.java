@@ -53,14 +53,17 @@ import org.xml.sax.SAXParseException;
 public abstract class AbstractParsedStmt {
 
     static class HSQLXMLErrorHandler implements ErrorHandler {
+        @Override
         public void error(SAXParseException exception) throws SAXException {
             throw exception;
         }
 
+        @Override
         public void fatalError(SAXParseException exception) throws SAXException {
             throw exception;
         }
 
+        @Override
         public void warning(SAXParseException exception) throws SAXException {
             throw exception;
         }
@@ -264,7 +267,7 @@ public abstract class AbstractParsedStmt {
         int size = VoltType.MAX_VALUE_LENGTH;
         assert(vt != VoltType.VOLTTABLE);
 
-        if (vt != VoltType.STRING) {
+        if ((vt != VoltType.STRING) && (vt != VoltType.VARBINARY)) {
             if (vt == VoltType.NULL) size = 0;
             else size = vt.getLengthInBytesForFixedTypes();
         }

@@ -120,8 +120,12 @@ public class TestVoltTable extends TestCase {
             return (d1.compareTo(d2) == 0);
         case STRING:
             if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_STRING && rhs == null) return true;
+            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null) return true;
             return ((String)lhs).equals(rhs);
+        case VARBINARY:
+            if (lhs == null && rhs == null) return true;
+            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null) return true;
+            return Arrays.equals((byte[])lhs, (byte[])rhs);
         case TIMESTAMP:
             if (lhs == null && rhs == null) return true;
             if (lhs == VoltType.NULL_TIMESTAMP && rhs == null) return true;
@@ -308,6 +312,23 @@ public class TestVoltTable extends TestCase {
         assertEquals(0, t2.fetchRow(0).getStringAsBytes(0).length);
         assertTrue(Arrays.equals(FOO, t2.fetchRow(1).getStringAsBytes(0)));
         assertEquals("foo", t2.fetchRow(1).getString(0));
+
+        t2.clearRowData();
+        assertTrue(t2.getRowCount() == 0);
+    }
+
+    public void testVarbinary() {
+        t = new VoltTable(new ColumnInfo("", VoltType.VARBINARY));
+        final byte[] empty = new byte[0];
+        t.addRow(empty);
+        final byte[] FOO = new byte[]{'f', 'o', 'o'};
+        t.addRow(FOO);
+
+        t2 = FastSerializableTestUtil.roundTrip(t);
+        assertEquals(2, t2.getRowCount());
+        assertTrue(Arrays.equals(empty, t2.fetchRow(0).getVarbinary(0)));
+        assertEquals(0, t2.fetchRow(0).getVarbinary(0).length);
+        assertTrue(Arrays.equals(FOO, t2.fetchRow(1).getVarbinary(0)));
 
         t2.clearRowData();
         assertTrue(t2.getRowCount() == 0);
@@ -584,7 +605,7 @@ public class TestVoltTable extends TestCase {
 
         Object content[] = { b1, S1, i1, l1, f1, s1, d1, B1, b1 };
 
-        Object nulls[] = { VoltType.NULL_TINYINT, VoltType.NULL_STRING, VoltType.NULL_INTEGER,
+        Object nulls[] = { VoltType.NULL_TINYINT, VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_INTEGER,
                            VoltType.NULL_BIGINT, VoltType.NULL_FLOAT, VoltType.NULL_SMALLINT,
                            VoltType.NULL_TIMESTAMP, VoltType.NULL_DECIMAL, VoltType.NULL_TINYINT };
 

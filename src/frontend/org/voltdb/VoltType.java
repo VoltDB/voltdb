@@ -21,8 +21,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.CRC32;
 
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
+
 
 /**
  * Represents a type in a VoltDB Stored Procedure or {@link VoltTable VoltTable}.
@@ -112,10 +115,15 @@ public enum VoltType {
     /**
      * Fixed precision=38, scale=12 string representation of a decimal
      */
-    DECIMAL_STRING  ((byte)23, 9, "decimal", new Class[] {}, '0');
+    DECIMAL_STRING  ((byte)23, 9, "decimal", new Class[] {}, '0'),
 
     /**
-     * Size in bytes of the maximum length for a VoltDB field value, presumably a string or blob
+     * Array of bytes of variable length
+     */
+    VARBINARY    ((byte)25, -1, "varbinary", new Class[] { byte[].class, Byte[].class }, 'l');
+
+    /**
+     * Size in bytes of the maximum length for a VoltDB field value, presumably a string or varbinary
      */
     public static final int MAX_VALUE_LENGTH = 1048576;
     public static final String MAX_VALUE_LENGTH_STR = String.valueOf(MAX_VALUE_LENGTH / 1024) + "k";
@@ -207,6 +215,7 @@ public enum VoltType {
         if (str.equals("DECIMAL")) return DECIMAL;
         if (str.equals("DOUBLE")) return FLOAT;
         if (str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
+        if (str.equals("VARBINARY")) return VARBINARY;
 
         throw new RuntimeException("Can't find type: " + str);
     }
@@ -252,8 +261,10 @@ public enum VoltType {
 
     public int getLengthInBytesForFixedTypes() {
         if (m_lengthInBytes == -1) {
+            Thread.dumpStack();
             throw new RuntimeException(
                     "Asking for fixed size for non-fixed or unknown type.");
+
         }
         return m_lengthInBytes;
     }
@@ -350,11 +361,13 @@ public enum VoltType {
         case FLOAT:
             return NULL_FLOAT;
         case STRING:
-            return NULL_STRING;
+            return NULL_STRING_OR_VARBINARY;
         case TIMESTAMP:
             return NULL_TIMESTAMP;
         case DECIMAL:
             return NULL_DECIMAL;
+        case VARBINARY:
+            return NULL_STRING_OR_VARBINARY;
         default:
             throw new VoltTypeException("No NULL value for " + toString());
         }
@@ -368,7 +381,7 @@ public enum VoltType {
             retval = true;
         }
         else if (obj == VoltType.NULL_TIMESTAMP ||
-                obj == VoltType.NULL_STRING ||
+                obj == VoltType.NULL_STRING_OR_VARBINARY ||
                 obj == VoltType.NULL_DECIMAL)
         {
             retval = true;
@@ -396,7 +409,10 @@ public enum VoltType {
                 retval = (obj == VoltType.NULL_TIMESTAMP);
                 break;
             case STRING:
-                retval = (obj == VoltType.NULL_STRING);
+                retval = (obj == VoltType.NULL_STRING_OR_VARBINARY);
+                break;
+            case VARBINARY:
+                retval = (obj == VoltType.NULL_STRING_OR_VARBINARY);
                 break;
             case DECIMAL:
                 retval = (obj == VoltType.NULL_DECIMAL);
@@ -445,6 +461,36 @@ public enum VoltType {
         return m_signatureChar;
     }
 
+    /**
+     * Make a printable, short string for a varbinary.
+     * String includes a CRC and the contents of the varbinary in hex.
+     * Contents longer than 13 chars are truncated and elipsized.
+     * Yes, "elipsized" is totally a word.
+     *
+     * Example: "bin[crc:1298399436,value:0xABCDEF12345...]"
+     *
+     * @param bin The bytes to print out.
+     * @return A string representation that is printable and short.
+     */
+    public static String varbinaryToPrintableString(byte[] bin) {
+        CRC32 crc = new CRC32();
+        StringBuilder sb = new StringBuilder();
+        sb.append("bin[crc:");
+        crc.update(bin);
+        sb.append(crc.getValue());
+        sb.append(",value:0x");
+        String hex = Encoder.hexEncode(bin);
+        if (hex.length() > 13) {
+            sb.append(hex.substring(0, 10));
+            sb.append("...");
+        }
+        else {
+            sb.append(hex);
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
     public static final int NULL_STRING_LENGTH = -1;
     public static final byte NULL_TINYINT = Byte.MIN_VALUE;
     public static final short NULL_SMALLINT = Short.MIN_VALUE;
@@ -457,8 +503,8 @@ public enum VoltType {
     private static final class NullTimestampSigil{}
     public static final NullTimestampSigil NULL_TIMESTAMP = new NullTimestampSigil();
 
-    private static final class NullStringSigil{}
-    public static final NullStringSigil NULL_STRING = new NullStringSigil();
+    private static final class NullStringOrVarbinarySigil{}
+    public static final NullStringOrVarbinarySigil NULL_STRING_OR_VARBINARY = new NullStringOrVarbinarySigil();
 
     private static final class NullDecimalSigil{}
     public static final NullDecimalSigil NULL_DECIMAL = new NullDecimalSigil();

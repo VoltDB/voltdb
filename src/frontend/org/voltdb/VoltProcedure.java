@@ -474,7 +474,7 @@ public abstract class VoltProcedure {
 
     /** @throws Exception with a message describing why the types are incompatible. */
     final private Object tryToMakeCompatible(int paramTypeIndex, Object param) throws Exception {
-        if (param == null || param == VoltType.NULL_STRING ||
+        if (param == null || param == VoltType.NULL_STRING_OR_VARBINARY ||
             param == VoltType.NULL_DECIMAL)
         {
             if (m_paramTypeIsPrimitive[paramTypeIndex]) {
@@ -499,7 +499,21 @@ public abstract class VoltProcedure {
             return param;
         }
 
+        // hack to fixup varbinary support for statement procs
+        if (m_paramTypes[paramTypeIndex] == byte[].class) {
+            m_paramTypeComponentType[paramTypeIndex] = byte.class;
+            m_paramTypeIsArray[paramTypeIndex] = true;
+        }
+
         Class<?> pclass = param.getClass();
+
+        // hack to make strings work with input as byte[]
+        if ((m_paramTypes[paramTypeIndex] == String.class) && (pclass == byte[].class)) {
+            String sparam = null;
+            sparam = new String((byte[]) param, "UTF-8");
+            return sparam;
+        }
+
         boolean slotIsArray = m_paramTypeIsArray[paramTypeIndex];
         if (slotIsArray != pclass.isArray())
             throw new Exception("Array / Scalar parameter mismatch");
@@ -950,7 +964,7 @@ public abstract class VoltProcedure {
             else if (type == VoltType.TIMESTAMP)
                 args[ii] = new TimestampType(Long.MIN_VALUE);
             else if (type == VoltType.STRING)
-                args[ii] = VoltType.NULL_STRING;
+                args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
             else if (type == VoltType.DECIMAL)
                 args[ii] = VoltType.NULL_DECIMAL;
             else

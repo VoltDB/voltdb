@@ -24,7 +24,9 @@ import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.PrintStream;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -476,7 +478,7 @@ public class DDLCompiler {
         int maxRowSize = 0;
         for (Column c : columnMap.values()) {
             VoltType t = VoltType.get((byte)c.getType());
-            if (t == VoltType.STRING) {
+            if ((t == VoltType.STRING) || (t == VoltType.VARBINARY)) {
                 if (c.getSize() > 1024 * 1024) {
                     throw m_compiler.new VoltCompilerException("Table name " + name + " column " + c.getName() +
                             " has a maximum size of " + c.getSize() + " bytes" +

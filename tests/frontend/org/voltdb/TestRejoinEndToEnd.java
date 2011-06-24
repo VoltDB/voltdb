@@ -38,14 +38,8 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportClientBase;
-import org.voltdb.exportclient.ExportClientException;
-import org.voltdb.exportclient.ExportConnection;
-import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
@@ -342,7 +336,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
     }
 
-    public void testRestoreThenRejoinPropagatesRestore() throws Exception {
+    /*public void testRestoreThenRejoinPropagatesRestore() throws Exception {
         System.out.println("testRestoreThenRejoinThenRestore");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
@@ -951,6 +945,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         localServer.shutdown();
         cluster.shutDown();
-    }
+    }*/
 
 }
