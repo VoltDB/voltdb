@@ -1013,8 +1013,7 @@ public class PlanAssembler {
                     else
                     {
                         /*
-                         * If there are other aggregates in the select columns,
-                         * don't do any push-down.
+                         * Unsupported aggregate (AVG for example)
                          */
                         isPushDownAgg = false;
                     }
