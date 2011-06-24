@@ -860,7 +860,9 @@ public class ClientInterface implements DumpManager.Dumpable {
     public void mayActivateSnapshotDaemon() {
         SnapshotSchedule schedule = m_catalogContext.get().database.getSnapshotschedule().get("default");
         if (m_siteId ==
-                m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId() && schedule != null) {
+                m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId() &&
+            schedule != null && schedule.getEnabled())
+        {
             m_snapshotDaemon.makeActive(schedule);
         } else {
             m_snapshotDaemon.makeInactive();

@@ -56,12 +56,12 @@ begin Database          "A set of schema, procedures and other metadata that tog
 end
 
 begin CommandLog "Configuration for a command log"
-bool enabled "Is command logging enabled"
-bool synchronous "Should commands be executed only once durable"
-int fsyncInterval "How often commands should be written to disk"
-int maxTxns "How many txns waiting to go to disk should trigger a flush"
-string logPath "Directory to store log files"
-string internalSnapshotPath "Directory to store internal snapshots for the command log"
+  bool enabled "Is command logging enabled"
+  bool synchronous "Should commands be executed only once durable"
+  int fsyncInterval "How often commands should be written to disk"
+  int maxTxns "How many txns waiting to go to disk should trigger a flush"
+  string logPath "Directory to store log files"
+  string internalSnapshotPath "Directory to store internal snapshots for the command log"
 end
 
 begin ConnectorTableInfo      "Per-export connector table configuration"
@@ -212,6 +212,7 @@ begin Column                    "A table column"
 end
 
 begin SnapshotSchedule          "A schedule for the database to follow when creating automated snapshots"
+  bool enabled                  "Is this auto snapshot schedule enabled?"
   string frequencyUnit          "Unit of time frequency is specified in"
   int frequencyValue            "Frequency in some unit"
   int retain                    "How many snapshots to retain"

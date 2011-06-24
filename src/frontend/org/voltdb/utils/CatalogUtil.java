@@ -852,8 +852,10 @@ public abstract class CatalogUtil {
      */
     private static void setSnapshotInfo(Catalog catalog, SnapshotType snapshotSettings) {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        if (snapshotSettings != null && snapshotSettings.isEnabled()) {
-            SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
+        SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
+        if (snapshotSettings != null)
+        {
+            schedule.setEnabled(snapshotSettings.isEnabled());
             String frequency = snapshotSettings.getFrequency();
             if (!frequency.endsWith("s") &&
                     !frequency.endsWith("m") &&
@@ -900,6 +902,10 @@ public abstract class CatalogUtil {
             schedule.setFrequencyvalue(frequencyInt);
             schedule.setPrefix(prefix);
             schedule.setRetain(retain);
+        }
+        else
+        {
+            schedule.setEnabled(false);
         }
     }
 

@@ -395,7 +395,7 @@ public class SystemInformation extends VoltSystemProcedure
 
         SnapshotSchedule snaps = context.getDatabase().getSnapshotschedule().get("default");
         String snap_enabled = "false";
-        if (snaps != null)
+        if (snaps != null && snaps.getEnabled())
         {
             snap_enabled = "true";
             String snap_freq = Integer.toString(snaps.getFrequencyvalue()) + snaps.getFrequencyunit();

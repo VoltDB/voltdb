@@ -250,13 +250,14 @@ public class TestCatalogUtil extends TestCase {
         final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
         CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath(), true);
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        assertTrue(db.getSnapshotschedule().isEmpty());
+        assertFalse(db.getSnapshotschedule().get("default").getEnabled());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
         CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath(), true);
         db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertFalse(db.getSnapshotschedule().isEmpty());
+        assertTrue(db.getSnapshotschedule().get("default").getEnabled());
         assertEquals(10, db.getSnapshotschedule().get("default").getRetain());
     }
 

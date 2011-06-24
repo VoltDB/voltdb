@@ -178,7 +178,7 @@ public class CatalogContext {
 
         // auto snapshot info
         SnapshotSchedule ssched = database.getSnapshotschedule().get("default");
-        if (ssched == null) {
+        if (ssched == null || !ssched.getEnabled()) {
             hostLog.info("No schedule set for automated snapshots.");
         }
         else {
