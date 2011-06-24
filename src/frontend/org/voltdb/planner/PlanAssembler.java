@@ -381,23 +381,7 @@ public class PlanAssembler {
         if ((m_parsedSelect.limit != -1) || (m_parsedSelect.limitParameterId != -1) ||
             (m_parsedSelect.offset > 0) || (m_parsedSelect.offsetParameterId != -1))
         {
-            LimitPlanNode limit = new LimitPlanNode();
-            limit.setLimit((int) m_parsedSelect.limit);
-            limit.setOffset((int) m_parsedSelect.offset);
-
-            if (m_parsedSelect.offsetParameterId != -1) {
-                ParameterInfo parameterInfo =
-                    m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
-                limit.setOffsetParameterIndex(parameterInfo.index);
-            }
-            if (m_parsedSelect.limitParameterId != -1) {
-                ParameterInfo parameterInfo =
-                    m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
-                limit.setLimitParameterIndex(parameterInfo.index);
-            }
-            limit.addAndLinkChild(root);
-            limit.generateOutputSchema(m_catalogDb);
-            root = limit;
+            root = handleLimitOperator(root);
         }
 
         SendPlanNode sendNode = new SendPlanNode();
@@ -833,6 +817,32 @@ public class PlanAssembler {
 
     AbstractPlanNode addOffsetAndLimit(AbstractPlanNode root) {
         return null;
+    }
+
+    /**
+     * Add a limit, pushed-down if possible, and return the possibly
+     * new root node.
+     * @param root
+     * @return new plan's root node
+     */
+    AbstractPlanNode handleLimitOperator(AbstractPlanNode root) {
+        LimitPlanNode limit = new LimitPlanNode();
+        limit.setLimit((int) m_parsedSelect.limit);
+        limit.setOffset((int) m_parsedSelect.offset);
+
+        if (m_parsedSelect.offsetParameterId != -1) {
+            ParameterInfo parameterInfo =
+                m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
+            limit.setOffsetParameterIndex(parameterInfo.index);
+        }
+        if (m_parsedSelect.limitParameterId != -1) {
+            ParameterInfo parameterInfo =
+                m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
+            limit.setLimitParameterIndex(parameterInfo.index);
+        }
+        limit.addAndLinkChild(root);
+        limit.generateOutputSchema(m_catalogDb);
+        return limit;
     }
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
