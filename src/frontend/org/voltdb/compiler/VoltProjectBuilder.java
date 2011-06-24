@@ -873,11 +873,7 @@ public class VoltProjectBuilder {
                 m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
             CommandLogType commandLogType = factory.createCommandLogType();
             if (m_commandLogSync != null) {
-                if (m_commandLogSync.booleanValue()) {
-                    commandLogType.setMode("sync");
-                } else {
-                    commandLogType.setMode("async");
-                }
+                commandLogType.setSynchronous(m_commandLogSync.booleanValue());
             }
             if (m_commandLogEnabled != null) {
                 commandLogType.setEnabled(m_commandLogEnabled);

@@ -477,14 +477,7 @@ public abstract class CatalogUtil {
         boolean sync = false;
         org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
         if (commandlog != null) {
-            String mode = commandlog.getMode();
-            if (mode.equalsIgnoreCase("sync")) {
-                sync = true;
-            } else if (mode.equalsIgnoreCase("async")) {
-                sync = false;
-            } else {
-                throw new RuntimeException("Invalid command log mode \"" + mode + "\" specified in deployment file");
-            }
+            sync = commandlog.isSynchronous();
             enabled = commandlog.isEnabled();
             Frequency freq = commandlog.getFrequency();
             if (freq != null) {

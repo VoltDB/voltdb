@@ -92,7 +92,7 @@
             </xs:complexType>
         </xs:element>
     </xs:all>
-    <xs:attribute name="mode" type="xs:string" default="async" use="optional" />
+    <xs:attribute name="synchronous" type="xs:boolean" default="false" use="optional" />
     <xs:attribute name="enabled" type="xs:boolean" default="true" use="optional" />
   </xs:complexType>
 
