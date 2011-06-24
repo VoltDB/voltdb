@@ -1069,8 +1069,7 @@ public class PlanAssembler {
             aggNode.setOutputSchema(agg_schema);
             topAggNode.setOutputSchema(agg_schema);
             /*
-             * Do push-down if and only if there is only one aggregate operator
-             * and it's count(*)
+             * Is there a necessary coordinator-aggregate node...
              */
             if (!hasAggregates || !isPushDownAgg)
             {
@@ -1095,6 +1094,11 @@ public class PlanAssembler {
      * top node on top of the send/receive pair. If the top node is not given,
      * the node will not be pushed down. It will be added on top of the
      * send/receive pair directly.
+     *
+     * Note: this works in part because the push-down node is also an acceptable
+     * top level node if the plan is not distributed. This wouldn't be true
+     * if we started pushing down something like (sum, count) to calculate
+     * a distributed average.
      *
      * @param root
      *            The root node
