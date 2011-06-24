@@ -821,8 +821,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
                 port, adminPort, context, network, siteId, initiator,
-                plannerThread, allPartitions,
-                VoltDB.instance().recovering());
+                plannerThread, allPartitions);
         onBackPressure.m_ci = ci;
         offBackPressure.m_ci = ci;
 
@@ -831,7 +830,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
     ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network, int siteId,
                     TransactionInitiator initiator, AsyncCompilerWorkThread plannerThread,
-                    int[] allPartitions, boolean recovering)
+                    int[] allPartitions)
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
@@ -848,11 +847,6 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
-
-        if (!recovering)
-        {
-            mayActivateSnapshotDaemon();
-        }
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID

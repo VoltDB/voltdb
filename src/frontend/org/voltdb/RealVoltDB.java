@@ -1755,6 +1755,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          */
         for (ClientInterface ci : m_clientInterfaces) {
             ci.getInitiator().setSendHeartbeats(true);
+            ci.mayActivateSnapshotDaemon();
             try {
                 ci.startAcceptingConnections();
             } catch (IOException e) {
