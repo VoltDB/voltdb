@@ -1098,7 +1098,7 @@ public class PlanAssembler {
      *
      * @param root
      *            The root node
-     * @param node
+     * @param distributedNode
      *            The node to push down
      * @param topNode
      *            The top node to put on top of the send/receive pair after
@@ -1106,8 +1106,8 @@ public class PlanAssembler {
      * @return The new root node.
      */
     AbstractPlanNode pushDownNode(AbstractPlanNode root,
-                                  HashAggregatePlanNode node,
-                                  HashAggregatePlanNode topNode) {
+                                  AbstractPlanNode distributedNode,
+                                  AbstractPlanNode topNode) {
         /*
          * Push this node down to partition if it's distributed. First remove
          * the send/receive pair, add the node, then put the send/receive pair
@@ -1122,9 +1122,9 @@ public class PlanAssembler {
             accessPlanTemp = null;
         }
 
-        node.addAndLinkChild(root);
-        node.generateOutputSchema(m_catalogDb);
-        root = node;
+        distributedNode.addAndLinkChild(root);
+        distributedNode.generateOutputSchema(m_catalogDb);
+        root = distributedNode;
 
         // Put the send/receive pair back into place
         if (accessPlanTemp != null) {
