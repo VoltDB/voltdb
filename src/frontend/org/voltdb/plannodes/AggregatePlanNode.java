@@ -40,10 +40,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         GROUPBY_EXPRESSIONS;
     }
 
-    //
-    // NOTE: I'm not really keen on how this is all laid out, but it's just
-    //     good enough for what we need in TPC-C for now...
-    //
     protected List<ExpressionType> m_aggregateTypes = new ArrayList<ExpressionType>();
     // a list of whether the aggregate is over distinct elements
     // 0 is not distinct, 1 is distinct
@@ -58,6 +54,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
     // At the moment these are guaranteed to be TVES.  This might always be true
     protected List<AbstractExpression> m_groupByExpressions
         = new ArrayList<AbstractExpression>();
+
+    // True if this aggregate node is the coordinator summary aggregator
+    // for an aggregator that was pushed down. Must know to correctly
+    // decide if other nodes can be pushed down / past this node.
+    public boolean m_isCoordinatingAggregator = false;
 
     public AggregatePlanNode() {
         super();

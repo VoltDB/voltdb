@@ -246,7 +246,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Add a plan node as a child of this node and link this node as it's parent.
+     * Add a child and link this node child's parent.
      * @param child The node to add.
      */
     public void addAndLinkChild(AbstractPlanNode child) {

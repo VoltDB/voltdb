@@ -17,10 +17,7 @@
 
 package org.voltdb.planner;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -383,6 +380,7 @@ public class PlanAssembler {
         {
             root = handleLimitOperator(root);
         }
+
 
         SendPlanNode sendNode = new SendPlanNode();
 
@@ -800,7 +798,11 @@ public class PlanAssembler {
         }
     }
 
-    AbstractPlanNode addOrderBy(AbstractPlanNode root) {
+    /**
+     * Configure the sort columns for a new OrderByPlanNode
+     * @return new OrderByPlanNode
+     */
+    OrderByPlanNode createOrderBy() {
         assert (m_parsedSelect != null);
 
         OrderByPlanNode orderByNode = new OrderByPlanNode();
@@ -809,7 +811,16 @@ public class PlanAssembler {
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
         }
-        // connect the nodes to build the graph
+        return orderByNode;
+    }
+
+    /**
+     * Create an order by node and add make it a parent of root.
+     * @param root
+     * @return new orderByNode (the new root)
+     */
+    AbstractPlanNode addOrderBy(AbstractPlanNode root) {
+        OrderByPlanNode orderByNode = createOrderBy();
         orderByNode.addAndLinkChild(root);
         orderByNode.generateOutputSchema(m_catalogDb);
         return orderByNode;
@@ -820,29 +831,69 @@ public class PlanAssembler {
     }
 
     /**
-     * Add a limit, pushed-down if possible, and return the possibly
-     * new root node.
-     * @param root
+     * Add a limit, pushed-down if possible, and return the new root.
+     * @param root top of the original plan
      * @return new plan's root node
      */
     AbstractPlanNode handleLimitOperator(AbstractPlanNode root) {
-        LimitPlanNode limit = new LimitPlanNode();
-        limit.setLimit((int) m_parsedSelect.limit);
-        limit.setOffset((int) m_parsedSelect.offset);
 
+        // The nodes that need to be applied at the coordinator
+        Stack<AbstractPlanNode> coordGraph = new Stack<AbstractPlanNode>();
+
+        // The nodes that need to be applied at the distributed plan.
+        Stack<AbstractPlanNode> distGraph = new Stack<AbstractPlanNode>();
+
+        // The coordinator's top limit graph fragment for a MP plan.
+        // If planning "order by ... limit", getNextSelectPlan()
+        // will have already added an order by to the coordinator frag.
+        LimitPlanNode coordLimit = new LimitPlanNode();
+        coordLimit.setLimit((int)m_parsedSelect.limit);
+        coordLimit.setOffset((int) m_parsedSelect.offset);
         if (m_parsedSelect.offsetParameterId != -1) {
             ParameterInfo parameterInfo =
                 m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
-            limit.setOffsetParameterIndex(parameterInfo.index);
+            coordLimit.setOffsetParameterIndex(parameterInfo.index);
         }
         if (m_parsedSelect.limitParameterId != -1) {
             ParameterInfo parameterInfo =
                 m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
-            limit.setLimitParameterIndex(parameterInfo.index);
+            coordLimit.setLimitParameterIndex(parameterInfo.index);
         }
-        limit.addAndLinkChild(root);
-        limit.generateOutputSchema(m_catalogDb);
-        return limit;
+
+        coordGraph.push(coordLimit);
+
+        // TODO: allow push down with offset
+        if ((int)m_parsedSelect.offset != 0 || m_parsedSelect.offsetParameterId != -1) {
+            coordGraph.clear();
+        }
+
+        // TODO: allow push down with distinct (select distinct C from T limit 5) .
+        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
+            AbstractExpression rootExpr = col.expression;
+            if (rootExpr instanceof AggregateExpression) {
+                if (((AggregateExpression)rootExpr).m_distinct) {
+                    coordGraph.clear();
+                    break;
+                }
+            }
+        }
+
+        // The distributed limit and the only limit node in a SP plan
+        LimitPlanNode distLimit = new LimitPlanNode();
+        distLimit.setLimit((int) m_parsedSelect.limit);
+        distLimit.setOffset((int) m_parsedSelect.offset);
+        if (m_parsedSelect.offsetParameterId != -1) {
+            ParameterInfo parameterInfo =
+                m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
+            distLimit.setOffsetParameterIndex(parameterInfo.index);
+        }
+        if (m_parsedSelect.limitParameterId != -1) {
+            ParameterInfo parameterInfo =
+                m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
+            distLimit.setLimitParameterIndex(parameterInfo.index);
+        }
+        distGraph.push(distLimit);
+        return pushDownLimit(root, distGraph, coordGraph);
     }
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
@@ -1074,7 +1125,7 @@ public class PlanAssembler {
             {
                 topAggNode = null;
             }
-            root = pushDownNode(root, aggNode, topAggNode);
+            root = pushDownAggregate(root, aggNode, topAggNode);
         }
         else
         {
@@ -1088,10 +1139,76 @@ public class PlanAssembler {
         return root;
     }
 
+
+
     /**
-     * Push the given node down if the plan is distributed, then add the given
-     * top node on top of the send/receive pair. If the top node is not given,
-     * the node will not be pushed down. It will be added on top of the
+     * Push the given aggregate if the plan is distributed, then add the
+     * coordinator node on top of the send/receive pair. If the plan
+     * is not distributed, or coordNode is not provided, the distNode
+     * is added at the top of the plan.
+     *
+     * Note: this works in part because the push-down node is also an acceptable
+     * top level node if the plan is not distributed. This wouldn't be true
+     * if we started pushing down something like (sum, count) to calculate
+     * a distributed average.
+     *
+     * @param root
+     *            The root node
+     * @param distNode
+     *            The node to push down
+     * @param coordNode
+     *            The top node to put on top of the send/receive pair after
+     *            push-down. If this is null, no push-down will be performed.
+     * @return The new root node.
+     */
+    AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
+                                       HashAggregatePlanNode distNode,
+                                       HashAggregatePlanNode coordNode) {
+
+        // remember that coordinating aggregation has a pushed-down
+        // counterpart deeper in the plan. this allows other operators
+        // to be pushed down past the receive as well.
+        if (coordNode != null) {
+            coordNode.m_isCoordinatingAggregator = true;
+        }
+
+        /*
+         * Push this node down to partition if it's distributed. First remove
+         * the send/receive pair, add the node, then put the send/receive pair
+         * back on top of the node, followed by another top node at the
+         * coordinator.
+         */
+        AbstractPlanNode accessPlanTemp = root;
+        if (coordNode != null && root instanceof ReceivePlanNode) {
+            root = root.getChild(0).getChild(0);
+            root.clearParents();
+        } else {
+            accessPlanTemp = null;
+        }
+
+        distNode.addAndLinkChild(root);
+        distNode.generateOutputSchema(m_catalogDb);
+        root = distNode;
+
+        // Put the send/receive pair back into place
+        if (accessPlanTemp != null) {
+            accessPlanTemp.getChild(0).clearChildren();
+            accessPlanTemp.getChild(0).addAndLinkChild(root);
+            root = accessPlanTemp;
+
+            // Add the top node
+            coordNode.addAndLinkChild(root);
+            coordNode.generateOutputSchema(m_catalogDb);
+            root = coordNode;
+        }
+        return root;
+    }
+
+
+    /**
+     * Push the distributed node down if the plan is distributed, then add the
+     * coord. nodes at the top of the root plan. If the coord node is not given,
+     * nothing is pushed down - the distributed node is added on top of the
      * send/receive pair directly.
      *
      * Note: this works in part because the push-down node is also an acceptable
@@ -1103,43 +1220,110 @@ public class PlanAssembler {
      *            The root node
      * @param distributedNode
      *            The node to push down
-     * @param topNode
-     *            The top node to put on top of the send/receive pair after
-     *            push-down. If this is null, no push-down will be performed.
+     * @param coordNodes
+     *            New coordinator node(s) to put on top of the plan.
+     *            If this is null, no push-down will be performed.
      * @return The new root node.
      */
-    AbstractPlanNode pushDownNode(AbstractPlanNode root,
-                                  AbstractPlanNode distributedNode,
-                                  AbstractPlanNode topNode) {
-        /*
-         * Push this node down to partition if it's distributed. First remove
-         * the send/receive pair, add the node, then put the send/receive pair
-         * back on top of the node, followed by another top node at the
-         * coordinator.
-         */
-        AbstractPlanNode accessPlanTemp = root;
-        if (topNode != null && root instanceof ReceivePlanNode) {
-            root = root.getChild(0).getChild(0);
-            root.clearParents();
-        } else {
-            accessPlanTemp = null;
+    AbstractPlanNode pushDownLimit(AbstractPlanNode root,
+                                  Stack<AbstractPlanNode> distNodes,
+                                  Stack<AbstractPlanNode> coordNodes) {
+
+        AbstractPlanNode receiveNode = root;
+
+        // Find a receive node, if one exists. There is guaranteed to be at
+        // most a single receive. Abort the search if between root and receive
+        // a node that can't be pushed down past is found.
+        //
+        // Can only push past:
+        //   * coordinatingAggregator: a distributed aggregator has
+        //     has already been pushed down. Distributed LIMIT of that
+        //     aggregation is correct.
+        //
+        //   * order by: if the plan requires a sort, getNextSelectPlan()
+        //     will have already added an ORDER BY. LIMIT will be added
+        //     above that sort. However, if LIMIT can be successfully
+        //     pushed down, it may be necessary to create and push down
+        //     a distributed sort as well. That work is done here.
+        //
+        //   * projection: we only LIMIT on constant value expressions.
+        //     whether the LIMIT happens pre-or-post projection is
+        //     is irrelevant.
+        //
+        // Set receiveNode to null if the plan is not distributed or if
+        // the distributed plan does not allow push-down of a limit.
+
+        while (!(receiveNode instanceof ReceivePlanNode)) {
+
+            // Limitation: can only push past some nodes (see above comment)
+            if (!(receiveNode instanceof AggregatePlanNode) &&
+                !(receiveNode instanceof OrderByPlanNode) &&
+                !(receiveNode instanceof ProjectionPlanNode)) {
+                receiveNode = null;
+                break;
+            }
+
+            // Limitation: can only push past coordinating aggregation nodes
+            if (receiveNode instanceof AggregatePlanNode &&
+                !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
+                receiveNode = null;
+                break;
+            }
+
+            // Traverse...
+            if (receiveNode.getChildCount() == 0) {
+                receiveNode = null;
+                break;
+            }
+
+            // nothing that allows pushing past has multiple inputs
+            assert(receiveNode.getChildCount() == 1);
+            receiveNode = receiveNode.getChild(0);
         }
 
-        distributedNode.addAndLinkChild(root);
-        distributedNode.generateOutputSchema(m_catalogDb);
-        root = distributedNode;
-
-        // Put the send/receive pair back into place
-        if (accessPlanTemp != null) {
-            accessPlanTemp.getChild(0).clearChildren();
-            accessPlanTemp.getChild(0).addAndLinkChild(root);
-            root = accessPlanTemp;
-
-            // Add the top node
-            topNode.addAndLinkChild(root);
-            topNode.generateOutputSchema(m_catalogDb);
-            root = topNode;
+        // If there is work to distribute and a receive node was found,
+        // disconnect the coordinator and distributed parts of the plan
+        // below the SEND node
+        AbstractPlanNode distributedPlan = root;
+        if (!coordNodes.isEmpty() && receiveNode != null) {
+            distributedPlan = receiveNode.getChild(0).getChild(0);
+            distributedPlan.clearParents();
+            receiveNode.getChild(0).clearChildren();
         }
+
+        // If there is work to distribute, determine if the distributed
+        // limit must be performed on ordered input. If so, produce that
+        // order if an explicit sort is necessary
+        if (!coordNodes.isEmpty() && receiveNode != null) {
+            if ((distributedPlan.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
+                ((IndexScanPlanNode) distributedPlan).getSortDirection() == SortDirectionType.INVALID) &&
+                m_parsedSelect.orderColumns.size() > 0) {
+                distNodes.push(createOrderBy());
+            }
+        }
+
+        // Add the distributed work to the plan
+        while (!distNodes.isEmpty()) {
+            AbstractPlanNode distributedNode = distNodes.pop();
+            distributedNode.addAndLinkChild(distributedPlan);
+            distributedPlan = distributedNode;
+        }
+
+        // Reconnect the plans and add the coordinator's work
+        if (!coordNodes.isEmpty() && receiveNode != null) {
+            receiveNode.getChild(0).addAndLinkChild(distributedPlan);
+
+            while (!coordNodes.isEmpty()) {
+                AbstractPlanNode coordNode = coordNodes.pop();
+                coordNode.addAndLinkChild(root);
+                root = coordNode;
+            }
+        }
+        else {
+            root = distributedPlan;
+        }
+
+        root.generateOutputSchema(m_catalogDb);
         return root;
     }
 
