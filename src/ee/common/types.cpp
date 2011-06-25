@@ -622,7 +622,7 @@ int32_t hexCharToInt(char c) {
 
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString) {
     assert (hexString);
-    int32_t len = strlen(hexString);
+    size_t len = strlen(hexString);
     if ((len % 2) != 0)
         return false;
 
