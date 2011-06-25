@@ -31,8 +31,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -81,7 +83,7 @@ import org.voltdb.utils.Pair;
  * <code>ClientConnection</code> instances.
  *
  */
-public class ClientInterface implements DumpManager.Dumpable {
+public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.DaemonInitiator {
 
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = -1;
@@ -857,7 +859,14 @@ public class ClientInterface implements DumpManager.Dumpable {
                 m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId() &&
             schedule != null && schedule.getEnabled())
         {
-            m_snapshotDaemon.makeActive(schedule);
+            Future<Void> future = m_snapshotDaemon.makeActive(schedule);
+            try {
+                future.get();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e.getCause());
+            }
         } else {
             m_snapshotDaemon.makeInactive();
         }
@@ -1278,9 +1287,6 @@ public class ClientInterface implements DumpManager.Dumpable {
         // poll planner queue
         checkForFinishedCompilerWork();
 
-        // snapshot work
-        initiateSnapshotDaemonWork(m_snapshotDaemon.processPeriodicWork(time));
-
         return;
     }
 
@@ -1321,6 +1327,9 @@ public class ClientInterface implements DumpManager.Dumpable {
             m_asyncCompilerWorkThread.shutdown();
             m_asyncCompilerWorkThread.join();
         }
+        if (m_snapshotDaemon != null) {
+            m_snapshotDaemon.shutdown();
+        }
     }
 
     public void startAcceptingConnections() throws IOException {
@@ -1329,6 +1338,8 @@ public class ClientInterface implements DumpManager.Dumpable {
         {
             m_adminAcceptor.start();
         }
+        m_snapshotDaemon.init(this, VoltDB.instance().getZK());
+        mayActivateSnapshotDaemon();
     }
 
     /**
@@ -1358,32 +1369,31 @@ public class ClientInterface implements DumpManager.Dumpable {
         return context;
     }
 
-    private void initiateSnapshotDaemonWork(final Pair<String, Object[]> invocation) {
-        if (invocation != null) {
-           final Config sysProc = SystemProcedureCatalog.listing.get(invocation.getFirst());
-           if (sysProc == null) {
-               throw new RuntimeException("SnapshotDaemon attempted to invoke " + invocation.getFirst() +
-                       " which is not a known procedure");
-           }
-           Procedure catProc = sysProc.asCatalogProcedure();
-           StoredProcedureInvocation spi = new StoredProcedureInvocation();
-           spi.procName = invocation.getFirst();
-           spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-               @Override
-               public ParameterSet call() {
-                   ParameterSet params = new ParameterSet();
-                   params.setParameters(invocation.getSecond());
-                   return params;
-               }
-           });
-           // initiate the transaction
-           m_initiator.createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
-                                         spi, catProc.getReadonly(),
-                                         catProc.getSinglepartition(), catProc.getEverysite(),
-                                         m_allPartitions, m_allPartitions.length,
-                                         m_snapshotDaemonAdapter,
-                                         0, EstTime.currentTimeMillis());
-       }
+    public void initiateSnapshotDaemonWork(final String procedureName, long clientData, final Object params[]) {
+        final Config sysProc = SystemProcedureCatalog.listing.get(procedureName);
+        if (sysProc == null) {
+            throw new RuntimeException("SnapshotDaemon attempted to invoke " + procedureName +
+            " which is not a known procedure");
+        }
+        Procedure catProc = sysProc.asCatalogProcedure();
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.procName = procedureName;
+        spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+            @Override
+            public ParameterSet call() {
+                ParameterSet paramSet = new ParameterSet();
+                paramSet.setParameters(params);
+                return paramSet;
+            }
+        });
+        spi.clientHandle = clientData;
+        // initiate the transaction
+        m_initiator.createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
+                spi, catProc.getReadonly(),
+                catProc.getSinglepartition(), catProc.getEverysite(),
+                m_allPartitions, m_allPartitions.length,
+                m_snapshotDaemonAdapter,
+                0, EstTime.currentTimeMillis());
     }
 
     /**
@@ -1425,15 +1435,15 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         @Override
         public boolean enqueue(FastSerializable f) {
-            initiateSnapshotDaemonWork(
-                    m_snapshotDaemon.processClientResponse((ClientResponseImpl) f));
+            m_snapshotDaemon.processClientResponse((ClientResponseImpl) f,
+                    ((ClientResponseImpl) f).getClientHandle());
             return true;
         }
 
         @Override
         public boolean enqueue(FastSerializable f, int expectedSize) {
-            initiateSnapshotDaemonWork(
-                    m_snapshotDaemon.processClientResponse((ClientResponseImpl) f));
+            m_snapshotDaemon.processClientResponse((ClientResponseImpl) f,
+                    ((ClientResponseImpl) f).getClientHandle());
             return true;
         }
 

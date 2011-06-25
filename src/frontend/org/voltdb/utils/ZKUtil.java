@@ -26,8 +26,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.TreeSet;
 import java.io.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.zip.*;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -188,6 +192,42 @@ public class ZKUtil {
             return null;
         }
         return zk;
+    }
+
+    public static class StringCallback implements
+         org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback {
+        private final CountDownLatch done = new CountDownLatch(1);
+        private Object results[];
+
+        public Object[] get() throws InterruptedException, KeeperException {
+            done.await();
+            return getResult();
+        }
+
+        public Object[] get(long timeout, TimeUnit unit)
+                throws InterruptedException, KeeperException,
+                TimeoutException {
+            if (done.await(timeout, unit)) {
+                return getResult();
+            } else {
+                throw new TimeoutException();
+            }
+        }
+
+        private Object[] getResult() throws KeeperException {
+            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
+            if (code == KeeperException.Code.OK) {
+                return results;
+            } else {
+                throw KeeperException.create(code);
+            }
+        }
+
+        @Override
+        public void processResult(int rc, String path, Object ctx, String name) {
+            results = new Object[] { rc, path, ctx, name };
+            done.countDown();
+        }
     }
 
 }

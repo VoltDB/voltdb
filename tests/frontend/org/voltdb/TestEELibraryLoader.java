@@ -37,7 +37,7 @@ public class TestEELibraryLoader
         MockVoltDB mockvolt = new MockVoltDB();
 
         VoltDB.replaceVoltDBInstanceForTest(mockvolt);
-
+        mockvolt.m_noLoadLib = true;
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(false));
         assertEquals(0, mockvolt.getCrashCount());
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));

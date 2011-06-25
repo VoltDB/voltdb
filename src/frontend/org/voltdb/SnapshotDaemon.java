@@ -18,23 +18,84 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Callable;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
+import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.Pair;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
+ * The new functionality for handling truncation snapshots operates separately from
+ * the old automated snapshots. They just share the same event processing threads. Future work
+ * should merge them.
  *
  */
-class SnapshotDaemon {
+class SnapshotDaemon implements SnapshotCompletionInterest {
+    private class TruncationSnapshotAttempt {
+        private String path;
+        private String nonce;
+        private boolean finished;
+    }
+
+    static int m_periodicWorkInterval = 2000;
+
+    /*
+     * Something that initiates procedures for the snapshot daemon.
+     */
+    public interface DaemonInitiator {
+        public void initiateSnapshotDaemonWork(final String procedureName, long clientData, Object params[]);
+    };
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
+    private final ScheduledExecutorService m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
+            public Thread newThread(Runnable r) {
+                return new Thread(r, "SnapshotDaemon");
+            }
+        },
+        new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
+
+    private ZooKeeper m_zk;
+    private DaemonInitiator m_initiator;
+    private long m_nextCallbackHandle;
+    private String m_truncationSnapshotPath;
+
+    private final TreeMap<Long, TruncationSnapshotAttempt> m_truncationSnapshotAttempts =
+        new TreeMap<Long, TruncationSnapshotAttempt>();
+    private Future<?> m_truncationSnapshotScanTask;
 
     private TimeUnit m_frequencyUnit;
     private long m_frequencyInMillis;
@@ -43,6 +104,9 @@ class SnapshotDaemon {
     private String m_path;
     private String m_prefix;
     private String m_prefixAndSeparator;
+    private Future<?> m_snapshotTask;
+
+    private final HashMap<Long, ProcedureCallback> m_procedureCallbacks = new HashMap<Long, ProcedureCallback>();
 
     private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
 
@@ -57,7 +121,7 @@ class SnapshotDaemon {
      * enough time has passed.
      */
     private long m_lastSysprocInvocation = System.currentTimeMillis();
-    private final long m_minTimeBetweenSysprocs = 3000;
+    static long m_minTimeBetweenSysprocs = 3000;
 
     /**
      * List of snapshots on disk sorted by creation time
@@ -104,26 +168,375 @@ class SnapshotDaemon {
     private State m_state = State.STARTUP;
 
     SnapshotDaemon() {
-            m_frequencyUnit = null;
-            m_retain = 0;
-            m_frequency = 0;
-            m_frequencyInMillis = 0;
-            m_prefix = null;
-            m_path = null;
-            m_prefixAndSeparator = null;
+
+        m_frequencyUnit = null;
+        m_retain = 0;
+        m_frequency = 0;
+        m_frequencyInMillis = 0;
+        m_prefix = null;
+        m_path = null;
+        m_prefixAndSeparator = null;
+
+
 
         // Register the snapshot status to the StatsAgent
         SnapshotStatus snapshotStatus = new SnapshotStatus("Snapshot Status");
         VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.SNAPSHOTSTATUS,
                                                               0,
                                                               snapshotStatus);
+        VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
+    }
+
+    public void init(DaemonInitiator initiator, ZooKeeper zk) {
+        m_initiator = initiator;
+        m_zk = zk;
+
+        try {
+            zk.create("/nodes_currently_snapshotting", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (Exception e) {}
+        try {
+            zk.create("/completed_snapshots", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (Exception e) {}
+
+        /*
+         * Really shouldn't leak this from a constructor, and twice to boot
+         */
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                leaderElection();
+            }
+        });
+    }
+
+    /*
+     *  Search for truncation snapshots, after a failure there may be
+     *  ones we don't know about, there may be ones from a previous instance etc.
+     *  Do this every five minutes as an easy hack to make sure we don't leak them.
+     *  Next time groom is called it will delete the old ones after a success.
+     */
+    private void scanTruncationSnapshots() {
+        if (m_truncationSnapshotPath == null) {
+            return;
+        }
+
+        Object params[] = new Object[1];
+        params[0] = m_truncationSnapshotPath;
+        long handle = m_nextCallbackHandle++;
+        m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+            @Override
+            public void clientCallback(final ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS){
+                    hostLog.error(clientResponse.getStatusString());
+                    return;
+                }
+
+                final VoltTable results[] = clientResponse.getResults();
+                if (results.length == 1) {
+                    setState(State.FAILURE);
+                    final VoltTable result = results[0];
+                    boolean advanced = result.advanceRow();
+                    assert(advanced);
+                    assert(result.getColumnCount() == 1);
+                    assert(result.getColumnType(0) == VoltType.STRING);
+                    loggingLog.error("Snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
+                    return;
+                }
+                assert(results.length == 3);
+
+                final VoltTable snapshots = results[0];
+                assert(snapshots.getColumnCount() == 9);
+
+                TreeMap<Long, TruncationSnapshotAttempt> foundSnapshots =
+                    new TreeMap<Long, TruncationSnapshotAttempt>();
+                while (snapshots.advanceRow()) {
+                    final String path = snapshots.getString("PATH");
+                    final String nonce = snapshots.getString("NONCE");
+                    final Long txnId = snapshots.getLong("TXNID");
+                    TruncationSnapshotAttempt snapshotAttempt = new TruncationSnapshotAttempt();
+                    snapshotAttempt.path = path;
+                    snapshotAttempt.nonce = nonce;
+                    foundSnapshots.put(txnId, snapshotAttempt);
+                }
+
+                for (Map.Entry<Long, TruncationSnapshotAttempt> entry : foundSnapshots.entrySet()) {
+                    if (!m_truncationSnapshotAttempts.containsKey(entry.getKey())) {
+                        m_truncationSnapshotAttempts.put(entry.getKey(), entry.getValue());
+                    }
+                }
+            }
+
+        });
+        m_initiator.initiateSnapshotDaemonWork("@SnapshotScan", handle, params);
+    }
+
+    /*
+     * Delete all snapshots older then the last successful snapshot.
+     * This only effects snapshots used for log truncation
+     */
+    private void groomTruncationSnapshots() {
+        ArrayList<TruncationSnapshotAttempt> toDelete = new ArrayList<TruncationSnapshotAttempt>();
+        boolean foundMostRecentSuccess = false;
+        Iterator<Map.Entry<Long, TruncationSnapshotAttempt>> iter =
+            m_truncationSnapshotAttempts.descendingMap().entrySet().iterator();
+        while (iter.hasNext()) {
+            Map.Entry<Long, TruncationSnapshotAttempt> entry = iter.next();
+            TruncationSnapshotAttempt snapshotAttempt = entry.getValue();
+            if (!foundMostRecentSuccess) {
+                if (snapshotAttempt.finished) {
+                    foundMostRecentSuccess = true;
+                }
+            } else {
+                iter.remove();
+                toDelete.add(entry.getValue());
+            }
+        }
+
+        String paths[] = new String[toDelete.size()];
+        String nonces[] = new String[toDelete.size()];
+
+        int ii = 0;
+        for (TruncationSnapshotAttempt attempt : toDelete) {
+            paths[ii] = attempt.path;
+            nonces[ii++] = attempt.nonce;
+        }
+
+        Object params[] =
+            new Object[] {
+                paths,
+                nonces,
+                };
+        long handle = m_nextCallbackHandle++;
+        m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    hostLog.error(clientResponse.getStatusString());
+                }
+            }
+
+        });
+        m_initiator.initiateSnapshotDaemonWork("@SnapshotDelete", handle, params);
+    }
+
+    /**
+     * Leader election is only for log truncation snapshots
+     */
+    private void leaderElection() {
+        loggingLog.info("Starting leader election for snapshot truncation daemon");
+        try {
+            while (true) {
+                Stat stat = m_zk.exists("/snapshot_truncation_master", new Watcher() {
+                    @Override
+                    public void process(WatchedEvent event) {
+                        switch(event.getType()) {
+                        case NodeDeleted:
+                            loggingLog.info("Detected the snapshot truncation leader's ephemeral node deletion");
+                            m_es.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    leaderElection();
+                                }
+                            });
+                            break;
+                            default:
+                                break;
+                        }
+                    }
+                });
+                if (stat == null) {
+                    try {
+                        m_zk.create("/snapshot_truncation_master", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                        loggingLog.info("This node was selected as the leader for snapshot truncation");
+                        m_truncationSnapshotScanTask = m_es.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    scanTruncationSnapshots();
+                                } catch (Exception e) {
+                                    loggingLog.error("Error during scan and group of truncation snapshots");
+                                }
+                            }
+                        }, 5, TimeUnit.MINUTES);
+                        truncationRequestExistenceCheck();
+                        return;
+                    } catch (NodeExistsException e) {
+                    }
+                } else {
+                    loggingLog.info("Leader election concluded, a leader already exists");
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            loggingLog.fatal("Exception in snapshot daemon electing master via ZK", e);
+            VoltDB.crashVoltDB();
+        }
+    }
+
+    private void processTruncationRequestEvent(final WatchedEvent event) {
+        if (event.getType() == EventType.NodeCreated) {
+            loggingLog.info("Snapshot truncation leader received snapshot truncation request");
+            String snapshotPathTemp;
+            ByteBuffer payload;
+            try {
+                payload = ByteBuffer.wrap(m_zk.getData("/request_truncation_snapshot", null, null));
+                byte pathBytes[] = new byte[payload.capacity() - 8];
+                payload.position(8);
+                payload.get(pathBytes);
+                snapshotPathTemp = new String(pathBytes, "UTF-8");
+            } catch (Exception e) {
+                loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
+                return;
+            }
+            m_truncationSnapshotPath = snapshotPathTemp;
+            final String snapshotPath = snapshotPathTemp;
+            final long now = System.currentTimeMillis();
+            final String nonce = Long.toString(now);
+            //Allow nodes to check and see if the nonce incoming for a snapshot is
+            //for a truncation snapshot. In that case they will mark the completion node
+            //to be for a truncation snapshot. SnapshotCompletionMonitor notices the mark.
+            try {
+                payload.putLong(0, now);
+                m_zk.setData("/request_truncation_snapshot", payload.array(), -1);
+            } catch (Exception e) {
+                loggingLog.error("Setting data on the truncation snapshot request in ZK should never fail", e);
+                //Cause a cascading failure?
+                VoltDB.crashVoltDB();
+            }
+            final Object params[] = new Object[3];
+            params[0] = snapshotPath;
+            params[1] = nonce;
+            params[2] = 0;//don't block
+            long handle = m_nextCallbackHandle++;
+            m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+                @Override
+                public void clientCallback(ClientResponse clientResponse)
+                        throws Exception {
+                    if (clientResponse.getStatus() != ClientResponse.SUCCESS){
+                        loggingLog.warn(
+                                "Attempt to initiate a truncation snapshot was not successful: " +
+                                clientResponse.getStatusString());
+                        loggingLog.warn("Retrying log truncation snapshot in 5 minutes");
+                        /*
+                         * Try again in a few minute
+                         */
+                        m_es.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                processTruncationRequestEvent(event);
+                            }
+                        }, 5, TimeUnit.MINUTES);
+                    }
+
+                    final VoltTable results[] = clientResponse.getResults();
+                    final VoltTable result = results[0];
+                    boolean success = true;
+                    if (result.getColumnCount() == 1) {
+                        boolean advanced = result.advanceRow();
+                        assert(advanced);
+                        assert(result.getColumnCount() == 1);
+                        assert(result.getColumnType(0) == VoltType.STRING);
+                        loggingLog.error("Snapshot failed with failure response: " + result.getString(0));
+                        success = false;
+                    }
+
+                    //assert(result.getColumnName(1).equals("TABLE"));
+                    if (success) {
+                        while (result.advanceRow()) {
+                            if (!result.getString("RESULT").equals("SUCCESS")) {
+                                success = false;
+                                loggingLog.warn("Snapshot save feasibility test failed for host "
+                                        + result.getLong("HOST_ID") + " table " + result.getString("TABLE") +
+                                        " with error message " + result.getString("ERR_MSG"));
+                            }
+                        }
+                    }
+
+                    if (success) {
+                        m_zk.delete("/request_truncation_snapshot", -1);
+                        try {
+                            JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
+                            long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
+                            TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(snapshotTxnId);
+                            if (snapshotAttempt == null) {
+                                snapshotAttempt = new TruncationSnapshotAttempt();
+                                m_truncationSnapshotAttempts.put(snapshotTxnId, snapshotAttempt);
+                            }
+                            snapshotAttempt.nonce = nonce;
+                            snapshotAttempt.path = snapshotPath;
+                        } finally {
+                            truncationRequestExistenceCheck();
+                        }
+                    } else {
+                        loggingLog.info("Retrying log truncation snapshot in 60 seconds");
+                        /*
+                         * Try again in a few minutes
+                         */
+                        m_es.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                processTruncationRequestEvent(event);
+                            }
+                        }, 1, TimeUnit.MINUTES);
+                    }
+                }
+
+            });
+            m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
+            return;
+        } else {
+            assert(event.getType() == EventType.NodeDeleted);
+            /*
+             * This will reset the watch it presumably fired because due to a delete
+             */
+            try {
+                truncationRequestExistenceCheck();
+            } catch (Exception e) {
+                loggingLog.error(e);
+            }
+        }
+    }
+
+    void truncationRequestExistenceCheck() throws KeeperException, InterruptedException {
+        if (m_zk.exists("/request_truncation_snapshot", new Watcher() {
+
+            @Override
+            public void process(final WatchedEvent event) {
+                m_es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        processTruncationRequestEvent(event);
+                    }
+                });
+            }
+        }) != null) {
+            processTruncationRequestEvent(new WatchedEvent(
+                    EventType.NodeCreated,
+                    KeeperState.SyncConnected,
+                    "/snapshot_truncation_master"));
+        }
     }
 
     /**
      * Make this SnapshotDaemon responsible for generating snapshots
      */
-    public synchronized void makeActive(SnapshotSchedule schedule)
+    public Future<Void> makeActive(final SnapshotSchedule schedule)
     {
+        return m_es.submit(new Callable<Void>() {
+            @Override
+            public Void call() throws Exception {
+                makeActivePrivate(schedule);
+                return null;
+            }
+        });
+    }
+
+    private void makeActivePrivate(final SnapshotSchedule schedule) {
         m_isActive = true;
         m_frequency = schedule.getFrequencyvalue();
         m_retain = schedule.getRetain();
@@ -150,11 +563,26 @@ class SnapshotDaemon {
         }
         m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
         m_nextSnapshotTime = System.currentTimeMillis() + m_frequencyInMillis;
+        m_es.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    doPeriodicWork(System.currentTimeMillis());
+                } catch (Exception e) {
+
+                }
+            }
+        }, 0, m_periodicWorkInterval, TimeUnit.MILLISECONDS);
     }
 
-    public synchronized void makeInactive() {
-        m_isActive = false;
-        m_snapshots.clear();
+    public void makeInactive() {
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                m_isActive = false;
+                m_snapshots.clear();
+            }
+        });
     }
 
     private class Snapshot implements Comparable<Snapshot> {
@@ -172,6 +600,11 @@ class SnapshotDaemon {
         public int compareTo(Snapshot o) {
             return txnId.compareTo(o.txnId);
         }
+
+        @Override
+        public String toString() {
+            return path + "/" + nonce;
+        }
     }
 
     /**
@@ -182,32 +615,30 @@ class SnapshotDaemon {
      * @param now Current time
      * @return null if there is no work to do or a sysproc with parameters if there is work
      */
-    synchronized Pair<String, Object[]> processPeriodicWork(final long now) {
+    private void doPeriodicWork(final long now) {
         if (!m_isActive)
         {
-            m_state = State.STARTUP;
-            return null;
+            setState(State.STARTUP);
+            return;
         }
 
         if (m_frequencyUnit == null) {
-            return null;
+            return;
         }
 
         if (m_state == State.STARTUP) {
-            return initiateSnapshotScan();
+            initiateSnapshotScan();
         } else if (m_state == State.SCANNING) {
-            return null;
+            return;
         } else if (m_state == State.FAILURE) {
-            return null;
+            return;
         } else if (m_state == State.WAITING){
-            return processWaitingPeriodicWork(now);
+            processWaitingPeriodicWork(now);
         } else if (m_state == State.SNAPSHOTTING) {
-            return null;
+            return;
         } else if (m_state == State.DELETING){
-            return null;
+            return;
         }
-
-        return null;
     }
 
     /**
@@ -219,24 +650,24 @@ class SnapshotDaemon {
      * the extras. Then it attempts to initiate a new snapshot if
      * one is due
      */
-    private Pair<String, Object[]> processWaitingPeriodicWork(long now) {
+    private void processWaitingPeriodicWork(long now) {
         if (now - m_lastSysprocInvocation < m_minTimeBetweenSysprocs) {
-            return null;
+            return;
         }
 
         if (m_snapshots.size() > m_retain) {
-            return deleteExtraSnapshots();
+            deleteExtraSnapshots();
+            return;
         }
 
         if (m_nextSnapshotTime < now) {
-            return initiateNextSnapshot(now);
+            initiateNextSnapshot(now);
+            return;
         }
-
-        return null;
     }
 
-    private Pair<String, Object[]> initiateNextSnapshot(long now) {
-        m_state = State.SNAPSHOTTING;
+    private void initiateNextSnapshot(long now) {
+        setState(State.SNAPSHOTTING);
         m_lastSysprocInvocation = now;
         final Date nowDate = new Date(now);
         final String dateString = m_dateFormat.format(nowDate);
@@ -246,7 +677,17 @@ class SnapshotDaemon {
         params[1] = nonce;
         params[2] = 0;//don't block
         m_snapshots.offer(new Snapshot(m_path, nonce, now));
-        return Pair.of("@SnapshotSave", params);
+        long handle = m_nextCallbackHandle++;
+        m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+            @Override
+            public void clientCallback(final ClientResponse clientResponse)
+                    throws Exception {
+                processClientResponsePrivate(clientResponse);
+            }
+
+        });
+        m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
     }
 
     /**
@@ -254,12 +695,22 @@ class SnapshotDaemon {
      * snapshots on disk that are managed by this daemon
      * @return
      */
-    private Pair<String, Object[]> initiateSnapshotScan() {
+    private void initiateSnapshotScan() {
         m_lastSysprocInvocation = System.currentTimeMillis();
         Object params[] = new Object[1];
         params[0] = m_path;
-        m_state = State.SCANNING;
-        return Pair.of("@SnapshotScan", params);
+        setState(State.SCANNING);
+        long handle = m_nextCallbackHandle++;
+        m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+            @Override
+            public void clientCallback(final ClientResponse clientResponse)
+                    throws Exception {
+                processClientResponsePrivate(clientResponse);
+            }
+
+        });
+        m_initiator.initiateSnapshotDaemonWork("@SnapshotScan", handle, params);
     }
 
     /**
@@ -268,7 +719,22 @@ class SnapshotDaemon {
      * @param response
      * @return
      */
-    synchronized Pair<String, Object[]> processClientResponse(ClientResponse response) {
+    public Future<Void> processClientResponse(final ClientResponse response, final long handle) {
+        return m_es.submit(new Callable<Void>() {
+            @Override
+            public Void call() throws Exception {
+                try {
+                    m_procedureCallbacks.remove(handle).clientCallback(response);
+                } catch (Exception e) {
+                    hostLog.warn(e);
+                    throw e;
+                }
+                return null;
+            }
+        });
+    }
+
+    private void processClientResponsePrivate(ClientResponse response) {
         if (m_frequencyUnit == null) {
             throw new RuntimeException("SnapshotDaemon received a response when it has not been configured to run");
         }
@@ -276,18 +742,16 @@ class SnapshotDaemon {
         if (m_state == State.STARTUP) {
             throw new RuntimeException("SnapshotDaemon received a response in the startup state");
         } else if (m_state == State.SCANNING) {
-            return processScanResponse(response);
+            processScanResponse(response);
         } else if (m_state == State.FAILURE) {
-            return null;
+            return;
         } else if (m_state == State.DELETING){
             processDeleteResponse(response);
-            return null;
+            return;
         } else if (m_state == State.SNAPSHOTTING){
             processSnapshotResponse(response);
-            return null;
+            return;
         }
-
-        return null;
     }
 
     /**
@@ -295,7 +759,7 @@ class SnapshotDaemon {
      * @param response
      */
     private void processSnapshotResponse(ClientResponse response) {
-        m_state = State.WAITING;
+        setState(State.WAITING);
         final long now = System.currentTimeMillis();
         m_nextSnapshotTime += m_frequencyInMillis;
         if (m_nextSnapshotTime < now) {
@@ -303,7 +767,7 @@ class SnapshotDaemon {
         }
 
         if (response.getStatus() != ClientResponse.SUCCESS){
-            m_state = State.FAILURE;
+            setState(State.FAILURE);
             logFailureResponse("Snapshot failed", response);
             return;
         }
@@ -346,12 +810,12 @@ class SnapshotDaemon {
      */
     private void processDeleteResponse(ClientResponse response) {
         //Continue snapshotting even if a delete fails.
-        m_state = State.WAITING;
+        setState(State.WAITING);
         if (response.getStatus() != ClientResponse.SUCCESS){
             /*
              * The delete may fail but the procedure should at least return success...
              */
-            m_state = State.FAILURE;
+            setState(State.FAILURE);
             logFailureResponse("Delete of snapshots failed", response);
             return;
         }
@@ -377,23 +841,23 @@ class SnapshotDaemon {
      * @param response
      * @return
      */
-    private Pair<String, Object[]> processScanResponse(ClientResponse response) {
+    private void processScanResponse(ClientResponse response) {
         if (response.getStatus() != ClientResponse.SUCCESS){
-            m_state = State.FAILURE;
+            setState(State.FAILURE);
             logFailureResponse("Initial snapshot scan failed", response);
-            return null;
+            return;
         }
 
         final VoltTable results[] = response.getResults();
         if (results.length == 1) {
-            m_state = State.FAILURE;
+            setState(State.FAILURE);
             final VoltTable result = results[0];
             boolean advanced = result.advanceRow();
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
             hostLog.error("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
-            return null;
+            return;
         }
         assert(results.length == 3);
 
@@ -415,19 +879,19 @@ class SnapshotDaemon {
 
         java.util.Collections.sort(m_snapshots);
 
-        return deleteExtraSnapshots();
+        deleteExtraSnapshots();
     }
 
     /**
-     * Check if there are extra snapshots and initate deletion
+     * Check if there are extra snapshots and initiate deletion
      * @return
      */
-    private Pair<String, Object[]> deleteExtraSnapshots() {
+    private void deleteExtraSnapshots() {
         if (m_snapshots.size() <= m_retain) {
-            m_state = State.WAITING;
+            setState(State.WAITING);
         } else {
             m_lastSysprocInvocation = System.currentTimeMillis();
-            m_state = State.DELETING;
+            setState(State.DELETING);
             final int numberToDelete = m_snapshots.size() - m_retain;
             String pathsToDelete[] = new String[numberToDelete];
             String noncesToDelete[] = new String[numberToDelete];
@@ -442,9 +906,18 @@ class SnapshotDaemon {
                     pathsToDelete,
                     noncesToDelete,
                     };
-            return Pair.of("@SnapshotDelete", params);
+            long handle = m_nextCallbackHandle++;
+            m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+                @Override
+                public void clientCallback(final ClientResponse clientResponse)
+                        throws Exception {
+                    processClientResponsePrivate(clientResponse);
+                }
+
+            });
+            m_initiator.initiateSnapshotDaemonWork("@SnapshotDelete", handle, params);
         }
-        return null;
     }
 
     private void logFailureResponse(String message, ClientResponse response) {
@@ -456,6 +929,41 @@ class SnapshotDaemon {
 
     State getState() {
         return m_state;
+    }
+
+    void setState(State state) {
+        m_state = state;
+    }
+
+    public void shutdown() throws InterruptedException {
+        if (m_snapshotTask != null) {
+            m_snapshotTask.cancel(false);
+        }
+        if (m_truncationSnapshotScanTask != null) {
+            m_truncationSnapshotScanTask.cancel(false);
+        }
+
+        m_es.shutdown();
+        m_es.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+    }
+
+    @Override
+    public void snapshotCompleted(final long txnId, final boolean truncation) {
+        if (!truncation) {
+            return;
+        }
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(txnId);
+                if (snapshotAttempt == null) {
+                    snapshotAttempt = new TruncationSnapshotAttempt();
+                    m_truncationSnapshotAttempts.put(txnId, snapshotAttempt);
+                }
+                snapshotAttempt.finished = true;
+                groomTruncationSnapshots();
+            }
+        });
     }
 
 }

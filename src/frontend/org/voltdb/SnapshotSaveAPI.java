@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -29,6 +30,10 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.catalog.Host;
@@ -38,6 +43,7 @@ import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.ZKUtil;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -159,13 +165,87 @@ public class SnapshotSaveAPI
     }
 
 
+    private void logSnapshotStartToZK(long txnId,
+            SystemProcedureExecutionContext context, String nonce) {
+        /*
+         * Going to send out the requests async to make snapshot init move faster
+         */
+        ZKUtil.StringCallback cb1 = new ZKUtil.StringCallback();
+        ZKUtil.StringCallback cb2 = new ZKUtil.StringCallback();
+
+        /*
+         * Log that we are currently snapshotting this snapshot
+         */
+        try {
+            //This node shouldn't already exist... should have been erased when the last snapshot finished
+            assert(VoltDB.instance().getZK().exists(
+                    "/nodes_currently_snapshotting/" + VoltDB.instance().getHostMessenger().getHostId(), false)
+                    == null);
+            ByteBuffer snapshotTxnId = ByteBuffer.allocate(8);
+            snapshotTxnId.putLong(txnId);
+            VoltDB.instance().getZK().create(
+                    "/nodes_currently_snapshotting/" + VoltDB.instance().getHostMessenger().getHostId(),
+                    snapshotTxnId.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, cb1, null);
+        } catch (NodeExistsException e) {
+            HOST_LOG.warn("Didn't expect the snapshot node to already exist", e);
+        } catch (Exception e) {
+            VoltDB.crashVoltDB();
+        }
+
+        /*
+         * Race with the others to create the place where will count down to completing the snapshot
+         */
+        ByteBuffer buf = ByteBuffer.allocate(17);
+        buf.putLong(txnId);
+        buf.putInt(context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size());
+        buf.putInt(0);
+        String nextTruncationNonce = null;
+        try {
+            ByteBuffer payload =
+                ByteBuffer.wrap(VoltDB.instance().getZK().getData("/request_truncation_snapshot", false, null));
+            nextTruncationNonce = Long.toString(payload.getLong());
+        } catch (KeeperException.NoNodeException e) {}
+        catch (Exception e) {
+            HOST_LOG.error("Getting the nonce should never fail with anything other than no node", e);
+            VoltDB.crashVoltDB();
+        }
+        if (nextTruncationNonce == null) {
+            buf.put((byte)0);
+        } else {
+            if (nextTruncationNonce.equals(nonce)) {
+                buf.put((byte)1);
+            } else {
+                buf.put((byte)0);
+            }
+        }
+
+        final String snapshotPath = "/completed_snapshots/" + txnId;
+        VoltDB.instance().getZK().create(
+                snapshotPath, buf.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb2, null);
+
+        try {
+            cb1.get();
+        } catch (NodeExistsException e) {
+            HOST_LOG.warn("Didn't expect the snapshot node to already exist", e);
+        } catch (Exception e) {
+            VoltDB.crashVoltDB();
+        }
+        try {
+            cb2.get();
+        } catch (KeeperException.NodeExistsException e) {
+        } catch (Exception e) {
+            HOST_LOG.fatal("Unexpected exception logging snapshot completion to ZK", e);
+            VoltDB.crashVoltDB();
+        }
+    }
+
+
     @SuppressWarnings("unused")
     private void createSetup(String file_path, String file_nonce,
             long txnId, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
-
             /*
              * Used to close targets on failure
              */
@@ -287,6 +367,7 @@ public class SnapshotSaveAPI
                 }
 
                 synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
+                    boolean aborted = false;
                     if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
                         SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(
                                 VoltDB.instance().getLocalSites().values().size());
@@ -295,6 +376,7 @@ public class SnapshotSaveAPI
                         }
                     } else {
                         SnapshotRegistry.discardSnapshot(snapshotRecord);
+                        aborted = true;
                     }
 
                     /**
@@ -307,6 +389,9 @@ public class SnapshotSaveAPI
                     int siteIndex = 0;
                     for (SnapshotTableTask t : replicatedSnapshotTasks) {
                         SnapshotSiteProcessor.m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
+                    }
+                    if (!aborted) {
+                        logSnapshotStartToZK( txnId, context, file_nonce);
                     }
                 }
             } catch (Exception ex) {
@@ -337,6 +422,7 @@ public class SnapshotSaveAPI
             } finally {
                 SnapshotSiteProcessor.m_snapshotPermits.release(numLocalSites);
             }
+
         }
     }
 

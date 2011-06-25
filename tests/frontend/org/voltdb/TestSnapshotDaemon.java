@@ -25,6 +25,8 @@ package org.voltdb;
 
 import static org.junit.Assert.*;
 
+import java.util.concurrent.Future;
+
 import org.junit.*;
 
 import org.voltdb.SnapshotDaemon;
@@ -38,13 +40,67 @@ import org.voltdb.VoltTable.ColumnInfo;
 
 public class TestSnapshotDaemon {
 
+    private static class Initiator implements SnapshotDaemon.DaemonInitiator {
+
+        private String procedureName;
+        private long clientData;
+        private Object[] params;
+        @Override
+        public void initiateSnapshotDaemonWork(String procedureName,
+                long clientData, Object[] params) {
+            this.procedureName = procedureName;
+            this.clientData = clientData;
+            this.params = params;
+        }
+
+        public void clear() {
+            procedureName = null;
+            clientData = Long.MIN_VALUE;
+            params = null;
+        }
+    }
+
+    private Initiator m_initiator;
+    private SnapshotDaemon m_daemon;
+    private MockVoltDB m_mockVoltDB;
+
+    @Before
+    public void setUp() throws Exception {
+        SnapshotDaemon.m_periodicWorkInterval = 100;
+        SnapshotDaemon.m_minTimeBetweenSysprocs = 1000;
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        m_daemon.shutdown();
+        m_mockVoltDB.shutdown(null);
+        m_mockVoltDB = null;
+        m_daemon = null;
+        m_initiator = null;
+    }
+
+    public SnapshotDaemon getSnapshotDaemon() throws Exception {
+        if (m_daemon != null) {
+            m_daemon.shutdown();
+            m_mockVoltDB.shutdown(null);
+        }
+        m_mockVoltDB = new MockVoltDB();
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        m_initiator = new Initiator();
+        m_daemon = new SnapshotDaemon();
+        m_daemon.init(m_initiator, m_mockVoltDB.getZK());
+        return m_daemon;
+    }
+
     @Test
     public void testBadFrequencyAndBasicInit() throws Exception {
-        SnapshotDaemon noSnapshots = new SnapshotDaemon();
-        assertNull(noSnapshots.processPeriodicWork(1));
+        SnapshotDaemon noSnapshots = getSnapshotDaemon();
+        Thread.sleep(60);
+        assertNull(m_initiator.procedureName);
         boolean threwException = false;
         try {
-            noSnapshots.processClientResponse(null);
+            Future<Void> future = noSnapshots.processClientResponse(null, 0);
+            future.get();
         } catch (Throwable t) {
             threwException = true;
         }
@@ -54,9 +110,10 @@ public class TestSnapshotDaemon {
         final SnapshotSchedule schedule = new SnapshotSchedule();
         schedule.setFrequencyunit("q");
         threwException = false;
-        SnapshotDaemon d = new SnapshotDaemon();
+        SnapshotDaemon d = getSnapshotDaemon();
         try {
-            d.makeActive(schedule);
+            Future<Void> future = d.makeActive(schedule);
+            future.get();
         } catch (Throwable t) {
             threwException = true;
         }
@@ -73,21 +130,22 @@ public class TestSnapshotDaemon {
         d.makeActive(schedule);
         threwException = false;
         try {
-            d.processClientResponse(null);
+            Future<Void> future = d.processClientResponse(null, 0);
+            future.get();
         } catch (Throwable t) {
             threwException = true;
         }
         assertTrue(threwException);
     }
 
-    public SnapshotDaemon getBasicDaemon() {
+    public SnapshotDaemon getBasicDaemon() throws Exception {
         final SnapshotSchedule schedule = new SnapshotSchedule();
         schedule.setFrequencyunit("s");
         schedule.setFrequencyvalue(1);
         schedule.setPath("/tmp");
         schedule.setPrefix("woobie");
         schedule.setRetain(2);
-        SnapshotDaemon d = new SnapshotDaemon();
+        SnapshotDaemon d = getSnapshotDaemon();
         d.makeActive(schedule);
         return d;
     }
@@ -191,21 +249,31 @@ public class TestSnapshotDaemon {
 
         SnapshotDaemon daemon = getBasicDaemon();
 
-        Pair<String, Object[]>  work = daemon.processPeriodicWork(0);
-        assertTrue("@SnapshotScan".equals(work.getFirst()));
-        assertEquals(1, work.getSecond().length);
-        assertTrue("/tmp".equals(work.getSecond()[0]));
+        Thread.sleep(60);
 
-        assertNull(daemon.processPeriodicWork(1));
+        long handle = m_initiator.clientData;
+        assertTrue("@SnapshotScan".equals(m_initiator.procedureName));
+        assertEquals(1, m_initiator.params.length);
+        assertTrue("/tmp".equals(m_initiator.params[0]));
 
-        daemon.processClientResponse(getFailureResponse());
-        assertNull(daemon.processPeriodicWork(2));
-        assertNull(daemon.processClientResponse(null));
+        m_initiator.clear();
+        Thread.sleep(60);
+
+        assertNull(m_initiator.params);
+
+        daemon.processClientResponse(getFailureResponse(), handle);
+        Thread.sleep(60);
+        assertNull(m_initiator.params);
+
+        daemon.processClientResponse(null, 0);
+        Thread.sleep(60);
+        assertNull(m_initiator.params);
 
         daemon = getBasicDaemon();
-        work = daemon.processPeriodicWork(0);
+        Thread.sleep(60);
 
-        daemon.processClientResponse(getErrMsgResponse());
+        assertNotNull(m_initiator.params);
+        daemon.processClientResponse(getErrMsgResponse(), m_initiator.clientData).get();
         assertEquals(SnapshotDaemon.State.FAILURE, daemon.getState());
     }
 
@@ -347,66 +415,96 @@ public class TestSnapshotDaemon {
     public void testSuccessfulScan() throws Exception {
         SnapshotDaemon daemon = getBasicDaemon();
 
-        Pair<String, Object[]>  work = daemon.processPeriodicWork(0);
+        Thread.sleep(60);
 
-        work = daemon.processClientResponse(getSuccessfulScanOneResult());
-        assertNull(work);
+        long handle = m_initiator.clientData;
+        m_initiator.clear();
+        daemon.processClientResponse(getSuccessfulScanOneResult(), handle).get();
+        Thread.sleep(60);
+        assertNull(m_initiator.procedureName);
 
         daemon = getBasicDaemon();
-        daemon.processPeriodicWork(0);
+        Thread.sleep(60);
 
-        work = daemon.processClientResponse(getSuccessfulScanThreeResults());
-        assertNotNull(work);
-        assertTrue("@SnapshotDelete".equals(work.getFirst()));
-        String path = ((String[])work.getSecond()[0])[0];
-        String nonce = ((String[])work.getSecond()[1])[0];
+        handle = m_initiator.clientData;
+        daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
+        assertNotNull(m_initiator.procedureName);
+        assertTrue("@SnapshotDelete".equals(m_initiator.procedureName));
+        String path = ((String[])m_initiator.params[0])[0];
+        String nonce = ((String[])m_initiator.params[1])[0];
         assertTrue("/tmp".equals(path));
         assertTrue("woobie_2".equals(nonce));
-        assertNull(daemon.processPeriodicWork(3));
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        Thread.sleep(60);
+        assertNull(m_initiator.procedureName);
 
-        assertNull(daemon.processClientResponse(getFailureResponse()));
+        daemon.processClientResponse(getFailureResponse(), handle).get();
+        assertNull(m_initiator.procedureName);
         assertEquals(daemon.getState(), SnapshotDaemon.State.FAILURE);
 
         daemon = getBasicDaemon();
-        daemon.processPeriodicWork(0);
-        work = daemon.processClientResponse(getSuccessfulScanThreeResults());
-        daemon.processClientResponse(getErrMsgResponse());
+        Thread.sleep(60);
+        handle = m_initiator.clientData;
+        daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
+        daemon.processClientResponse(getErrMsgResponse(), 1);
+        Thread.sleep(60);
         assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
     }
 
     @Test
     public void testDoSnapshot() throws Exception {
         SnapshotDaemon daemon = getBasicDaemon();
-        long startTime = System.currentTimeMillis();
-        Pair<String, Object[]>  work = daemon.processPeriodicWork(startTime);
-        work = daemon.processClientResponse(getSuccessfulScanOneResult());
-        assertNull(work);
-        assertNull(daemon.processPeriodicWork(startTime + 2000));
-        work = daemon.processPeriodicWork(startTime + 8000);
-        assertNotNull(work);
-        assertTrue("@SnapshotSave".equals(work.getFirst()));
-        assertTrue("/tmp".equals(work.getSecond()[0]));
-        assertTrue(((String)work.getSecond()[1]).startsWith("woobie_"));
-        assertEquals(0, work.getSecond()[2]);
+        Thread.sleep(60);
+        long handle = m_initiator.clientData;
+        m_initiator.clear();
+        daemon.processClientResponse(getSuccessfulScanOneResult(), handle).get();
+        assertNull(m_initiator.procedureName);
+        Thread.sleep(500);
+        assertNull(m_initiator.procedureName);
+        Thread.sleep(800);
+        assertNotNull(m_initiator.procedureName);
+        assertTrue("@SnapshotSave".equals(m_initiator.procedureName));
+        assertTrue("/tmp".equals(m_initiator.params[0]));
+        assertTrue(((String)m_initiator.params[1]).startsWith("woobie_"));
+        assertEquals(0, m_initiator.params[2]);
 
-        assertNull(daemon.processClientResponse(getFailureResponse()));
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        daemon.processClientResponse(getFailureResponse(), handle).get();
+        assertNull(m_initiator.procedureName);
         assertEquals(SnapshotDaemon.State.FAILURE, daemon.getState());
 
         daemon = getBasicDaemon();
-        startTime = System.currentTimeMillis();
-        assertNotNull(daemon.processPeriodicWork(startTime));
-        assertNull(daemon.processClientResponse(getSuccessfulScanOneResult()));
-        daemon.processPeriodicWork(startTime + 5000);
-        daemon.processClientResponse(getErrMsgResponse());
+        Thread.sleep(60);
+        assertNotNull(m_initiator.procedureName);
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        daemon.processClientResponse(getSuccessfulScanOneResult(), handle);
+        Thread.sleep(1200);
+        assertNotNull(m_initiator.procedureName);
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        daemon.processClientResponse(getErrMsgResponse(), handle).get();
         assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
 
         daemon = getBasicDaemon();
-        startTime = System.currentTimeMillis();
-        assertNotNull(daemon.processPeriodicWork(startTime));
-        assertNotNull(daemon.processClientResponse(getSuccessfulScanThreeResults()));
-        assertNull(daemon.processClientResponse(getErrMsgResponse()));
-        daemon.processPeriodicWork(startTime + 7500);
-        assertNull(daemon.processPeriodicWork(startTime + 10000));
+        Thread.sleep(60);
+        assertNotNull(m_initiator.procedureName);
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
+        assertNotNull(m_initiator.procedureName);
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        daemon.processClientResponse(getErrMsgResponse(), handle).get();
+        assertNull(m_initiator.procedureName);
+        Thread.sleep(1200);
+        assertNotNull(m_initiator.procedureName);
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        Thread.sleep(1200);
+        assertNull(m_initiator.procedureName);
         daemon.processClientResponse(new ClientResponse() {
 
             @Override
@@ -451,11 +549,15 @@ public class TestSnapshotDaemon {
                 return null;
             }
 
-        });
+        }, handle).get();
         assertEquals(SnapshotDaemon.State.WAITING, daemon.getState());
-        work = daemon.processPeriodicWork(startTime + 15000);
-        assertNotNull(work);
-        assertTrue("@SnapshotSave".equals(work.getFirst()));
+        assertNull(m_initiator.procedureName);
+
+        Thread.sleep(1200);
+        assertNotNull(m_initiator.procedureName);
+        assertTrue("@SnapshotSave".equals(m_initiator.procedureName));
+        handle = m_initiator.clientData;
+        m_initiator.clear();
         daemon.processClientResponse(new ClientResponse() {
 
             @Override
@@ -500,10 +602,10 @@ public class TestSnapshotDaemon {
                 return null;
             }
 
-        });
+        }, handle);
 
-        work = daemon.processPeriodicWork(startTime + 20000);
-        assertNotNull(work);
-        assertTrue("@SnapshotDelete".equals(work.getFirst()));
+        Thread.sleep(1200);
+        assertNotNull(m_initiator.procedureName);
+        assertTrue("@SnapshotDelete".equals(m_initiator.procedureName));
     }
 }

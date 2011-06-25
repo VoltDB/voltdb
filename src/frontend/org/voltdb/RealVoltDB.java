@@ -302,6 +302,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private MemoryStats m_memoryStats = null;
     private StatsManager m_statsManager = null;
     private ZooKeeper m_zk;
+    private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -390,7 +391,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
-
+            m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
             // start (asynchronously) getting platform info
             // this will start a thread that should die in less
             // than a second
@@ -867,6 +868,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 VoltDB.crashVoltDB();
             }
 
+            try {
+                m_snapshotCompletionMonitor.init(m_zk);
+            } catch (Exception e) {
+                hostLog.fatal("Error initializing snapshot completion monitor", e);
+                VoltDB.crashVoltDB();
+            }
+
             // tell other booting nodes that this node is ready. Primary purpose is to publish a hostname
             m_messenger.sendReadyMessage();
 
@@ -1206,6 +1214,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
+            m_snapshotCompletionMonitor.shutdown();
             fivems.interrupt();
             fivems.join();
             // Things are going pear-shaped, tell the fault distributor to
@@ -1755,7 +1764,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          */
         for (ClientInterface ci : m_clientInterfaces) {
             ci.getInitiator().setSendHeartbeats(true);
-            ci.mayActivateSnapshotDaemon();
             try {
                 ci.startAcceptingConnections();
             } catch (IOException e) {
@@ -1787,5 +1795,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public AgreementSite getAgreementSite() {
         return m_agreementSite;
+    }
+
+    @Override
+    public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
+        return m_snapshotCompletionMonitor;
     }
 }

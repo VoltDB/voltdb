@@ -38,13 +38,15 @@ public class TestSavedTableConverter extends TestCase
     private static final String TABLE_NAME = "TEST_TABLE";
     private static int DEFAULT_INT = 1234;
 
-    public TestSavedTableConverter()
-    {
-        m_catalogCreator = new MockVoltDB();
+    @Override
+    public void tearDown() throws Exception {
+        m_catalogCreator.shutdown(null);
     }
 
+    @Override
     public void setUp()
     {
+        m_catalogCreator = new MockVoltDB();
         m_catalogCreator.addTable(TABLE_NAME, false);
         m_catalogCreator.addColumnToTable(TABLE_NAME, "HAS_DEFAULT",
                                           VoltType.INTEGER, true,
@@ -128,7 +130,7 @@ public class TestSavedTableConverter extends TestCase
         assertEquals(4, result.getColumnCount());
         for (int i = 0; i < 10; i++)
         {
-            assertEquals((long) i, result.fetchRow(i).getLong("HAS_DEFAULT"));
+            assertEquals(i, result.fetchRow(i).getLong("HAS_DEFAULT"));
             assertEquals("name_" + i,
                          result.fetchRow(i).getString("HAS_NULLABLE_STRING"));
             assertEquals(new Double(i),
@@ -212,7 +214,7 @@ public class TestSavedTableConverter extends TestCase
         for (int i = 0; i < 10; i++)
         {
             VoltTableRow row = result.fetchRow(i);
-            assertEquals((long) i, row.getLong("HAS_DEFAULT"));
+            assertEquals(i, row.getLong("HAS_DEFAULT"));
             assertEquals(null, row.getString("HAS_NULLABLE_STRING"));
             assertTrue(row.wasNull());
             assertEquals(VoltType.NULL_FLOAT,

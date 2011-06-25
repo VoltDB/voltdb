@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.*;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -330,6 +332,15 @@ public class SnapshotSave extends VoltSystemProcedure
         performQuiesce();
 
         results = performSnapshotCreationWork( path, nonce, ctx.getCurrentTxnId(), (byte)block);
+        try {
+            JSONStringer stringer = new JSONStringer();
+            stringer.object();
+            stringer.key("txnId").value(ctx.getCurrentTxnId());
+            stringer.endObject();
+            setAppStatusString(stringer.toString());
+        } catch (Exception e) {
+            HOST_LOG.warn(e);
+        }
 
         final long finishTime = System.currentTimeMillis();
         final long duration = finishTime - startTime;

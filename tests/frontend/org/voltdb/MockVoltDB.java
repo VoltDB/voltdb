@@ -65,10 +65,10 @@ public class MockVoltDB implements VoltDBInterface
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata = "0.0.0.0:0:0:0";
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
-
+    private final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
     final AgreementSite m_agreementSite;
     private final ZooKeeper m_zk;
-    private boolean m_noLoadLib = false;
+    boolean m_noLoadLib = false;
 
     public MockVoltDB()
     {
@@ -114,6 +114,7 @@ public class MockVoltDB implements VoltDBInterface
                     false);
             m_agreementSite.start();
             m_zk = org.voltdb.utils.ZKUtil.getClient("localhost:2181", 60 * 1000);
+            m_snapshotCompletionMonitor.init(m_zk);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -138,8 +139,13 @@ public class MockVoltDB implements VoltDBInterface
         getCluster().getPartitions().add(Integer.toString(partitionId));
     }
 
+    private Hashtable<Integer, ExecutionSite> m_localSites = new Hashtable<Integer, ExecutionSite>();
+
     public void addSite(int siteId, int hostId, int partitionId, boolean isExec)
     {
+        if (hostId == 0) {
+            m_localSites.put(siteId, new ExecutionSite(partitionId));
+        }
         getCluster().getSites().add(Integer.toString(siteId));
         getSite(siteId).setHost(getHost(hostId));
         getSite(siteId).setIsexec(isExec);
@@ -289,8 +295,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Hashtable<Integer, ExecutionSite> getLocalSites()
     {
-        // TODO Auto-generated method stub
-        return null;
+        return m_localSites;
     }
 
     @Override
@@ -326,7 +331,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getVersionString()
     {
-        if (m_noLoadLib) {
+        if (!m_noLoadLib) {
             return new RealVoltDB().getVersionString();
         } else {
             return null;
@@ -371,6 +376,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void shutdown(Thread mainSiteThread) throws InterruptedException
     {
+        m_snapshotCompletionMonitor.shutdown();
         m_zk.close();
         m_agreementSite.shutdown();
     }
@@ -526,6 +532,9 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void onRestoreCompletion() {
         // TODO Auto-generated method stub
+    }
 
+    public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
+        return m_snapshotCompletionMonitor;
     }
 }

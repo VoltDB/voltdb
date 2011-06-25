@@ -178,4 +178,6 @@ public interface VoltDBInterface
     public void onRestoreCompletion();
 
     ZooKeeper getZK();
+
+    public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
 }

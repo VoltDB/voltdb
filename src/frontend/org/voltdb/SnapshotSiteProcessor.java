@@ -25,6 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
+import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -113,6 +115,7 @@ public class SnapshotSiteProcessor {
     private long m_lastSnapshotTxnId;
     private int m_lastSnapshotNumHosts;
 
+    private boolean m_lastSnapshotSucceded = true;
 
     /**
      * List of threads to join to block on snapshot completion
@@ -219,6 +222,7 @@ public class SnapshotSiteProcessor {
     }
 
     public void initiateSnapshots(ExecutionEngine ee, Deque<SnapshotTableTask> tasks, long txnId, int numHosts) {
+        m_lastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
         m_lastSnapshotNumHosts = numHosts;
         m_snapshotTableTasks = new ArrayDeque<SnapshotTableTask>(tasks);
@@ -314,6 +318,13 @@ public class SnapshotSiteProcessor {
             snapshotBuffer.b.limit(headerSize + serialized);
             snapshotBuffer.b.position(0);
             retval = currentTask.m_target.write(snapshotBuffer);
+            if (retval != null) {
+                try {
+                    retval.get();
+                } catch (Exception e) {
+                    m_lastSnapshotSucceded = false;
+                }
+            }
             break;
         }
 
@@ -364,13 +375,16 @@ public class SnapshotSiteProcessor {
                                 }
                             }
                         } finally {
-                            /**
-                             * Set it to -1 indicating the system is ready to perform another snapshot.
-                             * Changed to wait until all the previous snapshot work has finished so
-                             * that snapshot initiation doesn't wait on the file system
-                             */
-                            ExecutionSitesCurrentlySnapshotting.decrementAndGet();
-                            logSnapshotCompleteToZK(txnId, numHosts);
+                            try {
+                                logSnapshotCompleteToZK(txnId, numHosts, m_lastSnapshotSucceded);
+                            } finally {
+                                /**
+                                 * Set it to -1 indicating the system is ready to perform another snapshot.
+                                 * Changed to wait until all the previous snapshot work has finished so
+                                 * that snapshot initiation doesn't wait on the file system
+                                 */
+                                ExecutionSitesCurrentlySnapshotting.decrementAndGet();
+                            }
                         }
                     }
                 };
@@ -383,36 +397,10 @@ public class SnapshotSiteProcessor {
     }
 
 
-    private static void logSnapshotCompleteToZK(long txnId, int numHosts) {
+    private static void logSnapshotCompleteToZK(long txnId, int numHosts, boolean snapshotSuccess) {
         ZooKeeper zk = VoltDB.instance().getZK();
 
-        try {
-            zk.create("/completed_snapshots", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException e) {
-        } catch (Exception e) {
-            hostLog.fatal("Unexpected exception logging snapshot completion to ZK", e);
-            VoltDB.crashVoltDB();
-        }
-        ByteBuffer buf = ByteBuffer.allocate(16);
-        buf.putLong(txnId);
-        buf.putInt(numHosts);
-        buf.putInt(1);
-
         final String snapshotPath = "/completed_snapshots/" + txnId;
-        boolean alreadyExists = false;
-        try {
-            zk.create(snapshotPath, buf.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException e) {
-            alreadyExists = true;
-        } catch (Exception e) {
-            hostLog.fatal("Unexpected exception logging snapshot completion to ZK", e);
-            VoltDB.crashVoltDB();
-        }
-
-        if (!alreadyExists) {
-            return;
-        }
-
         boolean success = false;
         while (!success) {
             Stat stat = new Stat();
@@ -428,7 +416,7 @@ public class SnapshotSiteProcessor {
                 VoltDB.crashVoltDB();
             }
 
-            buf = ByteBuffer.wrap(data);
+            final ByteBuffer buf = ByteBuffer.wrap(data);
             if (buf.getLong() != txnId) {
                 hostLog.fatal("TxnId should match");
                 VoltDB.crashVoltDB();
@@ -439,6 +427,10 @@ public class SnapshotSiteProcessor {
             }
             int numHostsFinished = buf.getInt() + 1;
             buf.putInt(12, numHostsFinished);
+            if (!snapshotSuccess) {
+                hostLog.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
+                buf.put(16, (byte)0);
+            }
             try {
                 zk.setData(snapshotPath, buf.array(), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
@@ -447,6 +439,37 @@ public class SnapshotSiteProcessor {
                 VoltDB.crashVoltDB();
             }
             success = true;
+        }
+
+        /*
+         * If we are running without command logging there will be no consumer for
+         * the completed snapshot messages. Consume them here to bound space usage in ZK.
+         */
+        try {
+            TreeSet<String> snapshots = new TreeSet<String>(zk.getChildren("/completed_snapshots", false));
+            while (snapshots.size() > 30) {
+                try {
+                    zk.delete("/completed_snapshots/" + snapshots.first(), -1);
+                } catch (NoNodeException e) {}
+                catch (Exception e) {
+                    hostLog.fatal(
+                            "Deleting a snapshot completion record from ZK should only fail with NoNodeException", e);
+                    VoltDB.crashVoltDB();
+                }
+                snapshots.remove(snapshots.first());
+            }
+        } catch (Exception e) {
+            hostLog.fatal("Retrieving list of completed snapshots from ZK should never fail", e);
+            VoltDB.crashVoltDB();
+        }
+
+        try {
+            VoltDB.instance().getZK().delete(
+                    "/nodes_currently_snapshotting/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
+        } catch (NoNodeException e) {
+            hostLog.warn("Expect the snapshot node to already exist during deletion", e);
+        } catch (Exception e) {
+            VoltDB.crashVoltDB();
         }
     }
 
