@@ -35,6 +35,9 @@ public class Encoder {
      * @return A hex-encoded string with double length.
      */
     public static String hexEncode(byte[] data) {
+        if (data == null)
+            return null;
+
         StringBuilder sb = new StringBuilder();
         for (byte b : data) {
             // hex encoding same way as java.net.URLEncoder.

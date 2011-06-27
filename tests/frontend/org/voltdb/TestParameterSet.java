@@ -50,9 +50,14 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONException;
 import org.voltdb.messaging.FastSerializableTestUtil;
+import org.voltdb.types.TimestampType;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
@@ -84,5 +89,29 @@ public class TestParameterSet extends TestCase {
 
         byte[] bin = (byte[]) out.toArray()[0];
         assertEquals(bin[0], 'f'); assertEquals(bin[1], 'o'); assertEquals(bin[2], 'o');
+    }
+
+    public void testJSONEncodesBinary() throws JSONException, IOException {
+        params = new ParameterSet(true);
+        params.setParameters(new Object[]{ 123,
+                                           12345,
+                                           1234567,
+                                           12345678901L,
+                                           1.234567,
+                                           "aabbcc",
+                                           new byte[] { 10, 26, 10 },
+                                           new TimestampType(System.currentTimeMillis()),
+                                           new BigDecimal("123.45") } );
+
+        String json = params.toJSONString();
+        ParameterSet p2 = ParameterSet.fromJSONString(json);
+
+        assertEquals(p2.toJSONString(), json);
+
+        // this tests that param sets deal with hex-encoded binary stuff right
+        json = json.replace("[10,26,10]", "\"0a1A0A\"");
+        p2 = ParameterSet.fromJSONString(json);
+
+        assertEquals("0a1A0A", p2.m_params[6]);
     }
 }
