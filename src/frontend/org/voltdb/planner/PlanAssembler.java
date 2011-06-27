@@ -17,9 +17,13 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.Stack;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -528,10 +532,21 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
+
+            // make the literal type we're going to insert match the column type
+            AbstractExpression castedExpr = null;
+            try {
+                castedExpr = (AbstractExpression) col.getValue().clone();
+                ExpressionUtil.setOutputTypeForInsertExpression(
+                        castedExpr, VoltType.get((byte) col.getKey().getType()), col.getKey().getSize(), m_paramTypeOverrideMap);
+            } catch (Exception e) {
+                throw new PlanningErrorException(e.getMessage());
+            }
+
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
                                                    col.getKey().getTypeName(),
                                                    col.getKey().getTypeName(),
-                                                   col.getValue()));
+                                                   castedExpr));
 
             // check if this column is an indexed column
             if (affectedColumns.contains(col.getKey().getTypeName()))

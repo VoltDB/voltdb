@@ -55,6 +55,7 @@ public class TestBlobType extends TestCase {
         builder.addStmtProcedure("Select", "select * from blah;", null);
         builder.addStmtProcedure("Update", "update blah set b = ? where ival = ?", null);
         builder.addStmtProcedure("FindString", "select * from blah where ival = ? and s = ?", null);
+        builder.addStmtProcedure("LiteralUpdate", "update blah set b = '0a1A' where ival = 5", null);
         builder.addProcedures(VarbinaryStringLookup.class);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0, "localhost");
         assert(success);
@@ -75,12 +76,6 @@ public class TestBlobType extends TestCase {
         ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a' }, "hi", new byte[] { 'a' });
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
-        // test basics
-        cr = client.callProcedure("Select");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        cr = client.callProcedure("Update", new byte[] { 'b' }, 5);
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-
         // make sure strings as bytes works
         cr = client.callProcedure("FindString", 5, "hi".getBytes("UTF-8"));
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
@@ -89,6 +84,30 @@ public class TestBlobType extends TestCase {
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
         assertEquals(1, cr.getResults()[0].getRowCount());
         assertEquals(1, cr.getResults()[1].getRowCount());
+
+        // literal update
+        cr = client.callProcedure("LiteralUpdate");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(1, cr.getResults()[0].getRowCount());
+        assertEquals(1, cr.getResults()[0].asScalarLong());
+
+        // see if we can get the binary value from the '0a1A' insertion above
+        cr = client.callProcedure("Select");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        VoltTable t = cr.getResults()[0];
+        assertEquals(1, t.getRowCount());
+        t.resetRowPosition();
+        t.advanceRow();
+        byte[] vb = t.getVarbinary("b");
+        assertEquals(2, vb.length);
+        assertEquals((byte) 10, vb[0]);
+        assertEquals((byte) 26, vb[1]);
+
+        // adhoc query
+        cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb01' where ival = 5");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(1, cr.getResults()[0].getRowCount());
+        assertEquals(1, cr.getResults()[0].asScalarLong());
 
         localServer.shutdown();
         localServer.join();
