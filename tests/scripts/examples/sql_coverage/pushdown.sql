@@ -5,7 +5,7 @@ INSERT INTO R1 VALUES(_value[id], _value[string], _value[int16], _value[float]);
 INSERT INTO P2 VALUES(_value[id], _value[string], _value[int16], _value[int16]);
 
 -- Distributed limit on a partitioned table
-SELECT _variable, _variable FROM _table order by _variable limit _value[int:0,100];
+SELECT _variable[@order] FROM _table order by _variable[@order] limit _value[int:0,100];
 
 -- Distribute a limit on a distinct scan
 SELECT distinct(_variable[@order]) FROM _table order by _variable[@order] limit _value[int:0,10];
