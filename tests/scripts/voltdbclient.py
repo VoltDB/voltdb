@@ -77,6 +77,7 @@ class FastSerializer:
     VOLTTYPE_DECIMAL_STRING = 23  # 9 byte long
     VOLTTYPE_MONEY = 20     # 8 byte long
     VOLTTYPE_VOLTTABLE = 21
+    VOLTTYPE_VARBINARY = 25
 
     # SQL NULL indicator for object type serializations (string, decimal)
     NULL_STRING_INDICATOR = -1
@@ -128,6 +129,7 @@ class FastSerializer:
                        self.VOLTTYPE_BIGINT: self.readInt64,
                        self.VOLTTYPE_FLOAT: self.readFloat64,
                        self.VOLTTYPE_STRING: self.readString,
+                       self.VOLTTYPE_VARBINARY: self.readVarbinary,
                        self.VOLTTYPE_TIMESTAMP: self.readDate,
                        self.VOLTTYPE_DECIMAL: self.readDecimal,
                        self.VOLTTYPE_DECIMAL_STRING: self.readDecimalString}
@@ -138,6 +140,7 @@ class FastSerializer:
                        self.VOLTTYPE_BIGINT: self.writeInt64,
                        self.VOLTTYPE_FLOAT: self.writeFloat64,
                        self.VOLTTYPE_STRING: self.writeString,
+                       self.VOLTTYPE_VARBINARY: self.writeVarbinary,
                        self.VOLTTYPE_TIMESTAMP: self.writeDate,
                        self.VOLTTYPE_DECIMAL: self.writeDecimal,
                        self.VOLTTYPE_DECIMAL_STRING: self.writeDecimalString}
@@ -149,8 +152,7 @@ class FastSerializer:
                              self.VOLTTYPE_STRING: self.readStringArray,
                              self.VOLTTYPE_TIMESTAMP: self.readDateArray,
                              self.VOLTTYPE_DECIMAL: self.readDecimalArray,
-                             self.VOLTTYPE_DECIMAL_STRING:
-                                 self.readDecimalStringArray}
+                             self.VOLTTYPE_DECIMAL_STRING: self.readDecimalStringArray}
 
         self.__compileStructs()
 
@@ -183,6 +185,10 @@ class FastSerializer:
                               lambda x:
                               if_else(x == self.__class__.NULL_STRING_INDICATOR,
                                       None, x),
+                          self.VOLTTYPE_VARBINARY:
+                              lambda x:
+                              if_else(x == self.__class__.NULL_STRING_INDICATOR,
+                                      None, x),
                           self.VOLTTYPE_DECIMAL:
                               lambda x:
                               if_else(x == self.NULL_DECIMAL_INDICATOR,
@@ -201,6 +207,7 @@ class FastSerializer:
         self.uint64Type = lambda length : '%c%dQ' % (self.inputBOM, length)
         self.float64Type = lambda length : '%c%dd' % (self.inputBOM, length)
         self.stringType = lambda length : '%c%ds' % (self.inputBOM, length)
+        self.varbinaryType = lambda length : '%c%ds' % (self.inputBOM, length)
 
     def close(self):
         if self.dump_file != None:
@@ -359,17 +366,22 @@ class FastSerializer:
         if (not array) or (len(array) == 0) or (not type):
             return
 
-        if type not in self.WRITER:
+        if type not in self.ARRAY_READER:
             print "ERROR: Unsupported date type (", type, ")."
             exit(-2)
 
-        self.writeInt16(len(array))
+        # serialize arrays of bytes as larger values to support
+        # strings and varbinary input
+        if type != FastSerializer.VOLTTYPE_TINYINT:
+            self.writeInt16(len(array))
+        else:
+            self.writeInt32(len(array))
 
         for i in array:
             self.WRITER[type](i)
 
     def writeWireTypeArray(self, type, array):
-        if type not in self.WRITER:
+        if type not in self.ARRAY_READER:
             print "ERROR: can't write wire type(", type, ") yet."
             exit(-2)
 
@@ -384,7 +396,7 @@ class FastSerializer:
         return val
 
     def readByteArray(self):
-        length = self.readInt16()
+        length = self.readInt32()
         val = self.readByteArrayContent(length)
         val = map(self.NullCheck[self.VOLTTYPE_TINYINT], val)
         return val
@@ -534,6 +546,32 @@ class FastSerializer:
         encoded_value = value.encode("utf-8")
         self.writeInt32(len(encoded_value))
         self.wbuf.extend(encoded_value)
+
+    # varbinary
+    def readVarbinaryContent(self, cnt):
+        if cnt == 0:
+            return array.array('c', [])
+
+        offset = cnt * struct.calcsize('c')
+        val = struct.unpack(self.varbinaryType(cnt), self.rbuf[:offset])
+        self.rbuf = self.rbuf[offset:]
+
+        return array.array('c', val[0])
+
+    def readVarbinary(self):
+        # length preceeded (4 byte value) string
+        length = self.readInt32()
+        if self.NullCheck[self.VOLTTYPE_VARBINARY](length) == None:
+            return None
+        return self.readVarbinaryContent(length)
+
+    def writeVarbinary(self, value):
+        if value is None:
+            self.writeInt32(self.NULL_STRING_INDICATOR)
+            return
+
+        self.writeInt32(len(value))
+        self.wbuf.extend(value)
 
     # date
     # The timestamp we receive from the server is a 64-bit integer representing

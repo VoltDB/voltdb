@@ -55,14 +55,20 @@ public class EchoServer {
         }
 
         FastDeserializer fds = new FastDeserializer(buffer);
-        short count = 1;
+        int count = 1;
         try {
             fs.writeInt(length);
             fs.writeByte(type.getValue());
 
             if (isArray) {
-                count = fds.readShort();
-                fs.writeShort(count);
+                if (type == VoltType.TINYINT) {
+                    count = fds.readInt();
+                    fs.writeInt(count);
+                }
+                else {
+                    count = fds.readShort();
+                    fs.writeShort(count);
+                }
             }
 
             for (int ii = 0; ii < count; ii++) {
@@ -94,6 +100,10 @@ public class EchoServer {
                         strLen += str.getBytes("UTF-8").length;
                     }
                     fs.writeString(str);
+                    break;
+                case VARBINARY:
+                    byte[] bin = fds.readVarbinary();
+                    fs.writeVarbinary(bin);
                     break;
                 case TIMESTAMP:
                     fs.writeTimestamp(fds.readTimestamp());

@@ -328,6 +328,29 @@ public class FastSerializer implements DataOutput {
         write(strbytes);
     }
 
+    /**
+     * Write a varbinary in the standard VoltDB way. That is, two
+     * bytes of length info followed by the bytes.
+     *
+     * @param bin The byte array value to be serialized.
+     * @throws IOException Rethrows any IOExceptions thrown.
+     */
+    public void writeVarbinary(byte[] bin) throws IOException {
+        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
+        final int NULL_STRING_INDICATOR = -1;
+        if (bin == null) {
+            writeInt(NULL_STRING_INDICATOR);
+            return;
+        }
+
+        if (bin.length > MAX_LENGTH) {
+            throw new IOException("Varbinary exceeds maximum length of "
+                                  + MAX_LENGTH + " bytes.");
+        }
+        writeInt(bin.length);
+        write(bin);
+    }
+
     // These writeArray() methods are tested in TestSQLTypesSuite.
     // If changing the max limits, please update testInvalidParameterSerializations.
 
