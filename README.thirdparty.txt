@@ -652,6 +652,178 @@ THE SOFTWARE.
  */
 
 ================================================================================
+Linked with or Included in VoltDB tools
+================================================================================
+VoltDB sqlcmd uses the following third party component:
+
+JLine version 1.0
+http://jline.sourceforge.net/
+
+Copyright (c) 2002-2006, Marc Prud'hommeaux <mwp1@cornell.edu>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or
+without modification, are permitted provided that the following
+conditions are met:
+
+Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with
+the distribution.
+
+Neither the name of JLine nor the names of its contributors
+may be used to endorse or promote products derived from this
+software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
+BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+VoltDB Studio | Web uses the following open source components:
+
+--------------------------------------------------------------------------------
++ jQuery: http://jquery.com/
+  As the core javascript framework
+
+/*!
+ * jQuery JavaScript Library v1.6.1
+ * http://jquery.com/
+ *
+ * Copyright 2011, John Resig
+ * Dual licensed under the MIT or GPL Version 2 licenses.
+ * http://jquery.org/license
+ *
+ * Includes Sizzle.js
+ * http://sizzlejs.com/
+ * Copyright 2011, The Dojo Foundation
+ * Released under the MIT, BSD, and GPL Licenses.
+ *
+ * Date: Thu May 12 15:04:36 2011 -0400
+ */
+
+--------------------------------------------------------------------------------
++ jQueryUI: http://jqueryui.com/
+  As the core UI component library
+
+/*!
+ * jQuery UI 1.8.13
+ *
+ * Copyright 2011, AUTHORS.txt (http://jqueryui.com/about)
+ * Dual licensed under the MIT or GPL Version 2 licenses.
+ * http://jquery.org/license
+ *
+ * http://docs.jquery.com/UI
+ */
+
+--------------------------------------------------------------------------------
++ jqPlot: http://www.jqplot.com/
+  For HTML 5 charting support (Performance Monitor)
+
+/**
+ * jqPlot
+ * Pure JavaScript plotting plugin using jQuery
+ *
+ * Version: 1.0.0b1_r746
+ *
+ * Copyright (c) 2009-2011 Chris Leonello
+ * jqPlot is currently available for use in all personal or commercial projects 
+ * under both the MIT (http://www.opensource.org/licenses/mit-license.php) and GPL 
+ * version 2.0 (http://www.gnu.org/licenses/gpl-2.0.html) licenses. This means that you can 
+ * choose the license that best suits your project and use it accordingly. 
+ *
+ * Although not required, the author would appreciate an email letting him 
+ * know of any substantial use of jqPlot.  You can reach the author at: 
+ * chris at jqplot dot com or see http://www.jqplot.com/info.php .
+ *
+ * If you are feeling kind and generous, consider supporting the project by
+ * making a donation at: http://www.jqplot.com/donate.php .
+ *
+ * sprintf functions contained in jqplot.sprintf.js by Ash Searle:
+ *
+ *     version 2007.04.27
+ *     author Ash Searle
+ *     http://hexmen.com/blog/2007/03/printf-sprintf/
+ *     http://hexmen.com/js/sprintf.js
+ *     The author (Ash Searle) has placed this code in the public domain:
+ *     "This code is unrestricted: you are free to use it however you like."
+ * 
+ */
+--------------------------------------------------------------------------------
++ Tablesorter: http://tablesorter.com/
+  For sortable table outputs
+
+Author: Christian Bach
+Version: 2.0.5 (changelog)
+Licence: Dual licensed under MIT or GPL licenses. 
+
+--------------------------------------------------------------------------------
++ bassistance.de's jQuery Treeview Plugin:
+  http://bassistance.de/jquery-plugins/jquery-plugin-treeview/
+  For the Object Explorer
+  
+/*
+ * Treeview 1.5pre - jQuery plugin to hide and show branches of a tree
+ * 
+ * http://bassistance.de/jquery-plugins/jquery-plugin-treeview/
+ * http://docs.jquery.com/Plugins/Treeview
+ *
+ * Copyright (c) 2007 Jörn Zaefferer
+ *
+ * Dual licensed under the MIT and GPL licenses:
+ *   http://www.opensource.org/licenses/mit-license.php
+ *   http://www.gnu.org/licenses/gpl.html
+ *
+ * Revision: $Id: jquery.treeview.js 5759 2008-07-01 07:50:28Z joern.zaefferer $
+ *
+ */
+
+--------------------------------------------------------------------------------
++ A Beautiful Site LLC's jQuery Context Menu Plugin:
+  http://abeautifulsite.net/blog/2008/09/jquery-context-menu-plugin/
+  For context menu support on the Object Explorer
+
+// jQuery Context Menu Plugin
+//
+// Version 1.01
+//
+// Cory S.N. LaViska
+// A Beautiful Site (http://abeautifulsite.net/)
+//
+// More info: http://abeautifulsite.net/2008/09/jquery-context-menu-plugin/
+//
+// Terms of Use
+//
+// This plugin is dual-licensed under the GNU General Public License
+//   and the MIT License and is copyright A Beautiful Site, LLC.
+//
+
+--------------------------------------------------------------------------------
++ Binny V A's Shortcut script
+  http://www.openjs.com/scripts/events/keyboard_shortcuts/
+  For application keyboard shortcuts
+  
+/**
+ * http://www.openjs.com/scripts/events/keyboard_shortcuts/
+ * Version : 2.01.B
+ * By Binny V A
+ * License : BSD
+ */
+
+================================================================================
 Licenses referred to by some above package license texts
 ================================================================================
 
