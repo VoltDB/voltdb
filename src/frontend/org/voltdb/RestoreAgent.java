@@ -22,9 +22,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -72,7 +70,8 @@ import org.voltdb.utils.Pair;
  * Once all of these tasks have finished successfully, it will call RealVoltDB
  * to resume normal operation.
  */
-public class RestoreAgent implements CommandLogReinitiator.Callback {
+public class RestoreAgent implements CommandLogReinitiator.Callback,
+SnapshotCompletionInterest {
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
         public void onRestoreCompletion();
@@ -95,7 +94,6 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
     private final START_ACTION m_action;
 
     private final ZooKeeper m_zk;
-    private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
 
     private final int[] m_allPartitions;
 
@@ -907,13 +905,8 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
         }
 
         if (failure) {
-            if (m_state == State.RESTORE) {
-                LOG.fatal("Failed to restore from snapshot: " +
-                          res.getStatusString());
-            } else {
-                LOG.fatal("Failed to truncate command logs by snapshot: " +
-                          res.getStatusString());
-            }
+            LOG.fatal("Failed to restore from snapshot: " +
+                      res.getStatusString());
             VoltDB.crashVoltDB();
         } else {
             if (m_state == State.RESTORE) {
@@ -951,11 +944,19 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
              */
             CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
             if (isLowestHost() && commandLogElement != null) {
-                String path = commandLogElement.getInternalsnapshotpath();
-                Date now = new Date(System.currentTimeMillis());
-                String nonce = CL_NONCE_PREFIX + m_dateFormat.format(now);
-                initSnapshotWork(null, Pair.of("@SnapshotSave",
-                                               new Object[] {path, nonce, 1}));
+                byte[] pathBytes = commandLogElement.getInternalsnapshotpath().getBytes();
+                ByteBuffer buf = ByteBuffer.allocate(pathBytes.length + 8);
+                buf.position(8);
+                buf.put(pathBytes);
+                VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
+                try {
+                    m_zk.create("/request_truncation_snapshot", buf.array(),
+                                Ids.OPEN_ACL_UNSAFE,
+                                CreateMode.PERSISTENT);
+                } catch (Exception e) {
+                    LOG.fatal("Requesting a truncation snapshot via ZK should always succeed", e);
+                    VoltDB.crashVoltDB();
+                }
             } else {
                 m_state = State.TRUNCATE;
             }
@@ -1003,9 +1004,6 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
         if (m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
             paths.add(m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath());
         }
-        if (m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION") != null) {
-            paths.add(m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPath());
-        }
         TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
         FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
@@ -1032,5 +1030,16 @@ public class RestoreAgent implements CommandLogReinitiator.Callback {
         }
 
         return nonce;
+    }
+
+    @Override
+    public void snapshotCompleted(long txnId, boolean truncationSnapshot) {
+        if (!truncationSnapshot) {
+            LOG.fatal("Failed to truncate command logs by snapshot");
+            VoltDB.crashVoltDB();
+        } else {
+            VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
+            changeState();
+        }
     }
 }

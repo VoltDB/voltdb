@@ -898,6 +898,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             assert(m_clientInterfaces.size() > 0);
             ClientInterface ci = m_clientInterfaces.get(0);
+            ci.initializeSnapshotDaemon();
             TransactionInitiator initiator = ci.getInitiator();
 
             /*

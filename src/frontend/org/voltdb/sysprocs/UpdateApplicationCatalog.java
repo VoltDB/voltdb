@@ -119,7 +119,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             } catch (NodeExistsException e) {
 
             } catch (Exception e) {
-                hostLog.fatal("Requesting a truncation snapshot via ZK should always succede", e);
+                hostLog.fatal("Requesting a truncation snapshot via ZK should always succeed", e);
                 VoltDB.crashVoltDB();
             }
         }

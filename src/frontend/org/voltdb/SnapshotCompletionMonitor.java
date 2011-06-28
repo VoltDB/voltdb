@@ -150,6 +150,15 @@ public class SnapshotCompletionMonitor {
         });
     }
 
+    public void removeInterest(final SnapshotCompletionInterest interest) {
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                m_interests.remove(interest);
+            }
+        });
+    }
+
     public void shutdown() throws InterruptedException {
         m_es.shutdown();
         m_es.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);

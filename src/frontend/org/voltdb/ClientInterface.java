@@ -851,6 +851,13 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
     }
 
+    /**
+     * Initializes the snapshot daemon so that it's ready to take snapshots
+     */
+    public void initializeSnapshotDaemon() {
+        m_snapshotDaemon.init(this, VoltDB.instance().getZK());
+    }
+
     // if this ClientInterface's site ID is the lowest non-execution site ID
     // in the cluster, make our SnapshotDaemon responsible for snapshots
     public void mayActivateSnapshotDaemon() {
@@ -1338,7 +1345,6 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
         {
             m_adminAcceptor.start();
         }
-        m_snapshotDaemon.init(this, VoltDB.instance().getZK());
         mayActivateSnapshotDaemon();
     }
 
