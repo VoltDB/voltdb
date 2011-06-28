@@ -30,6 +30,7 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -99,6 +100,12 @@ public class TestBlobType extends TestCase {
         t.resetRowPosition();
         t.advanceRow();
         byte[] vb = t.getVarbinary("b");
+        assertEquals(2, vb.length);
+        assertEquals((byte) 10, vb[0]);
+        assertEquals((byte) 26, vb[1]);
+
+        // try again with generic call
+        vb = (byte[]) t.get("b", VoltType.VARBINARY);
         assertEquals(2, vb.length);
         assertEquals((byte) 10, vb[0]);
         assertEquals((byte) 26, vb[1]);

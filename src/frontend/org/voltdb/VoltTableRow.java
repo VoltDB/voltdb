@@ -252,6 +252,9 @@ public abstract class VoltTableRow {
         case STRING:
             ret = getString(columnIndex);
             break;
+        case VARBINARY:
+            ret = getVarbinary(columnIndex);
+            break;
         case TIMESTAMP:
             ret = getTimestampAsTimestamp(columnIndex);
             break;
