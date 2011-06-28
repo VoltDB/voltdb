@@ -253,7 +253,9 @@ public class SnapshotDelete extends VoltSystemProcedure {
                     return false;
                 }
 
-                if (!pathname.getName().endsWith(".vpt") && !pathname.getName().endsWith(".digest")) {
+                if (!pathname.getName().endsWith(".vpt") &&
+                    !pathname.getName().endsWith(".digest") &&
+                    !pathname.getName().endsWith(".jar")) {
                     return false;
                 }
 
@@ -267,11 +269,6 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
     private final VoltTable[] performSnapshotDeleteWork(String paths[], String nonces[])
     {
-        String nonceWithSeparators[] = new String[nonces.length];
-        for (int ii = 0; ii < nonces.length; ii++) {
-            nonceWithSeparators[ii] = nonces[ii] + "-";
-        }
-
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
         pfs[0] = new SynthesizedPlanFragment();
@@ -279,7 +276,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_snapshotDelete;
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(paths, nonceWithSeparators);
+        params.setParameters(paths, nonces);
         pfs[0].parameters = params;
 
         pfs[1] = new SynthesizedPlanFragment();
