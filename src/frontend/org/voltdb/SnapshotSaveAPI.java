@@ -259,13 +259,14 @@ public class SnapshotSaveAPI
 
                 final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
 
-                SnapshotUtil.recordSnapshotTableList(
+                SnapshotUtil.writeSnapshotDigest(
                         txnId,
                         file_path,
                         file_nonce,
                         tables,
                         context.getExecutionSite().getCorrespondingHostId(),
                         SnapshotSiteProcessor.getExportSequenceNumbers());
+                SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
                 final AtomicInteger numTables = new AtomicInteger(tables.size());
                 final SnapshotRegistry.Snapshot snapshotRecord =
                     SnapshotRegistry.startSnapshot(

@@ -17,6 +17,9 @@
 
 package org.voltdb;
 
+import java.io.File;
+import java.io.IOException;
+
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -27,6 +30,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.VoltFile;
 
 public class CatalogContext {
 
@@ -142,6 +146,22 @@ public class CatalogContext {
                     catalogVersion + incValue,
                     catalogCRC);
         return retval;
+    }
+
+    /**
+     * Write the original JAR file to the specified path/name
+     * @param path
+     * @param name
+     * @throws IOException
+     */
+    public void writeCatalogJarToFile(String path, String name) throws IOException
+    {
+        File catalog_file = new VoltFile(path, name);
+        if (catalog_file.exists())
+        {
+            catalog_file.delete();
+        }
+        m_jarfile.writeToFile(catalog_file);
     }
 
     /**

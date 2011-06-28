@@ -62,23 +62,24 @@ import org.voltdb.utils.VoltFile;
 public class SnapshotUtil {
 
     /**
-     * Create a digest for a snapshot containing the time of the snapshot and the list of tables included.
-     * The first item in the comma separated list is the time in milliseconds as a string.
-     * @param snapshotTime
-     * @param path
-     * @param nonce
-     * @param tables
+     * Create a digest for a snapshot
+     * @param txnId   transaction ID when snapshot was initiated
+     * @param path    path to which snapshot files will be written
+     * @param nonce   nonce used to distinguish this snapshot
+     * @param tables   List of tables present in this snapshot
+     * @param hostId   Host ID where this is happening
+     * @param exportSequenceNumbers  ???
      * @throws IOException
      */
-    public static void
-        recordSnapshotTableList(
-            long txnId,
-            String path,
-            String nonce,
-            List<Table> tables,
-            int hostId,
-            Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers
-            ) throws IOException {
+    public static void writeSnapshotDigest(
+        long txnId,
+        String path,
+        String nonce,
+        List<Table> tables,
+        int hostId,
+        Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers)
+    throws IOException
+    {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
         if (f.exists()) {
             if (!f.delete()) {
@@ -115,6 +116,7 @@ public class SnapshotUtil {
                 stringer.endObject();
             }
             stringer.endArray();
+            stringer.key("catalogCRC").value(VoltDB.instance().getCatalogContext().catalogCRC);
             stringer.endObject();
         } catch (JSONException e) {
             throw new IOException(e);
@@ -145,6 +147,25 @@ public class SnapshotUtil {
             }
         }
         return digests;
+    }
+
+    /**
+     * Write the current catalog associated with the database snapshot
+     * to the snapshot location
+     */
+    public static void writeSnapshotCatalog(String path, String nonce)
+    throws IOException
+    {
+        String filename = SnapshotUtil.constructCatalogFilenameForNonce(nonce);
+        try
+        {
+            VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename);
+        }
+        catch (IOException ioe)
+        {
+            throw new IOException("Unable to write snapshot catalog to file: " +
+                                  path + File.separator + filename);
+        }
     }
 
     /**
@@ -668,7 +689,7 @@ public class SnapshotUtil {
         }
 
         /*
-         * Tack on a summary at the beginning to indicate whether a restore is guaranteed to succede
+         * Tack on a summary at the beginning to indicate whether a restore is guaranteed to succeed
          * with this file set.
          */
         if (snapshotConsistent) {
@@ -714,9 +735,18 @@ public class SnapshotUtil {
     /**
      * Generates the digest filename for the given nonce.
      * @param nonce
+     * @param hostId
      */
     public static final String constructDigestFilenameForNonce(String nonce, int hostId) {
         return (nonce + "-host_" + hostId + ".digest");
+    }
+
+    /**
+     * Generates the catalog filename for the given nonce.
+     * @param nonce
+     */
+    public static final String constructCatalogFilenameForNonce(String nonce) {
+        return (nonce + ".jar");
     }
 
     public static final List<Table> getTablesToSave(Database database)
