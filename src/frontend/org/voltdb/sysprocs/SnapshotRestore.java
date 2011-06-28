@@ -939,7 +939,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         final PrintWriter pw = new PrintWriter(sw);
         pw.toString();
         pw.printf("%.2f", duration);
-        HOST_LOG.info("Finished restored of " + path + ", with ID: "
+        HOST_LOG.info("Finished restore of " + path + ", with ID: "
                 + nonce + " at " + endTime + " took " + sw.toString() + " seconds");
 //        m_sampler.setShouldStop();
 //        try {
