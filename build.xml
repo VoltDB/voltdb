@@ -56,6 +56,7 @@
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.test.dir'              location='${build.dir}/test' />
+<property name='raw.dist.dir'                location='${build.dir}' />
 <property name='dist.dir'                    location='${build.dir}/dist' />
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
 <property name='doc.dir'                     location='doc' />
@@ -454,6 +455,23 @@ DISTRIBUTION
     <distribute-example exampledir="twitter"/>
     <distribute-example exampledir="voter"/>
 
+    <!-- populate the sqlcmd tool -->
+    <copy todir="${dist.dir}/tools" >
+        <fileset dir="tools" defaultexcludes="yes">
+            <include name="sqlcmd/**"/>
+        </fileset>
+    </copy>
+
+    <!-- copy jline-1.0.jar for sqlcmd tool -->
+    <copy todir="${dist.dir}/tools/sqlcmd" file="third_party/java/jars/jline-1.0.jar"/>
+
+    <!-- make shell script executable -->
+    <chmod perm="ugo+rx">
+        <fileset dir="${dist.dir}/tools/sqlcmd" defaultexcludes="yes">
+            <include name="sqlcmd"/>
+        </fileset>
+    </chmod>
+
     <!-- populate the ad hoc tool -->
     <copy todir="${dist.dir}/tools" >
         <fileset dir="tools" defaultexcludes="yes">
@@ -485,21 +503,25 @@ DISTRIBUTION
     <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
 
     <!-- create an archive for distribution -->
-    <tar destfile="${build.dir}/voltdb-temp.tar" >
-        <tarfileset
-            prefix="voltdb-${dist.version}"
-            dir="${dist.dir}"
-            includes="**/*"
-            excludes="**/*.py generate"
-        />
-        <tarfileset
-            prefix="voltdb-${dist.version}"
-            dir="${dist.dir}"
-            includes="**/*.py generate"
-        />
-    </tar>
-    <gzip src="${build.dir}/voltdb-temp.tar" destfile="${build.dir}/voltdb-${dist.version}.tar.gz" />
-    <delete file="${build.dir}/voltdb-temp.tar" />
+    <exec executable="mv" failonerror="true">
+        <arg value="${raw.dist.dir}/dist"/>
+        <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
+    </exec>
+
+    <exec executable="tar" failonerror="true">
+        <arg value="-cz"/>
+        <arg value="-C"/>
+        <arg value="${raw.dist.dir}"/>
+        <arg value="-f"/>
+        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz"/>
+        <arg value="voltdb-${dist.version}"/>
+    </exec>    
+    
+    <!-- move it back to dist directory for downstream dependencies -->
+    <exec executable="mv" failonerror="true">
+        <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
+        <arg value="${raw.dist.dir}/dist"/>
+    </exec>
 </target>
 
 <!--
