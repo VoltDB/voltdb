@@ -30,11 +30,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -56,7 +60,42 @@ import org.voltdb.zk.ZKTestBase;
 public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callback {
     static int uid = 0;
 
+    class MockSnapshotMonitor extends SnapshotCompletionMonitor {
+        public void init(final ZooKeeper zk) {
+            try {
+                Watcher watcher = new Watcher() {
+                    @Override
+                    public void process(WatchedEvent event) {
+                        try {
+                            List<String> children = zk.getChildren("/", this);
+                            for (String s : children) {
+                                if (s.equals("request_truncation_snapshot")) {
+                                    snapshotted = true;
+                                    LinkedList<SnapshotCompletionInterest> interests =
+                                            new LinkedList<SnapshotCompletionInterest>(m_interests);
+                                    for (SnapshotCompletionInterest i : interests) {
+                                        i.snapshotCompleted(0, true);
+                                    }
+                                    break;
+                                }
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                };
+
+                zk.getChildren("/", watcher);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     List<File> paths = new ArrayList<File>();
+
+    SnapshotCompletionMonitor snapshotMonitor = null;
+    boolean snapshotted = false;
 
     CatalogContext context;
     String deploymentPath;
@@ -270,8 +309,11 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     public void setUp() throws Exception {
         m_count.set(0);
         m_done = false;
+        snapshotted = false;
         m_unexpectedSPIs.clear();
         setUpZK(1);
+        snapshotMonitor = new MockSnapshotMonitor();
+        snapshotMonitor.init(getClient(0));
     }
 
     @After
@@ -294,6 +336,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         MockInitiator initiator = new MockInitiator(null);
         RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
                                                      getClient(0),
+                                                     snapshotMonitor,
                                                      this,
                                                      0, START_ACTION.START);
         restoreAgent.restore();
@@ -313,7 +356,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         for (int i = 0; i < m_hostCount; i++) {
             agents.add(new RestoreAgent(context, initiator,
-                                        getClient(0),
+                                        getClient(0), snapshotMonitor,
                                         this, i, START_ACTION.START));
         }
         for (RestoreAgent agent : agents) {
@@ -341,7 +384,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         for (int i = 0; i < m_hostCount - 1; i++) {
             agents.add(new RestoreAgent(context, initiator,
-                                        getClient(0),
+                                        getClient(0), snapshotMonitor,
                                         this, i, START_ACTION.START));
         }
         for (RestoreAgent agent : agents) {
@@ -361,7 +404,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         // Start the last restore agent, should be able to reach agreement now
         RestoreAgent agent = new RestoreAgent(context, initiator,
-                                              getClient(0),
+                                              getClient(0), snapshotMonitor,
                                               this, m_hostCount - 1,
                                               START_ACTION.START);
         agent.restore();
@@ -395,7 +438,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         MockInitiator initiator = new MockInitiator(procs);
         RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
                                                      getClient(0),
-                                                     this,
+                                                     snapshotMonitor, this,
                                                      0, START_ACTION.START);
         restoreAgent.restore();
         while (!m_done) {
@@ -430,7 +473,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         for (int i = 0; i < m_hostCount; i++) {
             agents.add(new RestoreAgent(context, initiator,
-                                        getClient(0),
+                                        getClient(0), snapshotMonitor,
                                         this, i, START_ACTION.START));
         }
         for (RestoreAgent agent : agents) {

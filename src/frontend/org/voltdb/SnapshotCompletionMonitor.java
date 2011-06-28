@@ -27,7 +27,7 @@ import org.voltdb.logging.VoltLogger;
 
 public class SnapshotCompletionMonitor {
     private static final VoltLogger LOG = new VoltLogger("LOGGING");
-    private final LinkedList<SnapshotCompletionInterest> m_interests = new LinkedList<SnapshotCompletionInterest>();
+    final LinkedList<SnapshotCompletionInterest> m_interests = new LinkedList<SnapshotCompletionInterest>();
     private ZooKeeper m_zk;
     private final ExecutorService m_es = new ThreadPoolExecutor(1, 1,
             0L, TimeUnit.MILLISECONDS,

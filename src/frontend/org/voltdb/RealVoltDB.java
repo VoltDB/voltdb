@@ -910,7 +910,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (!isRejoin && !m_config.m_isRejoinTest) {
                 try {
                     m_restoreAgent = new RestoreAgent(m_catalogContext, initiator,
-                                                      m_zk, this, myHostId,
+                                                      m_zk, getSnapshotCompletionMonitor(),
+                                                      this, myHostId,
                                                       config.m_startAction);
                 } catch (IOException e) {
                     hostLog.fatal("Unable to establish a ZooKeeper connection: " +

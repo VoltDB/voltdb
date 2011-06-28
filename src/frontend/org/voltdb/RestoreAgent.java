@@ -90,6 +90,7 @@ SnapshotCompletionInterest {
     private final Integer m_hostId;
     private final CatalogContext m_context;
     private final TransactionInitiator m_initiator;
+    private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final START_ACTION m_action;
 
@@ -420,12 +421,13 @@ SnapshotCompletionInterest {
     }
 
     public RestoreAgent(CatalogContext context, TransactionInitiator initiator,
-                        ZooKeeper zk, Callback callback, int hostId,
-                        START_ACTION action)
+                        ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
+                        Callback callback, int hostId, START_ACTION action)
     throws IOException {
         m_hostId = hostId;
         m_context = context;
         m_initiator = initiator;
+        m_snapshotMonitor = snapshotMonitor;
         m_callback = callback;
         m_action = action;
         m_zk = zk;
@@ -950,7 +952,7 @@ SnapshotCompletionInterest {
                 ByteBuffer buf = ByteBuffer.allocate(pathBytes.length + 8);
                 buf.position(8);
                 buf.put(pathBytes);
-                VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
+                m_snapshotMonitor.addInterest(this);
                 try {
                     m_zk.create("/request_truncation_snapshot", buf.array(),
                                 Ids.OPEN_ACL_UNSAFE,
@@ -1040,7 +1042,7 @@ SnapshotCompletionInterest {
             LOG.fatal("Failed to truncate command logs by snapshot");
             VoltDB.crashVoltDB();
         } else {
-            VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
+            m_snapshotMonitor.removeInterest(this);
             m_replayAgent.returnAllSegments();
             changeState();
         }
