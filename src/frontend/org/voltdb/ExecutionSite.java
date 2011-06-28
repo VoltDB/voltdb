@@ -240,10 +240,26 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // This message is used to start a local snapshot. The snapshot
     // is *not* automatically coordinated across the full node set.
     // That must be arranged separately.
-    static class ExecutionSiteLocalSnapshotMessage extends VoltMessage
+    public static class ExecutionSiteLocalSnapshotMessage extends VoltMessage
     {
-        ExecutionSiteLocalSnapshotMessage(long roadblocktxnid) {
+        public final String path;
+        public final String nonce;
+        public final boolean crash;
+
+        /**
+         * @param roadblocktxnid
+         * @param path
+         * @param nonce
+         * @param crash Should Volt crash itself afterwards
+         */
+        public ExecutionSiteLocalSnapshotMessage(long roadblocktxnid,
+                                                 String path,
+                                                 String nonce,
+                                                 boolean crash) {
             m_roadblockTransactionId = roadblocktxnid;
+            this.path = path;
+            this.nonce = nonce;
+            this.crash = crash;
         }
 
         @Override
@@ -1305,17 +1321,19 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             ee.quiesce(lastCommittedTxnId);
 
             // then initiate the local snapshot
-            SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
+            ExecutionSiteLocalSnapshotMessage snapshotMsg =
+                    (ExecutionSiteLocalSnapshotMessage) message;
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
-            VoltTable startSnapshotting = saveAPI.startSnapshotting(schedule.getPath(),
-                                      schedule.getPrefix(),
+            VoltTable startSnapshotting = saveAPI.startSnapshotting(snapshotMsg.path,
+                                      snapshotMsg.nonce,
                                       (byte) 0x1,
-                                      ((ExecutionSiteLocalSnapshotMessage) message).m_roadblockTransactionId,
+                                      snapshotMsg.m_roadblockTransactionId,
                                       m_systemProcedureContext,
                                       ConnectionUtil.getHostnameOrAddress());
-            hostLog.info("Executing local snapshot. Finished final snapshot. Shutting down. " +
-                    "Result: " + startSnapshotting.toString());
-            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1) {
+            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
+                snapshotMsg.crash) {
+                hostLog.info("Executing local snapshot. Finished final snapshot. Shutting down. " +
+                        "Result: " + startSnapshotting.toString());
                 VoltDB.crashVoltDB();
             }
         }
@@ -1685,10 +1703,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         if (partitionDetected) {
             m_recoveryLog.info("Scheduling snapshot after txnId " + globalInitiationPoint +
                                " for cluster partition fault. Current commit point: " + this.lastCommittedTxnId);
+
+            SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
             m_transactionQueue.makeRoadBlock(
                 globalInitiationPoint,
                 QueueState.BLOCKED_CLOSED,
-                new ExecutionSiteLocalSnapshotMessage(globalInitiationPoint));
+                new ExecutionSiteLocalSnapshotMessage(globalInitiationPoint,
+                                                      schedule.getPath(),
+                                                      schedule.getPrefix(),
+                                                      true));
         }
 
 
