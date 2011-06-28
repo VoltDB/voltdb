@@ -55,6 +55,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 
 /**
  * Wraps the stored procedure object created by the user
@@ -514,6 +515,11 @@ public abstract class VoltProcedure {
             return sparam;
         }
 
+        // hack to make varbinary work with input as string
+        if ((m_paramTypes[paramTypeIndex] == byte[].class) && (pclass == String.class)) {
+            return Encoder.hexDecode((String) param);
+        }
+
         boolean slotIsArray = m_paramTypeIsArray[paramTypeIndex];
         if (slotIsArray != pclass.isArray())
             throw new Exception("Array / Scalar parameter mismatch");
@@ -964,6 +970,8 @@ public abstract class VoltProcedure {
             else if (type == VoltType.TIMESTAMP)
                 args[ii] = new TimestampType(Long.MIN_VALUE);
             else if (type == VoltType.STRING)
+                args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
+            else if (type == VoltType.VARBINARY)
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
             else if (type == VoltType.DECIMAL)
                 args[ii] = VoltType.NULL_DECIMAL;

@@ -35,6 +35,7 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
@@ -59,7 +60,7 @@ public class TestBlobType extends TestCase {
         builder.addStmtProcedure("LiteralUpdate", "update blah set b = '0a1A' where ival = 5", null);
         builder.addProcedures(VarbinaryStringLookup.class);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0, "localhost");
-        assert(success);
+        assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest.xml"));
 
         VoltDB.Configuration config = new VoltDB.Configuration();
@@ -116,12 +117,47 @@ public class TestBlobType extends TestCase {
         assertEquals(1, cr.getResults()[0].getRowCount());
         assertEquals(1, cr.getResults()[0].asScalarLong());
 
+        // try bad value insert for normal query
+        try {
+            cr = client.callProcedure("Insert", 6, new byte[] { 'a' }, "hi", new byte[] { 'a', 'b', 'c' });
+            fail();
+        }
+        catch (ProcCallException e) {}
+
+        // try invalid hex literal strings in adhoc query
+        try {
+            cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb01nt' where ival = 5");
+            fail();
+        }
+        catch (ProcCallException e) {}
+        try {
+            cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb0' where ival = 5");
+            fail();
+        }
+        catch (ProcCallException e) {}
+
         localServer.shutdown();
         localServer.join();
 
         // stop execution
         VoltDB.instance().shutdown(localServer);
     }
+
+    /*public void testIndexRejection() throws Exception {
+        String simpleSchema =
+            "create table blah (" +
+            "ival bigint default 0 not null, " +
+            "b varbinary(256) default null, " +
+            "PRIMARY KEY(ival));\n" +
+            "create index idx on blah (ival,b);";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addPartitionInfo("blah", "ival");
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0, "localhost");
+        assertFalse(success);
+    }*/
 
     public void testTPCCCustomerLookup() throws Exception {
 
