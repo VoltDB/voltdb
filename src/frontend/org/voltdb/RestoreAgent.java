@@ -133,6 +133,8 @@ SnapshotCompletionInterest {
         }
         @Override
         public void setSnapshotTxnId(long txnId) {}
+        @Override
+        public void returnAllSegments() {}
     };
 
     private Runnable m_restorePlanner = new Runnable() {
@@ -1039,6 +1041,7 @@ SnapshotCompletionInterest {
             VoltDB.crashVoltDB();
         } else {
             VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
+            m_replayAgent.returnAllSegments();
             changeState();
         }
     }

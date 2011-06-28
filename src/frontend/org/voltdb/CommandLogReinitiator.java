@@ -66,4 +66,10 @@ public interface CommandLogReinitiator {
      * @return null if the log is empty
      */
     public Long getMinLastSeenTxn();
+
+    /**
+     * Returns all command log segments to the pool and closes the reader. This
+     * discards the command log.
+     */
+    public void returnAllSegments();
 }
