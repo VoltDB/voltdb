@@ -27,6 +27,9 @@ PRIMARY ENTRY POINTS
 ***************************************
 -->
 
+<!-- apprunner looks for a target named build -->
+<target name="build" depends="srccompile, catalog"/>
+
 <target name="main" depends="srccompile, catalog" description="Default. Compile Java clients and stored procedures, then run the VoltDB compiler to generate the catalog." />
 
 <target name="server" depends="srccompile, catalog" description="Start VoltDB Server.">
