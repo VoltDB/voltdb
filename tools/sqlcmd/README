@@ -4,9 +4,9 @@ Application Requirements
 + VoltDB SQLCommand is a Java application that requires a Java runtime
   environment such as OpenJDK.
 
-+ The compilation build.xml and shorthand access bash script assume that the
-  VoltDB client library is located in the relative path: ../../voltdb/*.jar
-  Both files will need to be updated should your deployment be different.
++ The shorthand access bash script assumes that the VoltDB client library is 
+  located in the relative path: ../../voltdb/*.jar
+  It needs to be updated should your deployment be different.
 
 --------------------------------------------------------------------------------
 Using VoltDB SQLCommand
