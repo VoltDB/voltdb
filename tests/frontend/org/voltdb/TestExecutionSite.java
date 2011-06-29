@@ -986,7 +986,7 @@ public class TestExecutionSite extends TestCase {
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");
         spi.setParams("commit", 57, "gooniestoo");
-        InitiateTaskMessage mn = new InitiateTaskMessage(-1, -1, -1, false, false, spi, Long.MIN_VALUE);
+        InitiateTaskMessage mn = new InitiateTaskMessage(-1, 0, -1, false, false, spi, Long.MIN_VALUE);
 
         MultiPartitionParticipantTxnState ts =
             new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);

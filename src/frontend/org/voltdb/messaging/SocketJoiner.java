@@ -71,6 +71,7 @@ public class SocketJoiner extends Thread {
     static final int DEPCRC_FAILURE = 16;
     static final int HAVE_DONE_RESTORE_FAILURE = 32;
     static final int CATTXNID_FAILURE = 64;
+    static final int FAULT_MISMATCH_FAILURE = 128;
 
     static final int PING = 333;
     InetAddress m_coordIp = null;
@@ -87,6 +88,7 @@ public class SocketJoiner extends Thread {
     long m_deploymentCRC;
     int m_discoveredCatalogVersion = 0;
     long m_discoveredCatalogTxnId = 0;
+    long m_discoveredFaultSequenceNumber;
 
     // from configuration data
     int m_internalPort;
@@ -591,6 +593,7 @@ public class SocketJoiner extends Thread {
             long difftimes[] = new long[m_expectedHosts - 1];
             int readHostIds[] = new int[m_expectedHosts - 1];
             long othercrcs[] = new long[m_expectedHosts - 1];
+            long faultSequenceNumbers[] = new long [m_expectedHosts - 1];
             long otherdepcrcs[] = new long[m_expectedHosts - 1];
             int catalogVersions[] = new int[m_expectedHosts - 1];
             long catalogTxnIds[] = new long[m_expectedHosts - 1];
@@ -613,6 +616,7 @@ public class SocketJoiner extends Thread {
                 catalogVersions[i] = in.readInt();
                 haveDoneRestore[i] = in.readByte() == 0 ? false : true;
                 catalogTxnIds[i] = in.readLong();
+                faultSequenceNumbers[i] = in.readLong();
                 i++;
             }
 
@@ -669,6 +673,15 @@ public class SocketJoiner extends Thread {
                 }
             }
 
+            m_discoveredFaultSequenceNumber = faultSequenceNumbers[0];
+            for (long number : faultSequenceNumbers) {
+                if (m_discoveredFaultSequenceNumber != number) {
+                    recoveryLog.fatal("Fault sequence number " + number +
+                            " does not match previously seen number " + m_discoveredFaultSequenceNumber);
+                    errors |= FAULT_MISMATCH_FAILURE;
+                }
+            }
+
             boolean b_haveDoneRestore = haveDoneRestore[0];
             for (boolean b__haveDoneRestore : haveDoneRestore) {
                 if (b_haveDoneRestore != b__haveDoneRestore) {
@@ -722,6 +735,10 @@ public class SocketJoiner extends Thread {
             } else {
                 org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore = b_haveDoneRestore;
             }
+            if ((errors & FAULT_MISMATCH_FAILURE) != 0) {
+                if (m_hostLog != null)
+                    m_hostLog.error("Cluster does not agree on the fault sequence number");
+            }
 
             if (errors != 0) {
                 VoltDB.crashVoltDB();
@@ -756,6 +773,7 @@ public class SocketJoiner extends Thread {
             long catalogCRC,
             long deploymentCRC,
             Set<Integer> liveHosts,
+            long faultSequenceNumber,
             int catalogVersionNumber,
             long catalogTxnId) throws Exception {
         SocketChannel remoteConnection = null;
@@ -807,6 +825,8 @@ public class SocketJoiner extends Thread {
 
             out.writeLong(catalogTxnId);
 
+            out.writeLong(faultSequenceNumber);
+
             // flush these 3 writes
             out.flush();
 
@@ -818,6 +838,7 @@ public class SocketJoiner extends Thread {
                 return remoteConnection;
             else {
                 int errors = in.readInt();
+                System.out.println("Errors " + errors);
                 String msg = "";
 
                 if ((errors & NTP_FAILURE) != 0) {

@@ -292,7 +292,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
     {
         long now = EstTime.currentTimeMillis();
         InFlightTxnState retval = new InFlightTxnState(
-                txnId, coordIds[0], new int[]{}, readOnly,
+                txnId, coordIds[0], null, new int[]{}, readOnly,
                 isSinglePart, new StoredProcedureInvocation(),
                 m_testConnect, MESSAGE_SIZE, now, 0, "", false);
         if (coordIds.length > 1) {

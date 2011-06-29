@@ -470,12 +470,16 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public void setFaultSequenceNumber(long sequenceNumber,
-                    Set<Integer> failedSites) {
+            public long getFaultSequenceNumber() {
+                return 0;
+            }
+
+            @Override
+            public void initForRejoin(CatalogContext context,
+                    long faultSequenceNumber, Set<Integer> failedSites) {
                 // TODO Auto-generated method stub
 
             }
-
         };
     }
 
@@ -530,7 +534,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onRestoreCompletion() {
+    public void onRestoreCompletion(boolean initCommandLog) {
         // TODO Auto-generated method stub
     }
 

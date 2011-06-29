@@ -175,7 +175,7 @@ public interface VoltDBInterface
     /**
      * Notify RealVoltDB that command log replay is complete
      */
-    public void onRestoreCompletion();
+    public void onRestoreCompletion(boolean initCommandLog);
 
     ZooKeeper getZK();
 

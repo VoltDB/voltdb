@@ -491,7 +491,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     @Override
-    public void onRestoreCompletion() {
+    public void onRestoreCompletion(boolean initCommandLog) {
         if (m_count.incrementAndGet() == m_hostCount) {
             m_done = true;
         }

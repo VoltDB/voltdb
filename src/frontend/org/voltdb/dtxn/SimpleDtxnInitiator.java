@@ -179,32 +179,44 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
         else
         {
-            // store only partitions that are NOT the coordinator
+            SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
+            ArrayList<Integer> sitesOnThisHost =
+                tracker.m_hostsToSites.get(m_hostId);
+            int coordinatorId = sitesOnThisHost.get(1);
+            ArrayList<Integer> replicaIds = new ArrayList<Integer>();
+            for (Integer replica : tracker.getAllSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
+                if (replica != coordinatorId && tracker.getAllLiveSites().contains(replica)) {
+                    replicaIds.add(replica);
+                }
+            }
+
+            ArrayList<Integer> otherSiteIds = new ArrayList<Integer>();
+
+            // store only partitions that are NOT the coordinator or coordinator replica
             // this is a bit too slow
             int[] allSiteIds =
                 VoltDB.instance().getCatalogContext().
                 siteTracker.getLiveSitesForEachPartition(partitions);
-            int coordinatorId = allSiteIds[0];
-            int[] otherSiteIds = new int[allSiteIds.length - 1];
 
-            for (int i = 1; i < allSiteIds.length; i++)
+            for (int i = 0; i < allSiteIds.length; i++)
             {
                 // if this site is on the same host as the initiator
                 // then take over as the coordinator
-                if (m_hostId == allSiteIds[i] / VoltDB.SITES_TO_HOST_DIVISOR)
-                {
-                    otherSiteIds[i - 1] = coordinatorId;
-                    coordinatorId = allSiteIds[i];
+                if (allSiteIds[i] != coordinatorId && !replicaIds.contains(allSiteIds[i])) {
+                    otherSiteIds.add(allSiteIds[i]);
                 }
-                else
-                {
-                    otherSiteIds[i - 1] = allSiteIds[i];
-                }
+            }
+
+            int otherSiteIdsArr[] = new int[otherSiteIds.size()];
+            int ii = 0;
+            for (Integer otherSiteId : otherSiteIds) {
+                otherSiteIdsArr[ii++] = otherSiteId;
             }
 
             InFlightTxnState txn = new InFlightTxnState(txnId,
                                                         coordinatorId,
-                                                        otherSiteIds,
+                                                        replicaIds,
+                                                        otherSiteIdsArr,
                                                         isReadOnly,
                                                         false,
                                                         invocation,
@@ -302,6 +314,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             new InFlightTxnState(txnId,
                                  siteIds.get(0),
                                  null,
+                                 null,
                                  isReadOnly,
                                  true,
                                  invocation.getShallowCopy(),
@@ -343,14 +356,50 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             throw new RuntimeException(e);
         }
 
-        sendTransactionToCoordinator(txn, txn.firstCoordinatorId);
+        // figure out what the safely replicated txnid is for this execution site/partition id
+        // in the multi-part case where we send this initiate task message to replicas of the coordinator,
+        // the safe txn id is the same for all of them because they are all replicas of the same partition
+        long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(txn.firstCoordinatorId);
+
+        InitiateTaskMessage workRequest = new InitiateTaskMessage(
+                m_siteId,
+                txn.firstCoordinatorId,
+                txn.txnId,
+                txn.isReadOnly,
+                txn.isSinglePartition,
+                txn.invocation,
+                newestSafeTxnId); // this will allow all transactions to run for now
+
+        /*
+         * Send the transaction to the coordinator as well as his replicas
+         * so it is redudantly logged. The replicas that aren't listed
+         * as the coordinator in the work request will treat it as
+         * a participant notice
+         */
+        try {
+            m_mailbox.send(txn.firstCoordinatorId, 0, workRequest);
+            for (Integer replica : txn.coordinatorReplicas) {
+                newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(replica);
+                workRequest = new InitiateTaskMessage(
+                        m_siteId,
+                        txn.firstCoordinatorId,
+                        txn.txnId,
+                        txn.isReadOnly,
+                        txn.isSinglePartition,
+                        txn.invocation,
+                        newestSafeTxnId); // this will allow all transactions to run for now
+                m_mailbox.send(replica, 0, workRequest);
+            }
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
      * Send the initiation notice to the coordinator for a
      * transaction. This message does contain work. In the case
      * of a single-partition transaction, this is all that is
-     * needed to run a transaction.
+     * needed to run a transaction. Only used for single parts at this point
      *
      * @param txn Information about the transaction to send.
      */

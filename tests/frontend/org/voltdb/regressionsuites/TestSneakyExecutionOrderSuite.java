@@ -58,6 +58,9 @@ public class TestSneakyExecutionOrderSuite extends RegressionSuite {
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST){
                 return;
             }
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS){
+                System.out.println(clientResponse.getStatusString());
+            }
             assertTrue(clientResponse.getStatus() == ClientResponse.SUCCESS);
             answersReceived.decrementAndGet();
         }
@@ -67,6 +70,9 @@ public class TestSneakyExecutionOrderSuite extends RegressionSuite {
         public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST){
                 return;
+            }
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS){
+                System.out.println(clientResponse.getStatusString());
             }
             assertTrue(clientResponse.getStatus() == ClientResponse.SUCCESS);
             answersReceived.decrementAndGet();

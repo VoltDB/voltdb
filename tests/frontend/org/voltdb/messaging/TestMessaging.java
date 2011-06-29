@@ -628,7 +628,7 @@ public class TestMessaging extends TestCase {
 
         HashSet<Integer> liveHosts = new HashSet<Integer>();
         liveHosts.add(msg1.getHostId());
-        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), 0, 0, liveHosts, 1, 0);
+        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), 0, 0, liveHosts, 0, 1, 0);
         msg1.rejoinForeignHostCommit();
 
         // this timeout is rather lousy, but neither is it exception safe!

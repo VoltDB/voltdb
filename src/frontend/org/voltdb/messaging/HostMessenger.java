@@ -144,6 +144,10 @@ public class HostMessenger implements Messenger {
         return m_joiner.getDiscoveredCatalogVersionId();
     }
 
+    public long getDiscoveredFaultSequenceNumber() {
+        return m_joiner.m_discoveredFaultSequenceNumber;
+    }
+
     public long getDiscoveredCatalogTxnId() {
         return m_joiner.getDiscoveredCatalogTxnId();
     }
@@ -456,6 +460,7 @@ public class HostMessenger implements Messenger {
                                          long catalogCRC,
                                          long deploymentCRC,
                                          Set<Integer> liveHosts,
+                                         long faultSequenceNumber,
                                          int catalogVersionNumber,
                                          long catalogTxnId) throws Exception {
         if (hostId < 0)
@@ -468,7 +473,7 @@ public class HostMessenger implements Messenger {
 
         SocketChannel sock = SocketJoiner.connect(
                 m_localHostId, hostId, addr, catalogCRC, deploymentCRC,
-                liveHosts, catalogVersionNumber, catalogTxnId);
+                liveHosts, faultSequenceNumber, catalogVersionNumber, catalogTxnId);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
         m_tempNewFH.sendReadyMessage();

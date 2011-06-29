@@ -25,6 +25,8 @@ public interface CommandLog {
 
     public abstract void init(CatalogContext context);
 
+    public abstract void initForRejoin(CatalogContext context, long faultSequenceNumber, Set<Integer> failedSites);
+
     public abstract void log(InitiateTaskMessage message);
 
     public abstract void shutdown() throws InterruptedException;
@@ -38,7 +40,5 @@ public interface CommandLog {
 
     public abstract void logHeartbeat(final long txnId);
 
-    public abstract void setFaultSequenceNumber(long sequenceNumber, Set<Integer> failedSites);
-
-
+    public abstract long getFaultSequenceNumber();
 }

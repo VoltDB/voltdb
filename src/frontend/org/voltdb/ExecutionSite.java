@@ -1168,8 +1168,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                                   false,
                                                   ((InitiateTaskMessage) info).getLastSafeTxnId());
             }
-            // FragmentTasks aren't sent by initiators and shouldn't update
-            // transaction queue initiator states.
+            //Participant notices are sent enmasse from the initiator to multiple partitions
+            // and don't communicate any information about safe replication, hence DUMMY_LAST_SEEN_TXN_ID
+            // it can be used for global ordering since it is a valid txnid from an initiator
             else if (info instanceof MultiPartitionParticipantMessage) {
                 m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorSiteId(),
                                                   info.getTxnId(),

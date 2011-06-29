@@ -18,6 +18,7 @@
 package org.voltdb.dtxn;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -35,6 +36,7 @@ public class InFlightTxnState implements Serializable {
     public InFlightTxnState(
             long txnId,
             int firstCoordinatorId,
+            ArrayList<Integer> coordinatorReplicas,
             int otherSiteIds[],
             boolean isReadOnly,
             boolean isSinglePartition,
@@ -48,6 +50,7 @@ public class InFlightTxnState implements Serializable {
     {
         this.txnId = txnId;
         this.firstCoordinatorId = firstCoordinatorId;
+        this.coordinatorReplicas = coordinatorReplicas;
         this.invocation = invocation;
         this.isReadOnly = isReadOnly;
         this.isSinglePartition = isSinglePartition;
@@ -233,6 +236,8 @@ public class InFlightTxnState implements Serializable {
     //    if k > 0: the complete set of coords is stored
     //        in the outstandingCoordinators set
     public final int firstCoordinatorId;
+
+    public final ArrayList<Integer> coordinatorReplicas;
 
     protected int outstandingResponses = 1;
 

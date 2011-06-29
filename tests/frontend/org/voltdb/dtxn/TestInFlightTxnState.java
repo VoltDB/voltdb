@@ -34,7 +34,7 @@ public class TestInFlightTxnState extends TestCase
 {
     InFlightTxnState createTxnState(long txnId, int[] coordIds)
     {
-        InFlightTxnState retval = new InFlightTxnState(txnId, coordIds[0], new int[]{},
+        InFlightTxnState retval = new InFlightTxnState(txnId, coordIds[0], null, new int[]{},
                 false, true, new StoredProcedureInvocation(), new Object(), 0, 0, 0, "", false);
         for (int i = 1; i < coordIds.length; i++) {
             retval.addCoordinator(coordIds[i]);

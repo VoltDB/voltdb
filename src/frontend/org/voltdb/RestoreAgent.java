@@ -74,7 +74,7 @@ public class RestoreAgent implements CommandLogReinitiator.Callback,
 SnapshotCompletionInterest {
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
-        public void onRestoreCompletion();
+        public void onRestoreCompletion(boolean initCommandLog);
     }
 
     private final static VoltLogger LOG = new VoltLogger("RESTORE");
@@ -934,7 +934,7 @@ SnapshotCompletionInterest {
             m_state = State.TRUNCATE;
         } else if (m_state == State.TRUNCATE) {
             if (m_callback != null) {
-                m_callback.onRestoreCompletion();
+                m_callback.onRestoreCompletion(true);
             }
         }
     }

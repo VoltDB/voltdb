@@ -77,19 +77,26 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         m_siteId = site.getSiteId();
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
+        //Check to make sure we are the coordinator, it is possible to get an intiate task
+        //where we aren't the coordinator because we are a replica of the coordinator.
         if (notice instanceof InitiateTaskMessage)
         {
-            m_isCoordinator = true;
-            m_task = (InitiateTaskMessage) notice;
-            m_durabilityFlag = m_task.getDurabilityFlagIfItExists();
-            SiteTracker tracker = site.getSiteTracker();
-            // Add this check for tests which use a mock execution site
-            if (tracker != null) {
-                m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_siteId);
+            if (notice.getCoordinatorSiteId() == m_siteId) {
+                m_isCoordinator = true;
+                m_task = (InitiateTaskMessage) notice;
+                m_durabilityFlag = m_task.getDurabilityFlagIfItExists();
+                SiteTracker tracker = site.getSiteTracker();
+                // Add this check for tests which use a mock execution site
+                if (tracker != null) {
+                    m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_siteId);
+                }
+                m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
+                                                  null, m_siteId,
+                                                  null, false));
+            } else {
+                m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
+                m_task = null;
             }
-            m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
-                                              null, m_siteId,
-                                              null, false));
         } else {
             m_task = null;
             m_durabilityFlag = null;

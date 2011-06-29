@@ -44,6 +44,9 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
@@ -357,12 +360,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         @Override
-        public void setFaultSequenceNumber(long sequenceNumber,
-                Set<Integer> failedSites) {
+        public long getFaultSequenceNumber() {
+            return 0;
+        }
+
+        @Override
+        public void initForRejoin(CatalogContext context,
+                long faultSequenceNumber, Set<Integer> failedSites) {
             // TODO Auto-generated method stub
 
         }
-
     };
 
     private volatile OperationMode m_mode = OperationMode.RUNNING;
@@ -583,6 +590,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_network = new VoltNetwork();
             final HashSet<Integer> downHosts = new HashSet<Integer>();
             final Set<Integer> downNonExecSites = new HashSet<Integer>();
+            //For command log only, will also mark self as faulted
+            final Set<Integer> downSites = new HashSet<Integer>();
             boolean isRejoin = config.m_rejoinToHostAndPort != null;
             if (!isRejoin) {
                 // Create the intra-cluster mesh
@@ -607,6 +616,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             else {
                 downHosts.addAll(initializeForRejoin(config, m_catalogContext.catalogCRC, depCRC));
+
                 /**
                  * Whatever hosts were reported as being down on rejoin should
                  * be reported to the fault manager so that the fault can be distributed.
@@ -615,6 +625,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                  */
                 for (Integer downHost : downHosts) {
                     downNonExecSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
+                    downSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
                     m_faultManager.reportFault(
                             new NodeFailureFault(
                                 downHost,
@@ -628,6 +639,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
                 ExecutionSite.recoveringSiteCount.set(
                         m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size());
+                downSites.addAll(m_catalogContext.siteTracker.getAllSitesForHost(m_messenger.getHostId()));
             }
             m_catalogContext.m_transactionId = m_messenger.getDiscoveredCatalogTxnId();
             assert(m_messenger.getDiscoveredCatalogTxnId() != 0);
@@ -875,6 +887,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 VoltDB.crashVoltDB();
             }
 
+            if (m_commandLog != null && isRejoin) {
+                m_commandLog.initForRejoin(
+                        m_catalogContext,
+                        m_messenger.getDiscoveredFaultSequenceNumber(),
+                        downSites);
+            }
+
             // tell other booting nodes that this node is ready. Primary purpose is to publish a hostname
             m_messenger.sendReadyMessage();
 
@@ -919,7 +938,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     VoltDB.crashVoltDB();
                 }
             } else {
-                onRestoreCompletion();
+                onRestoreCompletion(!isRejoin);
             }
         }
     }
@@ -1216,6 +1235,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
+            m_executionSitesRecovered = false;
+            m_agreementSiteRecovered = false;
             m_snapshotCompletionMonitor.shutdown();
             fivems.interrupt();
             fivems.join();
@@ -1350,7 +1371,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         // connect to the joining node, build a foreign host
         try {
             messenger.rejoinForeignHostPrepare(rejoinHostId, addr, m_catalogContext.catalogCRC,
-                    m_catalogContext.deploymentCRC, liveHosts,
+                    m_catalogContext.deploymentCRC, liveHosts, m_commandLog.getFaultSequenceNumber(),
                     m_catalogContext.catalogVersion, m_catalogContext.m_transactionId);
             return null;
         } catch (Exception e) {
@@ -1701,6 +1722,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 "Node recovery completed after " + delta + " seconds with " + megabytes +
                 " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
+        hostLog.info("Logging host recovery completion to ZK");
+        try {
+            try {
+                m_zk.create("/unfaulted_hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            } catch (KeeperException.NodeExistsException e) {}
+            m_zk.create("/unfaulted_hosts/" + m_messenger.getHostId(), null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        } catch (Exception e) {
+            hostLog.fatal("Unable to log host recovery completion to ZK", e);
+            VoltDB.crashVoltDB();
+        }
     }
 
     @Override
@@ -1759,7 +1790,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public void onRestoreCompletion() {
+    public void onRestoreCompletion(boolean initCommandLog) {
         /*
          * Enable the initiator to send normal heartbeats and accept client
          * connections
@@ -1776,8 +1807,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        // Initialize command logger
-        m_commandLog.init(m_catalogContext);
+        /*
+         * Command log is already initialized if this is a rejoin
+         */
+        if (initCommandLog) {
+            // Initialize command logger
+            m_commandLog.init(m_catalogContext);
+        }
 
         if (m_startMode != null) {
             m_mode = m_startMode;

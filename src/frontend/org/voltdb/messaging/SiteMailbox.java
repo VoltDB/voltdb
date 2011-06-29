@@ -65,6 +65,10 @@ public class SiteMailbox implements Mailbox {
 
     public void deliver(VoltMessage message, final boolean toFront) {
         assert(message != null);
+
+        // tag what mailbox this message was delivered to, command log uses this
+        message.receivedFromSiteId = m_siteId;
+
         /*
          * Doing delivery here so that the delivery thread is the one interacting with the
          * log instead of the receiver. This way only the network threads contend for the log.
@@ -88,9 +92,6 @@ public class SiteMailbox implements Mailbox {
             }
             this.notify();
         }
-
-        // tag some extra transient data for debugging
-        message.receivedFromSiteId = m_siteId;
 
         // this code keeps track of last 10 messages received in various buckets
 
