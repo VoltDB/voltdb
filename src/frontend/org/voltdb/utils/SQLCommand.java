@@ -53,6 +53,16 @@ public class SQLCommand
         if (query == null)
             return null;
 
+        String[] command = new String[] {"exec", "execute", "declare proc", "declare procedure", "undeclare proc", "undeclare procedure"};
+        String[] keyword = new String[] {"select", "insert", "update", "delete", "declare", "undeclare"};
+        for(int i = 0;i<command.length;i++)
+        {
+            for(int j = 0;j<command.length;j++)
+            {
+                Pattern r = Pattern.compile("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+                query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
+            }
+        }
         query = SingleLineComments.matcher(query).replaceAll("");
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
         Matcher stringFragmentMatcher = Extract.matcher(query);
@@ -77,6 +87,7 @@ public class SQLCommand
                     for(int k = 0;k<stringFragments.size();k++)
                         sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
                 sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
+                sqlFragments[j] = sqlFragments[j].replace("#SQL_PARSER_STRING_KEYWORD#","");
                 queries.add(sqlFragments[j]);
             }
         }
@@ -507,6 +518,10 @@ public class SQLCommand
 
        return str.toString();
     }
+    private static boolean isUpdateResult(VoltTable table)
+    {
+        return ((table.getColumnName(0).length() == 0 || table.getColumnName(0).equals("modified_tuples"))&& table.getRowCount() == 1 && table.getColumnCount() == 1 && table.getColumnType(0) == VoltType.BIGINT);
+    }
     private static void printResponse(ClientResponse response) throws Exception
     {
         if (response.getStatus() != ClientResponse.SUCCESS)
@@ -515,6 +530,12 @@ public class SQLCommand
         {
             for(VoltTable t : response.getResults())
             {
+                if (isUpdateResult(t))
+                {
+                    if(OutputShowMetadata)
+                        System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
+                    continue;
+                }
                 int columnCount = t.getColumnCount();
                 int[] padding = new int[columnCount];
                 String[] fmt = new String[columnCount];
@@ -576,6 +597,12 @@ public class SQLCommand
             String separator = OutputFormat.equals("csv") ? "," : "\t";
             for(VoltTable t : response.getResults())
             {
+                if (isUpdateResult(t))
+                {
+                    if(OutputShowMetadata)
+                        System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
+                    continue;
+                }
                 int columnCount = t.getColumnCount();
                 if (OutputShowMetadata)
                 {
