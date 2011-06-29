@@ -16,11 +16,17 @@ this.InitWorkspace = function()
 	
 	$tabs = $("#worktabs").tabs(
 	{
-		tabTemplate: "<li><a href='#{href}'>#{label}</a> <span class='ui-icon ui-icon-close' title='Close Tab'>Close</span></li>",
+		tabTemplate: "<li><a href='#{href}'>#{label}</a> <span class='ui-icon ui-icon-close close-tab' title='Close Tab'>Close</span></li>",
 		panelTemplate: '<div id="#{href}"></div>',
 		add: function(event, ui)
 		{
 			$tabs.tabs('select', '#' + ui.panel.id);
+	        $('.close-tab').click(function() {
+		        var index = $( "li", $tabs ).index( $( this ).parent() );
+		        $tabs.tabs( "remove", index );
+	        });
+            $('.close-tab').removeClass('close-tab');
+
 			var tab = $($('#worktabs div.ui-tabs-panel')[$tabs.tabs('option','selected')]);
 			if (ui.panel.id.substr(0,1) == 'q')
 			{
@@ -103,11 +109,6 @@ this.InitWorkspace = function()
 			else
 				$tabs.tabs( 'add', '#m-' + MainUI.ActiveConnection().Key, 'Monitor: ' + MainUI.ActiveConnection().Display );
 		}
-	});
-
-	$( "#worktabs span.ui-icon-close" ).live( "click", function() {
-		var index = $( "li", $tabs ).index( $( this ).parent() );
-		$tabs.tabs( "remove", index );
 	});
 
 	$("#execute-query").button().click(function() {

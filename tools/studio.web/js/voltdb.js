@@ -121,12 +121,14 @@ var IVoltDB = (function(){
 			this.BeginExecute = function(procedure, parameters, callback)
 			{
 				Stack.push([procedure, parameters, callback]);
+/*
 				if (!Executing)
 				{
 					Executing = true;
 					var item = Stack[0];
 					CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {alert(x);Success = false;EndExecute();} })).Callback);
 				}
+*/
 				return this;
 			}
 			EndExecute = function()
@@ -149,8 +151,16 @@ var IVoltDB = (function(){
 			this.End = function(fcn, state)
 			{
 				OnCompleteHandler = [fcn, state];
+				if (!Executing)
+				{
+					Executing = true;
+					var item = Stack[0];
+					CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {alert(x);Success = false;EndExecute();} })).Callback);
+				}
+/*
 				if (!Executing && OnCompleteHandler != null)
 					OnCompleteHandler[0](OnCompleteHandler[1], (Success || ContinueOnFailure));
+*/
 				return this;
 			}
 		});

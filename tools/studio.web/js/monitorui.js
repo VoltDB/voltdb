@@ -189,6 +189,9 @@ this.RefreshData = function()
 
 this.RefreshMonitor = function(id, Success)
 {
+    if (!(id in MonitorUI.Monitors))
+        return;
+
 	if (!Success)
 	{
 		$(MonitorUI.Monitors[id].tab.find('.monitoritemselection')).attr('disabled','disabled');
@@ -404,8 +407,11 @@ this.RefreshMonitor = function(id, Success)
 			break;
 	}
 
-	MonitorUI.Monitors[id].leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
-	MonitorUI.Monitors[id].rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
+    try
+    {
+	    MonitorUI.Monitors[id].leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
+	    MonitorUI.Monitors[id].rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
+    } catch (x) {}
 
 	MonitorUI.UpdateMonitorItem(id);
 	MonitorUI.Monitors[id].lastTimerTick = currentTimerTick;
