@@ -136,6 +136,21 @@ public class TestBlobType extends TestCase {
         }
         catch (ProcCallException e) {}
 
+        // test invalid comparison
+        try {
+            cr = client.callProcedure("@AdHoc", "update blah set ival = 5 where b = 'Bb01'");
+            fail();
+        }
+        catch (ProcCallException e) {}
+
+        // test too long varbinary
+        byte[] overlong = new byte[VoltType.MAX_VALUE_LENGTH + 1];
+        try {
+            cr = client.callProcedure("Insert", 6, new byte[] { 'a' }, "hi", overlong);
+            fail();
+        }
+        catch (ProcCallException e) {}
+
         localServer.shutdown();
         localServer.join();
 
@@ -143,7 +158,7 @@ public class TestBlobType extends TestCase {
         VoltDB.instance().shutdown(localServer);
     }
 
-    /*public void testIndexRejection() throws Exception {
+    public void testIndexRejection() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
@@ -157,7 +172,7 @@ public class TestBlobType extends TestCase {
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0, "localhost");
         assertFalse(success);
-    }*/
+    }
 
     public void testTPCCCustomerLookup() throws Exception {
 

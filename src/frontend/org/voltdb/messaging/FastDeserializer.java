@@ -243,7 +243,7 @@ public class FastDeserializer implements DataInput {
         assert len >= 0;
 
         if (len > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Serializable strings cannot be longer then "
+            throw new IOException("Serializable varbinary values cannot be longer then "
                     + VoltType.MAX_VALUE_LENGTH + " bytes");
         }
         if (len < NULL_STRING_INDICATOR) {

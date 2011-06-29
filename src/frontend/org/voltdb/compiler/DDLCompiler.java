@@ -599,6 +599,11 @@ public class DDLCompiler {
                 has_nonint_col = true;
                 nonint_col_name = colNames[i];
             }
+            // disallow columns from VARBINARYs
+            if (colType == VoltType.VARBINARY) {
+                String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
+                throw this.m_compiler.new VoltCompilerException(msg);
+            }
         }
 
         Index index = table.getIndexes().add(name);
