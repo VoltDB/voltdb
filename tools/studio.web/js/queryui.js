@@ -224,8 +224,13 @@ function isUpdateResult(table)
 function printGrid(target, id, table)
 {
 	var src = '<table class="tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder">';
-	for(var j = 0; j < table.schema.length; j++)
-		src += '<th>' + table.schema[j].name + '</th>';
+    if (isUpdateResult(table))
+		src += '<th>modified_tuples</th>';
+    else
+    {
+    	for(var j = 0; j < table.schema.length; j++)
+	    	src += '<th>' + ( table.schema[j].name == "" ? ("Column " + (j+1)) : table.schema[j].name ) + '</th>';
+    }
 	src += '</thead><tbody>';
 	for(var j = 0; j < table.data.length; j++)
 	{
