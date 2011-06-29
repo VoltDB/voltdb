@@ -53,8 +53,8 @@ public class SQLCommand
         if (query == null)
             return null;
 
-        String[] command = new String[] {"exec", "execute", "declare proc", "declare procedure", "undeclare proc", "undeclare procedure"};
-        String[] keyword = new String[] {"select", "insert", "update", "delete", "declare", "undeclare"};
+        String[] command = new String[] {"exec", "execute", "undeclare proc", "undeclare procedure", "declare proc", "declare procedure"};
+        String[] keyword = new String[] {"select", "insert", "update", "delete", "undeclare", "declare"};
         for(int i = 0;i<command.length;i++)
         {
             for(int j = 0;j<command.length;j++)
@@ -457,6 +457,13 @@ public class SQLCommand
                             throw new Exception("Invalid Statistics Component: " + param);
                         objectParams[i] = param.toUpperCase();
                     }
+                    else if (paramType.equals("varbinary"))
+                    {
+                        if (IsNull.matcher(param).matches())
+                            objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
+                        else
+                            objectParams[i] = hexStringToByteArray(Unquote.matcher(param).replaceAll("").replace("''","'"));
+                    }
                     else
                         throw new Exception("Unsupported Data Type: " + paramType);
                 }
@@ -492,6 +499,27 @@ public class SQLCommand
             printResponse(VoltDB.callProcedure("@AdHoc", query));
         }
         return;
+    }
+
+    private static String byteArrayToHexString(byte[] data)
+    {
+        StringBuffer hexString = new StringBuffer();
+        for (int i=0;i<data.length;i++)
+        {
+            String hex = Integer.toHexString(0xFF & data[i]);
+            if (hex.length() == 1)
+                hexString.append('0');
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+    private static byte[] hexStringToByteArray(String s)
+    {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2)
+            data[i/2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i+1), 16));
+        return data;
     }
 
     // Output generation
@@ -548,7 +576,7 @@ public class SQLCommand
                     {
                         Object v = t.get(i, t.getColumnType(i));
                         if (v == null) v = "null";
-                        int l = v.toString().length();
+                        int l = t.getColumnType(i) == VoltType.VARBINARY ? ((byte[])v).length*2 : v.toString().length();
                         if (padding[i] < l)
                             padding[i] = l;
                     }
@@ -556,7 +584,7 @@ public class SQLCommand
                 for (int i = 0; i < columnCount; i++)
                 {
                     padding[i] += 1;
-                    fmt[i] = "%1$" + ((t.getColumnType(i) == VoltType.STRING || t.getColumnType(i) == VoltType.TIMESTAMP) ? "-" : "#") + padding[i] + "s";
+                    fmt[i] = "%1$" + ((t.getColumnType(i) == VoltType.STRING || t.getColumnType(i) == VoltType.TIMESTAMP || t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "#") + padding[i] + "s";
                 }
                 if (OutputShowMetadata)
                 {
@@ -581,8 +609,13 @@ public class SQLCommand
                     for (int i = 0; i < columnCount; i++)
                     {
                         Object v = t.get(i, t.getColumnType(i));
-                        if (v == null) v = "null";
-                        System.out.printf(fmt[i], v.toString());
+                        if (v == null)
+                            v = "null";
+                        else if (t.getColumnType(i) == VoltType.VARBINARY)
+                            v = byteArrayToHexString((byte[])v);
+                        else
+                            v = v.toString();
+                        System.out.printf(fmt[i], v);
                         if (i < columnCount - 1)
                             System.out.print(" ");
                     }
@@ -620,8 +653,13 @@ public class SQLCommand
                     {
                         if (i > 0) System.out.print(separator);
                         Object v = t.get(i, t.getColumnType(i));
-                        if (v == null) v = "null";
-                        System.out.print(v.toString());
+                        if (v == null)
+                            v = "null";
+                        else if (t.getColumnType(i) == VoltType.VARBINARY)
+                            v = byteArrayToHexString((byte[])v);
+                        else
+                            v = v.toString();
+                        System.out.print(v);
                     }
                     System.out.print("\n");
                 }
@@ -633,7 +671,7 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> Types = Arrays.asList("tinyint","smallint","int","bigint","float","decimal","varchar","timestamp");
+    private static final List<String> Types = Arrays.asList("tinyint","smallint","int","bigint","float","decimal","varchar","timestamp","varbinary");
     private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS");
     private static Map<String,List<String>> Procedures = new Hashtable<String,List<String>>();
     private static void loadSystemProcedures()
