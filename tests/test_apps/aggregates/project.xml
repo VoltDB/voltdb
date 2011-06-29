@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<project>
+  <database name='database'>
+    <schemas>
+      <schema path='ddl.sql' />
+    </schemas>
+    <procedures>
+        <procedure class='InsertP1' partitioninfo='P1.p1pk:0'>
+            <sql>Insert into P1 values (?, ?, ?)</sql>
+        </procedure>
+        <procedure class="InsertP2" partitioninfo="P2.p1fk:1">
+            <sql>Insert into P2 values (?, ?, ?, ?)</sql>
+        </procedure>
+    </procedures>
+    <partitions>
+      <partition table='P1' column='P1PK' />
+      <partition table='P2' column='P1FK' />
+    </partitions>
+  </database>
+</project>

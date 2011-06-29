@@ -25,12 +25,8 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.catalog.*;
+import org.voltdb.plannodes.*;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -196,12 +192,20 @@ public class TestPushDownAggregates extends TestCase {
                         null);
     }
 
+    public void testLimit() {
+        List<AbstractPlanNode> pn = compile("select PKEY from T1 order by PKEY limit 5", 0, false);
+        PlanNodeList pnl = new PlanNodeList(pn.get(0));
+        System.out.println(pnl.toDOTString("FRAG0"));
+        pnl = new PlanNodeList(pn.get(1));
+        System.out.println(pnl.toDOTString("FRAG1"));
+    }
+
     /**
      * Check if the aggregate node is pushed-down in the given plan. If the
      * pushDownTypes is null, it assumes that the aggregate node should NOT be
      * pushed-down.
      *
-     * @param pn
+     * @param np
      *            The generated plan
      * @param isMultiPart
      *            Whether or not the plan is distributed

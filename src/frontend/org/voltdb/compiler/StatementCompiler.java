@@ -192,6 +192,12 @@ public abstract class StatementCompiler {
             plansOut.println(json);
             plansOut.close();
 
+            // output the plan to disk for debugging
+            plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
+                    "statement-winner-plan-fragments", name + String.valueOf(i) + ".dot");
+            plansOut.println(node_list.toDOTString(name + "-" + String.valueOf(i)));
+            plansOut.close();
+
             // Place serialized version of PlanNodeTree into a PlanFragment
             try {
                 FastSerializer fs = new FastSerializer(true, false);

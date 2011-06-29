@@ -89,6 +89,13 @@
                       "ddl": "int-DDL.sql",
                       "template": "regression-advanced-ints.sql",
                       "normalizer": "normalizer.py"},
+# This suite written to test push-down of aggregates and limits in combination
+# with indexes, projections and order-by.
+    "pushdown": {"schema": "pushdown-schema.py",
+        "ddl": "pushdown-DDL.sql",
+        "template": "pushdown.sql",
+        "normalizer": "normalizer.py"},
+
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION, THE
 # REGRESSION SET IS NEXT TO USELESS, SKIPPING IT
 #    "advanced-decimal": {"schema": "decimal-schema.py",
@@ -96,3 +103,5 @@
 #                         "template": "regression-advanced-decimal.sql",
 #                         "normalizer": "normalizer.py"},
 }
+
+
