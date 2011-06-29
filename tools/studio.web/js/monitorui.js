@@ -102,6 +102,7 @@ this.AddMonitor = function(tab)
     , 'memMax': 1
     , 'strMax': 100
     , 'tickValues': tickValues
+    , 'partitionCount': partitionCount
     };
 
     InitializeChart(id, 'left', 'lat');
@@ -113,6 +114,8 @@ this.AddMonitor = function(tab)
 }
 this.RemoveMonitor = function(id)
 {
+    if (!(id in MonitorUI.Monitors))
+        return;
 	$(MonitorUI.Monitors[id].tab.find('.monitoritemselection')).attr('disabled','disabled');
 	$('a[href=#' + id + ']').text('Monitor: Disconnected');
 	delete MonitorUI.Monitors[id];
@@ -148,43 +151,35 @@ this.Redraw = function()
 {
 	for(var id in this.Monitors)
 	{
-		MonitorUI.Monitors[id].leftPlot.replot();
-		MonitorUI.Monitors[id].rightPlot.replot();
+        try
+        {
+    		MonitorUI.Monitors[id].leftPlot.replot();
+	    	MonitorUI.Monitors[id].rightPlot.replot();
+        } catch(x) {} // Will happen if charts are hidden
 	}
 }
+
 this.RefreshMonitorData = function(id)
 {
 	if (id in MonitorUI.Monitors)
-	{
+    {
 		var connection = VoltDB.GetConnection(id.substring(2));
 		if (connection == null)
 		{
 			MonitorUI.RemoveMonitor(id);
 			return;
 		}
-		connection.Queue.Start();
-			connection.Queue.BeginExecute('@Statistics', ['MEMORY', 0], MonitorUI.Monitors[id].memStatsCallback);
-			connection.Queue.BeginExecute('@Statistics', ['PROCEDURE', 0], MonitorUI.Monitors[id].procStatsCallback);
-			connection.Queue.BeginExecute('@Statistics', ['STARVATION', 1], MonitorUI.Monitors[id].starvStatsCallback);
-		connection.Queue.End(MonitorUI.RefreshMonitor, id);
-	}
+		connection.getQueue().Start()
+                			.BeginExecute('@Statistics', ['MEMORY', 0], MonitorUI.Monitors[id].memStatsCallback)
+    			            .BeginExecute('@Statistics', ['PROCEDURE', 0], MonitorUI.Monitors[id].procStatsCallback)
+    			            .BeginExecute('@Statistics', ['STARVATION', 1], MonitorUI.Monitors[id].starvStatsCallback)
+    	                	.End(MonitorUI.RefreshMonitor, id);
+    }
 }
 this.RefreshData = function()
 {
 	for(var id in MonitorUI.Monitors)
-	{
-		var connection = VoltDB.GetConnection(id.substring(2));
-		if (connection == null)
-			MonitorUI.RemoveMonitor(id);
-		else
-		{
-			connection.Queue.Start();
-				connection.Queue.BeginExecute('@Statistics', ['MEMORY', 0], MonitorUI.Monitors[id].memStatsCallback);
-				connection.Queue.BeginExecute('@Statistics', ['PROCEDURE', 0], MonitorUI.Monitors[id].procStatsCallback);
-				connection.Queue.BeginExecute('@Statistics', ['STARVATION', 1], MonitorUI.Monitors[id].starvStatsCallback);
-			connection.Queue.End(MonitorUI.RefreshMonitor, id);
-		}
-	}
+        this.RefreshMonitorData(id);
 }
 
 this.RefreshMonitor = function(id, Success)
@@ -192,27 +187,32 @@ this.RefreshMonitor = function(id, Success)
     if (!(id in MonitorUI.Monitors))
         return;
 
+    var monitor = MonitorUI.Monitors[id];
+
 	if (!Success)
 	{
-		$(MonitorUI.Monitors[id].tab.find('.monitoritemselection')).attr('disabled','disabled');
+		$(monitor.tab.find('.monitoritemselection')).attr('disabled','disabled');
 		MonitorUI.RemoveMonitor(id);
 		return;
 	}
 	if (!(id in MonitorUI.Monitors))
 		return;
-		
+
+	if ((monitor.starvStatsResponse == null) || (monitor.strData == null))
+        return;
+
 	var currentTimerTick = (new Date()).getTime();
-	var latData = MonitorUI.Monitors[id].latData;
-	var tpsData = MonitorUI.Monitors[id].tpsData;
-	var memData = MonitorUI.Monitors[id].memData;
-	var strData = MonitorUI.Monitors[id].strData;
+	var latData = monitor.latData;
+	var tpsData = monitor.tpsData;
+	var memData = monitor.memData;
+	var strData = monitor.strData;
 	
 	var dataMem = memData[0];
 	var dataLat = latData[0];
 	var dataTPS = tpsData[0];
 	var dataIdx  = dataMem[dataMem.length-1][0]+1;
 	var Mem = 0;
-	var table = MonitorUI.Monitors[id].memStatsResponse.results[0].data;
+	var table = monitor.memStatsResponse.results[0].data;
 	for(var j = 0; j < table.length; j++)
 		Mem += table[j][3]*1.0/1048576.0;
 	dataMem = dataMem.slice(1);
@@ -220,7 +220,7 @@ this.RefreshMonitor = function(id, Success)
 	var Lat = 0;
 	var TPS = 0;
 	var procStats = {};
-	table = MonitorUI.Monitors[id].procStatsResponse.results[0].data;
+	table = monitor.procStatsResponse.results[0].data;
 	for(var j = 0; j < table.length; j++)
 	{
 		var data = null;
@@ -237,7 +237,7 @@ this.RefreshMonitor = function(id, Success)
 			data = [table[j][5], table[j][6], table[j][8], table[j][10]*table[j][7], table[j][9], table[j][7]];
 		procStats[table[j][5]] = data;
 	}
-	table = MonitorUI.Monitors[id].starvStatsResponse.results[0].data;
+	table = monitor.starvStatsResponse.results[0].data;
 	var starvStats = {}
 	for(var j=0;j<table.length;j++)
 	{
@@ -265,13 +265,13 @@ this.RefreshMonitor = function(id, Success)
 	}
 	currentLatencyAverage = currentLatencyAverage / currentTimedTransactionCount*1.0;
 	
-	if (MonitorUI.Monitors[id].lastTransactionCount > 0 && MonitorUI.Monitors[id].lastTimerTick > 0)
+	if (monitor.lastTransactionCount > 0 && monitor.lastTimerTick > 0)
 	{
-		var delta = currentTransactionCount - MonitorUI.Monitors[id].lastTransactionCount;
+		var delta = currentTransactionCount - monitor.lastTransactionCount;
 		dataTPS = dataTPS.slice(1);
-		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - MonitorUI.Monitors[id].lastTimerTick)]);
+		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
 		dataLat = dataLat.slice(1);
-		if (currentTimedTransactionCount == MonitorUI.Monitors[id].lastTimedTransactionCount)
+		if (currentTimedTransactionCount == monitor.lastTimedTransactionCount)
 		{
 			if (delta < 10)
 				dataLat.push([dataIdx,0]);
@@ -279,7 +279,7 @@ this.RefreshMonitor = function(id, Success)
 				dataLat.push([dataIdx,currentLatencyAverage/1000.0]);
 		}
 		else
-			dataLat.push([dataIdx,((currentLatencyAverage * currentTimedTransactionCount - MonitorUI.Monitors[id].lastLatencyAverage * MonitorUI.Monitors[id].lastTimedTransactionCount) / (currentTimedTransactionCount - MonitorUI.Monitors[id].lastTimedTransactionCount)) /1000.0]);
+			dataLat.push([dataIdx,((currentLatencyAverage * currentTimedTransactionCount - monitor.lastLatencyAverage * monitor.lastTimedTransactionCount) / (currentTimedTransactionCount - monitor.lastTimedTransactionCount)) /1000.0]);
 	}
 	
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
@@ -316,21 +316,25 @@ this.RefreshMonitor = function(id, Success)
 			src += '</tr>';
 		}
 		src += '</tbody></table>';
-		$(MonitorUI.Monitors[id].tab.find('.tablebar')).html(src);
+		$(monitor.tab.find('.tablebar')).html(src);
 	}
 	$("#stats-" + id).tablesorter({widgets: ['zebra']});
 	
-	MonitorUI.Monitors[id].lastTransactionCount = currentTransactionCount;
-	MonitorUI.Monitors[id].lastTimedTransactionCount = currentTimedTransactionCount;
-	MonitorUI.Monitors[id].lastLatencyAverage = currentLatencyAverage;
+	monitor.lastTransactionCount = currentTransactionCount;
+	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
+	monitor.lastLatencyAverage = currentLatencyAverage;
 	
+    var keys = [];
 	for(var k in starvStats)
-	{
-		var dataStarv = strData[k-1]; //MonitorUI.Monitors[id].bottomPlot.series[k-1].data;
+        keys.push(k);
+    keys.sort();
+    for(var k=0;k<keys.length;k++)
+    {
+		var dataStarv = strData[k];
 		dataStarv = dataStarv.slice(1);
-		dataStarv.push([dataIdx,starvStats[k][0]/starvStats[k][1]]);
-		strData[k-1] = dataStarv;
-	}
+		dataStarv.push([dataIdx,starvStats[keys[k]][0]/starvStats[keys[k]][1]]);
+		strData[k] = dataStarv;
+    }
 
 	var lymax = 0.25;
 	var rymax = 100;
@@ -352,69 +356,77 @@ this.RefreshMonitor = function(id, Success)
 		tickValues.push(j);
 	tickValues.push(dataIdx);
 	
-	MonitorUI.Monitors[id].latMax = rymax;
-	MonitorUI.Monitors[id].tpsMax = ry2max;
-	MonitorUI.Monitors[id].memMax = lymax;
-	MonitorUI.Monitors[id].strMax = 100;
+	monitor.latMax = rymax;
+	monitor.tpsMax = ry2max;
+	monitor.memMax = lymax;
+	monitor.strMax = 100;
 	
-	MonitorUI.Monitors[id].latData = [dataLat];
-	MonitorUI.Monitors[id].tpsData = [dataTPS];
-	MonitorUI.Monitors[id].memData = [dataMem];
-	MonitorUI.Monitors[id].strData = strData;
+	monitor.latData = [dataLat];
+	monitor.tpsData = [dataTPS];
+	monitor.memData = [dataMem];
+	monitor.strData = strData;
 
-	MonitorUI.Monitors[id].tickValues = tickValues;
+	monitor.tickValues = tickValues;
 	
 	var lmax = 1;
 	var rmax = 1;
-	switch(MonitorUI.Monitors[id].leftMetric)
+	switch(monitor.leftMetric)
 	{
 		case 'lat':
-			MonitorUI.Monitors[id].leftPlot.series[0].data = dataLat;
+			monitor.leftPlot.series[0].data = dataLat;
 			lmax = rymax;
 			break;
 		case 'tps':
-			MonitorUI.Monitors[id].leftPlot.series[0].data = dataTPS;
+			monitor.leftPlot.series[0].data = dataTPS;
 			lmax = ry2max;
 			break;
 		case 'mem':
-			MonitorUI.Monitors[id].leftPlot.series[0].data = dataMem;
+			monitor.leftPlot.series[0].data = dataMem;
 			lmax = lymax;
 			break;
 		case 'str':
-			for(var k in starvStats)
-				MonitorUI.Monitors[id].leftPlot.series[k-1].data = strData[k-1];
+			for(var k=0;k<strData.length;k++)
+            {
+				monitor.leftPlot.series[k].data = strData[k];
+				monitor.leftPlot.series[k].label = keys[k];
+            }
 			lmax = 100;
 			break;
 	}
-	switch(MonitorUI.Monitors[id].rightMetric)
+	switch(monitor.rightMetric)
 	{
 		case 'lat':
-			MonitorUI.Monitors[id].rightPlot.series[0].data = dataLat;
+			monitor.rightPlot.series[0].data = dataLat;
 			rmax = rymax;
 			break;
 		case 'tps':
-			MonitorUI.Monitors[id].rightPlot.series[0].data = dataTPS;
+			monitor.rightPlot.series[0].data = dataTPS;
 			rmax = ry2max;
 			break;
 		case 'mem':
-			MonitorUI.Monitors[id].rightPlot.series[0].data = dataMem;
+			monitor.rightPlot.series[0].data = dataMem;
 			rmax = lymax;
 			break;
 		case 'str':
-			for(var k in starvStats)
-				MonitorUI.Monitors[id].rightPlot.series[k-1].data = strData[k-1];
+			for(var k=0;k<strData.length;k++)
+            {
+				monitor.rightPlot.series[k].data = strData[k];
+				monitor.rightPlot.series[k].label = keys[k];
+            }
 			rmax = 100;
 			break;
 	}
 
     try
     {
-	    MonitorUI.Monitors[id].leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
-	    MonitorUI.Monitors[id].rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
+//alert("plot: " + id + " | " + monitor.leftPlot.targetId);
+	    monitor.leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
+	    monitor.rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
     } catch (x) {}
 
 	MonitorUI.UpdateMonitorItem(id);
-	MonitorUI.Monitors[id].lastTimerTick = currentTimerTick;
+	monitor.lastTimerTick = currentTimerTick;
+    MonitorUI.Monitors[id] = monitor;
 }
 
 this.UpdateMonitorItem = function(id)

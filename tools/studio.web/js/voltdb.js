@@ -11,26 +11,26 @@ var IVoltDB = (function(){
 		user = user == null ? '' : jQuery.trim(user);
 		password = password == null ? '' : jQuery.trim(password);
 
-		var Server = server == '' ? 'localhost' : server;
-		var Port = port == '' ? 8080 : port;
-		var Admin = admin == true;
-		var User = user == '' ? null : user;
-		var Password = password == '' ? null : (isHashedPassword == false ? password : null);
-		var HashedPassword = password == '' ? null : (isHashedPassword == true ? password : null);
+		this.Server = server == '' ? 'localhost' : server;
+		this.Port = port == '' ? 8080 : port;
+		this.Admin = admin == true;
+		this.User = user == '' ? null : user;
+		this.Password = password == '' ? null : (isHashedPassword == false ? password : null);
+		this.HashedPassword = password == '' ? null : (isHashedPassword == true ? password : null);
 
 		this.Metadata = {};
 		this.Ready = false;
 
-		this.Key = (Server + '_' + Port + '_' + (user == ''?'':user) + '_' + (Admin == true?'Admin':'')).replace(/[^_a-zA-Z0-9]/g,"_");
-		this.Display = Server + ':' + Port + (user == ''?'':' (' + user + ')') + (Admin == true?' - Admin':'');
+		this.Key = (this.Server + '_' + this.Port + '_' + (user == ''?'':user) + '_' + (this.Admin == true?'Admin':'')).replace(/[^_a-zA-Z0-9]/g,"_");
+		this.Display = this.Server + ':' + this.Port + (user == ''?'':' (' + user + ')') + (this.Admin == true?' - Admin':'');
 
-		BuildURI = function(procedure, parameters)
+		this.BuildURI = function(procedure, parameters)
 		{
 			var s = [];
-			if (!(procedure in Procedures))
+			if (!(procedure in this.Procedures))
 				return ['Procedure "' + procedure + '" is undefined.'];
-			if (jQuery.isArray(parameters) && (parameters.length != Procedures[procedure].length))
-				return ['Invalid parameter count for procedure "' + procedure + '" (received: ' + parameters.length + ', expected: ' + Procedures[procedure].length + ')' ];
+			if (jQuery.isArray(parameters) && (parameters.length != this.Procedures[procedure].length))
+				return ['Invalid parameter count for procedure "' + procedure + '" (received: ' + parameters.length + ', expected: ' + this.Procedures[procedure].length + ')' ];
 
 			s[s.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
 			if (parameters != null)
@@ -42,7 +42,7 @@ var IVoltDB = (function(){
 				{
 					if (i > 0)
 						params += ',';
-					switch(Procedures[procedure][i])
+					switch(this.Procedures[procedure][i])
 					{
 						case 'tinyint':
 						case 'smallint':
@@ -70,20 +70,20 @@ var IVoltDB = (function(){
 				params += ']';
 				s[s.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent(params);
 			}
-			if (User != null)
-				s[s.length] = encodeURIComponent('User') + '=' + encodeURIComponent(User);
-			if (Password != null)
-				s[s.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(Password);
-			if (HashedPassword != null)
-				s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(HashedPassword);
-			if (Admin)
+			if (this.User != null)
+				s[s.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.User);
+			if (this.Password != null)
+				s[s.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.Password);
+			if (this.HashedPassword != null)
+				s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.HashedPassword);
+			if (this.Admin)
 				s[s.length] = 'admin=true';
-			var uri = 'http://' + Server + ':' + Port + '/api/1.0/?' + s.join('&') + '&jsonp=?';
+			var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/?' + s.join('&') + '&jsonp=?';
 			return uri;
 		}
-		function CallExecute(procedure, parameters, callback)
+		this.CallExecute = function(procedure, parameters, callback)
 		{
-			var uri = BuildURI(procedure, parameters);
+			var uri = this.BuildURI(procedure, parameters);
 			if (typeof(uri) == 'string')
 				jQuery.getJSON(uri, callback);
 			else
@@ -100,15 +100,17 @@ var IVoltDB = (function(){
 		}
 		this.BeginExecute = function(procedure, parameters, callback)
 		{
-			CallExecute(procedure, parameters, (new CallbackWrapper(callback)).Callback);
+			this.CallExecute(procedure, parameters, (new CallbackWrapper(callback)).Callback);
 		}
 
-		this.Queue = new (function(){
+		var IQueue = function(connection)
+        {
 			var ContinueOnFailure = false;
 			var Executing = false;
 			var Success = false;
 			var Stack = [];
 			var OnCompleteHandler = null;
+            var Connection = connection;
 			this.Start = function(continueOnFailure)
 			{
 				if (Executing)
@@ -121,50 +123,50 @@ var IVoltDB = (function(){
 			this.BeginExecute = function(procedure, parameters, callback)
 			{
 				Stack.push([procedure, parameters, callback]);
-/*
-				if (!Executing)
-				{
-					Executing = true;
-					var item = Stack[0];
-					CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {alert(x);Success = false;EndExecute();} })).Callback);
-				}
-*/
 				return this;
 			}
 			EndExecute = function()
 			{
+//$('#debug').append(Connection.Key == 'localhost_8080__' ? 'L' : 'V');
 				if (Stack.length > 0)
 					Stack.splice(0,1);
 				if (Stack.length > 0 && (Success || ContinueOnFailure))
 				{
 					var item = Stack[0];
-					CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {alert(x);Success = false;EndExecute();} })).Callback);
+					Connection.CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {Success = false;EndExecute();} })).Callback);
 				}
 				else
 				{
 					Executing = false;
 					if (OnCompleteHandler != null)
-						OnCompleteHandler[0](OnCompleteHandler[1], Success);
+                    {
+                        try { OnCompleteHandler[0](OnCompleteHandler[1], Success); /*if (OnCompleteHandler[1] != null) {$('#debug').append("C:" + OnCompleteHandler[1] + Connection.Key + "|");}*/ } catch(x) {}
+
+// I've grown braindead or some... The callback *always* comes back on the last used connection???  Means concurrent queries are a real mess...  Reason why I can only have 1 monitor and there are some flaky bug trying to run queries when a monitor is running a high speed...
+// Will be patch up ASAP (when I re-understand JS state and variable scope...!)
+                    }
 				}
 				return this;
 			}
 			this.End = function(fcn, state)
 			{
+//$('#debug').append(Connection.Key == 'localhost_8080__' ? 'L' : 'V');
 				OnCompleteHandler = [fcn, state];
 				if (!Executing)
 				{
 					Executing = true;
 					var item = Stack[0];
-					CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {alert(x);Success = false;EndExecute();} })).Callback);
+					Connection.CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {Success = false;EndExecute();} })).Callback);
 				}
-/*
-				if (!Executing && OnCompleteHandler != null)
-					OnCompleteHandler[0](OnCompleteHandler[1], (Success || ContinueOnFailure));
-*/
 				return this;
 			}
-		});
-		var Procedures = {
+			return this;
+		}
+        this.getQueue = function()
+        {
+            return (new IQueue(this));
+        }
+		this.Procedures = {
 							'@AdHoc': ['varchar']
 						  , '@Pause': []
 						  , '@Quiesce': []
@@ -219,7 +221,8 @@ var IVoltDB = (function(){
 	}
 
 	LoadConnectionMetadata = function(connection, onconnectionready) {
-		connection.Queue.Start()
+        var connectionQueue = connection.getQueue();
+		connectionQueue.Start()
 			.BeginExecute('@Statistics', ['TABLE',0], function(data) { connection.Metadata['rawTables'] = data.results[0]; })
 			.BeginExecute('@Statistics', ['INDEX',0], function(data) { connection.Metadata['rawIndexes'] = data.results[0]; })
 			.BeginExecute('@Statistics', ['PARTITIONCOUNT',0], function(data) { connection.Metadata['partitionCount'] = data.results[0].data[0][0]; })
@@ -274,12 +277,13 @@ var IVoltDB = (function(){
 												  , '@UpdateApplicationCatalog': ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]']
 												  , '@UpdateLogging': ['Configuration (xml)', 'Returns Table[]']
 												  };
-				connection.Queue.Start(true);
+                var childConnectionQueue = connection.getQueue();
+				childConnectionQueue.Start(true);
 				for(var table in connection.Metadata['tables'])
-					connection.Queue.BeginExecute('@AdHoc', 'SELECT TOP 1 * FROM ' + table, (new OnGetSchema(connection, 'tables', table)).Callback);
+					childConnectionQueue.BeginExecute('@AdHoc', 'SELECT TOP 1 * FROM ' + table, (new OnGetSchema(connection, 'tables', table)).Callback);
 				for(var view in connection.Metadata['views'])
-					connection.Queue.BeginExecute('@AdHoc', 'SELECT TOP 1 * FROM ' + view, (new OnGetSchema(connection, 'views', view)).Callback);
-				connection.Queue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection); }, null);
+					childConnectionQueue.BeginExecute('@AdHoc', 'SELECT TOP 1 * FROM ' + view, (new OnGetSchema(connection, 'views', view)).Callback);
+				childConnectionQueue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection, state); }, null);
 			}, null);
 	}
 
@@ -292,7 +296,7 @@ var IVoltDB = (function(){
 		{
 			if (tabledata.status == 1)
 			{
-				var DBType = { '3': 'tinyint', '4': 'smallint', '5': 'int', '6': 'bigint', '8': 'float', '9': 'varchar', '11': 'timestamp', '22': 'decimal', '23': 'decimal' };
+				var DBType = { '3': 'tinyint', '4': 'smallint', '5': 'int', '6': 'bigint', '8': 'float', '9': 'varchar', '11': 'timestamp', '22': 'decimal', '23': 'decimal', '25': 'varbinary' };
 				var columns = [];
 				for (var j = 0; j < tabledata.results[0].schema.length; j++)
 					columns[tabledata.results[0].schema[j].name] = tabledata.results[0].schema[j].name + ' (' + DBType[''+tabledata.results[0].schema[j].type] + ')';
@@ -338,7 +342,7 @@ var IVoltDB = (function(){
 			return this.Connections[key];
 		return null;
 	}
-	this.DBType = { '3': 'tinyint', '4': 'smallint', '5': 'int', '6': 'bigint', '8': 'float', '9': 'varchar', '11': 'timestamp', '22': 'decimal', '23': 'decimal' };
+	this.DBType = { '3': 'tinyint', '4': 'smallint', '5': 'int', '6': 'bigint', '8': 'float', '9': 'varchar', '11': 'timestamp', '22': 'decimal', '23': 'decimal', '25': 'varbinary' };
 });
 window.VoltDB = VoltDB = new IVoltDB();
 })(window);

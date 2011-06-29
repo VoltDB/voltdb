@@ -92,6 +92,11 @@ this.InitWorkspace = function()
 	});
 
 	$("#new-monitor").button().click(function() {
+	    if (!(Object.size(MonitorUI.Monitors) == 0))
+        {
+            alert('Only one monitor tab can be open at a time.');
+            return;
+        }
 		if (Object.size(VoltDB.Connections) == 0)
 		{
 			MainUI.OnAddConnectionCompleted = function(connection) {
@@ -300,10 +305,8 @@ this.OnAddConnectionCompleted = null;
 this.AddConnection = function(connection, success)
 {
     if ($('#'+connection.Key).size() > 0)
-{
-        alert("crap" + success);
         return;
-}
+
 	var src = '<li id="' + connection.Key + '" class="database"><span><span>' + connection.Display + '</span></span><ul>';
 
 	// Adding Tables

@@ -95,7 +95,6 @@ function executeCallback(format, target, id)
 this.execute = function()
 {
 	var statusBar = QueryTab.find('.workspacestatusbar span.status');
-//alert(DataSource.val());
 	if (DataSource.val() == 'Disconnected')
 	{
 		statusBar.text('Connect to a datasource first.');
@@ -135,7 +134,8 @@ this.execute = function()
 	}
 	var statements = SQLParser.parse(source);
 	var start = (new Date()).getTime();
-	connection.Queue.Start();
+    var connectionQueue = connection.getQueue();
+	connectionQueue.Start();
 	for(var i = 0; i < statements.length; i++)
 	{
 		var id = 'r' + i;
@@ -152,7 +152,7 @@ this.execute = function()
 			var procedure = params.splice(0,1)[0];
 			if ((procedure.charAt(0) == '@') && (!(procedure in connection.Metadata['sysprocs'])))
 				continue;
-			connection.Queue.BeginExecute(procedure, params, callback.Callback);
+			connectionQueue.BeginExecute(procedure, params, callback.Callback);
 		}
 		else if (/^declare proc /i.test(statements[i]))
 		{
@@ -172,20 +172,20 @@ this.execute = function()
 		}
 		else
 		{
-			connection.Queue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
+			connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
 		}
-		connection.Queue.End(function(state,success) {
-			var totalDuration = (new Date()).getTime() - state;
-            if (success)
-                statusBar.text('Query Duration: ' + (totalDuration/1000.0) + 's');
-            else
-            {
-        		statusBar.addClass('error');
-                statusBar.text('Query error | Query Duration: ' + (totalDuration/1000.0) + 's');
-            }
-			$("#execute-query").button("enable");
-		}, start);
 	}
+	connectionQueue.End(function(state,success) {
+		var totalDuration = (new Date()).getTime() - state;
+        if (success)
+            statusBar.text('Query Duration: ' + (totalDuration/1000.0) + 's');
+        else
+        {
+    		statusBar.addClass('error');
+            statusBar.text('Query error | Query Duration: ' + (totalDuration/1000.0) + 's');
+        }
+		$("#execute-query").button("enable");
+	}, start);
 }
 function processResponse(format, target, id, response)
 {
