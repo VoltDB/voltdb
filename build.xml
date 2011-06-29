@@ -266,6 +266,22 @@ PRIMARY ENTRY POINTS
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
     </exec>
 </target>
+
+<target name="quarantine"
+    depends="compile, ee"
+    description="Run quarantined tests." >
+    <condition property="timeoutLength" value="${timeoutLength}" else='480000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <exec executable="/usr/bin/ant" failonerror="true" timeout="1800000">
+        <arg value="junit_quarantine" />
+        <arg value="-Dbuild=${build}" />
+        <arg value="-DtimeoutLength=${timeoutLength}" />
+        <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+    </exec>
+</target>
+
 <target name="all"
     depends="compile, ee, junit, eecheck, doc, eedoc, jars"
     description="Do all tasks."
