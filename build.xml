@@ -1048,6 +1048,7 @@ TEST CASES
                 <exclude name="**/TestOrderBySuite.class" />
                 <exclude name="**/TestTPCCSuite.class" />
                 <exclude name="**/TestCatalogUpdateSuite.class" />
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
             </fileset>
         </tests>
     </run_junit>
@@ -1102,6 +1103,7 @@ TEST CASES
                 <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
             </fileset>
         </tests>
     </run_junit>
@@ -1141,6 +1143,54 @@ TEST CASES
     <unjar
         src='${build.testobjects.dir}/milestoneOneCatalog.jar'
         dest='${build.dir}/expanded/milestoneOneCatalog'
+    />
+</target>
+
+<target name="junit_quarantine" description="Run testcases which fail unpredictably.">
+    <!-- Run the unit tests -->
+    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <run_junit timeout="${timeoutLength}" printsummary="no">
+        <formatters>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
+        </formatters>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <include name='org/voltdb/quarantine/**/Test*.class'/>
+                <exclude name="**/*$*.class"/>
+            </fileset>
+        </tests>
+    </run_junit>
+
+    <!-- Generate unit test reports. -->
+    <mkdir dir='${build.testoutput.dir}/report' />
+    <junitreport todir="${build.testoutput.dir}">
+        <fileset dir='${build.testoutput.dir}'>
+            <include name="TEST-*.xml" />
+        </fileset>
+        <report format="noframes" todir="${build.testoutput.dir}/report"/>
+        <report
+            styledir="tools"
+            format="noframes"
+            todir="${build.testoutput.dir}"
+        />
+    </junitreport>
+
+    <!-- Fail the build if there were any problems.
+        This runs all the tests before failing. -->
+    <fail
+        if="junit.failures"
+        unless="emma.enabled"
+        message="JUnit had failures"
     />
 </target>
 
