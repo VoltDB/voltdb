@@ -43,7 +43,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
-import org.voltdb.regressionsuites.TestExportSuite;
+import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -243,8 +243,8 @@ public class TestVoltCompiler extends TestCase {
     // that a disabled connector is really disabled and that auth data is correct.
     public void testExportSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
 
         // note that Insert inherits from InsertBase (testing this feature too)
         project.addProcedures(org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase.class);

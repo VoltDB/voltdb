@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.regressionsuites;
+package org.voltdb.quarantine;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -51,6 +51,11 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportToFileClient;
+import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
+import org.voltdb.regressionsuites.RegressionSuite;
+import org.voltdb.regressionsuites.TestSQLTypesSuite;
+import org.voltdb.regressionsuites.VoltServerConfig;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.VoltFile;
@@ -1028,10 +1033,6 @@ public class TestExportSuite extends RegressionSuite {
         super(name);
     }
 
-    public static void main(final String args[]) {
-        org.junit.runner.JUnitCore.runClasses(TestOrderBySuite.class);
-    }
-
     static public junit.framework.Test suite() throws Exception
     {
         VoltServerConfig config;
@@ -1043,8 +1044,8 @@ public class TestExportSuite extends RegressionSuite {
         project.setSecurityEnabled(true);
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true  /*enabled*/,
                 java.util.Arrays.asList(new String[]{"export"}));
@@ -1088,7 +1089,7 @@ public class TestExportSuite extends RegressionSuite {
         project = new VoltProjectBuilder();
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true,  //enabled
                 java.util.Arrays.asList(new String[]{"export"}));
@@ -1116,9 +1117,9 @@ public class TestExportSuite extends RegressionSuite {
         project = new VoltProjectBuilder();
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
-        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-addedtable-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-addedtable-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true  /*enabled*/,
                 java.util.Arrays.asList(new String[]{"export"}));
