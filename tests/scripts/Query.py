@@ -35,6 +35,7 @@ class VoltQueryClient(cmd.Cmd):
              "long": FastSerializer.VOLTTYPE_BIGINT,
              "float": FastSerializer.VOLTTYPE_FLOAT,
              "string": FastSerializer.VOLTTYPE_STRING,
+             "varbinary": FastSerializer.VOLTTYPE_STRING,
              "date": FastSerializer.VOLTTYPE_TIMESTAMP}
 
     TRANSFORMERS = {FastSerializer.VOLTTYPE_TINYINT: eval,
@@ -42,6 +43,7 @@ class VoltQueryClient(cmd.Cmd):
                     FastSerializer.VOLTTYPE_INTEGER: eval,
                     FastSerializer.VOLTTYPE_BIGINT: eval,
                     FastSerializer.VOLTTYPE_FLOAT: eval,
+                    FastSerializer.VOLTTYPE_STRING: lambda x: x,
                     FastSerializer.VOLTTYPE_STRING: lambda x: x,
                     FastSerializer.VOLTTYPE_TIMESTAMP:
                         lambda x: datetime.fromtimestamp(x)}
