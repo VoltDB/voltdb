@@ -118,7 +118,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             @Override
             public boolean accept(File dir, String file)
             {
-                return file.startsWith(TESTNONCE);
+                // NOTE: at some point we will be prepared to corrupt
+                // the catalog.  At that point, get rid of the
+                // .jar exclusion.
+                return file.startsWith(TESTNONCE) && !file.endsWith(".jar");
             }
         };
 
@@ -700,7 +703,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertNotNull(deleteResults);
         assertEquals( 1, deleteResults.length);
         assertEquals( 9, deleteResults[0].getColumnCount());
-        assertEquals( 7, deleteResults[0].getRowCount());
+        assertEquals( 8, deleteResults[0].getRowCount());
         tmp_files = tmp_dir.listFiles(cleaner);
         assertEquals( 0, tmp_files.length);
 
