@@ -78,6 +78,10 @@ public class TestBlobType extends TestCase {
         ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a' }, "hi", new byte[] { 'a' });
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
+        // insert hex data
+        cr = client.callProcedure("Insert", 9, "aabbccdd", "hi", "aabb");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
         // make sure strings as bytes works
         cr = client.callProcedure("FindString", 5, "hi".getBytes("UTF-8"));
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
@@ -97,7 +101,7 @@ public class TestBlobType extends TestCase {
         cr = client.callProcedure("Select");
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
         VoltTable t = cr.getResults()[0];
-        assertEquals(1, t.getRowCount());
+        assertEquals(2, t.getRowCount());
         t.resetRowPosition();
         t.advanceRow();
         byte[] vb = t.getVarbinary("b");
@@ -111,8 +115,12 @@ public class TestBlobType extends TestCase {
         assertEquals((byte) 10, vb[0]);
         assertEquals((byte) 26, vb[1]);
 
-        // adhoc query
+        // adhoc queries
         cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb01' where ival = 5");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(1, cr.getResults()[0].getRowCount());
+        assertEquals(1, cr.getResults()[0].asScalarLong());
+        cr = client.callProcedure("@AdHoc", "insert into blah values (12, 'aabbcc', 'hi', 'aabb');");
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
         assertEquals(1, cr.getResults()[0].getRowCount());
         assertEquals(1, cr.getResults()[0].asScalarLong());
