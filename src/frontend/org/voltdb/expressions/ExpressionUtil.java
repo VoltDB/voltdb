@@ -573,6 +573,7 @@ public abstract class ExpressionUtil {
             if (neededType == VoltType.VARBINARY) {
                 if ((cve.getValueType() == VoltType.STRING) && (Encoder.isHexEncodedString(cve.getValue()))) {
                     cve.setValueType(neededType);
+                    cve.setValueSize(neededSize);
                     checkConstantValueTypeSafety(cve);
                     return;
                 }
