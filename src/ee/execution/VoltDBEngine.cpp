@@ -174,14 +174,29 @@ bool VoltDBEngine::initialize(
     assert (m_templateSingleLongTable == NULL);
     m_templateSingleLongTable = new char[m_templateSingleLongTableSize];
     memset(m_templateSingleLongTable, 0, m_templateSingleLongTableSize);
-    m_templateSingleLongTable[7] = 28; // table size
-    m_templateSingleLongTable[11] = 8; // size of header
-    m_templateSingleLongTable[13] = 0; // status code
-    m_templateSingleLongTable[14] = 1; // number of columns
+    m_templateSingleLongTable[7] = 43;  // size through start of data?
+    m_templateSingleLongTable[11] = 23; // size of header
+    m_templateSingleLongTable[13] = 0;  // status code
+    m_templateSingleLongTable[14] = 1;  // number of columns
     m_templateSingleLongTable[15] = VALUE_TYPE_BIGINT; // column type
-    m_templateSingleLongTable[16] = 0; // column name length
-    m_templateSingleLongTable[23] = 1; // row count
-    m_templateSingleLongTable[27] = 8; // row size
+    m_templateSingleLongTable[19] = 15; // column name length:  "modified_tuples" == 15
+    m_templateSingleLongTable[20] = 'm';
+    m_templateSingleLongTable[21] = 'o';
+    m_templateSingleLongTable[22] = 'd';
+    m_templateSingleLongTable[23] = 'i';
+    m_templateSingleLongTable[24] = 'f';
+    m_templateSingleLongTable[25] = 'i';
+    m_templateSingleLongTable[26] = 'e';
+    m_templateSingleLongTable[27] = 'd';
+    m_templateSingleLongTable[28] = '_';
+    m_templateSingleLongTable[29] = 't';
+    m_templateSingleLongTable[30] = 'u';
+    m_templateSingleLongTable[31] = 'p';
+    m_templateSingleLongTable[32] = 'l';
+    m_templateSingleLongTable[33] = 'e';
+    m_templateSingleLongTable[34] = 's';
+    m_templateSingleLongTable[38] = 1; // row count
+    m_templateSingleLongTable[43] = 8; // row size
 
     // required for catalog loading.
     m_executorContext = new ExecutorContext(siteId,

@@ -1379,7 +1379,7 @@ public abstract class VoltProcedure {
 
             if (batchStmts[i].catStmt.getReplicatedtabledml()) {
                 long newVal = results[i].asScalarLong() / m_numberOfPartitions;
-                results[i] = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
+                results[i] = new VoltTable(new VoltTable.ColumnInfo("modified_tuples", VoltType.BIGINT));
                 results[i].addRow(newVal);
             }
         }

@@ -981,6 +981,60 @@ public class TestFixedSQLSuite extends RegressionSuite {
         //System.out.println(results.toJSONString());
     }
 
+    /**
+     * Verify that DML returns correctly named "modified_tuple" column name
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testTicketEng1316() throws IOException, ProcCallException
+    {
+        // Fake HSQL. Only care about Volt column naming code.
+        if (isHSQL())
+        {
+            assertTrue(true);
+            return;
+        }
+
+        Client client = getClient();
+        ClientResponse rsp = null;
+
+        // Test partitioned tables (multipartition query)
+        rsp = client.callProcedure("Eng1316Insert_P", 100, "varcharvalue", 120, 1.0);
+        assertTrue(rsp.getResults()[0].asScalarLong() == 1);
+        assertEquals("modified_tuples", rsp.getResults()[0].getColumnName(0));
+        rsp = client.callProcedure("Eng1316Insert_P", 101, "varcharvalue2", 121, 1.1);
+        rsp = client.callProcedure("Eng1316Insert_P", 102, "varcharvalue2", 122, 1.2);
+        rsp = client.callProcedure("Eng1316Insert_P", 103, "varcharvalue2", 123, 1.3);
+        rsp = client.callProcedure("Eng1316Insert_P", 104, "varcharvalue2", 124, 1.4);
+        rsp = client.callProcedure("Eng1316Update_P"); // update where id < 124
+        assertTrue(rsp.getResults()[0].asScalarLong() == 4);
+        assertEquals("modified_tuples", rsp.getResults()[0].getColumnName(0));
+
+        // Test partitioned tables (single partition query)
+        rsp = client.callProcedure("Eng1316Insert_P1", 200, "varcharvalue", 120, 1.0);
+        assertTrue(rsp.getResults()[0].asScalarLong() == 1);
+        assertEquals("modified_tuples", rsp.getResults()[0].getColumnName(0));
+        rsp = client.callProcedure("Eng1316Insert_P1", 201, "varcharvalue2", 121, 1.1);
+        rsp = client.callProcedure("Eng1316Insert_P1", 202, "varcharvalue2", 122, 1.2);
+        rsp = client.callProcedure("Eng1316Insert_P1", 203, "varcharvalue2", 123, 1.3);
+        rsp = client.callProcedure("Eng1316Insert_P1", 204, "varcharvalue2", 124, 1.4);
+        rsp = client.callProcedure("Eng1316Update_P1", 201); // update where id == ?
+        assertTrue(rsp.getResults()[0].asScalarLong() == 1);
+        assertEquals("modified_tuples", rsp.getResults()[0].getColumnName(0));
+
+        // Test replicated tables.
+        rsp = client.callProcedure("Eng1316Insert_R", 100, "varcharvalue", 120, 1.0);
+        assertTrue(rsp.getResults()[0].asScalarLong() == 1);
+        assertEquals("modified_tuples", rsp.getResults()[0].getColumnName(0));
+        rsp = client.callProcedure("Eng1316Insert_R", 101, "varcharvalue2", 121, 1.1);
+        rsp = client.callProcedure("Eng1316Insert_R", 102, "varcharvalue2", 122, 1.2);
+        rsp = client.callProcedure("Eng1316Insert_R", 103, "varcharvalue2", 123, 1.3);
+        rsp = client.callProcedure("Eng1316Insert_R", 104, "varcharvalue2", 124, 1.4);
+        rsp = client.callProcedure("Eng1316Update_R"); // update where id < 104
+        assertTrue(rsp.getResults()[0].asScalarLong() == 4);
+        assertEquals("modified_tuples", rsp.getResults()[0].getColumnName(0));
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1011,6 +1065,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",
                                  "STRINGPART.NAME: 0");
         project.addStmtProcedure("Eng993Insert", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(1+?,'NULL',NULL,1+?);");
+
+        project.addStmtProcedure("Eng1316Insert_R", "insert into R1 values (?, ?, ?, ?);");
+        project.addStmtProcedure("Eng1316Update_R", "update R1 set num = num + 1 where id < 104");
+        project.addStmtProcedure("Eng1316Insert_P", "insert into P1 values (?, ?, ?, ?);");
+        project.addStmtProcedure("Eng1316Update_P", "update P1 set num = num + 1 where id < 104");
+        project.addStmtProcedure("Eng1316Insert_P1", "insert into P1 values (?, ?, ?, ?);", "P1.ID: 0");
+        project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
+
 
         // CONFIG #1: Local Site/Partitions running on IPC backend
         // config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
