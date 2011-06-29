@@ -125,32 +125,44 @@ var IVoltDB = (function(){
 				Stack.push([procedure, parameters, callback]);
 				return this;
 			}
-			EndExecute = function()
+			this.EndExecute = function()
 			{
-//$('#debug').append(Connection.Key == 'localhost_8080__' ? 'L' : 'V');
 				if (Stack.length > 0)
 					Stack.splice(0,1);
 				if (Stack.length > 0 && (Success || ContinueOnFailure))
 				{
 					var item = Stack[0];
-					Connection.CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {Success = false;EndExecute();} })).Callback);
+					Connection.CallExecute(item[0], item[1], (new CallbackWrapper(
+                                                                (function(queue,item) {
+                                                                    return function(response) {
+                                                                        try
+                                                                        {
+                                                                            if (response.status != 1)
+                                                                                Success = false;
+                                                                            if (item[2] != null)
+                                                                                item[2](response);
+                                                                            queue.EndExecute();
+                                                                        }
+                                                                        catch(x)
+                                                                        {
+                                                                            Success = false;
+                                                                            queue.EndExecute();
+                                                                        }
+                                                                    };
+                                                                })(this,item))).Callback);
 				}
 				else
 				{
 					Executing = false;
 					if (OnCompleteHandler != null)
                     {
-                        try { OnCompleteHandler[0](OnCompleteHandler[1], Success); /*if (OnCompleteHandler[1] != null) {$('#debug').append("C:" + OnCompleteHandler[1] + Connection.Key + "|");}*/ } catch(x) {}
-
-// I've grown braindead or some... The callback *always* comes back on the last used connection???  Means concurrent queries are a real mess...  Reason why I can only have 1 monitor and there are some flaky bug trying to run queries when a monitor is running a high speed...
-// Will be patch up ASAP (when I re-understand JS state and variable scope...!)
+                        try { OnCompleteHandler[0](OnCompleteHandler[1], Success); } catch(x) {}
                     }
 				}
 				return this;
 			}
 			this.End = function(fcn, state)
 			{
-//$('#debug').append(Connection.Key == 'localhost_8080__' ? 'L' : 'V');
 				OnCompleteHandler = [fcn, state];
 				if (!Executing)
 				{
@@ -159,7 +171,23 @@ var IVoltDB = (function(){
 
 					Executing = true;
 					var item = Stack[0];
-					Connection.CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {Success = false;EndExecute();} })).Callback);
+					Connection.CallExecute(item[0], item[1], (new CallbackWrapper((function(queue,item) {
+                                                                return function(response) {
+                                                                    try
+                                                                    {
+                                                                        if (response.status != 1)
+                                                                            Success = false;
+                                                                        if (item[2] != null)
+                                                                            item[2](response);
+                                                                        queue.EndExecute();
+                                                                    }
+                                                                    catch(x)
+                                                                    {
+                                                                        Success = false;
+                                                                        queue.EndExecute();
+                                                                    }
+                                                                };
+                                                            })(this,item))).Callback);
 				}
 			}
 		}
