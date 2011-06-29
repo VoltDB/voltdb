@@ -10,8 +10,8 @@ var QueryUI = (function(queryTab){
 			var AutoSplitParameters = /[\s,]+/gm;
 			this.parse = function(src)
 			{
-                var command = ["exec", "execute", "declare proc", "declare procedure", "undeclare proc", "undeclare procedure"];
-                var keyword = ["select", "insert", "update", "delete", "declare", "undeclare"];
+                var command = ["exec", "execute", "undeclare proc", "undeclare procedure", "declare proc", "declare procedure"];
+                var keyword = ["select", "insert", "update", "delete", "undeclare", "declare"];
                 for(var i = 0;i<command.length;i++)
                 {
                     for(var j = 0;j<command.length;j++)

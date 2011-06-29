@@ -154,13 +154,14 @@ var IVoltDB = (function(){
 				OnCompleteHandler = [fcn, state];
 				if (!Executing)
 				{
+    				if (Stack.length == 0)
+                        return EndExecute();
+
 					Executing = true;
 					var item = Stack[0];
 					Connection.CallExecute(item[0], item[1], (new CallbackWrapper(function(response) { try { if (response.status != 1) {Success = false;} if (item[2] != null) item[2](response); EndExecute(); } catch(x) {Success = false;EndExecute();} })).Callback);
 				}
-				return this;
 			}
-			return this;
 		}
         this.getQueue = function()
         {
@@ -192,20 +193,20 @@ var IVoltDB = (function(){
 					if (procedureInfo.params[i] == 'string')
 						procedureInfo.params[i] = 'varchar';
 				}
-				if (procedureInfo.name in Procedures)
+				if (procedureInfo.name in this.Procedures)
 				{
-					if (Procedures[procedureInfo.name].length == procedureInfo.params.length)
+					if (this.Procedures[procedureInfo.name].length == procedureInfo.params.length)
 					{
 						var identical = true;
 						for (var i = 0;i < procedureInfo.params.length; i++)
-							if (procedureInfo.params[i] != Procedures[procedureInfo.name][i])
+							if (procedureInfo.params[i] != this.Procedures[procedureInfo.name][i])
 								identical = false;
 						if (identical)
 							return;
 					}
 				}
-				delete Procedures[procedureInfo.name];
-				Procedures[procedureInfo.name] = procedureInfo.params;
+				delete this.Procedures[procedureInfo.name];
+				this.Procedures[procedureInfo.name] = procedureInfo.params;
 				MainUI.DeclareProcedure(this, procedureInfo);
 			}
 		}
@@ -213,7 +214,7 @@ var IVoltDB = (function(){
 		{
 			if (procedureName.indexOf('@') == -1)
 			{
-				delete Procedures[procedureName];
+				delete this.Procedures[procedureName];
 				MainUI.UndeclareProcedure(this, procedureName);
 			}
 		}
