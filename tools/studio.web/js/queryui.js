@@ -10,6 +10,16 @@ var QueryUI = (function(queryTab){
 			var AutoSplitParameters = /[\s,]+/gm;
 			this.parse = function(src)
 			{
+                var command = ["exec", "execute", "declare proc", "declare procedure", "undeclare proc", "undeclare procedure"];
+                var keyword = ["select", "insert", "update", "delete", "declare", "undeclare"];
+                for(var i = 0;i<command.length;i++)
+                {
+                    for(var j = 0;j<command.length;j++)
+                    {
+                        var r = new RegExp("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", "gmi");
+                        src = src.replace(r, " $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
+                    }
+                }
 				src = src.replace(SingleLineComments,'');
 				src = src.replace(/''/g, '$(SQL_PARSER_ESCAPE_SINGLE_QUOTE)');
 				var k = Extract.exec(src);
@@ -33,6 +43,7 @@ var QueryUI = (function(queryTab){
 							for(var j = 0; j< frag.length; j++)
 								sql = sql.replace('$(SQL_PARSER_STRING_FRAGMENT#' + j + ')', frag[j]);
 						sql = sql.replace(/\$\(SQL_PARSER_ESCAPE_SINGLE_QUOTE\)/g,"''");
+                        sql = sql.replace("#SQL_PARSER_STRING_KEYWORD#","");
 						statements.push(sql);
 					}
 				}
