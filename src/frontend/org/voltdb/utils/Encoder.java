@@ -35,6 +35,9 @@ public class Encoder {
      * @return A hex-encoded string with double length.
      */
     public static String hexEncode(byte[] data) {
+        if (data == null)
+            return null;
+
         StringBuilder sb = new StringBuilder();
         for (byte b : data) {
             // hex encoding same way as java.net.URLEncoder.
@@ -75,12 +78,16 @@ public class Encoder {
      * @return The binary byte array value for the string (half length).
      */
     public static byte[] hexDecode(String hexString) {
-        assert (hexString.length() % 2) == 0;
+        if ((hexString.length() % 2) != 0)
+            throw new RuntimeException("String is not properly hex-encoded.");
 
         hexString = hexString.toUpperCase();
         byte[] retval = new byte[hexString.length() / 2];
         for (int i = 0; i < retval.length; i++) {
-            retval[i] = (byte) Integer.parseInt(hexString.substring(2 * i, 2 * i + 2), 16);
+            int value = Integer.parseInt(hexString.substring(2 * i, 2 * i + 2), 16);
+            if ((value < 0) || (value > 255))
+                throw new RuntimeException("String is not properly hex-encoded.");
+            retval[i] = (byte) value;
         }
         return retval;
     }
@@ -99,6 +106,16 @@ public class Encoder {
             e.printStackTrace();
         }
         return retval;
+    }
+
+    public static boolean isHexEncodedString(String hexString) {
+        if ((hexString.length() % 2) != 0)
+            return false;
+        for (int i = 0; i < hexString.length(); i++) {
+            int value = Integer.parseInt(hexString.substring(i, i + 1), 16);
+            if ((value < 0) || (value > 15)) return false;
+        }
+        return true;
     }
 
     public static String compressAndBase64Encode(String string) {
@@ -156,6 +173,10 @@ public class Encoder {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
+    }
+
+    public static String base64Encode(byte[] bytes) {
+        return Base64.encodeBytes(bytes);
     }
 
     public static byte[] base64EncodeToBytes(String string) {

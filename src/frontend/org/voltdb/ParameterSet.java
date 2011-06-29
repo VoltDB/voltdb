@@ -109,15 +109,16 @@ import org.voltdb.types.VoltDecimalHelper;
             Class<?> cls = obj.getClass();
             if (cls.isArray()) {
 
-                // EE doesn't support array parameters. Arrays of bytes are
-                // only useful to strings. Special case them here.
-                if (m_serializingToEE && obj instanceof byte[]) {
+                // Since arrays of bytes could be varbinary or strings,
+                // and they are the only kind of array needed by the EE,
+                // special case them as the VARBINARY type.
+                if (obj instanceof byte[]) {
                     final byte[] b = (byte[]) obj;
-                    if (b.length > VoltType.MAX_VALUE_LENGTH) {
-                        throw new VoltOverflowException(
-                                "Value of string byte[] larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
-                    }
-                    out.writeByte(VoltType.STRING.getValue());
+                    // commented out this bit... presumably the EE will do this check upon recipt
+                    /*if (b.length > VoltType.MAX_VALUE_LENGTH) {
+                        throw new IOException("Value of byte[] larger than allowed max string or varbinary " + VoltType.MAX_VALUE_LENGTH_STR);
+                    }*/
+                    out.writeByte(VoltType.VARBINARY.getValue());
                     out.writeInt(b.length);
                     out.write(b);
                     continue;
@@ -177,7 +178,7 @@ import org.voltdb.types.VoltDecimalHelper;
                 out.writeLong(VoltType.NULL_BIGINT);  // corresponds to EE value.h isNull()
                 continue;
             }
-            else if (obj == VoltType.NULL_STRING) {
+            else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
                 out.writeByte(VoltType.STRING.getValue());
                 out.writeInt(VoltType.NULL_STRING_LENGTH);
                 continue;
@@ -390,11 +391,16 @@ import org.voltdb.types.VoltDecimalHelper;
                     return in.readDouble();
                 case STRING:
                     String string_val = in.readString();
-                    if (string_val == null)
-                    {
-                        return VoltType.NULL_STRING;
+                    if (string_val == null) {
+                        return VoltType.NULL_STRING_OR_VARBINARY;
                     }
                     return string_val;
+                case VARBINARY:
+                    byte[] bin_val = in.readVarbinary();
+                    if (bin_val == null) {
+                        return VoltType.NULL_STRING_OR_VARBINARY;
+                    }
+                    return bin_val;
                 case TIMESTAMP:
                     return in.readTimestamp();
                 case VOLTTABLE:

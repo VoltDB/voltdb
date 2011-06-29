@@ -34,6 +34,7 @@ import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.Encoder;
 
 /*
  * The primary representation of a result set (of tuples) or a temporary
@@ -568,6 +569,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                         case STRING:
                             m_buffer.putInt(NULL_STRING_INDICATOR);
                             break;
+                        case VARBINARY:
+                            m_buffer.putInt(NULL_STRING_INDICATOR);
+                            break;
                         case DECIMAL:
                             VoltDecimalHelper.serializeNull(m_buffer);
                             break;
@@ -656,14 +660,14 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
 
                         case STRING: {
                             // Accept byte[] and String
-                            if (value instanceof byte[]){
+                            if (value instanceof byte[]) {
                                 if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
                                     throw new VoltOverflowException(
                                             "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
 
                                 // bytes MUST be a UTF-8 encoded string.
                                 assert(testForUTF8Encoding((byte[]) value));
-                                writeStringToBuffer((byte[]) value, m_buffer);
+                                writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                             }
                             else {
                                 if (((String) value).length() > VoltType.MAX_VALUE_LENGTH)
@@ -671,6 +675,20 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                                             "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
 
                                 writeStringToBuffer((String) value, ROWDATA_ENCODING, m_buffer);
+                            }
+                            break;
+                        }
+
+                        case VARBINARY: {
+                            // Accept byte[] and String (hex-encoded)
+                            if (value instanceof String) {
+                                value = Encoder.hexDecode((String) value);
+                            }
+                            if (value instanceof byte[]) {
+                                if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
+                                        throw new VoltOverflowException(
+                                                "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                                writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                             }
                             break;
                         }
@@ -931,6 +949,15 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                         assert (string == null);
                     } else {
                         buffer.append(string);
+                    }
+                    break;
+                case VARBINARY:
+                    byte[] bin = r.getVarbinary(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                        assert (bin == null);
+                    } else {
+                        buffer.append(VoltType.varbinaryToPrintableString(bin));
                     }
                     break;
                 case DECIMAL:
@@ -1198,7 +1225,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         b.put(strbytes);
     }
 
-    private final void writeStringToBuffer(byte[] s, ByteBuffer b) {
+    private final void writeStringOrVarbinaryToBuffer(byte[] s, ByteBuffer b) {
         if (s == null) {
             b.putInt(NULL_STRING_INDICATOR);
             return;

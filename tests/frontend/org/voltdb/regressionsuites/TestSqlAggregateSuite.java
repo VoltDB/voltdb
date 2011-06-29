@@ -187,7 +187,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             }
             for (int i = ROWS; i < ROWS + 5; ++i)
             {
-                client.callProcedure("Insert", table, i, VoltType.NULL_STRING,
+                client.callProcedure("Insert", table, i, VoltType.NULL_STRING_OR_VARBINARY,
                                      new BigDecimal(10.0), i / 2, 14.5);
             }
             String query = String.format("select MIN(%s.DESC) from %s",
@@ -233,7 +233,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             }
             for (int i = good_rows; i < good_rows + null_rows; ++i)
             {
-                client.callProcedure("Insert", table, i, VoltType.NULL_STRING,
+                client.callProcedure("Insert", table, i, VoltType.NULL_STRING_OR_VARBINARY,
                                      VoltType.NULL_DECIMAL,
                                      VoltType.NULL_INTEGER,
                                      VoltType.NULL_FLOAT);
@@ -288,7 +288,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             Client client = getClient();
             for (int i = 0; i < null_rows; ++i)
             {
-                client.callProcedure("Insert", table, i, VoltType.NULL_STRING,
+                client.callProcedure("Insert", table, i, VoltType.NULL_STRING_OR_VARBINARY,
                                      VoltType.NULL_DECIMAL,
                                      VoltType.NULL_INTEGER,
                                      VoltType.NULL_FLOAT);

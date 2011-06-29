@@ -148,6 +148,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
             case STRING:
                 stringer.value(m_value);
                 break;
+            case VARBINARY:
+                stringer.value(m_value);
+                break;
             case TIMESTAMP:
                 stringer.value(Long.valueOf(m_value));
                 break;

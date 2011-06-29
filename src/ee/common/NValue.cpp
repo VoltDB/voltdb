@@ -134,10 +134,16 @@ std::string NValue::debug() const {
       case VALUE_TYPE_VARCHAR:
         ptr = reinterpret_cast<const char*>(getObjectValue());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr,
-                              getObjectLength());
+        out_val = std::string(ptr, getObjectLength());
         buffer << "[" << getObjectLength() << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
+        break;
+      case VALUE_TYPE_VARBINARY:
+        ptr = reinterpret_cast<const char*>(getObjectValue());
+        addr = reinterpret_cast<int64_t>(ptr);
+        out_val = std::string(ptr, getObjectLength());
+        buffer << "[" << getObjectLength() << "]";
+        buffer << "-bin[@" << addr << "]";
         break;
       case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
@@ -174,6 +180,9 @@ std::string NValue::getTypeName(ValueType type) {
         break;
       case (VALUE_TYPE_VARCHAR):
         ret = "varchar";
+        break;
+      case (VALUE_TYPE_VARBINARY):
+        ret = "varbinary";
         break;
       case (VALUE_TYPE_TIMESTAMP):
         ret = "timestamp";

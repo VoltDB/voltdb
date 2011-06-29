@@ -156,7 +156,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     columnInfo->type = static_cast<char>(type);
     columnInfo->allowNull = (char)(allowNull ? 1 : 0);
     columnInfo->length = length;
-    if (type == VALUE_TYPE_VARCHAR ) {
+    if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
         if (length < UNINLINEABLE_OBJECT_LENGTH && m_allowInlinedObjects) {
             /*
              * Inline the string if it is less then UNINLINEABLE_OBJECT_LENGTH bytes.
@@ -168,7 +168,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
             /*
              * Set the length to the size of a String pointer since it won't be inlined.
              */
-            offset = static_cast<uint32_t>(NValue::getTupleStorageSize(VALUE_TYPE_VARCHAR));
+            offset = static_cast<uint32_t>(NValue::getTupleStorageSize(type));
             columnInfo->inlined = false;
             setUninlinedObjectColumnInfoIndex(uninlinedObjectColumnIndex++, index);
         }
@@ -235,7 +235,7 @@ uint16_t TupleSchema::countUninlineableObjectColumns(
     const uint16_t numColumns = static_cast<uint16_t>(columnTypes.size());
     uint16_t numUninlineableObjects = 0;
     for (int ii = 0; ii < numColumns; ii++) {
-        if (columnTypes[ii] == VALUE_TYPE_VARCHAR) {
+        if ((columnTypes[ii] == VALUE_TYPE_VARCHAR) || ((columnTypes[ii] == VALUE_TYPE_VARBINARY))) {
             if (!allowInlineObjects) {
                 numUninlineableObjects++;
             } else if (columnSizes[ii] >= UNINLINEABLE_OBJECT_LENGTH) {

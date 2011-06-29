@@ -30,13 +30,9 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-
 import junit.framework.TestCase;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-import org.w3c.dom.Document;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -44,13 +40,16 @@ import org.xml.sax.SAXParseException;
 public class TestHSQLDB extends TestCase {
     class VoltErrorHandler implements ErrorHandler {
 
+        @Override
         public void error(SAXParseException exception) throws SAXException {
             throw exception;
         }
 
+        @Override
         public void fatalError(SAXParseException exception) throws SAXException {
         }
 
+        @Override
         public void warning(SAXParseException exception) throws SAXException {
             throw exception;
         }
@@ -108,7 +107,7 @@ public class TestHSQLDB extends TestCase {
         return hsql;
     }
 
-    public void testWithTPCCDDL() throws HSQLParseException {
+    /*public void testWithTPCCDDL() throws HSQLParseException {
         HSQLInterface hsql = setupTPCCDDL();
         assertTrue(hsql != null);
 
@@ -178,6 +177,38 @@ public class TestHSQLDB extends TestCase {
             assertFalse(doc == null);
         }
 
+    }*/
+
+    public void testVarbinary() {
+        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        URL url = getClass().getResource("hsqltest-varbinaryddl.sql");
+
+        try {
+            hsql.runDDLFile(URLDecoder.decode(url.getPath(), "UTF-8"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+
+        String sql = "SELECT * FROM BT;";
+        String xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+        }
+        assertFalse(xml == null);
+        System.out.println(xml);
+
+        sql = "INSERT INTO BT VALUES (?, ?, ?);";
+        xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+        }
+        assertFalse(xml == null);
+        System.out.println(xml);
     }
 
     /*public void testSimpleSQL() {

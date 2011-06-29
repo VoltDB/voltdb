@@ -25,6 +25,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.Encoder;
 
 /**
  * <h3>Summary</h3>
@@ -64,7 +65,7 @@ public abstract class VoltTableRow {
      * Size in bytes of the maximum length for a VoltDB tuple.
      * This is inclusive of the 4-byte row length prefix.
      *
-     * 2 megs to allow a max size string/blob + length prefix + some other stuff
+     * 2 megs to allow a max size string/varbinary + length prefix + some other stuff
      */
     public static final int MAX_TUPLE_LENGTH = 2097152;
     public static final String MAX_TUPLE_LENGTH_STR = String.valueOf(MAX_TUPLE_LENGTH / 1024) + "k";
@@ -132,14 +133,14 @@ public abstract class VoltTableRow {
         for (int i = 1; i < getColumnCount(); i++) {
             final VoltType type = getColumnType(i - 1);
             // handle variable length types specially
-            if (type == VoltType.STRING) {
-                final int strlen = m_buffer.getInt(m_offsets[i - 1]);
-                if (strlen == VoltTable.NULL_STRING_INDICATOR)
+            if ((type == VoltType.STRING) || (type == VoltType.VARBINARY)) {
+                final int len = m_buffer.getInt(m_offsets[i - 1]);
+                if (len == VoltTable.NULL_STRING_INDICATOR)
                     m_offsets[i] = m_offsets[i - 1] + STRING_LEN_SIZE;
-                else if (strlen < 0)
+                else if (len < 0)
                     throw new RuntimeException("Invalid object length for column: " + i);
                 else
-                    m_offsets[i] = m_offsets[i - 1] + strlen + STRING_LEN_SIZE;
+                    m_offsets[i] = m_offsets[i - 1] + len + STRING_LEN_SIZE;
             }
             else {
                 m_offsets[i] = m_offsets[i - 1] + type.getLengthInBytesForFixedTypes();
@@ -251,6 +252,9 @@ public abstract class VoltTableRow {
         case STRING:
             ret = getString(columnIndex);
             break;
+        case VARBINARY:
+            ret = getVarbinary(columnIndex);
+            break;
         case TIMESTAMP:
             ret = getTimestampAsTimestamp(columnIndex);
             break;
@@ -278,36 +282,8 @@ public abstract class VoltTableRow {
      * @see #wasNull()
      */
     public final Object get(String columnName, VoltType type) {
-        Object ret = null;
-        switch (type) {
-        case TINYINT:
-            ret = new Byte((byte) getLong(columnName));
-            break;
-        case SMALLINT:
-            ret = new Short((short) getLong(columnName));
-            break;
-        case INTEGER:
-            ret = new Integer((int) getLong(columnName));
-            break;
-        case BIGINT:
-            ret = getLong(columnName);
-            break;
-        case FLOAT:
-            ret = getDouble(columnName);
-            break;
-        case STRING:
-            ret = getString(columnName);
-            break;
-        case TIMESTAMP:
-            ret = getTimestampAsTimestamp(columnName);
-            break;
-        case DECIMAL:
-            ret = getDecimalAsBigDecimal(columnName);
-            break;
-        default:
-            throw new IllegalArgumentException("Invalid type '" + type + "'");
-        }
-        return ret;
+        final int colIndex = getColumnIndex(columnName);
+        return get(colIndex, type);
     }
 
     /**
@@ -484,6 +460,47 @@ public abstract class VoltTableRow {
     }
 
     /**
+     * Retrieve the varbinary value stored in the column specified by index.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnIndex Index of the column
+     * @return Varbinary value stored in the specified column
+     * @see #wasNull()
+     */
+    public final byte[] getVarbinary(int columnIndex) {
+        validateColumnType(columnIndex, VoltType.VARBINARY);
+        int pos = m_buffer.position();
+        m_buffer.position(getOffset(columnIndex));
+        int len = m_buffer.getInt();
+        if (len == VoltTable.NULL_STRING_INDICATOR) {
+            m_wasNull = true;
+            m_buffer.position(pos);
+            return null;
+        }
+        m_wasNull = false;
+        byte[] data = new byte[len];
+        m_buffer.get(data);
+        m_buffer.position(pos);
+        return data;
+    }
+
+    /**
+     * Retrieve the varbinary value stored in the column
+     * specified by name. Avoid retrieving via this method as it is slower than specifying the
+     * column by index. Use {@link #getVarbinary(int)} instead.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnName Name of the column
+     * @return Varbinary value stored in the specified column
+     * @see #wasNull()
+     * @see #getVarbinary(int)
+     */
+    public final byte[] getVarbinary(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getVarbinary(colIndex);
+    }
+
+    /**
      * Retrieve the <tt>long</tt> timestamp stored in the column specified by index.
      * Note that VoltDB uses GMT universally within its process space. Date objects sent over
      * the wire from clients may seem to be different times because of this, but it is just
@@ -639,6 +656,10 @@ public abstract class VoltTableRow {
             break;
         case STRING:
             js.value(getString(columnIndex));
+            break;
+        case VARBINARY:
+            byte[] bin = getVarbinary(columnIndex);
+            js.value(Encoder.hexEncode(bin));
             break;
         case DECIMAL:
             Object dec = getDecimalAsBigDecimal(columnIndex);

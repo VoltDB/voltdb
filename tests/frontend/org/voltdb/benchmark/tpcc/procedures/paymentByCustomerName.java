@@ -49,6 +49,7 @@
  */
 package org.voltdb.benchmark.tpcc.procedures;
 
+import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 
 import org.voltdb.ProcInfo;
@@ -223,7 +224,10 @@ public class paymentByCustomerName extends VoltProcedure {
         final VoltTable customers = voltExecuteSQL()[0];
         final int namecnt = customers.getRowCount();
         if (namecnt == 0) {
-            throw new VoltAbortException("no customers with last name: " + c_last + " in warehouse: "
+            String c_last_str = "";
+            try { c_last_str = new String(c_last, "UTF-8"); }
+            catch (UnsupportedEncodingException e) {}
+            throw new VoltAbortException("no customers with last name: " + c_last_str + " in warehouse: "
                     + c_w_id + " and in district " + c_d_id);
         }
 

@@ -78,8 +78,12 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.*;
-import org.voltdb.compiler.procedures.*;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.procedures.CrazyBlahProc;
+import org.voltdb.compiler.procedures.DelayProc;
+import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
@@ -700,12 +704,8 @@ public class TestJSONInterface extends TestCase {
             "    PRIMARY KEY (bar)\n" +
             ");";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
-
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
+        builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("foo", "bar");
         builder.addProcedures(DelayProc.class);
         builder.setHTTPDPort(8095);
@@ -723,6 +723,59 @@ public class TestJSONInterface extends TestCase {
         pset.setParameters(30000);
         String response = callProcOverJSON("DelayProc", pset, null, null, false);
         Response r = responseFromJSON(response);
+        assertEquals(ClientResponse.SUCCESS, r.status);
+
+        server.shutdown();
+        server.join();
+    }
+
+    public void testBinaryProc() throws Exception {
+        String simpleSchema =
+            "CREATE TABLE foo (\n" +
+            "    bar BIGINT NOT NULL,\n" +
+            "    b VARBINARY(256) DEFAULT NULL,\n" +
+            "    PRIMARY KEY (bar)\n" +
+            ");";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addPartitionInfo("foo", "bar");
+        builder.addStmtProcedure("Insert", "insert into foo values (?, ?);");
+        builder.setHTTPDPort(8095);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+        assertTrue(success);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+        config.m_pathToDeployment = builder.getPathToDeployment();
+        ServerThread server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        // try a good insert
+        String varString = "Procedure=Insert&Parameters=[5,\"aa\"]";
+        String response = callProcOverJSONRaw(varString, 200);
+        System.out.println(response);
+        Response r = responseFromJSON(response);
+        assertEquals(ClientResponse.SUCCESS, r.status);
+
+        // try two poorly hex-encoded inserts
+        varString = "Procedure=Insert&Parameters=[6,\"aaa\"]";
+        response = callProcOverJSONRaw(varString, 200);
+        System.out.println(response);
+        r = responseFromJSON(response);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
+        varString = "Procedure=Insert&Parameters=[7,\"aaay\"]";
+        response = callProcOverJSONRaw(varString, 200);
+        System.out.println(response);
+        r = responseFromJSON(response);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
+
+        // try null binary inserts
+        varString = "Procedure=Insert&Parameters=[8,NULL]";
+        response = callProcOverJSONRaw(varString, 200);
+        System.out.println(response);
+        r = responseFromJSON(response);
         assertEquals(ClientResponse.SUCCESS, r.status);
 
         server.shutdown();

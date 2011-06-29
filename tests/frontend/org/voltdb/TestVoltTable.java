@@ -23,11 +23,13 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONException;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.messaging.FastSerializableTestUtil;
 import org.voltdb.types.TimestampType;
@@ -120,8 +122,12 @@ public class TestVoltTable extends TestCase {
             return (d1.compareTo(d2) == 0);
         case STRING:
             if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_STRING && rhs == null) return true;
+            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null) return true;
             return ((String)lhs).equals(rhs);
+        case VARBINARY:
+            if (lhs == null && rhs == null) return true;
+            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null) return true;
+            return Arrays.equals((byte[])lhs, (byte[])rhs);
         case TIMESTAMP:
             if (lhs == null && rhs == null) return true;
             if (lhs == VoltType.NULL_TIMESTAMP && rhs == null) return true;
@@ -308,6 +314,23 @@ public class TestVoltTable extends TestCase {
         assertEquals(0, t2.fetchRow(0).getStringAsBytes(0).length);
         assertTrue(Arrays.equals(FOO, t2.fetchRow(1).getStringAsBytes(0)));
         assertEquals("foo", t2.fetchRow(1).getString(0));
+
+        t2.clearRowData();
+        assertTrue(t2.getRowCount() == 0);
+    }
+
+    public void testVarbinary() {
+        t = new VoltTable(new ColumnInfo("", VoltType.VARBINARY));
+        final byte[] empty = new byte[0];
+        t.addRow(empty);
+        final byte[] FOO = new byte[]{'f', 'o', 'o'};
+        t.addRow(FOO);
+
+        t2 = FastSerializableTestUtil.roundTrip(t);
+        assertEquals(2, t2.getRowCount());
+        assertTrue(Arrays.equals(empty, t2.fetchRow(0).getVarbinary(0)));
+        assertEquals(0, t2.fetchRow(0).getVarbinary(0).length);
+        assertTrue(Arrays.equals(FOO, t2.fetchRow(1).getVarbinary(0)));
 
         t2.clearRowData();
         assertTrue(t2.getRowCount() == 0);
@@ -584,7 +607,7 @@ public class TestVoltTable extends TestCase {
 
         Object content[] = { b1, S1, i1, l1, f1, s1, d1, B1, b1 };
 
-        Object nulls[] = { VoltType.NULL_TINYINT, VoltType.NULL_STRING, VoltType.NULL_INTEGER,
+        Object nulls[] = { VoltType.NULL_TINYINT, VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_INTEGER,
                            VoltType.NULL_BIGINT, VoltType.NULL_FLOAT, VoltType.NULL_SMALLINT,
                            VoltType.NULL_TIMESTAMP, VoltType.NULL_DECIMAL, VoltType.NULL_TINYINT };
 
@@ -641,4 +664,58 @@ public class TestVoltTable extends TestCase {
         }
         assertEquals(rowcounter, content.length);
     }
+
+    @SuppressWarnings("deprecation")
+    public void testJSONRoundTrip() throws JSONException, IOException {
+        VoltTable t1 = new VoltTable(
+                new ColumnInfo("tinyint", VoltType.TINYINT),
+                new ColumnInfo("smallint", VoltType.SMALLINT),
+                new ColumnInfo("integer", VoltType.INTEGER),
+                new ColumnInfo("bigint", VoltType.BIGINT),
+                new ColumnInfo("float", VoltType.FLOAT),
+                new ColumnInfo("string", VoltType.STRING),
+                new ColumnInfo("varbinary", VoltType.VARBINARY),
+                new ColumnInfo("timestamp", VoltType.TIMESTAMP),
+                new ColumnInfo("decimal", VoltType.DECIMAL));
+
+        // add a row of nulls the hard way
+        t1.addRow(VoltType.NULL_TINYINT,
+                  VoltType.NULL_SMALLINT,
+                  VoltType.NULL_INTEGER,
+                  VoltType.NULL_BIGINT,
+                  VoltType.NULL_FLOAT,
+                  VoltType.NULL_STRING_OR_VARBINARY,
+                  VoltType.NULL_STRING_OR_VARBINARY,
+                  VoltType.NULL_TIMESTAMP,
+                  VoltType.NULL_DECIMAL);
+
+        // add a row of nulls the easy way
+        t1.addRow(null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null);
+
+        // add a row of actual data
+        t1.addRow(123,
+                  12345,
+                  1234567,
+                  12345678901L,
+                  1.234567,
+                  "aabbcc",
+                  new byte[] { 10, 26, 10 },
+                  new TimestampType(System.currentTimeMillis()),
+                  new BigDecimal("123.45"));
+
+        String json = t1.toJSONString();
+
+        VoltTable t2 = VoltTable.fromJSONString(json);
+
+        assertTrue(t1.equals(t2));
+    }
+
 }

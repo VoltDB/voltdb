@@ -29,16 +29,16 @@ import java.net.UnknownHostException;
 
 import junit.framework.TestCase;
 
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.ClusterCompiler;
-import org.voltdb.compiler.ClusterConfig;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.MiscUtils;
 
 public class TestHSQLBackend extends TestCase {
 
@@ -82,7 +82,7 @@ public class TestHSQLBackend extends TestCase {
         server.join();
     }
 
-    public void testAdHocEmptyQuery() throws InterruptedException, IOException, ProcCallException {
+    public void testAdHocEmptyQuery() throws Exception {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
@@ -111,7 +111,7 @@ public class TestHSQLBackend extends TestCase {
         server.join();
     }
 
-    public void testDateInsertionAsLong() throws UnknownHostException, IOException, ProcCallException, InterruptedException {
+    public void testDateInsertionAsLong() throws Exception {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
@@ -171,5 +171,38 @@ public class TestHSQLBackend extends TestCase {
         server.shutdown();
         server.join();
         client.close();
+    }
+
+    public void testVarbinary() throws Exception {
+        String simpleSchema =
+            "create table blah (" +
+            "ival bigint default 0 not null, " +
+            "b varbinary default null, " +
+            "PRIMARY KEY(ival));";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addPartitionInfo("blah", "ival");
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("hsqldbbin.jar"), 1, 1, 0, "localhost");
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("hsqldbbin.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("hsqldbbin.xml");
+        config.m_backend = BackendTarget.HSQLDB_BACKEND;
+        ServerThread localServer = new ServerThread(config);
+        localServer.start();
+        localServer.waitForInitialization();
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a' });
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        // stop execution
+        VoltDB.instance().shutdown(localServer);
     }
 }

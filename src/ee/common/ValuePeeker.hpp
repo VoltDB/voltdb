@@ -71,12 +71,14 @@ public:
     }
 
     static inline void* peekObjectValue(const NValue value) {
-        assert(value.getValueType() == VALUE_TYPE_VARCHAR);
+        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
+               (value.getValueType() == VALUE_TYPE_VARBINARY));
         return value.getObjectValue();
     }
 
     static inline int32_t peekObjectLength(const NValue value) {
-        assert(value.getValueType() == VALUE_TYPE_VARCHAR);
+        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
+               (value.getValueType() == VALUE_TYPE_VARBINARY));
         return value.getObjectLength();
     }
 

@@ -33,11 +33,11 @@ package org.hsqldb_voltpatches.types;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
@@ -72,6 +72,7 @@ public abstract class Type implements SchemaObject, Cloneable {
     }
 
     // interface specific methods
+    @Override
     public final int getType() {
 
         if (userTypeModifier == null) {
@@ -81,6 +82,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getType();
     }
 
+    @Override
     public final HsqlName getName() {
 
         if (userTypeModifier == null) {
@@ -90,6 +92,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getName();
     }
 
+    @Override
     public final HsqlName getCatalogName() {
 
         if (userTypeModifier == null) {
@@ -99,6 +102,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSchemaName().schema;
     }
 
+    @Override
     public final HsqlName getSchemaName() {
 
         if (userTypeModifier == null) {
@@ -108,6 +112,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSchemaName();
     }
 
+    @Override
     public final Grantee getOwner() {
 
         if (userTypeModifier == null) {
@@ -117,6 +122,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getOwner();
     }
 
+    @Override
     public final OrderedHashSet getReferences() {
 
         if (userTypeModifier == null) {
@@ -126,6 +132,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getReferences();
     }
 
+    @Override
     public final OrderedHashSet getComponents() {
 
         if (userTypeModifier == null) {
@@ -135,6 +142,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getComponents();
     }
 
+    @Override
     public final void compile(Session session) {
 
         if (userTypeModifier == null) {
@@ -151,6 +159,7 @@ public abstract class Type implements SchemaObject, Cloneable {
      * @return the SQL character sequence required to (re)create the
      *  trigger
      */
+    @Override
     public String getSQL() {
 
         if (userTypeModifier == null) {
@@ -943,6 +952,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         // typeNames.put("CHAR", Types.SQL_CHAR);
         typeNames.put("VARCHAR", Types.SQL_VARCHAR);
         typeNames.put("TIMESTAMP", Types.SQL_TIMESTAMP);
+        typeNames.put("VARBINARY", Types.SQL_VARBINARY);
 
 
         //

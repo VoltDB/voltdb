@@ -79,8 +79,8 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         columnTypes[columnIndex] = type;
         const int32_t size = static_cast<int32_t>(catalog_column->size());
         //Strings length is provided, other lengths are derived from type
-        const int32_t length = type == VALUE_TYPE_VARCHAR ? size
-            : static_cast<int32_t>(NValue::getTupleStorageSize(type));
+        bool varlength = (type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY);
+        const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
         columnLengths[columnIndex] = length;
         columnAllowNull[columnIndex] = catalog_column->nullable();
         columnNames[catalog_column->index()] = catalog_column->name();

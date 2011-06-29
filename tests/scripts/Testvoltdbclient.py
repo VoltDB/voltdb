@@ -33,6 +33,7 @@ import struct
 import sys
 import subprocess
 import time
+import array
 
 from voltdbclient import *
 
@@ -89,6 +90,7 @@ class TestFastSerializer(unittest.TestCase):
     int64Array = [None, -52423, 2147483647, -9223372036854775807]
     floatArray = [None, float("-inf"), float("nan"), -0.009999999776482582]
     stringArray = [None, u"hello world", u"ça"]
+    binArray = [None, array.array('c', ['c', 'f', 'q'])]
     dateArray = [None, datetime.datetime.now(),
                  datetime.datetime.utcfromtimestamp(0),
                  datetime.datetime.utcnow()]
@@ -118,11 +120,17 @@ class TestFastSerializer(unittest.TestCase):
 
     def sendArrayAndCompare(self, type, value):
         self.fs.writeWireTypeArray(type, value)
+        sys.stdout.flush()
         self.fs.prependLength()
+        sys.stdout.flush()
         self.fs.flush()
+        sys.stdout.flush()
         self.fs.bufferForRead()
+        sys.stdout.flush()
         self.assertEqual(self.fs.readByte(), type)
+        sys.stdout.flush()
         self.assertEqual(list(self.fs.readArray(type)), value)
+        sys.stdout.flush()
 
     def testByte(self):
         for i in self.byteArray:
@@ -201,19 +209,21 @@ class TestFastSerializer(unittest.TestCase):
                                         name = "bigint"))
         table.columns.append(VoltColumn(type = FastSerializer.VOLTTYPE_STRING,
                                         name = "name"))
+        table.columns.append(VoltColumn(type = FastSerializer.VOLTTYPE_VARBINARY,
+                                        name = "bin"))
         table.columns.append(VoltColumn(type = FastSerializer.VOLTTYPE_TIMESTAMP,
                                         name = "date"))
         table.columns.append(VoltColumn(type = FastSerializer.VOLTTYPE_DECIMAL,
                                         name = "money"))
         table.tuples.append([self.byteArray[1], self.int64Array[2],
-                             self.stringArray[0], self.dateArray[2],
+                             self.stringArray[0], self.binArray[0], self.dateArray[2],
                              self.decimalArray[0]])
         table.tuples.append([self.byteArray[2], self.int64Array[1],
-                             self.stringArray[2], self.dateArray[1],
+                             self.stringArray[2], self.binArray[1], self.dateArray[1],
                              self.decimalArray[1]])
-        table.tuples.append([self.byteArray[0], self.int64Array[0],
-                             self.stringArray[1], self.dateArray[0],
-                             self.decimalArray[2]])
+        #table.tuples.append([self.byteArray[0], self.int64Array[0],
+        #                     self.stringArray[1], self.binArray[1], self.dateArray[0],
+        #                     self.decimalArray[2]])
 
         self.fs.writeByte(type)
         table.writeToSerializer()

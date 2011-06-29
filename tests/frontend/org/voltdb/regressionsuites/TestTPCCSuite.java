@@ -440,6 +440,10 @@ public class TestTPCCSuite extends RegressionSuite {
         // check for successful insertion.
         assertEquals(1L, customer4.asScalarLong());
 
+
+        TPCDataPrinter.printAllData(client);
+
+
         // long d_id, long w_id, double h_amount, String c_last, long c_w_id,
         // long c_d_id
         final double paymentAmount = 500.25;

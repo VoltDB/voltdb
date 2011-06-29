@@ -25,11 +25,11 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.voltdb.types.TimestampType;
-import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
 
 /**
  * <code>DataInputStream</code> subclass to read objects that implement
@@ -187,7 +187,7 @@ public class FastDeserializer implements DataInput {
 
 
     /**
-     * Read a string in the standard VoltDB way. That is, two
+     * Read a string in the standard VoltDB way. That is, four
      * bytes of length info followed by the bytes of characters
      * encoded in UTF-8.
      *
@@ -222,6 +222,37 @@ public class FastDeserializer implements DataInput {
             e.printStackTrace();
         }
 
+        return retval;
+    }
+
+    /**
+     * Read a varbinary, serialized the same way VoltDB serializes
+     * strings, but returned as byte[].
+     *
+     * @return The byte[] value read from the stream.
+     * @throws IOException Rethrows any IOExceptions.
+     */
+    public byte[] readVarbinary() throws IOException {
+        final int NULL_STRING_INDICATOR = -1;
+
+        final int len = readInt();
+
+        // check for null string
+        if (len == NULL_STRING_INDICATOR)
+            return null;
+        assert len >= 0;
+
+        if (len > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Serializable varbinary values cannot be longer then "
+                    + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        if (len < NULL_STRING_INDICATOR) {
+            throw new IOException("Varbinary length is negative " + len);
+        }
+
+        // now assume not null
+        final byte[] retval = new byte[len];
+        readFully(retval);
         return retval;
     }
 
