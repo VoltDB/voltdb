@@ -1,0 +1,103 @@
+<html>
+<body>
+<pre style="font-size:10px;font-family:Lucida Console, Courier New, Courier, monospace;">
+--------------------------------------------------------------------------------
+Application Requirements
+--------------------------------------------------------------------------------
++ VoltDB Studio | Web requires an HTML 5-compatible web browser, such as
+  Firefox 3.6, Safari 5.0, Chrome 12, Internet Explorer 9 or above.
+
+
+--------------------------------------------------------------------------------
+Using VoltDB Studio
+--------------------------------------------------------------------------------
+
+Schema Browsing ----------------------------------------------------------------
+
++ All schema information is available for browsing in the tree control on the
+  left side of the application window.
+
+
+Executing Arbitrary SQL --------------------------------------------------------
+
++ After connecting to the cluster open an SQL Query Window by clicking the New
+  Query button (or CTRL+N, or the New Query context menu option on a connection)
+
++ Enter valid VoltDB SQL (select, insert, update, delete)
+
++ Execute the Query by selecting Query->Execute (or F5).
+  + Results and any messages are displayed below the SQL Query Window.
+  + The output type can be changed from the default Grid type by selecting one
+    from the Results button set: csv, tab, fix, grid.
+
+
+Defining Stored Procedures -----------------------------------------------------
+
++ VoltDB Studio supports executing user created stored procedures but they first
+  need to be declared.
++ Syntax is:
+
+  declare proc(edure) <name> [<param-type-1> [,<param-type-2> [,<param-type-n>]]]
+
+  + <name> is the name of the stored procedure (case sensitive)
+  + [<param-type-1> [,<param-type-2> [,<param-type-n>]]] is a comma separated
+    list of parameter data types for the procedure
+
+    + Parameter types are the SQL Data Type equivalents of the Java Stored
+      Procedure parameters
+      + tinyint = byte
+      + smallint = short
+      + integer = int
+      + bigint = long
+      + float = double
+      + decimal = BigDecimal
+      + varchar = String
+      + timestamp = TimestampType
+      + Note: Array data types are not supported
+
++ Samples from the "Voter" example application
+  + declare proc Results
+  + declare proc Vote bigint, tinyint, bigint
+
+
+Running Stored Procedures ------------------------------------------------------
+
++ Syntax is:
+
+  exec(ute) <procedure-name> [<param-1> [,<param-2> [,param-n]]]
+
++ Samples from the "Voter" example application
+  + exec Results
+  + exec Vote 5055555555, 2, 10
+
+
+Removing Stored Procedure Definitions ------------------------------------------
+
++ You can remove an invalid procedure definition using the following syntax:
+
+  undeclare proc(edure) <stored-procedure-name>
+
+
+Monitoring Server Performance --------------------------------------------------
+
++ VoltDB Studio allows monitoring of memory usage (GB in use by VoltDB on all
+  servers in the cluster) as well as average transaction latency (within the
+  server) and overall transactional throughput.
++ To open a monitor window click the Performance Monitor button (or F3 or the
+  Performance Monitor context menu option on a connection)
+
+
+--------------------------------------------------------------------------------
+Known Issues / Limitations
+--------------------------------------------------------------------------------
++ The application gathers schema information immediately after connecting to the
+  cluster.  Tables with a large number of rows will fail the column name / data
+  type check and show "Schema could not be read..." in the UI.
++ Ad-Hoc queries are always executed multi-partition (VoltDB Studio uses the
+  @AdHoc System Stored Procedure) and are limited in how much data can be
+  selected, aggregated, sorted, and returned.  If any of these limits are
+  violated the query will fail and produce error text in the "Messages" tab.
+
+</pre>
+</body>
+</html>

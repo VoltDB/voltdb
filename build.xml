@@ -455,6 +455,13 @@ DISTRIBUTION
     <distribute-example exampledir="twitter"/>
     <distribute-example exampledir="voter"/>
 
+    <!-- populate the studio.web tool -->
+    <copy todir="${dist.dir}/tools" >
+        <fileset dir="tools" defaultexcludes="yes">
+            <include name="studio.web/**"/>
+        </fileset>
+    </copy>
+
     <!-- populate the sqlcmd tool -->
     <copy todir="${dist.dir}/tools" >
         <fileset dir="tools" defaultexcludes="yes">
