@@ -118,8 +118,19 @@ var IVoltDB = (function(){
 				ContinueOnFailure = (continueOnFailure == true);
 				OnCompleteHandler = null;
 				Success = true;
+                Stack.push(null);
 				return this;
 			}
+		    this.DeclareProcedure = function(procedureInfo)
+		    {
+				Stack.push(['@declare-proc', procedureInfo]);
+				return this;
+            }
+		    this.UndeclareProcedure = function(procedureName)
+		    {
+				Stack.push(['@undeclare-proc', procedureName]);
+				return this;
+            }
 			this.BeginExecute = function(procedure, parameters, callback)
 			{
 				Stack.push([procedure, parameters, callback]);
@@ -132,24 +143,37 @@ var IVoltDB = (function(){
 				if (Stack.length > 0 && (Success || ContinueOnFailure))
 				{
 					var item = Stack[0];
-					Connection.CallExecute(item[0], item[1], (new CallbackWrapper(
-                                                                (function(queue,item) {
-                                                                    return function(response) {
-                                                                        try
-                                                                        {
-                                                                            if (response.status != 1)
+                    if (item[0] == '@declare-proc')
+                    {
+                        Connection.DeclareProcedure(item[1]);
+                        return this.EndExecute();
+                    }
+                    else if (item[0] == '@undeclare-proc')
+                    {
+                        Connection.UndeclareProcedure(item[1]);
+                        return this.EndExecute();
+                    }
+                    else
+                    {
+					    Connection.CallExecute(item[0], item[1], (new CallbackWrapper(
+                                                                    (function(queue,item) {
+                                                                        return function(response) {
+                                                                            try
+                                                                            {
+                                                                                if (response.status != 1)
+                                                                                    Success = false;
+                                                                                if (item[2] != null)
+                                                                                    item[2](response);
+                                                                                queue.EndExecute();
+                                                                            }
+                                                                            catch(x)
+                                                                            {
                                                                                 Success = false;
-                                                                            if (item[2] != null)
-                                                                                item[2](response);
-                                                                            queue.EndExecute();
-                                                                        }
-                                                                        catch(x)
-                                                                        {
-                                                                            Success = false;
-                                                                            queue.EndExecute();
-                                                                        }
-                                                                    };
-                                                                })(this,item))).Callback);
+                                                                                queue.EndExecute();
+                                                                            }
+                                                                        };
+                                                                    })(this,item))).Callback);
+    				}
 				}
 				else
 				{
@@ -166,12 +190,16 @@ var IVoltDB = (function(){
 				OnCompleteHandler = [fcn, state];
 				if (!Executing)
 				{
+/*
     				if (Stack.length == 0)
                     {
                         this.EndExecute();
                         return;
                     }
+*/
 					Executing = true;
+                    this.EndExecute();
+/*
 					var item = Stack[0];
 					Connection.CallExecute(item[0], item[1], (new CallbackWrapper((function(queue,item) {
                                                                 return function(response) {
@@ -190,6 +218,7 @@ var IVoltDB = (function(){
                                                                     }
                                                                 };
                                                             })(this,item))).Callback);
+*/
 				}
 			}
 		}

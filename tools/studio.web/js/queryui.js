@@ -160,7 +160,7 @@ this.execute = function()
 			var procedure = params.splice(0,1)[0];
 			if (procedure.charAt(0) == '@')
 				continue;
-			connection.DeclareProcedure({name: procedure, 'params': params});
+			connectionQueue.DeclareProcedure({name: procedure, 'params': params});
 		}
 		else if (/^undeclare proc /i.test(statements[i]))
 		{
@@ -168,7 +168,7 @@ this.execute = function()
 			var procedure = params.splice(0,1)[0];
 			if (procedure.charAt(0) == '@')
 				continue;
-			connection.UndeclareProcedure(procedure);
+			connectionQueue.UndeclareProcedure(procedure);
 		}
 		else
 		{
