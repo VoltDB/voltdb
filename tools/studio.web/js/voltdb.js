@@ -167,8 +167,10 @@ var IVoltDB = (function(){
 				if (!Executing)
 				{
     				if (Stack.length == 0)
-                        return EndExecute();
-
+                    {
+                        this.EndExecute();
+                        return;
+                    }
 					Executing = true;
 					var item = Stack[0];
 					Connection.CallExecute(item[0], item[1], (new CallbackWrapper((function(queue,item) {
