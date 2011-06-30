@@ -58,6 +58,7 @@ public class TestBlobType extends TestCase {
         builder.addStmtProcedure("Update", "update blah set b = ? where ival = ?", null);
         builder.addStmtProcedure("FindString", "select * from blah where ival = ? and s = ?", null);
         builder.addStmtProcedure("LiteralUpdate", "update blah set b = '0a1A' where ival = 5", null);
+        builder.addStmtProcedure("LiteralInsert", "insert into blah values (13, 'aabbcc', 'hi', 'aabb');", null);
         builder.addProcedures(VarbinaryStringLookup.class);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0, "localhost");
         assertTrue(success);
@@ -75,11 +76,7 @@ public class TestBlobType extends TestCase {
         client.createConnection("localhost");
 
         // insert data
-        ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a' }, "hi", new byte[] { 'a' });
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-
-        // insert hex data
-        cr = client.callProcedure("Insert", 9, "aabbccdd", "hi", "aabb");
+        ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a', 'b', 'c', 'd' }, "hi", new byte[] { 'a' });
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
         // make sure strings as bytes works
@@ -97,11 +94,11 @@ public class TestBlobType extends TestCase {
         assertEquals(1, cr.getResults()[0].getRowCount());
         assertEquals(1, cr.getResults()[0].asScalarLong());
 
-        // see if we can get the binary value from the '0a1A' insertion above
+        // see if we can get the binary value from the '0a1A' update above
         cr = client.callProcedure("Select");
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
         VoltTable t = cr.getResults()[0];
-        assertEquals(2, t.getRowCount());
+        assertEquals(1, t.getRowCount());
         t.resetRowPosition();
         t.advanceRow();
         byte[] vb = t.getVarbinary("b");
@@ -114,6 +111,16 @@ public class TestBlobType extends TestCase {
         assertEquals(2, vb.length);
         assertEquals((byte) 10, vb[0]);
         assertEquals((byte) 26, vb[1]);
+
+        // insert hex data
+        cr = client.callProcedure("Insert", 9, "aabbccdd", "hi", "aabb");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        // literal inserts
+        cr = client.callProcedure("LiteralInsert");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(1, cr.getResults()[0].getRowCount());
+        assertEquals(1, cr.getResults()[0].asScalarLong());
 
         // adhoc queries
         cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb01' where ival = 5");
@@ -158,9 +165,6 @@ public class TestBlobType extends TestCase {
             fail();
         }
         catch (ProcCallException e) {}
-
-        localServer.shutdown();
-        localServer.join();
 
         // stop execution
         VoltDB.instance().shutdown(localServer);
