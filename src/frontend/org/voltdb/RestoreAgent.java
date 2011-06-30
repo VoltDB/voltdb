@@ -114,9 +114,14 @@ SnapshotCompletionInterest {
         }
         @Override
         public void replay() {
-            if (m_callback != null) {
-                m_callback.onReplayCompletion();
-            }
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    if (m_callback != null) {
+                        m_callback.onReplayCompletion();
+                    }
+                }
+            }).start();
         }
         @Override
         public void join() throws InterruptedException {}
@@ -928,11 +933,18 @@ SnapshotCompletionInterest {
         if (m_state == State.RESTORE) {
             waitForSnapshotTxnId();
             exitRestore();
-            m_replayAgent.replay();
             m_state = State.REPLAY;
+
+            /*
+             * Add the interest here so that we can use the barriers in replay
+             * agent to synchronize.
+             */
+            m_snapshotMonitor.addInterest(this);
+            m_replayAgent.replay();
         } else if (m_state == State.REPLAY) {
             m_state = State.TRUNCATE;
         } else if (m_state == State.TRUNCATE) {
+            m_snapshotMonitor.removeInterest(this);
             if (m_callback != null) {
                 m_callback.onRestoreCompletion(true);
             }
@@ -941,6 +953,20 @@ SnapshotCompletionInterest {
 
     @Override
     public void onReplayCompletion() {
+        if (!m_hasRestored && m_action == START_ACTION.RECOVER) {
+            /*
+             * This means we didn't restore any snapshot, and there's no command
+             * log to replay. But the user asked for recover
+             */
+            LOG.fatal("Nothing to recover from");
+            VoltDB.crashVoltDB();
+        } else if (!m_replayAgent.hasReplayed()) {
+            // Nothing was replayed, so no need to initiate truncation snapshot
+            m_state = State.TRUNCATE;
+        }
+
+        changeState();
+
         if (m_replayAgent.hasReplayed()) {
             /*
              * If this has the lowest host ID, initiate the snapshot that
@@ -952,7 +978,6 @@ SnapshotCompletionInterest {
                 ByteBuffer buf = ByteBuffer.allocate(pathBytes.length + 8);
                 buf.position(8);
                 buf.put(pathBytes);
-                m_snapshotMonitor.addInterest(this);
                 try {
                     m_zk.create("/request_truncation_snapshot", buf.array(),
                                 Ids.OPEN_ACL_UNSAFE,
@@ -961,21 +986,8 @@ SnapshotCompletionInterest {
                     LOG.fatal("Requesting a truncation snapshot via ZK should always succeed", e);
                     VoltDB.crashVoltDB();
                 }
-            } else {
-                m_state = State.TRUNCATE;
             }
-        } else if (!m_hasRestored && m_action == START_ACTION.RECOVER) {
-            /*
-             * This means we didn't restore any snapshot, and there's no command
-             * log to replay. But the user asked for recover
-             */
-            LOG.fatal("Nothing to recover from");
-            VoltDB.crashVoltDB();
-        } else {
-            m_state = State.TRUNCATE;
         }
-
-        changeState();
     }
 
     private boolean isLowestHost() {
@@ -1042,7 +1054,6 @@ SnapshotCompletionInterest {
             LOG.fatal("Failed to truncate command logs by snapshot");
             VoltDB.crashVoltDB();
         } else {
-            m_snapshotMonitor.removeInterest(this);
             m_replayAgent.returnAllSegments();
             changeState();
         }
