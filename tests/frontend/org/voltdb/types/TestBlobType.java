@@ -76,11 +76,7 @@ public class TestBlobType extends TestCase {
         client.createConnection("localhost");
 
         // insert data
-        ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a' }, "hi", new byte[] { 'a' });
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-
-        // insert hex data
-        cr = client.callProcedure("Insert", 9, "aabbccdd", "hi", "aabb");
+        ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a', 'b', 'c', 'd' }, "hi", new byte[] { 'a' });
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
         // make sure strings as bytes works
@@ -98,11 +94,11 @@ public class TestBlobType extends TestCase {
         assertEquals(1, cr.getResults()[0].getRowCount());
         assertEquals(1, cr.getResults()[0].asScalarLong());
 
-        // see if we can get the binary value from the '0a1A' insertion above
+        // see if we can get the binary value from the '0a1A' update above
         cr = client.callProcedure("Select");
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
         VoltTable t = cr.getResults()[0];
-        assertEquals(2, t.getRowCount());
+        assertEquals(1, t.getRowCount());
         t.resetRowPosition();
         t.advanceRow();
         byte[] vb = t.getVarbinary("b");
@@ -116,6 +112,11 @@ public class TestBlobType extends TestCase {
         assertEquals((byte) 10, vb[0]);
         assertEquals((byte) 26, vb[1]);
 
+        // insert hex data
+        cr = client.callProcedure("Insert", 9, "aabbccdd", "hi", "aabb");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        // literal inserts
         cr = client.callProcedure("LiteralInsert");
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
         assertEquals(1, cr.getResults()[0].getRowCount());
