@@ -1,65 +1,113 @@
 --------------------------------------------------------------------------------
-Application Requirements
+VoltDB SQLCommand
 --------------------------------------------------------------------------------
-+ VoltDB SQLCommand is a Java application that requires a Java runtime
-  environment such as OpenJDK.
 
-+ The shorthand access bash script assumes that the VoltDB client library is 
-  located in the relative path: ../../voltdb/*.jar
-  It needs to be updated should your deployment be different.
+VoltDB SQLCommand is a command line tool for connecting to a VoltDB database
+and invoking SQL statements and stored procedures interactively. SQLCommand
+can be run interactively from the system command line (or shell) or as part 
+of a script.
+
+The command line for running the SQLCommand utility is the following:
+
+    (linux)               $ ./sqlcmd  [options]  [command]
+    (Microsoft Windows)   > sqlcmd.cmd  [options]  [command]
+
+The options let you specify what database to connect to and how the output is
+formatted. The allowable options are:
+
+    --help or --usage
+    --servers=comma_separated_server_list
+    --port=port_number
+    --user=user
+    --password=password
+    --output-format=(fixed|csv|tab)
+     --output-skip-metadata
+
+
+If you specify a command when you invoke the utility, that command is executed 
+and the utility exits. If you do not specify a command, the utility enters 
+interactive mode and lets you specify commands at a command line prompt. 
+Valid commands are:
+
+    {SQL statement}
+    DECLARE PROC[EDURE] {procedure-name} [parameters]
+    EXEC[UTE] {procedure-name} [parameters]
+    FILE {file-name}
+    UNDECLARE PROC[EDURE] {procedure-name}
+
+Command and SQL keywords (such as DECLARE or SELECT) are case insensitive. 
+Commands can span multiple lines and multiple commands can be given before
+execution. Use the semi-colon to complete a set of commands and request
+execution. 
+
+In addition to database commands, when running the utility interactively (rather
+than as part of a script) there are a set of interactive commands that you
+can use to get information and control the tool itself. These commands are
+executed immediately (they do not require a semi-colon). The interactive
+commands are:
+
+    GO
+    LIST PROC[EDURES]
+    RECALL [command-number]
+    QUIT or EXIT
+
+The following sections provide more detail on how to use the SQLCommand utility. 
+
+
+--------------------------------------------------------------------------------
+System Requirements
+--------------------------------------------------------------------------------
+VoltDB SQLCommand is a Java application that requires a Java runtime
+environment such as OpenJDK.
+
+As installed, the command script assumes that the VoltDB client library is 
+located in the relative path: ../../voltdb/*.jar  If you move the script or if
+your deployment be different, you must update the command script.
 
 --------------------------------------------------------------------------------
 Using VoltDB SQLCommand
 --------------------------------------------------------------------------------
 
-Running the utility ------------------------------------------------------------
-
-+ The Java application has been wrapped into a convenient bash script for easier
-  access.  To launch, execute the following:
-  
-  + Linux/Mac = ./sqlcmd
-  + Windows = sqlcmd.cmd
-
 
 Connecting to a VoltDB database ------------------------------------------------
 
-+ By default, the utility attempts to connect to a VoltDB database on the
-  localhost, using the standard port (21212).  You may override those settings
-  through command line arguments, as well as provide specific user credentials
-  to connect with.
++ By default, the utility connects to a VoltDB database on the localhost, using 
+  the standard port (21212).  You may override those settings through command 
+  line arguments, as well as provide specific user credentials to connect with.
 
-  + For more information, run the utility with the --usage or --help command
-    line parameter.
++ For more information, run the utility with the --usage or --help command
+  line parameter.
 
 
-Executing Arbitrary SQL --------------------------------------------------------
+Executing SQL Statements -------------------------------------------------------
 
-+ Enter valid VoltDB SQL (select, insert, update, delete)
++ To execute a SQL statement, simply enter any valid VoltDB SQL statement (select, 
+  insert, update, delete) on the command line.
 
-+ You may enter a single SQL statement on multiple lines.
++ Individual SQL statements can span multiple lines. (A line continuation character
+  is not required.)
 
-+ You may enter more than one statement before requesting execution
++ You may enter more than one statement before requesting execution.
 
-+ To request execution, enter a semi-colon at the end of a statement
-
-+ Alternatively, enter to command: GO (case insensitive)
++ To request execution, enter a semi-colon at the end of a statement, or enter the
+  interactive command GO.
 
 
 Defining Stored Procedures -----------------------------------------------------
 
-+ VoltDB SQLCommand supports executing user created stored procedures but they
-  first need to be declared.
++ You can execute stored procedures defined in the VoltDB database, but they
+  must be declared first.
 
-+ Syntax is:
++ The syntax for declaring a stored procedure is the following:
 
   declare proc(edure) <name> [<param-type-1> [,<param-type-2> [,<param-type-n>]]]
 
   + <name> is the name of the stored procedure (case sensitive)
-  + [<param-type-1> [,<param-type-2> [,<param-type-n>]]] is a comma separated
+  + [<param-type-1> [,<param-type-2> [,<param-type-n>]]] is a comma-separated
     list of parameter data types for the procedure
 
-    + Parameter types are the SQL Data Type equivalents of the Java Stored
-      Procedure parameters
+  + You specify the parameter datatypes using the SQL datatype equivalents of 
+    the Java stored procedure parameters:
       + tinyint = byte
       + smallint = short
       + integer = int
@@ -68,20 +116,18 @@ Defining Stored Procedures -----------------------------------------------------
       + decimal = BigDecimal
       + varchar = String
       + timestamp = TimestampType
-      + Note: Array data types are not supported
+      
+  + Note: Array data types are not supported
 
-+ Samples from the "Voter" example application
++ For example, the following commands declare procedures from the "Voter" example 
+  application:
   + declare proc Results;
   + declare proc Vote bigint, tinyint, bigint;
 
-+ Procedure declaration statements are understood by the tool as a regular SQL
-  commands, thus must be terminated by a semi-colon for immediate execution.
+Executing Stored Procedures ------------------------------------------------------
 
-
-Running Stored Procedures ------------------------------------------------------
-
-+ You may run stored procedures you defined as well as the following system
-  procedures:
++ You can run any stored procedures that are previously defined, as well as the 
+  following system procedures:
 
   + @Pause
   + @Quiesce
@@ -96,9 +142,9 @@ Running Stored Procedures ------------------------------------------------------
   + @UpdateApplicationCatalog varchar, varchar
   + @UpdateLogging varchar
 
-+ 'bit' values may be provided as true|yes|1 | false|no|0
++ 'bit' values may be provided as either {true|yes|1} or {false|no|0}.
 
-+ 'StatisticsComponent' values should be either of:
++ 'StatisticsComponent' values should be one of the following:
   + INDEX
   + INITIATOR
   + IOSTATS
@@ -110,18 +156,15 @@ Running Stored Procedures ------------------------------------------------------
   + STARVATION
   + LIVECLIENTS
 
-+ 'null' values may be provided with null (unquoted)
++ Specify null values with the word "null" (without quotation marks).
 
-+ Execution syntax is:
++ The syntax for executing a procedure is:
 
   exec(ute) <procedure-name> [<param-1> [,<param-2> [,param-n]]]
 
-+ Samples from the "Voter" example application
++ Samples from the "Voter" example application:
   + exec Results;
   + exec Vote 5055555555, 2, 10;
-
-+ Procedure execution statements are understood by the tool as a regular SQL
-  commands, thus must be terminated by a semi-colon for immediate execution.
 
 
 Removing Stored Procedure Definitions ------------------------------------------
@@ -130,14 +173,11 @@ Removing Stored Procedure Definitions ------------------------------------------
 
   undeclare proc(edure) <stored-procedure-name>
 
-+ Procedure declaration statements are understood by the tool as a regular SQL
-  commands, thus must be terminated by a semi-colon for immediate execution.
 
+Listing Stored Procedures -------------------------------------------------------
 
-Listing Stored Procedure -------------------------------------------------------
-
-+ You can list system procedures as well as any procedure you defined using the
-  following interactive mode command:
++ You can list available stored procedures, including both system procedures 
+  as well as any procedure you defined, using the following interactive command:
 
   list proc(edures)
 
@@ -151,16 +191,21 @@ Listing Stored Procedure -------------------------------------------------------
 
 Recalling commands -------------------------------------------------------------
 
-+ You can recall past command using the following syntax:
++ You can recall past commands using the following syntax:
 
-  recall 123
+      recall {line-number}
 
-  (with 123 the line number you wish to recall)
+  for example:
+
+      recall 123
+
+  Where 123 is the line number you wish to recall.
   
-+ The recall operation allows you to retype the command at a given line number
-  as-is (with/without semi-colon, etc.), allowing you to recall a line of script
-  from anywhere into your current batch.  Should the line you recall contains a
-  semicolon, it will then be executed immediately (as it normally would have).
++ The recall operation allows you to reenter the command at a given line number
+  as-is (with or without the semi-colon, etc.), allowing you to recall a line of 
+  script from anywhere into your current command sequence.  Should the line you 
+  recall contain a semi-colon, it will be executed immediately (as it normally 
+  would have).
 
 + Recall operations are considered as interactive mode commands only, thus they
   do not require a terminating semi-colon: the requested command is merely
@@ -171,27 +216,27 @@ Recalling commands -------------------------------------------------------------
 
 Quitting the application -------------------------------------------------------
 
-+ While in interactive mode, type the commands EXIT or QUIT (case insensitive)
-  to quit the utility.
++ While in interactive mode, type the commands EXIT or QUIT to return to the 
+  shell prompt.
 
 
-Running in non-interactive mode ------------------------------------------------
+Running SQLCommand in non-interactive mode ------------------------------------------------
 
 + You can run the command utility in non-interactive mode by piping in sql
-  commands directly to the utility, such as:
+  commands directly to the utility. For example:
 
   + echo "declare proc Results;exec Results" | ./sqlcmd
   + ./sqlcmd < script.sql
 
 + The utility will run your SQL commands and exit immediately.
 
-+ You can then pipe the output to another command or an output file, such as:
++ You can pipe the output to another command or an output file. For example:
 
   + echo "declare proc Results;exec Results" | ./sqlcmd | grep "Edwina Burnam"
   + echo "declare proc Results;exec Results" | ./sqlcmd > results.txt
 
-+ Should any error occur during execution, messages will be output to Standard
-  Error so as not to corrupt the output data, while the application will return
++ Should any error occur during execution, messages are output to Standard
+  Error so as not to corrupt the output data, while the application returns
   the environment exit code '-1'.
 
 + Interactive mode commands such as RECALL, GO, QUIT, EXIT are ignored while
@@ -204,14 +249,14 @@ Running script files -----------------------------------------------------------
 
   file '/tmp/test.sql';
 
-+ Quoting is optional and can be with single or double quotes
++ Quoting is optional and can be either single or double quotes.
 
 + In interactive mode, terminating the command with a semi-colon will
   immediately close the current batch and execute all pending statements.
   
 + FILE statements can be nested and are executed recursively: a script may
-  contain one or several FILE statements.  Obviously, if you perform a logical
-  loop in your file inclusions, you will crash the application!
+  contain one or several FILE statements. If the included file(s) perform a 
+  logical loop, the command utility will fail.
 
 + Interactive mode commands such as RECALL, GO, QUIT, EXIT are ignored when
   found in a script file.
@@ -219,27 +264,27 @@ Running script files -----------------------------------------------------------
 
 Controlling output format ------------------------------------------------------
 
-+ You can choose between 'fixed' (column-aligned), 'csv' and 'tab' formats for
++ You can choose between 'fixed' (column-aligned), 'csv', and 'tab' formats for
   your result data by using the --output-format command line argument.
 
 + By default, columns header information, as well as affected row count is
-  displayed in the output.  This might not be desirable when piping data to a
-  file and you can remove metadata details with the command line argument
+  displayed in the output.  When post-processing the file or piping it to a file, 
+  you can remove such metadata with the command line argument 
   --output-skip-metadata.
 
 + The following statement shows how to return CSV data, with no header
   information:
 
-  + echo "declare proc Results;exec Results" | ./sqlcmd --output-format=csv \
+     echo "declare proc Results;exec Results" | ./sqlcmd --output-format=csv \
     --output-skip-metadata
 
 
-Important note on output stream ------------------------------------------------
+Important note on standard output messages ------------------------------------------------
 
-+ The VoltDB client library connection spills out informational messages to
-  standard output, a problem we have on our list to fix.  Until then, you will
-  want to grep the output of the utility to remove those messages when saving 
-  data to a file.  The following command shows how you can cleanup your stream:
++ The VoltDB client library connection writes informational messages to
+  standard output.  If you want to remove these extraneous messages from your
+  SQLCommand output, you can use grep to filter the output when saving 
+  data to a file.  The following command shows how you can filter the output:
 
   + echo "declare proc Results;exec Results" | ./sqlcmd --output-format=csv \
     --output-skip-metadata | grep -v "\[Volt Network\]" > VoterResults.csv
@@ -248,13 +293,14 @@ Important note on output stream ------------------------------------------------
 --------------------------------------------------------------------------------
 Known Issues / Limitations
 --------------------------------------------------------------------------------
-+ Ad-Hoc queries are always executed multi-partition (VoltDB Studio uses the
-  @AdHoc System Stored Procedure) and are limited in how much data can be
-  selected, aggregated, sorted, and returned.  If any of these limits are
-  violated the query will fail and produce error text in the output.
++ SQLCOmmand executes SQL statements as ad-hoc queries using the @AdHoc system 
+  procedure. Ad hoc queries are always executed as multi-partition procedures
+  and constrain how much data can be selected, aggregated, sorted, and returned.  
+  If any of these constraints are violated, the query will fail and produce 
+  error text in the output.
 
 + For consistency with similar applications on different database engines,
-  string data is NOT quoted.  However, take note that this can cause parsing
+  string output data is NOT quoted.  However, unquoted text can cause parsing
   issues when re-reading the data output in CSV or TAB format.
 
 
