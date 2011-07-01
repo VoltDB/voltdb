@@ -22,8 +22,7 @@ import java.util.Date;
 
 import org.json_voltpatches.JSONString;
 
-public class TimestampType implements JSONString {
-
+public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
      * Create a TimestampType from microseconds from epoch.
      * @param timestamp microseconds since epoch.
