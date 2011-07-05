@@ -10,8 +10,6 @@ table.tablesorter th {
 	font-size: 8pt;
 	padding: 4px;
 	padding-right: 24px;
-}
-table.tablesorter .header {
 	background-image: url(bg.gif);
 	background-repeat: no-repeat;
 	background-position: center right;
@@ -32,6 +30,14 @@ table.tablesorter .headerSortUp {
 table.tablesorter .headerSortDown {
 	background-image: url(desc.gif);
 }
-table.tablesorter .headerSortDown, table.tablesorter .headerSortUp {
+
+table.tablesorter .sorttable_sorted_reverse {
+	background-image: url(asc.gif);
+}
+table.tablesorter .sorttable_sorted {
+	background-image: url(desc.gif);
+}
+
+table.tablesorter .headerSortDown, table.tablesorter .headerSortUp, table.tablesorter .sorttable_sorted, table.tablesorter .sorttable_sorted_reverse {
 background-color: #999;
 }

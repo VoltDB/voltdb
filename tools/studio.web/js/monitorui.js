@@ -303,9 +303,9 @@ this.RefreshMonitor = function(id, Success)
 	}
 	else
 	{
-		var src = '<table id="stats-' + id + '" class="tablesorter statstable" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder">';
+		var src = '<table id="stats-' + id + '" class="sortable tablesorter statstable" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
 		src += '<th>Procedure</th><th>Calls</th><th>Min (ms)</th><th>Avg (ms)</th><th>Max (ms)</th>';
-		src += '</thead><tbody>';
+		src += '</tr></thead><tbody>';
 		for(var j in procStats)
 		{
 			src += '<tr>';
@@ -318,7 +318,7 @@ this.RefreshMonitor = function(id, Success)
 		src += '</tbody></table>';
 		$(monitor.tab.find('.tablebar')).html(src);
 	}
-	$("#stats-" + id).tablesorter({widgets: ['zebra']});
+    sorttable.makeSortable(document.getElementById('stats-' + id));
 	
 	monitor.lastTransactionCount = currentTransactionCount;
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;

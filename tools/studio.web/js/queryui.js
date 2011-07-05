@@ -223,7 +223,7 @@ function isUpdateResult(table)
 
 function printGrid(target, id, table)
 {
-	var src = '<table class="tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder">';
+	var src = '<table id="resultset-' + id + '" class="sortable tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
     if (isUpdateResult(table))
 		src += '<th>modified_tuples</th>';
     else
@@ -231,7 +231,7 @@ function printGrid(target, id, table)
     	for(var j = 0; j < table.schema.length; j++)
 	    	src += '<th>' + ( table.schema[j].name == "" ? ("Column " + (j+1)) : table.schema[j].name ) + '</th>';
     }
-	src += '</thead><tbody>';
+	src += '</tr></thead><tbody>';
 	for(var j = 0; j < table.data.length; j++)
 	{
 		src += '<tr>';
@@ -241,7 +241,7 @@ function printGrid(target, id, table)
 	}
 	src += '</tbody></table>';
 	$(target).append(src);
-	$(target).find(".resultset-" + id).tablesorter({widgets: ['zebra']});
+    sorttable.makeSortable(document.getElementById('resultset-' + id));
 }
 function printFixed(target, id, table)
 {
