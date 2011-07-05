@@ -1,0 +1,13 @@
+#!/bin/bash
+if [ "`ps aux | grep java | grep voter | grep -v grep | awk 'END {print NR}'`" != "0" ]; then
+    kill `ps aux | grep java | grep voter | grep -v grep | awk '{print $2}'`
+fi
+
+if [ "`ps aux | grep java | grep key_value | grep -v grep | awk 'END {print NR}'`" != "0" ]; then
+    kill `ps aux | grep java | grep key_value | grep -v grep | awk '{print $2}'`
+fi
+
+gnome-terminal -e 'bash -c "cd '`dirname $0`'/../../examples/'$1';ant;"' --geometry=120x10+0+0 --active
+sleep 5
+gnome-terminal -e 'bash -c "cd '`dirname $0`'/../../examples/'$1';ant client;exec bash"' --geometry=120x10+0+150
+

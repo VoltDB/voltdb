@@ -1,0 +1,64 @@
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="../../css/jquery.jqplot.min.css" />
+    <script language="javascript" type="text/javascript" src="../jquery-1.6.1.min.js"></script>
+    <!--[if IE]><script language="javascript" type="text/javascript" src="excanvas.min.js"></script><![endif]-->
+    <script language="javascript" type="text/javascript" src="jquery.jqplot.min.js"></script>
+    <script language="javascript" type="text/javascript" src="canvas-us-map.js"></script>
+    <script language="javascript" type="text/javascript" src="jqplot.mapRenderer.js"></script>
+    <style type="text/css"></style>
+<script type="text/javascript" language="javascript">
+$(document).ready(function(){
+
+    var contestants = [{label:'Edwina Burnam',color:'#f00'},{label:'Tabatha Gehling',color:'#900'},{label:'Kelly Clauss',color:'#0f0'},{label:'Jessie Alloway',color:'#090'},{label:'Alana Bregman',color:'#00f'},{label:'Jessie Eichman',color:'#009'}];
+    var states = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','ID','IL','IN','IA','HI','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+
+    var chartParams = {
+            legend:{ show: true, yoffset:110, xoffset: -80 },
+            seriesDefaults:{
+                    renderer: $.jqplot.MapRenderer,
+                    rendererOptions: { mapVarName: 'usMapData' }
+            },
+            axesDefaults: {
+                    tickOptions: {
+                            showMark: false,
+                            showLabel: false
+                    }
+            },
+            grid: {
+                    drawGridlines: false,
+                    shadow: false,
+                    borderWidth: 0.01,
+                    background: '#fff'
+            },
+            series: contestants, //[{label:'Chances of red', color:'#ff0000'}, {label:'Chances of blue', color:'#0000ff'}],
+            seriesColors: ['#ff0000','#0000ff']
+    };
+    var redData = [
+            ['AK',43], ['TX',80],['MS',95]
+    ];
+    var blueData = [
+            ['CA',88], ['FL',10], ['MA',79],['NY',55]
+    ];
+    $.jqplot('chartUSMap1', getData(), chartParams);
+
+function getData()
+{
+    var data = [[],[]];
+    for(var i=0;i<states.length;i++)
+        data[i%2].push([states[i], 33*(1+Math.floor(Math.random()*(contestants.length/2)))]);
+    return data;
+}
+});
+
+
+</script>
+
+</head>
+<body>
+
+<div class="jqPlot" id="chartUSMap1" style="height:380px; width:480px;"></div>
+
+</body>
+
+</html>
