@@ -32,6 +32,11 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Date;
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.GZIPInputStream;
+
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientConfig;
@@ -41,9 +46,71 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.utils.Encoder;
 
 public class ClientKV {
+
+    private static byte[] gzip(byte[] bytes)
+    {
+        try
+        {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(bytes.length * 0.7));
+            GZIPOutputStream gzos = new GZIPOutputStream(baos);
+            gzos.write(bytes);
+            gzos.close();
+            return baos.toByteArray();
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+    private static byte[] gunzip(byte bytes[])
+    {
+        // Check to see if it's gzip-compressed
+        // GZIP Magic Two-Byte Number: 0x8b1f (35615)
+        if( (bytes != null) && (bytes.length >= 4) )
+        {
+
+            int head = (bytes[0] & 0xff) | ((bytes[1] << 8) & 0xff00);
+            if( GZIPInputStream.GZIP_MAGIC == head )
+            {
+                ByteArrayInputStream  bais = null;
+                GZIPInputStream gzis = null;
+                ByteArrayOutputStream baos = null;
+                byte[] buffer = new byte[2048];
+                int    length = 0;
+
+                try
+                {
+                    baos = new ByteArrayOutputStream();
+                    bais = new ByteArrayInputStream( bytes );
+                    gzis = new GZIPInputStream( bais );
+
+                    while( ( length = gzis.read( buffer ) ) >= 0 )
+                        baos.write(buffer,0,length);
+
+                    // No error? Get new bytes.
+                    bytes = baos.toByteArray();
+
+                }   // end try
+                catch( java.io.IOException e )
+                {
+                    e.printStackTrace();
+                    // Just return originally-decoded bytes
+                }   // end catch
+                finally
+                {
+                    try{ baos.close(); } catch( Exception e ){}
+                    try{ gzis.close(); } catch( Exception e ){}
+                    try{ bais.close(); } catch( Exception e ){}
+                }   // end finally
+
+            }   // end if: gzipped
+        }   // end if: bytes.length >= 2
+        return bytes;
+    }
+
     public enum spName { GET, PUT };
 
     public static Object lockObject = new Object();
@@ -69,8 +136,7 @@ public class ClientKV {
 
     private enum Behavior {
         NONE,
-        BASE64,
-        COMPRESS_AND_BASE64;
+        GZIP;
     }
 
     private static Behavior behavior = Behavior.NONE;
@@ -101,18 +167,15 @@ public class ClientKV {
                         if (clientResponse.getResults()[0].getRowCount() == 0) {
                             m_logger.info("Get Miss, key = " + cbKeyValue);
                         } else {
-                            byte[] baGetValue = clientResponse.getResults()[0].fetchRow(0).getStringAsBytes(0);
+                            byte[] baGetValue = clientResponse.getResults()[0].fetchRow(0).getVarbinary(0);
                             get_value_compressed_bytes += baGetValue.length;
 
                             if (behavior == Behavior.NONE) {
                                 //if NOT bas64 encoding or compressing
                                 get_value_uncompressed_bytes += baGetValue.length;
-                            } else if (behavior == Behavior.BASE64) {
+                            } else if (behavior == Behavior.GZIP) {
                                 // if NOT using compression
-                                get_value_uncompressed_bytes += Encoder.decodeBase64ToBytes(baGetValue).length;
-                            } else if (behavior == Behavior.COMPRESS_AND_BASE64) {
-                                // if using compression
-                                get_value_uncompressed_bytes += Encoder.decodeBase64AndDecompressToBytes(baGetValue).length;
+                                get_value_uncompressed_bytes += gunzip(baGetValue).length;
                             } else {
                                 System.err.println("Unsupported behavior " + behavior);
                                 System.exit(-1);
@@ -208,12 +271,9 @@ public class ClientKV {
         if (behavior_type == 1) {
             m_logger.info(String.format("Payload stored as is."));
             behavior = Behavior.NONE;
-        } else if (behavior_type == 2) {
-            m_logger.info(String.format("Payload will be base64 encoded."));
-            behavior = Behavior.BASE64;
         } else {
-            m_logger.info(String.format("Payload will be base64 encoded and compressed."));
-            behavior = Behavior.COMPRESS_AND_BASE64;
+            m_logger.info(String.format("Payload will be Gzipped."));
+            behavior = Behavior.GZIP;
         }
 
         long transactions_this_second = 0;
@@ -256,17 +316,8 @@ public class ClientKV {
         byte[] baGenericValue = new byte[max_value_size];
 
         for (int i=0; i < max_value_size; i++) {
-            if (behavior == Behavior.NONE){
-                try {
-                    baGenericValue[i] = "b".getBytes("UTF-8")[0];
-                } catch (UnsupportedEncodingException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-            } else {
-                // set the "64" to whatever number of "values" from 256 you want included in the payload, the lower the number the more compressible the payload
-                baGenericValue[i] = (byte) rand.nextInt(64);
-            }
+            // set the "64" to whatever number of "values" from 256 you want included in the payload, the lower the number the more compressible the payload
+            baGenericValue[i] = (byte) rand.nextInt(64);
         }
 
         // test if database needs initialization
@@ -304,14 +355,11 @@ public class ClientKV {
                 byte[] this_value = null;
 
                 if (behavior == Behavior.NONE) {
-                    // if not using base64 or compression
+                    // if not using compression
                     this_value = baThisValue;
-                } else if (behavior == Behavior.BASE64) {
-                    // if NOT using compression
-                    this_value = Encoder.base64EncodeToBytes(baThisValue);
-                } else if (behavior == Behavior.COMPRESS_AND_BASE64) {
+                } else if (behavior == Behavior.GZIP) {
                     // if using compression
-                    this_value = Encoder.compressAndBase64EncodeToBytes(baThisValue);
+                    this_value = gzip(baThisValue);
                 } else {
                     System.err.println("Unsupported behavior " + behavior);
                     System.exit(-1);
@@ -499,14 +547,11 @@ public class ClientKV {
                 byte[] this_value = null;
 
                 if (behavior == Behavior.NONE) {
-                    // if not using base64 or compression
+                    // if not using compression
                     this_value = baThisValuePut;
-                } else if (behavior == Behavior.BASE64) {
-                    // if NOT using compression
-                    this_value = Encoder.base64EncodeToBytes(baThisValuePut);
-                } else if (behavior == Behavior.COMPRESS_AND_BASE64) {
+                } else if (behavior == Behavior.GZIP) {
                     // if using compression
-                    this_value = Encoder.compressAndBase64EncodeToBytes(baThisValuePut);
+                    this_value = gzip(baThisValuePut);
                 } else {
                     System.err.println("Unsupported behavior " + behavior);
                     System.exit(-1);
