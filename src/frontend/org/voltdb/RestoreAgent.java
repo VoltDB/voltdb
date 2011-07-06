@@ -953,7 +953,8 @@ SnapshotCompletionInterest {
 
     @Override
     public void onReplayCompletion() {
-        if (!m_hasRestored && m_action == START_ACTION.RECOVER) {
+        if (!m_hasRestored && !m_replayAgent.hasReplayed() &&
+            m_action == START_ACTION.RECOVER) {
             /*
              * This means we didn't restore any snapshot, and there's no command
              * log to replay. But the user asked for recover
