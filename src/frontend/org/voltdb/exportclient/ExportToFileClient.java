@@ -64,8 +64,11 @@ public class ExportToFileClient extends ExportClientBase {
     // ODBC Datetime Format
     // if you need microseconds, you'll have to change this code or
     //  export a bigint representing microseconds since an epoch
-    protected final SimpleDateFormat m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-
+    // ENG-1502: SDF is NOT thread-safe - What da...?!?
+    protected SimpleDateFormat dateFormat()
+    {
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    }
     // Batches only supports CSV or TSV
     protected final char m_delimiter;
     protected final String m_extension;
@@ -442,7 +445,7 @@ public class ExportToFileClient extends ExportClientBase {
                         fields[i] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType) row[i];
-                        fields[i] = m_sdf.format(timestamp.asApproximateJavaDate());
+                        fields[i] = dateFormat().format(timestamp.asApproximateJavaDate());
                         fields[i] += String.valueOf(timestamp.getUSec());
                     } else {
                         fields[i] = row[i].toString();
