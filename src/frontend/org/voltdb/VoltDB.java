@@ -84,6 +84,9 @@ public class VoltDB {
         /** name of the deployment file */
         public String m_pathToDeployment = null;
 
+        /** name of the license file, for commercial editions */
+        public String m_pathToLicense = "license.xml";
+
         /** level of internal transaction profiling (for testing) */
         public ProcedureProfiler.Level m_profilingLevel =
             ProcedureProfiler.Level.DISABLED;
@@ -252,6 +255,8 @@ public class VoltDB {
                 }
                 else if (arg.equals("deployment")) {
                     m_pathToDeployment = args[++i];
+                } else if (arg.equals("license")) {
+                    m_pathToLicense = args[++i];
                 } else if (arg.equalsIgnoreCase("useWatchdogs")) {
                     m_useWatchdogs = true;
                 } else if (arg.equalsIgnoreCase("ipcports")) {
@@ -312,7 +317,7 @@ public class VoltDB {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
-            hostLog.fatal("Usage: org.voltdb.VoltDB catalog <action> <catalog.jar> deployment <deployment.xml>");
+            hostLog.fatal("Usage: org.voltdb.VoltDB catalog <action> <catalog.jar> deployment <deployment.xml> license <license.xml>");
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 

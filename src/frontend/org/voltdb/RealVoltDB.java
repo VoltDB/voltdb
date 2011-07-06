@@ -33,14 +33,7 @@ import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -66,6 +59,7 @@ import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
@@ -481,16 +475,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 System.exit(-1);
             }
 
-            serializedCatalog = catalog.serialize();
+            // If running commercial code (of value), enforce licensing.
+            Class<?> proClass = MiscUtils.loadProClass(
+                    "org.voltdb.commandLogImpl",
+                    "Command logging", true);
+            if (proClass != null) {
+                if (!validateLicense(m_config.m_pathToCatalog, m_catalogContext.numberOfNodes)) {
+                    // validateLicense logs as appropriate. Exit call is here for testability.
 
+                    // TOOD: Stop running here!
+                    // VoltDB.crashVoltDB();
+                }
+            }
+
+            serializedCatalog = catalog.serialize();
             m_catalogContext = new CatalogContext(
                     0,
                     catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
 
             if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
                 try {
-                    @SuppressWarnings("rawtypes")
-                    Class loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
+                    Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
                                                                "Command logging", false);
                     if (loggerClass != null) {
                         m_commandLog = (CommandLog)loggerClass.newInstance();
@@ -941,6 +946,62 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 onRestoreCompletion(!isRejoin);
             }
         }
+    }
+
+    /**
+     * Validate the signature and business logic enforcement for a license.
+     * @param pathToLicense
+     * @param numberOfNodes
+     * @return true if the licensing constraints are met
+     */
+    boolean validateLicense(String pathToLicense, int numberOfNodes) {
+        // verify the file exists.
+        File licenseFile = new File(pathToLicense);
+        if (licenseFile.exists() == false) {
+            hostLog.fatal("Unable to open license file: " + m_config.m_pathToLicense);
+            return false;
+        }
+
+        // boilerplate to create a license api interface
+        LicenseApi licenseApi = null;
+        Class<?> licApiKlass = MiscUtils.loadProClass("org.voltdb.licensetool.LicenseApiImpl",
+                "License API", false);
+
+        if (licApiKlass != null) {
+            try {
+                licenseApi = (LicenseApi)licApiKlass.newInstance();
+            } catch (InstantiationException e) {
+                hostLog.fatal("Unable to process license file: could not create license API.");
+                return false;
+            } catch (IllegalAccessException e) {
+                hostLog.fatal("Unable to process license file: could not create license API.");
+                return false;
+            }
+        }
+
+        // need to initialize the api. Slightly weird interface, I know.
+        if (licenseApi.initializeFromFile(licenseFile) == false) {
+            hostLog.fatal("Unable to load license file: could not parse license.");
+            return false;
+        }
+
+        if (licenseApi.verify() == false) {
+            hostLog.fatal("Unable to load license file: could not verify license signature.");
+            return false;
+        }
+
+        Calendar now = GregorianCalendar.getInstance();
+        if (now.after(licenseApi.expires())) {
+            return false;
+        }
+
+        if (!licenseApi.isTrial() && licenseApi.maxHostcount() > numberOfNodes) {
+            hostLog.fatal("License allows a maximum of " + licenseApi.maxHostcount() + " nodes." +
+                    " May not start a " + numberOfNodes + " node cluster.");
+            return false;
+        }
+
+        return true;
     }
 
     public HashSet<Integer> initializeForRejoin(VoltDB.Configuration config, long catalogCRC, long deploymentCRC) {
