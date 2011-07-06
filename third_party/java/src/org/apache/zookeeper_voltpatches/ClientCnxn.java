@@ -21,6 +21,7 @@ package org.apache.zookeeper_voltpatches;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -39,14 +40,6 @@ import org.apache.jute.BinaryInputArchive;
 import org.apache.jute.BinaryOutputArchive;
 import org.apache.jute.Record;
 import org.apache.log4j.Logger;
-import org.apache.zookeeper_voltpatches.AsyncCallback;
-import org.apache.zookeeper_voltpatches.ClientCnxn;
-import org.apache.zookeeper_voltpatches.ClientWatchManager;
-import org.apache.zookeeper_voltpatches.ZooDefs;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.WatchedEvent;
-import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ACLCallback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.Children2Callback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback;
@@ -83,7 +76,7 @@ import org.apache.zookeeper_voltpatches.server.ZooTrace;
  * This class manages the socket i/o for the client. ClientCnxn maintains a list
  * of available servers to connect to and "transparently" switches servers it is
  * connected to as needed.
- * 
+ *
  */
 public class ClientCnxn {
     private static final Logger LOG = Logger.getLogger(ClientCnxn.class);
@@ -207,7 +200,7 @@ public class ClientCnxn {
 
     /**
      * Returns the address to which the socket is connected.
-     * 
+     *
      * @return ip address of the remote side of the connection or null if not
      *         connected
      */
@@ -225,7 +218,7 @@ public class ClientCnxn {
 
     /**
      * Returns the local address to which the socket is bound.
-     * 
+     *
      * @return ip address of the remote side of the connection or null if not
      *         connected
      */
@@ -320,7 +313,7 @@ public class ClientCnxn {
      * Creates a connection object. The actual network connect doesn't get
      * established until needed. The start() instance method must be called
      * subsequent to construction.
-     * 
+     *
      * @param hosts
      *            a comma separated list of hosts that can be connected to.
      * @param sessionTimeout
@@ -340,7 +333,7 @@ public class ClientCnxn {
      * Creates a connection object. The actual network connect doesn't get
      * established until needed. The start() instance method must be called
      * subsequent to construction.
-     * 
+     *
      * @param hosts
      *            a comma separated list of hosts that can be connected to.
      * @param sessionTimeout
@@ -405,7 +398,7 @@ public class ClientCnxn {
 
     /**
      * tests use this to check on reset of watches
-     * 
+     *
      * @return if the auto reset of watches are disabled
      */
     public static boolean getDisableAutoResetWatch() {
@@ -414,7 +407,7 @@ public class ClientCnxn {
 
     /**
      * tests use this to set the auto reset
-     * 
+     *
      * @param b
      *            the vaued to set disable watches to
      */
@@ -430,6 +423,7 @@ public class ClientCnxn {
     Object eventOfDeath = new Object();
 
     final static UncaughtExceptionHandler uncaughtExceptionHandler = new UncaughtExceptionHandler() {
+        @Override
         public void uncaughtException(Thread t, Throwable e) {
             LOG.error("from " + t.getName(), e);
         }
@@ -1170,11 +1164,23 @@ public class ClientCnxn {
                         if (e instanceof SessionExpiredException) {
                             LOG.info(e.getMessage()
                                     + ", closing socket connection");
-                        } else if (e instanceof SessionTimeoutException) {
+                        }
+                        else if (e instanceof SessionTimeoutException) {
                             LOG.info(e.getMessage() + RETRY_CONN_MSG);
-                        } else if (e instanceof EndOfStreamException) {
+                        }
+                        else if (e instanceof EndOfStreamException) {
                             LOG.info(e.getMessage() + RETRY_CONN_MSG);
-                        } else {
+                        }
+                        // next else added by jhugg to make zk less chatty / scary during tests
+                        else if ((e instanceof ConnectException) && (e.getMessage().contentEquals("Connection refused"))){
+                            StackTraceElement[] stes = e.getStackTrace();
+                            StackTraceElement ste = stes[stes.length - 1];
+                            String msg = String.format("\"Connection refused\" exception thrown on line %d of file %s in method %s::%s.",
+                                    ste.getLineNumber(), ste.getFileName(), ste.getClassName(), ste.getMethodName());
+                            LOG.warn(msg);
+                            LOG.warn("ConnectExceptions can often be ignored during VoltDB tests.");
+                        }
+                        else {
                             LOG.warn(
                                     "Session 0x"
                                             + Long.toHexString(getSessionId())
@@ -1295,7 +1301,7 @@ public class ClientCnxn {
     /**
      * Close the connection, which includes; send session disconnect to the
      * server, shutdown the send/event threads.
-     * 
+     *
      * @throws IOException
      */
     public void close() throws IOException {

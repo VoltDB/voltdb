@@ -22,15 +22,13 @@ import java.lang.management.ManagementFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.management.InstanceNotFoundException;
 import javax.management.JMException;
 import javax.management.MBeanServer;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper_voltpatches.jmx.CommonNames;
-import org.apache.zookeeper_voltpatches.jmx.MBeanRegistry;
-import org.apache.zookeeper_voltpatches.jmx.ZKMBeanInfo;
 
 /**
  * This class provides a unified interface for registering/unregistering of
@@ -112,7 +110,12 @@ public class MBeanRegistry {
         String path=mapBean2Path.get(bean);
         try {
             unregister(path,bean);
-        } catch (JMException e) {
+        }
+        catch (InstanceNotFoundException e) {
+            LOG.warn("InstanceNotFoundException during unregister usually means more than one Zookeeper server has been running in a single JVM");
+            LOG.warn("InstanceNotFoundException during unregister can be safely ignored during automated tests.");
+        }
+        catch (JMException e) {
             LOG.warn("Error during unregister", e);
         }
         mapBean2Path.remove(bean);
