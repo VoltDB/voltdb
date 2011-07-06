@@ -979,12 +979,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        // need to initialize the api. Slightly weird interface, I know.
+        if (licenseApi == null) {
+            hostLog.fatal("Unable to load license file: could not create license API.");
+            return false;
+        }
+
+        // Initialize the API. This parses the file but does NOT verify signatures.
         if (licenseApi.initializeFromFile(licenseFile) == false) {
             hostLog.fatal("Unable to load license file: could not parse license.");
             return false;
         }
 
+        // Perform signature verification - detect modified files
         if (licenseApi.verify() == false) {
             hostLog.fatal("Unable to load license file: could not verify license signature.");
             return false;
@@ -992,10 +998,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         Calendar now = GregorianCalendar.getInstance();
         if (now.after(licenseApi.expires())) {
-            return false;
+            if (licenseApi.isTrial()) {
+                hostLog.fatal("Trial license expired on " + licenseApi.expires());
+                return false;
+            }
+            else {
+                hostLog.error("License expired! Please obtain a new license from VoltDB.");
+                // note - not a fatal error.
+            }
         }
 
-        if (!licenseApi.isTrial() && licenseApi.maxHostcount() > numberOfNodes) {
+        if (!licenseApi.isTrial() && numberOfNodes > licenseApi.maxHostcount()) {
             hostLog.fatal("License allows a maximum of " + licenseApi.maxHostcount() + " nodes." +
                     " May not start a " + numberOfNodes + " node cluster.");
             return false;
