@@ -487,23 +487,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 System.exit(-1);
             }
 
-            // If running commercial code (of value), enforce licensing.
-            Class<?> proClass = MiscUtils.loadProClass(
-                    "org.voltdb.commandLogImpl",
-                    "Command logging", true);
-            if (proClass != null) {
-                if (!validateLicense(m_config.m_pathToCatalog, m_catalogContext.numberOfNodes)) {
-                    // validateLicense logs as appropriate. Exit call is here for testability.
-
-                    // TOOD: Stop running here!
-                    // VoltDB.crashVoltDB();
-                }
-            }
-
             serializedCatalog = catalog.serialize();
             m_catalogContext = new CatalogContext(
                     0,
                     catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
+
+            // If running commercial code (of value), enforce licensing.
+            Class<?> proClass = MiscUtils.loadProClass(
+                    "org.voltdb.CommandLogImpl",
+                    "Command logging", true);
+            if (proClass != null) {
+                assert(m_config != null);
+                assert(m_catalogContext != null);
+                if (!validateLicense(m_config.m_pathToLicense, m_catalogContext.numberOfNodes)) {
+                    // validateLicense logs as appropriate. Exit call is here for testability.
+
+                    // TOOD: Stop running here!
+                    //VoltDB.crashVoltDB();
+                }
+            }
 
             if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
                 try {
