@@ -538,8 +538,8 @@ DISTRIBUTION
         <arg value="-f"/>
         <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz"/>
         <arg value="voltdb-${dist.version}"/>
-    </exec>    
-    
+    </exec>
+
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
@@ -780,8 +780,7 @@ JAVA COMPILATION
     <!-- compile the individual source directories -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
     <invoke-javac srcdir="${src.jetty.dir}"/>
-    <invoke-javac srcdir="${vendor.src.dir}"/>
-    <invoke-javac srcdir="${src.gpl.dir}"/>
+    <invoke-javac srcdir="${src.gpl.dir}:${vendor.src.dir}"/>
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>

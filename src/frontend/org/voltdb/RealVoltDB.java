@@ -33,7 +33,16 @@ import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -366,7 +375,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
     };
 
-    private volatile OperationMode m_mode = OperationMode.RUNNING;
+    private volatile OperationMode m_mode = OperationMode.INITIALIZING;
     private OperationMode m_startMode = null;
 
     // metadata is currently of the format:
@@ -391,6 +400,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
+        // set the mode first thing
+        m_mode = OperationMode.INITIALIZING;
+
         synchronized(m_startAndStopLock) {
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
             // start (asynchronously) getting platform info
@@ -516,12 +528,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             {
                 m_startMode = OperationMode.PAUSED;
             }
-
-            /*
-             * Set the server in replay mode now, it will be set to the proper
-             * mode when replay finishes
-             */
-            m_mode = OperationMode.INITIALIZING;
 
             // set the adminPort from the deployment file
             int adminPort = m_catalogContext.cluster.getAdminport();
@@ -876,9 +882,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_network.start();
             try {
                 m_agreementSite.waitForRecovery();
-                m_zk = org.voltdb.utils.ZKUtil.getClient(m_config.m_zkInterface, 60 * 1000);
+                m_zk = org.voltdb.agreement.ZKUtil.getClient(m_config.m_zkInterface, 60 * 1000);
                 if (m_zk == null) {
-                    throw new Exception("Timed out trying to connect");
+                    throw new Exception("Timed out trying to connect local ZooKeeper instance");
                 }
             } catch (Exception e) {
                 hostLog.fatal("Unable to create a ZK client", e);
@@ -1309,6 +1315,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
+            m_mode = OperationMode.SHUTTINGDOWN;
             m_executionSitesRecovered = false;
             m_agreementSiteRecovered = false;
             m_snapshotCompletionMonitor.shutdown();

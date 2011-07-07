@@ -113,7 +113,7 @@ public class MockVoltDB implements VoltDBInterface
                     null,
                     false);
             m_agreementSite.start();
-            m_zk = org.voltdb.utils.ZKUtil.getClient("localhost:2181", 60 * 1000);
+            m_zk = org.voltdb.agreement.ZKUtil.getClient("localhost:2181", 60 * 1000);
             m_snapshotCompletionMonitor.init(m_zk);
         } catch (Exception e) {
             throw new RuntimeException(e);

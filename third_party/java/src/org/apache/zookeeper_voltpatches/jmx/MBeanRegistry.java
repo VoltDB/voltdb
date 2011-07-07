@@ -29,6 +29,8 @@ import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 
 import org.apache.log4j.Logger;
+import org.voltdb.OperationMode;
+import org.voltdb.VoltDB;
 
 /**
  * This class provides a unified interface for registering/unregistering of
@@ -37,7 +39,7 @@ import org.apache.log4j.Logger;
  * will be stored in the zookeeper data tree instance as a virtual data tree.
  */
 public class MBeanRegistry {
-    private static final Logger LOG = Logger.getLogger(MBeanRegistry.class);
+    private static final Logger LOG = Logger.getLogger("ZK-SERVER");
 
     private static MBeanRegistry instance=new MBeanRegistry();
 

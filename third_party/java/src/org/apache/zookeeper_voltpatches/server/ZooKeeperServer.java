@@ -30,33 +30,16 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 
 import org.apache.jute.BinaryInputArchive;
 import org.apache.jute.Record;
 import org.apache.log4j.Logger;
-import org.apache.zookeeper_voltpatches.server.ByteBufferInputStream;
-import org.apache.zookeeper_voltpatches.server.DataNode;
-import org.apache.zookeeper_voltpatches.server.DataTree;
-import org.apache.zookeeper_voltpatches.server.DataTreeBean;
-import org.apache.zookeeper_voltpatches.server.NIOServerCnxn;
-import org.apache.zookeeper_voltpatches.server.Request;
-import org.apache.zookeeper_voltpatches.server.ServerCnxn;
-import org.apache.zookeeper_voltpatches.server.ServerStats;
-import org.apache.zookeeper_voltpatches.server.SessionTracker;
-import org.apache.zookeeper_voltpatches.server.SessionTrackerImpl;
-import org.apache.zookeeper_voltpatches.server.ZKDatabase;
-import org.apache.zookeeper_voltpatches.server.ZooKeeperServer;
-import org.apache.zookeeper_voltpatches.server.ZooKeeperServerBean;
-import org.apache.zookeeper_voltpatches.server.ZooTrace;
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.Environment;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooDefs;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
-import org.apache.zookeeper_voltpatches.KeeperException.SessionExpiredException;
 import org.apache.zookeeper_voltpatches.KeeperException.SessionMovedException;
+import org.apache.zookeeper_voltpatches.ZooDefs;
 import org.apache.zookeeper_voltpatches.ZooDefs.OpCode;
 import org.apache.zookeeper_voltpatches.common.PathUtils;
 import org.apache.zookeeper_voltpatches.data.ACL;
@@ -111,7 +94,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
 
     static boolean skipACL;
     static {
-        LOG = Logger.getLogger(ZooKeeperServer.class);
+        LOG = Logger.getLogger("ZK-SERVER");
         //Environment.logEnv("Server environment:", LOG);
         skipACL = System.getProperty("zookeeper.skipACL", "no").equals("yes");
         if (skipACL) {
@@ -130,6 +113,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
     }
 
     static public class BasicDataTreeBuilder implements DataTreeBuilder {
+        @Override
         public DataTree build() {
             return new DataTree();
         }
@@ -250,7 +234,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
     }
 
     public void closeSession(long sessionId) {
-        LOG.info("Closing session 0x" + Long.toHexString(sessionId));
+        LOG.debug("Closing session 0x" + Long.toHexString(sessionId));
 
         // we do not want to wait for a session close. send it as soon as we
         // detect it!
@@ -271,6 +255,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
         }
     }
 
+    @Override
     public void expire(long sessionId) {
         LOG.info("Initiating close of session 0x" + Long.toHexString(sessionId));
         close(sessionId);
@@ -488,6 +473,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
     /**
      * return the last proceesed id from the datatree
      */
+    @Override
     public long getLastProcessedZxid() {
         return zkDb.getDataTreeLastProcessedZxid();
     }
@@ -496,6 +482,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
      * return the outstanding requests in the queue, which havent been processed
      * yet
      */
+    @Override
     public long getOutstandingRequests() {
         return getInProcess();
     }
@@ -532,6 +519,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
                 .getLocalPort() : -1;
     }
 
+    @Override
     public String getState() {
         return "standalone";
     }

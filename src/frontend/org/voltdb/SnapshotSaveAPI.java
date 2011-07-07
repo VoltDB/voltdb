@@ -36,6 +36,7 @@ import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
+import org.voltdb.agreement.ZKUtil;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Table;
 import org.voltdb.logging.VoltLogger;
@@ -43,7 +44,6 @@ import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.ZKUtil;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code

@@ -21,5 +21,5 @@ package org.voltdb;
  * All the operational modes VoltDB can be in
  */
 public enum OperationMode {
-    INITIALIZING, RUNNING, PAUSED
+    INITIALIZING, RUNNING, PAUSED, SHUTTINGDOWN
 }

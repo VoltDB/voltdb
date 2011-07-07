@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.utils;
+package org.voltdb.agreement;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,6 +42,8 @@ import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.voltdb.utils.Pair;
+import org.voltdb.utils.VoltFile;
 
 public class ZKUtil {
 

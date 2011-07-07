@@ -79,7 +79,7 @@ import org.apache.zookeeper_voltpatches.server.ZooTrace;
  *
  */
 public class ClientCnxn {
-    private static final Logger LOG = Logger.getLogger(ClientCnxn.class);
+    private static final Logger LOG = Logger.getLogger("ZK-CLIENT");
 
     /**
      * This controls whether automatic watch resetting is enabled. Clients
@@ -524,7 +524,7 @@ public class ClientCnxn {
                 LOG.error("Event thread exiting due to interruption", e);
             }
 
-            LOG.info("EventThread shut down");
+            LOG.debug("EventThread shut down");
         }
 
         private void processEvent(Object event) {
@@ -1173,12 +1173,13 @@ public class ClientCnxn {
                         }
                         // next else added by jhugg to make zk less chatty / scary during tests
                         else if ((e instanceof ConnectException) && (e.getMessage().contentEquals("Connection refused"))){
-                            StackTraceElement[] stes = e.getStackTrace();
-                            StackTraceElement ste = stes[stes.length - 1];
-                            String msg = String.format("\"Connection refused\" exception thrown on line %d of file %s in method %s::%s.",
-                                    ste.getLineNumber(), ste.getFileName(), ste.getClassName(), ste.getMethodName());
-                            LOG.warn(msg);
-                            LOG.warn("ConnectExceptions can often be ignored during VoltDB tests.");
+                            // SILENT (sorta lame hack)
+
+                            // sometimes connections fail for a while
+                            // org.voltdb.agreement.ZKUtil has a method to
+                            // connect with a timeout. Successful connections
+                            // might eng up here a few times before they connect
+                            // It's only really a problem if it persists
                         }
                         else {
                             LOG.warn(

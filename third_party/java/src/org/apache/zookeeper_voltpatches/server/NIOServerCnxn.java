@@ -48,14 +48,6 @@ import org.apache.jute.BinaryInputArchive;
 import org.apache.jute.BinaryOutputArchive;
 import org.apache.jute.Record;
 import org.apache.log4j.Logger;
-import org.apache.zookeeper_voltpatches.server.ByteBufferInputStream;
-import org.apache.zookeeper_voltpatches.server.ConnectionBean;
-import org.apache.zookeeper_voltpatches.server.DataTree;
-import org.apache.zookeeper_voltpatches.server.NIOServerCnxn;
-import org.apache.zookeeper_voltpatches.server.Request;
-import org.apache.zookeeper_voltpatches.server.ServerCnxn;
-import org.apache.zookeeper_voltpatches.server.ZooKeeperServer;
-import org.apache.zookeeper_voltpatches.server.ZooTrace;
 import org.apache.zookeeper_voltpatches.Environment;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.Version;
@@ -78,13 +70,14 @@ import org.apache.zookeeper_voltpatches.server.auth.ProviderRegistry;
  * client, but only one thread doing the communication.
  */
 public class NIOServerCnxn implements Watcher, ServerCnxn {
-    private static final Logger LOG = Logger.getLogger(NIOServerCnxn.class);
+    private static final Logger LOG = Logger.getLogger("ZK-SERVER");
 
     private ConnectionBean jmxConnectionBean;
 
     static public class Factory extends Thread {
         static {
             Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+                @Override
                 public void uncaughtException(Thread t, Throwable e) {
                     LOG.error("Thread " + t + " died", e);
                 }
@@ -287,7 +280,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
                 }
             }
             clear();
-            LOG.info("NIOServerCnxn factory exited run method");
+            LOG.debug("NIOServerCnxn factory exited run method");
         }
 
         /**
@@ -394,6 +387,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
     /* Send close connection packet to the client, doIO will eventually
      * close the underlying machinery (like socket, selectorkey, etc...)
      */
+    @Override
     public void sendCloseSession() {
         sendBuffer(closeConn);
     }
@@ -1354,6 +1348,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
      *
      * @see org.apache.zookeeper.server.ServerCnxnIface#getSessionTimeout()
      */
+    @Override
     public int getSessionTimeout() {
         return sessionTimeout;
     }
@@ -1440,7 +1435,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
             return;
         }
 
-        LOG.info("Closed socket connection for client "
+        LOG.debug("Closed socket connection for client "
                 + sock.socket().getRemoteSocketAddress()
                 + (sessionId != 0 ?
                         " which had sessionid 0x" + Long.toHexString(sessionId) :
@@ -1496,6 +1491,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
      * @see org.apache.zookeeper.server.ServerCnxnIface#sendResponse(org.apache.zookeeper.proto.ReplyHeader,
      *      org.apache.jute.Record, java.lang.String)
      */
+    @Override
     synchronized public void sendResponse(ReplyHeader h, Record r, String tag) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -1538,6 +1534,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
      *
      * @see org.apache.zookeeper.server.ServerCnxnIface#process(org.apache.zookeeper.proto.WatcherEvent)
      */
+    @Override
     synchronized public void process(WatchedEvent event) {
         ReplyHeader h = new ReplyHeader(-1, -1L, 0);
         if (LOG.isTraceEnabled()) {
@@ -1553,6 +1550,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
         sendResponse(h, e, "notification");
     }
 
+    @Override
     public void finishSessionInit(boolean valid) {
         // register with JMX
         try {
@@ -1608,18 +1606,22 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
      *
      * @see org.apache.zookeeper.server.ServerCnxnIface#getSessionId()
      */
+    @Override
     public long getSessionId() {
         return sessionId;
     }
 
+    @Override
     public void setSessionId(long sessionId) {
         this.sessionId = sessionId;
     }
 
+    @Override
     public ArrayList<Id> getAuthInfo() {
         return authInfo;
     }
 
+    @Override
     public synchronized InetSocketAddress getRemoteAddress() {
         if (sock == null) {
             return null;
@@ -1648,6 +1650,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
             reset();
         }
 
+        @Override
         public synchronized void reset() {
             packetsReceived.set(0);
             packetsSent.set(0);
@@ -1694,10 +1697,12 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
             totalLatency += elapsed;
         }
 
+        @Override
         public Date getEstablished() {
             return established;
         }
 
+        @Override
         public long getOutstandingRequests() {
             synchronized (NIOServerCnxn.this) {
                 synchronized (NIOServerCnxn.this.factory) {
@@ -1706,42 +1711,52 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
             }
         }
 
+        @Override
         public long getPacketsReceived() {
             return packetsReceived.longValue();
         }
 
+        @Override
         public long getPacketsSent() {
             return packetsSent.longValue();
         }
 
+        @Override
         public synchronized long getMinLatency() {
             return minLatency == Long.MAX_VALUE ? 0 : minLatency;
         }
 
+        @Override
         public synchronized long getAvgLatency() {
             return count == 0 ? 0 : totalLatency / count;
         }
 
+        @Override
         public synchronized long getMaxLatency() {
             return maxLatency;
         }
 
+        @Override
         public synchronized String getLastOperation() {
             return lastOp;
         }
 
+        @Override
         public synchronized long getLastCxid() {
             return lastCxid;
         }
 
+        @Override
         public synchronized long getLastZxid() {
             return lastZxid;
         }
 
+        @Override
         public synchronized long getLastResponseTime() {
             return lastResponseTime;
         }
 
+        @Override
         public synchronized long getLastLatency() {
             return lastLatency;
         }
@@ -1820,6 +1835,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
     }
 
     private final CnxnStats stats = new CnxnStats();
+    @Override
     public Stats getStats() {
         return stats;
     }
