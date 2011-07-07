@@ -77,7 +77,7 @@ SnapshotCompletionInterest {
         public void onRestoreCompletion(boolean initCommandLog);
     }
 
-    private final static VoltLogger LOG = new VoltLogger("RESTORE");
+    private final static VoltLogger LOG = new VoltLogger("HOST");
     // TODO: Nonce for command-log snapshots, TBD
     public final static String CL_NONCE_PREFIX = "command_log";
 
@@ -538,7 +538,7 @@ SnapshotCompletionInterest {
         ByteBuffer buf = ByteBuffer.allocate(8);
         buf.putLong(txnId);
 
-        LOG.debug("Sending snapshot ID " + txnId);
+        LOG.debug("Sending snapshot ID " + txnId + " for restore to other nodes");
         try {
             m_zk.create(SNAPSHOT_ID, buf.array(),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
