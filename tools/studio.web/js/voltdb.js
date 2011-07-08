@@ -286,6 +286,7 @@ var IVoltDB = (function(){
 			.BeginExecute('@Statistics', ['TABLE',0], function(data) { connection.Metadata['rawTables'] = data.results[0]; })
 			.BeginExecute('@Statistics', ['INDEX',0], function(data) { connection.Metadata['rawIndexes'] = data.results[0]; })
 			.BeginExecute('@Statistics', ['PARTITIONCOUNT',0], function(data) { connection.Metadata['partitionCount'] = data.results[0].data[0][0]; })
+			.BeginExecute('@Statistics', ['STARVATION',0], function(data) { connection.Metadata['siteCount'] = data.results[0].data.length; })
 			.End(function(state){
 				var tables = [];
 				var exports = [];

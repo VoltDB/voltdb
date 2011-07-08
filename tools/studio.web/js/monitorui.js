@@ -37,9 +37,9 @@ function InitializeChart(id, chart, metric)
 		    };
 			break;
 		case 'str':
-			var partitionCount = VoltDB.GetConnection(id.substr(2)).Metadata['partitionCount'];
+			var siteCount = VoltDB.GetConnection(id.substr(2)).Metadata['siteCount'];
 			var seriesStr = [];
-		    for(var j=0;j<partitionCount;j++)
+		    for(var j=0;j<siteCount;j++)
 		    	seriesStr.push({showMarker:false, yaxis:'y2axis', lineWidth: 2, shadow: false, label: (j+1)});
 		    opt = {
 		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:"%.2f"} } },
@@ -63,6 +63,7 @@ this.AddMonitor = function(tab)
 {
 	var id = $(tab).attr('id');
 	var partitionCount = VoltDB.GetConnection(id.substr(2)).Metadata['partitionCount'];
+	var siteCount = VoltDB.GetConnection(id.substr(2)).Metadata['siteCount'];
 	
 	var data = [];
     for(var i = 0;i<121;i++)
@@ -73,7 +74,7 @@ this.AddMonitor = function(tab)
     	tickValues.push(i);
     	
 	var dataStr = [];
-    for(var j=0;j<partitionCount;j++)
+    for(var j=0;j<siteCount;j++)
     	dataStr.push(data);
     
     MonitorUI.Monitors[id] = { 'id': id
@@ -103,6 +104,7 @@ this.AddMonitor = function(tab)
     , 'strMax': 100
     , 'tickValues': tickValues
     , 'partitionCount': partitionCount
+    , 'siteCount': siteCount
     };
 
     InitializeChart(id, 'left', 'lat');
@@ -200,6 +202,9 @@ this.RefreshMonitor = function(id, Success)
 
 	if ((monitor.starvStatsResponse == null) || (monitor.strData == null))
         return;
+
+try {
+
 
 	var currentTimerTick = (new Date()).getTime();
 	var latData = monitor.latData;
@@ -328,12 +333,16 @@ this.RefreshMonitor = function(id, Success)
 	for(var k in starvStats)
         keys.push(k);
     keys.sort();
+
     for(var k=0;k<keys.length;k++)
     {
 		var dataStarv = strData[k];
-		dataStarv = dataStarv.slice(1);
-		dataStarv.push([dataIdx,starvStats[keys[k]][0]/starvStats[keys[k]][1]]);
-		strData[k] = dataStarv;
+        if (dataStarv != null)
+        {
+		    dataStarv = dataStarv.slice(1);
+		    dataStarv.push([dataIdx,starvStats[keys[k]][0]/starvStats[keys[k]][1]]);
+		    strData[k] = dataStarv;
+        }
     }
 
 	var lymax = 0.25;
@@ -427,6 +436,8 @@ this.RefreshMonitor = function(id, Success)
 	MonitorUI.UpdateMonitorItem(id);
 	monitor.lastTimerTick = currentTimerTick;
     MonitorUI.Monitors[id] = monitor;
+
+} catch (crap) { alert(crap); }
 }
 
 this.UpdateMonitorItem = function(id)
