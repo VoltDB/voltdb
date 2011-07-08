@@ -23,6 +23,9 @@
 
 package org.voltdb;
 
+import java.io.File;
+import java.net.URL;
+
 /**
  * Wraps VoltDB in a Thread
  */
@@ -32,6 +35,7 @@ public class ServerThread extends Thread {
 
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
+        m_config.m_pathToLicense = getTestLicensePath();
 
         if (!m_config.validate()) {
             m_config.usage();
@@ -45,6 +49,9 @@ public class ServerThread extends Thread {
         m_config = new VoltDB.Configuration();
         m_config.m_pathToCatalog = pathToCatalog;
         m_config.m_backend = target;
+        m_config.m_pathToLicense = getTestLicensePath();
+
+        setName("ServerThread");
     }
 
     public ServerThread(String pathToCatalog, String pathToDeployment, BackendTarget target) {
@@ -52,11 +59,14 @@ public class ServerThread extends Thread {
         m_config.m_pathToCatalog = pathToCatalog;
         m_config.m_pathToDeployment = pathToDeployment;
         m_config.m_backend = target;
+        m_config.m_pathToLicense = getTestLicensePath();
 
         if (!m_config.validate()) {
             m_config.usage();
             System.exit(-1);
         }
+
+        setName("ServerThread");
     }
 
     @Override
@@ -77,5 +87,26 @@ public class ServerThread extends Thread {
         assert Thread.currentThread() != this;
         VoltDB.instance().shutdown(this);
         this.join();
+    }
+
+    /**
+     * For tests only, mostly with ServerThread or LocalCluster:
+     *
+     * Provide a valid license in the case where license checking
+     * is enabled.
+     *
+     * Outside tests, the license file probably won't exist.
+     */
+    public static String getTestLicensePath() {
+        // magic license stored in the voltdb enterprise code
+        URL resource = ServerThread.class.getResource("valid_subscription.xml");
+
+        // in the community edition, any non-empty string
+        // should work fine here, as it won't be checked
+        if (resource == null) return "[community]";
+
+        // return the filesystem path
+        File licxml = new File(resource.getFile());
+        return licxml.getPath();
     }
 }

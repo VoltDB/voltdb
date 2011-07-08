@@ -33,6 +33,7 @@ import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -503,7 +504,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     // validateLicense logs as appropriate. Exit call is here for testability.
 
                     // TOOD: Stop running here!
-                    //VoltDB.crashVoltDB();
+                    VoltDB.crashVoltDB();
                 }
             }
 
@@ -1005,22 +1006,43 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         Calendar now = GregorianCalendar.getInstance();
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy");
+        String expiresStr = sdf.format(licenseApi.expires().getTime());
+        boolean valid = true;
+
         if (now.after(licenseApi.expires())) {
             if (licenseApi.isTrial()) {
-                hostLog.fatal("Trial license expired on " + licenseApi.expires());
+                hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
                 return false;
             }
             else {
-                hostLog.error("License expired! Please obtain a new license from VoltDB.");
-                // note - not a fatal error.
+                hostLog.error("Warning, VoltDB commercial license expired on " + expiresStr + ".");
+                valid = false;
             }
         }
 
-        if (!licenseApi.isTrial() && numberOfNodes > licenseApi.maxHostcount()) {
-            hostLog.fatal("License allows a maximum of " + licenseApi.maxHostcount() + " nodes." +
-                    " May not start a " + numberOfNodes + " node cluster.");
-            return false;
+        // print out trial success message
+        if (licenseApi.isTrial()) {
+            hostLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
+            return true;
         }
+
+        // ASSUME CUSTOMER LICENSE HERE
+
+        if (numberOfNodes > licenseApi.maxHostcount()) {
+            hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
+                    " nodes, starting cluster with " + numberOfNodes + " nodes.");
+            valid = false;
+        }
+
+        // this gets printed even if there are non-fatal problems, so it
+        // injects the word "invalid" to make it clear this is the case
+        String msg = String.format("Starting VoltDB with %scommercial license. " +
+                "License for %d nodes expires on %s.",
+                (valid ? "" : "invalid "),
+                licenseApi.maxHostcount(),
+                expiresStr);
+        hostLog.info(msg);
 
         return true;
     }

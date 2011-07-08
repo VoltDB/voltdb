@@ -304,6 +304,8 @@ public class LocalCluster implements VoltServerConfig {
                                            "-classpath",
                                            classPath,
                                            "org.voltdb.VoltDB",
+                                           "license",
+                                           ServerThread.getTestLicensePath(),
                                            "zkinterface",
                                            "-1",
                                            "timestampsalt",
@@ -328,7 +330,7 @@ public class LocalCluster implements VoltServerConfig {
             command.add(m_debugOffset1, "");
         }
 
-        m_voltFilePrefixOffset = command.size() - 15;
+        m_voltFilePrefixOffset = command.size() - 17;
         command.add(m_voltFilePrefixOffset, "");
 
         m_zkInterfaceOffset = m_procBuilder.command().size() - 13;
