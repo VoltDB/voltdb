@@ -268,6 +268,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     @Override
     public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+
+        // HOW WE COST INDEXES
+        // unique, covering index always wins
+        // otherwise, pick the index with the most columns covered otherwise
+        // count non-equality scans as -0.5 coverage
+        // prefer array to hash to tree, all else being equal
+
+        // FYI: Index scores should range between 1 and 48898 (I think)
+
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
@@ -284,8 +293,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_lookupType != IndexLookupType.EQ)
             keyWidthFl -= 0.5;
 
-        double coverage = keyWidthFl / colCount;
-
         // estimate cost of scan
         int tuplesToRead = 0;
 
@@ -299,19 +306,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             tuplesToRead = 3;
         assert(tuplesToRead > 0);
 
-        // Perfect matches on a unique index always return low so they win
-        // add costs for less optimal index use here
-        if ((m_lookupType != IndexLookupType.EQ) ||
-             !m_catalogIndex.getUnique() &&
-             (colCount != keyWidth))
-        {
-            // so unique covering always wins
-            tuplesToRead += 4;
-            // points for percent coverage
-            tuplesToRead += (int) (50.0 * (1.0 - coverage));
-            // points for total columns covered
-            tuplesToRead += 50 - (10 * Math.min(keyWidth, 5));
+        // if not a unique, covering index, pick the choice with the most columns
+        if (!m_catalogIndex.getUnique() || (colCount != keyWidth)) {
+            // cost starts at 50000 and goes down by 10 for each column used
+            final double MAX_COLUMNS = 5000.0; // this number is pulled out of thin air, sorry
+            tuplesToRead = (int) (10.0 * (MAX_COLUMNS - keyWidthFl));
         }
+
         stats.incrementStatistic(0, StatsField.TUPLES_READ, tuplesToRead);
         m_estimatedOutputTupleCount = tuplesToRead;
 
