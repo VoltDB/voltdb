@@ -203,8 +203,6 @@ this.RefreshMonitor = function(id, Success)
 	if ((monitor.starvStatsResponse == null) || (monitor.strData == null))
         return;
 
-try {
-
 
 	var currentTimerTick = (new Date()).getTime();
 	var latData = monitor.latData;
@@ -437,7 +435,6 @@ try {
 	monitor.lastTimerTick = currentTimerTick;
     MonitorUI.Monitors[id] = monitor;
 
-} catch (crap) { alert(crap); }
 }
 
 this.UpdateMonitorItem = function(id)
