@@ -49,10 +49,10 @@ TempTableLimits::increaseAllocated(int bytes)
     if (m_memoryLimit > 0 &&
         m_currMemoryInBytes > m_memoryLimit)
     {
-        int64_t limit_mb = m_memoryLimit / (1024 * 1024);
+        int limit_mb = static_cast<int>(m_memoryLimit / (1024 * 1024));
         char msg[1024];
         snprintf(msg, 1024,
-                 "More than %ld MB of temp table memory used while executing SQL.  Aborting.",
+                 "More than %d MB of temp table memory used while executing SQL.  Aborting.",
                  limit_mb);
         throw SQLException(SQLException::volt_temp_table_memory_overflow,
                            msg);
@@ -61,10 +61,10 @@ TempTableLimits::increaseAllocated(int bytes)
         m_currMemoryInBytes > m_logThreshold)
     {
         m_logLatch = true;
-        int64_t thresh_mb = m_logThreshold / (1024 * 1024);
+        int thresh_mb = static_cast<int>(m_logThreshold / (1024 * 1024));
         char msg[1024];
         snprintf(msg, 1024,
-                 "More than %ld MB of temp table memory used while executing SQL.  This may indicate an operation that should be broken into smaller chunks.",
+                 "More than %d MB of temp table memory used while executing SQL.  This may indicate an operation that should be broken into smaller chunks.",
                  thresh_mb);
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
     }
