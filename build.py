@@ -294,6 +294,7 @@ CTX.INPUT['storage'] = """
  TableStats.cpp
  tableutil.cpp
  temptable.cpp
+ TempTableLimits.cpp
  TupleStreamWrapper.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
@@ -379,6 +380,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      table_and_indexes_test
      table_test
      tabletuple_export_test
+     TempTableLimitsTest
      TupleStreamWrapper_test
     """
 
@@ -387,6 +389,11 @@ if whichtests in ("${eetestsuite}", "structures"):
      CompactingMapTest
      CompactingHashTest
      CompactingPoolTest
+    """
+
+if whichtests in ("${eetestsuite}", "plannodes"):
+    CTX.TESTS['plannodes'] = """
+     PlanNodeFragmentTest
     """
 
 ###############################################################################

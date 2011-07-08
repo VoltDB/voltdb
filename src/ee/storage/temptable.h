@@ -48,19 +48,16 @@
 
 #include "table.h"
 #include "common/tabletuple.h"
-#include "storage/TupleBlock.h"
-#include "storage/tableiterator.h"
 #include "common/ThreadLocalPool.h"
+#include "storage/tableiterator.h"
+#include "storage/TempTableLimits.h"
+#include "storage/TupleBlock.h"
 
 namespace voltdb {
 
 class TableColumn;
 class TableFactory;
 class TableStats;
-
-// use no more than MAX_TEMP_TABLE_MEMORY per fragment
-const int MAX_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
-
 
 /**
  * Represents a Temporary Table to store temporary result (final
@@ -135,7 +132,7 @@ class TempTable : public Table {
 
     // ptr to global integer tracking temp table memory allocated per frag
     // should be null for persistent tables
-    int* m_tempTableMemoryInBytes;
+    TempTableLimits* m_limits;
 
   protected:
     // can not use this constructor to coerce a cast
@@ -221,8 +218,8 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     m_tupleCount = 0;
     while (m_data.size() > 1) {
         m_data.pop_back();
-        if (m_tempTableMemoryInBytes) {
-            (*m_tempTableMemoryInBytes) -= m_tableAllocationSize;
+        if (m_limits) {
+            m_limits->reduceAllocated(m_tableAllocationSize);
         }
     }
 
@@ -236,14 +233,10 @@ inline TBPtr TempTable::allocateNextBlock() {
     TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, TBBucketPtr()));
     m_data.push_back(block);
 
-    if (m_tempTableMemoryInBytes) {
-        (*m_tempTableMemoryInBytes) += m_tableAllocationSize;
-        if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
-            throw SQLException(SQLException::volt_temp_table_memory_overflow,
-                               "More than 100MB of temp table memory used while"
-                               " executing SQL. Aborting.");
-        }
+    if (m_limits) {
+        m_limits->increaseAllocated(m_tableAllocationSize);
     }
+
     return block;
 }
 

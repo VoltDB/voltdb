@@ -62,7 +62,8 @@ class UnionExecutor : public AbstractExecutor {
     public:
         UnionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) { }
     protected:
-        bool p_init(AbstractPlanNode*, int* tempTableMemoryInBytes);
+        bool p_init(AbstractPlanNode*,
+                    TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 };
 

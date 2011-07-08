@@ -92,13 +92,15 @@ class PlanNodeFragment {
         return m_executionList;
     }
 
+    // true if this plan fragment contains a delete plan node.  Used
+    // as part of the horrible ENG-1333 hack.
+    bool hasDelete() const;
+
     // produce a string describing pnf's content
     std::string debug();
 
     // Get the list of parameters used to execute this plan fragment
     std::vector<std::pair< int, voltdb::ValueType> > getParameters() { return parameters; }
-
-
 
   private:
 

@@ -57,9 +57,10 @@
 
 namespace voltdb {
 
-bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode, int* tempTableMemoryInBytes) {
+bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
+                                 TempTableLimits* limits)
+{
     VOLT_TRACE("init Materialize Executor");
-    assert(tempTableMemoryInBytes);
 
     node = dynamic_cast<MaterializePlanNode*>(abstractNode);
     assert(node);
@@ -76,10 +77,10 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode, int* tempTableM
         column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
     }
     node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                      "temp",
-                                                      schema,
-                                                      column_names,
-                                                      tempTableMemoryInBytes));
+                                                    "temp",
+                                                    schema,
+                                                    column_names,
+                                                    limits));
     delete[] column_names;
 
     // initialize local variables

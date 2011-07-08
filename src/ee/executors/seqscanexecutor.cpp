@@ -60,8 +60,9 @@
 
 using namespace voltdb;
 
-bool SeqScanExecutor::p_init(AbstractPlanNode *abstract_node,
-                             int* tempTableMemoryInBytes) {
+bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
+                             TempTableLimits* limits)
+{
     VOLT_TRACE("init SeqScan Executor");
 
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
@@ -98,7 +99,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode *abstract_node,
                                                         node->getTargetTable()->name(),
                                                         schema,
                                                         column_names,
-                                                        tempTableMemoryInBytes));
+                                                        limits));
         delete[] column_names;
     }
     return true;

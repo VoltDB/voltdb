@@ -58,9 +58,10 @@
 namespace voltdb {
 
 bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
-                                int* tempTableMemoryInBytes) {
+                                TempTableLimits* limits)
+{
     VOLT_TRACE("init Projection Executor");
-    assert(tempTableMemoryInBytes);
+    assert(limits);
 
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(abstractNode);
     assert(node);
@@ -79,7 +80,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
                                                     "temp",
                                                     schema,
                                                     column_names,
-                                                    tempTableMemoryInBytes));
+                                                    limits));
     delete[] column_names;
 
     // initialize local variables

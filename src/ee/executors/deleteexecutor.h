@@ -73,7 +73,8 @@ public:
     }
 
 protected:
-    bool p_init(AbstractPlanNode*, int* tempTableMemoryInBytes);
+    bool p_init(AbstractPlanNode*,
+                TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
     DeletePlanNode* m_node;

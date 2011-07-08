@@ -90,7 +90,8 @@ class TableSerializeTest : public Test {
                 columnTypes.push_back(col_types[ctr]);
             }
             voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
-            table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
+            table_ = TableFactory::getTempTable(this->database_id, "temp_table",
+                                                schema, columnNames, NULL);
 
             for (int64_t i = 1; i <= TUPLES; ++i) {
                 TableTuple &tuple = table_->tempTuple();
@@ -137,9 +138,11 @@ TEST_F(TableSerializeTest, RoundTrip) {
 
     // Deserialize the table: verify that it matches the existing table
     ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
-    int tempTableMemory = 0;
+    TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
-    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &tempTableMemory);
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo",
+                                                     schema, columnNames,
+                                                     &limits);
     deserialized->loadTuplesFrom(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
@@ -169,7 +172,8 @@ TEST_F(TableSerializeTest, NullStrings) {
     columnNames[0] = "";
     table_->deleteAllTuples(true);
     delete table_;
-    table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
+    table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema,
+                                        columnNames, NULL);
 
     TableTuple& tuple = table_->tempTuple();
     tuple.setNValue(0, ValueFactory::getNullStringValue());
@@ -181,9 +185,10 @@ TEST_F(TableSerializeTest, NullStrings) {
 
     // Deserialize the table: verify that it matches the existing table
     ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
-    int tempTableMemory = 0;
+    TempTableLimits limits;
     schema = TupleSchema::createTupleSchema(table_->schema());
-    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &tempTableMemory);
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema,
+                                                     columnNames, &limits);
     deserialized->loadTuplesFrom(serialize_in, NULL);
 
     EXPECT_EQ(1, deserialized->activeTupleCount());

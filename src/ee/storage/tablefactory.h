@@ -62,6 +62,7 @@ class Table;
 class PersistentTable;
 class SerializeInput;
 class TempTable;
+class TempTableLimits;
 class TableColumn;
 class TableIndex;
 class ExecutorContext;
@@ -143,7 +144,7 @@ public:
         const std::string &name,
         TupleSchema* schema,
         const std::string* columnNames,
-        int* tempTableMemoryInBytes);
+        TempTableLimits* limits);
 
     /**
     * Creates an empty temp table with given template table.
@@ -152,7 +153,7 @@ public:
         const voltdb::CatalogId databaseId,
         const std::string &name,
         const Table* templateTablezz,
-        int* tempTableMemoryInBytes);
+        TempTableLimits* limits);
 
 private:
     static void initConstraints(PersistentTable* table);

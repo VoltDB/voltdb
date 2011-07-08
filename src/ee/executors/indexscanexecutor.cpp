@@ -66,7 +66,8 @@
 
 using namespace voltdb;
 
-bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode, int* tempTableMemoryInBytes)
+bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
+                               TempTableLimits* limits)
 {
     VOLT_TRACE("init IndexScan Executor");
 
@@ -89,7 +90,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode, int* tempTableMem
                                                       m_node->getTargetTable()->name(),
                                                       schema,
                                                       column_names,
-                                                      tempTableMemoryInBytes));
+                                                      limits));
     delete[] column_names;
 
     //

@@ -62,8 +62,9 @@
 
 namespace voltdb {
 
-bool SendExecutor::p_init(AbstractPlanNode *abstractNode,
-                          int* tempTableMemoryInBytes) {
+bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
+                          TempTableLimits* limits)
+{
     VOLT_TRACE("init Send Executor");
 
     SendPlanNode* node = dynamic_cast<SendPlanNode*>(abstractNode);

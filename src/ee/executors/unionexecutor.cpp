@@ -56,8 +56,9 @@
 
 namespace voltdb {
 
-bool UnionExecutor::p_init(AbstractPlanNode *abstract_node,
-                           int* tempTableMemoryInBytes) {
+bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
+                           TempTableLimits* limits)
+{
     VOLT_TRACE("init Union Executor");
 
     UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(abstract_node);
@@ -115,9 +116,9 @@ bool UnionExecutor::p_init(AbstractPlanNode *abstract_node,
     // the same format. Therefore, we will just grab the first table in the list
     //
     node->setOutputTable(TableFactory::getCopiedTempTable(node->databaseId(),
-            node->getInputTables()[0]->name(),
-            node->getInputTables()[0],
-            tempTableMemoryInBytes));
+                                                          node->getInputTables()[0]->name(),
+                                                          node->getInputTables()[0],
+                                                          limits));
     return true;
 }
 

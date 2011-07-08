@@ -44,6 +44,8 @@ public:
     SQLException(const char* sqlState, std::string message);
     SQLException(const char* sqlState, std::string message, VoltEEExceptionType type);
     virtual ~SQLException() {}
+
+    const char* const getSqlState() { return m_sqlState; }
 protected:
     void p_serialize(ReferenceSerializeOutput *output);
 private:

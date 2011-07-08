@@ -161,10 +161,10 @@ namespace
 }
 
 bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
-                                   int* tempTableMemoryInBytes)
+                                   TempTableLimits* limits)
 {
     VOLT_TRACE("init NLIJ Executor");
-    assert(tempTableMemoryInBytes);
+    assert(limits);
 
     node = dynamic_cast<NestLoopIndexPlanNode*>(abstractNode);
     assert(node);
@@ -193,7 +193,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     node->setOutputTable(
         TableFactory::getTempTable(node->getInputTables()[0]->databaseId(),
                                    "temp", schema, columnNames,
-                                   tempTableMemoryInBytes));
+                                   limits));
     delete[] columnNames;
 
     //

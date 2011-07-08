@@ -51,12 +51,14 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <string>
 #include "harness.h"
 #include "common/common.h"
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/debuglog.h"
+#include "common/ThreadLocalPool.h"
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
 #include "storage/table.h"
@@ -73,62 +75,69 @@ using namespace voltdb;
 #define NUM_OF_TUPLES 10000
 
 ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_BIGINT,
-                                                    VALUE_TYPE_TINYINT,
-                                                    VALUE_TYPE_SMALLINT,
-                                                    VALUE_TYPE_INTEGER,
-                                                    VALUE_TYPE_BIGINT };
-int32_t COLUMN_SIZES[NUM_OF_COLUMNS]                = {
-                           NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
-                           NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),
-                           NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),
-                           NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),
-                           NValue::getTupleStorageSize(VALUE_TYPE_BIGINT) };
-bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { true, true, true, true, true };
+                                            VALUE_TYPE_TINYINT,
+                                            VALUE_TYPE_SMALLINT,
+                                            VALUE_TYPE_INTEGER,
+                                            VALUE_TYPE_BIGINT };
+
+int32_t COLUMN_SIZES[NUM_OF_COLUMNS] =
+    {
+        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
+        NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),
+        NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),
+        NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),
+        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)
+    };
+bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { true, true, true, true, true };
 
 class TableTest : public Test {
-    public:
-        TableTest() : table(NULL), temp_table(NULL), persistent_table(NULL) {
-            srand(0);
-            init(false); // default is temp_table. call init(true) to make it transactional
+public:
+    TableTest() : table(NULL), temp_table(NULL), persistent_table(NULL) {
+        srand(0);
+        init(false); // default is temp_table. call init(true) to make it transactional
+    }
+    ~TableTest() {
+        delete table;
+    }
+
+protected:
+    void init(bool xact) {
+        CatalogId database_id = 1000;
+        vector<boost::shared_ptr<const TableColumn> > columns;
+        char buffer[32];
+
+        string *columnNames = new string[NUM_OF_COLUMNS];
+        vector<ValueType> columnTypes;
+        vector<int32_t> columnLengths;
+        vector<bool> columnAllowNull;
+        for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
+            snprintf(buffer, 32, "column%02d", ctr);
+            columnNames[ctr] = buffer;
+            columnTypes.push_back(COLUMN_TYPES[ctr]);
+            columnLengths.push_back(COLUMN_SIZES[ctr]);
+            columnAllowNull.push_back(COLUMN_ALLOW_NULLS[ctr]);
         }
-        ~TableTest() {
-            delete table;
+        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+        if (xact) {
+            persistent_table = TableFactory::getPersistentTable(database_id, NULL, "test_table", schema, columnNames, -1, false, false);
+            table = persistent_table;
+        } else {
+            limits.setMemoryLimit(1024 * 1024);
+            temp_table = TableFactory::getTempTable(database_id, "test_table",
+                                                    schema, columnNames, &limits);
+            table = temp_table;
         }
+        assert(tableutil::addRandomTuples(this->table, NUM_OF_TUPLES));
 
-    protected:
-        void init(bool xact) {
-            CatalogId database_id = 1000;
-            vector<boost::shared_ptr<const TableColumn> > columns;
-            char buffer[32];
+        // clean up
+        delete[] columnNames;
+    }
 
-            string *columnNames = new string[NUM_OF_COLUMNS];
-            vector<ValueType> columnTypes;
-            vector<int32_t> columnLengths;
-            vector<bool> columnAllowNull;
-            for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
-                snprintf(buffer, 32, "column%02d", ctr);
-                columnNames[ctr] = buffer;
-                columnTypes.push_back(COLUMN_TYPES[ctr]);
-                columnLengths.push_back(COLUMN_SIZES[ctr]);
-                columnAllowNull.push_back(COLUMN_ALLOW_NULLS[ctr]);
-            }
-            TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
-            if (xact) {
-                persistent_table = TableFactory::getPersistentTable(database_id, NULL, "test_table", schema, columnNames, -1, false, false);
-                table = persistent_table;
-            } else {
-                temp_table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);
-                table = temp_table;
-            }
-            assert(tableutil::addRandomTuples(this->table, NUM_OF_TUPLES));
-
-            // clean up
-            delete[] columnNames;
-        }
-
-        Table* table;
-        Table* temp_table;
-        Table* persistent_table;
+    Table* table;
+    Table* temp_table;
+    Table* persistent_table;
+    TempTableLimits limits;
+    int tempTableMemory;
 };
 
 TEST_F(TableTest, ValueTypes) {
@@ -243,8 +252,56 @@ TEST_F(TableTest, TupleUpdate) {
             EXPECT_EQ(totalsNotSlim[col_ctr], new_total);
         }
     }
-
 }
+
+// I can't for the life of me make this pass using Valgrind.  I
+// suspect that there's an extra reference to the ThreadLocalPool
+// which isn't getting deleted, but I can't find it.  Leaving this
+// here for now, feel free to fix or delete if you're offended.
+// --izzy 7/8/2011
+//
+// TEST_F(TableTest, TempTableBoom)
+// {
+//     init(false);
+//     bool threw = false;
+//     try
+//     {
+//         while (true)
+//         {
+//             TableTuple &tuple = table->tempTuple();
+//             if (!tableutil::setRandomTupleValues(table, &tuple)) {
+//                 EXPECT_TRUE(false);
+//             }
+//             if (!table->insertTuple(tuple)) {
+//                 EXPECT_TRUE(false);
+//             }
+//
+//             /*
+//              * The insert into the table (assuming a persistent table)
+//              * will make a copy of the strings so the string
+//              * allocations for unlined columns need to be freed here.
+//              */
+//             for (int ii = 0; ii < tuple.getSchema()->getUninlinedObjectColumnCount(); ii++) {
+//                 tuple.getNValue(tuple.getSchema()->getUninlinedObjectColumnInfoIndex(ii)).free();
+//             }
+//         }
+//     }
+//     catch (SQLException& e)
+//     {
+//         TableTuple &tuple = table->tempTuple();
+//         for (int ii = 0; ii < tuple.getSchema()->getUninlinedObjectColumnCount(); ii++) {
+//             tuple.getNValue(tuple.getSchema()->getUninlinedObjectColumnInfoIndex(ii)).free();
+//         }
+//         EXPECT_GT(limits.getAllocated(), 1024 * 1024);
+//         string state(e.getSqlState());
+//         if (state == "V0002")
+//         {
+//             threw = true;
+//         }
+//     }
+//     EXPECT_TRUE(threw);
+// }
+
 /* deleteTuple in TempTable is not supported for performance reason.
 TEST_F(TableTest, TupleDelete) {
     //
@@ -265,61 +322,6 @@ TEST_F(TableTest, TupleDelete) {
     }
 }
 */
-/*TEST_F(TableTest, TupleInsertXact) {
-    this->init(true);
-    //
-    // First clear out our table
-    //
-    TableIterator iterator = this->table->iterator();
-    TableTuple *tuple;
-    while ((tuple = iterator.next()) != NULL) {
-        EXPECT_EQ(true, persistent_table->deleteTuple(tuple));
-    }
-
-    //
-    // Interweave the transactions. Only keep the total
-    //
-    //int xact_ctr;
-    int xact_cnt = 6;
-    vector<boost::shared_ptr<UndoLog> > undos;
-    for (int xact_ctr = 0; xact_ctr < xact_cnt; xact_ctr++) {
-        TransactionId xact_id = xact_ctr;
-        undos.push_back(boost::shared_ptr<UndoLog>(new UndoLog(xact_id)));
-    }
-
-    int64_t total = 0;
-    for (int tuple_ctr = 0; tuple_ctr < NUM_OF_TUPLES; tuple_ctr++) {
-        int xact_ctr2 = (rand() % xact_cnt);
-        tuple = this->table->tempTuple();
-        int64_t temp = rand() % 1000;
-        if (xact_ctr2 % 2 == 0) total += temp;
-        Value value = temp;
-        tuple->set(0, value);
-        //persistent_table->setUndoLog(undos[xact_ctr2]);
-        EXPECT_EQ(true, persistent_table->insertTuple(tuple));
-    }
-
-    for (xact_ctr = 0; xact_ctr < xact_cnt; xact_ctr++) {
-        if (xact_ctr % 2 == 0) {
-            undos[xact_ctr]->commit();
-        } else {
-            undos[xact_ctr]->rollback();
-        }
-    }
-
-    //
-    // Now make sure all of the values add up to our total
-    //
-    int64_t new_total = 0;
-    iterator = this->table->iterator();
-    while ((tuple = iterator.next()) != NULL) {
-        EXPECT_EQ(true, tuple->isActive());
-        new_total += tuple->get(0).getBigInt();
-    }
-
-    EXPECT_EQ(total, new_total);
-}*/
-
 
 /*TEST_F(TableTest, TupleUpdateXact) {
     this->init(true);

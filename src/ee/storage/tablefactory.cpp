@@ -52,6 +52,7 @@
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/temptable.h"
+#include "storage/TempTableLimits.h"
 #include "indexes/tableindexfactory.h"
 #include "common/Pool.hpp"
 
@@ -174,11 +175,11 @@ TempTable* TableFactory::getTempTable(
             const std::string &name,
             TupleSchema* schema,
             const std::string* columnNames,
-            int* tempTableMemoryInBytes) {
-
+            TempTableLimits* limits)
+{
     TempTable* table = new TempTable();
     TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
-    table->m_tempTableMemoryInBytes = tempTableMemoryInBytes;
+    table->m_limits = limits;
     return table;
 }
 
@@ -189,11 +190,12 @@ TempTable* TableFactory::getCopiedTempTable(
             const voltdb::CatalogId databaseId,
             const std::string &name,
             const Table* template_table,
-            int* tempTableMemoryInBytes) {
-
+            TempTableLimits* limits)
+{
     TempTable* table = new TempTable();
-    TableFactory::initCommon(databaseId, table, name, template_table->m_schema, template_table->m_columnNames, false);
-    table->m_tempTableMemoryInBytes = tempTableMemoryInBytes;
+    TableFactory::initCommon(databaseId, table, name, template_table->m_schema,
+                             template_table->m_columnNames, false);
+    table->m_limits = limits;
     return table;
 }
 

@@ -65,7 +65,9 @@
 using namespace std;
 using namespace voltdb;
 
-bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, int* tempTableMemoryInBytes) {
+bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
+                            TempTableLimits* limits)
+{
     VOLT_TRACE("init Insert Executor");
 
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
@@ -84,7 +86,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, int* tempTableMemory
                                                       "temp",
                                                       schema,
                                                       column_names,
-                                                      tempTableMemoryInBytes));
+                                                      limits));
     delete[] column_names;
 
     m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable

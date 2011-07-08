@@ -880,14 +880,25 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
         return false;
     }
 
-    boost::shared_ptr<ExecutorVector> ev = boost::shared_ptr<ExecutorVector>(new ExecutorVector());
-    ev->tempTableMemoryInBytes = 0;
+    // ENG-1333 HACK.  If the plan node fragment has a delete node,
+    // then turn off the governors
+    int64_t frag_temptable_log_limit = -1;
+    int64_t frag_temptable_limit = MAX_NORMAL_TEMP_TABLE_MEMORY;
+    if (pnf->hasDelete())
+    {
+        frag_temptable_log_limit = MAX_NORMAL_TEMP_TABLE_MEMORY;
+        frag_temptable_limit = -1;
+    }
+
+    boost::shared_ptr<ExecutorVector> ev =
+        boost::shared_ptr<ExecutorVector>
+        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit));
 
     // Initialize each node!
     for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
          ctr < cnt; ctr++) {
-        if (!initPlanNode(fragId, pnf->getExecuteList()[ctr],
-                          &(ev->tempTableMemoryInBytes))) {
+        if (!initPlanNode(fragId, pnf->getExecuteList()[ctr], &(ev->limits)))
+        {
             VOLT_ERROR("Failed to initialize PlanNode '%s' at position '%d'"
                        " for PlanFragment '%jd'",
                        pnf->getExecuteList()[ctr]->debug().c_str(), ctr,
@@ -906,7 +917,10 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
     return true;
 }
 
-bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, int* tempTableMemoryInBytes) {
+bool VoltDBEngine::initPlanNode(const int64_t fragId,
+                                AbstractPlanNode* node,
+                                TempTableLimits* limits)
+{
     assert(node);
     assert(node->getExecutor() == NULL);
 
@@ -925,7 +939,8 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
         for (internal_it = node->getInlinePlanNodes().begin();
              internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;
-            if (!initPlanNode(fragId, inline_node, tempTableMemoryInBytes)) {
+            if (!initPlanNode(fragId, inline_node, limits))
+            {
                 VOLT_ERROR("Failed to initialize the internal PlanNode '%s' of"
                            " PlanNode '%s'", inline_node->debug().c_str(),
                            node->debug().c_str());
@@ -935,7 +950,8 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
     }
 
     // Now use the executor to initialize the plannode for execution later on
-    if (!executor->init(this, tempTableMemoryInBytes)) {
+    if (!executor->init(this, limits))
+    {
         VOLT_ERROR("The Executor failed to initialize PlanNode '%s' for"
                    " PlanFragment '%jd'", node->debug().c_str(),
                    (intmax_t)fragId);
@@ -1070,7 +1086,7 @@ string VoltDBEngine::debug(void) const {
         output << "Fragment ID: " << iter->first << ", "
                << "Executor list size: " << iter->second->list.size() << ", "
                << "Temp table memory in bytes: "
-               << iter->second->tempTableMemoryInBytes << endl;
+               << iter->second->limits.getAllocated() << endl;
 
         for (executorIter = iter->second->list.begin();
              executorIter != iter->second->list.end();

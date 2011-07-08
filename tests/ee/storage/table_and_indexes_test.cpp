@@ -181,7 +181,8 @@ class TableAndIndexTest : public Test {
                                                                      false, false);
 
             districtTempTable = dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "DISTRICT TEMP", districtTable, &mem));
+                TableFactory::getCopiedTempTable(0, "DISTRICT TEMP", districtTable,
+                                                 &limits));
 
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, engine, "WAREHOUSE",
                                                                       warehouseTupleSchema,
@@ -191,7 +192,8 @@ class TableAndIndexTest : public Test {
                                                                       false, false);
 
             warehouseTempTable =  dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "WAREHOUSE TEMP", warehouseTable, &mem));
+                TableFactory::getCopiedTempTable(0, "WAREHOUSE TEMP", warehouseTable,
+                                                 &limits));
 
             customerTable = voltdb::TableFactory::getPersistentTable(0,engine, "CUSTOMER",
                                                                      customerTupleSchema,
@@ -201,7 +203,8 @@ class TableAndIndexTest : public Test {
                                                                      false, false);
 
             customerTempTable =  dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "CUSTOMER TEMP", customerTable, &mem));
+                TableFactory::getCopiedTempTable(0, "CUSTOMER TEMP", customerTable,
+                                                 &limits));
         }
 
         ~TableAndIndexTest() {
@@ -217,6 +220,7 @@ class TableAndIndexTest : public Test {
 
     protected:
         int mem;
+        TempTableLimits limits;
         UndoQuantum *dummyUndo;
         ExecutorContext *engine;
 

@@ -56,10 +56,11 @@
 
 namespace voltdb {
 
-bool ReceiveExecutor::p_init(AbstractPlanNode *abstract_node,
-                             int* tempTableMemoryInBytes) {
+bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
+                             TempTableLimits* limits)
+{
     VOLT_TRACE("init Receive Executor");
-    assert(tempTableMemoryInBytes);
+    assert(limits);
 
     ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(abstract_node);
     assert(node);
@@ -78,7 +79,7 @@ bool ReceiveExecutor::p_init(AbstractPlanNode *abstract_node,
                                                     "temp",
                                                     schema,
                                                     column_names,
-                                                    tempTableMemoryInBytes));
+                                                    limits));
     delete[] column_names;
     return true;
 }

@@ -67,7 +67,8 @@ namespace voltdb {
         ~OrderByExecutor();
 
     protected:
-        bool p_init(AbstractPlanNode* abstract_node, int* tempTableMemoryInBytes);
+        bool p_init(AbstractPlanNode* abstract_node,
+                    TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
     private:

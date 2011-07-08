@@ -91,7 +91,8 @@ public:
         }
         TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-        table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);
+        table = TableFactory::getTempTable(database_id, "test_table", schema,
+                                           columnNames, NULL);
 
         delete[] columnNames;
 
@@ -328,4 +329,3 @@ int main() {
     FilterTest::releaseAll();// will be eventually done as its smart pointer, but safer is better.
     return ret;
 }
-

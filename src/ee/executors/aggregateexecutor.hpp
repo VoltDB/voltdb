@@ -389,7 +389,8 @@ public:
     ~AggregateExecutor();
 
 protected:
-    bool p_init(AbstractPlanNode* abstract_node, int* tempTableMemoryInBytes);
+    bool p_init(AbstractPlanNode* abstract_node,
+                TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
     /*
@@ -838,11 +839,11 @@ private:
 template<PlanNodeType aggregateType>
 bool
 AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
-                                         int* tempTableMemoryInBytes)
+                                         TempTableLimits* limits)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(abstract_node);
     assert(node);
-    assert(tempTableMemoryInBytes);
+    assert(limits);
 
     assert(node->getInputTables().size() == 1);
     int columnCount = (int)node->getOutputSchema().size();
@@ -897,7 +898,7 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
                                                     "temp",
                                                     schema,
                                                     columnNames,
-                                                    tempTableMemoryInBytes));
+                                                    limits));
     delete[] columnNames;
 
     std::vector<ValueType> groupByColumnTypes;

@@ -61,7 +61,8 @@ namespace voltdb
             : AbstractExecutor(engine, abstract_node)
         {}
     protected:
-        bool p_init(AbstractPlanNode* abstract_node,int* tempTableMemoryInBytes);
+        bool p_init(AbstractPlanNode* abstract_node,
+                    TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
     };

@@ -53,6 +53,7 @@ public:
 
     void serialize(ReferenceSerializeOutput *output);
     std::string message() { return m_message; }
+    VoltEEExceptionType getType() { return m_exceptionType; }
 protected:
     virtual void p_serialize(ReferenceSerializeOutput *output) {};
 

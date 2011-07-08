@@ -57,7 +57,7 @@ namespace voltdb {
 TempTable::TempTable()
   : Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
-    m_tempTableMemoryInBytes(NULL)
+    m_limits(NULL)
 {
 }
 
@@ -88,5 +88,3 @@ std::string TempTable::tableType() const {
 
 voltdb::TableStats* TempTable::getTableStats() { return NULL; }
 }
-
-

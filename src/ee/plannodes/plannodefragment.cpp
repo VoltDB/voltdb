@@ -53,7 +53,7 @@
 
 using namespace std;
 
-namespace voltdb {
+using namespace voltdb;
 
 PlanNodeFragment::PlanNodeFragment()
 {
@@ -188,6 +188,24 @@ PlanNodeFragment::loadFromJSONObject(json_spirit::Object &obj)
     }
 }
 
+bool PlanNodeFragment::hasDelete() const
+{
+    bool has_delete = false;
+    for (int ii = 0; ii < m_planNodes.size(); ii++)
+    {
+        if (m_planNodes[ii]->getPlanNodeType() == PLAN_NODE_TYPE_DELETE)
+        {
+            has_delete = true;
+            break;
+        }
+        if (m_planNodes[ii]->getInlinePlanNode(PLAN_NODE_TYPE_DELETE) != NULL)
+        {
+            has_delete = true;
+            break;
+        }
+    }
+    return has_delete;
+}
 
 std::string PlanNodeFragment::debug() {
     std::ostringstream buffer;
@@ -199,8 +217,3 @@ std::string PlanNodeFragment::debug() {
     buffer << getRootNode()->debug(true);
     return (buffer.str());
 }
-
-
-
-}
-

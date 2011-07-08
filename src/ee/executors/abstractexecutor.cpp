@@ -54,7 +54,7 @@ using namespace std;
 using namespace voltdb;
 
 bool AbstractExecutor::init(VoltDBEngine* engine,
-                            int* tempTableMemoryInBytes)
+                            TempTableLimits* limits)
 {
     assert (m_abstractNode);
     //
@@ -124,7 +124,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
 
     // Call the p_init() method on our derived class
     try {
-        if (!p_init(m_abstractNode, tempTableMemoryInBytes))
+        if (!p_init(m_abstractNode, limits))
             return false;
     } catch (exception& err) {
         char message[128];

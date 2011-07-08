@@ -66,7 +66,9 @@
 using namespace std;
 using namespace voltdb;
 
-bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, int* tempTableMemoryInBytes) {
+bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
+                            TempTableLimits* limits)
+{
     VOLT_TRACE("init Update Executor");
 
     m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);
@@ -90,7 +92,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, int* tempTableMemor
                                                       "temp",
                                                       schema,
                                                       column_names,
-                                                      tempTableMemoryInBytes));
+                                                      limits));
     delete[] column_names;
 
     // record if a full index update is needed, or if these checks can be skipped

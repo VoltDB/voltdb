@@ -62,7 +62,7 @@ using namespace std;
 
 bool
 OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
-                        int* tempTableMemoryInBytes)
+                        TempTableLimits* limits)
 {
     VOLT_TRACE("init OrderBy Executor");
 
@@ -80,7 +80,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
                        getCopiedTempTable(node->databaseId(),
                                           node->getInputTables()[0]->name(),
                                           node->getInputTables()[0],
-                                          tempTableMemoryInBytes));
+                                          limits));
 
     // pickup an inlined limit, if one exists
     limit_node =

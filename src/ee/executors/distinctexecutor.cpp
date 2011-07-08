@@ -59,9 +59,10 @@
 
 using namespace voltdb;
 
-bool DistinctExecutor::p_init(AbstractPlanNode*, int* tempTableMemoryInBytes) {
+bool DistinctExecutor::p_init(AbstractPlanNode*,
+                              TempTableLimits* limits)
+{
     VOLT_DEBUG("init Distinct Executor");
-
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
     //
@@ -77,7 +78,7 @@ bool DistinctExecutor::p_init(AbstractPlanNode*, int* tempTableMemoryInBytes) {
                            getCopiedTempTable(node->databaseId(),
                                               node->getInputTables()[0]->name(),
                                               node->getInputTables()[0],
-                                              tempTableMemoryInBytes));
+                                              limits));
     }
     return (true);
 }

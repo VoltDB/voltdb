@@ -62,7 +62,9 @@
 using namespace std;
 using namespace voltdb;
 
-bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node, int* tempTableMemoryInBytes) {
+bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
+                            TempTableLimits* limits)
+{
     VOLT_TRACE("init Delete Executor");
 
     m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
@@ -82,7 +84,7 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node, int* tempTableMemor
                                                       "temp",
                                                       schema,
                                                       column_names,
-                                                      tempTableMemoryInBytes));
+                                                      limits));
     delete[] column_names;
 
     m_truncate = m_node->getTruncate();

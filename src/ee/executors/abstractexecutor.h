@@ -51,6 +51,7 @@
 
 namespace voltdb {
 
+class TempTableLimits;
 class VoltDBEngine;
 
 /**
@@ -61,7 +62,7 @@ class AbstractExecutor {
     virtual ~AbstractExecutor();
 
     /** Executors are initialized once when the catalog is loaded */
-    bool init(VoltDBEngine*, int* tempTableMemoryInBytes);
+    bool init(VoltDBEngine*, TempTableLimits* limits);
 
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray& params);
@@ -86,7 +87,8 @@ class AbstractExecutor {
     }
 
     /** Concrete executor classes implement initialization in p_init() */
-    virtual bool p_init(AbstractPlanNode*, int* tempTableMemoryInBytes) = 0;
+    virtual bool p_init(AbstractPlanNode*,
+                        TempTableLimits* limits) = 0;
 
     /** Concrete executor classes impelmenet execution in p_execute() */
     virtual bool p_execute(const NValueArray& params) = 0;

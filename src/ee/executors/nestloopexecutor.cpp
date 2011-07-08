@@ -161,10 +161,9 @@ namespace
 }
 
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
-                              int* tempTableMemoryInBytes)
+                              TempTableLimits* limits)
 {
     VOLT_TRACE("init NestLoop Executor");
-    assert(tempTableMemoryInBytes);
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(abstract_node);
     assert(node);
@@ -182,7 +181,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
     node->setOutputTable(
         TableFactory::getTempTable(node->getInputTables()[0]->databaseId(),
                                    "temp", schema, columnNames,
-                                   tempTableMemoryInBytes));
+                                   limits));
 
     // for each tuple value expression in the predicate, determine
     // which tuple is being represented. Tuple could come from outer
