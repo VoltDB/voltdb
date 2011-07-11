@@ -36,6 +36,7 @@ public class SiteMailbox implements Mailbox {
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
     final int m_siteId;
     final CommandLog m_log = VoltDB.instance().getCommandLog();
+    final boolean m_doLogging;
 
     // deques to store recent inter-site messages
     private final int MESSAGE_HISTORY_SIZE;
@@ -44,13 +45,14 @@ public class SiteMailbox implements Mailbox {
     ArrayDeque<VoltMessage> m_lastTenMembershipNotices = new ArrayDeque<VoltMessage>();
     ArrayDeque<VoltMessage> m_lastTenHeartbeats = new ArrayDeque<VoltMessage>();
 
-    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId) {
+    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, final boolean log) {
         this.m_hostMessenger = hostMessenger;
         this.m_siteId = siteId;
         MESSAGE_HISTORY_SIZE = 0;
         for (Subject s : Subject.values()) {
             m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
         }
+        m_doLogging = log;
     }
 
     @Override
@@ -69,18 +71,20 @@ public class SiteMailbox implements Mailbox {
         // tag what mailbox this message was delivered to, command log uses this
         message.receivedFromSiteId = m_siteId;
 
-        /*
-         * Doing delivery here so that the delivery thread is the one interacting with the
-         * log instead of the receiver. This way only the network threads contend for the log.
-         */
-        if (message instanceof InitiateTaskMessage) {
-            InitiateTaskMessage msg = (InitiateTaskMessage)message;
-            if (!msg.isReadOnly()) {
-                m_log.log(msg);
+        if (m_doLogging) {
+            /*
+             * Doing delivery here so that the delivery thread is the one interacting with the
+             * log instead of the receiver. This way only the network threads contend for the log.
+             */
+            if (message instanceof InitiateTaskMessage) {
+                InitiateTaskMessage msg = (InitiateTaskMessage)message;
+                if (!msg.isReadOnly()) {
+                    m_log.log(msg);
+                }
+            } else if (message instanceof HeartbeatMessage) {
+                HeartbeatMessage msg = (HeartbeatMessage)message;
+                m_log.logHeartbeat(msg.getTxnId());
             }
-        } else if (message instanceof HeartbeatMessage) {
-            HeartbeatMessage msg = (HeartbeatMessage)message;
-            m_log.logHeartbeat(msg.getTxnId());
         }
 
         final Deque<VoltMessage> dq = m_messages.get(message.getSubject());

@@ -159,7 +159,7 @@ public class TestMessaging extends TestCase {
             messenger.createLocalSite(mySiteId);
             // create the mailboxes
             for (int i = 0; i < mailboxCount; i++) {
-                mbox[i] = currentMessenger.createMailbox(mySiteId, i);
+                mbox[i] = currentMessenger.createMailbox(mySiteId, i, true);
             }
             // claim this site is done
             sitesDone.incrementAndGet();
@@ -296,6 +296,7 @@ public class TestMessaging extends TestCase {
 
     public void testJoinerBadCRC() {
         MockVoltDB mockVoltDB = new MockVoltDB();
+        mockVoltDB.shouldIgnoreCrashes = true;
         VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
 
         // test catalog crcs
@@ -367,8 +368,8 @@ public class TestMessaging extends TestCase {
         msg1.createLocalSite(siteId1);
         msg2.createLocalSite(siteId2);
 
-        Mailbox mb1 = msg1.createMailbox(siteId1, 1);
-        Mailbox mb2 = msg2.createMailbox(siteId2, 1);
+        Mailbox mb1 = msg1.createMailbox(siteId1, 1, false);
+        Mailbox mb2 = msg2.createMailbox(siteId2, 1, false);
 
         MsgTest.initWithSize(16);
         MsgTest mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);
@@ -446,11 +447,11 @@ public class TestMessaging extends TestCase {
         msg3.createLocalSite(siteId3);
         msg3.createLocalSite(siteId4);
 
-        Mailbox mb1 = msg1.createMailbox(siteId1, 1);
-        Mailbox mb2 = msg2.createMailbox(siteId2, 1);
-        Mailbox mb3 = msg3.createMailbox(siteId3, 1);
-        Mailbox mb4 = msg3.createMailbox(siteId4, 1);
-        Mailbox mb5 = msg1.createMailbox(siteId5, 1);
+        Mailbox mb1 = msg1.createMailbox(siteId1, 1, false);
+        Mailbox mb2 = msg2.createMailbox(siteId2, 1, false);
+        Mailbox mb3 = msg3.createMailbox(siteId3, 1, false);
+        Mailbox mb4 = msg3.createMailbox(siteId4, 1, false);
+        Mailbox mb5 = msg1.createMailbox(siteId5, 1, false);
 
         MsgTest.initWithSize(16);
         MsgTest mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);

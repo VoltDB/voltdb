@@ -181,7 +181,6 @@ public class ZKUtil {
     public static final ZooKeeper getClient(String zkAddress, int timeout) throws Exception {
         final Semaphore zkConnect = new Semaphore(0);
         ZooKeeper zk = new ZooKeeper(zkAddress, 2000, new Watcher() {
-
             @Override
             public void process(WatchedEvent event) {
                 if (event.getState() == KeeperState.SyncConnected) {

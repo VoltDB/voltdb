@@ -34,14 +34,23 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.zip.GZIPInputStream;
 
-import junit.framework.Test;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.json_voltpatches.JSONObject;
+import org.junit.*;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
+import org.voltdb.SnapshotCompletionInterest;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -53,6 +62,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
@@ -373,6 +383,88 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
           finally {
             System.setOut(original);
         }
+    }
+
+    private class SnapshotCompletionIntr implements SnapshotCompletionInterest {
+
+        private Semaphore snapshotCompleted = new Semaphore(0);
+        private long txnId;
+        private boolean truncationSnapshot;
+
+        @Override
+        public CountDownLatch snapshotCompleted(long txnId,
+                boolean truncationSnapshot) {
+            this.txnId = txnId;
+            this.truncationSnapshot = truncationSnapshot;
+            snapshotCompleted.release();
+            return null;
+        }
+
+    }
+
+    /*
+     * Test that if a snapshot is requested for truncation
+     * that it is reported as a truncation snapshot by SnapshotCompletionMonitor.
+     * Check that if the nonce doesn't match the truncation request that it is not
+     * reported as a truncation snapshot. Make sure that reusing a truncation nonce when
+     * there is no outstanding request also comes out as not a truncation snapshot.
+     */
+    @Test
+    public void testSnapshotSaveZKTruncation() throws Exception {
+        ZooKeeper zk = VoltDB.instance().getZK();
+
+        Client client = getClient();
+        byte pathBytes[] = TMPDIR.getBytes("UTF-8");
+        ByteBuffer payload = ByteBuffer.allocate(8 + pathBytes.length);
+        payload.putLong(0);
+        payload.put(pathBytes);
+
+        SnapshotCompletionMonitor monitor = VoltDB.instance().getSnapshotCompletionMonitor();
+        SnapshotCompletionIntr interest = new SnapshotCompletionIntr();
+        monitor.addInterest(interest);
+
+        zk.create("/request_truncation_snapshot", payload.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        interest.snapshotCompleted.acquire();
+        assertTrue(interest.truncationSnapshot);
+
+        Thread.sleep(100);
+        assertNull(zk.exists("/request_truncation_snapshot", false));
+
+        ClientResponse response = client.callProcedure("@SnapshotSave", TMPDIR,
+                TESTNONCE,
+                (byte)1);
+        String statusString = response.getAppStatusString();
+
+        JSONObject obj = new JSONObject(statusString);
+        long txnId = obj.getLong("txnId");
+        interest.snapshotCompleted.acquire();
+        assertEquals(interest.txnId, txnId);
+        assertFalse(interest.truncationSnapshot);
+
+        statusString = client.callProcedure("@SnapshotSave", TMPDIR,
+                TESTNONCE + "5",
+                (byte)1).getAppStatusString();
+
+        obj = new JSONObject(statusString);
+        txnId = obj.getLong("txnId");
+        interest.snapshotCompleted.acquire();
+        assertEquals(interest.txnId, txnId);
+        assertFalse(interest.truncationSnapshot);
+
+        /*
+         * Test that old completed snapshot notices are deleted
+         */
+        for (int ii = 0; ii < 35; ii++) {
+            zk.create("/completed_snapshots/" + ii, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        }
+
+        response = client.callProcedure("@SnapshotSave", TMPDIR,
+                TESTNONCE + "6",
+                (byte)1);
+        statusString = response.getAppStatusString();
+        Thread.sleep(300);
+        assertEquals( 30, zk.getChildren("/completed_snapshots", false).size());
     }
 
     public void testRestore12Snapshot()
@@ -1200,7 +1292,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
         java.util.Random r = new java.util.Random(0);
-        final int iterations = isValgrind() ? 5 : 100;
+        final int iterations = isValgrind() ? 5 : 5;
 
         for (int ii = 0; ii < iterations; ii++) {
             Client client = getClient();
@@ -1259,7 +1351,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
         java.util.Random r = new java.util.Random();
-        final int iterations = isValgrind() ? 5 : 100;
+        final int iterations = isValgrind() ? 5 : 5;
 
         for (int ii = 0; ii < iterations; ii++) {
             Client client = getClient();
@@ -1644,7 +1736,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
      * helpers to allow multiple back ends.
      * JUnit magic that uses the regression suite helper classes.
      */
-    static public Test suite() {
+    static public junit.framework.Test suite() {
         VoltServerConfig config = null;
 
         MultiConfigSuiteBuilder builder =

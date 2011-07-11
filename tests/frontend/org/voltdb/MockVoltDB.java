@@ -69,6 +69,7 @@ public class MockVoltDB implements VoltDBInterface
     final AgreementSite m_agreementSite;
     private final ZooKeeper m_zk;
     boolean m_noLoadLib = false;
+    public boolean shouldIgnoreCrashes = false;
 
     public MockVoltDB()
     {
@@ -341,9 +342,13 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean ignoreCrash()
     {
-        // TODO Auto-generated method stub
-        m_howManyCrashes++;
-        return true;
+        if (shouldIgnoreCrashes) {
+            // TODO Auto-generated method stub
+            m_howManyCrashes++;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override

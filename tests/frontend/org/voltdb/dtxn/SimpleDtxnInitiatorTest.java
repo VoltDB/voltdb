@@ -98,7 +98,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
     class MockMessenger implements Messenger
     {
         @Override
-        public Mailbox createMailbox(int siteId, int mailboxId)
+        public Mailbox createMailbox(int siteId, int mailboxId, boolean log)
         {
             return new MockMailbox();
         }

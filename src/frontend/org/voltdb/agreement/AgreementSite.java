@@ -244,7 +244,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
 
     public void shutdown() throws InterruptedException {
         m_shouldContinue = false;
-        m_cnxnFactory.shutdown();
         m_shutdownComplete.await();
     }
 

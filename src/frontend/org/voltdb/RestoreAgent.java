@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -142,6 +143,8 @@ SnapshotCompletionInterest {
         @Override
         public void returnAllSegments() {}
     };
+
+    private Thread m_restoreHeartbeatThread;
 
     private Runnable m_restorePlanner = new Runnable() {
         @Override
@@ -260,19 +263,19 @@ SnapshotCompletionInterest {
              * A thread to keep on sending fake heartbeats until the restore is
              * complete, or otherwise the RPQ is gonna be clogged.
              */
-            new Thread(new Runnable() {
+            m_restoreHeartbeatThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     while (m_state == State.RESTORE ||
                            (m_state == State.REPLAY && !m_replayAgent.started())) {
                         m_initiator.sendHeartbeat(txnId + 1);
-
                         try {
                             Thread.sleep(500);
                         } catch (InterruptedException e) {}
                     }
                 }
-            }).start();
+            });
+            m_restoreHeartbeatThread.start();
 
             if (!isLowestHost() || restorePath == null || restoreNonce == null) {
                 /*
@@ -945,6 +948,9 @@ SnapshotCompletionInterest {
             m_state = State.TRUNCATE;
         } else if (m_state == State.TRUNCATE) {
             m_snapshotMonitor.removeInterest(this);
+            try {
+                m_restoreHeartbeatThread.join();
+            } catch (InterruptedException e) {}
             if (m_callback != null) {
                 m_callback.onRestoreCompletion(true);
             }
@@ -1050,7 +1056,7 @@ SnapshotCompletionInterest {
     }
 
     @Override
-    public void snapshotCompleted(long txnId, boolean truncationSnapshot) {
+    public CountDownLatch snapshotCompleted(long txnId, boolean truncationSnapshot) {
         if (!truncationSnapshot) {
             LOG.fatal("Failed to truncate command logs by snapshot");
             VoltDB.crashVoltDB();
@@ -1058,5 +1064,6 @@ SnapshotCompletionInterest {
             m_replayAgent.returnAllSegments();
             changeState();
         }
+        return new CountDownLatch(0);
     }
 }

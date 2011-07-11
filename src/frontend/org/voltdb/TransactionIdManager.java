@@ -262,9 +262,11 @@ public class TransactionIdManager {
      */
     public static String toString(long txnId) {
         final StringBuilder sb = new StringBuilder(128);
-        sb.append("Timestamp: ").append(getTimestampFromTransactionId(txnId));
+        sb.append("TxnId: ").append(txnId);
+        sb.append(" Timestamp: ").append(getTimestampFromTransactionId(txnId));
         sb.append(".").append(getSequenceNumberFromTransactionId(txnId));
         sb.append(" InititatorId: ").append(getInitiatorIdFromTransactionId(txnId));
+        sb.append(" Date: ").append(getDateFromTransactionId(txnId));
         return sb.toString();
     }
 

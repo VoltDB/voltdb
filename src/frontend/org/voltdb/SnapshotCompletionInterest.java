@@ -16,6 +16,8 @@
  */
 package org.voltdb;
 
+import java.util.concurrent.CountDownLatch;
+
 public interface SnapshotCompletionInterest {
-    public void snapshotCompleted(long txnId, boolean truncationSnapshot);
+    public CountDownLatch snapshotCompleted(long txnId, boolean truncationSnapshot);
 }

@@ -174,7 +174,7 @@ public class RejoinTestBase extends TestCase {
 
         int myHostId = host2.getHostId() * 100;
         host2.createLocalSite(myHostId);
-        Mailbox mailbox = host2.createMailbox(myHostId, VoltDB.AGREEMENT_MAILBOX_ID);
+        Mailbox mailbox = host2.createMailbox(myHostId, VoltDB.AGREEMENT_MAILBOX_ID, false);
         AgreementSite site = new AgreementSite(
                 myHostId,
                 new HashSet<Integer>(Arrays.asList(0, 100)),

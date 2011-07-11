@@ -296,6 +296,7 @@ public class LocalCluster implements VoltServerConfig {
         m_procBuilder = new ProcessBuilder("java",
                                            "-Djava.library.path=" + m_buildDir + "/nativelibs",
                                            "-Dlog4j.configuration=log.xml",
+                                           "-DLOG_SEGMENT_SIZE=8",
                                            "-ea",
                                            "-XX:-ReduceInitialCardMarks",
                                            "-XX:MaxDirectMemorySize=2g",
@@ -362,9 +363,12 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public void setMaxHeap(int megabytes) {
-        m_procBuilder.command().set(6, "-Xmx" + megabytes + "m");
+        m_procBuilder.command().set(7, "-Xmx" + megabytes + "m");
     }
 
+    public String getPathToDeployment() {
+        return m_pathToDeployment;
+    }
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
@@ -600,6 +604,12 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(
                     m_voltFilePrefixOffset,
                     "-DVoltFilePrefix=" + subroot.getPath());
+
+            StringBuilder sb = new StringBuilder();
+            for (String arg : m_procBuilder.command()) {
+                sb.append(arg);
+                sb.append(' ');
+            }
 
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);

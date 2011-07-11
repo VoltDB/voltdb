@@ -139,6 +139,67 @@ public class TestSnapshotDaemon {
         return m_daemon;
     }
 
+    /*
+     * Quick smoke test
+     * that leader election work, it scans for snapshots,
+     * and then deletes the extra snapshots
+     */
+    @Test
+    public void testLeaderElectionAndEverythingElse() throws Exception {
+        m_mockVoltDB = new MockVoltDB();
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        m_initiator = new Initiator();
+        ZooKeeper zk = m_mockVoltDB.getZK();
+        zk.create("/snapshot_truncation_master", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        m_daemon = new SnapshotDaemon();
+        m_daemon.init(m_initiator, zk);
+
+        Thread.sleep(100);
+
+        assertNull(m_initiator.procedureName);
+
+        byte pathBytes[] = "/foo".getBytes("UTF-8");
+        ByteBuffer payload = ByteBuffer.allocate(pathBytes.length + 8);
+        payload.putLong(0);
+        payload.put(pathBytes);
+        zk.create("/request_truncation_snapshot", payload.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        Thread.sleep(100);
+        assertNull(m_initiator.procedureName);
+
+        zk.delete("/request_truncation_snapshot", -1);
+        zk.create("/test_scan_path", pathBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.delete("/snapshot_truncation_master", -1);
+        Thread.sleep(300);
+        assertNotNull(zk.exists("/snapshot_truncation_master", false));
+
+        assertTrue(m_initiator.procedureName.equals("@SnapshotScan"));
+        long handle = m_initiator.clientData;
+        m_initiator.clear();
+
+        m_daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
+
+        zk.create("/request_truncation_snapshot", payload.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        Thread.sleep(100);
+
+        assertTrue(m_initiator.procedureName.equals("@SnapshotSave"));
+        assertTrue(m_initiator.params[0].equals("/foo"));
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        assertTrue(ByteBuffer.wrap(zk.getData("/request_truncation_snapshot", false, null)).getLong() > 0);
+
+        m_daemon.processClientResponse(getSuccessResponse(32L), handle).get();
+        assertNull(zk.exists("/request_truncation_snapshot", false));
+
+        m_daemon.snapshotCompleted(32, true).await();
+        assertTrue(m_initiator.procedureName.equals("@SnapshotDelete"));
+        m_initiator.clear();
+
+        m_daemon.shutdown();
+        m_mockVoltDB.shutdown(null);
+    }
+
     @Test
     public void testBadFrequencyAndBasicInit() throws Exception {
         SnapshotDaemon noSnapshots = getSnapshotDaemon();
@@ -238,6 +299,70 @@ public class TestSnapshotDaemon {
             @Override
             public String getAppStatusString() {
                 return null;
+            }
+
+        };
+    }
+
+    public ClientResponse getSuccessResponse(final long txnId) {
+        return new ClientResponse() {
+
+            @Override
+            public byte getStatus() {
+                return ClientResponse.SUCCESS;
+            }
+
+            @Override
+            public byte getAppStatus() {
+                // TODO Auto-generated method stub
+                return 0;
+            }
+
+            @Override
+            public VoltTable[] getResults() {
+                VoltTable result =
+                    new VoltTable(
+                            new ColumnInfo("ERR_MSG", VoltType.STRING),
+                            new ColumnInfo("RESULT", VoltType.STRING));
+                return new VoltTable[] { result };
+            }
+
+            @Override
+            public String getStatusString() {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            @Override
+            public String getAppStatusString() {
+                try {
+                    JSONStringer stringer = new JSONStringer();
+                    stringer.object();
+                    stringer.key("txnId").value(Long.toString(txnId));
+                    stringer.endObject();
+                    return stringer.toString();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }
+
+            @Override
+            public Exception getException() {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            @Override
+            public int getClusterRoundtrip() {
+                // TODO Auto-generated method stub
+                return 0;
+            }
+
+            @Override
+            public int getClientRoundtrip() {
+                // TODO Auto-generated method stub
+                return 0;
             }
 
         };

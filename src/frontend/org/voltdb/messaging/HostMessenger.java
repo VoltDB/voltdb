@@ -302,13 +302,13 @@ public class HostMessenger implements Messenger {
     }
 
     @Override
-    public Mailbox createMailbox(int siteId, int mailboxId) {
+    public Mailbox createMailbox(int siteId, int mailboxId, boolean log) {
         assert(m_initialized);
         int localSiteId = siteId % VoltDB.SITES_TO_HOST_DIVISOR;
         MessengerSite site = m_messengerSites[localSiteId];
         if (site == null) return null;
 
-        return site.createMailbox(mailboxId);
+        return site.createMailbox(mailboxId, log);
     }
 
     public void send(final int siteId, final int mailboxId, final VoltMessage message)

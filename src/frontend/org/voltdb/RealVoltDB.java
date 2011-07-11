@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -237,7 +238,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         @Override
         public void run() {
             Mailbox mailbox = VoltDB.instance().getMessenger()
-            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID);
+            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, true);
 
             m_siteObj =
                 new ExecutionSite(VoltDB.instance(),
@@ -314,6 +315,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     private volatile boolean m_recovering = false;
+    //Only restrict recovery completion during test
+    static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
     private boolean m_executionSitesRecovered = false;
     private boolean m_agreementSiteRecovered = false;
     private long m_executionSiteRecoveryFinish;
@@ -690,7 +693,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 assert(m_agreementSite == null);
                 assert(myAgreementSiteId != -1);
                 Mailbox agreementMailbox =
-                    m_messenger.createMailbox(myAgreementSiteId, VoltDB.AGREEMENT_MAILBOX_ID);
+                    m_messenger.createMailbox(myAgreementSiteId, VoltDB.AGREEMENT_MAILBOX_ID, false);
                 try {
                     m_agreementSite =
                         new AgreementSite(
@@ -786,7 +789,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 new ExecutionSite(VoltDB.instance(),
                                   VoltDB.instance().getMessenger().createMailbox(
                                           siteId,
-                                          VoltDB.DTXN_MAILBOX_ID),
+                                          VoltDB.DTXN_MAILBOX_ID,
+                                          true),
                                   siteId,
                                   serializedCatalog,
                                   null,
@@ -1816,6 +1820,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         if (!m_executionSitesRecovered || !m_agreementSiteRecovered) {
             return;
         }
+        try {
+            m_testBlockRecoveryCompletion.acquire();
+        } catch (InterruptedException e) {}
         final long delta = ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000);
         final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);

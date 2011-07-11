@@ -30,11 +30,11 @@ class MessengerSite {
         m_siteId = siteId;
     }
 
-    public synchronized Mailbox createMailbox(int mailboxId) {
+    public synchronized Mailbox createMailbox(int mailboxId, boolean log) {
         SiteMailbox mbox = (SiteMailbox)getMailbox(mailboxId);
         if (mbox != null) return null;
 
-        SiteMailbox newMbox = new SiteMailbox(m_hostMessenger, m_siteId, mailboxId);
+        SiteMailbox newMbox = new SiteMailbox(m_hostMessenger, m_siteId, mailboxId, log);
         m_mailboxes.put(mailboxId, newMbox);
         return newMbox;
     }

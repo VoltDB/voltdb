@@ -51,6 +51,10 @@ public class VoltFile extends File {
     public static final File m_root = new File(getRootUserPortion());
 
 
+    public static void setSubrootForThisProcess(File prefix) {
+        m_voltFilePrefix = prefix;
+    }
+
     private static String getRootUserPortion() {
         return "/tmp/" + System.getProperty("user.name");
     }

@@ -27,6 +27,9 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -211,7 +214,11 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     private void scanTruncationSnapshots() {
         if (m_truncationSnapshotPath == null) {
-            return;
+            try {
+                m_truncationSnapshotPath = new String(m_zk.getData("/test_scan_path", false, null), "UTF-8");
+            } catch (Exception e) {
+                return;
+            }
         }
 
         Object params[] = new Object[1];
@@ -346,7 +353,7 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
                     try {
                         m_zk.create("/snapshot_truncation_master", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                         loggingLog.info("This node was selected as the leader for snapshot truncation");
-                        m_truncationSnapshotScanTask = m_es.schedule(new Runnable() {
+                        m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
                             @Override
                             public void run() {
                                 try {
@@ -355,7 +362,7 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
                                     loggingLog.error("Error during scan and group of truncation snapshots");
                                 }
                             }
-                        }, 5, TimeUnit.MINUTES);
+                        }, 0, 30, TimeUnit.MINUTES);
                         truncationRequestExistenceCheck();
                         return;
                     } catch (NodeExistsException e) {
@@ -511,6 +518,7 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
 
             @Override
             public void process(final WatchedEvent event) {
+                if (event.getState() == KeeperState.Disconnected) return;
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
@@ -952,22 +960,28 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     @Override
-    public void snapshotCompleted(final long txnId, final boolean truncation) {
+    public CountDownLatch snapshotCompleted(final long txnId, final boolean truncation) {
         if (!truncation) {
-            return;
+            return new CountDownLatch(0);
         }
+        final CountDownLatch latch = new CountDownLatch(1);
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(txnId);
-                if (snapshotAttempt == null) {
-                    snapshotAttempt = new TruncationSnapshotAttempt();
-                    m_truncationSnapshotAttempts.put(txnId, snapshotAttempt);
+                try {
+                    TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(txnId);
+                    if (snapshotAttempt == null) {
+                        snapshotAttempt = new TruncationSnapshotAttempt();
+                        m_truncationSnapshotAttempts.put(txnId, snapshotAttempt);
+                    }
+                    snapshotAttempt.finished = true;
+                    groomTruncationSnapshots();
+                } finally {
+                    latch.countDown();
                 }
-                snapshotAttempt.finished = true;
-                groomTruncationSnapshots();
             }
         });
+        return latch;
     }
 
 }

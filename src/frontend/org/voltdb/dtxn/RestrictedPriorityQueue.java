@@ -221,6 +221,12 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         if (lid.m_lastSafeTxnId < lastSafeTxnIdFromInitiator)
             lid.m_lastSafeTxnId = lastSafeTxnIdFromInitiator;
 
+        /*
+         * Why aren't we asserting that the txnId is > then the last seen/last safe
+         * It seems like this should be guaranteed by TCP ordering and we want to
+         * know if it isn't!
+         */
+
         // find the minimum value across all latest transactions
         long min = Long.MAX_VALUE;
         for (LastInitiatorData l : m_initiatorData.values())
