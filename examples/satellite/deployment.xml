@@ -6,9 +6,6 @@
        <user name="signal" password="wernher" groups="signal-group" />
        <user name="admin" password="nasa" groups="admin-group" />
     </users>
-    <paths>
-        <voltdbroot path="/tmp" />
-    </paths>
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>

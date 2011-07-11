@@ -1,9 +1,6 @@
 <?xml version="1.0"?>
 <deployment>
     <cluster hostcount="1" sitesperhost="2" leader="localhost" kfactor="0" />
-    <paths>
-        <voltdbroot path="/tmp" />
-    </paths>
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
