@@ -113,28 +113,10 @@
                 scale = Math.min(scaleX, scaleY);
             }
 
-            // calculate the color intensity of each node, base on its relative
-            // value compared to min & max. The minimum value in the series gets
-            // 10% of the "base color", while the maximum value gets 100% of base
-            // color
             var nodeParams = {};
-            var min = 0, max = 0;
+            var seriesColors = this.seriesColors;
             $(this.data).each(function(i, item) {
-                min = Math.min(min, item[1]);
-                max = Math.max(max, item[1]);
-            });
-            // rgb = base color
-            var rgb = $.jqplot.getColorComponents(this.seriesColors[this.index]);
-            var c1 = rgb[0]+((255-rgb[0])*0.9)
-            var c2 = rgb[1]+((255-rgb[1])*0.9)
-            var c3 = rgb[2]+((255-rgb[2])*0.9)
-            if ( max == min ) { max = min+1 } // prevents divide by zero
-            var m1 = (c1-rgb[0])/(min-max);
-            var m2 = (c2-rgb[1])/(min-max);
-            var m3 = (c3-rgb[2])/(min-max);
-            $(this.data).each(function(i, item) {
-                var rgbAdj = [Math.round((item[1]*m1)+c1), Math.round((item[1]*m2)+c2), Math.round((item[1]*m3)+c3)];
-                nodeParams[item[0]] = { fillStyle: $.jqplot.rgb2hex('rgba('+rgbAdj.join(',')+')') }
+                nodeParams[item[0]] = { fillStyle: seriesColors[item[1]] };
             });
             _drawMap(ctx, mapData, nodeParams, {scale: scale});
 

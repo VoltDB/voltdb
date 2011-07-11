@@ -1,9 +1,9 @@
 <html>
 <head>
-    <link rel="stylesheet" type="text/css" href="../../css/jquery.jqplot.min.css" />
-    <script language="javascript" type="text/javascript" src="../jquery-1.6.1.min.js"></script>
-    <!--[if IE]><script language="javascript" type="text/javascript" src="excanvas.min.js"></script><![endif]-->
-    <script language="javascript" type="text/javascript" src="jquery.jqplot.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="../../../studio.web/css/jquery.jqplot.min.css" />
+    <script language="javascript" type="text/javascript" src="../../../studio.web/js/jquery-1.6.1.min.js"></script>
+    <!--[if IE]><script language="javascript" type="text/javascript" src="../../../studio.web/js/jqplot/excanvas.min.js"></script><![endif]-->
+    <script language="javascript" type="text/javascript" src="../../../studio.web/js/jqplot/jquery.jqplot.min.js"></script>
     <script language="javascript" type="text/javascript" src="canvas-us-map.js"></script>
     <script language="javascript" type="text/javascript" src="jqplot.mapRenderer.js"></script>
     <style type="text/css"></style>
@@ -31,23 +31,25 @@ $(document).ready(function(){
                     borderWidth: 0.01,
                     background: '#fff'
             },
-            series: contestants, //[{label:'Chances of red', color:'#ff0000'}, {label:'Chances of blue', color:'#0000ff'}],
-            seriesColors: ['#ff0000','#0000ff']
+            series: contestants,
+            seriesColors: getSeriesColors()
     };
-    var redData = [
-            ['AK',43], ['TX',80],['MS',95]
-    ];
-    var blueData = [
-            ['CA',88], ['FL',10], ['MA',79],['NY',55]
-    ];
     $.jqplot('chartUSMap1', getData(), chartParams);
 
 function getData()
 {
-    var data = [[],[]];
+    var data = [[],[],[],[],[],[]];
     for(var i=0;i<states.length;i++)
-        data[i%2].push([states[i], 33*(1+Math.floor(Math.random()*(contestants.length/2)))]);
+        data[0].push([states[i], Math.floor(Math.random()*6)]);
+    window.d = data;
     return data;
+}
+function getSeriesColors()
+{
+    var colors = [];
+    for(var i=0;i<contestants.length;i++)
+        colors.push(contestants[i].color);
+    return colors;
 }
 });
 
