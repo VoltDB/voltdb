@@ -100,6 +100,8 @@
         <arg value="${catalog}" />
         <arg value="deployment" />
         <arg value="deployment.xml" />
+        <arg value="license" />
+        <arg value="${voltdb.dir}/license.xml" />
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
