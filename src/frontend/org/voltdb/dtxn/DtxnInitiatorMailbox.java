@@ -164,7 +164,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         final Connection c = (Connection)state.clientData;
 
         assert(c != null) : "NULL connection in connection state client data.";
-        final long now = EstTime.currentTimeMillis();
+        final long now = System.currentTimeMillis();
         final int delta = (int)(now - state.initiateTime);
         response.setClusterRoundtrip(delta);
         m_stats.logTransactionCompleted(

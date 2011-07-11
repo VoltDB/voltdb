@@ -902,7 +902,7 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
      * * return True if an error was generated and needs to be returned to the client
      */
     private final void handleRead(ByteBuffer buf, ClientInputHandler handler, Connection c) throws IOException {
-        final long now = EstTime.currentTimeMillis();
+        final long now = System.currentTimeMillis();
         final FastDeserializer fds = new FastDeserializer(buf);
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
 
