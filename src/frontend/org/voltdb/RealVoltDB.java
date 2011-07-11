@@ -44,7 +44,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -496,11 +495,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     0,
                     catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
 
-            // If running commercial code (of value), enforce licensing.
+            // determine if this is a rejoining node
+            // (used for license check and later the actual rejoin)
+            boolean isRejoin = config.m_rejoinToHostAndPort != null;
+
+            // If running commercial code (of value) and not rejoining, enforce licensing.
             Class<?> proClass = MiscUtils.loadProClass(
                     "org.voltdb.CommandLogImpl",
                     "Command logging", true);
-            if (proClass != null) {
+            if ((proClass != null) && !isRejoin) {
                 assert(m_config != null);
                 assert(m_catalogContext != null);
                 if (!validateLicense(m_config.m_pathToLicense, m_catalogContext.numberOfNodes)) {
@@ -609,7 +612,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             final Set<Integer> downNonExecSites = new HashSet<Integer>();
             //For command log only, will also mark self as faulted
             final Set<Integer> downSites = new HashSet<Integer>();
-            boolean isRejoin = config.m_rejoinToHostAndPort != null;
             if (!isRejoin) {
                 // Create the intra-cluster mesh
                 InetAddress leader = null;

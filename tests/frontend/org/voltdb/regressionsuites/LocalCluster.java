@@ -102,6 +102,8 @@ public class LocalCluster implements VoltServerConfig {
 
     private int m_timestampSaltOffset;
 
+    private int m_licensePathOffset;
+
     @SuppressWarnings("unused")
     private File m_pathToVoltRoot = null;
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
@@ -324,17 +326,18 @@ public class LocalCluster implements VoltServerConfig {
 
         List<String> command = m_procBuilder.command();
         // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = command.size() - 17;
-        m_debugOffset2 = command.size() - 16;
+        m_debugOffset1 = command.size() - 19;
+        m_debugOffset2 = command.size() - 18;
         if (m_debug) {
             command.add(m_debugOffset1, "");
             command.add(m_debugOffset1, "");
         }
 
-        m_voltFilePrefixOffset = command.size() - 17;
+        m_voltFilePrefixOffset = command.size() - 19;
         command.add(m_voltFilePrefixOffset, "");
 
-        m_zkInterfaceOffset = m_procBuilder.command().size() - 13;
+        m_licensePathOffset = command.size() - 15;
+        m_zkInterfaceOffset = command.size() - 13;
         m_timestampSaltOffset = command.size() - 11;
         m_pathToDeploymentOffset = command.size() - 7;
         m_portOffset = command.size() - 5;
@@ -569,6 +572,7 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, "");
+            m_procBuilder.command().set(m_licensePathOffset, ServerThread.getTestLicensePath());
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
             if (m_debug) {
                 m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
@@ -714,6 +718,7 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(adminPortNo));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, rejoinHost + ":" + String.valueOf(portNoToRejoin));
+            m_procBuilder.command().set(m_licensePathOffset, "");
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
             if (m_debug) {
                 System.out.println("Debug port is " + m_debugPortOffset);
