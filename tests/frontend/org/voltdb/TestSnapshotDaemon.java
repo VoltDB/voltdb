@@ -25,14 +25,21 @@ package org.voltdb;
 
 import static org.junit.Assert.*;
 
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.Future;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.junit.*;
 
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.utils.Pair;
 import org.voltdb.sysprocs.SnapshotScan;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.VoltTable;
@@ -41,16 +48,56 @@ import org.voltdb.VoltTable.ColumnInfo;
 public class TestSnapshotDaemon {
 
     private static class Initiator implements SnapshotDaemon.DaemonInitiator {
+        private final SnapshotDaemon daemon;
 
         private String procedureName;
         private long clientData;
         private Object[] params;
+
+        public Initiator() {
+            this(null);
+        }
+
+        public Initiator(SnapshotDaemon daemon) {
+            this.daemon = daemon;
+        }
+
         @Override
         public void initiateSnapshotDaemonWork(String procedureName,
                 long clientData, Object[] params) {
             this.procedureName = procedureName;
             this.clientData = clientData;
             this.params = params;
+
+            /*
+             * Fake a snapshot response if the daemon is set
+             */
+            if (this.daemon != null) {
+                /*
+                 * We need at least two columns so that the snapshot daemon won't
+                 * think that this is an error.
+                 */
+                ColumnInfo column1 = new ColumnInfo("RESULT", VoltType.STRING);
+                ColumnInfo column2 = new ColumnInfo("BLAH", VoltType.STRING);
+                VoltTable result = new VoltTable(new ColumnInfo[] {column1, column2});
+                result.addRow("SUCCESS", "BLAH");
+
+                JSONStringer stringer = new JSONStringer();
+                try {
+                    stringer.object();
+                    stringer.key("txnId").value(1);
+                    stringer.endObject();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                ClientResponse response =
+                        new ClientResponseImpl(ClientResponse.SUCCESS,
+                                               (byte) 0, stringer.toString(),
+                                               new VoltTable[] {result}, null);
+
+                this.daemon.processClientResponse(response, clientData);
+            }
         }
 
         public void clear() {
@@ -607,5 +654,66 @@ public class TestSnapshotDaemon {
         Thread.sleep(1200);
         assertNotNull(m_initiator.procedureName);
         assertTrue("@SnapshotDelete".equals(m_initiator.procedureName));
+    }
+
+    @Test
+    public void testCreateCompletionNode() throws Exception {
+        final SnapshotSchedule schedule = new SnapshotSchedule();
+        schedule.setFrequencyunit("s");
+        schedule.setFrequencyvalue(0);
+        schedule.setPath("/tmp");
+        schedule.setPrefix("woobie");
+        schedule.setRetain(2);
+
+        if (m_daemon != null) {
+            m_daemon.shutdown();
+            m_mockVoltDB.shutdown(null);
+        }
+        m_mockVoltDB = new MockVoltDB();
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        m_daemon = new SnapshotDaemon();
+        m_initiator = new Initiator(m_daemon);
+        m_daemon.init(m_initiator, m_mockVoltDB.getZK());
+        m_daemon.makeActive(schedule);
+
+        // Send a truncation snapshot request
+        ZooKeeper zk = m_mockVoltDB.getZK();
+        byte[] pathBytes = "/tmp".getBytes();
+        ByteBuffer buf = ByteBuffer.allocate(pathBytes.length + 8);
+        buf.position(8);
+        buf.put(pathBytes);
+        try {
+            zk.create("/request_truncation_snapshot", buf.array(),
+                      Ids.OPEN_ACL_UNSAFE,
+                      CreateMode.PERSISTENT);
+        } catch (Exception e) {
+            fail("Requesting a truncation snapshot via ZK should always succeed: " +
+                 e.getMessage());
+        }
+
+        m_daemon.truncationRequestExistenceCheck();
+
+        // Wait until the request node is gone
+        while (true) {
+            Stat exists = zk.exists("/request_truncation_snapshot", false);
+            if (exists == null) {
+                break;
+            }
+            Thread.sleep(200);
+        }
+
+        /*
+         * Check if the completed snapshot node is created with the correct
+         * information
+         */
+        List<String> children = zk.getChildren("/completed_snapshots", false);
+        assertEquals(1, children.size());
+
+        byte[] data = zk.getData("/completed_snapshots/" + children.get(0),
+                                 false, new Stat());
+        assertNotNull(data);
+        buf = ByteBuffer.wrap(data);
+        byte truncation = buf.get(16);
+        assertEquals(1, truncation);
     }
 }

@@ -18,10 +18,8 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -29,8 +27,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -52,9 +48,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.utils.Pair;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -458,10 +452,20 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
 
                     if (success) {
+                        /*
+                         * Race to create the completion node before deleting
+                         * the request node so that we can guarantee that the
+                         * completion node will have the correct information
+                         */
+                        JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
+                        long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
+                        int hosts = VoltDB.instance().getCatalogContext().siteTracker
+                                          .getAllLiveHosts().size();
+                        SnapshotSaveAPI.createSnapshotCompletionNode(snapshotTxnId,
+                                                                     true, hosts);
+
                         m_zk.delete("/request_truncation_snapshot", -1);
                         try {
-                            JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
-                            long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
                             TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(snapshotTxnId);
                             if (snapshotAttempt == null) {
                                 snapshotAttempt = new TruncationSnapshotAttempt();

@@ -171,7 +171,6 @@ public class SnapshotSaveAPI
          * Going to send out the requests async to make snapshot init move faster
          */
         ZKUtil.StringCallback cb1 = new ZKUtil.StringCallback();
-        ZKUtil.StringCallback cb2 = new ZKUtil.StringCallback();
 
         /*
          * Log that we are currently snapshotting this snapshot
@@ -192,14 +191,8 @@ public class SnapshotSaveAPI
             VoltDB.crashVoltDB();
         }
 
-        /*
-         * Race with the others to create the place where will count down to completing the snapshot
-         */
-        ByteBuffer buf = ByteBuffer.allocate(17);
-        buf.putLong(txnId);
-        buf.putInt(context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size());
-        buf.putInt(0);
         String nextTruncationNonce = null;
+        boolean isTruncation = false;
         try {
             ByteBuffer payload =
                 ByteBuffer.wrap(VoltDB.instance().getZK().getData("/request_truncation_snapshot", false, null));
@@ -210,18 +203,20 @@ public class SnapshotSaveAPI
             VoltDB.crashVoltDB();
         }
         if (nextTruncationNonce == null) {
-            buf.put((byte)0);
+            isTruncation = false;
         } else {
             if (nextTruncationNonce.equals(nonce)) {
-                buf.put((byte)1);
+                isTruncation = true;
             } else {
-                buf.put((byte)0);
+                isTruncation = false;
             }
         }
 
-        final String snapshotPath = "/completed_snapshots/" + txnId;
-        VoltDB.instance().getZK().create(
-                snapshotPath, buf.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb2, null);
+        /*
+         * Race with the others to create the place where will count down to completing the snapshot
+         */
+        int hosts = context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size();
+        createSnapshotCompletionNode(txnId, isTruncation, hosts);
 
         try {
             cb1.get();
@@ -230,8 +225,35 @@ public class SnapshotSaveAPI
         } catch (Exception e) {
             VoltDB.crashVoltDB();
         }
+    }
+
+
+    /**
+     * Create the completion node for the snapshot identified by the txnId. It
+     * assumes that all hosts will race to call this, so it doesn't fail if the
+     * node already exists.
+     *
+     * @param txnId
+     * @param isTruncation Whether or not this is a truncation snapshot
+     * @param hosts The total number of live hosts
+     */
+    public static void createSnapshotCompletionNode(long txnId,
+                                                    boolean isTruncation,
+                                                    int hosts) {
+        ByteBuffer buf = ByteBuffer.allocate(17);
+        buf.putLong(txnId);
+        buf.putInt(hosts);
+        buf.putInt(0);
+        buf.put(isTruncation ? 1 : (byte) 0);
+
+        ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
+        final String snapshotPath = "/completed_snapshots/" + txnId;
+        VoltDB.instance().getZK().create(
+                snapshotPath, buf.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
+                cb, null);
+
         try {
-            cb2.get();
+            cb.get();
         } catch (KeeperException.NodeExistsException e) {
         } catch (Exception e) {
             HOST_LOG.fatal("Unexpected exception logging snapshot completion to ZK", e);
