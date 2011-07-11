@@ -292,6 +292,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // count a scan as a half cover
         if (m_lookupType != IndexLookupType.EQ)
             keyWidthFl -= 0.5;
+        // when choosing between multiple matched indexes with 10 or more columns,
+        // we won't always pick the optimal one.
+        // if you hit this, you're probably in a silly use case
+        final double MAX_INTERESTING_INDEX_WIDTH = 10.0;
+        if (keyWidthFl > MAX_INTERESTING_INDEX_WIDTH)
+            keyWidthFl = MAX_INTERESTING_INDEX_WIDTH;
 
         // estimate cost of scan
         int tuplesToRead = 0;
@@ -308,9 +314,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // if not a unique, covering index, pick the choice with the most columns
         if (!m_catalogIndex.getUnique() || (colCount != keyWidth)) {
-            // cost starts at 50000 and goes down by 10 for each column used
-            final double MAX_COLUMNS = 5000.0; // this number is pulled out of thin air, sorry
-            tuplesToRead = (int) (10.0 * (MAX_COLUMNS - keyWidthFl));
+            assert(keyWidthFl <= MAX_INTERESTING_INDEX_WIDTH);
+            // cost starts at 100 and goes down by 10 for each column used
+            final double MAX_TUPLES_READ = MAX_INTERESTING_INDEX_WIDTH * 10.0;
+            tuplesToRead += (int) (10.0 * (MAX_TUPLES_READ - keyWidthFl));
         }
 
         stats.incrementStatistic(0, StatsField.TUPLES_READ, tuplesToRead);
