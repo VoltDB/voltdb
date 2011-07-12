@@ -18,8 +18,9 @@
 		<link type="text/css" href="css/demo.css" rel="stylesheet" />
 
 		<script type="text/javascript">var root = window.location.pathname.replace('guide.htm','');$(document).ready(function() {
-//alert(window.location
     $('.pnbw').click(function(){var active=this.id.replace('nlnk_','').replace('plnk_','');$('.sec').css('display','none');$('#sec_'+active).css('display','');parent.frames['content'].location.href = 'intro.' + active + '.htm';});
+    if (window.location.search != '')
+        $('#nlnk_' + window.location.search.replace('?s=','')).click();
 	$(document).unload(function() {$('*').unbind(); });
 });</script>
     </head>
