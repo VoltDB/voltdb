@@ -28,6 +28,8 @@ import static org.junit.Assert.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -44,6 +46,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.RestoreAgent.SnapshotInfo;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+import org.junit.runner.RunWith;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
@@ -59,8 +64,23 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.zk.ZKTestBase;
 
+@RunWith(Parameterized.class)
 public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callback {
     static int uid = 0;
+
+    @Parameters
+    public static Collection<Object[]> startActions() {
+        return Arrays.asList(new Object[][] {{START_ACTION.START},
+                                             {START_ACTION.RECOVER}});
+    }
+
+    /**
+     * The start action to use for some of the tests
+     */
+    protected final START_ACTION action;
+    public TestRestoreAgent(START_ACTION action) {
+        this.action = action;
+    }
 
     class MockSnapshotMonitor extends SnapshotCompletionMonitor {
         public void init(final ZooKeeper zk) {
@@ -493,7 +513,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
                                                      getClient(0),
                                                      snapshotMonitor, this,
-                                                     0, START_ACTION.START);
+                                                     0, this.action);
         restoreAgent.restore();
         while (!m_done) {
             try {
@@ -528,7 +548,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         for (int i = 0; i < m_hostCount; i++) {
             agents.add(new RestoreAgent(context, initiator,
                                         getClient(0), snapshotMonitor,
-                                        this, i, START_ACTION.START));
+                                        this, i, this.action));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
