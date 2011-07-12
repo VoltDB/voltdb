@@ -245,7 +245,7 @@ SnapshotCompletionInterest {
                 }
                 snapshotInfos.add(info);
             }
-            LOG.debug("Gathered " + snapshotInfos.size() + " snaphost information");
+            LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
 
             sendLocalRestoreInformation(minLastSeenTxn, snapshotInfos);
 
@@ -435,7 +435,7 @@ SnapshotCompletionInterest {
 
     /**
      * Creates a ZooKeeper directory if it doesn't exist. Crashes VoltDB if the
-     * creation fails.
+     * creation fails for any reason other then the path already existing.
      *
      * @param path
      */
