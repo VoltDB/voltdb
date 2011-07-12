@@ -23,12 +23,9 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
-import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
@@ -434,6 +431,7 @@ public class SnapshotSiteProcessor {
             try {
                 zk.setData(snapshotPath, buf.array(), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
+                continue;
             } catch (Exception e) {
                 hostLog.fatal("This ZK call should never fail", e);
                 VoltDB.crashVoltDB();
