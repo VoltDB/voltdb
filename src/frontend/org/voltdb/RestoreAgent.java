@@ -105,6 +105,7 @@ SnapshotCompletionInterest {
     // State of the restore agent
     private volatile State m_state = State.RESTORE;
     private final RestoreAdapter m_restoreAdapter = new RestoreAdapter();
+    // Whether or not we have a snapshot to restore
     private boolean m_hasRestored = false;
 
     private CommandLogReinitiator m_replayAgent = new CommandLogReinitiator() {
@@ -576,6 +577,11 @@ SnapshotCompletionInterest {
             }
         }
 
+        // If the txnId is not 0, it means we restored a snapshot
+        if (txnId != 0) {
+            m_hasRestored = true;
+        }
+
         m_replayAgent.setSnapshotTxnId(txnId);
     }
 
@@ -921,10 +927,6 @@ SnapshotCompletionInterest {
                       res.getStatusString());
             VoltDB.crashVoltDB();
         } else {
-            if (m_state == State.RESTORE) {
-                m_hasRestored = true;
-            }
-
             changeState();
         }
     }
