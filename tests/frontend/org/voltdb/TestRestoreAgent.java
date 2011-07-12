@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -42,6 +43,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.RestoreAgent.SnapshotInfo;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
@@ -98,6 +100,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     boolean snapshotted = false;
 
     CatalogContext context;
+    File catalogJarFile;
     String deploymentPath;
 
     private AtomicInteger m_count = new AtomicInteger();
@@ -222,9 +225,12 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
      * @param sitesPerHost
      * @param kfactor
      * @param voltroot
+     * @param excludeProcs  used to create a different catalog to check CRC match
+     * @param rebuildAll TODO
      * @throws IOException
      */
-    void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot)
+    void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
+                      boolean excludeProcs, boolean rebuildAll)
     throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         String schema = "create table A (i integer not null, s varchar(30), sh smallint, l bigint, primary key (i));";
@@ -232,12 +238,15 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         builder.addPartitionInfo("A", "i");
         builder.addStmtProcedure("hello", "select * from A where i = ? and s = ?", "A.i: 0");
         builder.addStmtProcedure("world", "select * from A where i = ? and sh = ? and s = ?", "A.i: 0");
-        builder.addStmtProcedure("bid", "select * from A where i = ? and sh = ? and s = ?", "A.i: 0");
-        builder.addStmtProcedure("sum", "select * from A where i = ? and sh = ? and s = ?", "A.i: 0");
-        builder.addStmtProcedure("calc", "select * from A where i = ? and sh = ? and s = ?", "A.i: 0");
-        builder.addStmtProcedure("HowWillAppleNameItsVaccuumCleaner", "select * from A where l = ? and sh = ? and s = ?");
-        builder.addStmtProcedure("Dedupe", "select * from A where l = ? and sh = ?");
-        builder.addStmtProcedure("Cill", "select * from A where l = ? and s = ?");
+        if (!excludeProcs)
+        {
+            builder.addStmtProcedure("bid", "select * from A where i = ? and sh = ? and s = ?", "A.i: 0");
+            builder.addStmtProcedure("sum", "select * from A where i = ? and sh = ? and s = ?", "A.i: 0");
+            builder.addStmtProcedure("calc", "select * from A where i = ? and sh = ? and s = ?", "A.i: 0");
+            builder.addStmtProcedure("HowWillAppleNameItsVaccuumCleaner", "select * from A where l = ? and sh = ? and s = ?");
+            builder.addStmtProcedure("Dedupe", "select * from A where l = ? and sh = ?");
+            builder.addStmtProcedure("Cill", "select * from A where l = ? and s = ?");
+        }
         builder.configureLogging(voltroot, voltroot, false, false, 200, 20000);
 
 
@@ -248,15 +257,28 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                    voltroot));
         deploymentPath = builder.getPathToDeployment();
 
-        String serializedCat = CatalogUtil.loadCatalogFromJar(cat.getAbsolutePath(),
-                                                              null);
+        File cat_to_use = cat;
+        if (rebuildAll)
+        {
+            catalogJarFile = cat;
+        }
+        else
+        {
+            cat_to_use = catalogJarFile;
+        }
+
+        String serializedCat =
+            CatalogUtil.loadCatalogFromJar(cat_to_use.getAbsolutePath(),
+                                           null);
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCat);
 
         long crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath,
                                                           true);
-        context = new CatalogContext(0, catalog, cat.getAbsolutePath(), crc, 0, 0);
+        context = new CatalogContext(0, catalog,
+                                     cat_to_use.getAbsolutePath(),
+                                     crc, 0, 0);
     }
 
     /**
@@ -332,7 +354,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     @Test
     public void testSingleHostEmptyRestore() throws Exception {
         m_hostCount = 1;
-        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
+        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         MockInitiator initiator = new MockInitiator(null);
         RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
                                                      getClient(0),
@@ -350,7 +372,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     @Test
     public void testMultipleHostEmptyRestore() throws Exception {
         m_hostCount = 3;
-        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
+        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         MockInitiator initiator = new MockInitiator(null);
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
@@ -378,7 +400,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     @Test
     public void testMultipleHostAgreementFailure() throws Exception {
         m_hostCount = 3;
-        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
+        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         MockInitiator initiator = new MockInitiator(null);
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
@@ -424,7 +446,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     @Test
     public void testSingleHostSnapshotRestore() throws Exception {
         m_hostCount = 1;
-        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null));
+        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(context.pathToCatalogJar,
                                                deploymentPath,
                                                BackendTarget.NATIVE_EE_JNI);
@@ -452,10 +474,42 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     @Test
+    public void testSingleHostSnapshotRestoreCatalogChange() throws Exception {
+        m_hostCount = 1;
+        String voltroot = newVoltRoot(null);
+        buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
+        ServerThread server = new ServerThread(context.pathToCatalogJar,
+                                               deploymentPath,
+                                               BackendTarget.NATIVE_EE_JNI);
+        server.start();
+        server.waitForInitialization();
+        snapshot();
+        server.shutdown();
+
+        buildCatalog(m_hostCount, 8, 0, voltroot, true, true);
+        HashSet<String> procs = new HashSet<String>();
+        procs.add("@SnapshotRestore");
+        MockInitiator initiator = new MockInitiator(procs);
+        RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
+                                                     getClient(0),
+                                                     snapshotMonitor, this,
+                                                     0, START_ACTION.START);
+        restoreAgent.restore();
+        while (!m_done) {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {}
+        }
+
+        Long count = initiator.getProcCounts().get("@SnapshotRestore");
+        assertEquals(new Long(1), count);
+    }
+
+    @Test
     public void testMultiHostSnapshotRestore() throws Exception {
         m_hostCount = 1;
         String voltroot = newVoltRoot(null);
-        buildCatalog(m_hostCount, 8, 0, voltroot);
+        buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
         ServerThread server = new ServerThread(context.pathToCatalogJar,
                                                deploymentPath,
                                                BackendTarget.NATIVE_EE_JNI);
@@ -465,7 +519,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         server.shutdown();
 
         m_hostCount = 3;
-        buildCatalog(m_hostCount, 8, 1, voltroot);
+        buildCatalog(m_hostCount, 8, 1, voltroot, false, true);
         HashSet<String> procs = new HashSet<String>();
         procs.add("@SnapshotRestore");
         MockInitiator initiator = new MockInitiator(procs);
@@ -495,5 +549,37 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         if (m_count.incrementAndGet() == m_hostCount) {
             m_done = true;
         }
+    }
+
+    void addSnapshotInfo(Map<Long, Set<SnapshotInfo>> frags,
+                         long txnid, long crc)
+    {
+        Set<SnapshotInfo> si = null;
+        if (frags.containsKey(txnid))
+        {
+            si = frags.get(txnid);
+        }
+        else
+        {
+            si = new HashSet<SnapshotInfo>();
+            frags.put(txnid, si);
+        }
+        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc));
+    }
+
+    @Test
+    public void testCurrySnapshotInfoJustSnapshots()
+    {
+        // Test that the snapshot info is un-curried if there's no command log,
+        // regardless of the CRC state
+        TreeMap<Long, Set<SnapshotInfo>> snapshotFragments =
+            new TreeMap<Long, Set<SnapshotInfo>>();
+
+        addSnapshotInfo(snapshotFragments, 1L, 12345678L);
+        addSnapshotInfo(snapshotFragments, 2L, 87654321L);
+
+        // Both should still be around for future restore processing
+        RestoreAgent.currySnapshotInfo(null, 12345678L, snapshotFragments);
+        assertEquals(2, snapshotFragments.size());
     }
 }

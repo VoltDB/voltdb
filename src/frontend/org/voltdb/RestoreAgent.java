@@ -39,6 +39,8 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.CommandLog;
@@ -204,6 +206,25 @@ SnapshotCompletionInterest {
                     }
                 }
 
+                Long catalog_crc = null;
+                try
+                {
+                    JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
+                    catalog_crc = digest_detail.getLong("catalogCRC");
+                }
+                catch (IOException ioe)
+                {
+                    LOG.info("Unable to read digest file: " +
+                             digest.getAbsolutePath() + " due to: " + ioe.getMessage());
+                    skip = true;
+                }
+                catch (JSONException je)
+                {
+                    LOG.info("Unable to extract catalog CRC from digest: " +
+                             digest.getAbsolutePath() + " due to: " + je.getMessage());
+                    skip = true;
+                }
+
                 if (skip) {
                     continue;
                 }
@@ -211,7 +232,7 @@ SnapshotCompletionInterest {
                 SnapshotInfo info =
                     new SnapshotInfo(e.getKey(), digest.getParent(),
                                      parseDigestFilename(digest.getName()),
-                                     partitionCount);
+                                     partitionCount, catalog_crc);
                 for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
                     TableFiles tableFile = te.getValue();
                     HashSet<Integer> ids = new HashSet<Integer>();
@@ -382,24 +403,29 @@ SnapshotCompletionInterest {
      * Information about the local files of a specific snapshot that will be
      * used to generate a restore plan
      */
-    private static class SnapshotInfo {
+    static class SnapshotInfo {
         public final long txnId;
         public final String path;
         public final String nonce;
         public final int partitionCount;
+        public final long catalogCrc;
         // All the partitions for partitioned tables in the local snapshot file
         public final Map<String, Set<Integer>> partitions = new TreeMap<String, Set<Integer>>();
 
-        public SnapshotInfo(long txnId, String path, String nonce, int partitions) {
+        public SnapshotInfo(long txnId, String path, String nonce, int partitions,
+                            long catalogCrc)
+        {
             this.txnId = txnId;
             this.path = path;
             this.nonce = nonce;
             this.partitionCount = partitions;
+            this.catalogCrc = catalogCrc;
         }
 
         public int size() {
-            // txnId + pathLen + nonceLen + partCount + path + nonce
-            int size = 8 + 4 + 4 + 8 + 4 + path.length() + nonce.length();
+            // I can't make this add up --izzy
+            // txnId + pathLen + nonceLen + partCount + catalogCrc + path + nonce
+            int size = 8 + 4 + 4 + 8 + 8 + 4 + path.length() + nonce.length();
             for (Entry<String, Set<Integer>> e : partitions.entrySet()) {
                 size += 4 + 4 + e.getKey().length() + 4 * e.getValue().size();
             }
@@ -609,6 +635,53 @@ SnapshotCompletionInterest {
     }
 
     /**
+     * @param clStartTxnId  The TXN ID at which the command log starts.
+     *                      NULL means no command log exists.
+     *                      Long.MIN_VALUE means the command log has no
+     *                      associated snapshot.
+     * @param snapshotFragments  A map of the TXNID/SnapshotInfo reported by
+     *                           the other hosts in the cluster.  Will be
+     *                           modified as snapshots are removed because
+     *                           they are not compatible with the command log
+     * @return Whether or not any of the snapshots matched the current
+     *         catalog's CRC check when there was a command log to replay
+     */
+    static boolean currySnapshotInfo(Long clStartTxnId, long currentCatalogCrc,
+                              Map<Long, Set<SnapshotInfo>> snapshotFragments)
+    {
+        boolean crc_catalog_match = false;
+        if (clStartTxnId != null && clStartTxnId == Long.MIN_VALUE)
+        {
+            // command log has no snapshot requirement.  Just clear out the
+            // fragment set directly
+            snapshotFragments.clear();
+            // Quick hack.  replace with command log catalog crc check
+            crc_catalog_match = true;
+        }
+        else
+        {
+            // Filter all snapshots that are not viable
+            Iterator<Long> iter = snapshotFragments.keySet().iterator();
+            while (iter.hasNext()) {
+                Long txnId = iter.next();
+                long this_crc = snapshotFragments.get(txnId).iterator().next().catalogCrc;
+                if (this_crc == currentCatalogCrc)
+                {
+                    crc_catalog_match = true;
+                }
+                if (clStartTxnId != null &&
+                    (this_crc != currentCatalogCrc ||
+                     txnId < clStartTxnId))
+                {
+                    iter.remove();
+                }
+            }
+        }
+
+        return crc_catalog_match;
+    }
+
+    /**
      * Pick the snapshot to restore from based on the global snapshot
      * information.
      *
@@ -659,18 +732,19 @@ SnapshotCompletionInterest {
             return null;
         }
 
-        // Filter all snapshots that are not viable
-        Iterator<Long> iter = snapshotFragments.keySet().iterator();
-        while (iter.hasNext()) {
-            Long txnId = iter.next();
-            if (clStartTxnId != null &&
-                (clStartTxnId < 0 || txnId < clStartTxnId)) {
-                iter.remove();
+        boolean crc_catalog_match = false;
+        // Eliminate any snapshot fragments that don't match our command log (if we have one)
+        crc_catalog_match = currySnapshotInfo(clStartTxnId, m_context.catalogCRC,
+                                              snapshotFragments);
+        // If we have a command log and it requires a snapshot, then bail if
+        // there's no good snapshot
+        if ((clStartTxnId != null && clStartTxnId != Long.MIN_VALUE) &&
+            snapshotFragments.size() == 0)
+        {
+            if (!crc_catalog_match)
+            {
+                LOG.fatal("No snapshot present that matches the loaded catalog.");
             }
-        }
-
-        if (clStartTxnId != null && clStartTxnId > 0 &&
-            snapshotFragments.size() == 0) {
             LOG.fatal("No viable snapshots to restore");
             VoltDB.crashVoltDB();
         }
@@ -781,6 +855,7 @@ SnapshotCompletionInterest {
                     fragments = new HashSet<SnapshotInfo>();
                     snapshotFragments.put(txnId, fragments);
                 }
+                long catalogCrc = buf.getLong();
 
                 int len = buf.getInt();
                 byte[] nonceBytes = new byte[len];
@@ -794,7 +869,8 @@ SnapshotCompletionInterest {
 
                 SnapshotInfo info = new SnapshotInfo(txnId, new String(pathBytes),
                                                      new String(nonceBytes),
-                                                     totalPartitionCount);
+                                                     totalPartitionCount,
+                                                     catalogCrc);
                 fragments.add(info);
 
                 int tableCount = buf.getInt();
@@ -844,6 +920,7 @@ SnapshotCompletionInterest {
         buf.putInt(snapshots.size());
         for (SnapshotInfo snapshot : snapshots) {
             buf.putLong(snapshot.txnId);
+            buf.putLong(snapshot.catalogCrc);
             buf.putInt(snapshot.nonce.length());
             buf.put(snapshot.nonce.getBytes());
             buf.putInt(snapshot.path.length());
