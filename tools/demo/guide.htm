@@ -15,27 +15,18 @@
 
 		<!-- VoltDB -->
 		<link type="text/css" href="../studio.web/css/voltdb.css" rel="stylesheet" />
-<style>
-h3.ui-accordion-header { font-weight:bold; }
-ul { padding-left:15px; }
-pre { font-size:9px;font-family:Lucida Console, Courier New, Courier, monospace;border:1px solid #999;background-color:#eee;padding:3px;-moz-user-select:text; }
-#accordion div { text-align:justify; }
-hr { border:0px;border-top:1px solid #999; }
-div.warning { border:1px solid #dcc; padding:3px; background-color:#fee;font-style:italic;color:#900;margin-bottom:5px; }
-td.nbr {width:40px;height:40px;background-color:#333;color:white;text-align:center;vertical-align:middle;font-size:2em;font-weight:bold;}
-td.nbrtitle {padding-left:20px;font-weight:bold;font-size:1.2em;}
-</style>
+		<link type="text/css" href="css/demo.css" rel="stylesheet" />
+
 		<script type="text/javascript">var root = window.location.pathname.replace('guide.htm','');$(document).ready(function() {
-    $('#accordion').accordion({fillSpace: true, navigation: true, change: function(event,ui) {var active = $('#accordion').accordion('option','active'); parent.frames['content'].location.href = 'intro.' + active + '.htm';}});
+//alert(window.location
+    $('.pnbw').click(function(){var active=this.id.replace('nlnk_','').replace('plnk_','');$('.sec').css('display','none');$('#sec_'+active).css('display','');parent.frames['content'].location.href = 'intro.' + active + '.htm';});
 	$(document).unload(function() {$('*').unbind(); });
-	$(window).resize(function(){$('#accordion').accordion('resize');});
 });</script>
     </head>
-<body class="body" style="background-color:white;padding:0px;margin:0px;-moz-user-select:-moz-none;">
-<div style="position:absolute;left:2px;top:2px;right:2px;bottom:4px;">
-<div id="accordion">
-	<h3><a href="#intro">Introduction</a></h3>
-	<div>
+<body class="body" style="background-color:white;padding:10px;margin:0px;-moz-user-select:text;s:-moz-none;">
+    <div style="border-bottom:1px solid #ccc;"><img src="../studio.web/img/logo_tagline_newsql.png" width="320" /></div>
+	<div id="sec_0" class="sec">
+        <h2>Requirements</h2>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Pre-requisites</td></tr></table>
         <ul>
             <li>Run these samples on a Linux 64 bit Operating system (or Mac OSX 64 bits).</li>
@@ -53,9 +44,16 @@ td.nbrtitle {padding-left:20px;font-weight:bold;font-size:1.2em;}
             <li>Check out our <a href="http://community.voltdb.com/forum" target="content">community forums</a> for answers.</li>
             <li>You can also find detailed documentation and white papers on VoltDB <a href="http://community.voltdb.com/documentation" target="content">here</a>.</li>
         </ul>
+
+        <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
+            <div id="nlnk_0" class="pnbw" style="display:none;"><!-- --></div>
+            <div id="nlnk_1" class="pnbw" style="float:right;"><div class="pnb">Next</div><div class="pnra_orange"><!-- --></div></div>
+        </div>
+
 	</div>
-	<h3><a id="sample_voter" href="#voter">Voting Contest ('Voter')</a></h3>
-	<div>
+
+	<div id="sec_1" class="sec" style="display:none;">
+    	<h2>Instructions</h2>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Running the sample</td></tr></table>
         <br/>
         Open Terminal, and run:<br/>
@@ -95,9 +93,15 @@ exec Results</pre>
             <li>Change the voting duration.</li>
         </ul>
 
+        <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
+            <div id="plnk_0" class="pnbw" style="float:left;"><div class="pnla"><!-- --></div><div class="pnb">Prev</div></div>
+            <div id="nlnk_2" class="pnbw" style="float:right;"><div class="pnb">Next</div><div class="pnra_orange"><!-- --></div></div>
+        </div>
+
 	</div>
-	<h3><a href="#keyvalue">Key/Value Store</a></h3>
-	<div>
+
+	<div id="sec_2" class="sec" style="display:none;">
+    	<h2>Instructions</h2>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Running the sample</td></tr></table>
         <br/>
         Open Terminal, and run:<br/>
@@ -137,25 +141,16 @@ exec Results</pre>
             <li>Test with GZIP compression.</li>
             <li>Test with various PUT/GET ratios.</li>
         </ul>
+
+        <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
+            <div id="plnk_1" class="pnbw" style="float:left;"><div class="pnla"><!-- --></div><div class="pnb">Prev</div></div>
+            <div id="nlnk_3" class="pnbw" style="float:right;"><div class="pnb">Next</div><div class="pnra_orange"><!-- --></div></div>
+        </div>
+
 	</div>
-<!--
-	<h3><a href="#market">Financial Market Analyzer</a></h3>
-	<div>
-		<p>
-		Cras dictum. Pellentesque habitant morbi tristique senectus et netus
-		et malesuada fames ac turpis egestas. Vestibulum ante ipsum primis in
-		faucibus orci luctus et ultrices posuere cubilia Curae; Aenean lacinia
-		mauris vel est.
-		</p>
-		<p>
-		Suspendisse eu nisl. Nullam ut libero. Integer dignissim consequat lectus.
-		Class aptent taciti sociosqu ad litora torquent per conubia nostra, per
-		inceptos himenaeos.
-		</p>
-	</div>
--->
-	<h3><a href="#next">What's Next?</a></h3>
-	<div>
+
+	<div id="sec_3" class="sec" style="display:none;">
+    	<h2>Next Steps</h2>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">More samples...</td></tr></table>
 		<p>A lot more sample applications are available for your to explore VoltDB's amazing performance.  Simply browse:</p>
         <pre><script>document.write(root.replace('/tools/demo/','/examples/'));</script></pre>
@@ -175,8 +170,12 @@ exec Results</pre>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Documentation</td></tr></table>
         <p>When you are ready to move forward and code your own application, make sure you check out our documentations at:</p>
         <pre><a href="http://community.voltdb.com/documentation" target="content">http://community.voltdb.com/documentation</a></pre>
+
+        <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
+            <div id="plnk_2" class="pnbw" style="float:left;"><div class="pnla"><!-- --></div><div class="pnb">Prev</div></div>
+        </div>
+
 	</div>
-</div>
-</div>
+
 </body>
 </html>

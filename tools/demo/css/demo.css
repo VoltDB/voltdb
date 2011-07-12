@@ -1,0 +1,15 @@
+td.nbr {width:20px;height:40px;color:orange;text-align:center;vertical-align:middle;font-size:2em;font-weight:bold;}
+td.nbrtitle {padding-left:10px;font-weight:bold;font-size:1.2em;}
+ul { padding-left:25px; }
+pre { font-size:9px;font-family:Lucida Console, Courier New, Courier, monospace;border:1px solid #999;background-color:#eee;padding:3px;-moz-user-select:text; }
+hr { border:0px;border-top:1px solid #999; }
+
+
+
+.pnla {border-style:solid;height:0;line-height:0;width:0; float:left;border-color:transparent orange transparent transparent;border-width:13px 12px 12px 0px;width:1px;cursor:pointer;}
+.pnb {float:left;background-color:orange;height:15px;width:50px;padding:5px;text-align:center;color:#fff;font-weight:bold;cursor:pointer;}
+
+.pnra_orange {border-style:solid;height:0;line-height:0;width:0; float:left;border-color:transparent transparent transparent orange;border-width:13px 0px 12px 12px;width:1px;cursor:pointer;}
+.pnra_blue {border-style:solid;height:0;line-height:0;width:0; float:left;border-color:transparent transparent transparent #06c;border-width:13px 0px 12px 12px;width:1px;cursor:pointer;}
+.pnb_blue {float:left;background-color:#06c;height:15px;width:50px;padding:5px;text-align:center;color:#fff;font-weight:bold;cursor:pointer;}
+

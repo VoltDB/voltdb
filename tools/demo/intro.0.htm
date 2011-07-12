@@ -15,65 +15,37 @@
 
 		<!-- VoltDB -->
 		<link type="text/css" href="../studio.web/css/voltdb.css" rel="stylesheet" />
-<style>
-h3.ui-accordion-header { font-weight:bold; }
-ul { padding-left:15px; }
-pre { font-size:9px;font-family:Lucida Console, Courier New, Courier, monospace;border:1px solid #999;background-color:#eee;padding:3px;-moz-user-select:text; }
-#accordion div { text-align:justify; }
-hr { border:0px;border-top:1px solid #999; }
-div.warning { border:1px solid #dcc; padding:3px; background-color:#fee;font-style:italic;color:#900;margin-bottom:5px; }
-</style>
+		<link type="text/css" href="css/demo.css" rel="stylesheet" />
 		<script type="text/javascript">var root = window.location.pathname.replace('guide.htm','');$(document).ready(function() {
-    $('#accordion').accordion({fillSpace: true, navigation: true});
+    $('.pnbw').click(function(){var active=this.id.replace('lnk_','');$(parent.frames['info'].document).find('#nlnk_'+active).click();});
 	$(document).unload(function() {$('*').unbind(); });
-	$(window).resize(function(){$('#accordion').accordion('resize');});
 });</script>
-    </head>
-<body class="body" style="background-color:white;-smoz-user-select:-moz-none;">
-<table cellspacing="0" cellpadding="0" border="0" width="100%" height="100%">
-<tr><td style="border-bottom:1px solid #ccc"><img src="../studio.web/img/logo_tagline_newsql.png" /></td></tr>
-<tr><td style="border-bottom:1px solid #ccc" align="center" valign="middle">
-<table cellspacing="0" cellpadding="0" border="0" width="500px;">
-<tr><td align="left" style="padding:20px;">
 
-	<div style="padding-bottom:20px;text-align:justify;">
+
+<style type="text/css">
+html,body {height:100%;width:100%;}
+h1 {text-align:center;}
+</style>
+
+    </head>
+<body class="body" style="background-color:#ddd9c3;-moz-user-select:text;s:-moz-none;">
+<table cellspacing="0" cellpadding="0" border="0" width="100%" height="100%"><tr><td align="center" valign="middle"><table cellspacing="0" cellpadding="0" border="0" width="500px;"><tr><td align="left" style="padding:20px;text-align:justify;">
+
+    <div style="font-size:1.5em;">
+        <h1>Introduction</h1>
 		VoltDB is a visionary "NewSQL" platform: the promise to deliver outstanding data access performance for demanding Big Data applications while scaling on commodity hardware.
 		<ul>
             <li>Unlike traditional databases bottlenecked by disk I/O, VoltDB can execute millions of transactions per second!</li>
             <li>Unlike "NoSQL" solutions, you work with a relational model and avoid data corruption with transactional/concurrency control.</li>
         </ul>
 		The following samples show you some uses cases where VoltDB truly excels and achieves the impossible...
-	</div>
+    </div>
 
-<table cellspacing="0" cellpadding="10" border="0"><tr><td valign="top">
-<table cellspacing="0" cellpadding="10" border="0"><tr><td style="background-color:#333;color:white;font-weight:bold;font-size:1.2em;" align="center" width="60">Example</td></tr><tr><td style="background-color:#555;color:#eee;font-weight:bold;font-size:2.0em;" align="center">1</td></tr></table>
-</td>
+        <div style="border-top:1px solid #ccc;padding:20px;margin-top:20px;margin-bottom:20px;">
+            <div id="lnk_0" class="pnbw" style="display:inline;"><div class="pnb" style="width:80px;">Intro</div><div class="pnra_orange"><!-- --></div></div>
+            <div id="lnk_1" class="pnbw" style="display:inline;"><div class="pnb_blue" style="width:80px;">Sample 1</div><div class="pnra_blue"><!-- --></div></div>
+            <div id="lnk_2" class="pnbw" style="display:inline;"><div class="pnb_blue" style="width:80px;">Sample 2</div><div class="pnra_blue"><!-- --></div></div>
+            <div id="lnk_3" class="pnbw" style="display:inline;"><div class="pnb_blue" style="width:80px;">Next Steps</div><div class="pnra_blue"><!-- --></div></div>
+        </div>
 
-<td valign="top"><h3>Voting Contest</h3>
-Imagine a competition for a prime-time TV show...<br/>
-6 artists, Millions of viewers, 2 minutes to vote for your favorite, seconds to publish the final winner!<br/>
-</td>
-</tr></table>
-
-<table cellspacing="0" cellpadding="10" border="0"><tr><td valign="top">
-<table cellspacing="0" cellpadding="10" border="0"><tr><td style="background-color:#333;color:white;font-weight:bold;font-size:1.2em;" align="center" width="60">Example</td></tr><tr><td style="background-color:#555;color:#eee;font-weight:bold;font-size:2.0em;" align="center">2</td></tr></table>
-</td>
-
-<td valign="top"><h3>Key/Value Store</h3>
-VoltDB is far more versatile than what 'NoSQL' systems, but if all you need is a high-speed Key/Value store this is the sample for you.<br/>
-</td>
-</tr></table>
-
-	<div style="padding-top:20px;text-align:justify;">
-		Use the options on the left to navigate through the samples...
-	</div>
-
-
-</td></tr>
-</table>
-
-</td></tr>
-</table>
-
-</body>
-</html>
+</td></tr></table></td></tr></table></body></html>
