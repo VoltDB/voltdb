@@ -452,7 +452,7 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public void init(CatalogContext context) {
+            public void init(CatalogContext context, long txnId) {
                 // TODO Auto-generated method stub
 
             }
@@ -480,7 +480,7 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public void initForRejoin(CatalogContext context,
+            public void initForRejoin(CatalogContext context, long txnId,
                     long faultSequenceNumber, Set<Integer> failedSites) {
                 // TODO Auto-generated method stub
 
@@ -536,11 +536,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public AgreementSite getAgreementSite() {
         return m_agreementSite;
-    }
-
-    @Override
-    public void onRestoreCompletion(boolean initCommandLog) {
-        // TODO Auto-generated method stub
     }
 
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {

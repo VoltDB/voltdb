@@ -22,10 +22,23 @@ import java.util.concurrent.Semaphore;
 import org.voltdb.messaging.InitiateTaskMessage;
 
 public interface CommandLog {
+    /**
+     *
+     * @param context
+     * @param txnId
+     *            The txnId of the truncation snapshot at the end of restore, or
+     *            Long.MIN if there was none.
+     */
+    public abstract void init(CatalogContext context, long txnId);
 
-    public abstract void init(CatalogContext context);
-
-    public abstract void initForRejoin(CatalogContext context, long faultSequenceNumber, Set<Integer> failedSites);
+    /**
+    *
+    * @param txnId
+    *            The txnId of the truncation snapshot at the end of restore, or
+    *            Long.MIN if there was none.
+    */
+    public abstract void initForRejoin(CatalogContext context, long txnId,
+                                       long faultSequenceNumber, Set<Integer> failedSites);
 
     public abstract void log(InitiateTaskMessage message);
 

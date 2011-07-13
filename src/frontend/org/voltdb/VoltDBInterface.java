@@ -172,11 +172,6 @@ public interface VoltDBInterface
      */
     public OperationMode getMode();
 
-    /**
-     * Notify RealVoltDB that command log replay is complete
-     */
-    public void onRestoreCompletion(boolean initCommandLog);
-
     ZooKeeper getZK();
 
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();

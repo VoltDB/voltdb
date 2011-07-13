@@ -127,6 +127,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     volatile int m_hostCount = 0;
     volatile boolean m_done = false;
     final Set<String> m_unexpectedSPIs = new HashSet<String>();
+    protected Long snapshotTxnId = null;
 
     /**
      * A mock initiator that checks if the we have all the initiations we
@@ -387,6 +388,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                 Thread.sleep(200);
             } catch (InterruptedException e) {}
         }
+
+        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
     }
 
     @Test
@@ -415,6 +418,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         if (!m_done) {
             fail("Timed out");
         }
+
+        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
     }
 
     @Test
@@ -461,6 +466,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         if (!m_done) {
             fail();
         }
+
+        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
     }
 
     @Test
@@ -491,6 +498,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         Long count = initiator.getProcCounts().get("@SnapshotRestore");
         assertEquals(new Long(1), count);
+        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
     }
 
     @Test
@@ -523,6 +531,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         Long count = initiator.getProcCounts().get("@SnapshotRestore");
         assertEquals(new Long(1), count);
+        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
     }
 
     @Test
@@ -562,10 +571,16 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         Long count = initiator.getProcCounts().get("@SnapshotRestore");
         assertEquals(new Long(1), count);
+        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
     }
 
     @Override
-    public void onRestoreCompletion(boolean initCommandLog) {
+    public void onRestoreCompletion(long txnId, boolean initCommandLog) {
+        if (snapshotTxnId != null) {
+            assertEquals(snapshotTxnId.longValue(), txnId);
+        }
+        snapshotTxnId = txnId;
+
         if (m_count.incrementAndGet() == m_hostCount) {
             m_done = true;
         }

@@ -77,7 +77,16 @@ public class RestoreAgent implements CommandLogReinitiator.Callback,
 SnapshotCompletionInterest {
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
-        public void onRestoreCompletion(boolean initCommandLog);
+        /**
+         * Callback function executed when restore finishes.
+         *
+         * @param txnId
+         *            The txnId of the truncation snapshot at the end of the
+         *            restore, or Long.MIN if there is none.
+         * @param initCommandLog
+         *            Whether or not to initialize the command log module
+         */
+        public void onRestoreCompletion(long txnId, boolean initCommandLog);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
@@ -96,6 +105,9 @@ SnapshotCompletionInterest {
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final START_ACTION m_action;
+
+    // The txnId of the truncation snapshot generated at the end.
+    private long m_truncationSnapshot = Long.MIN_VALUE;
 
     private final ZooKeeper m_zk;
 
@@ -1031,7 +1043,7 @@ SnapshotCompletionInterest {
                 m_restoreHeartbeatThread.join();
             } catch (InterruptedException e) {}
             if (m_callback != null) {
-                m_callback.onRestoreCompletion(true);
+                m_callback.onRestoreCompletion(m_truncationSnapshot, true);
             }
         }
     }
@@ -1134,12 +1146,18 @@ SnapshotCompletionInterest {
         return nonce;
     }
 
+    /**
+     * All nodes will be notified about the completion of the truncation
+     * snapshot.
+     */
     @Override
-    public CountDownLatch snapshotCompleted(long txnId, boolean truncationSnapshot) {
+    public CountDownLatch snapshotCompleted(long txnId,
+                                            boolean truncationSnapshot) {
         if (!truncationSnapshot) {
             LOG.fatal("Failed to truncate command logs by snapshot");
             VoltDB.crashVoltDB();
         } else {
+            m_truncationSnapshot = txnId;
             m_replayAgent.returnAllSegments();
             changeState();
         }

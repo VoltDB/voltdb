@@ -345,7 +345,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private CommandLog m_commandLog = new CommandLog() {
 
         @Override
-        public void init(CatalogContext context) {}
+        public void init(CatalogContext context, long txnId) {}
 
         @Override
         public void log(InitiateTaskMessage message) {}
@@ -371,7 +371,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         @Override
-        public void initForRejoin(CatalogContext context,
+        public void initForRejoin(CatalogContext context, long txnId,
                 long faultSequenceNumber, Set<Integer> failedSites) {
             // TODO Auto-generated method stub
 
@@ -909,7 +909,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             if (m_commandLog != null && isRejoin) {
                 m_commandLog.initForRejoin(
-                        m_catalogContext,
+                        m_catalogContext, Long.MIN_VALUE,
                         m_messenger.getDiscoveredFaultSequenceNumber(),
                         downSites);
             }
@@ -958,7 +958,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     VoltDB.crashVoltDB();
                 }
             } else {
-                onRestoreCompletion(!isRejoin);
+                onRestoreCompletion(Long.MIN_VALUE, !isRejoin);
             }
         }
     }
@@ -1904,7 +1904,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public void onRestoreCompletion(boolean initCommandLog) {
+    public void onRestoreCompletion(long txnId, boolean initCommandLog) {
         /*
          * Enable the initiator to send normal heartbeats and accept client
          * connections
@@ -1926,7 +1926,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          */
         if (initCommandLog) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext);
+            m_commandLog.init(m_catalogContext, txnId);
         }
 
         if (m_startMode != null) {
