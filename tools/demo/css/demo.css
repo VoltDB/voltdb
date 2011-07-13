@@ -5,11 +5,16 @@ pre { font-size:9px;font-family:Lucida Console, Courier New, Courier, monospace;
 hr { border:0px;border-top:1px solid #999; }
 
 
-
+/*
 .pnla {border-style:solid;height:0;line-height:0;width:0; float:left;border-color:transparent orange transparent transparent;border-width:13px 12px 12px 0px;width:1px;cursor:pointer;}
 .pnb {float:left;background-color:orange;height:15px;width:50px;padding:5px;text-align:center;color:#fff;font-weight:bold;cursor:pointer;}
 
 .pnra_orange {border-style:solid;height:0;line-height:0;width:0; float:left;border-color:transparent transparent transparent orange;border-width:13px 0px 12px 12px;width:1px;cursor:pointer;}
 .pnra_blue {border-style:solid;height:0;line-height:0;width:0; float:left;border-color:transparent transparent transparent #06c;border-width:13px 0px 12px 12px;width:1px;cursor:pointer;}
 .pnb_blue {float:left;background-color:#06c;height:15px;width:50px;padding:5px;text-align:center;color:#fff;font-weight:bold;cursor:pointer;}
+*/
+
+.pnb {height:23px;color:#fff;font-weight:bold;padding:4px;cursor:pointer;}
+.pnb.next {background:url(../img/btnr.png) no-repeat right top;padding-left:12px;padding-right:20px;float:right;}
+.pnb.prev {background:url(../img/btnl.png) no-repeat left top;padding-left:20px;padding-right:12px;float:left;}
 

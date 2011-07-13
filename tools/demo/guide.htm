@@ -18,14 +18,14 @@
 		<link type="text/css" href="css/demo.css" rel="stylesheet" />
 
 		<script type="text/javascript">var root = window.location.pathname.replace('guide.htm','');$(document).ready(function() {
-    $('.pnbw').click(function(){var active=this.id.replace('nlnk_','').replace('plnk_','');$('.sec').css('display','none');$('#sec_'+active).css('display','');parent.frames['content'].location.href = 'intro.' + active + '.htm';});
+    $('.pnb').click(function(){var active=this.id.replace('nlnk_','').replace('plnk_','');$('.sec').css('display','none');$('#sec_'+active).css('display','');parent.frames['content'].location.href = 'intro.htm?s=' + active;});
     if (window.location.search != '')
         $('#nlnk_' + window.location.search.replace('?s=','')).click();
 	$(document).unload(function() {$('*').unbind(); });
 });</script>
     </head>
-<body class="body" style="background-color:white;padding:10px;margin:0px;-moz-user-select:text;s:-moz-none;">
-    <div style="border-bottom:1px solid #ccc;"><img src="../studio.web/img/logo_tagline_newsql.png" width="320" /></div>
+<body class="body" style="background-color:white;padding:10px;margin:0px;-moz-user-select:text;s:-moz-none;font-size:0.8em">
+    <div style="border-bottom:1px solid #ccc;"><a href="http://voltdb.com/" target="content"><img src="../studio.web/img/logo_tagline_newsql.png" width="320" border="0" /></a></div>
 	<div id="sec_0" class="sec">
         <h2>Requirements</h2>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Pre-requisites</td></tr></table>
@@ -47,8 +47,8 @@
         </ul>
 
         <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
-            <div id="nlnk_0" class="pnbw" style="display:none;"><!-- --></div>
-            <div id="nlnk_1" class="pnbw" style="float:right;"><div class="pnb">Next</div><div class="pnra_orange"><!-- --></div></div>
+            <div id="nlnk_0" class="pnb prev" style="display:none;"><!-- --></div>
+            <div id="nlnk_1" class="pnb next">Next</div>
         </div>
 
 	</div>
@@ -95,8 +95,8 @@ exec Results</pre>
         </ul>
 
         <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
-            <div id="plnk_0" class="pnbw" style="float:left;"><div class="pnla"><!-- --></div><div class="pnb">Prev</div></div>
-            <div id="nlnk_2" class="pnbw" style="float:right;"><div class="pnb">Next</div><div class="pnra_orange"><!-- --></div></div>
+            <div id="plnk_0" class="pnb prev">Prev</div>
+            <div id="nlnk_2" class="pnb next">Next</div>
         </div>
 
 	</div>
@@ -144,8 +144,8 @@ exec Results</pre>
         </ul>
 
         <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
-            <div id="plnk_1" class="pnbw" style="float:left;"><div class="pnla"><!-- --></div><div class="pnb">Prev</div></div>
-            <div id="nlnk_3" class="pnbw" style="float:right;"><div class="pnb">Next</div><div class="pnra_orange"><!-- --></div></div>
+            <div id="plnk_1" class="pnb prev">Prev</div>
+            <div id="nlnk_3" class="pnb next">Next</div>
         </div>
 
 	</div>
@@ -162,18 +162,30 @@ exec Results</pre>
         <pre>ant client</pre>
         <p>(other options might be available as well for specific samples - explore the README file)</p>
 
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Development Tools</td></tr></table>
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Documentation</td></tr></table>
+        <p>When you are ready to move forward and code your own application, make sure you check out our documentations at:</p>
+        <pre><a href="http://community.voltdb.com/documentation" target="content">http://community.voltdb.com/documentation</a></pre>
+
+        <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
+            <div id="plnk_2" class="pnb prev">Prev</div>
+            <div id="nlnk_4" class="pnb next">Next</div>
+        </div>
+
+	</div>
+
+	<div id="sec_4" class="sec" style="display:none;">
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Development Tools</td></tr></table>
         <p>You can launch VoltDB's Web Studio from:</p>
         <pre><script>document.write(root.replace('/demo/','/studio.web/index.htm'));</script></pre>
         <p>You can launch a simple Command-Line Interface from:</p>
         <pre><script>document.write(root.replace('/demo/','/sqlcmd/sqlcmd'));</script></pre>
 
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">3</td><td class="nbrtitle">Documentation</td></tr></table>
-        <p>When you are ready to move forward and code your own application, make sure you check out our documentations at:</p>
-        <pre><a href="http://community.voltdb.com/documentation" target="content">http://community.voltdb.com/documentation</a></pre>
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Windows Tools</td></tr></table>
+        <p>If you work on Window, get VoltDB's Windows Studio from:</p>
+        <pre><a href="http://voltdb.com/downloads" target="content">http://voltdb.com/downloads</a></pre>
 
         <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
-            <div id="plnk_2" class="pnbw" style="float:left;"><div class="pnla"><!-- --></div><div class="pnb">Prev</div></div>
+            <div id="plnk_3" class="pnb prev">Prev</div>
         </div>
 
 	</div>
