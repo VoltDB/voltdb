@@ -1209,6 +1209,19 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
                         });
                         task.clientHandle = plannedStmt.clientHandle;
 
+                        /*
+                         * Round trip the invocation to initialize it for command logging
+                         */
+                        FastSerializer fs = new FastSerializer();
+                        try {
+                            fs.writeObject(task);
+                            FastDeserializer fds = new FastDeserializer(fs.getBuffer());
+                            task = new StoredProcedureInvocation();
+                            task.readExternal(fds);
+                        } catch (Exception e) {
+                            VoltDB.crashVoltDB();
+                        }
+
                         // initiate the transaction
                         m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
                                                       plannedStmt.adminConnection,
@@ -1235,6 +1248,19 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
                         }
                     });
                     task.clientHandle = changeResult.clientHandle;
+
+                    /*
+                     * Round trip the invocation to initialize it for command logging
+                     */
+                    FastSerializer fs = new FastSerializer();
+                    try {
+                        fs.writeObject(task);
+                        FastDeserializer fds = new FastDeserializer(fs.getBuffer());
+                        task = new StoredProcedureInvocation();
+                        task.readExternal(fds);
+                    } catch (Exception e) {
+                        VoltDB.crashVoltDB();
+                    }
 
                     // initiate the transaction. These hard-coded values from catalog
                     // procedure are horrible, horrible, horrible.
