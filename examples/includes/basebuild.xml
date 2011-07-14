@@ -61,6 +61,7 @@
             <include name="${catalog}" />
         </fileset>
     </delete>
+    <delete failonerror="false" dir="voltdbroot"/>
 </target>
 
 <!-- Some examples override srccompileImpl to add additional srcs or dependencies -->
