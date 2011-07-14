@@ -22,7 +22,6 @@ sleep 1
 
 spawn ant client
 set client_id $spawn_id
-expect -i $client_id eof abort timeout abort "com.ClientKV: Running for 120 second(s)"
 expect -i $client_id eof abort timeout abort "com.ClientKV: Initial number of keys/values = "
 expect -i $client_id eof abort timeout abort "com.ClientKV: Populating Initial Data"
 expect -i $client_id eof abort timeout abort "com.ClientKV: Checking Results - Populating Initial Data"

@@ -28,7 +28,6 @@ expect -i $client_id eof abort timeout abort "Connecting to server: 'localhost'"
 expect -i $client_id eof abort timeout abort "Voting Results"
 expect -i $client_id eof abort timeout abort " - Contestant Edwina Burnam was the winner."
 expect -i $client_id eof abort timeout abort "System Statistics"
-expect -i $client_id eof abort timeout abort "Ran for 120"
 expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
 expect -i $client_id timeout abort eof
 close -i $server_id
