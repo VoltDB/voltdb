@@ -17,7 +17,7 @@ function InitializeChart(id, chart, metric)
 	{
 		case 'lat':
 		    opt = {
-		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:'%d'} } },
+		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:'%.2f'} } },
 		    	series: [{showMarker:false, color:'Lime', yaxis:'y2axis', lineWidth: 1.5, shadow: false}],
 		    	grid: { shadow:false, background:'#000', borderWidth: 1, borderColor: 'DarkGreen', gridLineColor:'DarkGreen'}
 		    };
@@ -279,10 +279,10 @@ this.RefreshMonitor = function(id, Success)
 			if (delta < 10)
 				dataLat.push([dataIdx,0]);
 			else
-				dataLat.push([dataIdx,currentLatencyAverage/1000.0]);
+				dataLat.push([dataIdx,currentLatencyAverage/1000.0/1000.0]);
 		}
 		else
-			dataLat.push([dataIdx,((currentLatencyAverage * currentTimedTransactionCount - monitor.lastLatencyAverage * monitor.lastTimedTransactionCount) / (currentTimedTransactionCount - monitor.lastTimedTransactionCount)) /1000.0]);
+			dataLat.push([dataIdx,((currentLatencyAverage * currentTimedTransactionCount - monitor.lastLatencyAverage * monitor.lastTimedTransactionCount) / (currentTimedTransactionCount - monitor.lastTimedTransactionCount)) /1000.0/1000.0]);
 	}
 	
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
@@ -296,9 +296,9 @@ this.RefreshMonitor = function(id, Success)
 				if ($(cells[0]).text() == procStats[j][0])
 				{
 					$(cells[1]).text(procStats[j][1]);
-					$(cells[2]).text((Math.round(procStats[j][2]/10.0)/100.0));
-					$(cells[3]).text((Math.round(procStats[j][3]/10.0)/100.0));
-					$(cells[4]).text((Math.round(procStats[j][4]/10.0)/100.0));
+					$(cells[2]).text((Math.round(procStats[j][2]/10.0/1000.0)/100.0));
+					$(cells[3]).text((Math.round(procStats[j][3]/10.0/1000.0)/100.0));
+					$(cells[4]).text((Math.round(procStats[j][4]/10.0/1000.0)/100.0));
 				}
 			}
 		}
@@ -315,7 +315,7 @@ this.RefreshMonitor = function(id, Success)
 			src += '<td align="left">' + procStats[j][0] + '</td>';
 			src += '<td align="right">' + procStats[j][1] + '</td>';
 			for(var k = 2; k < 5; k++)
-				src += '<td align="right">' + (Math.round(procStats[j][k]/10.0)/100.0) + '</td>';
+				src += '<td align="right">' + (Math.round(procStats[j][k]/10.0/1000.00)/100.0) + '</td>';
 			src += '</tr>';
 		}
 		src += '</tbody></table>';
@@ -344,7 +344,7 @@ this.RefreshMonitor = function(id, Success)
     }
 
 	var lymax = 0.25;
-	var rymax = 100;
+	var rymax = 0.05;
 	var ry2max = 1000;
 	for(var j=0;j<121;j++)
 	{
@@ -355,7 +355,7 @@ this.RefreshMonitor = function(id, Success)
 		if (ry2max < dataTPS[j][1])
 			ry2max = dataTPS[j][1];
 	}
-	rymax = Math.ceil(rymax/100)*100;
+	//TMCrymax = Math.ceil(rymax/100)*100;
 	ry2max = Math.ceil(ry2max/1000)*1000;
 	var tickValues = [];
 	tickValues.push(dataIdx-120);
