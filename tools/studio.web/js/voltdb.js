@@ -307,7 +307,7 @@ var IVoltDB = (function(){
 								var indexName = connection.Metadata['rawIndexes'].data[j][5];
 								if (item.indexes == null)
 									item.indexes = [];
-								item.indexes[indexName] = indexName + ' (' + (connection.Metadata['rawIndexes'].data[j][7].toLowerCase().indexOf('hash')?'Hash':'Tree') + (connection.Metadata['rawIndexes'].data[j][8] == "1"?', Unique':'') + ')';
+								item.indexes[indexName] = indexName + ' (' + ((connection.Metadata['rawIndexes'].data[j][7].toLowerCase().indexOf('hash') > -1)?'Hash':'Tree') + (connection.Metadata['rawIndexes'].data[j][8] == "1"?', Unique':'') + ')';
 								if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
 									isView = true;
 								if (indexName.toUpperCase().indexOf("PK_") > -1)
