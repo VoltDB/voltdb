@@ -668,6 +668,12 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         if (m_snapshots.size() > m_retain) {
+            //Quick hack to make sure we don't delete while the snapshot is running.
+            //Deletes work really badly during a snapshot because the FS is occupied
+            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0) {
+                m_lastSysprocInvocation = System.currentTimeMillis() + 3000;
+                return;
+            }
             deleteExtraSnapshots();
             return;
         }

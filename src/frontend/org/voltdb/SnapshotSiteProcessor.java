@@ -103,6 +103,14 @@ public class SnapshotSiteProcessor {
      */
     private ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
 
+    /*
+     * Store the results of write attempts here
+     * so that the terminator thread can review them and
+     * decide whether the snapshot actually succeded.
+     */
+    private static List<Future<?>> m_writeFutures =
+        Collections.synchronizedList(new ArrayList<Future<?>>());
+
     /**
      * Queue of tasks for tables that still need to be snapshotted.
      * This is polled from until there are no more tasks.
@@ -316,11 +324,7 @@ public class SnapshotSiteProcessor {
             snapshotBuffer.b.position(0);
             retval = currentTask.m_target.write(snapshotBuffer);
             if (retval != null) {
-                try {
-                    retval.get();
-                } catch (Exception e) {
-                    m_lastSnapshotSucceded = false;
-                }
+                m_writeFutures.add(retval);
             }
             break;
         }
@@ -366,12 +370,22 @@ public class SnapshotSiteProcessor {
                                 try {
                                     t.close();
                                 } catch (IOException e) {
+                                    m_lastSnapshotSucceded = false;
                                     throw new RuntimeException(e);
                                 } catch (InterruptedException e) {
+                                    m_lastSnapshotSucceded = false;
                                     throw new RuntimeException(e);
                                 }
                             }
+                            for (Future<?> retval : m_writeFutures) {
+                                try {
+                                    retval.get();
+                                } catch (Exception e) {
+                                    m_lastSnapshotSucceded = false;
+                                }
+                            }
                         } finally {
+                            m_writeFutures = Collections.synchronizedList(new ArrayList<Future<?>>());
                             try {
                                 logSnapshotCompleteToZK(txnId, numHosts, m_lastSnapshotSucceded);
                             } finally {
