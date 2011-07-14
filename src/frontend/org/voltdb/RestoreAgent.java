@@ -830,7 +830,7 @@ SnapshotCompletionInterest {
      */
     private Long deserializeRestoreInformation(List<String> children,
                                                Map<Long, Set<SnapshotInfo>> snapshotFragments) {
-        byte recover = m_action != START_ACTION.CREATE ? (byte) 1 : 0;
+        byte recover = (byte) m_action.ordinal();
         Long clStartTxnId = null;
         ByteBuffer buf;
         for (String node : children) {
@@ -927,7 +927,7 @@ SnapshotCompletionInterest {
             buf.putLong(min);
         }
         // 1 means recover, 0 means to create new DB
-        buf.put(m_action != START_ACTION.CREATE ? (byte) 1 : 0);
+        buf.put((byte) m_action.ordinal());
 
         buf.putInt(snapshots.size());
         for (SnapshotInfo snapshot : snapshots) {
