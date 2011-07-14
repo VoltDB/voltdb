@@ -47,6 +47,7 @@ package org.voltdb.dtxn;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.StoredProcedureInvocation;
@@ -82,7 +83,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     /**
      * Indicates if backpressure has been seen and reported
      */
-    private boolean m_hadBackPressure = false;
+    private AtomicBoolean m_hadBackPressure = new AtomicBoolean(false);
 
     /*
      * Whether or not to send heartbeats. It's set to false by default, this
@@ -431,9 +432,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_pendingTxnBytes += messageSize;
         m_pendingTxnCount++;
         if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
-            if (!m_hadBackPressure) {
+            if (m_hadBackPressure.compareAndSet(false, true)) {
                 transactionLog.trace("DTXN back pressure began");
-                m_hadBackPressure = true;
                 m_onBackPressure.run();
             }
         }
@@ -447,10 +447,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         if (m_pendingTxnBytes < (MAX_DESIRED_PENDING_BYTES * .8) &&
             m_pendingTxnCount < (MAX_DESIRED_PENDING_TXNS * .8))
         {
-            if (m_hadBackPressure)
+            if (m_hadBackPressure.compareAndSet(true, false))
             {
                 transactionLog.trace("DTXN backpressure ended");
-                m_hadBackPressure = false;
                 m_offBackPressure.run();
             }
         }
@@ -499,5 +498,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     @Override
     public void setSendHeartbeats(boolean val) {
         m_sendHeartbeats = val;
+    }
+
+    @Override
+    public boolean isOnBackPressure() {
+        return m_hadBackPressure.get();
     }
 }

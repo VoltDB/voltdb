@@ -154,4 +154,10 @@ public abstract class TransactionInitiator {
     public abstract void setSendHeartbeats(boolean val);
 
     public abstract void sendHeartbeat(long txnId);
+
+    /**
+     * Whether or not the initiator is on back pressure.
+     * @return
+     */
+    public abstract boolean isOnBackPressure();
 }

@@ -285,6 +285,12 @@ public class TestDtxnInitiatorMailbox extends TestCase
             // TODO Auto-generated method stub
 
         }
+
+        @Override
+        public boolean isOnBackPressure() {
+            // TODO Auto-generated method stub
+            return false;
+        }
     }
 
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,
