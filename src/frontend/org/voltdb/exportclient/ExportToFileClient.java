@@ -307,8 +307,15 @@ public class ExportToFileClient extends ExportClientBase {
             File newFile = new File(path);
             try {
                 OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, true), "UTF-8");
-                writer = new CSVWriter(new BufferedWriter(osw, 1048576));
-            } catch (Exception e) {
+                if (m_delimiter == ',')
+                    // CSV
+                    writer = new CSVWriter(new BufferedWriter(osw, 1048576), m_delimiter);
+                else {
+                    // TSV
+                    writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 1048576));
+                }
+            }
+            catch (Exception e) {
                 m_logger.error(e.getMessage());
                 m_logger.error("Error: Failed to create output file: " + path);
                 throw new RuntimeException();
@@ -436,19 +443,19 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             try {
-                String[] fields = new String[m_tableSchema.size()];
+                String[] fields = new String[m_tableSchema.size() - m_firstfield];
 
                 for (int i = m_firstfield; i < m_tableSchema.size(); i++) {
                     if (row[i] == null) {
-                        fields[i] = "NULL";
+                        fields[i - m_firstfield] = "NULL";
                     } else if (m_tableSchema.get(i) == VoltType.STRING) {
-                        fields[i] = (String) row[i];
+                        fields[i - m_firstfield] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType) row[i];
-                        fields[i] = dateFormat().format(timestamp.asApproximateJavaDate());
-                        fields[i] += String.valueOf(timestamp.getUSec());
+                        fields[i - m_firstfield] = dateFormat().format(timestamp.asApproximateJavaDate());
+                        fields[i - m_firstfield] += String.valueOf(timestamp.getUSec());
                     } else {
-                        fields[i] = row[i].toString();
+                        fields[i - m_firstfield] = row[i].toString();
                     }
                 }
                 m_writer.writeNext(fields);
