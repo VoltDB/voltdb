@@ -52,6 +52,8 @@ PRIMARY ENTRY POINTS
         <arg value="catalog.jar" /> <!-- catalog -->
         <arg value="deployment" />
         <arg value="deployment.xml" /> <!-- deployment file -->
+        <arg value="license" />
+        <arg value="##voltdb_lib_path##/license.xml" /> <!-- license file -->
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
