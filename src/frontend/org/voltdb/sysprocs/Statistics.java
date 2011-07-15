@@ -469,7 +469,7 @@ public class Statistics extends VoltSystemProcedure {
             };
             final long endTime = System.currentTimeMillis();
             final long delta = endTime - now;
-            HOST_LOG.info("Statistics invocation of MANAGEMENT selector took " + delta + " milliseconds");
+            HOST_LOG.debug("Statistics invocation of MANAGEMENT selector took " + delta + " milliseconds");
         } else {
             throw new VoltAbortException(String.format("Invalid Statistics selector %s.", selector));
         }
