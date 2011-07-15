@@ -160,8 +160,10 @@ public class TestSnapshotDaemon {
         assertNull(m_initiator.procedureName);
 
         byte pathBytes[] = "/foo".getBytes("UTF-8");
-        zk.create("/truncation_snapshot_path", pathBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        ByteBuffer payload = ByteBuffer.allocate(pathBytes.length + 8);
+        payload.putLong(0);
+        payload.put(pathBytes);
+        zk.create("/request_truncation_snapshot", payload.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         Thread.sleep(100);
         assertNull(m_initiator.procedureName);
@@ -178,7 +180,7 @@ public class TestSnapshotDaemon {
 
         m_daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
 
-        zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create("/request_truncation_snapshot", payload.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         Thread.sleep(100);
 
         assertTrue(m_initiator.procedureName.equals("@SnapshotSave"));
@@ -802,10 +804,11 @@ public class TestSnapshotDaemon {
         // Send a truncation snapshot request
         ZooKeeper zk = m_mockVoltDB.getZK();
         byte[] pathBytes = "/tmp".getBytes();
+        ByteBuffer buf = ByteBuffer.allocate(pathBytes.length + 8);
+        buf.position(8);
+        buf.put(pathBytes);
         try {
-            zk.create("/truncation_snapshot_path", pathBytes, Ids.OPEN_ACL_UNSAFE,
-                      CreateMode.PERSISTENT);
-            zk.create("/request_truncation_snapshot", null,
+            zk.create("/request_truncation_snapshot", buf.array(),
                       Ids.OPEN_ACL_UNSAFE,
                       CreateMode.PERSISTENT);
         } catch (Exception e) {
@@ -834,7 +837,7 @@ public class TestSnapshotDaemon {
         byte[] data = zk.getData("/completed_snapshots/" + children.get(0),
                                  false, new Stat());
         assertNotNull(data);
-        ByteBuffer buf = ByteBuffer.wrap(data);
+        buf = ByteBuffer.wrap(data);
         byte truncation = buf.get(16);
         assertEquals(1, truncation);
     }

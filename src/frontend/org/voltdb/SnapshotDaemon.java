@@ -382,8 +382,13 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
         if (event.getType() == EventType.NodeCreated) {
             loggingLog.info("Snapshot truncation leader received snapshot truncation request");
             String snapshotPathTemp;
+            ByteBuffer payload;
             try {
-                snapshotPathTemp = new String(m_zk.getData("/truncation_snapshot_path", false, null), "UTF-8");
+                payload = ByteBuffer.wrap(m_zk.getData("/request_truncation_snapshot", null, null));
+                byte pathBytes[] = new byte[payload.capacity() - 8];
+                payload.position(8);
+                payload.get(pathBytes);
+                snapshotPathTemp = new String(pathBytes, "UTF-8");
             } catch (Exception e) {
                 loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
                 return;
@@ -396,7 +401,6 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
             //for a truncation snapshot. In that case they will mark the completion node
             //to be for a truncation snapshot. SnapshotCompletionMonitor notices the mark.
             try {
-                ByteBuffer payload = ByteBuffer.allocate(8);
                 payload.putLong(0, now);
                 m_zk.setData("/request_truncation_snapshot", payload.array(), -1);
             } catch (Exception e) {
