@@ -1024,11 +1024,12 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     if (message == null) {
                         m_starvationTracker.beginStarvation();
                         message = m_mailbox.recvBlocking(5);
+                        m_starvationTracker.endStarvation();
                     }
+
                     // do periodic work
                     tick();
                     if (message != null) {
-                        m_starvationTracker.endStarvation();
                         handleMailboxMessage(message);
                     }
                 }

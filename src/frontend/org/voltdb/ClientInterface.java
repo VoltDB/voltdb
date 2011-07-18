@@ -1215,10 +1215,15 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
                         FastSerializer fs = new FastSerializer();
                         try {
                             fs.writeObject(task);
-                            FastDeserializer fds = new FastDeserializer(fs.getBuffer());
+                            ByteBuffer source = fs.getBuffer();
+                            ByteBuffer copy = ByteBuffer.allocate(source.remaining());
+                            copy.put(source);
+                            copy.flip();
+                            FastDeserializer fds = new FastDeserializer(copy);
                             task = new StoredProcedureInvocation();
                             task.readExternal(fds);
                         } catch (Exception e) {
+                            hostLog.fatal(e);
                             VoltDB.crashVoltDB();
                         }
 
@@ -1255,10 +1260,15 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
                     FastSerializer fs = new FastSerializer();
                     try {
                         fs.writeObject(task);
-                        FastDeserializer fds = new FastDeserializer(fs.getBuffer());
+                        ByteBuffer source = fs.getBuffer();
+                        ByteBuffer copy = ByteBuffer.allocate(source.remaining());
+                        copy.put(source);
+                        copy.flip();
+                        FastDeserializer fds = new FastDeserializer(copy);
                         task = new StoredProcedureInvocation();
                         task.readExternal(fds);
                     } catch (Exception e) {
+                        hostLog.fatal(e);
                         VoltDB.crashVoltDB();
                     }
 

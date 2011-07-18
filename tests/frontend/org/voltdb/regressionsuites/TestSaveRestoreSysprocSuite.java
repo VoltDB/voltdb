@@ -414,16 +414,13 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         ZooKeeper zk = VoltDB.instance().getZK();
 
         Client client = getClient();
-        byte pathBytes[] = TMPDIR.getBytes("UTF-8");
-        ByteBuffer payload = ByteBuffer.allocate(8 + pathBytes.length);
-        payload.putLong(0);
-        payload.put(pathBytes);
+        zk.create("/truncation_snapshot_path", TMPDIR.getBytes("UTF-8"), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         SnapshotCompletionMonitor monitor = VoltDB.instance().getSnapshotCompletionMonitor();
         SnapshotCompletionIntr interest = new SnapshotCompletionIntr();
         monitor.addInterest(interest);
 
-        zk.create("/request_truncation_snapshot", payload.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         interest.snapshotCompleted.acquire();
         assertTrue(interest.truncationSnapshot);

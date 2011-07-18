@@ -1072,12 +1072,14 @@ SnapshotCompletionInterest {
              */
             CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
             if (isLowestHost() && commandLogElement != null) {
-                byte[] pathBytes = commandLogElement.getInternalsnapshotpath().getBytes();
-                ByteBuffer buf = ByteBuffer.allocate(pathBytes.length + 8);
-                buf.position(8);
-                buf.put(pathBytes);
                 try {
-                    m_zk.create("/request_truncation_snapshot", buf.array(),
+                    try {
+                        m_zk.create("/truncation_snapshot_path",
+                                commandLogElement.getInternalsnapshotpath().getBytes(),
+                                Ids.OPEN_ACL_UNSAFE,
+                                CreateMode.PERSISTENT);
+                    } catch (KeeperException.NodeExistsException e) {}
+                    m_zk.create("/request_truncation_snapshot", null,
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                 } catch (Exception e) {
