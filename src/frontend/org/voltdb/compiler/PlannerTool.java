@@ -418,7 +418,11 @@ public class PlannerTool {
                 continue;
             }
 
-            log("finished planning stmt");
+            log("finished planning stmt:");
+            log("SQL: " + plan.sql);
+            log("COST: " + Double.toString(plan.cost));
+            log("PLAN:\n");
+            log(plan.explainedPlan);
 
             assert(plan.fragments.size() <= 2);
 
