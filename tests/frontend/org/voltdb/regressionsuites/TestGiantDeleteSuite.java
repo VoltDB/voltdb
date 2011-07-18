@@ -40,6 +40,12 @@ public class TestGiantDeleteSuite extends RegressionSuite {
 
     public void testGiantDelete() throws IOException, ProcCallException
     {
+        /*
+         * Times out with valgrind
+         */
+        if (isValgrind()) {
+            return;
+        }
         Client client = getClient();
         client.callProcedure("InsertBatch", 20000000, 0);
         boolean threw = false;
