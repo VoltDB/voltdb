@@ -18,22 +18,24 @@
 package org.voltdb;
 
 import java.io.IOException;
-
+import java.nio.ByteBuffer;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.Callable;
 
-import java.nio.ByteBuffer;
-
+import org.json_voltpatches.JSONString;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.*;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializable;
+import org.voltdb.messaging.FastSerializer;
 
 /**
  * Represents a serializeable bundle of procedure name and parameters. This
  * is the object that is sent by the client library to call a stored procedure.
  *
  */
-public class StoredProcedureInvocation implements FastSerializable {
+public class StoredProcedureInvocation implements FastSerializable, JSONString {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     String procName = null;
 
@@ -184,5 +186,24 @@ public class StoredProcedureInvocation implements FastSerializable {
 
     public void setSerializedParams(ByteBuffer serializedParams) {
         unserializedParams = serializedParams;
+    }
+
+    @Override
+    public String toJSONString() {
+        params.run();
+        JSONStringer js = new JSONStringer();
+        try {
+            js.object();
+            js.key("proc_name");
+            js.value(procName);
+            js.key("parameters");
+            js.value(params.get());
+            js.endObject();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to serialize an invocation to JSON.", e);
+        }
+        return js.toString();
     }
 }

@@ -17,15 +17,27 @@
 
 package org.voltdb.dtxn;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
-import org.voltdb.fault.*;
+import org.voltdb.fault.FaultHandler;
+import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.messaging.*;
+import org.voltdb.messaging.HeartbeatResponseMessage;
+import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
-import org.voltdb.utils.EstTime;
+import org.voltdb.utils.ResponseSampler;
 
 /**
  * DtxnInitiatorQueue matches incoming result set responses to outstanding
@@ -230,6 +242,10 @@ public class DtxnInitiatorMailbox implements Mailbox
         //and several other locks need to be acquired in the network subsystem. Bad voodoo.
         //addResponse returning non-null means send the response to the client
         if (toSend != null) {
+            // the next bit is usually a noop, unless we're sampling responses for test
+            if (!state.isReadOnly)
+                ResponseSampler.offerResponse(state.txnId, state.invocation, toSend);
+            // queue the response to be sent to the client
             enqueueResponse(toSend, state);
         }
     }

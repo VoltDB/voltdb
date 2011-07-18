@@ -333,10 +333,42 @@ public class VoltDB {
         }
         public static String getPathToCatalogForTest(String jarname) {
             String answer = jarname;
+
+            // first try to get the "right" place to put the thing
             if (System.getenv("TEST_DIR") != null) {
                 answer = System.getenv("TEST_DIR") + File.separator + jarname;
+                // returns a full path, like a boss
+                return new File(answer).getAbsolutePath();
             }
-            return answer;
+
+            // try to find an obj directory
+            String userdir = System.getProperty("user.dir");
+            String buildMode = System.getProperty("build");
+            if (buildMode == null)
+                buildMode = "release";
+            assert(buildMode.length() > 0);
+            if (userdir != null) {
+                File userObjDir = new File(userdir + File.separator + "obj" + File.separator + buildMode);
+                if (userObjDir.exists() && userObjDir.isDirectory() && userObjDir.canWrite()) {
+                    File testobjectsDir = new File(userObjDir.getPath() + File.separator + "testobjects");
+                    if (!testobjectsDir.exists()) {
+                        boolean created = testobjectsDir.mkdir();
+                        assert(created);
+                    }
+                    assert(testobjectsDir.isDirectory());
+                    assert(testobjectsDir.canWrite());
+                    return testobjectsDir.getAbsolutePath() + File.separator + jarname;
+                }
+            }
+
+            // otherwise use a local dir
+            File testObj = new File("testobjects");
+            if (!testObj.exists()) {
+                testObj.mkdir();
+            }
+            assert(testObj.isDirectory());
+            assert(testObj.canWrite());
+            return testObj.getAbsolutePath() + File.separator + jarname;
         }
     }
 

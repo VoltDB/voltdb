@@ -331,7 +331,7 @@ import org.voltdb.types.VoltDecimalHelper;
         }
         catch (JSONException e) {
             e.printStackTrace();
-            throw new RuntimeException("Failed to serialized a parameter set to JSON.", e);
+            throw new RuntimeException("Failed to serialize a parameter set to JSON.", e);
         }
         return js.toString();
     }

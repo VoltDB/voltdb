@@ -83,6 +83,7 @@ import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.VoltSampler;
 
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
@@ -531,6 +532,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             } else {
                 hostLog.info("Command logging is disabled");
             }
+
+            // start up the response sampler if asked to by setting the env var
+            // VOLTDB_RESPONSE_SAMPLE_PATH to a valid path
+            ResponseSampler.initializeIfEnabled();
 
             // See if we should bring the server up in admin mode
             if (m_catalogContext.cluster.getAdminstartup())
