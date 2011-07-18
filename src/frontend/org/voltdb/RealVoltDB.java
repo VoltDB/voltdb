@@ -1905,6 +1905,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public void onRestoreCompletion(long txnId, boolean initCommandLog) {
+
+        /*
+         * Command log is already initialized if this is a rejoin
+         */
+        if (initCommandLog) {
+            // Initialize command logger
+            m_commandLog.init(m_catalogContext, txnId);
+        }
+
         /*
          * Enable the initiator to send normal heartbeats and accept client
          * connections
@@ -1919,14 +1928,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                e);
                 VoltDB.crashVoltDB();
             }
-        }
-
-        /*
-         * Command log is already initialized if this is a rejoin
-         */
-        if (initCommandLog) {
-            // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId);
         }
 
         if (m_startMode != null) {
