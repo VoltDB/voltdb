@@ -76,7 +76,7 @@ public class Insert你好 extends VoltProcedure {
 
             String randomStringData = prefix + String.valueOf(rando);
             voltQueueSQL(insert, pval你好 , maxIval + 1 + i, now, randomStringData);
-            retval.addRow(pval你好 , maxIval + 1, now, randomStringData);
+            retval.addRow(pval你好 , maxIval + 1 + i, now, randomStringData);
         }
 
         VoltTable[] results = voltExecuteSQL();

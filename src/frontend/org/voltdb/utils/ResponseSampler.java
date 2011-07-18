@@ -20,9 +20,11 @@ package org.voltdb.utils;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.util.Collections;
 import java.util.Set;
 import java.util.SortedSet;
@@ -36,6 +38,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.logging.VoltLogger;
 
 public abstract class ResponseSampler {
@@ -196,6 +199,10 @@ public abstract class ResponseSampler {
             // skip files that aren't samples
             if (!filename.startsWith(SAMPLE_FILE_PREFIX))
                 continue;
+            if (filename.contains(REPLAY_TOKEN)) {
+                LOG.fatal("Found replay files in the samples directory. Can't continue until cleaned up.");
+                VoltDB.crashVoltDB();
+            }
 
             // sanity check
             assert(f.canRead());
@@ -359,7 +366,8 @@ public abstract class ResponseSampler {
         assert(f.canRead());
         StringBuilder sb = new StringBuilder();
         try {
-            BufferedReader reader = new BufferedReader(new FileReader(f));
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(f),"UTF-8"));
             String line = null;
             while ((line = reader.readLine()) != null) {
                 sb.append(line).append("\n");
@@ -384,7 +392,8 @@ public abstract class ResponseSampler {
         assert(f.exists() == false);
         assert(f.getParentFile().canWrite());
         try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(f));
+            BufferedWriter writer = new BufferedWriter(
+                    new OutputStreamWriter(new FileOutputStream(f),"UTF-8"));
             writer.write(jsonResponseData);
             writer.close();
         } catch (IOException e) {
