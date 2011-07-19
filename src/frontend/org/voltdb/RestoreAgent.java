@@ -90,8 +90,6 @@ SnapshotCompletionInterest {
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
-    // TODO: Nonce for command-log snapshots, TBD
-    public final static String CL_NONCE_PREFIX = "command_log";
 
     // ZK stuff
     private final static String RESTORE = "/restore";
