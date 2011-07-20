@@ -289,6 +289,10 @@ this.InitWorkspace = function()
             }
         }
     }
+	else
+	{
+		parent.frames['versioncheck'].location.href = 'http://community.voltdb.com/versioncheck?app=webstudio&ver=1.3.5&productid=ws-ipc';
+	}
 }
 function hasQueryParameters()
 {
