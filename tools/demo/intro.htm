@@ -58,7 +58,7 @@ ul.chk li
 padding-left: 25px;
 background-image: url(img/check.png);
 background-repeat: no-repeat;
-background-position: 0 0;
+background-position: 3px 3px;
 margin-bottom:5px;
 }
 
@@ -93,12 +93,9 @@ ul.tabs li.active
 <!--<table cellspacing="0" cellpadding="0" border="0" width="100%" height="100%"><tr><td align="center" valign="middle"><table cellspacing="0" cellpadding="0" border="0" width="500px;"><tr><td align="left" style="padding:20px;text-align:justify;">-->
 
     <div style="font-size:1.5em;">
-        <h1>Welcome</h1>
-		VoltDB is a visionary "NewSQL" platform: the promise to deliver outstanding data access performance for demanding Big Data applications while scaling on commodity hardware.
-		<ul class="chk">
-            <li>Unlike traditional databases bottlenecked by disk I/O, VoltDB can execute millions of transactions per second!</li>
-            <li>Unlike "NoSQL" solutions, you work with a relational model and avoid data corruption with transactional/concurrency control.</li>
-        </ul>
+        <h1>VoltDB Demo Dashboard</h1>
+		<p>Welcome!  Thanks for downloading VoltDB.  Your installation kit includes the VoltDB software itself, a growing collection of sample applications, and some helpful tools for VoltDB application development.  While you can find all of the distribution components directly through your file system, you can also use this dashboard to find helpful resources without fishing around for them manually.</p>
+        <p>Use the tabs below and the instructions in the panel to the left to find what you need.  And feel free to contact us if we can assist you in any way.</p>
     </div>
 </div>
 </div>
@@ -107,8 +104,8 @@ ul.tabs li.active
 <div id="middle-1-front-pg">
 <ul class="tabs">
 <li id="lnk_0" class="active">Introduction</li>
-<li id="lnk_1">Sample 1</li>
-<li id="lnk_2">Sample 2</li>
+<li id="lnk_1">Voter</li>
+<li id="lnk_2">K/V Store</li>
 <li id="lnk_3">Next Steps</li>
 <li id="lnk_4">Cool Tools!</li>
 </ul>
@@ -117,65 +114,62 @@ ul.tabs li.active
 <div style="background-color:white;clear:both;padding-left:25px;padding-right:25px;">
 
     <div id="sec_0" class="sec">
-		This demonstration dashboard walks you through a few sample scneario of high-throughput data application built with VoltDB.
+		This Demo Dashboard walks you through sample VoltDB applications and puts some useful tools at your fingertips.  As you click your way across the tabs:
 		<ul class="chk">
-            <li>Notes and walk-through information are displayed on the left section.</li>
-            <li>Application details and tools, such as VoltDB Studio will be displayed in this frame.</li>
+            <li>Notes and walk-through instructions will be displayed in the panel to the left</li>
+            <li>Application details and tools, such as VoltDB Studio, will be displayed in this panel</li>
         </ul>
-		Play with the samples to see how VoltDB achieves the impossible...
+		So play with the samples, check out the tools and get yourself up to speed with VoltDB, the fastest RDBMS on the planet!
     </div>
 
     <div id="sec_1" class="sec" style="display:none;">
-		<h2>America Votes!</h2>
-		Imagine a competition for a prime-time TV show.
-        <ul>
-            <li>6 artists</li>
+		<h2>Vote with the Stars!</h2>
+		Imagine a prime-time TV talent show.
+        <ul class="chk">
+            <li>Six artists</li>
             <li>Millions of viewers</li>
-            <li>2 minutes to vote for your favorite</li>
+            <li>Two minutes to vote for your favorite contestant</li>
         </ul>
-		With millions of callers hitting the phone, how do you build a system that tracks votes but prevents fraud?
-		<ul>
-			<li>Viewers can only vote for the same contestant once</li>
-			<li>Viewers are allowed a maximum of 3 votes</li>
-			<li>Report the final winner in less than 1 minute.</li>
+		The application must scale from zero to millions of simultaneous callers, tracking all their votes while protecting against fraud.
+		<ul class="chk">
+			<li>Each caller is allowed a maximum of three votes</li>
+			<li>Callers can only vote for the same contestant once</li>
+			<li>The system must report a winner in less than one minute</li>
 		</ul>
 
-		Use the instructions on the left to explore the sample...
+        See the instructions in the left panel to explore the Voter sample.
+
     </div>
 
     <div id="sec_2" class="sec" style="display:none;">
 		<h2>Key/Value Store</h2>
 
-		VoltDB is far more versatile than what 'NoSQL' systems, but if all you need is a high-speed Key/Value store this sample shows you how.
-        <ul>
+		VoltDB is a fully featured RDBMS.  However, if you need a high performance Key/Value store back by a highly-available, ACID compliant database manager, this example will show you how to get the best of both worlds by using:
+        <ul class="chk">
             <li>String keys</li>
             <li>Binary values up to 1MB</li>
         </ul>
-		Binary storage lets you use any logic you might want on the client side: you could for instance:
-		<ul>
-			<li>Serialize client object in binary form</li>
+		Binary storage lets you use whatever logic you may need on the client side.  For instance, you can:
+		<ul class="chk">
+			<li>Serialize client objects in binary form</li>
 			<li>Store zipped content/files</li>
 			<li>Store Unicode string data</li>
 		</ul>
 
-		Use the instructions on the left to explore the sample...
+		See the instructions in the left panel to explore the K/V Store sample.
 
     </div>
 
     <div id="sec_3" class="sec" style="display:none;">
 		<h2>Need Help?</h2>
-		VoltDB has a great community of users and customer exchanging tips and tricks on how to best leverage all the possibilities of the platform.
-        <ul>
+		VoltDB has a thriving user community.  Join us to get instant access to the latest product builds and learn the best techniques for leveraging the power of VoltDB.
+        <ul class="chk">
             <li>Check out our <a href="http://community.voltdb.com/forum">community forums</a></li>
-            <li>Don't forget our thorough documentation that will give you all the details on how to develop your own killer data application.</li>
+            <li>Review VoltDB <a href="http://community.voltdb.com/documentation" target="content">documentation</a> and technical white papers</li>
+            <li>Connect with VoltDB experts worldwide</li>
         </ul>
-		<h2>Want Professional Support?</h2>
-		<ul>
-			<li>We can help you get started quickly</li>
-			<li>Build a proof of concept for your project</li>
-			<li>Provide expert advice to get the most out of VoltDB</li>
-		</ul>
-        Simply contact [Fred?  Who do we send them to? - that's your call to action]
+		<h2>Want to Jump-start Your VoltDB Project?</h2>
+        Whether you’re tackling a POC or beginning your first VoltDB application, we’re here to help you.  All you need to do is send a quick email to <a href="mailto:sales@voltdb.com">sales@voltdb.com</a>.
 
     </div>
 
