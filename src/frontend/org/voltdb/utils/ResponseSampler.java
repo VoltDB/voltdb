@@ -123,13 +123,11 @@ public abstract class ResponseSampler {
                     continue;
 
                 // make some room if need be
-                if (m_sampledTxnIds.size() >= MAX_SAMPLES) {
+                while (m_sampledTxnIds.size() >= MAX_SAMPLES) {
                     long oldestTxnId = m_sampledTxnIds.first();
                     File f = txnIdToFile(oldestTxnId, false);
-                    assert(f.exists());
-                    assert(f.canWrite());
-                    boolean deleted = f.delete();
-                    assert(deleted);
+                    if (f.exists())
+                        f.delete();
                     m_sampledTxnIds.remove(oldestTxnId);
                 }
 
