@@ -470,19 +470,25 @@ DISTRIBUTION
     <distribute-example exampledir="twitter"/>
     <distribute-example exampledir="voter"/>
 
-    <!-- populate the studio.web tool -->
+    <!-- populate the tools -->
     <copy todir="${dist.dir}/tools" >
         <fileset dir="tools" defaultexcludes="yes">
             <include name="studio.web/**"/>
+            <include name="demo/**"/>
+            <include name="sqlcmd/**"/>
+            <include name="browser_adhoc/**"/>
         </fileset>
     </copy>
 
-    <!-- populate the sqlcmd tool -->
-    <copy todir="${dist.dir}/tools" >
-        <fileset dir="tools" defaultexcludes="yes">
-            <include name="sqlcmd/**"/>
+    <!-- make shell script executable -->
+    <chmod perm="ugo+rx">
+        <fileset dir="${dist.dir}/tools/demo" defaultexcludes="yes">
+            <include name="launch"/>
         </fileset>
-    </copy>
+    </chmod>
+
+    <!-- populate top level demo html -->
+    <copy todir="${dist.dir}/" file="STARTHERE.htm"/>
 
     <!-- copy jline-1.0.jar for sqlcmd tool -->
     <copy todir="${dist.dir}/tools/sqlcmd" file="third_party/java/jars/jline-1.0.jar"/>
@@ -493,13 +499,6 @@ DISTRIBUTION
             <include name="sqlcmd"/>
         </fileset>
     </chmod>
-
-    <!-- populate the ad hoc tool -->
-    <copy todir="${dist.dir}/tools" >
-        <fileset dir="tools" defaultexcludes="yes">
-            <include name="browser_adhoc/**"/>
-        </fileset>
-    </copy>
 
     <!-- copy voltdbclient.py for python examples -->
     <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/voltdbclient.py"/>
