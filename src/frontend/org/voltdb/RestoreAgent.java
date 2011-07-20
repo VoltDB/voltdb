@@ -298,8 +298,7 @@ SnapshotCompletionInterest {
             m_restoreHeartbeatThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    while (m_state == State.RESTORE ||
-                           (m_state == State.REPLAY && !m_replayAgent.started())) {
+                    while (m_state == State.RESTORE) {
                         m_initiator.sendHeartbeat(txnId + 1);
                         try {
                             Thread.sleep(500);
