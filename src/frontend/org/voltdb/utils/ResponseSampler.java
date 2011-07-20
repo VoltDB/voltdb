@@ -50,6 +50,7 @@ public abstract class ResponseSampler {
     public static final String SAMPLE_FILE_EXTENSION = ".json";
     public static final String REPLAY_TOKEN = "-replay";
     public static final long MAX_SAMPLES = 5000;
+    public static final long NON_REPLAY_SAMPLE = 0;
 
     // local state
     static final SortedSet<Long> m_sampledTxnIds = Collections.synchronizedSortedSet(new TreeSet<Long>());
@@ -125,14 +126,14 @@ public abstract class ResponseSampler {
                 // make some room if need be
                 while (m_sampledTxnIds.size() >= MAX_SAMPLES) {
                     long oldestTxnId = m_sampledTxnIds.first();
-                    File f = txnIdToFile(oldestTxnId, false);
+                    File f = txnIdToFile(oldestTxnId, NON_REPLAY_SAMPLE);
                     if (f.exists())
                         f.delete();
                     m_sampledTxnIds.remove(oldestTxnId);
                 }
 
                 // write the new file
-                writeFile(work.txnId, work.data, false);
+                writeFile(work.txnId, work.data, NON_REPLAY_SAMPLE);
                 m_sampledTxnIds.add(work.txnId);
             }
 
@@ -251,7 +252,7 @@ public abstract class ResponseSampler {
         }
     }
 
-    public static void offerResponse(long txnId, StoredProcedureInvocation invocation, JSONString responseData) {
+    public static void offerResponse(long initiatorId, long txnId, StoredProcedureInvocation invocation, JSONString responseData) {
         // no-op if not sampling
         if (!m_sampling) return;
 
@@ -260,7 +261,7 @@ public abstract class ResponseSampler {
         // check if we have a response to compare it to
         if (m_sampledTxnIds.contains(txnId)) {
             work = new SamplerWork(txnId, invocation, responseData);
-            checkReplayedResponse(work);
+            checkReplayedResponse(initiatorId, work);
             return;
         }
 
@@ -328,11 +329,16 @@ public abstract class ResponseSampler {
     /**
      * Verify that the contents on the disk match the data for the txn we're
      * about to replay.
+     * @param initiatorId
      */
-    static void checkReplayedResponse(SamplerWork work) {
+    static void checkReplayedResponse(long initiatorId, SamplerWork work) {
         String originalResponse = readFile(work.txnId);
+        // silent fail (at least here) if the file can't be found
+        if (originalResponse == null)
+            return;
+        // do the comparison
         if (!originalResponse.equals(work.data)) {
-            writeFile(work.txnId, work.data, true);
+            writeFile(work.txnId, work.data, initiatorId);
             ++errorsFound;
             LOG.error(String.format("Replay response differs for txnId: %d", work.txnId));
         }
@@ -343,13 +349,13 @@ public abstract class ResponseSampler {
      * Given a txn id, return the File object that represents it.
      * Note that the file doesn't have to exist.
      */
-    static File txnIdToFile(long txnId, boolean duringReplay) {
+    static File txnIdToFile(long txnId, long initiatorId ) {
         String path = String.format("%s%s%s%d%s%s",
                 m_sampleDir.getPath(),
                 File.separator,
                 SAMPLE_FILE_PREFIX,
                 txnId,
-                duringReplay ? REPLAY_TOKEN : "",
+                initiatorId != NON_REPLAY_SAMPLE ? REPLAY_TOKEN + String.valueOf(initiatorId) : "",
                 SAMPLE_FILE_EXTENSION);
         return new File(path);
     }
@@ -359,9 +365,10 @@ public abstract class ResponseSampler {
      * the right file, read its contents and return them.
      */
     static String readFile(long txnId) {
-        File f = txnIdToFile(txnId, false);
-        assert(f.exists() == true);
-        assert(f.canRead());
+        File f = txnIdToFile(txnId, NON_REPLAY_SAMPLE);
+        // silent fail if missing
+        if (!f.exists())
+            return null;
         StringBuilder sb = new StringBuilder();
         try {
             BufferedReader reader = new BufferedReader(
@@ -372,9 +379,9 @@ public abstract class ResponseSampler {
             }
             reader.close();
         } catch (IOException e) {
-            e.printStackTrace();
             String msg = String.format("Unable to read reposnse sample file at path %s", f.getPath());
             LOG.error(msg, e);
+            return null;
         }
         String retval = sb.toString();
         assert(retval != null);
@@ -385,8 +392,8 @@ public abstract class ResponseSampler {
      * Given a txnId, data and whether this is a replayed txn, write the contents
      * to the right filename.
      */
-    static void writeFile(long txnId, String jsonResponseData, boolean duringReplay) {
-        File f = txnIdToFile(txnId, duringReplay);
+    static void writeFile(long txnId, String jsonResponseData, long initiatorId) {
+        File f = txnIdToFile(txnId, initiatorId);
         assert(f.exists() == false);
         assert(f.getParentFile().canWrite());
         try {

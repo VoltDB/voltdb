@@ -244,7 +244,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         if (toSend != null) {
             // the next bit is usually a noop, unless we're sampling responses for test
             if (!state.isReadOnly)
-                ResponseSampler.offerResponse(state.txnId, state.invocation, toSend);
+                ResponseSampler.offerResponse(this.getSiteId(), state.txnId, state.invocation, toSend);
             // queue the response to be sent to the client
             enqueueResponse(toSend, state);
         }
