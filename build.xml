@@ -667,6 +667,8 @@ JAR BUILDING
             <include name="org/opencsv_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/apache/jute/**" />
+            <include name="org/apache/zookeeper_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
             <include name="org/voltdb/**" />
@@ -1597,6 +1599,7 @@ BENCHMARKS
         <param name="clienthost1" value="localhost"/>
         <param name="processesperclient" value="1"/>
         <param name="warehouses" value="2"/>
+        <param name="local" value="true"/>
         <param name="volt.server.memory" value="2048"/>
     </antcall>
 </target>
