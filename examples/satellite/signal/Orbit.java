@@ -54,6 +54,13 @@ public class Orbit extends Satellite {
         // Calculate the vertical location.
         currentLat = (peak *  Math.sin(currentLong+longOffset)) + latOffset;
     }
+        /*
+         *     Allow for objects where teh content will be read from the database
+         */
+    Orbit() {
+            // no initialization
+    }
+
 
     public void Move() {
         /*

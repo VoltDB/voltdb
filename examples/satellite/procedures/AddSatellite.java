@@ -34,13 +34,15 @@ public class AddSatellite extends VoltProcedure {
         new SQLStmt("SELECT ID FROM SATELLITE " +
                     " ORDER BY ID DESC LIMIT 1;");
     public final SQLStmt insertSatItem =
-        new SQLStmt("INSERT INTO SATELLITE (ID,MODEL_NUMBER,COUNTRY) " +
-                    "VALUES (?,?,?);");
+        new SQLStmt("INSERT INTO SATELLITE (ID,MODEL_NUMBER,COUNTRY,SPEED,DIRECTION,LATOFFSET,LONGOFFSET) " +
+                    "VALUES (?,?,?,?,?,?,?);");
     public final SQLStmt insertLocItem =
         new SQLStmt("INSERT INTO LOCATION (ID,LATITUDE,LONGITUDE) " +
                     "VALUES (?,?,?);");
 
     public long run( long id, String model, String country,
+                     double speed, double direction,             
+                     double latoffset, double longoffset,             
                      double latitude, double longitude) {
         long newid;
 
@@ -58,7 +60,7 @@ public class AddSatellite extends VoltProcedure {
 
         // Add a SQL statement to the execution queue. Queries
         // and DMLs may not be mixed in one batch.
-        voltQueueSQL( insertSatItem, newid, model, country );
+        voltQueueSQL( insertSatItem, newid, model, country, speed, direction, latoffset, longoffset );
         voltQueueSQL( insertLocItem, newid, latitude, longitude );
 
         // Run all queued queries.

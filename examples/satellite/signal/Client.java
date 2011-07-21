@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.NoConnectionsException;
 
 import procedures.AddSatellite;
 import procedures.UpdateLocation;
@@ -45,7 +46,7 @@ public class Client {
     static ArrayList<Orbit> sat = new ArrayList<Orbit>(20);
     final static String validcountries = "/usa/france/brazil/china/india/";
     final static ClientConfig config = new ClientConfig("signal", "wernher");
-    final static org.voltdb.client.Client db = ClientFactory.createClient(config);
+    static org.voltdb.client.Client db; 
 
     /**
      * @param args
@@ -67,7 +68,34 @@ public class Client {
         // Initialize the database.
         init_db();
 
-        // Generate the satellites.
+        // Check for existing satellites, if client or database restarts
+            try {
+                VoltTable[] result = db.callProcedure("GetAllSatellites").getResults();
+                VoltTable satellites = result[0];    // One set of results.
+                satellites.resetRowPosition();
+                while (satellites.advanceRow()) {
+                    Orbit o = new Orbit();
+                    o.id = (int) satellites.getLong("ID");
+                    o.country = satellites.getString("COUNTRY");
+                    o.model = satellites.getString("MODEL_NUMBER");
+                    o.speed = satellites.getDouble("SPEED");
+                    o.peak = satellites.getDouble("DIRECTION");
+                    o.latOffset= satellites.getDouble("LATOFFSET");
+                    o.longOffset= satellites.getDouble("LONGOFFSET");
+                          // Now get the current location
+                    VoltTable[] location = db.callProcedure("GetThisLocation",o.id).getResults();
+                    o.currentLong = location[0].fetchRow(0).getDouble("LONGITUDE");
+                    o.currentLat = location[0].fetchRow(0).getDouble("LATITUDE");
+                    System.out.println("Existing satellite ID is " + o.id);
+                    sat.add(o);
+                }
+                
+            }
+            catch (Exception e) {
+                System.err.println(e.getMessage());
+            }
+
+        // Generate new satellites.
         for (int i=0; i<num_of_satellites; i++) {
             Orbit o = new Orbit(Math.toRadians(minlat),Math.toRadians(maxlat),Math.toRadians(minoffset),Math.toRadians(maxoffset));
             o.country = country;
@@ -77,9 +105,10 @@ public class Client {
             //Add to the database
             try {
                 VoltTable[] result = db.callProcedure(AddSatellite.class.getSimpleName(),
-                            o.id, o.model, o.country, o.currentLat, o.currentLong).getResults();
+                            o.id, o.model, o.country, o.speed, o.peak, o.latOffset, o.longOffset, 
+                            o.currentLat, o.currentLong).getResults();
                 o.id = (int) result[0].asScalarLong();
-                System.out.println("Satellite ID is " + o.id);
+                System.out.println("New satellite ID is " + o.id);
             }
             catch (Exception e) {
                 System.err.println(e.getMessage());
@@ -92,7 +121,7 @@ public class Client {
          */
 
         int counter = 0;
-        while(counter < 3000) {        // Run for approximately 5 minutes
+        while(counter < 9000) {        // Run for approximately 15 minutes
             counter++;
             for (Orbit s: sat) {
                 s.Move();
@@ -102,6 +131,10 @@ public class Client {
                     assert (result != null);
                     long updatedRows = result[0].fetchRow(0).getLong(0);
                     assert(updatedRows > 0);
+                }
+                catch (NoConnectionsException e) {
+                     System.out.println("Connection Lost.");
+                     System.exit(-1);
                 }
                 catch (Exception e) {
                     System.err.println(e.getMessage());
@@ -163,6 +196,7 @@ public class Client {
 
     static void init_db() {
         boolean started = false;
+        db = ClientFactory.createClient(config);
         while (!started) {
             try {
                 db.createConnection("localhost");

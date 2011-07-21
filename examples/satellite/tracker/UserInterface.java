@@ -46,7 +46,7 @@ public class UserInterface {
     static JLabel label;
     static Board board;
     final static ClientConfig config = new ClientConfig("tracker", "vonbraun");
-    final static org.voltdb.client.Client db = ClientFactory.createClient(config);
+    static org.voltdb.client.Client db;
 
     // Create a constructor method, where the UI is constructed.
     public static void main(String args[]){
@@ -83,8 +83,12 @@ public class UserInterface {
 
         }
         catch (java.io.IOException e) {
-            e.printStackTrace();
             if (e instanceof NoConnectionsException) {
+                System.out.println("No connection.");
+                init_db();
+                return(false);
+            } else {
+                e.printStackTrace();
                 System.exit(-1);
             }
         }
@@ -178,6 +182,7 @@ public class UserInterface {
 
     static void init_db() {
         boolean started = false;
+        db  = ClientFactory.createClient(config);
         while (!started) {
             try {
                 db.createConnection("localhost");

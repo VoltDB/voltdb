@@ -10,6 +10,13 @@
             <procedure class='procedures.UpdateLocation' groups="signal-group" />
             <procedure class='procedures.GetLocationData' groups="tracker-group" />
             <procedure class='procedures.GetSatelliteData' groups="tracker-group" />
+            <procedure class='simple.GetAllSatellites' groups="signal-group">
+                 <sql>SELECT * FROM satellite ORDER BY id;</sql>
+            </procedure>
+           <procedure class='simple.GetThisLocation' 
+                      partitioninfo="Location.id:0" groups="signal-group">
+                 <sql >SELECT * FROM location WHERE id=?;</sql>
+            </procedure>
         </procedures>
         <groups>
             <group name="tracker-group" />
