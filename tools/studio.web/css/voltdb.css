@@ -1,5 +1,5 @@
 .hidden { display:none;}
-.toolbar { position:absolute;left:0;right:0;top:0;height:34px;z-index:10;padding-right:10px;min-width:650px; }
+.toolbar { position:absolute;left:0;right:0;top:0;height:34px;z-index:10;min-width:670px; }
 .toolbar div { float:left; }
 .toolbar button { float:left;height:25px; }
 
@@ -10,7 +10,7 @@
 #new-monitor span { background: url(icons/icon.performance.png) no-repeat 4px 4px scroll; }
 .toolbar .separator { float:left;height:25px;border-right:1px solid #999;margin-right:5px;width:5px; }
 
-.canvas { position:absolute;left:0px;top:34px;bottom:0px;right:0px;z-index:1; background-color:#ccc; }
+.canvas { position:absolute;left:0px;top:34px;bottom:0px;right:0px;z-index:1; background-color:#ccc;min-width:670px; }
 .sidebar { position:absolute;left:0px;width:250px;top:0px;bottom:0px;z-index:2; background-color:#fff;border:1px solid #666;overflow:hidden; }
 .sidebar li { white-space: nowrap; }
 .sidebar .header { position: absolute;top:0px;left:0px;right:0px;height:16px;background-color:#8c8c8c;color:white;padding:2px;padding-left:5px;font-weight:bold; }
