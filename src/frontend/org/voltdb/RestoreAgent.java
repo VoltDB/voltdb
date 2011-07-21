@@ -279,20 +279,6 @@ SnapshotCompletionInterest {
             }
 
             /*
-             * If this has the lowest host ID, initiate the snapshot restore
-             */
-            if (isLowestHost()) {
-                sendSnapshotTxnId(lastSnapshotTxnId);
-                if (restorePath != null && restoreNonce != null) {
-                    LOG.debug("Initiating snapshot " + restoreNonce +
-                              " in " + restorePath);
-                    initSnapshotWork(RESTORE_TXNID,
-                                     Pair.of("@SnapshotRestore",
-                                             new Object[] {restorePath, restoreNonce}));
-                }
-            }
-
-            /*
              * A thread to keep on sending fake heartbeats until the restore is
              * complete, or otherwise the RPQ is gonna be clogged.
              */
@@ -307,6 +293,21 @@ SnapshotCompletionInterest {
                     }
                 }
             });
+
+            /*
+             * If this has the lowest host ID, initiate the snapshot restore
+             */
+            if (isLowestHost()) {
+                sendSnapshotTxnId(lastSnapshotTxnId);
+                if (restorePath != null && restoreNonce != null) {
+                    LOG.debug("Initiating snapshot " + restoreNonce +
+                              " in " + restorePath);
+                    initSnapshotWork(RESTORE_TXNID,
+                                     Pair.of("@SnapshotRestore",
+                                             new Object[] {restorePath, restoreNonce}));
+                }
+            }
+
             m_restoreHeartbeatThread.start();
 
             if (!isLowestHost() || restorePath == null || restoreNonce == null) {
