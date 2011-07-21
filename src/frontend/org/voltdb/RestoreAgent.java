@@ -97,6 +97,9 @@ SnapshotCompletionInterest {
     private final static String SNAPSHOT_ID = "/restore/snapshot_id";
     private final String zkBarrierNode;
 
+    // Transaction ID of the restore sysproc
+    private final static long RESTORE_TXNID = 1l;
+
     private final Integer m_hostId;
     private final CatalogContext m_context;
     private final TransactionInitiator m_initiator;
@@ -167,8 +170,6 @@ SnapshotCompletionInterest {
 
             enterRestore();
 
-            // Transaction ID of the restore sysproc
-            final long txnId = 1l;
             TreeMap<Long, Snapshot> snapshots = getSnapshots();
             Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
 
@@ -285,7 +286,7 @@ SnapshotCompletionInterest {
                 if (restorePath != null && restoreNonce != null) {
                     LOG.debug("Initiating snapshot " + restoreNonce +
                               " in " + restorePath);
-                    initSnapshotWork(txnId,
+                    initSnapshotWork(RESTORE_TXNID,
                                      Pair.of("@SnapshotRestore",
                                              new Object[] {restorePath, restoreNonce}));
                 }
@@ -299,7 +300,7 @@ SnapshotCompletionInterest {
                 @Override
                 public void run() {
                     while (m_state == State.RESTORE) {
-                        m_initiator.sendHeartbeat(txnId + 1);
+                        m_initiator.sendHeartbeat(RESTORE_TXNID + 1);
                         try {
                             Thread.sleep(500);
                         } catch (InterruptedException e) {}
@@ -498,14 +499,16 @@ SnapshotCompletionInterest {
                                                START_ACTION.class,
                                                TransactionInitiator.class,
                                                CatalogContext.class,
-                                               ZooKeeper.class);
+                                               ZooKeeper.class,
+                                               long.class);
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_initiator,
                                                                     m_context,
-                                                                    m_zk);
+                                                                    m_zk,
+                                                                    RESTORE_TXNID + 1);
             }
         } catch (Exception e) {
             LOG.fatal("Unable to instantiate command log reinitiator", e);
@@ -1026,6 +1029,10 @@ SnapshotCompletionInterest {
             exitRestore();
             m_state = State.REPLAY;
 
+            try {
+                m_restoreHeartbeatThread.join();
+            } catch (InterruptedException e) {}
+
             /*
              * Add the interest here so that we can use the barriers in replay
              * agent to synchronize.
@@ -1036,9 +1043,6 @@ SnapshotCompletionInterest {
             m_state = State.TRUNCATE;
         } else if (m_state == State.TRUNCATE) {
             m_snapshotMonitor.removeInterest(this);
-            try {
-                m_restoreHeartbeatThread.join();
-            } catch (InterruptedException e) {}
             if (m_callback != null) {
                 m_callback.onRestoreCompletion(m_truncationSnapshot, true);
             }
