@@ -488,7 +488,7 @@ DISTRIBUTION
     </chmod>
 
     <!-- populate top level demo html -->
-    <copy todir="${dist.dir}/" file="Click Here to Start.htm"/>
+    <copy todir="${dist.dir}/" file="Click Here to Start.html"/>
 
     <!-- copy jline-1.0.jar for sqlcmd tool -->
     <copy todir="${dist.dir}/tools/sqlcmd" file="third_party/java/jars/jline-1.0.jar"/>
