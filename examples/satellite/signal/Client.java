@@ -46,7 +46,7 @@ public class Client {
     static ArrayList<Orbit> sat = new ArrayList<Orbit>(20);
     final static String validcountries = "/usa/france/brazil/china/india/";
     final static ClientConfig config = new ClientConfig("signal", "wernher");
-    static org.voltdb.client.Client db; 
+    static org.voltdb.client.Client db;
 
     /**
      * @param args
@@ -89,7 +89,7 @@ public class Client {
                     System.out.println("Existing satellite ID is " + o.id);
                     sat.add(o);
                 }
-                
+
             }
             catch (Exception e) {
                 System.err.println(e.getMessage());
@@ -105,7 +105,7 @@ public class Client {
             //Add to the database
             try {
                 VoltTable[] result = db.callProcedure(AddSatellite.class.getSimpleName(),
-                            o.id, o.model, o.country, o.speed, o.peak, o.latOffset, o.longOffset, 
+                            o.id, o.model, o.country, o.speed, o.peak, o.latOffset, o.longOffset,
                             o.currentLat, o.currentLong).getResults();
                 o.id = (int) result[0].asScalarLong();
                 System.out.println("New satellite ID is " + o.id);

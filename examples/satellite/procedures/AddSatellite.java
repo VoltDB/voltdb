@@ -41,8 +41,8 @@ public class AddSatellite extends VoltProcedure {
                     "VALUES (?,?,?);");
 
     public long run( long id, String model, String country,
-                     double speed, double direction,             
-                     double latoffset, double longoffset,             
+                     double speed, double direction,
+                     double latoffset, double longoffset,
                      double latitude, double longitude) {
         long newid;
 
