@@ -9,11 +9,9 @@ PARAM1=$1
 if [ $1 != "trunk" ]; then
     ENGTAG=tags/${PARAM1}
     PROTAG=tags/${PARAM1}
-    DOCTAG=tags/${PARAM1}
 else
     ENGTAG=trunk
     PROTAG=branches/rest
-    DOCTAG=trunk
 fi
 
 # check that the directory is empty
@@ -21,9 +19,8 @@ ls * > /dev/null && exit 1
 
 OS=`uname -s | tr [a-z] [A-Z] | sed 's/DARWIN/MAC/'`
 
-rm -rf doc eng pro
+rm -rf eng pro
 
-svn co https://svn.voltdb.com/doc/$DOCTAG doc
 svn co https://svn.voltdb.com/eng/$ENGTAG eng
 svn co https://svn.voltdb.com/pro/$PROTAG pro
 
@@ -37,12 +34,6 @@ svn status
 ant -f mmt.xml clean
 VOLTCORE=../eng ant -f mmt.xml dist.pro
 cp obj/pro/voltdb-ent-*.tar.gz ~/releases/`cat ../eng/version.txt`/
-cd ../doc
-# we do not include EE release notes in the documentation zip file
-rm pdfs/enterprise_releasenotes.pdf
-mv pdfs `cat ../eng/version.txt`-docs_pdf
-zip ~/releases/`cat ../eng/version.txt`/`cat ../eng/version.txt`-docs_pdf.zip `cat ../eng/version.txt`-docs_pdf/*.pdf
-mv `cat ../eng/version.txt`-docs_pdf pdfs
 cd ../eng
 echo "CRC checksums:" > ~/releases/`cat version.txt`/checksums.txt
 echo "" >> ~/releases/`cat version.txt`/checksums.txt
