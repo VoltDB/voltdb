@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.proto;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.proto.ConnectRequest;
 public class ConnectRequest implements Record {
   private int protocolVersion;
@@ -135,7 +135,7 @@ public String toString() {
     {
       byte[] my = passwd;
       byte[] ur = peer.passwd;
-      ret = org.apache.jute.Utils.compareBytes(my,0,my.length,ur,0,ur.length);
+      ret = org.apache.jute_voltpatches.Utils.compareBytes(my,0,my.length,ur,0,ur.length);
     }
     if (ret != 0) return ret;
      return ret;
@@ -158,7 +158,7 @@ public boolean equals(Object peer_) {
     if (!ret) return ret;
     ret = (sessionId==peer.sessionId);
     if (!ret) return ret;
-    ret = org.apache.jute.Utils.bufEquals(passwd,peer.passwd);
+    ret = org.apache.jute_voltpatches.Utils.bufEquals(passwd,peer.passwd);
     if (!ret) return ret;
      return ret;
   }

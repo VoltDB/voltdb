@@ -32,8 +32,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
-import org.apache.jute.BinaryInputArchive;
-import org.apache.jute.Record;
+import org.apache.jute_voltpatches.BinaryInputArchive;
+import org.apache.jute_voltpatches.Record;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;

@@ -33,10 +33,10 @@ import java.util.zip.Adler32;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.CheckedOutputStream;
 
-import org.apache.jute.BinaryInputArchive;
-import org.apache.jute.BinaryOutputArchive;
-import org.apache.jute.InputArchive;
-import org.apache.jute.OutputArchive;
+import org.apache.jute_voltpatches.BinaryInputArchive;
+import org.apache.jute_voltpatches.BinaryOutputArchive;
+import org.apache.jute_voltpatches.InputArchive;
+import org.apache.jute_voltpatches.OutputArchive;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.server.persistence.FileHeader;
 import org.apache.zookeeper_voltpatches.server.persistence.FileSnap;

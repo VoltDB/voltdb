@@ -51,8 +51,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.*;
 
-import org.apache.jute.BinaryInputArchive;
-import org.apache.jute.BinaryOutputArchive;
+import org.apache.jute_voltpatches.BinaryInputArchive;
+import org.apache.jute_voltpatches.BinaryOutputArchive;
 import org.apache.zookeeper_voltpatches.ZooDefs.OpCode;
 import org.apache.zookeeper_voltpatches.server.*;
 

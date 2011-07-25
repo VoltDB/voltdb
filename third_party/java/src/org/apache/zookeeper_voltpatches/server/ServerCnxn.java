@@ -23,7 +23,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Date;
 
-import org.apache.jute.Record;
+import org.apache.jute_voltpatches.Record;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.data.Id;

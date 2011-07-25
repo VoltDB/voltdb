@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.server.persistence;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.server.persistence.FileHeader;
 public class FileHeader implements Record {
   private int magic;

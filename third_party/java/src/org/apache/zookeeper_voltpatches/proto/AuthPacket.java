@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.proto;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.proto.AuthPacket;
 public class AuthPacket implements Record {
   private int type;
@@ -107,7 +107,7 @@ public String toString() {
     {
       byte[] my = auth;
       byte[] ur = peer.auth;
-      ret = org.apache.jute.Utils.compareBytes(my,0,my.length,ur,0,ur.length);
+      ret = org.apache.jute_voltpatches.Utils.compareBytes(my,0,my.length,ur,0,ur.length);
     }
     if (ret != 0) return ret;
      return ret;
@@ -126,7 +126,7 @@ public boolean equals(Object peer_) {
     if (!ret) return ret;
     ret = scheme.equals(peer.scheme);
     if (!ret) return ret;
-    ret = org.apache.jute.Utils.bufEquals(auth,peer.auth);
+    ret = org.apache.jute_voltpatches.Utils.bufEquals(auth,peer.auth);
     if (!ret) return ret;
      return ret;
   }

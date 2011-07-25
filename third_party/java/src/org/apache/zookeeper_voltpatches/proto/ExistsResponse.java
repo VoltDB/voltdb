@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.proto;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.proto.ExistsResponse;
 public class ExistsResponse implements Record {
   private org.apache.zookeeper_voltpatches.data.Stat stat;

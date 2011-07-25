@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.proto;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.proto.CreateRequest;
 public class CreateRequest implements Record {
   private String path;
@@ -150,7 +150,7 @@ public boolean equals(Object peer_) {
     boolean ret = false;
     ret = path.equals(peer.path);
     if (!ret) return ret;
-    ret = org.apache.jute.Utils.bufEquals(data,peer.data);
+    ret = org.apache.jute_voltpatches.Utils.bufEquals(data,peer.data);
     if (!ret) return ret;
     ret = acl.equals(peer.acl);
     if (!ret) return ret;

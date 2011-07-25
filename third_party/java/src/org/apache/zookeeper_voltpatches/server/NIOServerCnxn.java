@@ -44,9 +44,9 @@ import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.jute.BinaryInputArchive;
-import org.apache.jute.BinaryOutputArchive;
-import org.apache.jute.Record;
+import org.apache.jute_voltpatches.BinaryInputArchive;
+import org.apache.jute_voltpatches.BinaryOutputArchive;
+import org.apache.jute_voltpatches.Record;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.Environment;
 import org.apache.zookeeper_voltpatches.KeeperException;

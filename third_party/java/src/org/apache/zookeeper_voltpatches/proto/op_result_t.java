@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.proto;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.proto.op_result_t;
 public class op_result_t implements Record {
   private int rc;
@@ -107,7 +107,7 @@ public String toString() {
     {
       byte[] my = response;
       byte[] ur = peer.response;
-      ret = org.apache.jute.Utils.compareBytes(my,0,my.length,ur,0,ur.length);
+      ret = org.apache.jute_voltpatches.Utils.compareBytes(my,0,my.length,ur,0,ur.length);
     }
     if (ret != 0) return ret;
      return ret;
@@ -126,7 +126,7 @@ public boolean equals(Object peer_) {
     if (!ret) return ret;
     ret = (op==peer.op);
     if (!ret) return ret;
-    ret = org.apache.jute.Utils.bufEquals(response,peer.response);
+    ret = org.apache.jute_voltpatches.Utils.bufEquals(response,peer.response);
     if (!ret) return ret;
      return ret;
   }

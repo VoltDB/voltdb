@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.txn;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.txn.SetDataTxn;
 public class SetDataTxn implements Record {
   private String path;
@@ -105,7 +105,7 @@ public String toString() {
     {
       byte[] my = data;
       byte[] ur = peer.data;
-      ret = org.apache.jute.Utils.compareBytes(my,0,my.length,ur,0,ur.length);
+      ret = org.apache.jute_voltpatches.Utils.compareBytes(my,0,my.length,ur,0,ur.length);
     }
     if (ret != 0) return ret;
     ret = (version == peer.version)? 0 :((version<peer.version)?-1:1);
@@ -124,7 +124,7 @@ public boolean equals(Object peer_) {
     boolean ret = false;
     ret = path.equals(peer.path);
     if (!ret) return ret;
-    ret = org.apache.jute.Utils.bufEquals(data,peer.data);
+    ret = org.apache.jute_voltpatches.Utils.bufEquals(data,peer.data);
     if (!ret) return ret;
     ret = (version==peer.version);
     if (!ret) return ret;

@@ -22,9 +22,9 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.apache.jute.InputArchive;
-import org.apache.jute.OutputArchive;
-import org.apache.jute.Record;
+import org.apache.jute_voltpatches.InputArchive;
+import org.apache.jute_voltpatches.OutputArchive;
+import org.apache.jute_voltpatches.Record;
 import org.apache.zookeeper_voltpatches.server.DataNode;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.apache.zookeeper_voltpatches.data.StatPersisted;

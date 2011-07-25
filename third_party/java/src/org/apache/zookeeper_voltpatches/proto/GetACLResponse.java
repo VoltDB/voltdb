@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.proto;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.proto.GetACLResponse;
 public class GetACLResponse implements Record {
   private java.util.List<org.apache.zookeeper_voltpatches.data.ACL> acl;

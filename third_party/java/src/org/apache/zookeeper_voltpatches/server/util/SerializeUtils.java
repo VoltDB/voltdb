@@ -25,9 +25,9 @@ import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
 
-import org.apache.jute.InputArchive;
-import org.apache.jute.OutputArchive;
-import org.apache.jute.Record;
+import org.apache.jute_voltpatches.InputArchive;
+import org.apache.jute_voltpatches.OutputArchive;
+import org.apache.jute_voltpatches.Record;
 import org.apache.zookeeper_voltpatches.server.util.SerializeUtils;
 import org.apache.zookeeper_voltpatches.ZooDefs.OpCode;
 import org.apache.zookeeper_voltpatches.server.DataTree;

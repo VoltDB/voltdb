@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.txn;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.txn.TxnHeader;
 public class TxnHeader implements Record {
   private long clientId;

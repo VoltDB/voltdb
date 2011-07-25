@@ -20,7 +20,7 @@
 package org.apache.zookeeper_voltpatches.data;
 
 import java.util.*;
-import org.apache.jute.*;
+import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.data.StatPersisted;
 public class StatPersisted implements Record {
   private long czxid;

@@ -36,9 +36,9 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.apache.jute.BinaryInputArchive;
-import org.apache.jute.BinaryOutputArchive;
-import org.apache.jute.Record;
+import org.apache.jute_voltpatches.BinaryInputArchive;
+import org.apache.jute_voltpatches.BinaryOutputArchive;
+import org.apache.jute_voltpatches.Record;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ACLCallback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.Children2Callback;

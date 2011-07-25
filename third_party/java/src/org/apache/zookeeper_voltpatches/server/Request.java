@@ -21,7 +21,7 @@ package org.apache.zookeeper_voltpatches.server;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import org.apache.jute.Record;
+import org.apache.jute_voltpatches.Record;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.server.Request;
 import org.apache.zookeeper_voltpatches.server.ServerCnxn;

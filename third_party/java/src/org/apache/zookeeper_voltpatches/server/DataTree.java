@@ -29,10 +29,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.jute.Index;
-import org.apache.jute.InputArchive;
-import org.apache.jute.OutputArchive;
-import org.apache.jute.Record;
+import org.apache.jute_voltpatches.Index;
+import org.apache.jute_voltpatches.InputArchive;
+import org.apache.jute_voltpatches.OutputArchive;
+import org.apache.jute_voltpatches.Record;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.server.DataNode;
 import org.apache.zookeeper_voltpatches.server.DataTree;
