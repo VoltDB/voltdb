@@ -2,7 +2,7 @@
 <project>
     <info>
         <name>Voter Example</name>
-        <version>1.0</version>
+        <version>2.0</version>
         <description>Demonstrates call-in vote counting scheme.</description>
     </info>
     <database>
@@ -13,6 +13,11 @@
             <procedure class='com.procedures.Initialize' />
             <procedure class='com.procedures.Results' />
             <procedure class='com.procedures.Vote' />
+            <procedure class='com.procedures.ContestantResultsByAreaCode' />
+            <procedure class='com.procedures.ContestantWinningStates' />
+            <procedure class="com.procedures.VotesByAreaCode">
+                <sql>select * from v_votes_by_area_code</sql>
+            </procedure>
         </procedures>
         <partitions>
             <partition table='votes' column='phone_number' />

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2011 VoltDB Inc.
+ * Copyright (C) 2008-2010 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,47 +30,42 @@ package com.procedures;
 
 import org.voltdb.*;
 
-@ProcInfo(
-    singlePartition = false
-)
+@ProcInfo (singlePartition = false)
 
 public class Initialize extends VoltProcedure {
     // check if the system has already been initialized
     public final SQLStmt checkContestant = new SQLStmt("select count(*) from contestants;");
-
+    // insert an area code
+    public final SQLStmt insertACS = new SQLStmt("insert into area_code_state values(?,?);");
     // insert a contestant
     public final SQLStmt insertContestant = new SQLStmt("insert into contestants (contestant_name, contestant_number) values (?, ?);");
 
-    public VoltTable[] run(
-        int maxContestant,
-        String[] contestantArray
-    ) {
+    public VoltTable[] run(int maxContestant, String contestants, short[] areaCodes, String[] states)
+    {
+        String[] contestantArray = contestants.split(",");
         int numContestants = 1;
 
         voltQueueSQL(checkContestant);
         VoltTable results1[] = voltExecuteSQL();
 
-        if (results1[0].fetchRow(0).getLong(0) == 0) {
-            // insert contestants
-            for (int i=0; i < maxContestant; i++) {
+        if (results1[0].fetchRow(0).getLong(0) == 0)
+        {
+            for (int i=0; i < maxContestant; i++)
                 voltQueueSQL(insertContestant, contestantArray[i], i+1);
-            }
-
             voltExecuteSQL();
 
             numContestants = maxContestant;
-        } else {
-            // get number of contestants
-            numContestants = (int) results1[0].fetchRow(0).getLong(0);
+
+            for(int i=0;i<areaCodes.length;i++)
+                voltQueueSQL(insertACS, areaCodes[i], states[i]);
+            voltExecuteSQL();
+
         }
+        else
+            numContestants = (int) results1[0].fetchRow(0).getLong(0);
 
         VoltTable vtContestants = new VoltTable(new VoltTable.ColumnInfo("numContestants",VoltType.INTEGER));
-        Object row[] = new Object[1];
-        row[0] = numContestants;
-        vtContestants.addRow(row);
-
-        final VoltTable[] vtReturn = {vtContestants};
-
-        return vtReturn;
+        vtContestants.addRow(new Object[] {numContestants});
+        return new VoltTable[] {vtContestants};
     }
 }

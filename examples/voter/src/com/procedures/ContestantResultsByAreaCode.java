@@ -34,20 +34,18 @@ import org.voltdb.*;
     singlePartition = false
 )
 
-public class Results extends VoltProcedure {
+public class ContestantResultsByAreaCode extends VoltProcedure {
     // get the results
 
-    public final SQLStmt getResults = new SQLStmt("select a.contestant_name contestant_name, " +
-                                                  "       a.contestant_number contestant_number, " +
-                                                  "       sum(b.num_votes) total_votes " +
-                                                  "from v_votes_by_contestant_number b, " +
-                                                  "     contestants a " +
-                                                  "where a.contestant_number = b.contestant_number " +
-                                                  "group by a.contestant_name, a.contestant_number " +
-                                                  "order by total_votes asc;");
+    public final SQLStmt getResults = new SQLStmt( "select top 10 area_code, "
+                                                 + "       SUM(num_votes) AS total_votes "
+                                                 + "  from v_votes_by_contestant_number_area_code "
+                                                 + " where contestant_number = ? "
+                                                 + " group by area_code "
+                                                 + " order by total_votes desc;");
 
-    public VoltTable[] run() {
-        voltQueueSQL(getResults);
+    public VoltTable[] run(int contestantNumber) {
+        voltQueueSQL(getResults,contestantNumber);
         return voltExecuteSQL(true);
     }
 }
