@@ -3,7 +3,7 @@
 <!--DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"-->
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
     <head>
-		<title>Voter Sample :: Real-Time/Live Results</title>
+		<title>Voter Sample: Real-Time Results</title>
 		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
         <link rel="stylesheet" type="text/css" href="../../tools/studio.web/css/jquery.jqplot.min.css" />
         <script language="javascript" type="text/javascript" src="../../tools/studio.web/js/jquery-1.6.1.min.js"></script>
@@ -24,7 +24,6 @@
             {
                 try
                 {
-                    SetRefreshInterval(1);
                     var data = [['XX',0]];
                     var agg = [0,0,0,0,0,0];
                     var tot = 1;
@@ -115,8 +114,8 @@
 <tr><td valign="middle=" align="center"><div style="width:580px;padding:20px;padding-top:0px;background-color:white;border:1px solid #ddd;">
 
 <div style="width:580px;text-align:justify">
-<h1>Voter Sample :: Real-Time/Live Results</h1>
-<p>Watch the voting results live - the heat map indicates which contestant is winning in a given state, while the table below the map lists the total number of votes each contestant has received, nationwide.  Feel free to change the refresh speed for the data below.</p>
+<h1>Voter Sample: Real-Time Results</h1>
+<p>Watch the voting results live - the heat map indicates which contestant is winning in a given state, while the table below the map lists the total number of votes each contestant has received, nationwide.  Use the pulldown menu to change the refresh rate..</p>
 </div>
 <hr size="1" />
 <b>Refresh Data: </b><select onchange="SetRefreshInterval(this.value)">
