@@ -15,9 +15,7 @@
             <procedure class='com.procedures.Vote' />
             <procedure class='com.procedures.ContestantResultsByAreaCode' />
             <procedure class='com.procedures.ContestantWinningStates' />
-            <procedure class="com.procedures.VotesByAreaCode">
-                <sql>select * from v_votes_by_area_code</sql>
-            </procedure>
+            <procedure class='com.procedures.GetStateHeatmap' />
         </procedures>
         <partitions>
             <partition table='votes' column='phone_number' />
