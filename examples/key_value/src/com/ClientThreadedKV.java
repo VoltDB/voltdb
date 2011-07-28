@@ -385,14 +385,23 @@ public class ClientThreadedKV {
 
         String[] voltServers = serverList.split(",");
 
-        for (String thisServer : voltServers) {
-            try {
-                thisServer = thisServer.trim();
-                m_logger.info(String.format("Connecting to server: %s",thisServer));
-                voltclient.createConnection(thisServer);
-            } catch (IOException e) {
-                m_logger.error(e.toString());
-                System.exit(-1);
+        for (String thisServer : voltServers)
+        {
+            thisServer = thisServer.trim();
+            m_logger.info(String.format("Connecting to server: '%s'\n",thisServer));
+            int sleep = 1000;
+            while(true)
+            {
+                try
+                {
+                    voltclient.createConnection(thisServer);
+                    break;
+                } catch (IOException e) {
+                    m_logger.info("Connection failed - retrying in " + (sleep/1000) + " second(s).");
+                    try {Thread.sleep(sleep);} catch(Exception tie){}
+                    if (sleep < 8000)
+                        sleep += sleep;
+                }
             }
         }
 

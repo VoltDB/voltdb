@@ -105,15 +105,23 @@ public class SyncClientVoter {
 
         String[] voltServers = serverList.split(",");
 
-        for (String thisServer : voltServers) {
-            try {
-                thisServer = thisServer.trim();
-                System.out.printf("Connecting to server: '%s'\n",thisServer);
-
-                voltclient.createConnection(thisServer, 21212);
-            } catch (IOException e) {
-                e.printStackTrace();
-                System.exit(-1);
+        for (String thisServer : voltServers)
+        {
+            thisServer = thisServer.trim();
+            System.out.printf("Connecting to server: '%s'\n",thisServer);
+            int sleep = 1000;
+            while(true)
+            {
+                try
+                {
+                    voltclient.createConnection(thisServer);
+                    break;
+                } catch (IOException e) {
+                    System.out.println("Connection failed - retrying in " + (sleep/1000) + " second(s).");
+                    try {Thread.sleep(sleep);} catch(Exception tie){}
+                    if (sleep < 8000)
+                        sleep += sleep;
+                }
             }
         }
 

@@ -231,13 +231,21 @@ public class Client {
 
         // connect to VoltDB server
         org.voltdb.client.Client client = null;
-        try {
-            ClientConfig config = new ClientConfig("program", "pass");
-            client = ClientFactory.createClient(config);
-            client.createConnection("localhost");
-        } catch (java.io.IOException e) {
-            e.printStackTrace();
-            System.exit(-1);
+        ClientConfig config = new ClientConfig("program", "pass");
+        client = ClientFactory.createClient(config);
+        int sleep = 1000;
+        while(true)
+        {
+            try
+            {
+                client.createConnection("localhost");
+                break;
+            } catch (Exception e) {
+                System.out.println("Connection failed - retrying in " + (sleep/1000) + " second(s).");
+                try {Thread.sleep(sleep);} catch(Exception tie){}
+                if (sleep < 8000)
+                    sleep += sleep;
+            }
         }
 
         System.out.println("* Connected                           *");
