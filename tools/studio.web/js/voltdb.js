@@ -266,7 +266,7 @@ var IVoltDB = (function(){
 				}
 				delete this.Procedures[procedureInfo.name];
 				this.Procedures[procedureInfo.name] = procedureInfo.params;
-				MainUI.DeclareProcedure(this, procedureInfo);
+                try { MainUI.DeclareProcedure(this, procedureInfo); } catch(x) {}
 			}
 		}
 		this.UndeclareProcedure = function(procedureName)
@@ -274,7 +274,7 @@ var IVoltDB = (function(){
 			if (procedureName.indexOf('@') == -1)
 			{
 				delete this.Procedures[procedureName];
-				MainUI.UndeclareProcedure(this, procedureName);
+				try { MainUI.UndeclareProcedure(this, procedureName); } catch(x) {}
 			}
 		}
 		return this;
