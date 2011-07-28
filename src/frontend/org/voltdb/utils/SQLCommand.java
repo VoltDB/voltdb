@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.util.Map;
 import java.util.Hashtable;
+import java.util.TreeSet;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -134,6 +135,7 @@ public class SQLCommand
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ListToken = Pattern.compile("^\\s*(list proc|list procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListTablesToken = Pattern.compile("^\\s*(list tables);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
@@ -250,6 +252,28 @@ public class SQLCommand
                     System.out.print("\n");
                 }
             }
+            // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
+            else if (ListTablesToken.matcher(line).matches())
+            {
+                if (interactive)
+                {
+                    Object[] lists = GetTableList();
+                    for(int i=0;i<3;i++)
+                    {
+                        if (i == 0)
+                            System.out.println("\n--- User Tables --------------------------------------------");
+                        else if (i == 1)
+                            System.out.println("\n--- User Views ---------------------------------------------");
+                        else
+                            System.out.println("\n--- User Export Streams ------------------------------------");
+                        Iterator<String> list = (Iterator<String>)((TreeSet<String>)lists[i]).iterator();
+                        while(list.hasNext())
+                            System.out.println(list.next());
+                        System.out.print("\n");
+                    }
+                    System.out.print("\n");
+                }
+            }
             // GO commands - ONLY in interactive mode, close batch and parse for execution
             else if (GoToken.matcher(line).matches())
             {
@@ -300,9 +324,7 @@ public class SQLCommand
         }
         while(true);
     }
-//  private static boolean getLine(boolean interactive)
-//  {
-//  }
+
     private static String readScriptFile(String filePath)
     {
         try
@@ -767,8 +789,39 @@ public class SQLCommand
         }
     }
 
-
-   private static InputStream in = null;
+    private static Object[] GetTableList() throws Exception
+    {
+        VoltTable tableData = VoltDB.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+        VoltTable indexData = VoltDB.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+        TreeSet<String> tables = new TreeSet<String>();
+        TreeSet<String> exports = new TreeSet<String>();
+        TreeSet<String> views = new TreeSet<String>();
+        for(int i = 0; i < tableData.getRowCount(); i++)
+        {
+            String tableName = tableData.fetchRow(i).getString(5);
+            if (tableData.fetchRow(i).getString(6).equals("StreamedTable"))
+                exports.add(tableName);
+            else
+            {
+                boolean isView = false;
+                for(int j = 0; j < indexData.getRowCount(); j++)
+                {
+                    if (indexData.fetchRow(j).getString(6).toUpperCase().equals(tableName.toUpperCase()))
+                    {
+                        String indexName = indexData.fetchRow(j).getString(5);
+                        if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
+                            isView = true;
+                    }
+                }
+                if (isView)
+                    views.add(tableName);
+                else
+                    tables.add(tableName);
+            }
+        }
+        return new Object[] {tables, views, exports};
+    }
+    private static InputStream in = null;
     private static Writer out = null;
     // Application entry point
     public static void main(String args[])
