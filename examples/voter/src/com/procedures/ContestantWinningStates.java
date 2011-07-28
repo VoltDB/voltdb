@@ -52,12 +52,12 @@ public class ContestantWinningStates extends VoltProcedure {
             this.Votes = votes;
         }
     }
-    static class OrderByVotesDesc implements Comparator
+    static class OrderByVotesDesc implements Comparator<Result>
     {
-        public int compare(Object a, Object b)
+        public int compare(Result a, Result b)
         {
-            long numVotesA = ((Result)a).Votes;
-            long numVotesB = ((Result)b).Votes;
+            long numVotesA = a.Votes;
+            long numVotesB = b.Votes;
             if (numVotesA > numVotesB)
                 return -1;
             else if (numVotesA < numVotesB)
@@ -82,7 +82,7 @@ public class ContestantWinningStates extends VoltProcedure {
                     results.add(new Result(state, summary.getLong(2)));
             }
         }
-        Object[] resultArray = results.toArray();
+        Result[] resultArray = (Result[])results.toArray();
         Arrays.sort(resultArray, new OrderByVotesDesc());
         VoltTable result = new VoltTable(new VoltTable.ColumnInfo("state",VoltType.STRING), new VoltTable.ColumnInfo("num_votes",VoltType.BIGINT));
         for(int i=0;i<Math.min(resultArray.length,max);i++)
