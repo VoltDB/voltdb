@@ -55,6 +55,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
 //        return false;
     }
 
+    std::size_t bytesSerialized = 0;
     while (out->remaining() >= (m_maxTupleLength + sizeof(int32_t))) {
         const bool hadMore = m_iterator->next(tuple);
 
@@ -97,6 +98,12 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
             CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
             //Save the extra lookup if possible
             m_table->deleteTupleStorage(tuple, iter->m_currentBlock);
+        }
+
+        // If we have serialized more than 1MB of tuple data, stop for a while
+        bytesSerialized += tupleEndPosition - tupleStartPosition;
+        if (bytesSerialized >= 1024 * 256) {
+            break;
         }
     }
     /*

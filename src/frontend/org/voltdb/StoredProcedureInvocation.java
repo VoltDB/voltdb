@@ -181,7 +181,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     }
 
     public ByteBuffer getSerializedParams() {
-        return unserializedParams.duplicate();
+        if (unserializedParams != null) {
+            return unserializedParams;
+        }
+        return null;
     }
 
     public void setSerializedParams(ByteBuffer serializedParams) {

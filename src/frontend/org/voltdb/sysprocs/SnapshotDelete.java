@@ -67,7 +67,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
     @Override
     public DependencyPair
-    executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
+    executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, final ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
@@ -83,47 +83,31 @@ public class SnapshotDelete extends VoltSystemProcedure {
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
-                assert(params.toArray()[0] != null);
-                assert(params.toArray()[0] instanceof String[]);
-                assert(((String[])params.toArray()[0]).length > 0);
-                assert(params.toArray()[1] != null);
-                assert(params.toArray()[1] instanceof String[]);
-                assert(((String[])params.toArray()[1]).length > 0);
-                assert(((String[])params.toArray()[0]).length == ((String[])params.toArray()[1]).length);
+                new Thread() {
+                    @Override
+                    public void run() {
+                        assert(params.toArray()[0] != null);
+                        assert(params.toArray()[0] instanceof String[]);
+                        assert(((String[])params.toArray()[0]).length > 0);
+                        assert(params.toArray()[1] != null);
+                        assert(params.toArray()[1] instanceof String[]);
+                        assert(((String[])params.toArray()[1]).length > 0);
+                        assert(((String[])params.toArray()[0]).length == ((String[])params.toArray()[1]).length);
 
-                final String paths[] = (String[])params.toArray()[0];
-                final String nonces[] = (String[])params.toArray()[1];
-                for (int ii = 0; ii < paths.length; ii++) {
-                    List<File> relevantFiles = retrieveRelevantFiles(paths[ii], nonces[ii]);
-                    if (relevantFiles == null) {
-                        result.addRow(
-                                      Integer.parseInt(context.getSite().getHost().getTypeName()),
-                                      hostname,
-                                      paths[ii],
-                                      nonces[ii],
-                                      "",
-                                      0,
-                                      "FALSE",
-                                      "FAILURE",
-                                      errorString);
-                    } else {
-                        for (final File f : relevantFiles) {
-                            long size = f.length();
-                            boolean deleted = f.delete();
-                            result.addRow(
-                                          Integer.parseInt(context.getSite().getHost().getTypeName()),
-                                          hostname,
-                                          paths[ii],
-                                          nonces[ii],
-                                          f.getName(),
-                                          size,
-                                          deleted ? "TRUE": "FALSE",
-                                                  "SUCESS",
-                            "");
-
+                        final String paths[] = (String[])params.toArray()[0];
+                        final String nonces[] = (String[])params.toArray()[1];
+                        for (int ii = 0; ii < paths.length; ii++) {
+                            List<File> relevantFiles = retrieveRelevantFiles(paths[ii], nonces[ii]);
+                            if (relevantFiles == null) {
+                            } else {
+                                for (final File f : relevantFiles) {
+                                    //long size = f.length();
+                                    boolean deleted = f.delete();
+                                }
+                            }
                         }
                     }
-                }
+                }.start();
             }
 
             return new DependencyPair( DEP_snapshotDelete, result);

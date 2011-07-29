@@ -281,14 +281,20 @@ public class SnapshotSaveAPI
 
                 final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
 
-                SnapshotUtil.writeSnapshotDigest(
+                Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                         txnId,
                         file_path,
                         file_nonce,
                         tables,
                         context.getExecutionSite().getCorrespondingHostId(),
                         SnapshotSiteProcessor.getExportSequenceNumbers());
-                SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
+                if (completionTask != null) {
+                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+                }
+                completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
+                if (completionTask != null) {
+                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+                }
                 final AtomicInteger numTables = new AtomicInteger(tables.size());
                 final SnapshotRegistry.Snapshot snapshotRecord =
                     SnapshotRegistry.startSnapshot(

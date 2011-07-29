@@ -76,9 +76,16 @@ public class SnapshotSiteProcessor {
     private static final Map<String, List<Pair<Integer, Long>>> m_exportSequenceNumbers =
         new HashMap<String, List<Pair<Integer, Long>>>();
 
+    /*
+     * Do some random tasks that are deferred to the snapshot termination thread.
+     * The two I know about are syncing/closing the digest file and catalog copy
+     */
+    public static final ConcurrentLinkedQueue<Runnable> m_tasksOnSnapshotCompletion =
+        new ConcurrentLinkedQueue<Runnable>();
+
 
     /** Number of snapshot buffers to keep */
-    static final int m_numSnapshotBuffers = 3;
+    static final int m_numSnapshotBuffers = 12;
 
     /**
      * Pick a buffer length that is big enough to store at least one of the largest size tuple supported
@@ -168,6 +175,12 @@ public class SnapshotSiteProcessor {
         return sequenceNumbers;
     }
 
+    private long m_quietUntil = 0;
+
+    private boolean inQuietPeriod() {
+        return org.voltdb.utils.EstTime.currentTimeMillis() < m_quietUntil;
+    }
+
     /**
      * A class identifying a table that should be snapshotted as well as the destination
      * for the resulting tuple blocks
@@ -227,6 +240,7 @@ public class SnapshotSiteProcessor {
     }
 
     public void initiateSnapshots(ExecutionEngine ee, Deque<SnapshotTableTask> tasks, long txnId, int numHosts) {
+        m_quietUntil = System.currentTimeMillis() + 200;
         m_lastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
         m_lastSnapshotNumHosts = numHosts;
@@ -248,7 +262,7 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    public Future<?> doSnapshotWork(ExecutionEngine ee) {
+    public Future<?> doSnapshotWork(ExecutionEngine ee, boolean ignoreQuietPeriod) {
         Future<?> retval = null;
 
         /*
@@ -256,7 +270,9 @@ public class SnapshotSiteProcessor {
          * a snapshot is finished. If the snapshot buffer is loaned out that means
          * it is pending I/O somewhere so there is no work to do until it comes back.
          */
-        if (m_snapshotTableTasks == null || m_availableSnapshotBuffers.isEmpty()) {
+        if (m_snapshotTableTasks == null ||
+                m_availableSnapshotBuffers.isEmpty() ||
+                (!ignoreQuietPeriod && inQuietPeriod())) {
             return retval;
         }
 
@@ -278,7 +294,6 @@ public class SnapshotSiteProcessor {
                     snapshotBuffer,
                     currentTask.m_tableId,
                     TableStreamType.SNAPSHOT);
-
             if (serialized < 0) {
                 hostLog.error("Failure while serialize data from a table for COW snapshot");
                 VoltDB.crashVoltDB();
@@ -325,6 +340,9 @@ public class SnapshotSiteProcessor {
             retval = currentTask.m_target.write(snapshotBuffer);
             if (retval != null) {
                 m_writeFutures.add(retval);
+            }
+            if (!ignoreQuietPeriod) {
+                m_quietUntil = System.currentTimeMillis() + 5 + ((long)(Math.random() * 5));
             }
             break;
         }
@@ -377,6 +395,16 @@ public class SnapshotSiteProcessor {
                                     throw new RuntimeException(e);
                                 }
                             }
+
+                            Runnable r = null;
+                            while ((r = m_tasksOnSnapshotCompletion.poll()) != null) {
+                                try {
+                                    r.run();
+                                } catch (Exception e) {
+                                    hostLog.error("Error running snapshot completion task", e);
+                                }
+                            }
+
                             for (Future<?> retval : m_writeFutures) {
                                 try {
                                     retval.get();
@@ -492,7 +520,7 @@ public class SnapshotSiteProcessor {
     public HashSet<Exception> completeSnapshotWork(ExecutionEngine ee) throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(ee);
+            Future<?> result = doSnapshotWork(ee, false);
             if (result != null) {
                 try {
                     result.get();

@@ -71,7 +71,7 @@ public class SnapshotUtil {
      * @param exportSequenceNumbers  ???
      * @throws IOException
      */
-    public static void writeSnapshotDigest(
+    public static Runnable writeSnapshotDigest(
         long txnId,
         String path,
         String nonce,
@@ -86,7 +86,7 @@ public class SnapshotUtil {
                 throw new IOException("Unable to write table list file " + f);
             }
         }
-        FileOutputStream fos = new FileOutputStream(f);
+        final FileOutputStream fos = new FileOutputStream(f);
         StringWriter sw = new StringWriter();
         JSONStringer stringer = new JSONStringer();
         try {
@@ -132,8 +132,17 @@ public class SnapshotUtil {
         fileBuffer.put(tableListBytes);
         fileBuffer.flip();
         fos.getChannel().write(fileBuffer);
-        fos.getChannel().force(false);
-        fos.close();
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    fos.getChannel().force(false);
+                    fos.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
     }
 
     public static List<JSONObject> retrieveDigests(String path,
@@ -153,13 +162,13 @@ public class SnapshotUtil {
      * Write the current catalog associated with the database snapshot
      * to the snapshot location
      */
-    public static void writeSnapshotCatalog(String path, String nonce)
+    public static Runnable writeSnapshotCatalog(String path, String nonce)
     throws IOException
     {
         String filename = SnapshotUtil.constructCatalogFilenameForNonce(nonce);
         try
         {
-            VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename);
+            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename);
         }
         catch (IOException ioe)
         {

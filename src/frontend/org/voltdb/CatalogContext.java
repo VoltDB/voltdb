@@ -154,14 +154,14 @@ public class CatalogContext {
      * @param name
      * @throws IOException
      */
-    public void writeCatalogJarToFile(String path, String name) throws IOException
+    public Runnable writeCatalogJarToFile(String path, String name) throws IOException
     {
         File catalog_file = new VoltFile(path, name);
         if (catalog_file.exists())
         {
             catalog_file.delete();
         }
-        m_jarfile.writeToFile(catalog_file);
+        return m_jarfile.writeToFile(catalog_file);
     }
 
     /**

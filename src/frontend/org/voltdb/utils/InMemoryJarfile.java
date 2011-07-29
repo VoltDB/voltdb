@@ -115,14 +115,26 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     // OUTPUT
     ///////////////////////////////////////////////////////
 
-    public void writeToFile(File file) throws IOException {
-        FileOutputStream output = new FileOutputStream(file);
+    public Runnable writeToFile(File file) throws IOException {
+        final FileOutputStream output = new FileOutputStream(file);
         writeToOutputStream(output);
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    output.getFD().sync();
+                    output.close();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
     }
 
     public byte[] getFullJarBytes() throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         writeToOutputStream(output);
+        output.close();
         return output.toByteArray();
     }
 
@@ -140,8 +152,6 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             jarOut.flush();
             jarOut.closeEntry();
         }
-
-        jarOut.close();
     }
 
     ///////////////////////////////////////////////////////
