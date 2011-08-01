@@ -160,7 +160,21 @@ SnapshotCompletionInterest {
         public void returnAllSegments() {}
     };
 
-    private Thread m_restoreHeartbeatThread;
+    /*
+     * A thread to keep on sending fake heartbeats until the restore is
+     * complete, or otherwise the RPQ is gonna be clogged.
+     */
+    private Thread m_restoreHeartbeatThread = new Thread(new Runnable() {
+        @Override
+        public void run() {
+            while (m_state == State.RESTORE) {
+                m_initiator.sendHeartbeat(RESTORE_TXNID + 1);
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {}
+            }
+        }
+    });
 
     private Runnable m_restorePlanner = new Runnable() {
         @Override
@@ -170,10 +184,17 @@ SnapshotCompletionInterest {
 
             enterRestore();
 
-            TreeMap<Long, Snapshot> snapshots = getSnapshots();
-            Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
+            TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, SnapshotUtil.Snapshot>();
+            /*
+             * If the user wants to create a new database, don't scan the
+             * snapshots.
+             */
+            if (m_action != START_ACTION.CREATE) {
+                snapshots = getSnapshots();
+            }
 
             final Long minLastSeenTxn = m_replayAgent.getMinLastSeenTxn();
+            Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
             for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
                 /*
                  * If the txn of the snapshot is before the earliest txn
@@ -277,22 +298,6 @@ SnapshotCompletionInterest {
                 }
                 assert(restorePath != null && restoreNonce != null);
             }
-
-            /*
-             * A thread to keep on sending fake heartbeats until the restore is
-             * complete, or otherwise the RPQ is gonna be clogged.
-             */
-            m_restoreHeartbeatThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    while (m_state == State.RESTORE) {
-                        m_initiator.sendHeartbeat(RESTORE_TXNID + 1);
-                        try {
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {}
-                    }
-                }
-            });
 
             /*
              * If this has the lowest host ID, initiate the snapshot restore
@@ -601,7 +606,7 @@ SnapshotCompletionInterest {
             LOG.debug("Waiting for the initiator to send the snapshot txnid");
             try {
                 if (m_zk.exists(SNAPSHOT_ID, false) == null) {
-                    Thread.sleep(500);
+                    Thread.sleep(200);
                     continue;
                 } else {
                     byte[] data = m_zk.getData(SNAPSHOT_ID, false, null);
