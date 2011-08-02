@@ -18,7 +18,6 @@
 package org.voltdb.compiler;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -26,13 +25,11 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltdb.debugstate.PlannerThreadContext;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
 
-public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpable {
+public class AsyncCompilerWorkThread extends Thread {
 
     LinkedBlockingQueue<AsyncCompilerWork> m_work = new LinkedBlockingQueue<AsyncCompilerWork>();
     final ArrayDeque<AsyncCompilerResult> m_finished = new ArrayDeque<AsyncCompilerResult>();
@@ -48,10 +45,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     /** If this is true, update the catalog */
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
-    // store the id used by the DumpManager to identify this execution site
-    final String m_dumpId;
-    long m_currentDumpTimestamp = 0;
-
     public AsyncCompilerWorkThread(CatalogContext context, int siteId) {
         m_ptool = null;
         //m_hsql = null;
@@ -59,9 +52,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         m_context = context;
 
         setName("Ad Hoc Planner");
-
-        m_dumpId = "AdHocPlannerThread." + String.valueOf(m_siteId);
-        DumpManager.register(m_dumpId, this);
     }
 
     public synchronized void ensureLoadedPlanner() {
@@ -174,32 +164,26 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             e.printStackTrace();
         }
         while (work.shouldShutdown == false) {
-            // handle a dump if needed
-            if (work.shouldDump == true) {
-                DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
+            // deal with reloading the global catalog
+            if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
+                m_context = VoltDB.instance().getCatalogContext();
+                // kill the planner process which has an outdated catalog
+                // it will get created again for the next stmt
+                if (m_ptool != null) {
+                    m_ptool.kill();
+                    m_ptool = null;
+                }
             }
-            else {
-                // deal with reloading the global catalog
-                if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
-                    m_context = VoltDB.instance().getCatalogContext();
-                    // kill the planner process which has an outdated catalog
-                    // it will get created again for the next stmt
-                    if (m_ptool != null) {
-                        m_ptool.kill();
-                        m_ptool = null;
-                    }
-                }
 
-                AsyncCompilerResult result = null;
-                if (work instanceof AdHocPlannerWork)
-                    result = compileAdHocPlan((AdHocPlannerWork) work);
-                if (work instanceof CatalogChangeWork)
-                    result = prepareApplicationCatalogDiff((CatalogChangeWork) work);
-                assert(result != null);
+            AsyncCompilerResult result = null;
+            if (work instanceof AdHocPlannerWork)
+                result = compileAdHocPlan((AdHocPlannerWork) work);
+            if (work instanceof CatalogChangeWork)
+                result = prepareApplicationCatalogDiff((CatalogChangeWork) work);
+            assert(result != null);
 
-                synchronized (m_finished) {
-                    m_finished.add(result);
-                }
+            synchronized (m_finished) {
+                m_finished.add(result);
             }
 
             try {
@@ -214,46 +198,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
     public void notifyShouldUpdateCatalog() {
         m_shouldUpdateCatalog.set(true);
-    }
-
-    @Override
-    public void goDumpYourself(long timestamp) {
-        m_currentDumpTimestamp = timestamp;
-        AdHocPlannerWork work = new AdHocPlannerWork();
-        work.shouldDump = true;
-        m_work.add(work);
-
-        DumpManager.putDump(m_dumpId, timestamp, false, getDumpContents());
-    }
-
-    /**
-     * Get the actual file contents for a dump of state reachable by
-     * this thread. Can be called unsafely or safely.
-     */
-    public PlannerThreadContext getDumpContents() {
-        PlannerThreadContext context = new PlannerThreadContext();
-        context.siteId = m_siteId;
-
-        // doing this with arraylists before arrays seems more stable
-        // if the contents change while iterating
-
-        ArrayList<AsyncCompilerWork> toplan = new ArrayList<AsyncCompilerWork>();
-        ArrayList<AsyncCompilerResult> planned = new ArrayList<AsyncCompilerResult>();
-
-        for (AsyncCompilerWork work : m_work)
-            toplan.add(work);
-        for (AsyncCompilerResult stmt : m_finished)
-            planned.add(stmt);
-
-        context.compilerWork = new AsyncCompilerWork[toplan.size()];
-        for (int i = 0; i < toplan.size(); i++)
-            context.compilerWork[i] = toplan.get(i);
-
-        context.compilerResults = new AsyncCompilerResult[planned.size()];
-        for (int i = 0; i < planned.size(); i++)
-            context.compilerResults[i] = planned.get(i);
-
-        return context;
     }
 
     private AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {

@@ -87,10 +87,6 @@ public class VoltDB {
         /** name of the license file, for commercial editions */
         public String m_pathToLicense = "license.xml";
 
-        /** level of internal transaction profiling (for testing) */
-        public ProcedureProfiler.Level m_profilingLevel =
-            ProcedureProfiler.Level.DISABLED;
-
         /** false if voltdb.so shouldn't be loaded (for example if JVM is
          *  started by voltrun).
          */
@@ -118,8 +114,6 @@ public class VoltDB {
 
         /** start up action */
         public START_ACTION m_startAction = START_ACTION.START;
-
-        public boolean listenForDumpRequests = false;
 
         /**
          * At rejoin time an interface will be selected. It will be the
@@ -172,15 +166,6 @@ public class VoltDB {
                 }
                 else if (arg.equals("valgrind")) {
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
-                }
-                else if (arg.equals("polite")) {
-                    m_profilingLevel = ProcedureProfiler.Level.POLITE;
-                }
-                else if (arg.equals("intrusive")) {
-                    m_profilingLevel = ProcedureProfiler.Level.INTRUSIVE;
-                }
-                else if (arg.equals("listenfordumps")) {
-                    listenForDumpRequests = true;
                 }
                 else if (arg.equals("quietadhoc"))
                 {

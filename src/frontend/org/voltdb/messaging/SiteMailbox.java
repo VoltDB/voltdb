@@ -23,8 +23,6 @@ import java.util.Deque;
 
 import org.voltdb.CommandLog;
 import org.voltdb.VoltDB;
-import org.voltdb.debugstate.MailboxHistory;
-import org.voltdb.debugstate.MailboxHistory.MessageState;
 
 /**
  *
@@ -38,17 +36,9 @@ public class SiteMailbox implements Mailbox {
     final CommandLog m_log = VoltDB.instance().getCommandLog();
     final boolean m_doLogging;
 
-    // deques to store recent inter-site messages
-    private final int MESSAGE_HISTORY_SIZE;
-    ArrayDeque<VoltMessage> m_lastTenSentMessages = new ArrayDeque<VoltMessage>();
-    ArrayDeque<VoltMessage> m_lastTenReceivedMessages = new ArrayDeque<VoltMessage>();
-    ArrayDeque<VoltMessage> m_lastTenMembershipNotices = new ArrayDeque<VoltMessage>();
-    ArrayDeque<VoltMessage> m_lastTenHeartbeats = new ArrayDeque<VoltMessage>();
-
     SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, final boolean log) {
         this.m_hostMessenger = hostMessenger;
         this.m_siteId = siteId;
-        MESSAGE_HISTORY_SIZE = 0;
         for (Subject s : Subject.values()) {
             m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
         }
@@ -96,33 +86,6 @@ public class SiteMailbox implements Mailbox {
             }
             this.notify();
         }
-
-        // this code keeps track of last 10 messages received in various buckets
-
-        if (MESSAGE_HISTORY_SIZE > 0) {
-            if (message instanceof DebugMessage)
-                return;
-            else if (message instanceof TransactionInfoBaseMessage) {
-                TransactionInfoBaseMessage mn = (TransactionInfoBaseMessage) message;
-                if (mn instanceof HeartbeatMessage)
-                    synchronized(m_lastTenHeartbeats) {
-                        m_lastTenHeartbeats.addLast(message);
-                        if (m_lastTenHeartbeats.size() > MESSAGE_HISTORY_SIZE)
-                            m_lastTenHeartbeats.pollFirst();
-                    }
-                else
-                    synchronized(m_lastTenMembershipNotices) {
-                        m_lastTenMembershipNotices.addLast(message);
-                        if (m_lastTenMembershipNotices.size() > MESSAGE_HISTORY_SIZE)
-                            m_lastTenMembershipNotices.pollFirst();
-                    }
-            }
-            else synchronized(m_lastTenReceivedMessages) {
-                m_lastTenReceivedMessages.addLast(message);
-                if (m_lastTenReceivedMessages.size() > MESSAGE_HISTORY_SIZE)
-                    m_lastTenReceivedMessages.pollFirst();
-            }
-        }
     }
 
     @Override
@@ -146,15 +109,6 @@ public class SiteMailbox implements Mailbox {
             throws MessagingException {
         assert(message != null);
         m_hostMessenger.send(siteId, mailboxId, message);
-
-        // this code keeps track of last 10 non-heartbeat messages sent
-        if (message instanceof HeartbeatMessage)
-            return;
-        synchronized(m_lastTenSentMessages) {
-            m_lastTenSentMessages.addLast(message);
-            if (m_lastTenSentMessages.size() > MESSAGE_HISTORY_SIZE)
-                m_lastTenSentMessages.pollFirst();
-        }
     }
 
     @Override
@@ -163,57 +117,6 @@ public class SiteMailbox implements Mailbox {
         assert(message != null);
         assert(siteIds != null);
         m_hostMessenger.send(siteIds, mailboxId, message);
-
-        // this code keeps track of last 10 non-heartbeat messages sent
-        if (message instanceof HeartbeatMessage)
-            return;
-        synchronized(m_lastTenSentMessages) {
-            m_lastTenSentMessages.addLast(message);
-            if (m_lastTenSentMessages.size() > MESSAGE_HISTORY_SIZE)
-                m_lastTenSentMessages.pollFirst();
-        }
-    }
-
-    public MailboxHistory getHistory() {
-        MailboxHistory retval = new MailboxHistory();
-
-        synchronized(m_lastTenSentMessages) {
-            retval.messagesSent = new MessageState[m_lastTenSentMessages.size()];
-            int i = 0;
-            for (VoltMessage message : m_lastTenSentMessages) {
-                assert (message != null);
-                retval.messagesSent[i++] = message.getDumpContents();
-            }
-        }
-
-        synchronized(m_lastTenReceivedMessages) {
-            retval.messagesReceived = new MessageState[m_lastTenReceivedMessages.size()];
-            int i = 0;
-            for (VoltMessage message : m_lastTenReceivedMessages) {
-                assert (message != null);
-                retval.messagesReceived[i++] = message.getDumpContents();
-            }
-        }
-
-        synchronized(m_lastTenHeartbeats) {
-            retval.heartbeatsReceived = new MessageState[m_lastTenHeartbeats.size()];
-            int i = 0;
-            for (VoltMessage message : m_lastTenHeartbeats) {
-                assert (message != null);
-                retval.heartbeatsReceived[i++] = message.getDumpContents();
-            }
-        }
-
-        synchronized(m_lastTenMembershipNotices) {
-            retval.noticesReceived = new MessageState[m_lastTenMembershipNotices.size()];
-            int i = 0;
-            for (VoltMessage message : m_lastTenMembershipNotices) {
-                assert (message != null);
-                retval.noticesReceived[i++] = message.getDumpContents();
-            }
-        }
-
-        return retval;
     }
 
     @Override

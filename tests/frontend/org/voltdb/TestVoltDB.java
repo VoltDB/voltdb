@@ -41,7 +41,6 @@ public class TestVoltDB extends TestCase {
         VoltDB.Configuration blankConfig = new VoltDB.Configuration();
         assertFalse(blankConfig.m_noLoadLibVOLTDB);
         assertEquals(BackendTarget.NATIVE_EE_JNI, blankConfig.m_backend);
-        assertEquals(ProcedureProfiler.Level.DISABLED, blankConfig.m_profilingLevel);
         assertEquals(null, blankConfig.m_pathToCatalog);
         assertEquals(null, blankConfig.m_pathToDeployment);
         assertEquals(VoltDB.DEFAULT_PORT, blankConfig.m_port);
@@ -63,16 +62,6 @@ public class TestVoltDB extends TestCase {
         String args5[] = { "ipc", "hsqldb" };
         VoltDB.Configuration cfg5 = new VoltDB.Configuration(args5);
         assertEquals(BackendTarget.HSQLDB_BACKEND, cfg5.m_backend);
-
-        String args6[] = { "polite" };
-        VoltDB.Configuration cfg6 = new VoltDB.Configuration(args6);
-        assertEquals(ProcedureProfiler.Level.POLITE, cfg6.m_profilingLevel);
-        String args7[] = { "intrusive" };
-        VoltDB.Configuration cfg7 = new VoltDB.Configuration(args7);
-        assertEquals(ProcedureProfiler.Level.INTRUSIVE, cfg7.m_profilingLevel);
-        String args8[] = { "intrusive", "polite" };
-        VoltDB.Configuration cfg8 = new VoltDB.Configuration(args8);
-        assertEquals(ProcedureProfiler.Level.POLITE, cfg8.m_profilingLevel);
 
         String args9[] = { "catalog xtestxstringx" };
         VoltDB.Configuration cfg9 = new VoltDB.Configuration(args9);

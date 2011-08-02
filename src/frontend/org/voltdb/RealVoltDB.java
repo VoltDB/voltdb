@@ -79,7 +79,6 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -456,10 +455,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 System.exit(-1);
             }
 
-            // start the dumper thread
-            if (config.listenForDumpRequests)
-                DumpManager.init();
-
             readBuildInfo();
             m_config = config;
 
@@ -824,28 +819,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_localSites.put(runner.m_siteId, runner.m_siteObj);
                 }
             }
-
-
-            // set up profiling and tracing
-            // hack to prevent profiling on multiple machines
-            if (m_config.m_profilingLevel != ProcedureProfiler.Level.DISABLED) {
-                if (m_localSites.size() == 1) {
-                    hostLog.l7dlog(Level.INFO,
-                                   LogKeys.host_VoltDB_ProfileLevelIs.name(),
-                                   new Object[] { m_config.m_profilingLevel },
-                                   null);
-                    ProcedureProfiler.profilingLevel = m_config.m_profilingLevel;
-                }
-                else {
-                    hostLog.l7dlog(
-                                   Level.INFO,
-                                   LogKeys.host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts.name(),
-                                   null);
-                }
-            }
-
-            // if a workload tracer is specified, start her up!
-            ProcedureProfiler.initializeWorkloadTrace(catalog);
 
             // Create the client interfaces and associated dtxn initiators
             int portOffset = 0;

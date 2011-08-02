@@ -27,7 +27,6 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltdb.ProcedureProfiler.Level;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
@@ -42,7 +41,6 @@ public class TestAdHocQueries extends TestCase {
         config.m_backend = BackendTarget.NATIVE_EE_JNI;
         config.m_noLoadLibVOLTDB = false;
         config.setPathToCatalogForTest("tpcc.jar");
-        config.m_profilingLevel = Level.DISABLED;
 
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();

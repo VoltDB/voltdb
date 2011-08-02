@@ -23,15 +23,14 @@ import java.util.List;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.ProcedureProfiler;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
@@ -73,7 +72,6 @@ public class Shutdown extends VoltSystemProcedure {
                 return null;
             }
 
-            ProcedureProfiler.flushProfile();
             try {
                 Thread.sleep(1000);
             }

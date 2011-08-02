@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 import org.voltdb.VoltTable;
-import org.voltdb.debugstate.MailboxHistory.MessageState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.utils.DBBPool;
 
@@ -236,14 +235,5 @@ public class FragmentResponseMessage extends VoltMessage {
         }
 
         return sb.toString();
-    }
-
-    @Override
-    public MessageState getDumpContents() {
-        MessageState ms = super.getDumpContents();
-        ms.txnId = m_txnId;
-        ms.fromSiteId = m_executorSiteId;
-        ms.toSiteId = m_destinationSiteId;
-        return ms;
     }
 }

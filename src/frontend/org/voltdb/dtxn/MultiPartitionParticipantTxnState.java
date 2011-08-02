@@ -28,8 +28,6 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
-import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
@@ -619,30 +617,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         }
     }
 
-    @Override
-    public void getDumpContents(StringBuilder sb) {
-        sb.append("  Multi Partition Txn State with id ").append(txnId);
-    }
-
-    @Override
-    public ExecutorTxnState getDumpContents() {
-        ExecutorTxnState retval = new ExecutorTxnState();
-        retval.txnId = txnId;
-        retval.coordinatorSiteId = coordinatorSiteId;
-        retval.initiatorSiteId = initiatorSiteId;
-        retval.hasUndoWorkUnit = false;
-        retval.isReadOnly = m_isReadOnly;
-        retval.nonCoordinatingSites = m_nonCoordinatingSites;
-
-        if (m_missingDependencies != null) {
-            retval.workUnits = new WorkUnitState[m_missingDependencies.size()];
-            int i = 0;
-            for (WorkUnit wu : m_missingDependencies.values()) {
-                retval.workUnits[i++] = wu.getDumpContents();
-            }
-        }
-
-        return retval;
+    // for test only
+    @Deprecated
+    public int[] getNonCoordinatingSites() {
+        return m_nonCoordinatingSites;
     }
 
     @Override

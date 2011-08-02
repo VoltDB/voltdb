@@ -24,7 +24,6 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
@@ -117,23 +116,6 @@ public class SinglePartitionTxnState extends TransactionState {
             m_done = true;
         }
         return m_done;
-    }
-
-    @Override
-    public void getDumpContents(StringBuilder sb) {
-        sb.append("  Single Partition Txn State with id ").append(txnId);
-    }
-
-    @Override
-    public ExecutorTxnState getDumpContents() {
-        ExecutorTxnState retval = new ExecutorTxnState();
-        retval.txnId = txnId;
-        retval.coordinatorSiteId = coordinatorSiteId;
-        retval.initiatorSiteId = initiatorSiteId;
-        retval.isReadOnly = m_isReadOnly;
-        retval.nonCoordinatingSites = null;
-        retval.procedureIsAborting = false;
-        return retval;
     }
 
     @Override

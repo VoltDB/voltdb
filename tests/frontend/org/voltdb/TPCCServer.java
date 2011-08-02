@@ -60,8 +60,8 @@ public class TPCCServer {
         int partitions = 1;
         boolean doCompile = true;
 
-        if (args.length > 5) {
-            System.err.println("TPCCServer [partitions=1] [compile=true] [useProfiling=0]");
+        if (args.length > 3) {
+            System.err.println("TPCCServer [partitions=1] [compile=true]");
             System.exit(1);
         }
 
@@ -70,12 +70,6 @@ public class TPCCServer {
         }
         if (args.length >= 2) {
             doCompile = args[1].equals("true");
-        }
-        if (args.length >= 3) {
-            if (args[2].equals("1"))
-                config.m_profilingLevel = ProcedureProfiler.Level.POLITE;
-            if (args[2].equals("2"))
-                config.m_profilingLevel = ProcedureProfiler.Level.INTRUSIVE;
         }
 
         if (doCompile) {

@@ -31,7 +31,6 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -80,8 +79,6 @@ public abstract class VoltProcedure {
     public static final String ANON_STMT_NAME = "sql";
 
     protected HsqlBackend m_hsql;
-
-    final private ProcedureProfiler m_profiler = new ProcedureProfiler();
 
     //For runtime statistics collection
     private ProcedureStatsCollector m_statsCollector;
@@ -318,9 +315,6 @@ public abstract class VoltProcedure {
         m_statusString = null;
         // kill the cache of the rng
         m_cachedRNG = null;
-        if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED) {
-            m_profiler.startCounter(m_catProc);
-        }
         m_statsCollector.beginProcedure();
 
         // in case sql was queued but executed
@@ -348,15 +342,6 @@ public abstract class VoltProcedure {
                 status = ClientResponseImpl.GRACEFUL_FAILURE;
                 return getErrorResponse(status, msg, null);
             }
-        }
-
-        // Workload Trace
-        // Create a new transaction record in the trace manager. This will give us back
-        // a handle that we need to pass to the trace manager when we want to register a new query
-        if ((ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) &&
-                (ProcedureProfiler.workloadTrace != null)) {
-            m_workloadQueryHandles = new HashSet<Object>();
-            m_workloadXactHandle = ProcedureProfiler.workloadTrace.startTransaction(this, m_catProc, paramList);
         }
 
         ClientResponseImpl retval = null;
@@ -423,15 +408,7 @@ public abstract class VoltProcedure {
             }
         }
 
-        if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED)
-            m_profiler.stopCounter();
         m_statsCollector.endProcedure( abort, error);
-
-        // Workload Trace - Stop the transaction trace record.
-        if ((ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) &&
-                (ProcedureProfiler.workloadTrace != null && m_workloadXactHandle != null)) {
-            ProcedureProfiler.workloadTrace.stopTransaction(m_workloadXactHandle);
-        }
 
         if (retval == null)
             retval = new ClientResponseImpl(
@@ -781,40 +758,10 @@ public abstract class VoltProcedure {
 
         assert (m_batchQueryStmtIndex == m_batchQueryArgsIndex);
 
-        // if profiling is turned on, record the sql statements being run
-        if (ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) {
-            // Workload Trace - Start Query
-            if (ProcedureProfiler.workloadTrace != null && m_workloadXactHandle != null) {
-                m_workloadBatchId = ProcedureProfiler.workloadTrace.getNextBatchId(m_workloadXactHandle);
-                for (int i = 0; i < m_batchQueryStmtIndex; i++) {
-                    Object queryHandle = ProcedureProfiler.workloadTrace.startQuery(
-                            m_workloadXactHandle, m_batchQueryStmts[i].catStmt, m_batchQueryArgs[i], m_workloadBatchId);
-                    m_workloadQueryHandles.add(queryHandle);
-                }
-            }
-        }
-
         VoltTable[] retval = null;
 
-        if (ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) {
-            retval = executeQueriesInIndividualBatches(m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
-        }
-        else {
-            retval = executeQueriesInABatch(
+        retval = executeQueriesInABatch(
                 m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
-        }
-
-        // Workload Trace - Stop Query
-        if (ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) {
-            if (ProcedureProfiler.workloadTrace != null) {
-                for (Object handle : m_workloadQueryHandles) {
-                    if (handle != null) ProcedureProfiler.workloadTrace.stopQuery(handle);
-                }
-                // Make sure that we clear out our query handles so that the next
-                // time they queue a query they will get a new batch id
-                m_workloadQueryHandles.clear();
-            }
-        }
 
         m_batchQueryStmtIndex = 0;
         m_batchQueryArgsIndex = 0;
@@ -856,13 +803,6 @@ public abstract class VoltProcedure {
 
         if (stmtCount == 0)
             return new VoltTable[] {};
-
-        if (ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) {
-            assert(batchStmts.length == 1);
-            assert(batchStmts[0].numFragGUIDs == 1);
-            ProcedureProfiler.startStatementCounter(batchStmts[0].fragGUIDs[0]);
-        }
-        else ProcedureProfiler.startStatementCounter(-1);
 
         final int batchSize = stmtCount;
         int fragmentIdIndex = 0;
@@ -930,18 +870,13 @@ public abstract class VoltProcedure {
         }
 
         VoltTable[] results = null;
-        try {
-            results = m_site.executeQueryPlanFragmentsAndGetResults(
-                m_fragmentIds,
-                fragmentIdIndex,
-                m_parameterSets,
-                parameterSetIndex,
-                m_currentTxnState.txnId,
-                m_catProc.getReadonly());
-        }
-        finally {
-            ProcedureProfiler.stopStatementCounter();
-        }
+        results = m_site.executeQueryPlanFragmentsAndGetResults(
+            m_fragmentIds,
+            fragmentIdIndex,
+            m_parameterSets,
+            parameterSetIndex,
+            m_currentTxnState.txnId,
+            m_catProc.getReadonly());
         return results;
     }
 

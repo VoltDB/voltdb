@@ -30,19 +30,19 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.Callable;
 
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Partition;
@@ -53,7 +53,6 @@ import org.voltdb.compiler.AdHocPlannedStmt;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWorkThread;
 import org.voltdb.compiler.CatalogChangeResult;
-import org.voltdb.debugstate.InitiatorContext;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
@@ -72,7 +71,6 @@ import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.Pair;
@@ -83,7 +81,7 @@ import org.voltdb.utils.Pair;
  * <code>ClientConnection</code> instances.
  *
  */
-public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.DaemonInitiator {
+public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = -1;
@@ -122,7 +120,6 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
 
     private final int m_allPartitions[];
     final int m_siteId;
-    final String m_dumpId;
 
     private final QueueMonitor m_clientQueueMonitor = new QueueMonitor() {
         private final int MAX_QUEABLE = 33554432;
@@ -842,8 +839,6 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
         m_allPartitions = allPartitions;
 
         m_siteId = siteId;
-        m_dumpId = "Initiator." + String.valueOf(siteId);
-        DumpManager.register(m_dumpId, this);
 
         m_acceptor = new ClientAcceptor(port, network, false);
 
@@ -1393,24 +1388,6 @@ public class ClientInterface implements DumpManager.Dumpable, SnapshotDaemon.Dae
     }
 
     @Override
-    public void goDumpYourself(long timestamp) {
-        DumpManager.putDump(m_dumpId, timestamp, true, getDumpContents());
-    }
-
-    /**
-     * Get the actual file contents for a dump of state reachable by
-     * this thread. Can be called unsafely or safely.
-     */
-    public InitiatorContext getDumpContents() {
-        InitiatorContext context = new InitiatorContext();
-        context.siteId = m_siteId;
-
-        if (m_initiator instanceof SimpleDtxnInitiator)
-            ((SimpleDtxnInitiator) m_initiator).getDumpContents(context);
-
-        return context;
-    }
-
     public void initiateSnapshotDaemonWork(final String procedureName, long clientData, final Object params[]) {
         final Config sysProc = SystemProcedureCatalog.listing.get(procedureName);
         if (sysProc == null) {

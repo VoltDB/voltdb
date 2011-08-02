@@ -17,7 +17,6 @@
 
 package org.voltdb.messaging;
 
-import org.voltdb.debugstate.MailboxHistory.MessageState;
 
 /**
  * Message from an initiator to an execution site, informing the
@@ -85,13 +84,5 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_coordinatorSiteId = m_buffer.getInt();
         m_txnId = m_buffer.getLong();
         m_isReadOnly = m_buffer.get() == 1;
-    }
-
-    @Override
-    public MessageState getDumpContents() {
-        MessageState ms = super.getDumpContents();
-        ms.fromSiteId = m_initiatorSiteId;
-        ms.txnId = m_txnId;
-        return ms;
     }
 }

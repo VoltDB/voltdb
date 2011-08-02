@@ -23,7 +23,6 @@ import java.util.Map;
 
 import org.voltdb.ExecutionSite;
 import org.voltdb.VoltTable;
-import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -172,10 +171,6 @@ public abstract class TransactionState extends OrderableTransaction  {
     public int getNextDependencyId() {
         return m_nextDepId++;
     }
-
-    public abstract void getDumpContents(StringBuilder sb);
-
-    public abstract ExecutorTxnState getDumpContents();
 
     /**
      * Process the failure of failedSites.

@@ -53,7 +53,6 @@ import org.voltdb.CatalogContext;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
-import org.voltdb.debugstate.InitiatorContext;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -471,21 +470,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             {
                 sb.append("emptyfornow\n");
             }
-        }
-    }
-
-    public void getDumpContents(InitiatorContext context)
-    {
-        // add mailbox history
-//        if (m_mailbox instanceof SiteMailbox)
-//            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
-
-        // list transactions in flight
-        List<InFlightTxnState> inFlightTxnList = m_mailbox.getInFlightTxns();
-        context.inFlightTxns = new InFlightTxnState[inFlightTxnList.size()];
-        for (int i = 0; i < inFlightTxnList.size(); i++)
-        {
-            context.inFlightTxns[i] = inFlightTxnList.get(i);
         }
     }
 

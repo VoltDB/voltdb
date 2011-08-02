@@ -40,7 +40,6 @@ import junit.framework.TestCase;
 
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
@@ -981,6 +980,7 @@ public class TestExecutionSite extends TestCase {
      * site ids on failure. A little out of place in this file but the configured
      * ExecutionSite and Mailbox are necessary to construct a MP txn state.
      */
+    @SuppressWarnings("deprecation")
     public void testMultiPartitionParticipantTxnState_handleSiteFaults() {
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);
@@ -999,10 +999,10 @@ public class TestExecutionSite extends TestCase {
         failedSites.add(5);
         ts.handleSiteFaults(failedSites);
 
-        // steal dump accessors to peek at some internals
-        ExecutorTxnState dumpContents = ts.getDumpContents();
-        assertEquals(4, dumpContents.nonCoordinatingSites.length);
-        assertEquals(4, dumpContents.nonCoordinatingSites[0]);
+        // peek at some internals
+        int[] nonCoordinatingSites = ts.getNonCoordinatingSites();
+        assertEquals(4, nonCoordinatingSites.length);
+        assertEquals(4, nonCoordinatingSites[0]);
 
         // fail first site
         ts = new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);
@@ -1010,15 +1010,15 @@ public class TestExecutionSite extends TestCase {
         failedSites.add(1);
         ts.handleSiteFaults(failedSites);
 
-        dumpContents = ts.getDumpContents();
-        assertEquals(7, dumpContents.nonCoordinatingSites.length);
-        assertEquals(2, dumpContents.nonCoordinatingSites[0]);
-        assertEquals(3, dumpContents.nonCoordinatingSites[1]);
-        assertEquals(4, dumpContents.nonCoordinatingSites[2]);
-        assertEquals(5, dumpContents.nonCoordinatingSites[3]);
-        assertEquals(6, dumpContents.nonCoordinatingSites[4]);
-        assertEquals(7, dumpContents.nonCoordinatingSites[5]);
-        assertEquals(8, dumpContents.nonCoordinatingSites[6]);
+        nonCoordinatingSites = ts.getNonCoordinatingSites();
+        assertEquals(7, nonCoordinatingSites.length);
+        assertEquals(2, nonCoordinatingSites[0]);
+        assertEquals(3, nonCoordinatingSites[1]);
+        assertEquals(4, nonCoordinatingSites[2]);
+        assertEquals(5, nonCoordinatingSites[3]);
+        assertEquals(6, nonCoordinatingSites[4]);
+        assertEquals(7, nonCoordinatingSites[5]);
+        assertEquals(8, nonCoordinatingSites[6]);
 
         // fail site that isn't a non-coordinator site
         ts = new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);
@@ -1027,10 +1027,10 @@ public class TestExecutionSite extends TestCase {
         failedSites.add(10);
         ts.handleSiteFaults(failedSites);
 
-        dumpContents = ts.getDumpContents();
-        assertEquals(8, dumpContents.nonCoordinatingSites.length);
+        nonCoordinatingSites = ts.getNonCoordinatingSites();
+        assertEquals(8, nonCoordinatingSites.length);
         for (int i=0; i < 8; i++) {
-            assertEquals(i+1, dumpContents.nonCoordinatingSites[i]);
+            assertEquals(i+1, nonCoordinatingSites[i]);
         }
 
     }

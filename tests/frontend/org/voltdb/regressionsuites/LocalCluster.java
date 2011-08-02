@@ -39,7 +39,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.ProcedureProfiler;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -476,7 +475,6 @@ public class LocalCluster implements VoltServerConfig {
             config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
             config.m_pathToCatalog = m_jarFileName;
             config.m_pathToDeployment = m_pathToDeployment;
-            config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
             config.m_port = VoltDB.DEFAULT_PORT;
             config.m_adminPort = m_baseAdminPort;
             ArrayList<Integer> ports = new ArrayList<Integer>();

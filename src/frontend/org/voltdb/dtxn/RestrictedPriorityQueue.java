@@ -17,15 +17,11 @@
 
 package org.voltdb.dtxn;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.PriorityQueue;
-import java.util.Map.Entry;
 
-import org.voltdb.debugstate.ExecutorContext;
-import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.Mailbox;
@@ -294,32 +290,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
             return null;
         }
         return lid.m_lastSafeTxnId;
-    }
-
-    public void getDumpContents(ExecutorContext context) {
-        // set misc scalars
-        context.transactionsStarted = m_txnsPopped;
-
-        // get all the queued transactions
-        context.queuedTransactions = new ExecutorTxnState[size()];
-        int i = 0;
-        for (OrderableTransaction txnState : this) {
-            assert(txnState != null);
-            context.queuedTransactions[i] = ((TransactionState)txnState).getDumpContents();
-            context.queuedTransactions[i].ready = (txnState.txnId <= m_newestCandidateTransaction);
-            i++;
-        }
-        Arrays.sort(context.queuedTransactions);
-
-        // store the contact history
-        context.contactHistory = new ExecutorContext.InitiatorContactHistory[m_initiatorData.size()];
-        i = 0;
-        for (Entry<Integer, LastInitiatorData> e : m_initiatorData.entrySet()) {
-            context.contactHistory[i] = new ExecutorContext.InitiatorContactHistory();
-            context.contactHistory[i].initiatorSiteId = e.getKey();
-            context.contactHistory[i].transactionId = e.getValue().m_lastSeenTxnId;
-            i++;
-        }
     }
 
     public void shutdown() throws InterruptedException {

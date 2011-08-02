@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 
 import org.voltdb.VoltDB;
-import org.voltdb.debugstate.MailboxHistory.MessageState;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -41,7 +40,6 @@ public abstract class VoltMessage {
     final public static byte PARTICIPANT_NOTICE_ID = 5;
     final public static byte HEARTBEAT_ID = 6;
     final public static byte HEARTBEAT_RESPONSE_ID = 7;
-    final public static byte DEBUG_MESSAGE_ID = 8;
     final public static byte FAILURE_SITE_UPDATE_ID = 9;
     final public static byte RECOVERY_ID = 10;
     final public static byte COMPLETE_TRANSACTION_ID = 11;
@@ -133,9 +131,6 @@ public abstract class VoltMessage {
         case HEARTBEAT_RESPONSE_ID:
             message = new HeartbeatResponseMessage();
             break;
-        case DEBUG_MESSAGE_ID:
-            message = new DebugMessage();
-            break;
         case FAILURE_SITE_UPDATE_ID:
             message = new FailureSiteUpdateMessage();
             break;
@@ -200,15 +195,6 @@ public abstract class VoltMessage {
     public BBContainer getBufferForMessaging(final DBBPool pool) throws IOException {
         flattenToBuffer(pool);
         return m_container;
-    }
-
-    public MessageState getDumpContents() {
-        MessageState ms = new MessageState();
-        ms.summary = toString();
-        ms.toSiteId = receivedFromSiteId;
-        ms.fromSiteId = -1;
-        ms.txnId = -1;
-        return ms;
     }
 
     /**

@@ -27,8 +27,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.voltdb.BackendTarget;
-import org.voltdb.ProcedureProfiler;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -103,6 +103,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         return m_compiled;
     }
 
+    @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder,
                                         int adminPort, boolean adminOnStartup)
     {
@@ -188,7 +189,6 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
         // m_jarFileName is already prefixed with test output path.
         config.m_pathToCatalog = m_jarFileName;
-        config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
         config.m_pathToDeployment = m_pathToDeployment;
 
         config.m_ipcPorts = java.util.Collections.synchronizedList(new ArrayList<Integer>());

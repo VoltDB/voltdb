@@ -23,7 +23,6 @@ public class AsyncCompilerWork implements Serializable {
     private static final long serialVersionUID = 6588086204761949082L;
 
     boolean shouldShutdown = false;
-    boolean shouldDump = false;
     long clientHandle = -1;
     long connectionId = -1;
     String hostname = "";

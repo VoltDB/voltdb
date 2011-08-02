@@ -21,13 +21,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
-import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState.DependencyState;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.VoltMessage;
 
@@ -340,29 +337,5 @@ class WorkUnit
                 tracker.removeSite(siteId);
             }
         }
-    }
-
-    /** Return a simplified, flat version of this objects state for dumping */
-    WorkUnitState getDumpContents() {
-        WorkUnitState retval = new WorkUnitState();
-
-        if (m_payload != null)
-            retval.payload = m_payload.toString();
-        retval.shouldResume = m_shouldResumeProcedure;
-        retval.outstandingDependencyCount = 0;
-        if (m_dependencies != null) {
-            retval.dependencies = new DependencyState[m_dependencies.size()];
-            int i = 0;
-            for (Entry<Integer, DependencyTracker> entry : m_dependencies.entrySet())
-            {
-                DependencyState ds = new DependencyState();
-                ds.dependencyId = entry.getKey();
-                ds.count = entry.getValue().size();
-                retval.outstandingDependencyCount += entry.getValue().getExpectedDepCount();
-                retval.dependencies[i++] = ds;
-            }
-        }
-
-        return retval;
     }
 }
