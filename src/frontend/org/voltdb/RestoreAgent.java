@@ -147,7 +147,7 @@ SnapshotCompletionInterest {
             return false;
         }
         @Override
-        public Long getMinLastSeenTxn() {
+        public Long getMaxLastSeenTxn() {
             return null;
         }
         @Override
@@ -193,17 +193,17 @@ SnapshotCompletionInterest {
                 snapshots = getSnapshots();
             }
 
-            final Long minLastSeenTxn = m_replayAgent.getMinLastSeenTxn();
+            final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
             Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
             for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
                 /*
-                 * If the txn of the snapshot is before the earliest txn
+                 * If the txn of the snapshot is before the latest txn
                  * among the last seen txns across all initiators when the
                  * log starts, there is a gap in between the snapshot was
                  * taken and the beginning of the log. So the snapshot is
                  * not viable for replay.
                  */
-                if (minLastSeenTxn != null && e.getKey() < minLastSeenTxn) {
+                if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
                     continue;
                 }
 
@@ -279,7 +279,7 @@ SnapshotCompletionInterest {
             }
             LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
 
-            sendLocalRestoreInformation(minLastSeenTxn, snapshotInfos);
+            sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
 
             // Negotiate with other hosts about which snapshot to restore
             String restorePath = null;
@@ -633,14 +633,14 @@ SnapshotCompletionInterest {
      * Send the information about the local snapshot files to the other hosts to
      * generate restore plan.
      *
-     * @param min
-     *            The minimum txnId of the last txn across all initiators in the
+     * @param max
+     *            The maximum txnId of the last txn across all initiators in the
      *            local command log.
      * @param snapshots
      *            The information of the local snapshot files.
      */
-    private void sendLocalRestoreInformation(Long min, Set<SnapshotInfo> snapshots) {
-        ByteBuffer buf = serializeRestoreInformation(min, snapshots);
+    private void sendLocalRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
+        ByteBuffer buf = serializeRestoreInformation(max, snapshots);
 
         String zkNode = RESTORE + "/" + m_hostId;
         try {
@@ -820,7 +820,7 @@ SnapshotCompletionInterest {
             }
         }
 
-        if (clStartTxnId != null && clStartTxnId > 0 &&
+        if (clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
             snapshotFragments.size() == 0) {
             LOG.fatal("No viable snapshots to restore");
             VoltDB.crashVoltDB();
@@ -852,9 +852,9 @@ SnapshotCompletionInterest {
             // Check if there is log to replay
             boolean hasLog = buf.get() == 1;
             if (hasLog) {
-                long minTxnId = buf.getLong();
-                if (clStartTxnId == null || minTxnId > clStartTxnId) {
-                    clStartTxnId = minTxnId;
+                long maxTxnId = buf.getLong();
+                if (clStartTxnId == null || maxTxnId > clStartTxnId) {
+                    clStartTxnId = maxTxnId;
                 }
             }
 
@@ -910,15 +910,15 @@ SnapshotCompletionInterest {
     }
 
     /**
-     * @param min
+     * @param max
      * @param snapshots
      * @return
      */
-    private ByteBuffer serializeRestoreInformation(Long min, Set<SnapshotInfo> snapshots) {
+    private ByteBuffer serializeRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
         // hasLog + recover + snapshotCount
         int size = 1 + 1 + 4;
-        if (min != null) {
-            // we need to add the size of the min number to the total size
+        if (max != null) {
+            // we need to add the size of the max number to the total size
             size += 8;
         }
         for (SnapshotInfo i : snapshots) {
@@ -926,11 +926,11 @@ SnapshotCompletionInterest {
         }
 
         ByteBuffer buf = ByteBuffer.allocate(size);
-        if (min == null) {
+        if (max == null) {
             buf.put((byte) 0);
         } else {
             buf.put((byte) 1);
-            buf.putLong(min);
+            buf.putLong(max);
         }
         // 1 means recover, 0 means to create new DB
         buf.put((byte) m_action.ordinal());

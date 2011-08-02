@@ -60,12 +60,12 @@ public interface CommandLogReinitiator {
     public boolean hasReplayed();
 
     /**
-     * Get the minimum transaction ID among the last seen transactions across
+     * Get the maximum transaction ID among the last seen transactions across
      * all initiators in the previous segment.
      *
      * @return null if the log is empty
      */
-    public Long getMinLastSeenTxn();
+    public Long getMaxLastSeenTxn();
 
     /**
      * Returns all command log segments to the pool and closes the reader. This
