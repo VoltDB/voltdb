@@ -45,6 +45,7 @@ public class ExportClientSuddenDeathTest extends TestCase {
                                                          new File("."),
                                                          1,
                                                          "yyyyMMddHHmmss",
+                                                         null,
                                                          0,
                                                          false,
                                                          false,

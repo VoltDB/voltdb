@@ -40,6 +40,7 @@ public class TestExportToFileClient extends TestCase {
                 new File("/tmp/" + System.getProperty("user.name")),
                 60,
                 "yyyyMMddHHmmss",
+                null,
                 0,
                 false,
                 false,

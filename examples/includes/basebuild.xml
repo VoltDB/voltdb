@@ -17,6 +17,9 @@
     <fileset dir='${voltdb.dir}' >
         <include name='voltdb*.jar' />
     </fileset>
+    <fileset dir='${voltdb.dir}/../lib/' >
+        <include name='*.jar' />
+    </fileset>
     <pathelement location='${build.dir}' />
     <pathelement path="${java.class.path}"/>
 </path>

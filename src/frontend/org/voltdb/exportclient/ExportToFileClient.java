@@ -35,6 +35,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeMap;
 
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
@@ -69,8 +70,8 @@ public class ExportToFileClient extends ExportClientBase {
     {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     }
-    // Batches only supports CSV or TSV
     protected final char m_delimiter;
+    protected final char[] m_fullDelimiters;
     protected final String m_extension;
     protected final String m_nonce;
     // outDir is the folder that will contain the raw files or batch folders
@@ -307,7 +308,11 @@ public class ExportToFileClient extends ExportClientBase {
             File newFile = new File(path);
             try {
                 OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, true), "UTF-8");
-                if (m_delimiter == ',')
+                if (m_fullDelimiters != null) {
+                    writer = new CSVWriter(new BufferedWriter(osw, 1048576),
+                            m_fullDelimiters[0], m_fullDelimiters[1], m_fullDelimiters[2], String.valueOf(m_fullDelimiters[3]));
+                }
+                else if (m_delimiter == ',')
                     // CSV
                     writer = new CSVWriter(new BufferedWriter(osw, 1048576), m_delimiter);
                 else {
@@ -562,6 +567,7 @@ public class ExportToFileClient extends ExportClientBase {
                               File outdir,
                               int period,
                               String dateformatString,
+                              String fullDelimiters,
                               int firstfield,
                               boolean useAdminPorts,
                               boolean batched,
@@ -578,6 +584,18 @@ public class ExportToFileClient extends ExportClientBase {
         m_firstfield = firstfield;
         m_batched = batched;
         m_withSchema = withSchema;
+
+        if (fullDelimiters != null) {
+            fullDelimiters = StringEscapeUtils.unescapeHtml4(fullDelimiters);
+            m_fullDelimiters = new char[4];
+            for (int i = 0; i < 4; i++) {
+                m_fullDelimiters[i] = fullDelimiters.charAt(i);
+                System.out.printf("FULL DELIMETER %d: %c\n", i, m_fullDelimiters[i]);
+            }
+        }
+        else {
+            m_fullDelimiters = null;
+        }
 
         // init the batch system with the first batch
         assert(m_current == null);
@@ -681,6 +699,7 @@ public class ExportToFileClient extends ExportClientBase {
                         + "[--dateformat date_pattern_for_file_name] "
                         + "[--outdir target_directory] "
                         + "[--skipinternals] "
+                        + "[--delimiters html-escaped delimiter set (4 chars)] "
                         + "[--user export_username] "
                         + "[--password export_password]");
         System.out.println("Note that server hostnames may be appended with a specific port:");
@@ -702,6 +721,7 @@ public class ExportToFileClient extends ExportClientBase {
         String dateformatString = "yyyyMMddHHmmss";
         boolean batched = false;
         boolean withSchema = false;
+        String fullDelimiters = null;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -834,6 +854,19 @@ public class ExportToFileClient extends ExportClientBase {
             else if (arg.equals("--with-schema")) {
                 withSchema = true;
             }
+            else if (arg.equals("--delimiters")) {
+                if (args.length < ii + 1) {
+                    System.err.println("Error: Not enough args following --delimiters");
+                    printHelpAndQuit(-1);
+                }
+                fullDelimiters = args[ii + 1].trim();
+                ii++;
+                String charsAsStr = StringEscapeUtils.unescapeHtml4(fullDelimiters.trim());
+                if (charsAsStr.length() != 4) {
+                    System.err.println("The delimiter set must contain exactly 4 characters (after any html escaping).");
+                    printHelpAndQuit(-1);
+                }
+            }
         }
         // Check args for validity
         if (volt_servers == null || volt_servers.length < 1) {
@@ -869,6 +902,7 @@ public class ExportToFileClient extends ExportClientBase {
                                                            outdir,
                                                            period,
                                                            dateformatString,
+                                                           null,
                                                            firstfield,
                                                            connect == 'a',
                                                            batched,

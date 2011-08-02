@@ -66,6 +66,7 @@
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
+<property name='lib.dir'                     location='lib' />
 <property name='vendor.lib.dir'              location='third_party/java/jars' />
 <property name='vendor.src.dir'              location='third_party/java/src'  />
 <property name='vendor.obj.dir'              location='third_party/java/obj'  />
@@ -97,6 +98,9 @@
     <pathelement location='${build.prod.dir}' />
     <pathelement location='${build.test.dir}' />
     <pathelement location='${vendor.obj.dir}' />
+    <fileset dir='${lib.dir}'>
+        <include name='*.jar' />
+    </fileset>
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
@@ -490,8 +494,13 @@ DISTRIBUTION
     <!-- populate top level demo html -->
     <copy todir="${dist.dir}/" file="Click Here to Start.html"/>
 
-    <!-- copy jline-1.0.jar for sqlcmd tool -->
-    <copy todir="${dist.dir}/tools/sqlcmd" file="third_party/java/jars/jline-1.0.jar"/>
+    <!-- copy lib dir -->
+    <mkdir dir="${dist.dir}/lib" />
+    <copy todir="${dist.dir}/lib">
+        <fileset dir="${lib.dir}" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </copy>
 
     <!-- make shell script executable -->
     <chmod perm="ugo+rx">
