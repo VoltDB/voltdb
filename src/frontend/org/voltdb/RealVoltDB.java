@@ -31,6 +31,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.text.SimpleDateFormat;
@@ -1833,24 +1834,35 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         final long delta = ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000);
         final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
-        m_recovering = false;
         for (ClientInterface intf : getClientInterfaces()) {
             intf.mayActivateSnapshotDaemon();
         }
         hostLog.info(
-                "Node recovery completed after " + delta + " seconds with " + megabytes +
+                "Node data recovery completed after " + delta + " seconds with " + megabytes +
                 " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
-        hostLog.info("Logging host recovery completion to ZK");
         try {
             try {
                 m_zk.create("/unfaulted_hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } catch (KeeperException.NodeExistsException e) {}
-            m_zk.create("/unfaulted_hosts/" + m_messenger.getHostId(), null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
+                try {
+                    m_zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                } catch (KeeperException.NodeExistsException e) {}
+            } else {
+                m_recovering = false;
+            }
+            ByteBuffer txnIdBuffer = ByteBuffer.allocate(8);
+            txnIdBuffer.putLong(TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
+            m_zk.create(
+                    "/unfaulted_hosts/" + m_messenger.getHostId(),
+                    txnIdBuffer.array(),
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             hostLog.fatal("Unable to log host recovery completion to ZK", e);
             VoltDB.crashVoltDB();
         }
+        hostLog.info("Logging host recovery completion to ZK");
     }
 
     @Override

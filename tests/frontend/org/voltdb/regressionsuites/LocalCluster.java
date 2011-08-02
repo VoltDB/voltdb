@@ -120,7 +120,7 @@ public class LocalCluster implements VoltServerConfig {
      */
     public static class PipeToFile extends Thread {
         final static String m_initToken = "Server completed init";
-        final static String m_rejoinToken = "Node recovery complete";
+        final static String m_rejoinToken = "Node data recovery completed";
         final static String m_initiatorID = "Initializing initiator ID:";
 
         FileWriter m_writer ;

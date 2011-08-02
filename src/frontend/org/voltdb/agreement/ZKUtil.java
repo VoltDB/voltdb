@@ -42,6 +42,7 @@ import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltFile;
 
@@ -193,6 +194,37 @@ public class ZKUtil {
             return null;
         }
         return zk;
+    }
+
+    public static class ByteArrayCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback {
+        private final CountDownLatch done = new CountDownLatch(1);
+        private Object results[];
+
+        public Object[] get() throws InterruptedException, KeeperException {
+            done.await();
+            return getResult();
+        }
+
+        public byte[] getData() throws InterruptedException, KeeperException {
+            done.await();
+            return (byte[])getResult()[3];
+        }
+
+        private Object[] getResult() throws KeeperException {
+            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
+            if (code == KeeperException.Code.OK) {
+                return results;
+            } else {
+                throw KeeperException.create(code);
+            }
+        }
+
+        @Override
+        public void processResult(int rc, String path, Object ctx, byte[] data,
+                Stat stat) {
+            results = new Object[] { rc, path, ctx, data, stat };
+            done.countDown();
+        }
     }
 
     public static class StringCallback implements
