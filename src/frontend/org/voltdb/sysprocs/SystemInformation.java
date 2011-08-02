@@ -188,40 +188,49 @@ public class SystemInformation extends VoltSystemProcedure
         HashMap<String, String> first_map = new HashMap<String, String>();
         HashMap<String, String> second_map = new HashMap<String, String>();
 
-        while (first.advanceRow())
-        {
-            first_map.put(first.getString(0), first.getString(1));
-        }
-        while (second.advanceRow())
-        {
-            second_map.put(second.getString(0), second.getString(1));
-        }
-
-        if (first_map.size() != second_map.size())
-        {
-            retval = false;
-        }
-        else
-        {
-            for (Entry<String, String> first_entry : first_map.entrySet())
+        try {
+            while (first.advanceRow())
             {
-                String second_value = second_map.get(first_entry.getKey());
-                if (second_value == null || !second_value.equals(first_entry.getValue()))
+                first_map.put(first.getString(0), first.getString(1));
+            }
+            while (second.advanceRow())
+            {
+                second_map.put(second.getString(0), second.getString(1));
+            }
+
+            if (first_map.size() != second_map.size())
+            {
+                retval = false;
+            }
+            else
+            {
+                for (Entry<String, String> first_entry : first_map.entrySet())
                 {
-                    // Ignore deltas due to LocalCluster's use of
-                    // VoltFileRoot
-                    if ((((String)(first_entry.getKey())).contains("path") ||
-                         ((String)(first_entry.getKey())).contains("root")) &&
-                        (System.getProperty("VoltFilePrefix") != null))
+                    String second_value = second_map.get(first_entry.getKey());
+                    if (second_value == null || !second_value.equals(first_entry.getValue()))
                     {
-                        continue;
-                    }
-                    else
-                    {
-                        retval = false;
-                        break;
+                        // Ignore deltas due to LocalCluster's use of
+                        // VoltFileRoot
+                        if ((((first_entry.getKey())).contains("path") ||
+                                ((first_entry.getKey())).contains("root")) &&
+                                (System.getProperty("VoltFilePrefix") != null))
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            retval = false;
+                            break;
+                        }
                     }
                 }
+            }
+        } finally {
+            if (first != null) {
+                first.resetRowPosition();
+            }
+            if (second != null) {
+                second.resetRowPosition();
             }
         }
         return retval;
