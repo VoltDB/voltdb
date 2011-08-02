@@ -793,9 +793,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             throw new VoltAbortException("Cluster has already been restored or has failed a restore." +
                     " Restart the cluster before doing another restore.");
         }
-      //  m_sampler.start();
+
         final long startTime = System.currentTimeMillis();
-        HOST_LOG.info("Restoring from path: " + path + ", with ID: " + nonce + " at " + startTime);
+        HOST_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
 
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
@@ -939,8 +939,8 @@ public class SnapshotRestore extends VoltSystemProcedure
         final PrintWriter pw = new PrintWriter(sw);
         pw.toString();
         pw.printf("%.2f", duration);
-        HOST_LOG.info("Finished restore of " + path + ", with ID: "
-                + nonce + " at " + endTime + " took " + sw.toString() + " seconds");
+        HOST_LOG.info("Finished restore of " + path + " with nonce: "
+                + nonce + " in " + sw.toString() + " seconds");
 //        m_sampler.setShouldStop();
 //        try {
 //            m_sampler.join();
