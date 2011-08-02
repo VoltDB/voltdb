@@ -16,6 +16,9 @@ PATHS AND PROPERTIES
 
 <path id='project.classpath'>
     <pathelement location='${build.dir}' />
+    <fileset dir='##voltdb_lib_path##/../lib' >
+        <include name='*.jar' />
+    </fileset>
     <fileset dir='##voltdb_lib_path##' >
         <include name='voltdb*.jar' />
     </fileset>
