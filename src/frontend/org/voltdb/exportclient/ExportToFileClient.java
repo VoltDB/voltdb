@@ -65,11 +65,9 @@ public class ExportToFileClient extends ExportClientBase {
     // ODBC Datetime Format
     // if you need microseconds, you'll have to change this code or
     //  export a bigint representing microseconds since an epoch
-    // ENG-1502: SDF is NOT thread-safe - What da...?!?
-    protected SimpleDateFormat dateFormat()
-    {
-        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-    }
+    protected static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
+    // use thread-local to avoid SimpleDateFormat thread-safety issues
+    protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat;
     protected final char m_delimiter;
     protected final char[] m_fullDelimiters;
     protected final String m_extension;
@@ -80,7 +78,9 @@ public class ExportToFileClient extends ExportClientBase {
     protected final HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
     // how often to roll batches / files
     protected final int m_period;
-    protected final SimpleDateFormat m_dateformat;
+    // use thread-local to avoid SimpleDateFormat thread-safety issues
+    protected final ThreadLocal<SimpleDateFormat> m_dateformat;
+    protected final String m_dateFormatOriginalString;
     protected final int m_firstfield;
 
     // timer used to roll batches
@@ -89,14 +89,14 @@ public class ExportToFileClient extends ExportClientBase {
     // record the original command line args for servers
     protected final List<String> m_commandLineServerArgs = new ArrayList<String>();
 
-    protected final String m_dateFormatOriginalString;
-
     protected final Set<String> m_globalSchemasWritten = new HashSet<String>();
 
     protected PeriodicExportContext m_current = null;
 
     protected final boolean m_batched;
     protected final boolean m_withSchema;
+
+    protected final Object m_batchLock = new Object();
 
     /**
     *
@@ -140,7 +140,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           m_dateformat.format(start) +
+                           m_dateformat.get().format(start) +
                            m_extension;
                 }
             }
@@ -193,7 +193,7 @@ public class ExportToFileClient extends ExportClientBase {
 
         String getPathOfBatchDir(String prefix) {
             assert(m_batched);
-            return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.format(start);
+            return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.get().format(start);
         }
 
         /**
@@ -202,7 +202,7 @@ public class ExportToFileClient extends ExportClientBase {
          * of the active state.
          */
         void decref(ExportToFileDecoder decoder) {
-            synchronized (getClass()) {
+            synchronized (m_batchLock) {
                 m_decoders.remove(decoder);
                 if ((end != null) && (m_decoders.size() == 0)) {
                     closeAllWriters();
@@ -375,7 +375,7 @@ public class ExportToFileClient extends ExportClientBase {
          */
         @Override
         protected void finalize() throws Throwable {
-            synchronized (getClass()) {
+            synchronized (m_batchLock) {
                 closeAllWriters();
             }
             super.finalize();
@@ -457,7 +457,7 @@ public class ExportToFileClient extends ExportClientBase {
                         fields[i - m_firstfield] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType) row[i];
-                        fields[i - m_firstfield] = dateFormat().format(timestamp.asApproximateJavaDate());
+                        fields[i - m_firstfield] = m_ODBCDateformat.get().format(timestamp.asApproximateJavaDate());
                         fields[i - m_firstfield] += String.valueOf(timestamp.getUSec());
                     } else {
                         fields[i - m_firstfield] = row[i].toString();
@@ -485,7 +485,10 @@ public class ExportToFileClient extends ExportClientBase {
                 throw new RuntimeException("NULL context object found.");
             }
 
-            m_writer = m_context.getWriter(m_tableName, m_generation);
+            // prevent us from trying to get a writer in the middle of a roll
+            synchronized (m_batchLock) {
+                m_writer = m_context.getWriter(m_tableName, m_generation);
+            }
             if (m_writer == null) {
                 m_logger.error("NULL writer object from context.");
                 throw new RuntimeException("NULL writer object from context.");
@@ -579,8 +582,21 @@ public class ExportToFileClient extends ExportClientBase {
         m_outDir = outdir;
         m_tableDecoders = new HashMap<Long, HashMap<String, ExportToFileDecoder>>();
         m_period = period;
-        m_dateformat = new SimpleDateFormat(dateformatString);
         m_dateFormatOriginalString = dateformatString;
+        // SimpleDateFormat isn't threadsafe
+        // ThreadLocal variables should protect them, lamely.
+        m_dateformat = new ThreadLocal<SimpleDateFormat>() {
+            @Override
+            protected SimpleDateFormat initialValue() {
+                return new SimpleDateFormat(m_dateFormatOriginalString);
+            }
+        };
+        m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
+            @Override
+            protected SimpleDateFormat initialValue() {
+                return new SimpleDateFormat(ODBC_DATE_FORMAT_STRING);
+            }
+        };
         m_firstfield = firstfield;
         m_batched = batched;
         m_withSchema = withSchema;
@@ -611,9 +627,11 @@ public class ExportToFileClient extends ExportClientBase {
         m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
     }
 
-    synchronized PeriodicExportContext getCurrentContextAndAddref(ExportToFileDecoder decoder) {
-        m_current.m_decoders.add(decoder);
-        return m_current;
+    PeriodicExportContext getCurrentContextAndAddref(ExportToFileDecoder decoder) {
+        synchronized(m_batchLock) {
+            m_current.m_decoders.add(decoder);
+            return m_current;
+        }
     }
 
     @Override
@@ -640,12 +658,14 @@ public class ExportToFileClient extends ExportClientBase {
      * be active until all writers have finished writing their current blocks
      * to it.
      */
-    synchronized void roll(Date rollTime) {
-        m_logger.trace("Rolling batch.");
-        m_current.end = rollTime;
-        if (m_current.m_decoders.size() == 0)
-            m_current.closeAllWriters();
-        m_current = new PeriodicExportContext(rollTime);
+    void roll(Date rollTime) {
+        synchronized(m_batchLock) {
+            m_logger.trace("Rolling batch.");
+            m_current.end = rollTime;
+            if (m_current.m_decoders.size() == 0)
+                m_current.closeAllWriters();
+            m_current = new PeriodicExportContext(rollTime);
+        }
     }
 
     protected void logConfigurationInfo() {
