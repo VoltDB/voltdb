@@ -27,25 +27,23 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.Callable;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -79,6 +77,7 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
     private final ScheduledExecutorService m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
+            @Override
             public Thread newThread(Runnable r) {
                 return new Thread(r, "SnapshotDaemon");
             }
@@ -195,15 +194,18 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
             zk.create("/completed_snapshots", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
 
-        /*
-         * Really shouldn't leak this from a constructor, and twice to boot
-         */
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                leaderElection();
-            }
-        });
+        // Really shouldn't leak this from a constructor, and twice to boot
+        //
+        // If enterprise version, do leader election for snapshot truncation
+        // Eventually, we may want to do this for the community edition as well
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    leaderElection();
+                }
+            });
+        }
     }
 
     /*

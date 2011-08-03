@@ -455,7 +455,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 System.exit(-1);
             }
 
-            readBuildInfo();
+            // determine if this is a rejoining node
+            // (used for license check and later the actual rejoin)
+            boolean isRejoin = config.m_rejoinToHostAndPort != null;
+
+            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
             m_config = config;
 
             // Initialize the catalog and some common shortcuts
@@ -492,15 +496,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     0,
                     catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
 
-            // determine if this is a rejoining node
-            // (used for license check and later the actual rejoin)
-            boolean isRejoin = config.m_rejoinToHostAndPort != null;
-
             // If running commercial code (of value) and not rejoining, enforce licensing.
-            Class<?> proClass = MiscUtils.loadProClass(
-                    "org.voltdb.CommandLogImpl",
-                    "Command logging", true);
-            if ((proClass != null) && !isRejoin) {
+            if (config.m_isEnterprise && !isRejoin) {
                 assert(m_config != null);
                 assert(m_catalogContext != null);
                 if (!validateLicense(m_config.m_pathToLicense, m_catalogContext.numberOfNodes)) {
@@ -512,21 +509,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
-                try {
-                    Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
-                                                               "Command logging", false);
-                    if (loggerClass != null) {
-                        m_commandLog = (CommandLog)loggerClass.newInstance();
-                    }
-                } catch (InstantiationException e) {
-                    hostLog.fatal("Unable to instantiate command log", e);
-                    VoltDB.crashVoltDB();
-                } catch (IllegalAccessException e) {
-                    hostLog.fatal("Unable to instantiate command log", e);
-                    VoltDB.crashVoltDB();
+                if (!config.m_isEnterprise) {
+                    hostLog.warn(
+                            "Command logging requested in deployment file but can't be enabled in Community Edition.");
                 }
-            } else {
-                hostLog.info("Command logging is disabled");
+                else {
+                    try {
+                        Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
+                                                                   "Command logging", false);
+                        if (loggerClass != null) {
+                            m_commandLog = (CommandLog)loggerClass.newInstance();
+                        }
+                    } catch (InstantiationException e) {
+                        hostLog.fatal("Unable to instantiate command log", e);
+                        VoltDB.crashVoltDB();
+                    } catch (IllegalAccessException e) {
+                        hostLog.fatal("Unable to instantiate command log", e);
+                        VoltDB.crashVoltDB();
+                    }
+                }
             }
 
             // start up the response sampler if asked to by setting the env var
@@ -1271,11 +1272,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public void readBuildInfo() {
+    public void readBuildInfo(String editionTag) {
         String buildInfo[] = extractBuildInfo();
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
-        hostLog.info("Build: " + m_versionString + " " + m_buildString);
+        hostLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
     }
 
     /**

@@ -34,6 +34,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
+
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
@@ -498,7 +499,7 @@ SnapshotCompletionInterest {
         // Load command log reinitiator
         try {
             Class<?> replayClass = MiscUtils.loadProClass("org.voltdb.CommandLogReinitiatorImpl",
-                                                          "Command log replay", false);
+                                                          "Command log replay", true);
             if (replayClass != null) {
                 Constructor<?> constructor =
                     replayClass.getConstructor(int.class,
@@ -1120,9 +1121,11 @@ SnapshotCompletionInterest {
          * they can be set individually
          */
         List<String> paths = new ArrayList<String>();
-        CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
-        if (commandLogElement != null) {
-            paths.add(commandLogElement.getInternalsnapshotpath());
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
+            if (commandLogElement != null) {
+                paths.add(commandLogElement.getInternalsnapshotpath());
+            }
         }
         if (m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
             paths.add(m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath());

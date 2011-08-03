@@ -364,7 +364,7 @@ public class TestExecutionEngine extends TestCase {
     @Override
     protected void setUp() throws Exception {
         super.setUp();
-        VoltDB.instance().readBuildInfo();
+        VoltDB.instance().readBuildInfo("Test");
         sourceEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();

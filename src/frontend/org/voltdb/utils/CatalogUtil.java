@@ -65,6 +65,8 @@ import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
+import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -75,8 +77,6 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
-import org.voltdb.compiler.deploymentfile.CommandLogType;
-import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
@@ -460,10 +460,10 @@ public abstract class CatalogUtil {
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
 
-
         setExportInfo( catalog, deployment.getExport());
 
         setCommandLogInfo( catalog, deployment.getCommandlog());
+
         return getDeploymentCRC(deployment);
     }
 
@@ -971,25 +971,39 @@ public abstract class CatalogUtil {
                            "export_overflow");
         validateDirectory("export overflow", exportOverflowPath, crashOnFailedValidation);
 
+        // only use these directories in the enterprise version
+        File commandLogPath = null;
+        File commandLogSnapshotPath = null;
+
         path_entry = null;
         if (paths != null)
         {
             path_entry = paths.getCommandlog();
         }
-        File commandLogPath =
-            getFeaturePath(paths, path_entry, voltDbRoot, "command log",
-                           "command_log");
-        validateDirectory("command log", commandLogPath, crashOnFailedValidation);
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            commandLogPath =
+                    getFeaturePath(paths, path_entry, voltDbRoot, "command log", "command_log");
+            validateDirectory("command log", commandLogPath, crashOnFailedValidation);
+        }
+        else {
+            // dumb defaults if you ask for logging in community version
+            commandLogPath = new VoltFile(voltDbRoot, "command_log");;
+        }
 
         path_entry = null;
         if (paths != null)
         {
             path_entry = paths.getCommandlogsnapshot();
         }
-        File commandLogSnapshotPath =
-            getFeaturePath(paths, path_entry, voltDbRoot, "command log snapshot",
-                           "command_log_snapshot");
-        validateDirectory("command log snapshot", commandLogSnapshotPath, crashOnFailedValidation);
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            commandLogSnapshotPath =
+                getFeaturePath(paths, path_entry, voltDbRoot, "command log snapshot", "command_log_snapshot");
+            validateDirectory("command log snapshot", commandLogSnapshotPath, crashOnFailedValidation);
+        }
+        else {
+            // dumb defaults if you ask for logging in community version
+            commandLogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");;
+        }
 
         //Set the volt root in the catalog
         catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());

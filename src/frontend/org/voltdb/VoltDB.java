@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.TimeZone;
 
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * <code>VoltDB</code> is the main class for VoltDB server.
@@ -111,6 +112,10 @@ public class VoltDB {
 
         /** information used to rejoin this new node to a cluster */
         public String m_rejoinToHostAndPort = null;
+
+        /** running the enterprise version? */
+        public final boolean m_isEnterprise =
+                (null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true));
 
         /** start up action */
         public START_ACTION m_startAction = START_ACTION.START;

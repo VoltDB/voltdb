@@ -39,7 +39,7 @@ public interface VoltDBInterface
      */
     public boolean ignoreCrash();
 
-    public void readBuildInfo();
+    public void readBuildInfo(String editionTag);
 
     public CommandLog getCommandLog();
 

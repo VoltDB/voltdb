@@ -40,7 +40,7 @@ public class TestTheHashinator extends TestCase {
 
     @Override
     public void setUp() {
-        VoltDB.instance().readBuildInfo();
+        VoltDB.instance().readBuildInfo("Test");
     }
 
     public void testSameLongHash1() {

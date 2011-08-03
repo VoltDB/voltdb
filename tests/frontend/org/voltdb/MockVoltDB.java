@@ -365,7 +365,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void readBuildInfo()
+    public void readBuildInfo(String editionTag)
     {
         // TODO Auto-generated method stub
 
@@ -538,6 +538,7 @@ public class MockVoltDB implements VoltDBInterface
         return m_agreementSite;
     }
 
+    @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
     }

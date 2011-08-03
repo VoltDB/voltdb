@@ -61,7 +61,7 @@ public class TestTwoSitePlans extends TestCase {
 
     @Override
     public void setUp() throws IOException {
-        VoltDB.instance().readBuildInfo();
+        VoltDB.instance().readBuildInfo("Test");
 
         // compile a catalog
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
