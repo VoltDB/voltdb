@@ -280,7 +280,7 @@ public class ZKTestBase {
                     ii,
                     new HashSet<Integer>(),
                     m_mailboxes.get(ii),
-                    new InetSocketAddress(2181 + ii),
+                    new InetSocketAddress(2182 + ii),
                     m_faultDistributor,
                     false));
         }
@@ -299,11 +299,12 @@ public class ZKTestBase {
                 site.shutdown();
             }
         }
+        m_agreementSites.clear();
     }
 
     protected ZooKeeper getClient(int site) throws Exception {
         final Semaphore permit = new Semaphore(0);
-        ZooKeeper keeper = new ZooKeeper("localhost:" + Integer.toString(2181 + site), 4000, new Watcher() {
+        ZooKeeper keeper = new ZooKeeper("localhost:" + Integer.toString(2182 + site), 4000, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
                 if (event.getState() == KeeperState.SyncConnected) {

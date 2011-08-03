@@ -93,7 +93,7 @@ public class TestZK extends ZKTestBase {
                     site,
                     failedSites,
                     m_mailboxes.get(site),
-                    new InetSocketAddress(2181 + site),
+                    new InetSocketAddress(2182 + site),
                     m_faultDistributor,
                     true));
         m_agreementSites.get(site).start();

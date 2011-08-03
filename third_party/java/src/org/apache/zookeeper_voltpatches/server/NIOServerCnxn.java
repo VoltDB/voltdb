@@ -64,6 +64,7 @@ import org.apache.zookeeper_voltpatches.proto.RequestHeader;
 import org.apache.zookeeper_voltpatches.proto.WatcherEvent;
 import org.apache.zookeeper_voltpatches.server.auth.AuthenticationProvider;
 import org.apache.zookeeper_voltpatches.server.auth.ProviderRegistry;
+import org.voltdb.VoltDB;
 
 /**
  * This class handles communication with clients using NIO. There is one per
@@ -147,7 +148,8 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
                 ss.configureBlocking(false);
                 ss.register(selector, SelectionKey.OP_ACCEPT);
             } catch (IOException e) {
-                LOG.error("Unable to bind to socket, will run in no client mode.", e);
+                LOG.fatal("Unable to bind to ZooKeeper client socket", e);
+                VoltDB.crashVoltDB();
             }
         }
 
