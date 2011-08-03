@@ -24,12 +24,12 @@
 package org.voltdb.regressionsuites;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
@@ -65,7 +65,6 @@ public class TestPartitionDetection extends TestCase
         try {
             System.setOut(ps);
             String args[] = new String[] {
-                    TESTNONCE,
                     "--dir",
                     TMPDIR
             };
@@ -73,10 +72,18 @@ public class TestPartitionDetection extends TestCase
             ps.flush();
             String reportString = baos.toString("UTF-8");
             boolean success = false;
+            String[] snapshots = reportString.split("\n\n");
+            String ppdSnapshot = null;
+            for (String snapshot : snapshots) {
+                if (snapshot.contains(TESTNONCE)) {
+                    ppdSnapshot = snapshot;
+                    break;
+                }
+            }
             if (expectSuccess) {
-                success = reportString.startsWith("Snapshot valid\n");
+                success = ppdSnapshot != null && ppdSnapshot.startsWith("Snapshot valid");
             } else {
-                success = reportString.startsWith("Snapshot corrupted\n");
+                success = ppdSnapshot == null || ppdSnapshot.startsWith("Snapshot corrupted\n");
             }
             if (!success) {
                 fail(reportString);
@@ -141,10 +148,18 @@ public class TestPartitionDetection extends TestCase
 
         // clean up from any previous test execution.
         try {
-            File file = new File("/" + TMPDIR + "/" + TESTNONCE + "-T-host_1.vpt");
-            file.delete();
-            file = new File("/" + TMPDIR + "/ppd_nonce.digest");
-            file.delete();
+            File dir = new File(TMPDIR);
+            File[] files = dir.listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File arg0, String arg1) {
+                    if (arg1.startsWith(TESTNONCE))
+                        return true;
+                    return false;
+                }
+            });
+            for (File file : files) {
+                file.delete();
+            }
         } catch (Exception ignored) {
             ignored.printStackTrace();
         }

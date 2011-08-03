@@ -1320,9 +1320,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             // then initiate the local snapshot
             ExecutionSiteLocalSnapshotMessage snapshotMsg =
                     (ExecutionSiteLocalSnapshotMessage) message;
+            String nonce = snapshotMsg.nonce + "_" + snapshotMsg.m_roadblockTransactionId;
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable startSnapshotting = saveAPI.startSnapshotting(snapshotMsg.path,
-                                      snapshotMsg.nonce,
+                                      nonce,
                                       (byte) 0x1,
                                       snapshotMsg.m_roadblockTransactionId,
                                       m_systemProcedureContext,
