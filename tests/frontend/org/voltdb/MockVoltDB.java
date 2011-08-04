@@ -269,7 +269,7 @@ public class MockVoltDB implements VoltDBInterface
     public Configuration getConfig()
     {
         // TODO Auto-generated method stub
-        return null;
+        return new VoltDB.Configuration();
     }
 
     public void setFaultDistributor(FaultDistributorInterface distributor)
