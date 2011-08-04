@@ -61,7 +61,12 @@ public class MockVoltDB implements VoltDBInterface
     StatsAgent m_statsAgent = null;
     int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
-    HostMessenger m_hostMessenger = null;
+    HostMessenger m_hostMessenger = new HostMessenger() {
+        @Override
+        public int getHostId() {
+            return 1;
+        }
+    };
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata = "0.0.0.0:0:0:0";
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
@@ -541,5 +546,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
+    }
+
+    @Override
+    public void recoveryComplete() {
+        // TODO Auto-generated method stub
+
     }
 }

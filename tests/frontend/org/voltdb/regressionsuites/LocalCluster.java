@@ -119,7 +119,7 @@ public class LocalCluster implements VoltServerConfig {
      */
     public static class PipeToFile extends Thread {
         final static String m_initToken = "Server completed init";
-        final static String m_rejoinToken = "Logging host recovery completion";
+        final static String m_rejoinToken = "Node recovery completed";
         final static String m_initiatorID = "Initializing initiator ID:";
 
         FileWriter m_writer ;
@@ -784,20 +784,6 @@ public class LocalCluster implements VoltServerConfig {
             return true;
         } else {
             System.out.println("Recovering process exited before recovery completed");
-            try {
-                File destFile = new File(ptf.m_filename + ".bak");
-                while (destFile.exists()) {
-                    destFile = new File(destFile.getPath() + ".bak");
-                }
-                destFile.createNewFile();
-                FileChannel source = new FileInputStream(new File(ptf.m_filename)).getChannel();
-                FileChannel destination = new FileOutputStream(destFile).getChannel();
-                destination.transferFrom(source, 0, source.size());
-                source.close();
-                destination.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
             try {
                 silentShutdownSingleHost(hostId, true);
             } catch (InterruptedException e) {

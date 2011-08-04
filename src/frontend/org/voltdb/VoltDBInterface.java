@@ -34,6 +34,11 @@ public interface VoltDBInterface
 
     public boolean recovering();
 
+    /*
+     * Invoked from the command log once this node is marked unfaulted.
+     */
+    public void recoveryComplete();
+
     /**
      * Whether calls to crashVoltDB should result in a crash or be ignored
      */

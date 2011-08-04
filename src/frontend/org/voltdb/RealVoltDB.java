@@ -314,6 +314,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
+    // If CL is enabled this will be set to true
+    // by the CL when the truncation snapshot completes
+    // and this node is viable for replay
     private volatile boolean m_recovering = false;
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
@@ -1816,6 +1819,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
         try {
+            boolean logRecoveryCompleted = false;
             try {
                 m_zk.create("/unfaulted_hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } catch (KeeperException.NodeExistsException e) {}
@@ -1824,7 +1828,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 } catch (KeeperException.NodeExistsException e) {}
             } else {
-                m_recovering = false;
+                logRecoveryCompleted = true;
             }
             ByteBuffer txnIdBuffer = ByteBuffer.allocate(8);
             txnIdBuffer.putLong(TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
@@ -1832,6 +1836,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     "/unfaulted_hosts/" + m_messenger.getHostId(),
                     txnIdBuffer.array(),
                     Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            if (logRecoveryCompleted) {
+                m_recovering = false;
+                hostLog.info("Node recovery completed");
+            }
         } catch (Exception e) {
             hostLog.fatal("Unable to log host recovery completion to ZK", e);
             VoltDB.crashVoltDB();
@@ -1944,5 +1952,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
+    }
+
+    @Override
+    public synchronized void recoveryComplete() {
+        m_recovering = false;
+        hostLog.info("Node recovery completed");
     }
 }

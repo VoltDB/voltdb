@@ -187,6 +187,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
 
             client = ClientFactory.createClient(m_cconfig);
             final Client clientRef = client;
+            System.out.println("Connecting to " + toConnectTo);
             client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectTo);
             lastServerValues = new ArrayList<Integer>(serverValues);
             final AtomicBoolean shouldContinue = new AtomicBoolean(true);
