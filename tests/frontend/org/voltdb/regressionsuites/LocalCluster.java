@@ -70,7 +70,7 @@ public class LocalCluster implements VoltServerConfig {
     final BackendTarget m_target;
     final String m_buildDir;
     int m_portOffset;
-    int m_zkInterfaceOffset;
+    int m_zkPortOffset;
     int m_adminPortOffset;
     boolean m_hasLocalServer = true;
     String m_pathToDeployment;
@@ -308,7 +308,7 @@ public class LocalCluster implements VoltServerConfig {
                                            "org.voltdb.VoltDB",
                                            "license",
                                            ServerThread.getTestLicensePath(),
-                                           "zkinterface",
+                                           "zkport",
                                            "-1",
                                            "timestampsalt",
                                            "0",
@@ -336,7 +336,7 @@ public class LocalCluster implements VoltServerConfig {
         command.add(m_voltFilePrefixOffset, "");
 
         m_licensePathOffset = command.size() - 15;
-        m_zkInterfaceOffset = command.size() - 13;
+        m_zkPortOffset = command.size() - 13;
         m_timestampSaltOffset = command.size() - 11;
         m_pathToDeploymentOffset = command.size() - 7;
         m_portOffset = command.size() - 5;
@@ -592,7 +592,7 @@ public class LocalCluster implements VoltServerConfig {
                 m_procBuilder.command().set(m_ipcPortOffset2, portString);
                 m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
             }
-            m_procBuilder.command().set(m_zkInterfaceOffset, "localhost:" + (2181 + hostId));
+            m_procBuilder.command().set(m_zkPortOffset, Integer.toString(2181 + hostId));
 
             //If local directories are being cleared
             //Generate a new subroot, otherwise reuse the existing directory
@@ -726,7 +726,7 @@ public class LocalCluster implements VoltServerConfig {
                         "-agentlib:jdwp=transport=dt_socket,address="
                         + m_debugPortOffset++ + ",server=y,suspend=n");
             }
-            m_procBuilder.command().set(m_zkInterfaceOffset, "localhost:" + (2181 + hostId));
+            m_procBuilder.command().set(m_zkPortOffset, Integer.toString(2181 + hostId));
 
             Process proc = m_procBuilder.start();
             start = System.currentTimeMillis();
