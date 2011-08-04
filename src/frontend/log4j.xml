@@ -3,7 +3,9 @@
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
     <appender name="Console" class="org.apache.log4j.ConsoleAppender">
         <param name="Target" value="System.out" />
-        <layout class="org.apache.log4j.TTCCLayout">
+        <layout class="org.apache.log4j.PatternLayout">
+          <param name="ConversionPattern"
+                 value="%-5p %d{HH:mm:ss,SSS}   [%t] %c: %m%n"/>
         </layout>
     </appender>
     <appender name="Async" class="org.apache.log4j.AsyncAppender">

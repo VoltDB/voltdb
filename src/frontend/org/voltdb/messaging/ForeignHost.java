@@ -392,5 +392,19 @@ public class ForeignHost {
         for (int i = 0; i < destCount; i++) {
             deliverMessage(recvDests[i], mailboxId, message);
         }
+        // ENG-1608.  We sniff for FailureSiteUpdateMessages here so
+        // that a node will participate in the failure resolution protocol
+        // even if it hasn't directly witnessed a node fault.
+        if (message instanceof FailureSiteUpdateMessage)
+        {
+            int failed_host_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getHostForSite(((FailureSiteUpdateMessage)message).m_failedSiteIds.iterator().next());
+            VoltDB.instance().getFaultDistributor().
+            reportFault(new NodeFailureFault(
+                    failed_host_id,
+                    VoltDB.instance().getCatalogContext().siteTracker.getNonExecSitesForHost(failed_host_id),
+                    m_hostMessenger.getHostnameForHostID(failed_host_id)));
+        }
     }
 }

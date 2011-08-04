@@ -119,7 +119,7 @@ public class LocalCluster implements VoltServerConfig {
      */
     public static class PipeToFile extends Thread {
         final static String m_initToken = "Server completed init";
-        final static String m_rejoinToken = "Node data recovery completed";
+        final static String m_rejoinToken = "Logging host recovery completion";
         final static String m_initiatorID = "Initializing initiator ID:";
 
         FileWriter m_writer ;
@@ -296,7 +296,7 @@ public class LocalCluster implements VoltServerConfig {
         m_pipes = new ArrayList<PipeToFile>();
         m_procBuilder = new ProcessBuilder("java",
                                            "-Djava.library.path=" + m_buildDir + "/nativelibs",
-                                           "-Dlog4j.configuration=log.xml",
+                                           "-Dlog4j.configuration=log4j.xml",
                                            "-DLOG_SEGMENT_SIZE=8",
                                            "-ea",
                                            "-XX:-ReduceInitialCardMarks",
@@ -660,8 +660,6 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer portOffset, String rejoinHost) {
-        System.out.println("Rejoining " + hostId);
-
         // port for the new node
         int portNo = VoltDB.DEFAULT_PORT + hostId;
         int adminPortNo = m_baseAdminPort - hostId;
@@ -674,6 +672,8 @@ public class LocalCluster implements VoltServerConfig {
             portNoToRejoin = VoltDB.DEFAULT_PORT + portOffset;
             // adminPortNo = m_baseAdminPort - portOffset;
         }
+        System.out.println("Rejoining " + hostId + " to hostID: " + portOffset);
+
 
         ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
         for (EEProcess proc : eeProcs) {

@@ -331,7 +331,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         while (!pendingFaults.isEmpty()) {
             VoltFault fault = pendingFaults.poll();
             if (isKnownFault(fault)) {
-                hostLog.info("Fault is being dropped because it is already known " + fault);
+                hostLog.debug("Fault is being dropped because it is already known " + fault);
                 continue;
             }
             HashSet<VoltFault> faults = faultsMap.get(fault.getFaultType());
