@@ -28,6 +28,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.fault.NodeFailureFault;
 import org.apache.zookeeper_voltpatches.*;
@@ -61,7 +63,7 @@ public class TestZK extends ZKTestBase {
         m_agreementSites.set(site, null);
         m_mailboxes.set(site, null);
         m_faultDistributor.m_faults.remove(m_faultDistributor.m_faultHandlers.get(site));
-        m_faultDistributor.m_faultHandlers.remove(site);
+        m_faultDistributor.m_faultHandlers.set(site, null);
         m_faultDistributor.reportFault(
                 new NodeFailureFault(
                         site,
@@ -219,4 +221,27 @@ public class TestZK extends ZKTestBase {
         assertEquals(null, zk.getData("/bar", false, null));
         assertTrue(zk.getData("/foo", false, null).length == 0);
     }
+
+    @Test
+    public void testSessionExpireAndRecovery() throws Exception {
+        ZooKeeper zk = getClient(0);
+        zk.create("/foo", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        failSite(1);
+        recoverSite(1);
+        m_agreementSites.get(1).waitForRecovery();
+        for (int ii = 2; ii < 8; ii++) {
+            failSite(ii);
+        }
+        failSite(0);
+        zk = getClient(1);
+        assertNull(zk.exists("/foo", false));
+    }
+//
+//    @Test
+//    public void testMassiveNode() throws Exception {
+//        ZooKeeper zk = getClient(0);
+//        byte bytes[] = new byte[1048400];
+//        zk.create("/bar", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+//        zk.create("/foo", bytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+//    }
 }

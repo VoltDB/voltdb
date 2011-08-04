@@ -756,7 +756,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
                         txnId, getTime(), OpCode.createSession);
                 request.request.rewind();
                 int to = request.request.getInt();
-                txn = new CreateSessionTxn(to);
+                txn = new CreateSessionTxn((Integer)request.getOwner());
                 request.request.rewind();
                 sessionTracker.addSession(request.sessionId,
                         (Integer) request.getOwner());

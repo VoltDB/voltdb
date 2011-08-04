@@ -46,7 +46,7 @@ import org.apache.zookeeper_voltpatches.KeeperException.SessionExpiredException;
 public class SessionTrackerImpl implements SessionTracker {
     private static final Logger LOG = Logger.getLogger(SessionTrackerImpl.class);
 
-    HashMap<Long, Integer> sessionsById = new HashMap<Long, Integer>();
+    ConcurrentHashMap<Long, Integer> sessionsById = new ConcurrentHashMap<Long, Integer>();
 
     SessionExpirer m_expirer;
 
@@ -54,7 +54,7 @@ public class SessionTrackerImpl implements SessionTracker {
             ConcurrentHashMap<Long, Integer> sessionsAndOwners)
     {
         m_expirer = expirer;
-        sessionsById = new HashMap<Long, Integer>(sessionsById);
+        sessionsById = sessionsAndOwners;
     }
 
     public void dumpSessions(PrintWriter pwriter) {
