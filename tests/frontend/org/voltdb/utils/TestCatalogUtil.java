@@ -28,6 +28,7 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -303,17 +304,20 @@ public class TestCatalogUtil extends TestCase {
                    exportdir.exists());
         assertTrue("export overflow directory: " + exportdir.getAbsolutePath() + " is not a directory",
                    exportdir.isDirectory());
-        File commandlogdir = new File(voltdbroot, commandlogpath);
-        assertTrue("command log directory: " + commandlogdir.getAbsolutePath() + " does not exist",
-                   commandlogdir.exists());
-        assertTrue("command log directory: " + commandlogdir.getAbsolutePath() + " is not a directory",
-                   commandlogdir.isDirectory());
-        File commandlogsnapshotdir = new File(voltdbroot, commandlogsnapshotpath);
-        assertTrue("command log snapshot directory: " +
-                   commandlogsnapshotdir.getAbsolutePath() + " does not exist",
-                   commandlogsnapshotdir.exists());
-        assertTrue("command log snapshot directory: " +
-                   commandlogsnapshotdir.getAbsolutePath() + " is not a directory",
-                   commandlogsnapshotdir.isDirectory());
+        if (VoltDB.instance().getConfig().m_isEnterprise)
+        {
+            File commandlogdir = new File(voltdbroot, commandlogpath);
+            assertTrue("command log directory: " + commandlogdir.getAbsolutePath() + " does not exist",
+                       commandlogdir.exists());
+            assertTrue("command log directory: " + commandlogdir.getAbsolutePath() + " is not a directory",
+                       commandlogdir.isDirectory());
+            File commandlogsnapshotdir = new File(voltdbroot, commandlogsnapshotpath);
+            assertTrue("command log snapshot directory: " +
+                       commandlogsnapshotdir.getAbsolutePath() + " does not exist",
+                       commandlogsnapshotdir.exists());
+            assertTrue("command log snapshot directory: " +
+                       commandlogsnapshotdir.getAbsolutePath() + " is not a directory",
+                       commandlogsnapshotdir.isDirectory());
+        }
     }
 }
