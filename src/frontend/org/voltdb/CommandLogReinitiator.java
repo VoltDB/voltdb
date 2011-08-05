@@ -52,12 +52,23 @@ public interface CommandLogReinitiator {
     public void join() throws InterruptedException;
 
     /**
-     * Whether or not there were SPIs replayed in the cluster. This will return
-     * true even if there were SPIs replayed by other nodes.
+     * Whether or not there were log segments replayed in the cluster. This will
+     * return true even if there were segments replayed by other nodes. It
+     * doesn't necessarily mean that there were SPIs replayed. The segments
+     * could be empty.
      *
-     * @return true if there were at least one SPI replayed
+     * @return true if there were at least one segment replayed
      */
     public boolean hasReplayed();
+
+    /**
+     * Whether or not the log segments are empty, meaning no SPIs replayed. Call
+     * this after the replay. Call it before that will not give you the correct
+     * result.
+     *
+     * @return true if the logs are empty.
+     */
+    public boolean areLogsEmpty();
 
     /**
      * Get the maximum transaction ID among the last seen transactions across

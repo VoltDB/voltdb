@@ -159,6 +159,10 @@ SnapshotCompletionInterest {
         public void setSnapshotTxnId(long txnId) {}
         @Override
         public void returnAllSegments() {}
+        @Override
+        public boolean areLogsEmpty() {
+            return true;
+        }
     };
 
     /*
@@ -1066,14 +1070,14 @@ SnapshotCompletionInterest {
              */
             LOG.fatal("Nothing to recover from");
             VoltDB.crashVoltDB();
-        } else if (!m_replayAgent.hasReplayed()) {
+        } else if (m_replayAgent.areLogsEmpty()) {
             // Nothing was replayed, so no need to initiate truncation snapshot
             m_state = State.TRUNCATE;
         }
 
         changeState();
 
-        if (m_replayAgent.hasReplayed()) {
+        if (!m_replayAgent.areLogsEmpty()) {
             /*
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs
