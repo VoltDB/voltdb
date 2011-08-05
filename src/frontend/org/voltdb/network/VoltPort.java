@@ -361,7 +361,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
                 }
             }
         } finally {
-            networkLog.info("Closing channel " + m_toString);
+            networkLog.debug("Closing channel " + m_toString);
             try {
                 m_channel.close();
             } catch (IOException e) {
