@@ -47,12 +47,12 @@ import org.voltdb.VoltTable.ColumnInfo;
 
 public class TestSnapshotDaemon {
 
-    private static class Initiator implements SnapshotDaemon.DaemonInitiator {
+    static class Initiator implements SnapshotDaemon.DaemonInitiator {
         private final SnapshotDaemon daemon;
 
-        private String procedureName;
-        private long clientData;
-        private Object[] params;
+        String procedureName;
+        long clientData;
+        Object[] params;
 
         public Initiator() {
             this(null);
@@ -107,9 +107,9 @@ public class TestSnapshotDaemon {
         }
     }
 
-    private Initiator m_initiator;
-    private SnapshotDaemon m_daemon;
-    private MockVoltDB m_mockVoltDB;
+    protected Initiator m_initiator;
+    protected SnapshotDaemon m_daemon;
+    protected MockVoltDB m_mockVoltDB;
 
     @Before
     public void setUp() throws Exception {
@@ -137,65 +137,6 @@ public class TestSnapshotDaemon {
         m_daemon = new SnapshotDaemon();
         m_daemon.init(m_initiator, m_mockVoltDB.getZK());
         return m_daemon;
-    }
-
-    /*
-     * Quick smoke test
-     * that leader election work, it scans for snapshots,
-     * and then deletes the extra snapshots
-     */
-    @Test
-    public void testLeaderElectionAndEverythingElse() throws Exception {
-        m_mockVoltDB = new MockVoltDB();
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
-        m_initiator = new Initiator();
-        ZooKeeper zk = m_mockVoltDB.getZK();
-        zk.create("/snapshot_truncation_master", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-        m_daemon = new SnapshotDaemon();
-        m_daemon.init(m_initiator, zk);
-
-        Thread.sleep(100);
-
-        assertNull(m_initiator.procedureName);
-
-        byte pathBytes[] = "/foo".getBytes("UTF-8");
-        zk.create("/truncation_snapshot_path", pathBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-        Thread.sleep(100);
-        assertNull(m_initiator.procedureName);
-
-        zk.delete("/request_truncation_snapshot", -1);
-        zk.create("/test_scan_path", pathBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        zk.delete("/snapshot_truncation_master", -1);
-        Thread.sleep(300);
-        assertNotNull(zk.exists("/snapshot_truncation_master", false));
-
-        assertTrue(m_initiator.procedureName.equals("@SnapshotScan"));
-        long handle = m_initiator.clientData;
-        m_initiator.clear();
-
-        m_daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
-
-        zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        Thread.sleep(100);
-
-        assertTrue(m_initiator.procedureName.equals("@SnapshotSave"));
-        assertTrue(m_initiator.params[0].equals("/foo"));
-        handle = m_initiator.clientData;
-        m_initiator.clear();
-        assertTrue(ByteBuffer.wrap(zk.getData("/request_truncation_snapshot", false, null)).getLong() > 0);
-
-        m_daemon.processClientResponse(getSuccessResponse(32L), handle).get();
-        assertNull(zk.exists("/request_truncation_snapshot", false));
-
-        m_daemon.snapshotCompleted(32, true).await();
-        assertTrue(m_initiator.procedureName.equals("@SnapshotDelete"));
-        m_initiator.clear();
-
-        m_daemon.shutdown();
-        m_mockVoltDB.shutdown(null);
     }
 
     @Test
