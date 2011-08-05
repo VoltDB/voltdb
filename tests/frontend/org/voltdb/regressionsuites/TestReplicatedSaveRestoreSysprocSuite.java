@@ -79,9 +79,6 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
     @Override
     public void testRestore12Snapshot() {}
 
-    @Override
-    public void testSnapshotSaveZKTruncation() {}
-
     /**
      * Build a list of the tests to be run. Use the regression suite
      * helpers to allow multiple back ends.
