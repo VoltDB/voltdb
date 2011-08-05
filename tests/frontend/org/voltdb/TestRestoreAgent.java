@@ -313,7 +313,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
      * @throws IOException
      */
     void snapshot() throws IOException {
-        String path = context.cluster.getLogconfig().get("log").getLogpath();
+        String path = context.cluster.getVoltroot() + File.separator + "snapshots";
         ClientConfig clientConfig = new ClientConfig();
         Client client = ClientFactory.createClient(clientConfig);
         client.createConnection("localhost");

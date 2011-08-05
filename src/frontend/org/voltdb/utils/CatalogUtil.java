@@ -987,7 +987,7 @@ public abstract class CatalogUtil {
         }
         else {
             // dumb defaults if you ask for logging in community version
-            commandLogPath = new VoltFile(voltDbRoot, "command_log");;
+            commandLogPath = new VoltFile(voltDbRoot, "command_log");
         }
 
         path_entry = null;
