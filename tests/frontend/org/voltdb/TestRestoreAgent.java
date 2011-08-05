@@ -245,6 +245,13 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         }
     }
 
+    void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
+                      boolean excludeProcs, boolean rebuildAll)
+    throws IOException {
+        buildCatalog(hostCount, sitesPerHost, kfactor, voltroot, false,
+                     excludeProcs, rebuildAll);
+    }
+
     /**
      * Build a new catalog context.
      *
@@ -257,7 +264,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
      * @throws IOException
      */
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
-                      boolean excludeProcs, boolean rebuildAll)
+                      boolean commandLog, boolean excludeProcs, boolean rebuildAll)
     throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         String schema = "create table A (i integer not null, s varchar(30), sh smallint, l bigint, primary key (i));";
@@ -274,7 +281,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             builder.addStmtProcedure("Dedupe", "select * from A where l = ? and sh = ?");
             builder.addStmtProcedure("Cill", "select * from A where l = ? and s = ?");
         }
-        builder.configureLogging(voltroot, voltroot, false, false, 200, 20000);
+        builder.configureLogging(voltroot, voltroot, false, commandLog, 200, 20000);
 
 
         File cat = File.createTempFile("temp-restore", "catalog");
