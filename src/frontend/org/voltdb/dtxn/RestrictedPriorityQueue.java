@@ -41,6 +41,7 @@ import org.voltdb.messaging.VoltMessage;
  * <p>This class manages all that state.</p>
  */
 public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final long serialVersionUID = 1L;
     private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
 
@@ -206,7 +207,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         // Drop old data from already-failed initiators.
         if (m_initiatorData.containsKey(initiatorSiteId) == false) {
-            System.out.println("Dropping data from failed initiatorSiteId: " + initiatorSiteId);
+            //hostLog.info("Dropping txn " + txnId + " data from failed initiatorSiteId: " + initiatorSiteId);
             return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
         }
 

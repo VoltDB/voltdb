@@ -474,8 +474,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         atm.m_lastSafeTxnId);
                 AgreementTransactionState transactionState =
                     new AgreementTransactionState(atm.m_txnId, atm.m_initiatorId, atm.m_request);
-                m_txnQueue.add(transactionState);
-                m_transactionsById.put(transactionState.txnId, transactionState);
+                if (m_txnQueue.add(transactionState)) {
+                    m_transactionsById.put(transactionState.txnId, transactionState);
+                } else {
+                    m_agreementLog.info(
+                            "Dropping txn " + transactionState.txnId +
+                            " data from failed initiatorSiteId: " + transactionState.initiatorSiteId);
+                }
             } else {
                 m_recoveryLog.info("Agreement, discarding duplicate txn during recovery, txnid is " + atm.m_txnId +
                         " this should only occur during recovery.");
@@ -581,9 +586,10 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_siteIds.removeAll(m_knownFailedSites);
         HashMap<Integer, Integer> expectedResponseCounts = new HashMap<Integer, Integer>();
         int expectedResponses = discoverGlobalFaultData_send(expectedResponseCounts);
-        Long safeInitPoint = discoverGlobalFaultData_rcv(expectedResponses, expectedResponseCounts);
+        HashMap<Integer, Long> initiatorSafeInitPoint =
+            discoverGlobalFaultData_rcv(expectedResponses, expectedResponseCounts);
 
-        if (safeInitPoint == null) {
+        if (initiatorSafeInitPoint == null) {
             return;
         }
 
@@ -596,7 +602,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         HashSet<Integer> newFailedSiteIds = new HashSet<Integer>(failedSiteIds);
         newFailedSiteIds.removeAll(m_handledFailedSites);
 
-        handleSiteFaults(newFailedSiteIds, safeInitPoint);
+        handleSiteFaults(newFailedSiteIds, initiatorSafeInitPoint);
 
         m_handledFailedSites.addAll(failedSiteIds);
         for (NodeFailureFault fault : failures) {
@@ -608,9 +614,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     }
 
     private void handleSiteFaults(HashSet<Integer> newFailedSiteIds,
-            Long safeInitPoint) {
+            HashMap<Integer, Long> initiatorSafeInitPoint) {
         m_recoveryLog.info("Agreement, handling site faults for newly failed sites " +
-                newFailedSiteIds + " safeInitPoint " + safeInitPoint);
+                newFailedSiteIds + " initiatorSafeInitPoints " + initiatorSafeInitPoint);
         // Fix safe transaction scoreboard in transaction queue
         for (Integer siteId : newFailedSiteIds) {
             m_txnQueue.gotFaultForInitiator(siteId);
@@ -624,9 +630,12 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         {
             final long tid = it.next();
             AgreementTransactionState ts = m_transactionsById.get(tid);
-
+            if (!initiatorSafeInitPoint.containsKey(ts.initiatorSiteId)){
+                //Not from a failed initiator, no need to inspect and potentially discard
+                continue;
+            }
             // Fault a transaction that was not globally initiated
-            if (ts.txnId > safeInitPoint &&
+            if (ts.txnId > initiatorSafeInitPoint.get(ts.initiatorSiteId) &&
                     newFailedSiteIds.contains(ts.initiatorSiteId))
             {
                 m_recoveryLog.info("Faulting non-globally initiated transaction " + ts.txnId);
@@ -670,6 +679,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 FailureSiteUpdateMessage srcmsg =
                     new FailureSiteUpdateMessage(m_siteId,
                                                  m_knownFailedSites,
+                                                 site,
                                                  txnId != null ? txnId : Long.MIN_VALUE,
                                                  site);
 
@@ -693,12 +703,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
      * Concurrent failures can be detected by additional reports from the FaultDistributor
      * or a mismatch in the set of failed hosts reported in a message from another site
      */
-    private Long discoverGlobalFaultData_rcv(int expectedResponses, HashMap<Integer, Integer> expectedResponseCount)
+    private HashMap<Integer, Long> discoverGlobalFaultData_rcv(
+            int expectedResponses,
+            HashMap<Integer, Integer> expectedResponseCount)
     {
         int responses = 0;
-        long safeInitPoint = Long.MIN_VALUE;
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
-
+        HashMap<Integer, Long> initiatorSafeInitPoint = new HashMap<Integer, Long>();
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
             if (m == null) {
@@ -785,11 +796,15 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     + " from " + fm.m_sourceSiteId + " for failed sites " + fm.m_failedSiteIds +
                     " safe txn id " + fm.m_safeTxnId + " failed site " + fm.m_committedTxnId);
             m_recoveryLog.info("Agreement, expecting failures messages " + expectedResponseCount);
-            safeInitPoint =
-                Math.max(safeInitPoint, fm.m_safeTxnId);
+            if (!initiatorSafeInitPoint.containsKey(fm.m_initiatorForSafeTxnId)) {
+                initiatorSafeInitPoint.put(fm.m_initiatorForSafeTxnId, Long.MIN_VALUE);
+            }
+            initiatorSafeInitPoint.put(
+                    fm.m_initiatorForSafeTxnId,
+                    Math.max(initiatorSafeInitPoint.get(fm.m_initiatorForSafeTxnId), fm.m_safeTxnId));
         } while(responses < expectedResponses);
-        assert(safeInitPoint != Long.MIN_VALUE);
-        return safeInitPoint;
+        assert(!initiatorSafeInitPoint.containsValue(Long.MIN_VALUE));
+        return initiatorSafeInitPoint;
     }
 
     @Override

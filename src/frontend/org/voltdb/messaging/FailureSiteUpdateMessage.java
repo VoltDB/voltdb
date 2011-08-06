@@ -29,6 +29,8 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     /** Site id of the failed sites */
     public HashSet<Integer> m_failedSiteIds = new HashSet<Integer>();
 
+    /** Safe txn id is for this specific initiator **/
+    public int m_initiatorForSafeTxnId;
 
     /** Greatest 2PC transaction id at source m_sourceSiteId seen from failed initiator */
     public long m_safeTxnId;
@@ -39,11 +41,13 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     public FailureSiteUpdateMessage(
             int sourceSiteId,
             HashSet<Integer> failedSiteIds,
+            int initiatorForSafeTxnId,
             long safeTxnId,
             long committedTxnId)
     {
         m_sourceSiteId = sourceSiteId;
         m_failedSiteIds = new HashSet<Integer>(failedSiteIds);
+        m_initiatorForSafeTxnId = initiatorForSafeTxnId;
         m_safeTxnId = safeTxnId;
         m_committedTxnId = committedTxnId;
     }
@@ -58,7 +62,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
 
     @Override
     protected void flattenToBuffer(DBBPool pool) {
-        int msgsize = 2 * 4 + 2 * 8 + 1 + 4 + (4 * m_failedSiteIds.size()); // 2 ints, 2 longs, 1 byte, 4 byte failed host count + 4 bytes per failed host
+        int msgsize = 3 * 4 + 2 * 8 + 1 + 4 + (4 * m_failedSiteIds.size()); // 3 ints, 2 longs, 1 byte, 4 byte failed host count + 4 bytes per failed host
         if (m_buffer == null) {
             m_container = pool.acquire(HEADER_SIZE + msgsize);
             m_buffer = m_container.b;
@@ -71,6 +75,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         for (Integer hostId : m_failedSiteIds) {
             m_buffer.putInt(hostId);
         }
+        m_buffer.putInt(m_initiatorForSafeTxnId);
         m_buffer.putLong(m_safeTxnId);
         m_buffer.putLong(m_committedTxnId);
     }
@@ -84,6 +89,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         for (int ii = 0; ii < numIds; ii++) {
             m_failedSiteIds.add(m_buffer.getInt());
         }
+        m_initiatorForSafeTxnId = m_buffer.getInt();
         m_safeTxnId = m_buffer.getLong();
         m_committedTxnId = m_buffer.getLong();
     }
@@ -99,6 +105,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         for (Integer hostId : m_failedSiteIds) {
             sb.append(hostId).append(' ');
         }
+        sb.append(" initiator for safe txn:").append(m_initiatorForSafeTxnId);
         sb.append(" safe txn: ");
         sb.append(m_safeTxnId);
         sb.append(" committed txn: ");

@@ -57,6 +57,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.LocalObjectMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -314,6 +315,10 @@ public class TestExecutionSite extends TestCase {
     // ExecutionSite's snapshot processor requires the shared library
     static { EELibraryLoader.loadExecutionEngineLibrary(true); }
 
+    /*
+     * If you change the topology parameters there is a chance you might
+     * make the test for ENG1617 invalid
+     */
     // Topology parameters
     private static final int K_FACTOR = 2;
     private static final int PARTITION_COUNT = 3;
@@ -1087,7 +1092,7 @@ public class TestExecutionSite extends TestCase {
                 HashSet<Integer> failedHosts = new HashSet<Integer>();
                 failedHosts.add(getHostIdForSiteId(1));
                 m_mboxes[0].deliver(new FailureSiteUpdateMessage
-                                    (ss, failedHosts,
+                                    (ss, failedHosts, tx1_1.initiatorSiteId,
                                      tx1_1.txnId, tx1_1.txnId));
             }
         }
@@ -1269,23 +1274,183 @@ public class TestExecutionSite extends TestCase {
 
 
 
+    private void createAndRunSiteThreads() {
+        createAndRunSiteThreads(false);
+    }
+
     /*
      * Run the mailboxes / sites to completion.
      */
-    private void createAndRunSiteThreads()
+    private void createAndRunSiteThreads(final boolean loopUntilPoison)
     {
         for (int i=0; i < SITE_COUNT; ++i) {
             final int site_id = i;
             m_siteThreads[i] = new Thread(new Runnable() {
                @Override
                public void run() {
-                   m_sites[site_id].runLoop();
+                   m_sites[site_id].runLoop(loopUntilPoison);
                }
             }, "Site: " + site_id);
         }
 
         for (int i=0; i < SITE_COUNT; ++i) {
             m_siteThreads[i].start();
+        }
+    }
+
+    /*
+     * Create one txn for each initiator. Both initiators will fail concurrently.
+     * The first transaction will not be fully replicated (only exists at 1).
+     * The second transaction from a different initiator
+     * will be fully replicated, and will have a higher transaction id.
+     * When failure agreement runs for both failures at once,
+     * if the bug exists you should see the transaction from the second failed initiator cause the partially
+     * initiated transaction from the first to be executed at a subset of surviving replicas sites.
+     */
+    public void testENG1617() throws Exception {
+        System.out.println("Starting testENG1617");
+        for (int i=0; i < SITE_COUNT; ++i) {
+          m_mboxes[i].setFailureLikelihood(0);
+        }
+        createAndRunSiteThreads(true);
+
+        /*
+         * These are the sites that will receive the txns from the two concurrently dieing initiators
+         */
+        List<Integer> involvedSites1 = getSiteIdsForPartitionId(0);
+
+        /*
+         * Will use these sites to find initiators to kill
+         */
+        List<Integer> involvedSites2 = getSiteIdsForPartitionId(1);
+
+        //This initiator will initiate the txn with the lower id that is partially replicated to just one site
+        int initiatorToDie1 = getInitiatorIdForSiteId(involvedSites2.get(0));
+
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
+        spi.setParams("commit", new Integer(0));
+
+        InitiateTaskMessage itm =
+                new InitiateTaskMessage(initiatorToDie1,
+                                        involvedSites1.get(2),             // each site is its own coordinator
+                                        1,
+                                        false,
+                                        true,          // single partition
+                                        spi,
+                                        0);  // last safe txnid
+        m_mboxes[involvedSites1.get(2)].deliver(itm);
+
+        //This initiator will initiate the txn with the higher txn id that is fully replicated
+        int initiatorToDie2 = getInitiatorIdForSiteId(involvedSites2.get(1));
+
+        for (int ii = 0; ii < 3; ii++) {
+            spi = new StoredProcedureInvocation();
+            spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
+            spi.setParams("commit", new Integer(0));
+
+            itm =
+                    new InitiateTaskMessage(initiatorToDie2,
+                                            involvedSites1.get(ii),             // each site is its own coordinator
+                                            3,
+                                            false,
+                                            true,          // single partition
+                                            spi,
+                                            2);  // last safe txnid
+            m_mboxes[involvedSites1.get(ii)].deliver(itm);
+        }
+
+        /*
+         * Kill the two initiators
+         */
+        m_mboxes[involvedSites2.get(0)].deliver(new LocalObjectMessage(new Runnable() {
+            @Override
+            public void run() {
+                throw new Error();
+            }
+        }));
+        m_mboxes[involvedSites2.get(1)].deliver(new LocalObjectMessage(new Runnable() {
+            @Override
+            public void run() {
+                throw new Error();
+            }
+        }));
+        m_siteThreads[involvedSites2.get(0)].join();
+        m_siteThreads[involvedSites2.get(1)].join();
+
+        m_sites[involvedSites2.get(0)].shutdown();
+        m_voltdb.killSite(involvedSites2.get(0));
+        m_voltdb.getFaultDistributor().reportFault(
+                new NodeFailureFault(
+                        getHostIdForSiteId(involvedSites2.get(0)),
+                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(involvedSites2.get(0))),
+                        String.valueOf(getHostIdForSiteId(involvedSites2.get(0)))));
+        // remove this site from the postoffice
+        postoffice.remove(involvedSites2.get(0));
+
+        m_sites[involvedSites2.get(1)].shutdown();
+        m_voltdb.killSite(involvedSites2.get(1));
+        m_voltdb.getFaultDistributor().reportFault(
+                new NodeFailureFault(
+                        getHostIdForSiteId(involvedSites2.get(1)),
+                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(involvedSites2.get(1))),
+                        String.valueOf(getHostIdForSiteId(involvedSites2.get(1)))));
+        // remove this site from the postoffice
+        postoffice.remove(involvedSites2.get(1));
+
+        Thread.sleep(200);
+        /*
+         * Spin for a while giving them a chance to process all the failures.
+         */
+        long start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start > 15000) {
+            boolean containsBadValue = false;
+            for (int ii = 0; ii < m_sites.length; ii++) {
+                if (m_sites[ii] != null) {
+                    if (m_sites[ii].m_transactionsById.containsKey(1L) ||
+                            m_sites[ii].m_transactionsById.containsKey(3L)) {
+                        containsBadValue = true;
+                    }
+                }
+            }
+            if (!containsBadValue) {
+                break;
+            } else {
+                Thread.sleep(100);
+            }
+        }
+
+        for (RussianRouletteMailbox mailbox : m_mboxes) {
+            if (mailbox != null) {
+                mailbox.deliver(new LocalObjectMessage(new Runnable() {
+                    @Override
+                    public void run() {
+                        throw new Error();
+                    }
+                }));
+            }
+        }
+
+        for (Thread t : m_siteThreads) {
+            t.join();
+        }
+
+        /*
+         * Txn 1 should have been dropped because it was partially replicated when the initiator failed.
+         * In the old code it would have been marked as safely replicated due to txn 2 from the other initiator
+         * that failed concurrently.
+         */
+        for (int ii = 0; ii < m_sites.length; ii++) {
+            if (m_sites[ii] != null) {
+                if (m_sites[ii].m_transactionsById.containsKey(1L)) {
+                    System.out.println("Site " + ii + " contains txn 1");
+                }
+                assertFalse(m_sites[ii].m_transactionsById.containsKey(1L));
+                if (m_sites[ii].m_transactionsById.containsKey(3L)) {
+                    System.out.println("Site " + ii + " contains txn 3");
+                }
+                assertFalse(m_sites[ii].m_transactionsById.containsKey(3L));
+            }
         }
     }
 }

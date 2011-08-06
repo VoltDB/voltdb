@@ -80,6 +80,7 @@ import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.LocalObjectMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -1068,7 +1069,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Run the execution site execution loop, for tests currently.
      * Will integrate this in to the real run loop soon.. ish.
      */
-    public void runLoop() {
+    public void runLoop(boolean loopUntilPoison) {
         while (m_shouldContinue) {
             TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
             if (currentTxnState == null) {
@@ -1079,7 +1080,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 if (message != null) {
                     handleMailboxMessage(message);
                 }
-                else {
+                else if (!loopUntilPoison){
                     // Terminate run loop on empty mailbox AND no currentTxnState
                     return;
                 }
@@ -1218,8 +1219,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 else {
                     ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info);
                 }
-                m_transactionQueue.add(ts);
-                m_transactionsById.put(ts.txnId, ts);
+                if (m_transactionQueue.add(ts)) {
+                    m_transactionsById.put(ts.txnId, ts);
+                } else {
+                    hostLog.info(
+                            "Dropping txn " + ts.txnId + " data from failed initiatorSiteId: " + ts.initiatorSiteId);
+                }
             }
 
             if (ts != null)
@@ -1334,8 +1339,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         "Result: " + startSnapshotting.toString());
                 VoltDB.crashVoltDB();
             }
-        }
-        else {
+        } else if (message instanceof LocalObjectMessage) {
+              LocalObjectMessage lom = (LocalObjectMessage)message;
+              ((Runnable)lom.payload).run();
+        } else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),
                            new Object[] { message.getClass().getName() }, null);
             VoltDB.crashVoltDB();
@@ -1410,10 +1417,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         m_knownFailedSites.addAll(failedSiteIds);
 
+        HashMap<Integer, Long> initiatorSafeInitPoint = new HashMap<Integer, Long>();
         int expectedResponses = discoverGlobalFaultData_send();
-        long[] commit_and_safe = discoverGlobalFaultData_rcv(expectedResponses);
+        Long multiPartitionCommitPoint = discoverGlobalFaultData_rcv(expectedResponses, initiatorSafeInitPoint);
 
-        if (commit_and_safe == null) {
+        if (multiPartitionCommitPoint == null) {
             return;
         }
 
@@ -1437,14 +1445,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         if (makePPDPolicyDecisions == PPDPolicyDecision.NodeFailure) {
             handleSiteFaults(false,
                     newFailedSiteIds,
-                    commit_and_safe[0],
-                    commit_and_safe[1]);
+                    multiPartitionCommitPoint,
+                    initiatorSafeInitPoint);
         }
         else if (makePPDPolicyDecisions == PPDPolicyDecision.PartitionDetection) {
             handleSiteFaults(true,
                     newFailedSiteIds,
-                    commit_and_safe[0],
-                    commit_and_safe[1]);
+                    multiPartitionCommitPoint,
+                    initiatorSafeInitPoint);
         }
 
         m_handledFailedSites.addAll(failedSiteIds);
@@ -1517,6 +1525,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     FailureSiteUpdateMessage srcmsg =
                         new FailureSiteUpdateMessage(m_siteId,
                                                      m_knownFailedSites,
+                                                     site,
                                                      txnId != null ? txnId : Long.MIN_VALUE,
                                                      //txnId,
                                                      lastKnownGloballyCommitedMultiPartTxnId);
@@ -1543,14 +1552,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Concurrent failures can be detected by additional reports from the FaultDistributor
      * or a mismatch in the set of failed hosts reported in a message from another site
      */
-    private long[] discoverGlobalFaultData_rcv(int expectedResponses)
+    private Long discoverGlobalFaultData_rcv(int expectedResponses, Map<Integer, Long> initiatorSafeInitPoint)
     {
         final int localPartitionId =
             m_context.siteTracker.getPartitionForSite(m_siteId);
         int responses = 0;
         int responsesFromSamePartition = 0;
         long commitPoint = Long.MIN_VALUE;
-        long safeInitPoint = Long.MIN_VALUE;
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
@@ -1645,15 +1653,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 m_context.siteTracker.getPartitionForSite(fm.m_sourceSiteId);
 
             if (remotePartitionId == localPartitionId) {
-                safeInitPoint =
-                    Math.max(safeInitPoint, fm.m_safeTxnId);
+                Integer initiatorId = fm.m_initiatorForSafeTxnId;
+                if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
+                    initiatorSafeInitPoint.put(initiatorId, Long.MIN_VALUE);
+                }
+                initiatorSafeInitPoint.put(
+                        initiatorId, Math.max(initiatorSafeInitPoint.get(initiatorId), fm.m_safeTxnId));
                 responsesFromSamePartition++;
             }
         } while(responses < expectedResponses);
 
         assert(commitPoint != Long.MIN_VALUE);
-        assert(safeInitPoint != Long.MIN_VALUE);
-        return new long[] {commitPoint, safeInitPoint};
+        assert(!initiatorSafeInitPoint.containsValue(Long.MIN_VALUE));
+        return commitPoint;
     }
 
 
@@ -1674,7 +1686,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     void handleSiteFaults(boolean partitionDetected,
             HashSet<Integer> failedSites,
             long globalMultiPartCommitPoint,
-            long globalInitiationPoint)
+            HashMap<Integer, Long> initiatorSafeInitiationPoint)
     {
         HashSet<Integer> failedHosts = new HashSet<Integer>();
         for (Integer siteId : failedSites) {
@@ -1688,17 +1700,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         if (m_txnlog.isTraceEnabled())
         {
             m_txnlog.trace("FUZZTEST handleNodeFault " + sb.toString() +
-                    " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and globalInitiationPoint "
-                    + globalInitiationPoint);
+                    " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and safeInitiationPoints "
+                    + initiatorSafeInitiationPoint);
         } else {
             m_recoveryLog.info("Handling node faults " + sb.toString() +
-                    " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and globalInitiationPoint "
-                    + globalInitiationPoint);
+                    " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and safeInitiationPoints "
+                    + initiatorSafeInitiationPoint);
         }
         lastKnownGloballyCommitedMultiPartTxnId = globalMultiPartCommitPoint;
 
         // If possibly partitioned, run through the safe initiated transaction and stall
+        // The unsafe txns from each initiators will be dropped. after this partition detected branch
         if (partitionDetected) {
+            Long globalInitiationPoint = Long.MIN_VALUE;
+            for (Long initiationPoint : initiatorSafeInitiationPoint.values()) {
+                globalInitiationPoint = Math.max( initiationPoint, globalInitiationPoint);
+            }
             m_recoveryLog.info("Scheduling snapshot after txnId " + globalInitiationPoint +
                                " for cluster partition fault. Current commit point: " + this.lastCommittedTxnId);
 
@@ -1728,6 +1745,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          */
         Set<Long> faultedTxns = new HashSet<Long>();
 
+        //System.out.println("Site " + m_siteId + " dealing with faultable txns " + m_transactionsById.keySet());
         // Correct transaction state internals and commit
         // or remove affected transactions from RPQ and txnId hash.
         Iterator<Long> it = m_transactionsById.keySet().iterator();
@@ -1737,11 +1755,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             TransactionState ts = m_transactionsById.get(tid);
             ts.handleSiteFaults(failedSites);
 
-            // Fault a transaction that was not globally initiated
-            if (ts.txnId > globalInitiationPoint &&
+            // Fault a transaction that was not globally initiated by a failed initiator
+            if (initiatorSafeInitiationPoint.containsKey(ts.initiatorSiteId) &&
+                    ts.txnId > initiatorSafeInitiationPoint.get(ts.initiatorSiteId) &&
                 failedSites.contains(ts.initiatorSiteId))
             {
-                m_recoveryLog.info("Faulting non-globally initiated transaction " + ts.txnId);
+                m_recoveryLog.info("Site " + m_siteId + " faulting non-globally initiated transaction " + ts.txnId);
                 it.remove();
                 if (!ts.isReadOnly()) {
                     faultedTxns.add(ts.txnId);
