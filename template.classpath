@@ -1,38 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-    <classpathentry kind="src" path="examples/auction/procedures"/>
-    <classpathentry kind="src" path="examples/auction/src"/>
-    <classpathentry kind="src" path="examples/game_of_life/src"/>
-    <classpathentry kind="src" path="examples/helloworld"/>
-    <classpathentry kind="src" path="examples/key_value/src"/>
-    <classpathentry kind="src" path="examples/satellite"/>
-    <classpathentry kind="src" path="examples/twitter/src"/>
-    <classpathentry kind="lib" path="examples/twitter/twitter4j-core-2.1.2.jar"/>
-    <classpathentry kind="lib" path="examples/twitter/commons-logging-api-1.0.4.jar"/>
-    <classpathentry kind="lib" path="examples/twitter/hadoop-0.20.2-core.jar"/>
-    <classpathentry kind="src" path="examples/voter/src"/>
-    <classpathentry kind="src" path="src/frontend"/>
-    <classpathentry kind="src" path="src/hsqldb19b3"/>
-    <classpathentry kind="src" path="src/jetty716"/>
-    <classpathentry kind="src" path="tests/frontend"/>
-    <classpathentry kind="src" path="tests/hsqldb"/>
-    <classpathentry kind="src" path="third_party/java/src"/>
-    <classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/emma_ant.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/emma.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/junit-4.8.2.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
-    <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
-        <attributes>
+	<classpathentry kind="src" path="examples/auction/procedures"/>
+	<classpathentry kind="src" path="examples/auction/src"/>
+	<classpathentry kind="src" path="examples/game_of_life/src"/>
+	<classpathentry kind="src" path="examples/helloworld"/>
+	<classpathentry kind="src" path="examples/key_value/src"/>
+	<classpathentry kind="src" path="examples/satellite"/>
+	<classpathentry kind="src" path="examples/twitter/src"/>
+	<classpathentry kind="lib" path="examples/twitter/twitter4j-core-2.1.2.jar"/>
+	<classpathentry kind="lib" path="examples/twitter/commons-logging-api-1.0.4.jar"/>
+	<classpathentry kind="lib" path="examples/twitter/hadoop-0.20.2-core.jar"/>
+	<classpathentry kind="src" path="examples/voter/src"/>
+	<classpathentry kind="src" path="src/frontend"/>
+	<classpathentry kind="src" path="src/hsqldb19b3"/>
+	<classpathentry kind="src" path="src/jetty716"/>
+	<classpathentry kind="src" path="tests/frontend"/>
+	<classpathentry kind="src" path="tests/hsqldb"/>
+	<classpathentry kind="src" path="third_party/java/src"/>
+	<classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/emma_ant.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/emma.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/junit-4.8.2.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
+	  <attributes>
             <!-- Update the directory value to reflect
             your top-level project directory name, then
             copy it to .classpath -->
-            <attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY"
-                   value="trunk/obj/release/nativelibs"/>
-        </attributes>
-    </classpathentry>
+            <attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="eng/obj/release/nativelibs"/>
+          </attributes>
+        </classpathentry>
         <classpathentry kind="lib" path="third_party/java/obj"/>
-    <classpathentry kind="output" path="obj/eclipse"/>
+        <classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
+        <classpathentry kind="lib" path="lib/jline-1.0.jar"/>
+        <classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
