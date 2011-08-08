@@ -477,10 +477,17 @@ DISTRIBUTION
     <!-- populate the tools -->
     <copy todir="${dist.dir}/tools" >
         <fileset dir="tools" defaultexcludes="yes">
-            <include name="studio.web/**"/>
             <include name="demo/**"/>
             <include name="sqlcmd/**"/>
             <include name="browser_adhoc/**"/>
+        </fileset>
+    </copy>
+
+    <!-- copy studio.web -->
+    <mkdir dir="${dist.dir}/tools/studio.web" />
+    <copy todir="${dist.dir}/tools/studio.web">
+        <fileset dir="${src.gpl.dir}/org/voltdb/studio" defaultexcludes="yes">
+            <include name="**"/>
         </fileset>
     </copy>
 
@@ -748,6 +755,12 @@ JAVA COMPILATION
     <copy todir='${build.prod.dir}/javax/servlet_voltpatches/resources'>
         <fileset dir="${src.jetty.dir}/javax/servlet_voltpatches/resources">
             <include name="*"/>
+        </fileset>
+    </copy>
+
+    <copy todir='${build.prod.dir}/org/voltdb/studio'>
+        <fileset dir="${src.gpl.dir}/org/voltdb/studio">
+            <include name="**"/>
         </fileset>
     </copy>
 

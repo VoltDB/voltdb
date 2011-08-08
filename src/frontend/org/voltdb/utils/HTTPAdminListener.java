@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,13 +34,19 @@ import javax.servlet_voltpatches.http.HttpServletRequest;
 import javax.servlet_voltpatches.http.HttpServletResponse;
 
 import org.eclipse.jetty_voltpatches.server.AsyncContinuation;
+import org.eclipse.jetty_voltpatches.server.Handler;
 import org.eclipse.jetty_voltpatches.server.Request;
 import org.eclipse.jetty_voltpatches.server.Server;
 import org.eclipse.jetty_voltpatches.server.bio.SocketConnector;
 import org.eclipse.jetty_voltpatches.server.handler.AbstractHandler;
+import org.eclipse.jetty_voltpatches.server.handler.ContextHandler;
+import org.eclipse.jetty_voltpatches.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty_voltpatches.server.handler.ResourceHandler;
+import org.eclipse.jetty_voltpatches.util.resource.FileResource;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.logging.VoltLogger;
 
 public class HTTPAdminListener {
@@ -47,6 +55,70 @@ public class HTTPAdminListener {
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
+
+    class StudioHander extends ResourceHandler {
+
+        StudioHander() {
+            URL url = VoltDB.class.getResource("studio");
+            this.setResourceBase(url.getPath());
+            this.setDirectoriesListed(false);
+            //this.setWelcomeFiles(new String[] { "index.htm" });
+        }
+
+        @Override
+        public void handle(String target, Request baseRequest,
+                HttpServletRequest request, HttpServletResponse response)
+                throws IOException, ServletException {
+
+            if (!target.equals("/") && !target.equals("/index.htm")) {
+                super.handle(target, baseRequest, request, response);
+                if (baseRequest.isHandled() == false) {
+                    String msg = "404: Resource not found.\n";
+                    response.setContentType("text/plain;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    baseRequest.setHandled(true);
+                    response.getWriter().print(msg);
+                }
+                return;
+            }
+
+            // HANDLE INDEX.HTM
+
+            baseRequest.setHandled(true);
+
+            URL resourceURL = VoltDB.class.getResource("studio/index.htm");
+            FileResource resource = null;
+            try {
+                resource = new FileResource(resourceURL);
+            } catch (URISyntaxException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
+            }
+
+            // set the headers
+            doResponseHeaders(response, resource, "text/html;charset=utf-8");
+
+            // read the template
+            InputStream is = resource.getInputStream();
+            BufferedReader r = new BufferedReader(new InputStreamReader(is));
+            StringBuilder sb = new StringBuilder();
+            String line = null;
+            while ((line = r.readLine()) != null) {
+                sb.append(line + "\n");
+            }
+            r.close(); is.close();
+            String template = sb.toString();
+
+            // fill in missing values in the template
+            Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
+            template = template.replace("${hostname}", "localhost");
+            template = template.replace("${portnumber}", String.valueOf(cluster.getHttpdportno()));
+            template = template.replace("${requires-authentication}", cluster.getSecurityenabled() ? "true" : "false");
+
+            // write the response
+            response.getWriter().print(template);
+        }
+    }
 
     class RequestHandler extends AbstractHandler {
 
@@ -243,7 +315,19 @@ public class HTTPAdminListener {
             connector.setName("VoltDB-HTTPD");
             m_server.addConnector(connector);
 
-            m_server.setHandler(new RequestHandler());
+            ContextHandler studioHander = new ContextHandler("/studio");
+            studioHander.setHandler(new StudioHander());
+
+            ContextHandler baseHander = new ContextHandler("/");
+            baseHander.setHandler(new RequestHandler());
+
+            ContextHandlerCollection handlers = new ContextHandlerCollection();
+            handlers.setHandlers(new Handler[] {
+                    studioHander,
+                    baseHander
+            });
+
+            m_server.setHandler(handlers);
             m_server.start();
             m_jsonEnabled = jsonEnabled;
         }
