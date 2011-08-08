@@ -41,6 +41,7 @@
 		<script type="text/javascript" src="js/queryui.js"></script>
 		<script type="text/javascript" src="js/mainui.js"></script>
 		<script type="text/javascript" src="js/monitorui.js"></script>
+        <script type="text/javascript">var Injection = ['${hostname}', '${portnumber}', '${requires-authentication}'];var hostnameDefault = 'localhost';var portDefault = '8080';</script>
 		<script type="text/javascript">$(document).ready(function() { MainUI.InitWorkspace(); });</script>
 	</head>
 <body class="body">
@@ -97,11 +98,11 @@
 				<table>
 					<tr>
 						<td><label for="server">Server</label></td>
-						<td><input type="text" name="server" id="server" class="text ui-widget-content ui-corner-all" value="localhost" /></td>
+						<td><input type="text" name="server" id="server" class="text ui-widget-content ui-corner-all" value="" /></td>
 					</tr>
 					<tr>
 						<td><label for="port">Port</label></td>
-						<td><input type="text" name="port" id="port" value="" class="text ui-widget-content ui-corner-all" value="8080" /></td>
+						<td><input type="text" name="port" id="port" value="" class="text ui-widget-content ui-corner-all" value="" /></td>
 					</tr>
 				</table>
 			</td>

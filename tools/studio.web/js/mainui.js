@@ -2,7 +2,7 @@
 
 var IMainUI = (function(){
 
-var tab_counter = 2;
+var tab_counter = 1;
 var $tabs = null;
 
 this.InitWorkspace = function()
@@ -221,8 +221,8 @@ this.InitWorkspace = function()
 				allFields.val( "" ).removeClass( "ui-state-error" );
 			},
 			open: function() {
-				if (server.val() == '') server.val('localhost');
-				if (port.val() == '') port.val('8080');
+				if (server.val() == '') server.val(hostnameDefault);
+				if (port.val() == '') port.val(portDefault);
 				tips.text('');
                 if (autoConnect)
                 {
@@ -272,11 +272,6 @@ this.InitWorkspace = function()
             $('#ms-' + getQueryParameter('ms')).click();
         if (getQueryParameter('startup') != null)
         {
-    		//$('#server').val('localhost');
-			//$('#port').val('8080');
-			//$('#user').val('');
-			//$('#password').val('');
-			//$('#admin').attr('checked','checked');
             if (getQueryParameter('startup') == 'monitor')
             {
                 autoConnect = true;
@@ -291,6 +286,14 @@ this.InitWorkspace = function()
     }
 	else
 	{
+        if (Injection[0] != '${hostname}')
+        {
+            hostnameDefault = Injection[0];
+            portDefault = Injection[1];
+            if (Injection[2] == 'false')
+                autoConnect = true;
+            setTimeout(function() {$("#new-query").button().click()}, 100);
+        }
 		parent.frames['versioncheck'].location.href = 'http://community.voltdb.com/versioncheck?app=webstudio&ver=1.3.5&productid=ws-ipc';
 	}
 }
