@@ -42,7 +42,6 @@ import org.eclipse.jetty_voltpatches.server.bio.SocketConnector;
 import org.eclipse.jetty_voltpatches.server.handler.AbstractHandler;
 import org.eclipse.jetty_voltpatches.server.handler.ContextHandler;
 import org.eclipse.jetty_voltpatches.server.handler.ContextHandlerCollection;
-import org.eclipse.jetty_voltpatches.server.handler.ResourceHandler;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
@@ -56,14 +55,7 @@ public class HTTPAdminListener {
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
 
-    class StudioHander extends ResourceHandler {
-
-        StudioHander() {
-            URL url = VoltDB.class.getResource("studio");
-            this.setResourceBase(url.getPath());
-            this.setDirectoriesListed(false);
-            //this.setWelcomeFiles(new String[] { "index.htm" });
-        }
+    class StudioHander extends AbstractHandler {
 
         @Override
         public void handle(String target, Request baseRequest,
