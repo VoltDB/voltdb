@@ -17,12 +17,13 @@
 
 package org.voltdb.utils;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.InetAddress;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Date;
 import java.util.HashMap;
@@ -42,7 +43,6 @@ import org.eclipse.jetty_voltpatches.server.handler.AbstractHandler;
 import org.eclipse.jetty_voltpatches.server.handler.ContextHandler;
 import org.eclipse.jetty_voltpatches.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty_voltpatches.server.handler.ResourceHandler;
-import org.eclipse.jetty_voltpatches.util.resource.FileResource;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
@@ -70,53 +70,76 @@ public class HTTPAdminListener {
                 HttpServletRequest request, HttpServletResponse response)
                 throws IOException, ServletException {
 
-            if (!target.equals("/") && !target.equals("/index.htm")) {
-                super.handle(target, baseRequest, request, response);
-                if (baseRequest.isHandled() == false) {
-                    String msg = "404: Resource not found.\n";
-                    response.setContentType("text/plain;charset=utf-8");
-                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                    baseRequest.setHandled(true);
-                    response.getWriter().print(msg);
-                }
-                return;
+            // redirect the base dir
+            if (target.equals("/")) target = "/index.htm";
+
+            // check if a file exists
+            URL url = VoltDB.class.getResource("studio" + target);
+            if (url == null) {
+                // write 404
+                String msg = "404: Resource not found.\n";
+                response.setContentType("text/plain;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                baseRequest.setHandled(true);
+                response.getWriter().print(msg);
             }
-
-            // HANDLE INDEX.HTM
-
-            baseRequest.setHandled(true);
-
-            URL resourceURL = VoltDB.class.getResource("studio/index.htm");
-            FileResource resource = null;
-            try {
-                resource = new FileResource(resourceURL);
-            } catch (URISyntaxException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            }
-
-            // set the headers
-            doResponseHeaders(response, resource, "text/html;charset=utf-8");
 
             // read the template
-            InputStream is = resource.getInputStream();
-            BufferedReader r = new BufferedReader(new InputStreamReader(is));
-            StringBuilder sb = new StringBuilder();
-            String line = null;
-            while ((line = r.readLine()) != null) {
-                sb.append(line + "\n");
+            InputStream is = VoltDB.class.getResourceAsStream("studio" + target);
+
+            if (target.endsWith("/index.htm")) {
+                // load the file as text
+                BufferedReader r = new BufferedReader(new InputStreamReader(is));
+                StringBuilder sb = new StringBuilder();
+                String line = null;
+                while ((line = r.readLine()) != null) {
+                    sb.append(line + "\n");
+                }
+                r.close(); is.close();
+                String template = sb.toString();
+
+                // fill in missing values in the template
+                Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
+                template = template.replace("${hostname}", "localhost");
+                template = template.replace("${portnumber}", String.valueOf(cluster.getHttpdportno()));
+                template = template.replace("${requires-authentication}", cluster.getSecurityenabled() ? "true" : "false");
+
+                // set the headers
+                response.setContentType("text/html;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                baseRequest.setHandled(true);
+
+                // write the response
+                assert(template != null);
+                response.getWriter().print(template);
             }
-            r.close(); is.close();
-            String template = sb.toString();
+            else {
+                // set the mime type in a giant hack
+                String mime = "text/html;charset=utf-8";
+                if (target.endsWith(".js"))
+                    mime = "application/x-javascript;charset=utf-8";
+                if (target.endsWith(".css"))
+                    mime = "text/css;charset=utf-8";
+                if (target.endsWith(".gif"))
+                    mime = "image/gif";
+                if (target.endsWith(".png"))
+                    mime = "image/png";
+                if ((target.endsWith(".jpg")) || (target.endsWith(".jpeg")))
+                    mime = "image/jpeg";
 
-            // fill in missing values in the template
-            Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
-            template = template.replace("${hostname}", "localhost");
-            template = template.replace("${portnumber}", String.valueOf(cluster.getHttpdportno()));
-            template = template.replace("${requires-authentication}", cluster.getSecurityenabled() ? "true" : "false");
+                // set the headers
+                response.setContentType(mime);
+                response.setStatus(HttpServletResponse.SC_OK);
+                baseRequest.setHandled(true);
 
-            // write the response
-            response.getWriter().print(template);
+                // write the file out
+                BufferedInputStream bis = new BufferedInputStream(is);
+                OutputStream os = response.getOutputStream();
+                int c = -1;
+                while ((c = bis.read()) != -1) {
+                    os.write(c);
+                }
+            }
         }
     }
 
