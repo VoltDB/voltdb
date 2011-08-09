@@ -17,28 +17,16 @@
 
 package org.voltdb;
 
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URLDecoder;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
-import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,34 +42,24 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Site;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.fault.VoltFault;
-import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.network.VoltNetwork;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.VoltSampler;
@@ -91,86 +69,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
-
-    private class VoltDBNodeFailureFaultHandler implements FaultHandler
-    {
-        @Override
-        public void faultOccured(Set<VoltFault> faults)
-        {
-            for (VoltFault fault : faults) {
-                if (fault instanceof NodeFailureFault)
-                {
-                    NodeFailureFault node_fault = (NodeFailureFault) fault;
-                    handleNodeFailureFault(node_fault);
-                }
-                VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
-            }
-        }
-
-        private void handleNodeFailureFault(NodeFailureFault node_fault) {
-            ArrayList<Integer> dead_sites =
-                VoltDB.instance().getCatalogContext().
-                siteTracker.getAllSitesForHost(node_fault.getHostId());
-            Collections.sort(dead_sites);
-            hostLog.error("Host failed, host id: " + node_fault.getHostId() +
-                    " hostname: " + node_fault.getHostname());
-            hostLog.error("  Removing sites from cluster: " + dead_sites);
-            StringBuilder sb = new StringBuilder();
-            for (int site_id : dead_sites)
-            {
-                sb.append("set ");
-                String site_path = VoltDB.instance().getCatalogContext().catalog.
-                                   getClusters().get("cluster").getSites().
-                                   get(Integer.toString(site_id)).getPath();
-                sb.append(site_path).append(" ").append("isUp false");
-                sb.append("\n");
-            }
-            VoltDB.instance().clusterUpdate(sb.toString());
-            if (m_catalogContext.siteTracker.getFailedPartitions().size() != 0)
-            {
-                hostLog.fatal("Failure of host " + node_fault.getHostId() +
-                              " has rendered the cluster unviable.  Shutting down...");
-                VoltDB.crashVoltDB();
-            }
-            m_waitForFaultReported.release();
-
-            /*
-             * Use a new thread since this is a asynchronous (and infrequent)
-             * task and locks are being held by the fault distributor.
-             */
-            new Thread() {
-                @Override
-                public void run() {
-                    //Notify the export manager the cluster topology has changed
-                    ExportManager.instance().notifyOfClusterTopologyChange();
-                }
-            }.start();
-        }
-
-        @Override
-        public void faultCleared(Set<VoltFault> faults) {
-            for (VoltFault fault : faults) {
-                if (fault instanceof NodeFailureFault) {
-                    m_waitForFaultClear.release();
-                }
-            }
-        }
-
-        /**
-         * When clearing a fault, specifically a rejoining node, wait to make sure it is cleared
-         * before proceeding because proceeding might generate new faults that should
-         * be deduped by the FaultManager.
-         */
-        private final Semaphore m_waitForFaultClear = new Semaphore(0);
-
-        /**
-         * When starting up as a rejoining node a fault is reported
-         * for every currently down node. Once this fault is handled
-         * here by RealVoltDB's handler the catalog will be updated.
-         * Then the rest of the system can init with the updated catalog.
-         */
-        private final Semaphore m_waitForFaultReported = new Semaphore(0);
-    }
 
     static class RejoinCallback implements ProcedureCallback {
         ClientResponse response;
@@ -207,117 +105,53 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
     }
 
-    /**
-     * A class that instantiates an ExecutionSite and then waits for notification before
-     * running the execution site. Would it be better if this extended Thread
-     * so we don't have to have m_runners and m_siteThreads?
-     */
-    private static class ExecutionSiteRunner implements Runnable {
 
-        private volatile boolean m_isSiteCreated = false;
-        private final int m_siteId;
-        private final String m_serializedCatalog;
-        private volatile ExecutionSite m_siteObj;
-        private final boolean m_recovering;
-        private final HashSet<Integer> m_failedHostIds;
-        private final long m_txnId;
-
-        public ExecutionSiteRunner(
-                final int siteId,
-                final CatalogContext context,
-                final String serializedCatalog,
-                boolean recovering,
-                HashSet<Integer> failedHostIds) {
-            m_siteId = siteId;
-            m_serializedCatalog = serializedCatalog;
-            m_recovering = recovering;
-            m_failedHostIds = failedHostIds;
-            m_txnId = context.m_transactionId;
-        }
-
-        @Override
-        public void run() {
-            Mailbox mailbox = VoltDB.instance().getMessenger()
-            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, true);
-
-            m_siteObj =
-                new ExecutionSite(VoltDB.instance(),
-                                  mailbox,
-                                  m_siteId,
-                                  m_serializedCatalog,
-                                  null,
-                                  m_recovering,
-                                  m_failedHostIds,
-                                  m_txnId);
-            synchronized (this) {
-                m_isSiteCreated = true;
-                this.notifyAll();
-                try {
-                    wait();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            try
-            {
-                m_siteObj.run();
-            }
-            catch (OutOfMemoryError e)
-            {
-                // Even though OOM should be caught by the Throwable section below,
-                // it sadly needs to be handled seperately. The goal here is to make
-                // sure VoltDB crashes.
-
-                String errmsg = "ExecutionSite: " + m_siteId + " ran out of Java memory. " +
-                    "This node will shut down.";
-                hostLog.fatal(errmsg, e);
-                VoltDB.crashVoltDB();
-            }
-            catch (Throwable t)
-            {
-                String errmsg = "ExecutionSite: " + m_siteId + " encountered an " +
-                    "unexpected error and will die, taking this VoltDB node down.";
-                System.err.println(errmsg);
-                t.printStackTrace();
-                hostLog.fatal(errmsg, t);
-                VoltDB.crashVoltDB();
-            }
-        }
-
-    }
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
-    private CatalogContext m_catalogContext;
+    CatalogContext m_catalogContext;
     private String m_buildString;
     private static final String m_defaultVersionString = "1.3.6";
     private String m_versionString = m_defaultVersionString;
     // fields accessed via the singleton
-    private HostMessenger m_messenger = null;
+    HostMessenger m_messenger = null;
     private final ArrayList<ClientInterface> m_clientInterfaces =
         new ArrayList<ClientInterface>();
     private Map<Integer, ExecutionSite> m_localSites;
-    private VoltNetwork m_network = null;
-    private AgreementSite m_agreementSite;
-    private HTTPAdminListener m_adminListener;
+    VoltNetwork m_network = null;
+    AgreementSite m_agreementSite;
+    HTTPAdminListener m_adminListener;
     private Map<Integer, Thread> m_siteThreads;
     private ArrayList<ExecutionSiteRunner> m_runners;
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
-    private FaultDistributor m_faultManager;
-    private Object m_instanceId[];
+    FaultDistributor m_faultManager;
+    Object m_instanceId[];
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
     private StatsManager m_statsManager = null;
     private ZooKeeper m_zk;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
+    int m_myHostId;
+    long m_depCRC = -1;
+    String m_serializedCatalog;
+    String m_httpPortExtraLogMessage = null;
+    boolean m_jsonEnabled;
+
+    DeploymentType m_deployment;
+
+    final HashSet<Integer> m_downHosts = new HashSet<Integer>();
+    final Set<Integer> m_downNonExecSites = new HashSet<Integer>();
+    //For command log only, will also mark self as faulted
+    final Set<Integer> m_downSites = new HashSet<Integer>();
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     // If CL is enabled this will be set to true
     // by the CL when the truncation snapshot completes
     // and this node is viable for replay
-    private volatile boolean m_recovering = false;
+    volatile boolean m_recovering = false;
+
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
     private boolean m_executionSitesRecovered = false;
@@ -335,7 +169,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
 
-    private final VoltDBNodeFailureFaultHandler m_faultHandler = new VoltDBNodeFailureFaultHandler();
+    final VoltDBNodeFailureFaultHandler m_faultHandler = new VoltDBNodeFailureFaultHandler(this);
 
     private RestoreAgent m_restoreAgent = null;
 
@@ -346,7 +180,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private long m_recoveryStartTime = System.currentTimeMillis();
 
-    private CommandLog m_commandLog = new CommandLog() {
+    CommandLog m_commandLog = new CommandLog() {
 
         @Override
         public void init(CatalogContext context, long txnId) {}
@@ -383,12 +217,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     };
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
-    private OperationMode m_startMode = null;
+    OperationMode m_startMode = null;
 
     // metadata is currently of the format:
     // IP:CIENTPORT:ADMINPORT:HTTPPORT
-    private volatile String m_localMetadata = "0.0.0.0:0:0:0";
-    private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
+    volatile String m_localMetadata = "0.0.0.0:0:0:0";
+    final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
     // methods accessed via the singleton
     @Override
@@ -400,8 +234,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     PeriodicWorkTimerThread fivems;
 
-    private static File m_pidFile = null;
-
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
@@ -411,37 +243,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         m_mode = OperationMode.INITIALIZING;
 
         synchronized(m_startAndStopLock) {
-            m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
-            // start (asynchronously) getting platform info
-            // this will start a thread that should die in less
-            // than a second
-            PlatformProperties.fetchPlatformProperties();
-
-            if (m_pidFile == null) {
-                String name = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
-                String pidString = name.substring(0, name.indexOf('@'));
-                m_pidFile = new java.io.File("/var/tmp/voltpid." + pidString);
-                try {
-                    boolean success = m_pidFile.createNewFile();
-                    if (!success) {
-                        hostLog.error("Could not create PID file " + m_pidFile + " because it already exists");
-                    }
-                    m_pidFile.deleteOnExit();
-                    FileOutputStream fos = new FileOutputStream(m_pidFile);
-                    fos.write(pidString.getBytes("UTF-8"));
-                    fos.close();
-                } catch (IOException e) {
-                    hostLog.error("Error creating PID file " + m_pidFile, e);
-                }
-            }
-
-            // useful for debugging, but doesn't do anything unless VLog is enabled
-            if (config.m_port != VoltDB.DEFAULT_PORT) {
-                VLog.setPortNo(config.m_port);
-            }
-            VLog.log("\n### RealVoltDB.initialize() for port %d ###", config.m_port);
-
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+            m_config = config;
+
+            // determine if this is a rejoining node
+            // (used for license check and later the actual rejoin)
+            boolean isRejoin = config.m_rejoinToHostAndPort != null;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
@@ -458,280 +266,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 System.exit(-1);
             }
 
-            // determine if this is a rejoining node
-            // (used for license check and later the actual rejoin)
-            boolean isRejoin = config.m_rejoinToHostAndPort != null;
+            m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
-            m_config = config;
-
-            // Initialize the catalog and some common shortcuts
-            if (m_config.m_pathToCatalog.startsWith("http")) {
-                hostLog.info("Loading application catalog jarfile from " + m_config.m_pathToCatalog);
-            }
-            else {
-                File f = new File(m_config.m_pathToCatalog);
-                hostLog.info("Loading application catalog jarfile from " + f.getAbsolutePath());
-            }
-
-            String serializedCatalog = CatalogUtil.loadCatalogFromJar(m_config.m_pathToCatalog, hostLog);
-            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
-                VoltDB.crashVoltDB();
-
-            /* N.B. node recovery requires discovering the current catalog version. */
-            final int catalogVersion = 0;
-            Catalog catalog = new Catalog();
-            catalog.execute(serializedCatalog);
-
-            // note if this fails it will print an error first
-            long depCRC = -1;
-            try {
-                depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_config.m_pathToDeployment, true);
-                if (depCRC < 0)
-                    System.exit(-1);
-            } catch (Exception e) {
-                hostLog.fatal("Error parsing deployment file", e);
-                System.exit(-1);
-            }
-
-            serializedCatalog = catalog.serialize();
-            m_catalogContext = new CatalogContext(
-                    0,
-                    catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
-
-            // If running commercial code (of value) and not rejoining, enforce licensing.
-            if (config.m_isEnterprise && !isRejoin) {
-                assert(m_config != null);
-                assert(m_catalogContext != null);
-                if (!validateLicense(m_config.m_pathToLicense, m_catalogContext.numberOfNodes)) {
-                    // validateLicense logs as appropriate. Exit call is here for testability.
-
-                    // TOOD: Stop running here!
-                    VoltDB.crashVoltDB();
-                }
-            }
-
-            if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
-                if (!config.m_isEnterprise) {
-                    hostLog.warn(
-                            "Command logging requested in deployment file but can't be enabled in Community Edition.");
-                }
-                else {
-                    try {
-                        Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
-                                                                   "Command logging", false);
-                        if (loggerClass != null) {
-                            m_commandLog = (CommandLog)loggerClass.newInstance();
-                        }
-                    } catch (InstantiationException e) {
-                        hostLog.fatal("Unable to instantiate command log", e);
-                        VoltDB.crashVoltDB();
-                    } catch (IllegalAccessException e) {
-                        hostLog.fatal("Unable to instantiate command log", e);
-                        VoltDB.crashVoltDB();
-                    }
-                }
-            }
 
             // start up the response sampler if asked to by setting the env var
             // VOLTDB_RESPONSE_SAMPLE_PATH to a valid path
             ResponseSampler.initializeIfEnabled();
 
-            // See if we should bring the server up in admin mode
-            if (m_catalogContext.cluster.getAdminstartup())
-            {
-                m_startMode = OperationMode.PAUSED;
-            }
-
-            // set the adminPort from the deployment file
-            int adminPort = m_catalogContext.cluster.getAdminport();
-            // but allow command line override
-            if (config.m_adminPort > 0)
-                adminPort = config.m_adminPort;
-            // other places might use config to figure out the port
-            config.m_adminPort = adminPort;
-
-            // requires a catalog context.
-            m_faultManager = new FaultDistributor(this);
-            // Install a handler for NODE_FAILURE faults to update the catalog
-            // This should be the first handler to run when a node fails
-            m_faultManager.registerFaultHandler(NodeFailureFault.NODE_FAILURE_CATALOG,
-                                                m_faultHandler,
-                                                FaultType.NODE_FAILURE);
-            if (!m_faultManager.testPartitionDetectionDirectory(m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
-                VoltDB.crashVoltDB();
-            }
-
-            // Initialize the complex partitioning scheme
-            TheHashinator.initialize(catalog);
-
-            // start the httpd dashboard/jsonapi. A port value of -1 means disabled
-            // by the deployment.xml configuration.
-            int httpPort = m_catalogContext.cluster.getHttpdportno();
-            boolean jsonEnabled = m_catalogContext.cluster.getJsonapi();
-            String httpPortExtraLogMessage = null;
-            // if not set by the user, just find a free port
-            if (httpPort == 0) {
-                // if not set by the user, start at 8080
-                httpPort = 8080;
-
-                for (; true; httpPort++) {
-                    try {
-                        m_adminListener = new HTTPAdminListener(jsonEnabled, httpPort);
-                        break;
-                    } catch (Exception e1) {}
-                }
-                if (httpPort == 8081)
-                    httpPortExtraLogMessage = "HTTP admin console unable to bind to port 8080";
-                else if (httpPort > 8081)
-                    httpPortExtraLogMessage = "HTTP admin console unable to bind to ports 8080 through " + String.valueOf(httpPort - 1);
-            }
-            else if (httpPort != -1) {
-                try {
-                    m_adminListener = new HTTPAdminListener(jsonEnabled, httpPort);
-                } catch (Exception e1) {
-                    hostLog.info("HTTP admin console unable to bind to port " + httpPort + ". Exiting.");
-                    System.exit(-1);
-                }
-            }
-
-            // create the string that describes the public interface
-            // format "XXX.XXX.XXX.XXX:clientport:adminport:httpport"
-            InetAddress addr = null;
-            try {
-                addr = InetAddress.getLocalHost();
-            } catch (UnknownHostException e1) {
-                hostLog.fatal("Unable to discover local IP address by invoking Java's InetAddress.getLocalHost() method. Usually this is because the hostname of this node fails to resolve (for example \"ping `hostname`\" would fail). VoltDB requires that the hostname of every node resolves correctly at that node as well as every other node.");
-                VoltDB.crashVoltDB();
-            }
-            String localMetadata = addr.getHostAddress();
-            localMetadata += ":" + Integer.valueOf(config.m_port);
-            localMetadata += ":" + Integer.valueOf(adminPort);
-            localMetadata += ":" + Integer.valueOf(httpPort); // json
-            // possibly atomic swap from null to realz
-            m_localMetadata = localMetadata;
-
-            // Prepare the network socket manager for work
-            m_network = new VoltNetwork();
-            final HashSet<Integer> downHosts = new HashSet<Integer>();
-            final Set<Integer> downNonExecSites = new HashSet<Integer>();
-            //For command log only, will also mark self as faulted
-            final Set<Integer> downSites = new HashSet<Integer>();
-            if (!isRejoin) {
-                // Create the intra-cluster mesh
-                InetAddress leader = null;
-                try {
-                    leader = InetAddress.getByName(m_catalogContext.cluster.getLeaderaddress());
-                } catch (UnknownHostException ex) {
-                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_catalogContext.cluster.getLeaderaddress() }, null);
-                    VoltDB.crashVoltDB();
-                }
-                // ensure at least one host (catalog compiler should check this too
-                if (m_catalogContext.numberOfNodes <= 0) {
-                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(), new Object[] { m_catalogContext.numberOfNodes }, null);
-                    VoltDB.crashVoltDB();
-                }
-
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
-                hostLog.info(String.format("Beginning inter-node communication on port %d.", config.m_internalPort));
-                m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, m_catalogContext.catalogCRC, depCRC, hostLog);
-                Object retval[] = m_messenger.waitForGroupJoin();
-                m_instanceId = new Object[] { retval[0], retval[1] };
-            }
-            else {
-                downHosts.addAll(initializeForRejoin(config, m_catalogContext.catalogCRC, depCRC));
-
-                /**
-                 * Whatever hosts were reported as being down on rejoin should
-                 * be reported to the fault manager so that the fault can be distributed.
-                 * The execution sites were informed on construction so they don't have
-                 * to go through the agreement process.
-                 */
-                for (Integer downHost : downHosts) {
-                    downNonExecSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
-                    downSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
-                    m_faultManager.reportFault(
-                            new NodeFailureFault(
-                                downHost,
-                                m_catalogContext.siteTracker.getNonExecSitesForHost(downHost),
-                                "UNKNOWN"));
-                }
-                try {
-                    m_faultHandler.m_waitForFaultReported.acquire(downHosts.size());
-                } catch (InterruptedException e) {
-                    VoltDB.crashVoltDB();
-                }
-                ExecutionSite.recoveringSiteCount.set(
-                        m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size());
-                downSites.addAll(m_catalogContext.siteTracker.getAllSitesForHost(m_messenger.getHostId()));
-            }
-            m_catalogContext.m_transactionId = m_messenger.getDiscoveredCatalogTxnId();
-            assert(m_messenger.getDiscoveredCatalogTxnId() != 0);
-
-            // Use the host messenger's hostId.
-            final int myHostId = m_messenger.getHostId();
-
-            /*
-             * Initialize the agreement site with the same site id as the CI/SDTXN,
-             * but a different mailbox.
-             */
-            {
-                int myAgreementSiteId = -1;
-                HashSet<Integer> agreementSiteIds = new HashSet<Integer>();
-                int myAgreementInitiatorId = 0;
-                for (Site site : m_catalogContext.siteTracker.getAllSites()) {
-                    int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-                    int currSiteId = Integer.parseInt(site.getTypeName());
-
-                    if (sitesHostId == myHostId) {
-                        log.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { currSiteId }, null);
-                        m_messenger.createLocalSite(currSiteId);
-                    }
-                    // Create an agreement site for every initiator
-                    if (site.getIsexec() == false) {
-                        agreementSiteIds.add(currSiteId);
-                        if (sitesHostId == myHostId) {
-                            myAgreementSiteId = currSiteId;
-                            myAgreementInitiatorId = site.getInitiatorid();
-                        }
-                    }
-                }
-
-                assert(m_agreementSite == null);
-                assert(myAgreementSiteId != -1);
-                Mailbox agreementMailbox =
-                    m_messenger.createMailbox(myAgreementSiteId, VoltDB.AGREEMENT_MAILBOX_ID, false);
-                try {
-                    m_agreementSite =
-                        new AgreementSite(
-                                myAgreementSiteId,
-                                agreementSiteIds,
-                                myAgreementInitiatorId,
-                                downNonExecSites,
-                                agreementMailbox,
-                                new InetSocketAddress(
-                                        m_config.m_zkInterface.split(":")[0],
-                                        Integer.parseInt(m_config.m_zkInterface.split(":")[1])),
-                                m_faultManager,
-                                m_recovering);
-                    m_agreementSite.start();
-                } catch (Exception e) {
-                    hostLog.fatal(null, e);
-                    System.exit(-1);
-                }
-            }
-
-            // make sure the local entry for metadata is current
-            // it's possible it could get overwritten in a rejoin scenario
-            m_clusterMetadata.put(myHostId, m_localMetadata);
-
-            // Let the Export system read its configuration from the catalog.
-            try {
-                ExportManager.initialize(myHostId, m_catalogContext, isRejoin);
-            } catch (ExportManager.SetupException e) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ExportInitFailure.name(), e);
-                System.exit(-1);
-            }
+            Inits inits = new Inits(this, 4);
+            inits.doInitializationWork();
 
             // set up site structure
             m_localSites = Collections.synchronizedMap(new HashMap<Integer, ExecutionSite>());
@@ -742,7 +286,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 int eeCount = 0;
                 for (Site site : m_catalogContext.siteTracker.getUpSites()) {
                     if (site.getIsexec() &&
-                            myHostId == Integer.parseInt(site.getHost().getTypeName())) {
+                            m_myHostId == Integer.parseInt(site.getHost().getTypeName())) {
                         eeCount++;
                     }
                 }
@@ -765,7 +309,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 int siteId = Integer.parseInt(site.getTypeName());
 
                 // start a local site
-                if (sitesHostId == myHostId) {
+                if (sitesHostId == m_myHostId) {
                     if (site.getIsexec()) {
                         if (siteForThisThread == null) {
                             siteForThisThread = site;
@@ -774,9 +318,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                 new ExecutionSiteRunner(
                                         siteId,
                                         m_catalogContext,
-                                        serializedCatalog,
+                                        m_serializedCatalog,
                                         m_recovering,
-                                        downHosts);
+                                        m_downHosts,
+                                        hostLog);
                             m_runners.add(runner);
                             Thread runnerThread = new Thread(runner, "Site " + siteId);
                             runnerThread.start();
@@ -799,10 +344,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                           VoltDB.DTXN_MAILBOX_ID,
                                           true),
                                   siteId,
-                                  serializedCatalog,
+                                  m_serializedCatalog,
                                   null,
                                   m_recovering,
-                                  downHosts,
+                                  m_downHosts,
                                   m_catalogContext.m_transactionId);
             m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
             m_currentThreadSite = siteObj;
@@ -831,7 +376,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 int currSiteId = Integer.parseInt(site.getTypeName());
 
                 // create CI for each local non-EE site
-                if ((sitesHostId == myHostId) && (site.getIsexec() == false)) {
+                if ((sitesHostId == m_myHostId) && (site.getIsexec() == false)) {
                     ClientInterface ci =
                         ClientInterface.create(m_network,
                                                m_messenger,
@@ -840,7 +385,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                currSiteId,
                                                site.getInitiatorid(),
                                                config.m_port + portOffset,
-                                               adminPort + portOffset,
+                                               config.m_adminPort + portOffset,
                                                m_config.m_timestampTestingSalt);
                     portOffset++;
                     m_clientInterfaces.add(ci);
@@ -894,7 +439,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_commandLog.initForRejoin(
                         m_catalogContext, Long.MIN_VALUE,
                         m_messenger.getDiscoveredFaultSequenceNumber(),
-                        downSites);
+                        m_downSites);
             }
 
             // tell other booting nodes that this node is ready. Primary purpose is to publish a hostname
@@ -911,7 +456,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             fivems.start();
 
             // print out a bunch of useful system info
-            logDebuggingInfo(adminPort, httpPort, httpPortExtraLogMessage, jsonEnabled);
+            logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
 
             int k = m_catalogContext.numberOfExecSites / m_catalogContext.numberOfPartitions;
             if (k == 1) {
@@ -933,7 +478,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 try {
                     m_restoreAgent = new RestoreAgent(m_catalogContext, initiator,
                                                       m_zk, getSnapshotCompletionMonitor(),
-                                                      this, myHostId,
+                                                      this, m_myHostId,
                                                       config.m_startAction);
                 } catch (IOException e) {
                     hostLog.fatal("Unable to establish a ZooKeeper connection: " +
@@ -944,234 +489,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 onRestoreCompletion(Long.MIN_VALUE, !isRejoin);
             }
         }
-    }
-
-    /**
-     * Validate the signature and business logic enforcement for a license.
-     * @param pathToLicense
-     * @param numberOfNodes
-     * @return true if the licensing constraints are met
-     */
-    boolean validateLicense(String pathToLicense, int numberOfNodes) {
-        // verify the file exists.
-        File licenseFile = new File(pathToLicense);
-        if (licenseFile.exists() == false) {
-            hostLog.fatal("Unable to open license file: " + m_config.m_pathToLicense);
-            return false;
-        }
-
-        // boilerplate to create a license api interface
-        LicenseApi licenseApi = null;
-        Class<?> licApiKlass = MiscUtils.loadProClass("org.voltdb.licensetool.LicenseApiImpl",
-                "License API", false);
-
-        if (licApiKlass != null) {
-            try {
-                licenseApi = (LicenseApi)licApiKlass.newInstance();
-            } catch (InstantiationException e) {
-                hostLog.fatal("Unable to process license file: could not create license API.");
-                return false;
-            } catch (IllegalAccessException e) {
-                hostLog.fatal("Unable to process license file: could not create license API.");
-                return false;
-            }
-        }
-
-        if (licenseApi == null) {
-            hostLog.fatal("Unable to load license file: could not create license API.");
-            return false;
-        }
-
-        // Initialize the API. This parses the file but does NOT verify signatures.
-        if (licenseApi.initializeFromFile(licenseFile) == false) {
-            hostLog.fatal("Unable to load license file: could not parse license.");
-            return false;
-        }
-
-        // Perform signature verification - detect modified files
-        if (licenseApi.verify() == false) {
-            hostLog.fatal("Unable to load license file: could not verify license signature.");
-            return false;
-        }
-
-        Calendar now = GregorianCalendar.getInstance();
-        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy");
-        String expiresStr = sdf.format(licenseApi.expires().getTime());
-        boolean valid = true;
-
-        if (now.after(licenseApi.expires())) {
-            if (licenseApi.isTrial()) {
-                hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
-                return false;
-            }
-            else {
-                hostLog.error("Warning, VoltDB commercial license expired on " + expiresStr + ".");
-                valid = false;
-            }
-        }
-
-        // print out trial success message
-        if (licenseApi.isTrial()) {
-            hostLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
-            return true;
-        }
-
-        // ASSUME CUSTOMER LICENSE HERE
-
-        if (numberOfNodes > licenseApi.maxHostcount()) {
-            hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
-                    " nodes, starting cluster with " + numberOfNodes + " nodes.");
-            valid = false;
-        }
-
-        // this gets printed even if there are non-fatal problems, so it
-        // injects the word "invalid" to make it clear this is the case
-        String msg = String.format("Starting VoltDB with %scommercial license. " +
-                "License for %d nodes expires on %s.",
-                (valid ? "" : "invalid "),
-                licenseApi.maxHostcount(),
-                expiresStr);
-        hostLog.info(msg);
-
-        return true;
-    }
-
-    public HashSet<Integer> initializeForRejoin(VoltDB.Configuration config, long catalogCRC, long deploymentCRC) {
-        // sensible defaults (sorta)
-        String rejoinHostCredentialString = null;
-        String rejoinHostAddressString = null;
-
-        //Client interface port of node that will receive @Rejoin invocation
-        int rejoinPort = config.m_port;
-        String rejoinHost = null;
-        String rejoinUser = null;
-        String rejoinPass = null;
-
-        // this will cause the ExecutionSites to start in recovering mode
-        m_recovering = true;
-
-        // split a "user:pass@host:port" string into "user:pass" and "host:port"
-        int atSignIndex = config.m_rejoinToHostAndPort.indexOf('@');
-        if (atSignIndex == -1) {
-            rejoinHostAddressString = config.m_rejoinToHostAndPort;
-        }
-        else {
-            rejoinHostCredentialString = config.m_rejoinToHostAndPort.substring(0, atSignIndex).trim();
-            rejoinHostAddressString = config.m_rejoinToHostAndPort.substring(atSignIndex + 1).trim();
-        }
-
-
-        int colonIndex = -1;
-        // split a "user:pass" string into "user" and "pass"
-        if (rejoinHostCredentialString != null) {
-            colonIndex = rejoinHostCredentialString.indexOf(':');
-            if (colonIndex == -1) {
-                rejoinUser = rejoinHostCredentialString.trim();
-                System.out.print("password: ");
-                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-                try {
-                    rejoinPass = br.readLine();
-                } catch (IOException e) {
-                    hostLog.error("Unable to read passord for rejoining credentials from console.");
-                    System.exit(-1);
-                }
-            }
-            else {
-                rejoinUser = rejoinHostCredentialString.substring(0, colonIndex).trim();
-                rejoinPass = rejoinHostCredentialString.substring(colonIndex + 1).trim();
-            }
-        }
-
-        // split a "host:port" string into "host" and "port"
-        colonIndex = rejoinHostAddressString.indexOf(':');
-        if (colonIndex == -1) {
-            rejoinHost = rejoinHostAddressString.trim();
-            // note rejoinPort has a default
-        }
-        else {
-            rejoinHost = rejoinHostAddressString.substring(0, colonIndex).trim();
-            rejoinPort = Integer.parseInt(rejoinHostAddressString.substring(colonIndex + 1).trim());
-        }
-
-        hostLog.info(String.format("Inter-node communication will use port %d.", config.m_internalPort));
-        ServerSocketChannel listener = null;
-        try {
-            listener = ServerSocketChannel.open();
-            listener.socket().bind(new InetSocketAddress(config.m_internalPort));
-        } catch (IOException e) {
-            hostLog.error("Problem opening listening rejoin socket: " + e.getMessage());
-            System.exit(-1);
-        }
-        m_messenger = new HostMessenger(m_network, listener, m_catalogContext.numberOfNodes, catalogCRC, deploymentCRC, hostLog);
-
-        // make empty strings null
-        if ((rejoinUser != null) && (rejoinUser.length() == 0)) rejoinUser = null;
-        if ((rejoinPass != null) && (rejoinPass.length() == 0)) rejoinPass = null;
-
-        // URL Decode so usernames/passwords can contain weird stuff
-        try {
-            if (rejoinUser != null) rejoinUser = URLDecoder.decode(rejoinUser, "UTF-8");
-            if (rejoinPass != null) rejoinPass = URLDecoder.decode(rejoinPass, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            hostLog.error("Problem URL-decoding credentials for rejoin authentication: " + e.getMessage());
-            System.exit(-1);
-        }
-
-        ClientConfig clientConfig = new ClientConfig(rejoinUser, rejoinPass);
-        Client client = ClientFactory.createClient(clientConfig);
-        ClientResponse response = null;
-        RejoinCallback rcb = new RejoinCallback() {
-
-        };
-        try {
-            client.createConnection(rejoinHost, rejoinPort);
-            InetSocketAddress inetsockaddr = new InetSocketAddress(rejoinHost, rejoinPort);
-            SocketChannel socket = SocketChannel.open(inetsockaddr);
-            String ip_addr = socket.socket().getLocalAddress().getHostAddress();
-            socket.close();
-            config.m_selectedRejoinInterface =
-                config.m_internalInterface.isEmpty() ? ip_addr : config.m_internalInterface;
-            client.callProcedure(
-                    rcb,
-                    "@Rejoin",
-                    config.m_selectedRejoinInterface,
-                    config.m_internalPort);
-        }
-        catch (Exception e) {
-            recoveryLog.fatal("Problem connecting client: " + e.getMessage());
-            VoltDB.crashVoltDB();
-        }
-
-        Object retval[] = m_messenger.waitForGroupJoin(60 * 1000);
-
-        m_catalogContext = new CatalogContext(
-                TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0),
-                m_catalogContext.catalog,
-                m_catalogContext.pathToCatalogJar,
-                deploymentCRC,
-                m_messenger.getDiscoveredCatalogVersion(),
-                0);
-
-        m_instanceId = new Object[] { retval[0], retval[1] };
-
-        @SuppressWarnings("unchecked")
-        HashSet<Integer> downHosts = (HashSet<Integer>)retval[2];
-        recoveryLog.info("Down hosts are " + downHosts.toString());
-
-        try {
-            //Callback validates response asynchronously. Just wait for the response before continuing.
-            //Timeout because a failure might result in the response not coming.
-            response = rcb.waitForResponse(3000);
-            if (response == null) {
-                recoveryLog.fatal("Recovering node timed out rejoining");
-                VoltDB.crashVoltDB();
-            }
-        }
-        catch (InterruptedException e) {
-            recoveryLog.fatal("Interrupted while attempting to rejoin cluster");
-            VoltDB.crashVoltDB();
-        }
-        return downHosts;
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -1464,7 +781,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         // connect to the joining node, build a foreign host
         try {
-            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, m_catalogContext.catalogCRC,
+            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, 0,
                     m_catalogContext.deploymentCRC, liveHosts, m_commandLog.getFaultSequenceNumber(),
                     m_catalogContext.catalogVersion, m_catalogContext.m_transactionId);
             return null;
@@ -1681,8 +998,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public VoltDB.Configuration getConfig()
-    {
+    public VoltDB.Configuration getConfig() {
         return m_config;
     }
 

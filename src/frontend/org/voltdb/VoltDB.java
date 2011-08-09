@@ -113,9 +113,14 @@ public class VoltDB {
         /** information used to rejoin this new node to a cluster */
         public String m_rejoinToHostAndPort = null;
 
+        /** HTTP port can't be set here, but eventually value will be reflected here */
+        public int m_httpPort = Integer.MAX_VALUE;
+
         /** running the enterprise version? */
         public final boolean m_isEnterprise =
                 (null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true));
+
+        public int m_deadHostTimeoutMS = 10000;
 
         /** start up action */
         public START_ACTION m_startAction = START_ACTION.START;

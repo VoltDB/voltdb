@@ -122,7 +122,7 @@ public class CatalogDiffEngine {
     private void writeModification(CatalogType newType, String field)
     {
         checkModifyWhitelist(newType, field);
-        newType.writeCommandForField(m_sb, field);
+        newType.writeCommandForField(m_sb, field, true);
     }
 
     /**

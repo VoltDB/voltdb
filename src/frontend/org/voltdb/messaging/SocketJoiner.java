@@ -334,6 +334,8 @@ public class SocketJoiner extends Thread {
             // figure out if any catalogs are not identical
             for (long crc : othercrcs) {
                 if (crc != m_catalogCRC) {
+                    System.err.printf("remote crc: %d, local crc: %d\n", crc, m_catalogCRC);
+                    System.err.flush();
                     errors |= CRC_FAILURE;
                 }
             }
@@ -647,6 +649,8 @@ public class SocketJoiner extends Thread {
             // figure out if any catalogs are not identical
             for (long crc : othercrcs) {
                 if (crc != m_catalogCRC) {
+                    System.err.printf("remote crc: %d, local crc: %d\n", crc, m_catalogCRC);
+                    System.err.flush();
                     errors |= CRC_FAILURE;
                 }
             }

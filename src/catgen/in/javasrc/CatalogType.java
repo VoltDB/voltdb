@@ -240,8 +240,11 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         sb.append("\n");
     }
 
-    void writeCommandForField(StringBuilder sb, String field) {
-        sb.append("set ").append(m_path).append(" ");
+    void writeCommandForField(StringBuilder sb, String field, boolean printFullPath) {
+        String path = m_path;
+        if (!printFullPath) path = "$PREV"; // use cacheing to shrink output + speed parsing
+
+        sb.append("set ").append(path).append(" ");
         sb.append(field).append(" ");
         Object value = m_fields.get(field);
         if (value == null) {
@@ -266,8 +269,10 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     void writeFieldCommands(StringBuilder sb) {
+        int i = 0;
         for (String field : m_fields.keySet()) {
-            writeCommandForField(sb, field);
+            writeCommandForField(sb, field, i == 0);
+            ++i;
         }
     }
 

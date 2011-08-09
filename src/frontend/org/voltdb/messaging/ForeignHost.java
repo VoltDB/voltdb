@@ -56,7 +56,7 @@ public class ForeignHost {
     private final Socket m_socket;
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
-    private long m_deadHostTimeout = 10000;
+    private final long m_deadHostTimeout;
     private long m_lastMessageMillis;
 
     private class FHFaultHandler implements FaultHandler
@@ -151,6 +151,7 @@ public class ForeignHost {
         m_isUp = true;
         m_lastMessageMillis = Long.MAX_VALUE;
         m_socket = socket.socket();
+        m_deadHostTimeout = VoltDB.instance().getConfig().m_deadHostTimeoutMS;
         //TestMessaging doesn't have the real deal
         if (VoltDB.instance() != null) {
             if (VoltDB.instance().getFaultDistributor() != null) {
@@ -160,8 +161,6 @@ public class ForeignHost {
                             new FHFaultHandler(),
                             org.voltdb.fault.VoltFault.FaultType.NODE_FAILURE);
             }
-            m_deadHostTimeout = VoltDB.instance().getCatalogContext().
-                                cluster.getHeartbeattimeout() * 1000; // convert to millis
             hostLog.info("Heartbeat timeout to host: " + m_ipAddress + " is " +
                          m_deadHostTimeout + " milliseconds");
         }

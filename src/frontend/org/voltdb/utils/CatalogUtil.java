@@ -419,20 +419,21 @@ public abstract class CatalogUtil {
         return false;
     }
 
+    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL, boolean crashOnFailedValidation) {
+        DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
+        if (deployment == null) {
+            return -1;
+        }
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
+    }
+
     /**
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
-     * @param deploymentURL Path to the deployment.xml file.
+     * @param deployment Parsed representation of the deployment.xml file.
      * @return CRC of the deployment contents (>0) or -1 on failure.
      */
-    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL, boolean crashOnFailedValidation) {
-        DeploymentType deployment = parseDeployment(deploymentURL);
-
-        // wasn't a valid xml deployment file
-        if (deployment == null) {
-            hostLog.error("Not a valid XML deployment file at URL: " + deploymentURL);
-            return -1;
-        }
+    public static long compileDeploymentAndGetCRC(Catalog catalog, DeploymentType deployment, boolean crashOnFailedValidation) {
 
         if (!validateDeployment(catalog, deployment)) {
             return -1;
