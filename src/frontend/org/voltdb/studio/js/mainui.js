@@ -286,7 +286,7 @@ this.InitWorkspace = function()
     }
 	else
 	{
-        if (Injection[0] != '${hostname}')
+        if (Injection[2] != '${requires-authentication}')
         {
             hostnameDefault = Injection[0];
             portDefault = Injection[1];
