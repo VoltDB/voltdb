@@ -38,7 +38,9 @@ public:
             StreamBlock *block,
             bool sync,
             bool endOfStream);
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {
 
+    }
 private:
     ::VoltDBIPC *m_vdbipc;
 };

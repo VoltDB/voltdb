@@ -40,6 +40,8 @@ public class AsyncCompilerWorkThread extends Thread {
     boolean m_isLoaded = false;
     CatalogContext m_context;
 
+    public static int m_OOPTimeout = 60000;
+
     private static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
     /** If this is true, update the catalog */
@@ -69,7 +71,7 @@ public class AsyncCompilerWorkThread extends Thread {
     public void verifyEverthingIsKosher() {
         if (m_ptool != null) {
             // check if the planner process has been blocked for 10 seconds
-            if (m_ptool.perhapsIsHung(60000)) {
+            if (m_ptool.perhapsIsHung(m_OOPTimeout)) {
                 ahpLog.error("Out-of-process planner unresponsive.");
                 // Get the actual cause of death, maybe
                 if (!m_ptool.expensiveIsRunningCheck())

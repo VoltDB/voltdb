@@ -79,6 +79,17 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_fallbackToEEAllocatedBufferMID =
+            m_jniEnv->GetMethodID(
+                    jniClass,
+                    "fallbackToEEAllocatedBuffer",
+                    "(Ljava/nio/ByteBuffer;)V");
+    if (m_fallbackToEEAllocatedBufferMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_fallbackToEEAllocatedBufferMID != 0);
+        throw std::exception();
+    }
+
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     if (m_nextDependencyMID == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -135,8 +146,30 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         m_crashVoltDBMID == 0 ||
         m_pushExportBufferMID == 0 ||
         m_getQueuedExportBytesMID == 0 ||
-        m_exportManagerClass == 0)
+        m_exportManagerClass == 0 ||
+        m_fallbackToEEAllocatedBufferMID == 0)
     {
+        throw std::exception();
+    }
+}
+
+
+void JNITopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {
+    JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 1);
+    if (jni_frame.checkResult() < 0) {
+        VOLT_ERROR("Unable to load dependency: jni frame error.");
+        throw std::exception();
+    }
+
+    jobject jbuffer = m_jniEnv->NewDirectByteBuffer(buffer, length);
+    if (jbuffer == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+
+    m_jniEnv->CallVoidMethod(m_javaExecutionEngine, m_fallbackToEEAllocatedBufferMID, jbuffer);
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
         throw std::exception();
     }
 }
@@ -279,5 +312,4 @@ void JNITopend::pushExportBuffer(
         throw std::exception();
     }
 }
-
 }

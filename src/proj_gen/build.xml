@@ -46,7 +46,6 @@ PRIMARY ENTRY POINTS
 
 <target name="server" depends="srccompile, compile" description="Start the server and load the catalog." >
     <java fork="yes" classname="org.voltdb.VoltDB" >
-        <arg value="polite" /> <!-- polite level profiling (delete to disable profiling) -->
         <jvmarg value="-Djava.library.path=##voltdb_lib_path##" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />

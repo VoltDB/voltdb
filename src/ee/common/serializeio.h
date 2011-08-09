@@ -452,7 +452,7 @@ public:
     }
 
     /** Set the buffer to buffer with capacity and sets the position. */
-    void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
+    virtual void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
         setPosition(position);
         initialize(buffer, capacity);
     }
@@ -471,6 +471,38 @@ protected:
             "Output from SQL stmt overflowed output/network buffer of 10mb. "
             "Try a \"limit\" clause or a stronger predicate.");
     }
+};
+
+/*
+ * A serialize output class that falls back to allocating a 50 meg buffer
+ * if the regular allocation runs out of space. The topend is notified when this occurs.
+ */
+class FallbackSerializeOutput : public ReferenceSerializeOutput {
+public:
+    FallbackSerializeOutput() :
+        ReferenceSerializeOutput(), fallbackBuffer_(NULL) {
+    }
+
+    /** Set the buffer to buffer with capacity and sets the position. */
+    void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
+        if (fallbackBuffer_ != NULL) {
+            char *temp = fallbackBuffer_;
+            fallbackBuffer_ = NULL;
+            delete []temp;
+        }
+        setPosition(position);
+        initialize(buffer, capacity);
+    }
+
+    // Destructor frees the fallback buffer if it is allocated
+    virtual ~FallbackSerializeOutput() {
+        delete []fallbackBuffer_;
+    }
+
+    /** Expand once to a fallback size, and if that doesn't work abort */
+    void expand(size_t minimum_desired);
+private:
+    char *fallbackBuffer_;
 };
 
 /** Implementation of SerializeOutput that makes a copy of the buffer. */

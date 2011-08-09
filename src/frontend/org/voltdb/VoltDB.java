@@ -153,7 +153,7 @@ public class VoltDB {
             // Arguments are accepted in any order.
             //
             // options:
-            // [noloadlib] [hsqldb|jni|ipc] [polite|intrusive] [catalog path_to_catalog] [deployment path_to_deployment]
+            // [noloadlib] [hsqldb|jni|ipc] [catalog path_to_catalog] [deployment path_to_deployment]
 
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
