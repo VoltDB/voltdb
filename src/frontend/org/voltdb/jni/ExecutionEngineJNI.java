@@ -73,6 +73,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     private FastDeserializer deserializer =
         new FastDeserializer(deserializerBufferOrigin.b);
 
+    /*
+     * For large result sets the EE will allocate new memory for the results
+     * and invoke a callback to set the allocated memory here.
+     */
+    private ByteBuffer fallbackBuffer = null;
+
     private final BBContainer exceptionBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
     private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b;
 
@@ -229,28 +235,32 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializer.clear();
         final int errorCode = nativeExecutePlanFragment(pointer, planFragmentId, outputDepId, inputDepId,
                                                         txnId, lastCommittedTxnId, undoToken);
-        checkErrorCode(errorCode);
-
         try {
-            // read the complete size of the buffer used (ignored here)
-            deserializer.readInt();
-            // check if anything was changed
-            final boolean dirty = deserializer.readBoolean();
-            if (dirty)
-                m_dirty = true;
-            // read the number of tables returned by this fragment
-            final int numDependencies = deserializer.readInt();
-            final VoltTable dependencies[] = new VoltTable[numDependencies];
-            final int depIds[] = new int[numDependencies];
-            for (int i = 0; i < numDependencies; ++i) {
-                depIds[i] = deserializer.readInt();
-                dependencies[i] = deserializer.readObject(VoltTable.class);
+            checkErrorCode(errorCode);
+            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
+            try {
+                // read the complete size of the buffer used (ignored here)
+                fds.readInt();
+                // check if anything was changed
+                final boolean dirty = fds.readBoolean();
+                if (dirty)
+                    m_dirty = true;
+                // read the number of tables returned by this fragment
+                final int numDependencies = fds.readInt();
+                final VoltTable dependencies[] = new VoltTable[numDependencies];
+                final int depIds[] = new int[numDependencies];
+                for (int i = 0; i < numDependencies; ++i) {
+                    depIds[i] = fds.readInt();
+                    dependencies[i] = fds.readObject(VoltTable.class);
+                }
+                assert(depIds.length == 1);
+                return new DependencyPair(depIds[0], dependencies[0]);
+            } catch (final IOException ex) {
+                LOG.error("Failed to deserialze result dependencies" + ex);
+                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
             }
-            assert(depIds.length == 1);
-            return new DependencyPair(depIds[0], dependencies[0]);
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialze result dependencies" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        } finally {
+            fallbackBuffer = null;
         }
 
     }
@@ -268,25 +278,29 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             errorCode = nativeExecuteCustomPlanFragment(pointer, plan, outputDepId, inputDepId,
                                                         txnId, lastCommittedTxnId, undoQuantumToken);
         }
-        checkErrorCode(errorCode);
-
         try {
-            deserializer.readInt(); // total size of the data
-            // check if anything was changed
-            final boolean dirty = deserializer.readBoolean();
-            if (dirty)
-                m_dirty = true;
-            final int numDependencies = deserializer.readInt();
-            assert(numDependencies == 1);
-            final VoltTable dependencies[] = new VoltTable[numDependencies];
-            for (int i = 0; i < numDependencies; ++i) {
-                /*int depId =*/ deserializer.readInt();
-                dependencies[i] = deserializer.readObject(VoltTable.class);
+            checkErrorCode(errorCode);
+            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
+            try {
+                fds.readInt(); // total size of the data
+                // check if anything was changed
+                final boolean dirty = fds.readBoolean();
+                if (dirty)
+                    m_dirty = true;
+                final int numDependencies = fds.readInt();
+                assert(numDependencies == 1);
+                final VoltTable dependencies[] = new VoltTable[numDependencies];
+                for (int i = 0; i < numDependencies; ++i) {
+                    /*int depId =*/ fds.readInt();
+                    dependencies[i] = fds.readObject(VoltTable.class);
+                }
+                return dependencies[0];
+            } catch (final IOException ex) {
+                LOG.error("Failed to deserialze result dependencies" + ex);
+                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
             }
-            return dependencies[0];
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialze result dependencies" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        } finally {
+            fallbackBuffer = null;
         }
     }
 
@@ -327,40 +341,52 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         // Execute the plan, passing a raw pointer to the byte buffers for input and output
         deserializer.clear();
-        final int errorCode = nativeExecuteQueryPlanFragmentsAndGetResults(pointer, planFragmentIds, numFragmentIds, txnId, lastCommittedTxnId, undoToken);
-        checkErrorCode(errorCode);
+        final int errorCode =
+            nativeExecuteQueryPlanFragmentsAndGetResults(
+                    pointer,
+                    planFragmentIds,
+                    numFragmentIds,
+                    txnId,
+                    lastCommittedTxnId,
+                    undoToken);
 
-        // get a copy of the result buffers and make the tables
-        // use the copy
         try {
-            // read the complete size of the buffer used
-            final int totalSize = deserializer.readInt();
-            // check if anything was changed
-            final boolean dirty = deserializer.readBoolean();
-            if (dirty)
-                m_dirty = true;
-            // get a copy of the buffer
-            final ByteBuffer fullBacking = deserializer.readBuffer(totalSize);
-            final VoltTable[] results = new VoltTable[batchSize];
-            for (int i = 0; i < batchSize; ++i) {
-                final int numdeps = fullBacking.getInt(); // number of dependencies for this frag
-                assert(numdeps == 1);
-                @SuppressWarnings("unused")
-                final
-                int depid = fullBacking.getInt(); // ignore the dependency id
-                final int tableSize = fullBacking.getInt();
-                // reasonableness check
-                assert(tableSize < 10000000);
-                final ByteBuffer tableBacking = fullBacking.slice();
-                fullBacking.position(fullBacking.position() + tableSize);
-                tableBacking.limit(tableSize);
+            checkErrorCode(errorCode);
+            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
+            // get a copy of the result buffers and make the tables
+            // use the copy
+            try {
+                // read the complete size of the buffer used
+                final int totalSize = fds.readInt();
+                // check if anything was changed
+                final boolean dirty = fds.readBoolean();
+                if (dirty)
+                    m_dirty = true;
+                // get a copy of the buffer
+                final ByteBuffer fullBacking = fds.readBuffer(totalSize);
+                final VoltTable[] results = new VoltTable[batchSize];
+                for (int i = 0; i < batchSize; ++i) {
+                    final int numdeps = fullBacking.getInt(); // number of dependencies for this frag
+                    assert(numdeps == 1);
+                    @SuppressWarnings("unused")
+                    final
+                    int depid = fullBacking.getInt(); // ignore the dependency id
+                    final int tableSize = fullBacking.getInt();
+                    // reasonableness check
+                    assert(tableSize < 50000000);
+                    final ByteBuffer tableBacking = fullBacking.slice();
+                    fullBacking.position(fullBacking.position() + tableSize);
+                    tableBacking.limit(tableSize);
 
-                results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
+                    results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
+                }
+                return results;
+            } catch (final IOException ex) {
+                LOG.error("Failed to deserialze result table" + ex);
+                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
             }
-            return results;
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialze result table" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        } finally {
+            fallbackBuffer = null;
         }
     }
 
@@ -441,10 +467,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         try {
             deserializer.readInt();//Ignore the length of the result tables
+            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
             final VoltTable results[] = new VoltTable[numResults];
             for (int ii = 0; ii < numResults; ii++) {
                 final VoltTable resultTable = PrivateVoltTableFactory.createUninitializedVoltTable();
-                results[ii] = (VoltTable)deserializer.readObject(resultTable, this);
+                results[ii] = (VoltTable)fds.readObject(resultTable, this);
             }
             return results;
         } catch (final IOException ex) {
@@ -544,5 +571,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public long getThreadLocalPoolAllocations() {
         return nativeGetThreadLocalPoolAllocations();
+    }
+
+    /*
+     * Instead of using the reusable output buffer to get results for the next batch,
+     * use this buffer allocated by the EE. This is for one time use.
+     */
+    public void fallbackToEEAllocatedBuffer(ByteBuffer buffer) {
+        assert(buffer != null);
+        assert(fallbackBuffer == null);
+        fallbackBuffer = buffer;
     }
 }

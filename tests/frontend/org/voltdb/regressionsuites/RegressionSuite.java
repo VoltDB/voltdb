@@ -109,6 +109,10 @@ public class RegressionSuite extends TestCase {
         return m_config.isValgrind();
     }
 
+    public boolean isLocalCluster() {
+        return m_config instanceof LocalCluster;
+    }
+
     /**
      * @return a reference to the associated VoltServerConfig
      */
