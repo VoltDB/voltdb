@@ -27,10 +27,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
@@ -47,16 +44,7 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.GroupRef;
-import org.voltdb.catalog.MaterializedViewInfo;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Statement;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportType;
@@ -68,6 +56,7 @@ import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -653,6 +642,12 @@ public class VoltCompiler {
             compileExport(export, db);
         }
 
+        // Generate the auto-CRUD procedure descriptors. This creates
+        // procedure descriptors to insert, delete, select and update
+        // tables, with some caveats. (See ENG-1601).
+        List<ProcedureDescriptor> autoCrudProcedures = generateCrud(m_catalog);
+        procedures.addAll(autoCrudProcedures);
+
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
             final String procedureName = procedureDescriptor.m_className;
@@ -671,7 +666,275 @@ public class VoltCompiler {
     }
 
 
+    /**
+     * Create INSERT, UPDATE, DELETE and SELECT procedure descriptors for all partitioned,
+     * non-export tables with primary keys that include the partitioning column.
+     *
+     * @param catalog
+     * @return a list of new procedure descriptors
+     */
+    List<ProcedureDescriptor> generateCrud(Catalog catalog) {
+        final LinkedList<ProcedureDescriptor> crudprocs = new LinkedList<ProcedureDescriptor>();
+
+        final Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        for (Table table : db.getTables()) {
+            if (table.getIsreplicated()) {
+                compilerLog.info("Skipping creation of CRUD procedures for replicated table " +
+                        table.getTypeName());
+                continue;
+            }
+
+            if (CatalogUtil.isTableExportOnly(db, table)) {
+                compilerLog.info("Skipping creation of CRUD procedures for export-only table " +
+                        table.getTypeName());
+                continue;
+            }
+
+            if (table.getMaterializer() != null) {
+                compilerLog.info("Skipping creation of CRUD procedures for view " +
+                        table.getTypeName());
+                continue;
+            }
+
+            // CRUD requires pkey. Pkeys are stored as constraints.
+            final CatalogMap<Constraint> constraints = table.getConstraints();
+            final Iterator<Constraint> it = constraints.iterator();
+            Constraint pkey = null;
+            while (it.hasNext()) {
+                Constraint constraint = it.next();
+                if (constraint.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
+                    pkey = constraint;
+                    break;
+                }
+            }
+
+            if (pkey == null) {
+                compilerLog.info("Skipping creation of CRUD procedures for partitioned table " +
+                        table.getTypeName() + " because no primary key is declared.");
+                continue;
+            }
+
+            // Primary key must include the partition column for the table.
+            final Column partitioncolumn = table.getPartitioncolumn();
+            boolean pkeyHasPartitionColumn = false;
+            CatalogMap<ColumnRef> pkeycols = pkey.getIndex().getColumns();
+            Iterator<ColumnRef> pkeycolsit = pkeycols.iterator();
+            while (pkeycolsit.hasNext()) {
+                ColumnRef colref = pkeycolsit.next();
+                if (colref.getColumn().equals(partitioncolumn)) {
+                    pkeyHasPartitionColumn = true;
+                    break;
+                }
+            }
+
+            if (!pkeyHasPartitionColumn) {
+                compilerLog.info("Skipping creation of CRUD procedures for partitioned table " +
+                        table.getTypeName() + " because primary key does not include the partitioning column.");
+                continue;
+            }
+
+            crudprocs.add(generateCrudSelect(table, partitioncolumn, pkey));
+            crudprocs.add(generateCrudInsert(table, partitioncolumn, pkey));
+            crudprocs.add(generateCrudDelete(table, partitioncolumn, pkey));
+            crudprocs.add(generateCrudUpdate(table, partitioncolumn, pkey));
+        }
+
+        return crudprocs;
+    }
+
+    /**
+     * Helper to generate a WHERE pkey_col1 = ?, pkey_col2 = ? ...; clause.
+     * @param partitioncolumn partitioning column for the table
+     * @param pkey constraint from the catalog
+     * @param paramoffset 0-based counter of parameters in the full sql statement so far
+     * @param sb string buffer accumulating the sql statement
+     * @return partition key offset (which must be in the primary key)
+     */
+    private int generateCrudPKeyWhereClause(Column partitioncolumn,
+            Constraint pkey, int paramoffset, StringBuilder sb)
+    {
+        int partitionoffset = -1;
+        boolean first;
+        first = true;
+        sb.append(" WHERE ");
+        for (ColumnRef pkc : pkey.getIndex().getColumns()) {
+            paramoffset++;
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(pkc.getColumn().getName() + " = ?");
+            if (pkc.getColumn() == partitioncolumn) {
+                partitionoffset = paramoffset;
+            }
+        }
+        sb.append(";");
+        return partitionoffset;
+    }
+
+    /**
+     * Helper to generate a full col1 = ?, col2 = ?... clause.
+     * @param table
+     * @param sb
+     * @return number of columns added (for partition key offset calculation).
+     */
+    private int generateCrudExpressionColumns(Table table, StringBuilder sb) {
+        boolean first = true;
+        int paramoffset = -1;
+        for (Column c : table.getColumns()) {
+            paramoffset++;
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(c.getName() + " = ?");
+        }
+        return paramoffset;
+    }
+
+    /**
+     * Helper to generate a full col1, col2, col3 list.
+     */
+    private int generateCrudColumnList(Column partitioncolumn, Table table, StringBuilder sb) {
+        int partitionoffset = -1;
+        boolean first = true;
+        int paramoffset = 0;
+        sb.append("(");
+        for (Column c : table.getColumns()) {
+            paramoffset++;
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append("?");
+            if (c == partitioncolumn) {
+                partitionoffset = paramoffset;
+            }
+        }
+        sb.append(")");
+        return partitionoffset;
+    }
+
+    /**
+     * Create a statement like:
+     *  "delete from <table> where {<pkey-column =?>...}"
+     * @param table
+     * @param partitioncolumn
+     * @param pkey
+     * @return
+     */
+    private ProcedureDescriptor generateCrudDelete(Table table,
+            Column partitioncolumn, Constraint pkey)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("DELETE FROM " + table.getTypeName());
+
+        int partitionoffset =
+            generateCrudPKeyWhereClause(partitioncolumn, pkey, -1, sb);
+
+        String partitioninfo =
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
+
+        ProcedureDescriptor pd =
+            new ProcedureDescriptor(
+                    new ArrayList<String>(),  // groups
+                    table.getTypeName() + ".delete",        // className
+                    sb.toString(),            // singleStmt
+                    null,                     // joinOrder
+                    partitioninfo);           // table.column:offset
+
+        compilerLog.info("Synthesized built-in DELETE procedure: " +
+                sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
+                partitioninfo);
+
+        return pd;
+    }
+
+    /**
+     * Create a statement like:
+     * "update <table> set {<each-column = ?>...} where {<pkey-column = ?>...}
+     */
+    private ProcedureDescriptor generateCrudUpdate(Table table,
+            Column partitioncolumn, Constraint pkey)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("UPDATE " + table.getTypeName() + " SET ");
+
+        int paramoffset =
+            generateCrudExpressionColumns(table, sb);
+
+        int partitionoffset =
+            generateCrudPKeyWhereClause(partitioncolumn, pkey, paramoffset, sb);
+
+        String partitioninfo =
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
+
+        ProcedureDescriptor pd =
+            new ProcedureDescriptor(
+                    new ArrayList<String>(),  // groups
+                    table.getTypeName() + ".update",        // className
+                    sb.toString(),            // singleStmt
+                    null,                     // joinOrder
+                    partitioninfo);           // table.column:offset
+
+        compilerLog.info("Synthesized built-in UPDATE procedure: " +
+                sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
+                partitioninfo);
+
+        return pd;
+    }
+
+    private ProcedureDescriptor generateCrudInsert(Table table,
+            Column partitioncolumn, Constraint pkey)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("INSERT INTO " + table.getTypeName() + " VALUES ");
+
+        int partitionoffset =
+            generateCrudColumnList(partitioncolumn, table, sb);
+
+        String partitioninfo =
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
+
+        ProcedureDescriptor pd =
+            new ProcedureDescriptor(
+                    new ArrayList<String>(),  // groups
+                    table.getTypeName() + ".insertcrud",        // className
+                    sb.toString(),            // singleStmt
+                    null,                     // joinOrder
+                    partitioninfo);           // table.column:offset
+
+        compilerLog.info("Synthesized built-in INSERT procedure: " +
+                sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
+                partitioninfo);
+
+        return pd;
+    }
+
+    private ProcedureDescriptor generateCrudSelect(Table table,
+            Column partitioncolumn, Constraint pkey)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT * FROM " + table.getTypeName());
+
+        int partitionoffset =
+            generateCrudPKeyWhereClause(partitioncolumn, pkey, -1, sb);
+
+        String partitioninfo =
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
+
+        ProcedureDescriptor pd =
+            new ProcedureDescriptor(
+                    new ArrayList<String>(),  // groups
+                    table.getTypeName() + ".select",        // className
+                    sb.toString(),            // singleStmt
+                    null,                     // joinOrder
+                    partitioninfo);           // table.column:offset
+
+        compilerLog.info("Synthesized built-in SELECT procedure: " +
+                sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
+                partitioninfo);
+
+        return pd;
+    }
+
     static void addDatabaseEstimatesInfo(final DatabaseEstimates estimates, final Database db) {
+        // Not implemented yet. Don't panic.
+
         /*for (Table table : db.getTables()) {
             DatabaseEstimates.TableEstimates tableEst = new DatabaseEstimates.TableEstimates();
             tableEst.maxTuples = 1000000;
