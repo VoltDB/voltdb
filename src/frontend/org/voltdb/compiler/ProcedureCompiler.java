@@ -356,8 +356,8 @@ public abstract class ProcedureCompiler {
         String[] parts = className.split("\\.");
         String shortName = parts[parts.length - 1];
 
-        // add an entry to the catalog
-        final Procedure procedure = db.getProcedures().add(shortName);
+        // add an entry to the catalog (using the full className)
+        final Procedure procedure = db.getProcedures().add(className);
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
