@@ -1062,7 +1062,14 @@ SnapshotCompletionInterest {
 
     @Override
     public void onReplayCompletion() {
-        CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
+        boolean clEnabled = false;
+        String clSnapshotPath = null;
+
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
+            clEnabled = commandLogElement.getEnabled();
+            clSnapshotPath = commandLogElement.getInternalsnapshotpath();
+        }
 
         if (!m_hasRestored && !m_replayAgent.hasReplayed() &&
             m_action == START_ACTION.RECOVER) {
@@ -1072,7 +1079,7 @@ SnapshotCompletionInterest {
              */
             LOG.fatal("Nothing to recover from");
             VoltDB.crashVoltDB();
-        } else if (!commandLogElement.getEnabled() && m_replayAgent.areLogsEmpty()) {
+        } else if (!clEnabled && m_replayAgent.areLogsEmpty()) {
             // Nothing was replayed, so no need to initiate truncation snapshot
             m_state = State.TRUNCATE;
         }
@@ -1083,16 +1090,16 @@ SnapshotCompletionInterest {
          * ENG-1516: Use truncation snapshot to save the catalog if CL is
          * enabled.
          */
-        if (commandLogElement.getEnabled() || !m_replayAgent.areLogsEmpty()) {
+        if (clEnabled || !m_replayAgent.areLogsEmpty()) {
             /*
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs
              */
-            if (isLowestHost() && commandLogElement != null) {
+            if (isLowestHost()) {
                 try {
                     try {
                         m_zk.create("/truncation_snapshot_path",
-                                    commandLogElement.getInternalsnapshotpath().getBytes(),
+                                    clSnapshotPath.getBytes(),
                                     Ids.OPEN_ACL_UNSAFE,
                                     CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
