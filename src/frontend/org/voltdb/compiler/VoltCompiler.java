@@ -645,8 +645,9 @@ public class VoltCompiler {
         // Generate the auto-CRUD procedure descriptors. This creates
         // procedure descriptors to insert, delete, select and update
         // tables, with some caveats. (See ENG-1601).
-        List<ProcedureDescriptor> autoCrudProcedures = generateCrud(m_catalog);
-        procedures.addAll(autoCrudProcedures);
+        // Disabled pending: ENG-1660.
+        // List<ProcedureDescriptor> autoCrudProcedures = generateCrud(m_catalog);
+        // procedures.addAll(autoCrudProcedures);
 
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
@@ -763,9 +764,9 @@ public class VoltCompiler {
         sb.append(" WHERE ");
         for (ColumnRef pkc : pkey.getIndex().getColumns()) {
             paramoffset++;
-            if (!first) sb.append(", ");
+            if (!first) sb.append(" AND ");
             first = false;
-            sb.append(pkc.getColumn().getName() + " = ?");
+            sb.append("(" + pkc.getColumn().getName() + " = ?" + ")");
             if (pkc.getColumn() == partitioncolumn) {
                 partitionoffset = paramoffset;
             }
@@ -798,7 +799,7 @@ public class VoltCompiler {
     private int generateCrudColumnList(Column partitioncolumn, Table table, StringBuilder sb) {
         int partitionoffset = -1;
         boolean first = true;
-        int paramoffset = 0;
+        int paramoffset = -1;
         sb.append("(");
         for (Column c : table.getColumns()) {
             paramoffset++;
