@@ -651,8 +651,12 @@ public class VoltCompiler {
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
             final String procedureName = procedureDescriptor.m_className;
-            m_currentFilename = procedureName.substring(procedureName.lastIndexOf('.') + 1);
-            m_currentFilename += ".class";
+            if (procedureDescriptor.m_singleStmt == null) {
+                m_currentFilename = procedureName.substring(procedureName.lastIndexOf('.') + 1);
+                m_currentFilename += ".class";
+            } else {
+                m_currentFilename = procedureName;
+            }
             ProcedureCompiler.compile(this, m_hsql, m_estimates,
                     m_catalog, db, procedureDescriptor);
         }
@@ -679,19 +683,19 @@ public class VoltCompiler {
         final Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         for (Table table : db.getTables()) {
             if (table.getIsreplicated()) {
-                compilerLog.info("Skipping creation of CRUD procedures for replicated table " +
+                compilerLog.debug("Skipping creation of CRUD procedures for replicated table " +
                         table.getTypeName());
                 continue;
             }
 
             if (CatalogUtil.isTableExportOnly(db, table)) {
-                compilerLog.info("Skipping creation of CRUD procedures for export-only table " +
+                compilerLog.debug("Skipping creation of CRUD procedures for export-only table " +
                         table.getTypeName());
                 continue;
             }
 
             if (table.getMaterializer() != null) {
-                compilerLog.info("Skipping creation of CRUD procedures for view " +
+                compilerLog.debug("Skipping creation of CRUD procedures for view " +
                         table.getTypeName());
                 continue;
             }
@@ -709,7 +713,7 @@ public class VoltCompiler {
             }
 
             if (pkey == null) {
-                compilerLog.info("Skipping creation of CRUD procedures for partitioned table " +
+                compilerLog.debug("Skipping creation of CRUD procedures for partitioned table " +
                         table.getTypeName() + " because no primary key is declared.");
                 continue;
             }
@@ -728,7 +732,7 @@ public class VoltCompiler {
             }
 
             if (!pkeyHasPartitionColumn) {
-                compilerLog.info("Skipping creation of CRUD procedures for partitioned table " +
+                compilerLog.debug("Skipping creation of CRUD procedures for partitioned table " +
                         table.getTypeName() + " because primary key does not include the partitioning column.");
                 continue;
             }
@@ -812,10 +816,6 @@ public class VoltCompiler {
     /**
      * Create a statement like:
      *  "delete from <table> where {<pkey-column =?>...}"
-     * @param table
-     * @param partitioncolumn
-     * @param pkey
-     * @return
      */
     private ProcedureDescriptor generateCrudDelete(Table table,
             Column partitioncolumn, Constraint pkey)
@@ -837,7 +837,7 @@ public class VoltCompiler {
                     null,                     // joinOrder
                     partitioninfo);           // table.column:offset
 
-        compilerLog.info("Synthesized built-in DELETE procedure: " +
+        compilerLog.debug("Synthesized built-in DELETE procedure: " +
                 sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
                 partitioninfo);
 
@@ -878,6 +878,10 @@ public class VoltCompiler {
         return pd;
     }
 
+    /**
+     * Create a statement like:
+     *  "insert into <table> values (?, ?, ...);"
+     */
     private ProcedureDescriptor generateCrudInsert(Table table,
             Column partitioncolumn, Constraint pkey)
     {
@@ -886,6 +890,7 @@ public class VoltCompiler {
 
         int partitionoffset =
             generateCrudColumnList(partitioncolumn, table, sb);
+        sb.append(";");
 
         String partitioninfo =
             table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
@@ -893,7 +898,7 @@ public class VoltCompiler {
         ProcedureDescriptor pd =
             new ProcedureDescriptor(
                     new ArrayList<String>(),  // groups
-                    table.getTypeName() + ".insertcrud",        // className
+                    table.getTypeName() + ".insert",        // className
                     sb.toString(),            // singleStmt
                     null,                     // joinOrder
                     partitioninfo);           // table.column:offset
@@ -905,6 +910,10 @@ public class VoltCompiler {
         return pd;
     }
 
+    /**
+     * Create a statement like:
+     *  "select * from <table> where pkey_col1 = ?, pkey_col2 = ? ... ;"
+     */
     private ProcedureDescriptor generateCrudSelect(Table table,
             Column partitioncolumn, Constraint pkey)
     {
