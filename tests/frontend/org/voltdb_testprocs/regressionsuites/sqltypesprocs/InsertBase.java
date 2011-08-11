@@ -29,10 +29,10 @@ import org.voltdb.VoltProcedure;
 public class InsertBase extends VoltProcedure {
 
     protected final SQLStmt i_no_nulls = new SQLStmt
-    ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     protected final SQLStmt i_allow_nulls = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_with_defaults = new SQLStmt
     ("INSERT INTO WITH_DEFAULTS (PKEY) VALUES (?)");

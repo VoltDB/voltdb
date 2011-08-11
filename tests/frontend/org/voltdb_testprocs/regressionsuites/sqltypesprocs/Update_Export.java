@@ -53,6 +53,8 @@ public class Update_Export extends VoltProcedure {
             String a_inline_s2,
             String a_pool_s,
             String a_pool_max_s,
+            byte[] b_inline,
+            byte[] b_pool,
             BigDecimal a_decimal
             )
     {

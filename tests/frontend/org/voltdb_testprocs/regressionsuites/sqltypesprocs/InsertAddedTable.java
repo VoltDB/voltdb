@@ -39,7 +39,7 @@ import org.voltdb.types.TimestampType;
 public class InsertAddedTable extends VoltProcedure {
 
     public final SQLStmt i_addedtable = new SQLStmt
-    ("INSERT INTO ADDED_TABLE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO ADDED_TABLE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public VoltTable[] run(
             String tablename,
@@ -54,6 +54,8 @@ public class InsertAddedTable extends VoltProcedure {
             String a_inline_s2,
             String a_pool_s,
             String a_pool_max_s,
+            byte[] b_inline,
+            byte[] b_pool,
             BigDecimal a_decimal
             )
     {
@@ -71,7 +73,7 @@ public class InsertAddedTable extends VoltProcedure {
         if (tablename.equals("ADDED_TABLE")) {
             voltQueueSQL(i_addedtable, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         return voltExecuteSQL();
     }

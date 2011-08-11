@@ -152,6 +152,9 @@ public abstract class ExportDecoderBase {
         case STRING:
             retval = decodeString(fds);
             break;
+        case VARBINARY:
+            retval = decodeVarbinary(fds);
+            break;
         case DECIMAL:
             retval = decodeDecimal(fds);
             break;
@@ -199,6 +202,20 @@ public abstract class ExportDecoderBase {
         final byte[] strdata = new byte[strlength];
         fds.readFully(strdata);
         return new String(strdata);
+    }
+
+    /**
+     * Read a varbinary according to the Export encoding specification
+     *
+     * @param fds
+     * @throws IOException
+     */
+    static public Object decodeVarbinary(final FastDeserializer fds)
+            throws IOException {
+        final int length = fds.readInt();
+        final byte[] data = new byte[length];
+        fds.readFully(data);
+        return data;
     }
 
     /**
