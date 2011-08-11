@@ -22,6 +22,7 @@ import java.util.*;
 import java.util.regex.*;
 import org.voltdb.*;
 import org.voltdb.client.*;
+import org.voltdb.clientutils.*;
 
 public class Driver implements java.sql.Driver
 {
@@ -75,23 +76,9 @@ public class Driver implements java.sql.Driver
                             maxoutstandingtxns = Integer.parseInt(value);
                         // else - unknown; ignore
                     }
-
-                       // Create configuration
-                       final ClientConfig config = new ClientConfig(user, password);
-                    config.setHeavyweight(heavyweight);
-                    if (maxoutstandingtxns > 0)
-                        config.setMaxOutstandingTxns(maxoutstandingtxns);
-
-                    // Create client
-                    final Client client = ClientFactory.createClient(config);
-
-                    // Create connections
-                    for (String server : servers)
-                        if (server.trim().length() > 0)
-                            client.createConnection(server.trim(), port);
-
+                    
                     // Return JDBC connection wrapper for the client
-                    return new JDBC4Connection(client, user);
+                    return new JDBC4Connection(ClientConnectionPool.get(servers,port,user,password,heavyweight,maxoutstandingtxns), user);
                 }
             }
             catch(Exception x)

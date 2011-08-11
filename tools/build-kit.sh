@@ -95,7 +95,7 @@ cd ..
 CANDDIR=~/releases/candidate
 if [ -d "$CANDDIR" ]; then
     if [ -L "$CANDDIR" ]; then
-        rm "$SCANDDIR"
+        rm "$CANDDIR"
     else
         #someone created a dir with the name we want, bad
         rm -rf "$CANDDIR"
