@@ -22,16 +22,19 @@ import java.util.*;
 import java.util.regex.*;
 import org.voltdb.*;
 import org.voltdb.client.*;
+import org.voltdb.clientutils.*;
 
 public class JDBC4Connection implements java.sql.Connection
 {
+    protected final ClientConnection NativeConnectionWrapper;
     protected final Client NativeConnection;
     protected final String User;
     private boolean isClosed = false;
 
-    public JDBC4Connection(Client connection, String user)
+    public JDBC4Connection(ClientConnection connection, String user)
     {
-        this.NativeConnection = connection;
+        this.NativeConnectionWrapper = connection;
+        this.NativeConnection = connection.Client;
         this.User = user;
     }
 
@@ -48,14 +51,13 @@ public class JDBC4Connection implements java.sql.Connection
         throw SQLError.noSupport();
     }
 
-
     // Releases this Connection object's database and JDBC resources immediately instead of waiting for them to be automatically released.
     public void close() throws SQLException
     {
         try
         {
             isClosed = true;
-             NativeConnection.close();
+            ClientConnectionPool.dispose(NativeConnectionWrapper);
         }
         catch(Exception x)
         {

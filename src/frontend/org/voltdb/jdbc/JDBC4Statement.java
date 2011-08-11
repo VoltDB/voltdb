@@ -77,7 +77,7 @@ public class JDBC4Statement implements java.sql.Statement
             return false;
         }
 
-        public VoltTable[] execute(Client connection) throws SQLException
+        protected VoltTable[] execute(Client connection) throws SQLException
         {
             try
             {
