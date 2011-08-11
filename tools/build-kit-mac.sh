@@ -55,7 +55,7 @@ cp obj/release/voltdb-`cat version.txt`.tar.gz ~/releases/`cat version.txt`/${OS
 CANDDIR=~/releases/candidate
 if [ -d "$CANDDIR" ]; then
     if [ -L "$CANDDIR" ]; then
-        rm "$SCANDDIR"
+        rm "$CANDDIR"
     else
         #someone created a dir with the name we want, bad
         rm -rf "$CANDDIR"
