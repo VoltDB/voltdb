@@ -76,7 +76,7 @@ public class Driver implements java.sql.Driver
                             maxoutstandingtxns = Integer.parseInt(value);
                         // else - unknown; ignore
                     }
-                    
+
                     // Return JDBC connection wrapper for the client
                     return new JDBC4Connection(ClientConnectionPool.get(servers,port,user,password,heavyweight,maxoutstandingtxns), user);
                 }
@@ -114,4 +114,3 @@ public class Driver implements java.sql.Driver
         return false;
     }
 }
-
