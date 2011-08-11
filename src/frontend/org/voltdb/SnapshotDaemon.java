@@ -430,6 +430,7 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
                                 processTruncationRequestEvent(event);
                             }
                         }, 5, TimeUnit.MINUTES);
+                        return;
                     }
 
                     final VoltTable results[] = clientResponse.getResults();

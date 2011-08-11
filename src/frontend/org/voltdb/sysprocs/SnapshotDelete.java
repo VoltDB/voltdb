@@ -83,7 +83,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
-                new Thread() {
+                new Thread("Async snapshot deletion thread") {
                     @Override
                     public void run() {
                         assert(params.toArray()[0] != null);
@@ -98,8 +98,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                         final String nonces[] = (String[])params.toArray()[1];
                         for (int ii = 0; ii < paths.length; ii++) {
                             List<File> relevantFiles = retrieveRelevantFiles(paths[ii], nonces[ii]);
-                            if (relevantFiles == null) {
-                            } else {
+                            if (relevantFiles != null) {
                                 for (final File f : relevantFiles) {
                                     //long size = f.length();
                                     boolean deleted = f.delete();

@@ -136,10 +136,15 @@ public class SnapshotUtil {
             @Override
             public void run() {
                 try {
-                    fos.getChannel().force(false);
-                    fos.close();
+                    fos.getChannel().force(true);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
+                } finally {
+                    try {
+                        fos.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             }
         };

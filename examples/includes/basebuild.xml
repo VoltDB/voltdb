@@ -41,7 +41,9 @@
         <jvmarg value="-XX:-ReduceInitialCardMarks" />
         <classpath refid='project.classpath'/>
         <assertions><disable/></assertions>
-        <javac/>
+        <javac>
+            <compilerarg value="-Xlint"/>
+        </javac>
     </java>
   </sequential>
 </macrodef>
@@ -72,12 +74,14 @@
     <mkdir dir='${build.dir}' />
     <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true' includeAntRuntime='true'>
         <classpath refid="project.classpath" />
+        <compilerarg value="-Xlint:unchecked"/>
     </javac>
 </target>
 
 <target name="proccompile" if="procedures.dir">
     <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true' includeAntRuntime='true'>
         <classpath refid="project.classpath" />
+        <compilerarg value="-Xlint:unchecked"/>
     </javac>
 </target>
 

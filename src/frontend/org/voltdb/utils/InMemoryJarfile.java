@@ -123,9 +123,14 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             public void run() {
                 try {
                     output.getFD().sync();
-                    output.close();
                 } catch (Exception e) {
                     throw new RuntimeException(e);
+                } finally {
+                    try {
+                        output.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             }
         };
