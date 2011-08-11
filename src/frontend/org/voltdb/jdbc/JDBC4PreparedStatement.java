@@ -142,31 +142,28 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     // Sets the designated parameter to the given java.sql.Array object.
     public void setArray(int parameterIndex, Array x) throws SQLException
     {
-//        checkParameterBounds(parameterIndex);
-//        this.parameters[parameterIndex-1] = x;
-
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given input stream.
     public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given input stream, which will have the specified number of bytes.
     public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given input stream, which will have the specified number of bytes.
     public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -180,49 +177,49 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     // Sets the designated parameter to the given input stream.
     public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given input stream, which will have the specified number of bytes.
     public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given input stream, which will have the specified number of bytes.
     public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given java.sql.Blob object.
     public void setBlob(int parameterIndex, Blob x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to a InputStream object.
     public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to a InputStream object.
     public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given Java boolean value.
     public void setBoolean(int parameterIndex, boolean x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -243,56 +240,56 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     // Sets the designated parameter to the given Reader object.
     public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given Reader object, which is the given number of characters long.
     public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given Reader object, which is the given number of characters long.
     public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given java.sql.Clob object.
     public void setClob(int parameterIndex, Clob x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to a Reader object.
     public void setClob(int parameterIndex, Reader reader) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to a Reader object.
     public void setClob(int parameterIndex, Reader reader, long length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given java.sql.Date value using the default time zone of the virtual machine that is running the application.
     public void setDate(int parameterIndex, Date x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given java.sql.Date value, using the given Calendar object.
     public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -306,7 +303,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     // Sets the designated parameter to the given Java float value.
     public void setFloat(int parameterIndex, float x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -327,49 +324,48 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     // Sets the designated parameter to a Reader object.
     public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to a Reader object.
     public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to a java.sql.NClob object.
     public void setNClob(int parameterIndex, NClob value) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to a Reader object.
     public void setNClob(int parameterIndex, Reader reader) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to a Reader object.
     public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated paramter to the given String object.
     public void setNString(int parameterIndex, String value) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to SQL NULL.
     public void setNull(int parameterIndex, int sqlType) throws SQLException
     {
-        checkClosed();
         checkParameterBounds(parameterIndex);
         switch(sqlType)
         {
@@ -414,35 +410,64 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     public void setObject(int parameterIndex, Object x) throws SQLException
     {
         checkParameterBounds(parameterIndex);
-        throw SQLError.noSupport();
-        //this.parameters[parameterIndex-1] = x;
+        this.parameters[parameterIndex-1] = x;
     }
 
     // Sets the value of the designated parameter with the given object.
     public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException
     {
-        checkClosed();
-        throw SQLError.noSupport();
+        checkParameterBounds(parameterIndex);
+        switch(targetSqlType)
+        {
+            case Types.TINYINT:
+                setByte(parameterIndex, ((Byte)x).byteValue());
+                break;
+            case Types.SMALLINT:
+                setShort(parameterIndex, ((Short)x).shortValue());
+                break;
+            case Types.INTEGER:
+                setInt(parameterIndex, ((Integer)x).intValue());
+                break;
+            case Types.BIGINT:
+                setLong(parameterIndex, ((Long)x).longValue());
+                break;
+            case Types.DOUBLE:
+                setDouble(parameterIndex, ((Double)x).doubleValue());
+                break;
+            case Types.DECIMAL:
+                setBigDecimal(parameterIndex, (BigDecimal)x);
+                break;
+            case Types.TIMESTAMP:
+                setTimestamp(parameterIndex, (Timestamp)x);
+                break;
+            case Types.VARBINARY:
+            case Types.VARCHAR:
+            case Types.NVARCHAR:
+                setString(parameterIndex, (String)x);
+                break;
+            default:
+                throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);
+        }
     }
 
     // Sets the value of the designated parameter with the given object.
     public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given REF(<structured-type>) value.
     public void setRef(int parameterIndex, Ref x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given java.sql.RowId object.
     public void setRowId(int parameterIndex, RowId x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -456,7 +481,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     // Sets the designated parameter to the given java.sql.SQLXML object.
     public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -470,14 +495,14 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     // Sets the designated parameter to the given java.sql.Time value.
     public void setTime(int parameterIndex, Time x) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
     // Sets the designated parameter to the given java.sql.Time value, using the given Calendar object.
     public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -491,7 +516,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     // Sets the designated parameter to the given java.sql.Timestamp value, using the given Calendar object.
     public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -499,7 +524,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     @Deprecated
     public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException
     {
-        checkClosed();
+        checkParameterBounds(parameterIndex);
         throw SQLError.noSupport();
     }
 
@@ -509,5 +534,4 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
         checkParameterBounds(parameterIndex);
         this.parameters[parameterIndex-1] = x == null ? VoltType.NULL_STRING_OR_VARBINARY : x.toString();
     }
-
  }
