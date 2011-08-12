@@ -226,7 +226,7 @@ public class TestExportSuite extends RegressionSuite {
             if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
                 if (stats.getLong("PARTITION_ID") == 0) {
                     assertEquals(14, stats.getLong("TUPLE_COUNT"));
-                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                    assertEquals(3, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
                 } else if (stats.getLong("PARTITION_ID") == 1) {
                     assertEquals(13, stats.getLong("TUPLE_COUNT"));
                     assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
@@ -365,7 +365,7 @@ public class TestExportSuite extends RegressionSuite {
             if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
                 if (stats.getLong("PARTITION_ID") == 0) {
                     assertEquals(14, stats.getLong("TUPLE_COUNT"));
-                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
+                    assertEquals(3, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
                 } else if (stats.getLong("PARTITION_ID") == 1) {
                     assertEquals(13, stats.getLong("TUPLE_COUNT"));
                     assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));

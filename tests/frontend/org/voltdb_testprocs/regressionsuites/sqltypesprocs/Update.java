@@ -38,10 +38,10 @@ import org.voltdb.types.TimestampType;
 public class Update extends VoltProcedure {
 
     public final SQLStmt u_no_nulls = new SQLStmt
-    ("UPDATE NO_NULLS SET A_TINYINT = ?, A_SMALLINT = ?, A_INTEGER = ?, A_BIGINT = ?, A_FLOAT = ?, A_TIMESTAMP = ?, A_INLINE_S1 = ?, A_INLINE_S2 = ?, A_POOL_S = ?, A_POOL_MAX_S = ?, A_DECIMAL = ? WHERE PKEY = ?;");
+    ("UPDATE NO_NULLS SET A_TINYINT = ?, A_SMALLINT = ?, A_INTEGER = ?, A_BIGINT = ?, A_FLOAT = ?, A_TIMESTAMP = ?, A_INLINE_S1 = ?, A_INLINE_S2 = ?, A_POOL_S = ?, A_POOL_MAX_S = ?, A_INLINE_B = ?, A_POOL_B = ?, A_DECIMAL = ? WHERE PKEY = ?;");
 
     public final SQLStmt u_allow_nulls = new SQLStmt
-    ("UPDATE ALLOW_NULLS SET A_TINYINT = ?, A_SMALLINT = ?, A_INTEGER = ?, A_BIGINT = ?, A_FLOAT = ?, A_TIMESTAMP = ?, A_INLINE_S1 = ?, A_INLINE_S2 = ?, A_POOL_S = ?, A_POOL_MAX_S = ?, A_DECIMAL = ? WHERE PKEY = ?;");
+    ("UPDATE ALLOW_NULLS SET A_TINYINT = ?, A_SMALLINT = ?, A_INTEGER = ?, A_BIGINT = ?, A_FLOAT = ?, A_TIMESTAMP = ?, A_INLINE_S1 = ?, A_INLINE_S2 = ?, A_POOL_S = ?, A_POOL_MAX_S = ?, A_INLINE_B = ?, A_POOL_B = ?, A_DECIMAL = ? WHERE PKEY = ?;");
 
     public final SQLStmt u_jumbo_row = new SQLStmt
     ("UPDATE JUMBO_ROW SET STRING1 = ?, STRING2 = ? WHERE PKEY = ?;");
@@ -59,6 +59,8 @@ public class Update extends VoltProcedure {
             String a_inline_s2,
             String a_pool_s,
             String a_pool_max_s,
+            byte[] b_inline,
+            byte[] b_pool,
             BigDecimal a_decimal
             )
     {
@@ -76,12 +78,12 @@ public class Update extends VoltProcedure {
         if (tablename.equals("NO_NULLS")) {
             voltQueueSQL(u_no_nulls, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal, pkey);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal, pkey);
         }
         else if (tablename.equals("ALLOW_NULLS")) {
             voltQueueSQL(u_allow_nulls, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal, pkey);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal, pkey);
         } else if (tablename.equals("JUMBO_ROW")) {
             voltQueueSQL(u_jumbo_row, a_inline_s1, a_inline_s2, 0);
         }

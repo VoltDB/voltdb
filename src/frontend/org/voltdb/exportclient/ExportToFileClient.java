@@ -42,6 +42,7 @@ import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
@@ -453,6 +454,8 @@ public class ExportToFileClient extends ExportClientBase {
                 for (int i = m_firstfield; i < m_tableSchema.size(); i++) {
                     if (row[i] == null) {
                         fields[i - m_firstfield] = "NULL";
+                    } else if (m_tableSchema.get(i) == VoltType.VARBINARY) {
+                        fields[i - m_firstfield] = Encoder.hexEncode((byte[]) row[i]);
                     } else if (m_tableSchema.get(i) == VoltType.STRING) {
                         fields[i - m_firstfield] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {

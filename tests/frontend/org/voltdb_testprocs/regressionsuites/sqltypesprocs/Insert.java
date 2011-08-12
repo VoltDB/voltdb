@@ -44,10 +44,10 @@ public class Insert extends InsertBase {
     ("INSERT INTO WITH_NULL_DEFAULTS (PKEY) VALUES (?)");
 
     final SQLStmt i_expressions_with_nulls = new SQLStmt
-    ("INSERT INTO EXPRESSIONS_WITH_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO EXPRESSIONS_WITH_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     private final SQLStmt i_expressions_no_nulls = new SQLStmt
-      ("INSERT INTO EXPRESSIONS_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      ("INSERT INTO EXPRESSIONS_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     protected final SQLStmt i_jumbo_row = new SQLStmt
     ("INSERT INTO JUMBO_ROW VALUES (?, ?, ?)");
@@ -65,6 +65,8 @@ public class Insert extends InsertBase {
             String a_inline_s2,
             String a_pool_s,
             String a_pool_max_s,
+            byte[] b_inline,
+            byte[] b_pool,
             BigDecimal a_decimal
             )
     {
@@ -82,12 +84,12 @@ public class Insert extends InsertBase {
         if (tablename.equals("NO_NULLS")) {
             voltQueueSQL(i_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("ALLOW_NULLS")) {
             voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("WITH_DEFAULTS")) {
             voltQueueSQL(i_with_defaults, pkey);
@@ -98,12 +100,12 @@ public class Insert extends InsertBase {
         else if (tablename.equals("EXPRESSIONS_WITH_NULLS")) {
             voltQueueSQL(i_expressions_with_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("EXPRESSIONS_NO_NULLS")) {
             voltQueueSQL(i_expressions_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         } else if (tablename.equals("JUMBO_ROW")) {
             voltQueueSQL(i_jumbo_row, 0, a_inline_s1, a_inline_s2);
         }

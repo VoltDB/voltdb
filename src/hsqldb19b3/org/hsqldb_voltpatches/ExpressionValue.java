@@ -32,6 +32,7 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 
@@ -154,6 +155,11 @@ public class ExpressionValue extends Expression {
                                                           time.getZone()) * 1e6) +
                                                          time.getNanos() / 1000);
                         }
+                        // convert binary default values to hex
+                        else if (valueData instanceof BinaryData) {
+                            BinaryData bd = (BinaryData) valueData;
+                            value = hexEncode(bd.getBytes());
+                        }
                         else
                         {
                             value = valueData.toString();
@@ -180,6 +186,34 @@ public class ExpressionValue extends Expression {
             sb.append("unknown");
         }
 
+        return sb.toString();
+    }
+
+    private static final int caseDiff = ('a' - 'A');
+    /**
+     *
+     * @param data A binary array of bytes.
+     * @return A hex-encoded string with double length.
+     */
+    public static String hexEncode(byte[] data) {
+        if (data == null)
+            return null;
+
+        StringBuilder sb = new StringBuilder();
+        for (byte b : data) {
+            // hex encoding same way as java.net.URLEncoder.
+            char ch = Character.forDigit((b >> 4) & 0xF, 16);
+            // to uppercase
+            if (Character.isLetter(ch)) {
+                ch -= caseDiff;
+            }
+            sb.append(ch);
+            ch = Character.forDigit(b & 0xF, 16);
+            if (Character.isLetter(ch)) {
+                ch -= caseDiff;
+            }
+            sb.append(ch);
+        }
         return sb.toString();
     }
 }
