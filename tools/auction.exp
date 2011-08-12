@@ -9,7 +9,7 @@ if { $argc != 1 } {
 set buildstring [lindex $argv 0]
 puts "Build string is: $buildstring"
 
-set timeout 150
+set timeout 600
 proc abort {} {
   exec mv deployment.xml.bak deployment.xml
   exit 1
