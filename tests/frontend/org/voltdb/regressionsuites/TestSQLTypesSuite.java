@@ -313,8 +313,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
             new String("abcdefghij"),
             new String("abcdefghijklmnopqrstuvwxyz"),
             new String("abcdefghijklmnopqrstuvwxyz"),
-            new String("abcdefabcdef0123"),
-            new String("abcdefabcdef0123456789"),
+            new String("ABCDEFABCDEF0123"),
+            new String("ABCDEFABCDEF0123456789"),
             new BigDecimal(new BigInteger("6000000000000"))
                     .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale)
     // UPDATE WHEN ADDING NEW TYPE
