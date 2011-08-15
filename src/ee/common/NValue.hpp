@@ -1546,7 +1546,7 @@ class NValue {
     static NValue getBinaryValue(const std::string value) {
         NValue retval(VALUE_TYPE_VARBINARY);
         const int32_t length = static_cast<int32_t>(value.length() / 2);
-        boost::scoped_ptr<unsigned char> buf(new unsigned char[length]);
+        boost::scoped_array<unsigned char> buf(new unsigned char[length]);
         hexDecodeToBinary(buf.get(), value.c_str());
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         const int32_t minLength = length + lengthLength;
