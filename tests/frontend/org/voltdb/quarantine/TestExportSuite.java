@@ -202,11 +202,11 @@ public class TestExportSuite extends RegressionSuite {
         return false;
     }
 
-    /**
-     * Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
-     * when the snapshot is restored
-     * @throws Exception
-     */
+    //
+    // Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
+    // when the snapshot is restored
+    // @throws Exception
+    //
     public void testExportEnterExitAdminMode() throws Exception {
         System.out.println("testExportEnterExitAdminMode");
         m_username = "admin";
@@ -343,11 +343,11 @@ public class TestExportSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
-     * when the snapshot is restored
-     * @throws Exception
-     */
+    //
+    // Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
+    // when the snapshot is restored
+    // @throws Exception
+    //
     public void testExportSnapshotTruncatesExportData() throws Exception {
         System.out.println("testExportSnapshotTruncatesExportData");
         Client client = getClient();
@@ -524,9 +524,7 @@ public class TestExportSuite extends RegressionSuite {
 
         client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
 
-        /**
-         * There will be 1 disconnect for the
-         */
+        // There will be 1 disconnect for the
         for (int ii = 0; m_tester.m_generationsSeen.size() < 2 ||
              m_tester.m_verifiers.get(m_tester.m_generationsSeen.last()).size() < 6; ii++) {
             Thread.sleep(500);
@@ -567,9 +565,7 @@ public class TestExportSuite extends RegressionSuite {
         }
         client.drain();
 
-        /*
-         *  Kill a host and then process the failure
-         */
+        //  Kill a host and then process the failure
         ((LocalCluster)m_config).shutDownSingleHost(1);
         Thread.sleep(500);
         boolean threwException = false;
@@ -597,9 +593,7 @@ public class TestExportSuite extends RegressionSuite {
         }
         assertTrue(threwException);
 
-        /*
-         * After being booted try to reconnect. This should work.
-         */
+        // After being booted try to reconnect. This should work.
         Thread.sleep(1000);
         quiesceAndVerifyRetryWorkOnIOException(getClient(), m_tester);
     }
@@ -702,9 +696,9 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
     }
 
-    /**
-     * Verify safe startup (we can connect clients and poll empty tables)
-     */
+    //
+    // Verify safe startup (we can connect clients and poll empty tables)
+    //
     public void testExportSafeStartup() throws Exception
     {
         System.out.println("testExportSafeStartup");
@@ -742,7 +736,7 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerifyFalse(client, m_tester);
     }
 
-    /** Verify test infrastructure fails a test that sends too few rows */
+    // Verify test infrastructure fails a test that sends too few rows
     public void testExportLocalServerTooFew() throws Exception
     {
         System.out.println("testExportLocalServerTooFew");
@@ -761,7 +755,7 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerifyFalse(client, m_tester);
     }
 
-    /** Verify test infrastructure fails a test that sends mismatched data */
+    // Verify test infrastructure fails a test that sends mismatched data
     public void testExportLocalServerBadData() throws Exception
     {
         System.out.println("testExportLocalServerBadData");
@@ -778,10 +772,10 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerifyFalse(client, m_tester);
     }
 
-    /**
-     * Sends ten tuples to an Export enabled VoltServer and verifies the receipt
-     * of those tuples after a quiesce (shutdown). Base case.
-     */
+    //
+    // Sends ten tuples to an Export enabled VoltServer and verifies the receipt
+    // of those tuples after a quiesce (shutdown). Base case.
+    //
     public void testExportRoundTripStreamedTable() throws Exception
     {
         System.out.println("testExportRoundTripStreamedTable");
@@ -798,7 +792,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
 
-    /** Test that a table w/o Export enabled does not produce Export content */
+    // Test that a table w/o Export enabled does not produce Export content
     public void testThatTablesOptIn() throws Exception
     {
         System.out.println("testThatTablesOptIn");
@@ -821,11 +815,11 @@ public class TestExportSuite extends RegressionSuite {
     }
 
 
-    /*
-     * Sends many tuples to an Export enabled VoltServer and verifies the receipt
-     * of each in the Export stream. Some procedures rollback (after a real insert).
-     * Tests that streams are correct in the face of rollback.
-     */
+    //
+    // Sends many tuples to an Export enabled VoltServer and verifies the receipt
+    // of each in the Export stream. Some procedures rollback (after a real insert).
+    // Tests that streams are correct in the face of rollback.
+    //
     public void testExportRollback() throws Exception {
         System.out.println("testExportRollback");
         final Client client = getClient();
@@ -872,9 +866,9 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
-    /*
-     * Verify that planner rejects updates to append-only tables
-     */
+    //
+    // Verify that planner rejects updates to append-only tables
+    //
     public void testExportUpdateAppendOnly() throws IOException {
         System.out.println("testExportUpdateAppendOnly");
         final Client client = getClient();
@@ -890,9 +884,9 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(passed);
     }
 
-    /*
-     * Verify that planner rejects reads of append-only tables.
-     */
+    //
+    // Verify that planner rejects reads of append-only tables.
+    //
     public void testExportSelectAppendOnly() throws IOException {
         System.out.println("testExportSelectAppendOnly");
         final Client client = getClient();
@@ -908,9 +902,9 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(passed);
     }
 
-    /*
-     *  Verify that planner rejects deletes of append-only tables
-     */
+    //
+    //  Verify that planner rejects deletes of append-only tables
+    //
     public void testExportDeleteAppendOnly() throws IOException {
         System.out.println("testExportDeleteAppendOnly");
         final Client client = getClient();
