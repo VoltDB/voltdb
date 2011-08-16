@@ -22,8 +22,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.Serializable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.processtools.ShellTools;
 
@@ -242,34 +240,11 @@ public class PlatformProperties implements Serializable {
 
     protected static PlatformProperties m_singletonProperties = null;
     private static final long serialVersionUID = 1841311119700809716L;
-    private static final CountDownLatch m_gotProperties = new CountDownLatch(1);
-    private static final AtomicBoolean m_isGettingProperties = new AtomicBoolean(false);
 
-    public static synchronized void fetchPlatformProperties() {
-        if (m_isGettingProperties.get()) return;
-        m_isGettingProperties.set(true);
-        new Thread() {
-            @Override
-            public void run() {
-                PlatformProperties pp = new PlatformProperties();
-                m_singletonProperties = pp;
-                m_gotProperties.countDown();
-            }
-        }.start();
-
-        // only set properties once
-        if (m_singletonProperties != null) return;
+    public synchronized static PlatformProperties getPlatformProperties() {
+        if (m_singletonProperties != null)
+            return m_singletonProperties;
         m_singletonProperties = new PlatformProperties();
-    }
-
-    public static PlatformProperties getPlatformProperties() {
-        fetchPlatformProperties();
-        try {
-            m_gotProperties.await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            return null;
-        }
         assert(m_singletonProperties != null);
         return m_singletonProperties;
     }
@@ -278,7 +253,6 @@ public class PlatformProperties implements Serializable {
      * @param args
      */
     public static void main(String[] args) {
-        fetchPlatformProperties();
         PlatformProperties pp = getPlatformProperties();
         System.out.println(pp.toLogLines());
     }

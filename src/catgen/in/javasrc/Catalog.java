@@ -31,6 +31,7 @@ import java.util.HashMap;
 public class Catalog extends CatalogType {
 
     private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
+    private CatalogType m_prevUsedPath = null;
 
     CatalogMap<Cluster> m_clusters;
 
@@ -90,9 +91,18 @@ public class Catalog extends CatalogType {
         String arg2 = stmt.substring(pos + 1);
 
         // resolve the ref to a node in the catalog
-        CatalogType resolved = getItemForRef(ref);
-        if (resolved == null) {
-            throw new CatalogException("Unable to find reference for catalog item '" + ref + "'");
+        CatalogType resolved = null;
+        if (ref.equals("$PREV")) {
+            if (m_prevUsedPath == null)
+                throw new CatalogException("$PREV reference was not preceded by a cached reference.");
+            resolved = m_prevUsedPath;
+        }
+        else {
+            resolved = getItemForRef(ref);
+            if (resolved == null) {
+                throw new CatalogException("Unable to find reference for catalog item '" + ref + "'");
+            }
+            m_prevUsedPath = resolved;
         }
 
         // run either command

@@ -166,7 +166,7 @@ public class RejoinTestBase extends TestCase {
         retval.catalogCRC = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar")).getCRC();
         VoltNetwork network2 = new VoltNetwork();
         InetAddress leader = InetAddress.getByName("localhost");
-        HostMessenger host2 = new HostMessenger(network2, leader, 2, retval.catalogCRC, deploymentCRC, null);
+        HostMessenger host2 = new HostMessenger(network2, leader, 2, 0, deploymentCRC, null);
 
         retval.localServer.start();
         host2.waitForGroupJoin();

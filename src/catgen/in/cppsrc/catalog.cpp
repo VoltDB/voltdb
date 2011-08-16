@@ -39,9 +39,11 @@ Catalog::Catalog()
     m_allCatalogObjects["/"] = this;
     m_childCollections["clusters"] = &m_clusters;
     m_relativeIndex = 1;
+    m_lastUsedPath = NULL;
 }
 
 Catalog::~Catalog() {
+    m_lastUsedPath = NULL;
     std::map<std::string, Cluster*>::const_iterator cluster_iter = m_clusters.begin();
     while (cluster_iter != m_clusters.end()) {
         delete cluster_iter->second;
@@ -134,10 +136,21 @@ void Catalog::executeOne(const string &stmt) {
     string command, ref, coll, child;
     parse(stmt, command, ref, coll, child);
 
-    CatalogType *item = itemForRef(ref);
-    if (item == NULL) {
-        std::string errmsg = "Catalog reference for " + ref + " not found.";
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+    CatalogType *item = NULL;
+    if (ref.compare("$PREV") == 0) {
+        if (!m_lastUsedPath) {
+            std::string errmsg = "$PREV reference was not preceded by a cached reference.";
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+        }
+        item = m_lastUsedPath;
+    }
+    else {
+        item = itemForRef(ref);
+        if (item == NULL) {
+            std::string errmsg = "Catalog reference for " + ref + " not found.";
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+        }
+        m_lastUsedPath = item;
     }
 
     // execute

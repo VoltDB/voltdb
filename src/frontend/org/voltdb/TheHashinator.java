@@ -19,8 +19,6 @@ package org.voltdb;
 
 import java.io.UnsupportedEncodingException;
 
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.LogKeys;
@@ -37,9 +35,8 @@ public abstract class TheHashinator {
      * Initialize TheHashinator
      * @param catalog A pointer to the catalog data structure.
      */
-    public static void initialize(Catalog catalog) {
-        Cluster cluster = catalog.getClusters().get("cluster");
-        catalogPartitionCount = cluster.getPartitions().size();
+    public static void initialize(int partitionCount) {
+        catalogPartitionCount = partitionCount;
     }
 
     /**

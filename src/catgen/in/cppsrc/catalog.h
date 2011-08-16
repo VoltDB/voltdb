@@ -57,6 +57,9 @@ protected:
     // for memory cleanup and fast-lookup purposes
     boost::unordered_map<std::string, CatalogType*> m_allCatalogObjects;
 
+    // last use path
+    CatalogType* m_lastUsedPath;
+
     //  paths of objects recently deleted from the catalog.
     std::vector<std::string> m_deletions;
 

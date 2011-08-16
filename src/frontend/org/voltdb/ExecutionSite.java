@@ -104,7 +104,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 {
     private VoltLogger m_txnlog;
     private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
-    private static final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
+    private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
     static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
@@ -1382,7 +1382,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 msg.append("New notice is for new or completed transaction.\n");
             }
             msg.append("New notice of type: " + notice.getClass().getName());
-            log.fatal(msg);
+            log.fatal(msg.toString());
             VoltDB.crashVoltDB();
         }
 

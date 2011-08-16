@@ -200,7 +200,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     // sql select lists.
     public static String[] m_columnNames = { "A_TINYINT", "A_SMALLINT",
             "A_INTEGER", "A_BIGINT", "A_FLOAT", "A_TIMESTAMP", "A_INLINE_S1",
-            "A_INLINE_S2", "A_POOL_S", "A_POOL_MAX_S", "B_INLINE", "B_POOL",
+            "A_INLINE_S2", "A_POOL_S", "A_POOL_MAX_S", "A_INLINE_B", "A_POOL_B",
             "A_DECIMAL"
     // UPDATE WHEN ADDING NEW TYPE
     };
