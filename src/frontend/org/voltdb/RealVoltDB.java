@@ -931,7 +931,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     {
         synchronized(m_catalogUpdateLock) {
             // A site is catching up with catalog updates
-            if (currentTxnId <= m_catalogContext.m_transactionId) {
+            if (currentTxnId <= m_catalogContext.m_transactionId && !m_txnIdToContextTracker.isEmpty()) {
                 ContextTracker contextTracker = m_txnIdToContextTracker.get(currentTxnId);
                 // This 'dispensed' concept is a little crazy fragile. Maybe it would be better
                 // to keep a rolling N catalogs? Or perhaps to keep catalogs for N minutes? Open

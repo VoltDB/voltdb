@@ -67,7 +67,7 @@ public class SystemProcedureCatalog {
         }
 
         boolean getSinglepartition() {
-            return false;
+            return className.equals("org.voltdb.sysprocs.UpdateApplicationCatalog");
         }
 
         String getClassname() {
