@@ -121,7 +121,7 @@ public class TestCRUDSuite extends RegressionSuite {
                     "CREATE TABLE p3(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
                     "CREATE UNIQUE INDEX p3_tree_idx ON p3(a1);"
             );
-            project.addPartitionInfo("p2", "a2");
+            project.addPartitionInfo("p3", "a2");
 
             // a replicated table (should not generate procedures).
             project.addLiteralSchema(
