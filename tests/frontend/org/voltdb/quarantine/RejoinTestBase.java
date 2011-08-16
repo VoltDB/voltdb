@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb;
+package org.voltdb.quarantine;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -33,6 +33,8 @@ import java.util.HashSet;
 
 import junit.framework.TestCase;
 
+import org.voltdb.ServerThread;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.client.ClientConfig;

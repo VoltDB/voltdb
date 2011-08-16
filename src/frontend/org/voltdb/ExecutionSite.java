@@ -124,7 +124,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * The permit is only acquired by recovering partitions and not the source
      * partitions.
      */
-    static final Semaphore m_recoveryPermit = new Semaphore(Integer.MAX_VALUE);
+    public static final Semaphore m_recoveryPermit = new Semaphore(Integer.MAX_VALUE);
 
     private boolean m_recovering = false;
     private boolean m_haveRecoveryPermit = false;
