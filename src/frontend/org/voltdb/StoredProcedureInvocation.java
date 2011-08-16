@@ -180,6 +180,16 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         sb.append(")");
     }
 
+    /*
+     * Store a copy of the parameters to the procedure in serialized form.
+     * In a cluster there is no reason to throw away the unserialized bytes
+     * because it will be forwarded in most cases and there is no need to repeate the work.
+     * Command logging also takes advantage of this to avoid reserializing the parameters.
+     * In some cases the params will never have been serialized (null) because
+     * the SPI is generated internally. A duplicate view of the buffer is returned
+     * to make access thread safe. Can't return a read only view because ByteBuffer.array()
+     * is invoked by the command log.
+     */
     public ByteBuffer getSerializedParams() {
         if (unserializedParams != null) {
             return unserializedParams.duplicate();

@@ -32,6 +32,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.AsyncCompilerWorkThread;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.exceptions.ConstraintFailureException;
@@ -45,6 +46,7 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.FetchTooMuch;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertBigString;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ReturnAppStatus;
+import org.voltdb_testprocs.regressionsuites.failureprocs.SelectBigString;
 import org.voltdb_testprocs.regressionsuites.failureprocs.TooFewParams;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniqueness;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
@@ -59,7 +61,7 @@ public class TestFailuresSuite extends RegressionSuite {
         ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
         DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
         InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
-        ReturnAppStatus.class, BatchTooBig.class
+        ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class
     };
 
     /**
@@ -285,7 +287,7 @@ public class TestFailuresSuite extends RegressionSuite {
     }
 
     //
-    // Note: this test looks like it should be testing the 10MB buffer serialization
+    // Note: this test looks like it should be testing the 50MB buffer serialization
     // limit between the EE and Java but watching it run, it really fails on max
     // temp table serialization sizes. This needs more investigation.
     //
@@ -295,7 +297,7 @@ public class TestFailuresSuite extends RegressionSuite {
         final int STRLEN = 30000;
 
         int totalBytes = 0;
-        int expectedMaxSuccessBytes = 10000000; // less than the 10*1024*1024 limit.
+        int expectedMaxSuccessBytes = 40000000; // less than the 50*1024*1024 limit.
         int expectedRows = 0;
 
         System.out.println("STARTING testMemoryOverload");
@@ -322,12 +324,17 @@ public class TestFailuresSuite extends RegressionSuite {
         assertEquals(expectedRows, results[0].getRowCount());
         totalBytes += STRLEN;
 
-        // 11MB exceeds the response buffer limit.
-        while (totalBytes < (11 * 1024 * 1024)) {
+        // 51MB exceeds the response buffer limit.
+        while (totalBytes < (50 * 1024 * 1024)) {
             results = client.callProcedure("InsertBigString", expectedRows++, longString).getResults();
             assertEquals(1, results.length);
             assertEquals(1, results[0].asScalarLong());
             totalBytes += STRLEN;
+        }
+
+        for (int ii = 0; ii < 4; ii++) {
+            results = client.callProcedure("SelectBigString", ii).getResults();
+            assertEquals(874, results[0].getRowCount());
         }
 
         //System.out.printf("Fail Bytes: %d, Expected Rows %d\n", totalBytes, expectedRows);
@@ -434,6 +441,8 @@ public class TestFailuresSuite extends RegressionSuite {
     // Make sure it doesn't kill the system
     public void testKillOPPlanner() throws IOException, ProcCallException {
         System.out.println("STARTING testKillOPPlanner");
+        if (isHSQL() || isValgrind() || isLocalCluster()) return;
+        AsyncCompilerWorkThread.m_OOPTimeout = 5000;
         Client client = getClient();
 
         try {

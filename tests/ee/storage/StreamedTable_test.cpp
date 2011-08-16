@@ -81,6 +81,7 @@ class MockTopend : public Topend {
 
     }
 
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
     queue<int32_t> partitionIds;
     queue<std::string> signatures;
     vector<shared_ptr<StreamBlock> > blocks;

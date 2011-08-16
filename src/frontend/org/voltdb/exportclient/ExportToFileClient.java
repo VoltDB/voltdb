@@ -42,6 +42,7 @@ import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
@@ -453,6 +454,8 @@ public class ExportToFileClient extends ExportClientBase {
                 for (int i = m_firstfield; i < m_tableSchema.size(); i++) {
                     if (row[i] == null) {
                         fields[i - m_firstfield] = "NULL";
+                    } else if (m_tableSchema.get(i) == VoltType.VARBINARY) {
+                        fields[i - m_firstfield] = Encoder.hexEncode((byte[]) row[i]);
                     } else if (m_tableSchema.get(i) == VoltType.STRING) {
                         fields[i - m_firstfield] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
@@ -606,7 +609,7 @@ public class ExportToFileClient extends ExportClientBase {
             m_fullDelimiters = new char[4];
             for (int i = 0; i < 4; i++) {
                 m_fullDelimiters[i] = fullDelimiters.charAt(i);
-                System.out.printf("FULL DELIMETER %d: %c\n", i, m_fullDelimiters[i]);
+                //System.out.printf("FULL DELIMETER %d: %c\n", i, m_fullDelimiters[i]);
             }
         }
         else {
@@ -886,6 +889,9 @@ public class ExportToFileClient extends ExportClientBase {
                     System.err.println("The delimiter set must contain exactly 4 characters (after any html escaping).");
                     printHelpAndQuit(-1);
                 }
+            } else {
+                System.err.println("Unrecognized parameter " + arg);
+                System.exit(-1);
             }
         }
         // Check args for validity
@@ -922,7 +928,7 @@ public class ExportToFileClient extends ExportClientBase {
                                                            outdir,
                                                            period,
                                                            dateformatString,
-                                                           null,
+                                                           fullDelimiters,
                                                            firstfield,
                                                            connect == 'a',
                                                            batched,

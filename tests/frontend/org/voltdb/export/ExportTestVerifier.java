@@ -27,6 +27,7 @@ import java.util.ArrayDeque;
 
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.utils.Encoder;
 
 class ExportTestVerifier extends ExportDecoderBase
 {
@@ -137,11 +138,23 @@ class ExportTestVerifier extends ExportDecoderBase
             // index into srcdata.
             for (int i = 5; i < m_tableSchema.size(); i++)
             {
-                if (!(decoded[i].equals(srcdata[i-5])))
+                Object toCompare1 = decoded[i];
+                Object toCompare2 = srcdata[i-5];
+
+                // convert binary to hex
+                if (toCompare1 instanceof byte[]) {
+                    toCompare1 = Encoder.hexEncode((byte[]) toCompare1);
+                }
+                if (toCompare2 instanceof byte[]) {
+                    toCompare2 = Encoder.hexEncode((byte[]) toCompare2);
+                }
+
+                // check other data
+                if (!(toCompare1.equals(toCompare2)))
                 {
                     System.out.println("Failed on table column: " + (i-5));
-                    System.out.println("  orig value:" + srcdata[i-5].toString());
-                    System.out.println("  export value:" + decoded[i].toString());
+                    System.out.println("  orig value:" + toCompare2.toString());
+                    System.out.println("  export value:" + toCompare1.toString());
                     m_rowFailed = true;
                 }
             }

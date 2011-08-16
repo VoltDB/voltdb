@@ -799,6 +799,7 @@ public class Inits {
         InitAgreementSite() {
             dependsOn(LoadCatalog.class);
             dependsOn(JoinAndInitNetwork.class);
+            dependsOn(PostNetworkAndCatalogWork.class);
         }
 
         @Override

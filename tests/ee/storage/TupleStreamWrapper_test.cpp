@@ -89,6 +89,7 @@ public:
         receivedExportBuffer = true;
     }
 
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
     queue<int32_t> partitionIds;
     queue<std::string> signatures;
     deque<shared_ptr<StreamBlock> > blocks;

@@ -47,6 +47,7 @@ class Topend {
             bool sync,
             bool endOfStream) = 0;
 
+    virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
     virtual ~Topend()
     {
     }

@@ -38,22 +38,22 @@ import org.voltdb.types.TimestampType;
 public class InsertMulti extends VoltProcedure {
 
     public final SQLStmt i_no_nulls = new SQLStmt
-      ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+      ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt i_allow_nulls = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_with_defaults = new SQLStmt
-    ("INSERT INTO WITH_DEFAULTS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO WITH_DEFAULTS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_with_null_defaults = new SQLStmt
-    ("INSERT INTO WITH_NULL_DEFAULTS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO WITH_NULL_DEFAULTS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_expressions_with_nulls = new SQLStmt
-    ("INSERT INTO EXPRESSIONS_WITH_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO EXPRESSIONS_WITH_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_expressions_no_nulls = new SQLStmt
-      ("INSERT INTO EXPRESSIONS_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      ("INSERT INTO EXPRESSIONS_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public VoltTable[] run(
             String tablename,
@@ -68,6 +68,8 @@ public class InsertMulti extends VoltProcedure {
             String a_inline_s2,
             String a_pool_s,
             String a_pool_max_s,
+            byte[] b_inline,
+            byte[] b_pool,
             BigDecimal a_decimal
             )
     {
@@ -85,12 +87,12 @@ public class InsertMulti extends VoltProcedure {
         if (tablename.equals("NO_NULLS")) {
             voltQueueSQL(i_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("ALLOW_NULLS")) {
             voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("WITH_DEFAULTS")) {
             voltQueueSQL(i_with_defaults, pkey);
@@ -101,12 +103,12 @@ public class InsertMulti extends VoltProcedure {
         else if (tablename.equals("EXPRESSIONS_WITH_NULLS")) {
             voltQueueSQL(i_expressions_with_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("EXPRESSIONS_NO_NULLS")) {
             voltQueueSQL(i_expressions_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
-                         a_pool_s, a_pool_max_s, a_decimal);
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
 
         return voltExecuteSQL();

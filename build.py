@@ -209,6 +209,7 @@ CTX.INPUT['common'] = """
  RecoveryProtoMessageBuilder.cpp
  DefaultTupleSerializer.cpp
  executorcontext.cpp
+ serializeio.cpp
 """
 
 CTX.INPUT['execution'] = """

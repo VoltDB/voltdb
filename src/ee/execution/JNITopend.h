@@ -40,7 +40,7 @@ public:
             StreamBlock *block,
             bool sync,
             bool endOfStream);
-
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 private:
     JNIEnv *m_jniEnv;
 
@@ -49,6 +49,7 @@ private:
      * if this is NULL, VoltDBEngine will fail to call sendDependency().
     */
     jobject m_javaExecutionEngine;
+    jmethodID m_fallbackToEEAllocatedBufferMID;
     jmethodID m_nextDependencyMID;
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;

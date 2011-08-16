@@ -637,7 +637,6 @@ bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString) {
         assert (result >= 0 && result < 256);
         bufferdst[i] = static_cast<unsigned char>(result);
     }
-    bufferdst[i] = '\0';
     return true;
 }
 

@@ -41,7 +41,7 @@
 		<script type="text/javascript" src="js/queryui.js"></script>
 		<script type="text/javascript" src="js/mainui.js"></script>
 		<script type="text/javascript" src="js/monitorui.js"></script>
-        <script type="text/javascript">var Injection = ['${hostname}', '${portnumber}', '${requires-authentication}'];var hostnameDefault = 'localhost';var portDefault = '8080';</script>
+        <script type="text/javascript">var Injection = [location.hostname, location.port, '${requires-authentication}'];var hostnameDefault = 'localhost';var portDefault = '8080';</script>
 		<script type="text/javascript">$(document).ready(function() { MainUI.InitWorkspace(); });</script>
 	</head>
 <body class="body">

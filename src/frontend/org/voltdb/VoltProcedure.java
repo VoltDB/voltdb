@@ -76,6 +76,9 @@ public abstract class VoltProcedure {
     final static int MAX_BATCH_SIZE = 1000;
 
     final static Double DOUBLE_NULL = new Double(-1.7976931348623157E+308);
+
+    // The name of the SQLStmt implied by a statement procedure's sql statement.
+    // And how much wood a woodchuck chucks.
     public static final String ANON_STMT_NAME = "sql";
 
     protected HsqlBackend m_hsql;
