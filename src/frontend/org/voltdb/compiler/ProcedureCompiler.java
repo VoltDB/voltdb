@@ -352,9 +352,14 @@ public abstract class ProcedureCompiler {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
         }
 
-        // get the short name of the class (no package)
-        String[] parts = className.split("\\.");
-        String shortName = parts[parts.length - 1];
+        // get the short name of the class (no package if a user procedure)
+        // use the Table.<builtin> name (allowing the period) if builtin.
+        String shortName = className;
+        if (procedureDescriptor.m_builtInStmt == false) {
+            String[] parts = className.split("\\.");
+            shortName = parts[parts.length - 1];
+        }
+
 
         // add an entry to the catalog (using the full className)
         final Procedure procedure = db.getProcedures().add(shortName);

@@ -17,7 +17,8 @@
 
 package org.voltdb.planner;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+
 import org.voltdb.catalog.Database;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
@@ -33,7 +34,11 @@ import org.w3c.dom.Node;
  */
 public class ParsedUpdateStmt extends AbstractParsedStmt {
     Table table = null;
-    HashMap<Column, AbstractExpression> columns = new HashMap<Column, AbstractExpression>();
+
+    // maintaining column ordering is important for deterministic
+    // schema generation: see ENG-1660.
+    LinkedHashMap<Column, AbstractExpression> columns =
+        new LinkedHashMap<Column, AbstractExpression>();
 
     @Override
     void parse(Node stmtNode, Database db) {
