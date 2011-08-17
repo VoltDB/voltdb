@@ -28,7 +28,11 @@
 
 package com.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 
 @ProcInfo(
     partitionInfo = "VOTES.PHONE_NUMBER: 0",
@@ -75,7 +79,14 @@ public class Vote extends VoltProcedure {
 
         if (validContestant && validVoter) {
             voltQueueSQL(getState, areaCode);
-            String state = voltExecuteSQL()[0].fetchRow(0).getString(0);
+
+            // not all example clients produce valid area code inputs.
+            // assign all non-initialized area codes to the EU for now.
+            String state = "EU";
+            VoltTable r1 = voltExecuteSQL()[0];
+            if (r1.getRowCount() > 0) {
+                state = r1.fetchRow(0).getString(0);
+            }
             voltQueueSQL(insertVote, phoneNumber, areaCode, state, contestantNumber);
             voltExecuteSQL();
             returnValue = 0;

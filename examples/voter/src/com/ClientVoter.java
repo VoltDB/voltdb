@@ -209,7 +209,7 @@ public class ClientVoter {
              *  otherwise get existing configuration information
              */
             VoltTable[] vtInitialize =
-                voltclient.callProcedure("Initialize", maxContestant, contestantNameList, areaCodes, states).getResults();
+                voltclient.callProcedure("Initialize", maxContestant, contestantNameList).getResults();
             maxContestant = (int) vtInitialize[0].fetchRow(0).getLong(0);
             System.out.printf("Running for %d contestant(s)\n",maxContestant);
         } catch (ProcCallException e) {
@@ -235,7 +235,7 @@ public class ClientVoter {
         AsyncCallback callBack = new AsyncCallback();
 
         for(int i=0;i<votingMap.length;i++)
-            votingMap[i] = (short)(((rand.nextInt(maxContestant) * rand.nextInt(maxContestant) + (int)Math.floor(100*Math.sin((double)i))) % maxContestant) + 1);
+            votingMap[i] = (short)(((rand.nextInt(maxContestant) * rand.nextInt(maxContestant) + (int)Math.floor(100*Math.sin(i))) % maxContestant) + 1);
 
         while (endTime > currentTime) {
             num_sp_calls++;
@@ -305,7 +305,7 @@ public class ClientVoter {
                     }
                     else if (((double) cycle_tot_execution_milliseconds / (double) cycle_tot_executions_latency) < 0.9d*auto_tuning_target_latency_millis)
                     {
-                        long new_transactions_per_second = ((long)Math.max(1.05d*transactions_per_second, (double)(cycle_num_sp_calls / cycle_elapsedTimeSec2))/1000l) *1000l;
+                        long new_transactions_per_second = ((long)Math.max(1.05d*transactions_per_second, (cycle_num_sp_calls / cycle_elapsedTimeSec2))/1000l) *1000l;
                         if (new_transactions_per_second > transactions_per_second_requested)
                             new_transactions_per_second = transactions_per_second_requested;
                         if (new_transactions_per_second > transactions_per_second)
