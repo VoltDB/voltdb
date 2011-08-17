@@ -93,8 +93,8 @@ SnapshotCompletionInterest {
     private final static VoltLogger LOG = new VoltLogger("HOST");
 
     // ZK stuff
-    private final static String RESTORE = "/restore";
-    private final static String RESTORE_BARRIER = "/restore_barrier";
+    final static String RESTORE = "/restore";
+    final static String RESTORE_BARRIER = "/restore_barrier";
     private final static String SNAPSHOT_ID = "/restore/snapshot_id";
     private final String zkBarrierNode;
 
@@ -144,7 +144,7 @@ SnapshotCompletionInterest {
         @Override
         public void join() throws InterruptedException {}
         @Override
-        public boolean hasReplayed() {
+        public boolean hasReplayedSegments() {
             return false;
         }
         @Override
@@ -160,8 +160,12 @@ SnapshotCompletionInterest {
         @Override
         public void returnAllSegments() {}
         @Override
-        public boolean areLogsEmpty() {
+        public boolean hasReplayedTxns() {
             return true;
+        }
+        @Override
+        public long generateReplayPlan() {
+            return 0;
         }
     };
 
@@ -189,138 +193,37 @@ SnapshotCompletionInterest {
 
             enterRestore();
 
-            TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, SnapshotUtil.Snapshot>();
-            /*
-             * If the user wants to create a new database, don't scan the
-             * snapshots.
-             */
-            if (m_action != START_ACTION.CREATE) {
-                snapshots = getSnapshots();
-            }
-
-            final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
-            Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
-            for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
-                /*
-                 * If the txn of the snapshot is before the latest txn
-                 * among the last seen txns across all initiators when the
-                 * log starts, there is a gap in between the snapshot was
-                 * taken and the beginning of the log. So the snapshot is
-                 * not viable for replay.
-                 */
-                if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
-                    continue;
-                }
-
-                Snapshot s = e.getValue();
-                File digest = s.m_digests.get(0);
-                int partitionCount = -1;
-                boolean skip = false;
-                for (TableFiles tf : s.m_tableFiles.values()) {
-                    if (tf.m_isReplicated) {
-                        continue;
-                    }
-
-                    if (skip) {
-                        break;
-                    }
-
-                    for (boolean completed : tf.m_completed) {
-                        if (!completed) {
-                            skip = true;
-                            break;
-                        }
-                    }
-
-                    // Everyone has to agree on the total partition count
-                    for (int count : tf.m_totalPartitionCounts) {
-                        if (partitionCount == -1) {
-                            partitionCount = count;
-                        } else if (count != partitionCount) {
-                            skip = true;
-                            break;
-                        }
-                    }
-                }
-
-                Long catalog_crc = null;
-                try
-                {
-                    JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
-                    catalog_crc = digest_detail.getLong("catalogCRC");
-                }
-                catch (IOException ioe)
-                {
-                    LOG.info("Unable to read digest file: " +
-                             digest.getAbsolutePath() + " due to: " + ioe.getMessage());
-                    skip = true;
-                }
-                catch (JSONException je)
-                {
-                    LOG.info("Unable to extract catalog CRC from digest: " +
-                             digest.getAbsolutePath() + " due to: " + je.getMessage());
-                    skip = true;
-                }
-
-                if (skip) {
-                    continue;
-                }
-
-                SnapshotInfo info =
-                    new SnapshotInfo(e.getKey(), digest.getParent(),
-                                     parseDigestFilename(digest.getName()),
-                                     partitionCount, catalog_crc);
-                for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
-                    TableFiles tableFile = te.getValue();
-                    HashSet<Integer> ids = new HashSet<Integer>();
-                    for (Set<Integer> idSet : tableFile.m_validPartitionIds) {
-                        ids.addAll(idSet);
-                    }
-                    if (!tableFile.m_isReplicated) {
-                        info.partitions.put(te.getKey(), ids);
-                    }
-                }
-                snapshotInfos.add(info);
-            }
-            LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
-
-            sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
-
-            // Negotiate with other hosts about which snapshot to restore
-            String restorePath = null;
-            String restoreNonce = null;
-            long lastSnapshotTxnId = 0;
-            Entry<Long, Set<SnapshotInfo>> lastSnapshot = getRestorePlan();
-            if (lastSnapshot != null) {
-                LOG.debug("Snapshot to restore: " + lastSnapshot.getKey());
-                lastSnapshotTxnId = lastSnapshot.getKey();
-                Iterator<SnapshotInfo> i = lastSnapshot.getValue().iterator();
-                while (i.hasNext()) {
-                    SnapshotInfo next = i.next();
-                    restorePath = next.path;
-                    restoreNonce = next.nonce;
-                    break;
-                }
-                assert(restorePath != null && restoreNonce != null);
+            SnapshotInfo snapshotToRestore = null;
+            try {
+                snapshotToRestore = generatePlans();
+            } catch (Exception e) {
+                LOG.fatal(e.getMessage());
+                VoltDB.crashVoltDB();
             }
 
             /*
              * If this has the lowest host ID, initiate the snapshot restore
              */
             if (isLowestHost()) {
-                sendSnapshotTxnId(lastSnapshotTxnId);
-                if (restorePath != null && restoreNonce != null) {
-                    LOG.debug("Initiating snapshot " + restoreNonce +
-                              " in " + restorePath);
+                long txnId = 0;
+                if (snapshotToRestore != null) {
+                    txnId = snapshotToRestore.txnId;
+                }
+                sendSnapshotTxnId(txnId);
+
+                if (snapshotToRestore != null) {
+                    LOG.debug("Initiating snapshot " + snapshotToRestore.nonce +
+                              " in " + snapshotToRestore.path);
+                    Object[] params = new Object[] {snapshotToRestore.path,
+                                                    snapshotToRestore.nonce};
                     initSnapshotWork(RESTORE_TXNID,
-                                     Pair.of("@SnapshotRestore",
-                                             new Object[] {restorePath, restoreNonce}));
+                                     Pair.of("@SnapshotRestore", params));
                 }
             }
 
             m_restoreHeartbeatThread.start();
 
-            if (!isLowestHost() || restorePath == null || restoreNonce == null) {
+            if (!isLowestHost() || snapshotToRestore == null) {
                 /*
                  * Hosts that are not initiating the restore should change
                  * state immediately
@@ -460,7 +363,7 @@ SnapshotCompletionInterest {
      *
      * @param path
      */
-    private void createZKDirectory(String path) {
+    void createZKDirectory(String path) {
         try {
             try {
                 m_zk.create(path, new byte[0],
@@ -531,7 +434,7 @@ SnapshotCompletionInterest {
     /**
      * Enters the restore process. Creates ZooKeeper barrier node for this host.
      */
-    private void enterRestore() {
+    void enterRestore() {
         try {
             m_zk.create(zkBarrierNode, new byte[0],
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -579,6 +482,148 @@ SnapshotCompletionInterest {
      */
     public void restore() {
         new Thread(m_restorePlanner, "restore-planner").start();
+    }
+
+    /**
+     * Generate restore and replay plans.
+     *
+     * @return The snapshot to restore, or null if there is none.
+     * @throws Exception
+     *             If any exception is thrown, it means that the plan generation
+     *             has failed. Should crash the cluster.
+     */
+    SnapshotInfo generatePlans() throws Exception {
+        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, SnapshotUtil.Snapshot>();
+        /*
+         * If the user wants to create a new database, don't scan the
+         * snapshots.
+         */
+        if (m_action != START_ACTION.CREATE) {
+            snapshots = getSnapshots();
+        }
+
+        final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
+        Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
+        for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
+            /*
+             * If the txn of the snapshot is before the latest txn
+             * among the last seen txns across all initiators when the
+             * log starts, there is a gap in between the snapshot was
+             * taken and the beginning of the log. So the snapshot is
+             * not viable for replay.
+             */
+            if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
+                continue;
+            }
+
+            Snapshot s = e.getValue();
+            File digest = s.m_digests.get(0);
+            int partitionCount = -1;
+            boolean skip = false;
+            for (TableFiles tf : s.m_tableFiles.values()) {
+                if (tf.m_isReplicated) {
+                    continue;
+                }
+
+                if (skip) {
+                    break;
+                }
+
+                for (boolean completed : tf.m_completed) {
+                    if (!completed) {
+                        skip = true;
+                        break;
+                    }
+                }
+
+                // Everyone has to agree on the total partition count
+                for (int count : tf.m_totalPartitionCounts) {
+                    if (partitionCount == -1) {
+                        partitionCount = count;
+                    } else if (count != partitionCount) {
+                        skip = true;
+                        break;
+                    }
+                }
+            }
+
+            Long catalog_crc = null;
+            try
+            {
+                JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
+                catalog_crc = digest_detail.getLong("catalogCRC");
+            }
+            catch (IOException ioe)
+            {
+                LOG.info("Unable to read digest file: " +
+                         digest.getAbsolutePath() + " due to: " + ioe.getMessage());
+                skip = true;
+            }
+            catch (JSONException je)
+            {
+                LOG.info("Unable to extract catalog CRC from digest: " +
+                         digest.getAbsolutePath() + " due to: " + je.getMessage());
+                skip = true;
+            }
+
+            if (skip) {
+                continue;
+            }
+
+            SnapshotInfo info =
+                new SnapshotInfo(e.getKey(), digest.getParent(),
+                                 parseDigestFilename(digest.getName()),
+                                 partitionCount, catalog_crc);
+            for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
+                TableFiles tableFile = te.getValue();
+                HashSet<Integer> ids = new HashSet<Integer>();
+                for (Set<Integer> idSet : tableFile.m_validPartitionIds) {
+                    ids.addAll(idSet);
+                }
+                if (!tableFile.m_isReplicated) {
+                    info.partitions.put(te.getKey(), ids);
+                }
+            }
+            snapshotInfos.add(info);
+        }
+        LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
+
+        sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
+
+        // Negotiate with other hosts about which snapshot to restore
+        SnapshotInfo last = null;
+        Set<SnapshotInfo> lastSnapshot = getRestorePlan();
+        if (lastSnapshot != null) {
+            Iterator<SnapshotInfo> i = lastSnapshot.iterator();
+            while (i.hasNext()) {
+                last = i.next();
+                break;
+            }
+            assert(last != null);
+            LOG.debug("Snapshot to restore: " + last.txnId);
+        }
+
+        /*
+         * Generate the replay plan here so that we don't have to wait until the
+         * snapshot restore finishes.
+         *
+         * ENG-1678: Fail if the partition count in the cluster does not equal
+         * to the partition count recorded in the command logs.
+         */
+        if (m_action != START_ACTION.CREATE) {
+            long partitionCount = m_replayAgent.generateReplayPlan();
+            if (partitionCount > 0 &&
+                partitionCount != m_context.numberOfPartitions) {
+                String msg = "Command logs can only be replayed on a cluster" +
+                        " with the same number of partitions. Command" +
+                        " logs recorded " + partitionCount +
+                        " partitions, but the cluster has " +
+                        m_context.numberOfPartitions + " partitions";
+                throw new RuntimeException(msg);
+            }
+        }
+
+        return last;
     }
 
     /**
@@ -652,8 +697,8 @@ SnapshotCompletionInterest {
             m_zk.create(zkNode, buf.array(),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
-            LOG.fatal("Failed to create Zookeeper node: " + e.getMessage());
-            VoltDB.crashVoltDB();
+            throw new RuntimeException("Failed to create Zookeeper node: " +
+                                       e.getMessage(), e);
         }
     }
 
@@ -709,8 +754,9 @@ SnapshotCompletionInterest {
      * information.
      *
      * @return The snapshot to restore from, null if none.
+     * @throws Exception
      */
-    private Entry<Long, Set<SnapshotInfo>> getRestorePlan() {
+    private Set<SnapshotInfo> getRestorePlan() throws Exception {
         /*
          * Only let the first host do the rest, so we don't end up having
          * multiple hosts trying to initiate a snapshot restore
@@ -725,8 +771,7 @@ SnapshotCompletionInterest {
             try {
                 children = m_zk.getChildren(RESTORE, false);
             } catch (KeeperException e2) {
-                LOG.fatal(e2.getMessage());
-                VoltDB.crashVoltDB();
+                throw e2;
             } catch (InterruptedException e2) {
                 continue;
             }
@@ -742,9 +787,8 @@ SnapshotCompletionInterest {
         }
 
         if (children == null) {
-            LOG.fatal("Unable to read agreement messages from other hosts for" +
-                      " restore plan");
-            VoltDB.crashVoltDB();
+            throw new RuntimeException("Unable to read agreement messages from" +
+                                       " other hosts for restore plan");
         }
 
         TreeMap<Long, Set<SnapshotInfo>> snapshotFragments = new TreeMap<Long, Set<SnapshotInfo>>();
@@ -768,8 +812,7 @@ SnapshotCompletionInterest {
             {
                 LOG.fatal("No snapshot present that matches the loaded catalog.");
             }
-            LOG.fatal("No viable snapshots to restore");
-            VoltDB.crashVoltDB();
+            throw new RuntimeException("No viable snapshots to restore");
         }
         LOG.debug("There are " + snapshotFragments.size() +
                   " snapshots available in the cluster");
@@ -827,20 +870,26 @@ SnapshotCompletionInterest {
 
         if (clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
             snapshotFragments.size() == 0) {
-            LOG.fatal("No viable snapshots to restore");
-            VoltDB.crashVoltDB();
+            throw new RuntimeException("No viable snapshots to restore");
         }
 
-        return snapshotFragments.lastEntry();
+        if (snapshotFragments.isEmpty()) {
+            return null;
+        } else {
+            return snapshotFragments.lastEntry().getValue();
+        }
     }
 
     /**
      * @param children
      * @param snapshotFragments
      * @return null if there is no log to replay in the whole cluster
+     * @throws Exception
      */
-    private Long deserializeRestoreInformation(List<String> children,
-                                               Map<Long, Set<SnapshotInfo>> snapshotFragments) {
+    private Long
+    deserializeRestoreInformation(List<String> children,
+                                  Map<Long, Set<SnapshotInfo>> snapshotFragments)
+    throws Exception {
         byte recover = (byte) m_action.ordinal();
         Long clStartTxnId = null;
         ByteBuffer buf;
@@ -849,8 +898,7 @@ SnapshotCompletionInterest {
             try {
                 data = m_zk.getData(RESTORE + "/" + node, false, null);
             } catch (Exception e) {
-                LOG.fatal(e.getMessage());
-                VoltDB.crashVoltDB();
+                throw e;
             }
 
             buf = ByteBuffer.wrap(data);
@@ -865,9 +913,9 @@ SnapshotCompletionInterest {
 
             byte recoverByte = buf.get();
             if (recoverByte != recover) {
-                LOG.fatal("Database actions are not consistent, please enter " +
-                          "the same database action on the command-line.");
-                VoltDB.crashVoltDB();
+                String msg = "Database actions are not consistent, please enter " +
+                    "the same database action on the command-line.";
+                throw new RuntimeException(msg);
             }
 
             int count = buf.getInt();
@@ -1071,7 +1119,7 @@ SnapshotCompletionInterest {
             clSnapshotPath = commandLogElement.getInternalsnapshotpath();
         }
 
-        if (!m_hasRestored && !m_replayAgent.hasReplayed() &&
+        if (!m_hasRestored && !m_replayAgent.hasReplayedSegments() &&
             m_action == START_ACTION.RECOVER) {
             /*
              * This means we didn't restore any snapshot, and there's no command
@@ -1079,7 +1127,7 @@ SnapshotCompletionInterest {
              */
             LOG.fatal("Nothing to recover from");
             VoltDB.crashVoltDB();
-        } else if (!clEnabled && m_replayAgent.areLogsEmpty()) {
+        } else if (!clEnabled && m_replayAgent.hasReplayedTxns()) {
             // Nothing was replayed, so no need to initiate truncation snapshot
             m_state = State.TRUNCATE;
         }
@@ -1090,7 +1138,7 @@ SnapshotCompletionInterest {
          * ENG-1516: Use truncation snapshot to save the catalog if CL is
          * enabled.
          */
-        if (clEnabled || !m_replayAgent.areLogsEmpty()) {
+        if (clEnabled || !m_replayAgent.hasReplayedTxns()) {
             /*
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs

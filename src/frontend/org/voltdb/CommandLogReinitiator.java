@@ -31,9 +31,20 @@ public interface CommandLogReinitiator {
     public void setCallback(Callback callback);
 
     /**
+     * Generate the local replay plan. Call this before starting replay.
+     *
+     * @return the total partition count recorded in the logs, or 0 if there is
+     *         nothing to replay.
+     */
+    public long generateReplayPlan();
+
+    /**
      * Start replaying the log. Two threads will be started, one for reading the
      * log and transforming them into task messages, the other one for reading
      * them off the queue and reinitiating them.
+     *
+     * Note: the replay plan has to be generated prior to calling this method.
+     * Call {@link #generateReplayPlan()} to generate the replay plan.
      */
     public void replay();
 
@@ -59,16 +70,15 @@ public interface CommandLogReinitiator {
      *
      * @return true if there were at least one segment replayed
      */
-    public boolean hasReplayed();
+    public boolean hasReplayedSegments();
 
     /**
-     * Whether or not the log segments are empty, meaning no SPIs replayed. Call
-     * this after the replay. Call it before that will not give you the correct
-     * result.
+     * Whether or not there were SPIs replayed in the cluster. Call this after
+     * the replay. Call it before replay will not give you the correct result.
      *
      * @return true if the logs are empty.
      */
-    public boolean areLogsEmpty();
+    public boolean hasReplayedTxns();
 
     /**
      * Get the maximum transaction ID among the last seen transactions across
