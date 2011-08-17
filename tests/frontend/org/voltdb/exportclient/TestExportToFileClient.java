@@ -44,7 +44,8 @@ public class TestExportToFileClient extends TestCase {
                 0,
                 false,
                 false,
-                false);
+                false,
+                0);
         AdvertisedDataSource source0 = TestExportDecoderBase.constructTestSource(0);
         AdvertisedDataSource source1 = TestExportDecoderBase.constructTestSource(1);
         ExportToFileDecoder decoder0 = exportClient.constructExportDecoder(source0);

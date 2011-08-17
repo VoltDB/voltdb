@@ -30,6 +30,7 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.utils.BandwidthMonitor;
 import org.voltdb.utils.Pair;
 
 /**
@@ -48,6 +49,7 @@ public class ExportConnection {
     private int m_state = CLOSED;
 
     public final String name;
+    public final String m_ipString;
     private final InetSocketAddress serverAddr;
     private SocketChannel m_socket;
 
@@ -62,18 +64,24 @@ public class ExportConnection {
 
     private long m_lastAckOffset;
 
+    final BandwidthMonitor m_bandwidthMonitor;
+
     public ExportConnection(
             String username, String password,
             InetSocketAddress serverAddr,
-            HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> dataSinks)
+            HashMap<Long, HashMap<String,
+            HashMap<Integer, ExportDataSink>>> dataSinks,
+            BandwidthMonitor bandwidthMonitor)
     {
         m_username = username != null ? username : "";
         m_password = password != null ? password : "";
         m_sinks = dataSinks;
         this.serverAddr = serverAddr;
         name = serverAddr.toString();
+        m_ipString = serverAddr.getAddress().getHostAddress();
         dataSources = new ArrayList<AdvertisedDataSource>();
         hosts = new ArrayList<String>();
+        m_bandwidthMonitor = bandwidthMonitor;
     }
 
     /**
@@ -132,6 +140,10 @@ public class ExportConnection {
 
         // perhaps a more controversial assertion?
         dataSources.clear();
+
+        // clear this host from the list of tracked hosts
+        if (m_bandwidthMonitor != null)
+            m_bandwidthMonitor.removeHost(m_ipString);
     }
 
     /**
@@ -297,15 +309,25 @@ public class ExportConnection {
         messageBuf.flip();
         fds = new FastDeserializer(messageBuf);
         ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
+
+        // log bandwidth
+        if (m_bandwidthMonitor != null)
+            m_bandwidthMonitor.logBytesTransfered(m_ipString, length + 4, 0);
+
         return m;
     }
 
     public void sendMessage(ExportProtoMessage m) throws IOException
     {
         ByteBuffer buf = m.toBuffer();
+        long length = buf.remaining();
         while (buf.remaining() > 0) {
             m_socket.write(buf);
         }
+
+        // log bandwidth
+        if (m_bandwidthMonitor != null)
+            m_bandwidthMonitor.logBytesTransfered(m_ipString, 0, length);
     }
 
     public long getLastAckOffset() {

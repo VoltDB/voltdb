@@ -250,7 +250,8 @@ public class TestExportSuite extends RegressionSuite {
               0,
               false,
               false,
-              false);
+              false,
+              0);
         exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
         exportClient.addCredentials("export", "export");
         final Thread currentThread = Thread.currentThread();
@@ -439,7 +440,8 @@ public class TestExportSuite extends RegressionSuite {
               0,
               false,
               false,
-              false);
+              false,
+              0);
       exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
       exportClient.addCredentials("export", "export");
       final Thread currentThread = Thread.currentThread();

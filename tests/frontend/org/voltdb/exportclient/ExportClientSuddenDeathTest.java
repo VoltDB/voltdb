@@ -49,7 +49,8 @@ public class ExportClientSuddenDeathTest extends TestCase {
                                                          0,
                                                          false,
                                                          false,
-                                                         false);
+                                                         false,
+                                                         0);
 
         InetSocketAddress addr = new InetSocketAddress("127.0.0.1", VoltDB.DEFAULT_PORT);
         etfc.addServerInfo(addr);

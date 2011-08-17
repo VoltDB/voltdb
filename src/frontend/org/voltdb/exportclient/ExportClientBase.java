@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.BandwidthMonitor;
 import org.voltdb.utils.Pair;
 
 /**
@@ -60,6 +61,8 @@ public abstract class ExportClientBase {
 
     private final HashSet<AdvertisedDataSource> m_knownDataSources = new HashSet<AdvertisedDataSource>();
 
+    final BandwidthMonitor m_bandwidthMonitor;
+
     // credentials
     protected String m_username = "", m_password = "";
 
@@ -89,7 +92,16 @@ public abstract class ExportClientBase {
 
     public ExportClientBase(boolean useAdminPorts)
     {
+        this(false, 0);
+    }
+
+    public ExportClientBase(boolean useAdminPorts, int throughputDisplayPeriod)
+    {
         m_useAdminPorts = useAdminPorts;
+        if (throughputDisplayPeriod > 0)
+            m_bandwidthMonitor = new BandwidthMonitor(throughputDisplayPeriod, m_logger);
+        else
+            m_bandwidthMonitor = null;
     }
 
     /**
@@ -178,7 +190,7 @@ public abstract class ExportClientBase {
 
     private ExportConnection connectToServer(InetSocketAddress addr) throws InterruptedException {
         try {
-            ExportConnection retval = new ExportConnection(m_username, m_password, addr, m_sinks);
+            ExportConnection retval = new ExportConnection(m_username, m_password, addr, m_sinks, m_bandwidthMonitor);
             retval.openExportConnection();
 
             if (!retval.isConnected()) {
@@ -260,7 +272,7 @@ public abstract class ExportClientBase {
         for (InetSocketAddress serverAddr : m_servers) {
             ExportConnection exportConnection = null;
             try {
-                exportConnection = new ExportConnection(m_username, m_password, serverAddr, m_sinks);
+                exportConnection = new ExportConnection(m_username, m_password, serverAddr, m_sinks, m_bandwidthMonitor);
                 exportConnection.openExportConnection();
 
                 // failed to connect

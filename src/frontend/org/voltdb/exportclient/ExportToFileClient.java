@@ -577,8 +577,9 @@ public class ExportToFileClient extends ExportClientBase {
                               int firstfield,
                               boolean useAdminPorts,
                               boolean batched,
-                              boolean withSchema) {
-        super(useAdminPorts);
+                              boolean withSchema,
+                              int throughputMonitorPeriod) {
+        super(useAdminPorts, throughputMonitorPeriod);
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -745,6 +746,7 @@ public class ExportToFileClient extends ExportClientBase {
         boolean batched = false;
         boolean withSchema = false;
         String fullDelimiters = null;
+        int throughputMonitorPeriod = 0;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -889,7 +891,16 @@ public class ExportToFileClient extends ExportClientBase {
                     System.err.println("The delimiter set must contain exactly 4 characters (after any html escaping).");
                     printHelpAndQuit(-1);
                 }
-            } else {
+            }
+            else if (arg.equals("--throughput-monitor-period")) {
+                if (args.length < ii + 1) {
+                    System.err.println("Error: Not enough args following --throughput-monitor-period");
+                    printHelpAndQuit(-1);
+                }
+                throughputMonitorPeriod = Integer.parseInt(args[ii + 1].trim());
+                ii++;
+            }
+            else {
                 System.err.println("Unrecognized parameter " + arg);
                 System.exit(-1);
             }
@@ -932,7 +943,8 @@ public class ExportToFileClient extends ExportClientBase {
                                                            firstfield,
                                                            connect == 'a',
                                                            batched,
-                                                           withSchema);
+                                                           withSchema,
+                                                           throughputMonitorPeriod);
 
         // add all of the servers specified
         for (String server : volt_servers) {
