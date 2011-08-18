@@ -377,6 +377,7 @@ DISTRIBUTION
     <mkdir dir="${dist.dir}/doc" />
     <mkdir dir="${dist.dir}/tools" />
     <mkdir dir="${dist.dir}/voltdb" />
+    <mkdir dir="${dist.dir}/bin" />
 
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
@@ -459,8 +460,15 @@ DISTRIBUTION
     <!-- populate top level README by copying and renaming README.dist -->
     <copy tofile="${dist.dir}/README" file="doc/README.dist"/>
 
-    <!-- populate top level thirdparty readmy by copying it -->
+    <!-- populate top level thirdparty readme by copying it -->
     <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty.txt"/>
+
+    <!-- populate the bin dir -->
+    <copy todir="${dist.dir}/bin" >
+        <fileset dir="bin" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </copy>
 
     <!-- populate examples top level README -->
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
@@ -491,8 +499,11 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- make shell script executable -->
+    <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
+        <fileset dir="${dist.dir}/bin" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
         <fileset dir="${dist.dir}/tools/demo" defaultexcludes="yes">
             <include name="launch"/>
         </fileset>

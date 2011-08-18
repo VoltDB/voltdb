@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+bin=`dirname "$0"`
+bin=`cd "$bin"; pwd`
+
+# resolve links - $0 may be a softlink
+
+this="$0"
+while [ -h "$this" ]; do
+  ls=`ls -ld "$this"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '.*/.*' > /dev/null; then
+    this="$link"
+  else
+    this=`dirname "$this"`/"$link"
+  fi
+done
+
+# convert relative path to absolute path
+bin=`dirname "$this"`
+script=`basename "$this"`
+bin=`cd "$bin"; pwd`
+this="$bin/$script"
+
+# the root of the Hadoop installation
+export VOLTDB_HOME=`dirname "$this"`/..
+#echo $VOLTDB_HOME
+
+#check to see if the conf dir is given as an optional argument
+if [ $# -gt 1 ]
+then
+    if [ "--config" = "$1" ]
+	  then
+	      shift
+	      confdir=$1
+	      shift
+	      VOLTDB_CONF_DIR=$confdir
+    fi
+fi
+
+# Allow alternate conf dir location.
+VOLTDB_CONF_DIR="${VOLTDB_CONF_DIR:-$VOLTDB_HOME/conf}"
+
+# get arguments
+#COMMAND=$1
+#shift
+
+JAVA=`which java`
+JAVA_HEAP_MAX=-Xmx1024m
+
+# some Java parameters
+if [ "$JAVA_HOME" != "" ]; then
+  #echo "run java in $JAVA_HOME"
+  JAVA=$JAVA_HOME/bin/java
+fi
+
+# check envvars which might override default args
+if [ "$VOLTDB_HEAPSIZE" != "" ]; then
+  #echo "run with heapsize $HADOOP_HEAPSIZE"
+  JAVA_HEAP_MAX="-Xmx""$VOLTDB_HEAPSIZE""m"
+else
+  JAVA_HEAP_MAX="-Xmx1024m"
+fi
+#echo $JAVA_HEAP_MAX
+
+if [ -d "$VOLTDB_HOME/obj/release/prod" ]; then
+  CLASSPATH=$VOLTDB_HOME/obj/release/prod:$VOLTDB_HOME/third_party/java/obj
+  for f in $VOLTDB_HOME/third_party/java/jars/*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+elif [ -d "$VOLTDB_HOME/obj/debug/prod" ]; then
+  CLASSPATH=$VOLTDB_HOME/obj/debug/prod:$VOLTDB_HOME/third_party/java/obj
+  for f in $VOLTDB_HOME/third_party/java/jars/*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+elif [ -f "$VOLTDB_HOME/voltdb/voltdb-1.3.6.jar" ]; then
+  CLASSPATH=$VOLTDB_HOME/voltdb/voltdb-1.3.6.jar
+else
+  echo "Couldn't find compiled VoltDB to run."
+  exit 1
+fi
+
+if [ -d "$VOLTDB_HOME/obj/release/nativelibs" ]; then
+  JAVA_LIBRARY_PATH=${VOLTDB_HOME}/obj/release/nativelibs
+elif [ -d "$VOLTDB_HOME/voltdb" ]; then
+  JAVA_LIBRARY_PATH=${VOLTDB_HOME}/voltdb
+else
+  echo "Couldn't find compiled VoltDB to run."
+  exit 1
+fi
+#echo $JAVA_LIBRARY_PATH
+
+# add libs to CLASSPATH
+for f in $VOLTDB_HOME/lib/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
+
+# run it
+export CMDVAL="$JAVA $JAVA_HEAP_MAX $VOLTDB_OPTS -Djava.library.path=${JAVA_LIBRARY_PATH} -classpath $CLASSPATH org.voltdb.VoltDB $@"
+#echo $CMDVAL
+exec $CMDVAL
