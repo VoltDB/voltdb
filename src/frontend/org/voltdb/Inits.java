@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
@@ -62,6 +63,12 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
+/**
+ * This breaks up VoltDB initialization tasks into discrete units.
+ * To add a task, create a nested subclass of InitWork in the Inits class.
+ * You can specify other tasks as dependencies in the constructor.
+ *
+ */
 public class Inits {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -118,21 +125,25 @@ public class Inits {
         m_isRejoin = m_config.m_rejoinToHostAndPort != null;
         m_threadCount = threadCount;
 
-        // add all the jobs
-        m_jobs.put(CollectPlatformInfo.class, new CollectPlatformInfo());
-        m_jobs.put(ReadDeploymentFile.class, new ReadDeploymentFile());
-        m_jobs.put(LoadCatalog.class, new LoadCatalog());
-        m_jobs.put(EnforceLicensing.class, new EnforceLicensing());
-        m_jobs.put(SetupCommandLogging.class, new SetupCommandLogging());
-        m_jobs.put(StartHTTPServer.class, new StartHTTPServer());
-        m_jobs.put(InitFaultManager.class, new InitFaultManager());
-        m_jobs.put(InitExport.class, new InitExport());
-        m_jobs.put(InitHashinator.class, new InitHashinator());
-        m_jobs.put(CollectLocalNetworkMetadata.class, new CollectLocalNetworkMetadata());
-        m_jobs.put(JoinAndInitNetwork.class, new JoinAndInitNetwork());
-        m_jobs.put(InitAgreementSite.class, new InitAgreementSite());
-        m_jobs.put(SetupAdminMode.class, new SetupAdminMode());
-        m_jobs.put(PostNetworkAndCatalogWork.class, new PostNetworkAndCatalogWork());
+        // find all the InitWork subclasses using reflection and load them up
+        Class<?>[] declaredClasses = Inits.class.getDeclaredClasses();
+        for (Class<?> cls : declaredClasses) {
+            // skip base classes and fake classes
+            if (cls == InitWork.class) continue;
+            if (cls == COMPLETION_WORK.class) continue;
+
+            if (InitWork.class.isAssignableFrom(cls)) {
+                InitWork instance = null;
+                try {
+                    Constructor<?> constructor = cls.getDeclaredConstructor(Inits.class);
+                    instance = (InitWork) constructor.newInstance(this);
+                } catch (Exception e) {
+                    hostLog.fatal("Critical error loading class " + cls.getName(), e);
+                    VoltDB.crashVoltDB();
+                }
+                m_jobs.put(instance.getClass(), instance);
+            }
+        }
 
         // make blockers and blockees symmetrical
         for (InitWork iw : m_jobs.values()) {
@@ -368,7 +379,7 @@ public class Inits {
 
         @Override
         public void run() {
-            int adminPort = 0;
+            int adminPort = VoltDB.DEFAULT_ADMIN_PORT;;
 
             // See if we should bring the server up in admin mode
             if (m_deployment.getAdminMode() != null) {
