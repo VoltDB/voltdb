@@ -44,8 +44,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
-import org.voltdb.catalog.CommandLog;
-import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionInitiator;
@@ -102,12 +100,20 @@ SnapshotCompletionInterest {
     private final static long RESTORE_TXNID = 1l;
 
     private final Integer m_hostId;
-    private final CatalogContext m_context;
     private final TransactionInitiator m_initiator;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final START_ACTION m_action;
+    private final int m_partitionCount;
+    private final Set<Integer> m_liveHosts;
+    private final boolean m_clEnabled;
+    private final String m_clPath;
+    private final String m_clSnapshotPath;
+    private final String m_snapshotPath;
+    private final int m_lowestHostId;
 
+    // The snapshot to restore
+    private SnapshotInfo m_snapshotToRestore = null;
     // The txnId of the truncation snapshot generated at the end.
     private long m_truncationSnapshot = Long.MIN_VALUE;
 
@@ -161,12 +167,14 @@ SnapshotCompletionInterest {
         public void returnAllSegments() {}
         @Override
         public boolean hasReplayedTxns() {
-            return true;
+            return false;
         }
         @Override
         public long generateReplayPlan() {
             return 0;
         }
+        @Override
+        public void setCatalogContext(CatalogContext context) {}
     };
 
     /*
@@ -188,17 +196,16 @@ SnapshotCompletionInterest {
     private Runnable m_restorePlanner = new Runnable() {
         @Override
         public void run() {
-            createZKDirectory(RESTORE);
-            createZKDirectory(RESTORE_BARRIER);
-
-            enterRestore();
-
-            SnapshotInfo snapshotToRestore = null;
+            boolean planned = false;
             try {
-                snapshotToRestore = generatePlans();
-            } catch (Exception e) {
-                LOG.fatal(e.getMessage());
-                VoltDB.crashVoltDB();
+                planned = m_zk.exists(zkBarrierNode, false) != null;
+            } catch (Exception e) {}
+
+            /*
+             * In case the plans aren't generated yet, generate them now.
+             */
+            if (!planned) {
+                findRestoreCatalog();
             }
 
             /*
@@ -206,16 +213,16 @@ SnapshotCompletionInterest {
              */
             if (isLowestHost()) {
                 long txnId = 0;
-                if (snapshotToRestore != null) {
-                    txnId = snapshotToRestore.txnId;
+                if (m_snapshotToRestore != null) {
+                    txnId = m_snapshotToRestore.txnId;
                 }
                 sendSnapshotTxnId(txnId);
 
-                if (snapshotToRestore != null) {
-                    LOG.debug("Initiating snapshot " + snapshotToRestore.nonce +
-                              " in " + snapshotToRestore.path);
-                    Object[] params = new Object[] {snapshotToRestore.path,
-                                                    snapshotToRestore.nonce};
+                if (m_snapshotToRestore != null) {
+                    LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
+                              " in " + m_snapshotToRestore.path);
+                    Object[] params = new Object[] {m_snapshotToRestore.path,
+                                                    m_snapshotToRestore.nonce};
                     initSnapshotWork(RESTORE_TXNID,
                                      Pair.of("@SnapshotRestore", params));
                 }
@@ -223,7 +230,7 @@ SnapshotCompletionInterest {
 
             m_restoreHeartbeatThread.start();
 
-            if (!isLowestHost() || snapshotToRestore == null) {
+            if (!isLowestHost() || m_snapshotToRestore == null) {
                 /*
                  * Hosts that are not initiating the restore should change
                  * state immediately
@@ -379,25 +386,30 @@ SnapshotCompletionInterest {
         }
     }
 
-    public RestoreAgent(CatalogContext context, TransactionInitiator initiator,
+    public RestoreAgent(TransactionInitiator initiator,
                         ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
-                        Callback callback, int hostId, START_ACTION action)
+                        Callback callback, int hostId, START_ACTION action,
+                        int partitionCount, boolean clEnabled,
+                        String clPath, String clSnapshotPath,
+                        String snapshotPath, int lowestHostId, int[] allPartitions,
+                        Set<Integer> liveHosts)
     throws IOException {
         m_hostId = hostId;
-        m_context = context;
         m_initiator = initiator;
         m_snapshotMonitor = snapshotMonitor;
         m_callback = callback;
         m_action = action;
         m_zk = zk;
+        m_partitionCount = partitionCount;
+        m_clEnabled = clEnabled;
+        m_clPath = clPath;
+        m_clSnapshotPath = clSnapshotPath;
+        m_snapshotPath = snapshotPath;
+        m_lowestHostId = lowestHostId;
+        m_allPartitions = allPartitions;
+        m_liveHosts = liveHosts;
 
         zkBarrierNode = RESTORE_BARRIER + "/" + m_hostId;
-
-        m_allPartitions = new int[m_context.numberOfPartitions];
-        int i = 0;
-        for (Partition p : m_context.cluster.getPartitions()) {
-            m_allPartitions[i++] = Integer.parseInt(p.getTypeName());
-        }
 
         initialize();
     }
@@ -412,16 +424,22 @@ SnapshotCompletionInterest {
                     replayClass.getConstructor(int.class,
                                                START_ACTION.class,
                                                TransactionInitiator.class,
-                                               CatalogContext.class,
                                                ZooKeeper.class,
+                                               int.class,
+                                               String.class,
+                                               int[].class,
+                                               Set.class,
                                                long.class);
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_initiator,
-                                                                    m_context,
                                                                     m_zk,
+                                                                    m_partitionCount,
+                                                                    m_clPath,
+                                                                    m_allPartitions,
+                                                                    m_liveHosts,
                                                                     RESTORE_TXNID + 1);
             }
         } catch (Exception e) {
@@ -429,6 +447,42 @@ SnapshotCompletionInterest {
             VoltDB.crashVoltDB();
         }
         m_replayAgent.setCallback(this);
+    }
+
+    public void setCatalogContext(CatalogContext context) {
+        m_replayAgent.setCatalogContext(context);
+    }
+
+    /**
+     * Generate restore and replay plans and return the catalog associated with
+     * the snapshot to restore if there is anything to restore.
+     *
+     * @return The absolute path to the catalog, or null if there is no snapshot
+     *         to restore.
+     */
+    public String findRestoreCatalog() {
+        createZKDirectory(RESTORE);
+        createZKDirectory(RESTORE_BARRIER);
+
+        enterRestore();
+
+        try {
+            m_snapshotToRestore = generatePlans();
+        } catch (Exception e) {
+            LOG.fatal(e.getMessage());
+            VoltDB.crashVoltDB();
+        }
+
+        String path = null;
+        if (m_snapshotToRestore != null) {
+            File file = new File(m_snapshotToRestore.path,
+                                 m_snapshotToRestore.nonce + ".jar");
+            if (file.exists() && file.canRead()) {
+                path = file.getAbsolutePath();
+            }
+        }
+
+        return path;
     }
 
     /**
@@ -613,12 +667,12 @@ SnapshotCompletionInterest {
         if (m_action != START_ACTION.CREATE) {
             long partitionCount = m_replayAgent.generateReplayPlan();
             if (partitionCount > 0 &&
-                partitionCount != m_context.numberOfPartitions) {
+                partitionCount != m_partitionCount) {
                 String msg = "Command logs can only be replayed on a cluster" +
                         " with the same number of partitions. Command" +
                         " logs recorded " + partitionCount +
                         " partitions, but the cluster has " +
-                        m_context.numberOfPartitions + " partitions";
+                        m_partitionCount + " partitions";
                 throw new RuntimeException(msg);
             }
         }
@@ -703,53 +757,6 @@ SnapshotCompletionInterest {
     }
 
     /**
-     * @param clStartTxnId  The TXN ID at which the command log starts.
-     *                      NULL means no command log exists.
-     *                      Long.MIN_VALUE means the command log has no
-     *                      associated snapshot.
-     * @param snapshotFragments  A map of the TXNID/SnapshotInfo reported by
-     *                           the other hosts in the cluster.  Will be
-     *                           modified as snapshots are removed because
-     *                           they are not compatible with the command log
-     * @return Whether or not any of the snapshots matched the current
-     *         catalog's CRC check when there was a command log to replay
-     */
-    static boolean currySnapshotInfo(Long clStartTxnId, long currentCatalogCrc,
-                              Map<Long, Set<SnapshotInfo>> snapshotFragments)
-    {
-        boolean crc_catalog_match = false;
-        if (clStartTxnId != null && clStartTxnId == Long.MIN_VALUE)
-        {
-            // command log has no snapshot requirement.  Just clear out the
-            // fragment set directly
-            snapshotFragments.clear();
-            // Quick hack.  replace with command log catalog crc check
-            crc_catalog_match = true;
-        }
-        else
-        {
-            // Filter all snapshots that are not viable
-            Iterator<Long> iter = snapshotFragments.keySet().iterator();
-            while (iter.hasNext()) {
-                Long txnId = iter.next();
-                long this_crc = snapshotFragments.get(txnId).iterator().next().catalogCrc;
-                if (this_crc == currentCatalogCrc)
-                {
-                    crc_catalog_match = true;
-                }
-                if (clStartTxnId != null &&
-                    (this_crc != currentCatalogCrc ||
-                     txnId < clStartTxnId))
-                {
-                    iter.remove();
-                }
-            }
-        }
-
-        return crc_catalog_match;
-    }
-
-    /**
      * Pick the snapshot to restore from based on the global snapshot
      * information.
      *
@@ -776,8 +783,7 @@ SnapshotCompletionInterest {
                 continue;
             }
 
-            Set<Integer> liveHosts = m_context.siteTracker.getAllLiveHosts();
-            if (children.size() < liveHosts.size()) {
+            if (children.size() < m_liveHosts.size()) {
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e1) {}
@@ -799,19 +805,16 @@ SnapshotCompletionInterest {
             return null;
         }
 
-        boolean crc_catalog_match = false;
-        // Eliminate any snapshot fragments that don't match our command log (if we have one)
-        crc_catalog_match = currySnapshotInfo(clStartTxnId, m_context.catalogCRC,
-                                              snapshotFragments);
+        if (clStartTxnId != null && clStartTxnId == Long.MIN_VALUE) {
+            // command log has no snapshot requirement.  Just clear out the
+            // fragment set directly
+            snapshotFragments.clear();
+        }
         // If we have a command log and it requires a snapshot, then bail if
         // there's no good snapshot
         if ((clStartTxnId != null && clStartTxnId != Long.MIN_VALUE) &&
             snapshotFragments.size() == 0)
         {
-            if (!crc_catalog_match)
-            {
-                LOG.fatal("No snapshot present that matches the loaded catalog.");
-            }
             throw new RuntimeException("No viable snapshots to restore");
         }
         LOG.debug("There are " + snapshotFragments.size() +
@@ -1110,15 +1113,6 @@ SnapshotCompletionInterest {
 
     @Override
     public void onReplayCompletion() {
-        boolean clEnabled = false;
-        String clSnapshotPath = null;
-
-        if (VoltDB.instance().getConfig().m_isEnterprise) {
-            CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
-            clEnabled = commandLogElement.getEnabled();
-            clSnapshotPath = commandLogElement.getInternalsnapshotpath();
-        }
-
         if (!m_hasRestored && !m_replayAgent.hasReplayedSegments() &&
             m_action == START_ACTION.RECOVER) {
             /*
@@ -1127,7 +1121,7 @@ SnapshotCompletionInterest {
              */
             LOG.fatal("Nothing to recover from");
             VoltDB.crashVoltDB();
-        } else if (!clEnabled && m_replayAgent.hasReplayedTxns()) {
+        } else if (!m_clEnabled && !m_replayAgent.hasReplayedTxns()) {
             // Nothing was replayed, so no need to initiate truncation snapshot
             m_state = State.TRUNCATE;
         }
@@ -1138,7 +1132,7 @@ SnapshotCompletionInterest {
          * ENG-1516: Use truncation snapshot to save the catalog if CL is
          * enabled.
          */
-        if (clEnabled || !m_replayAgent.hasReplayedTxns()) {
+        if (m_clEnabled || m_replayAgent.hasReplayedTxns()) {
             /*
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs
@@ -1147,7 +1141,7 @@ SnapshotCompletionInterest {
                 try {
                     try {
                         m_zk.create("/truncation_snapshot_path",
-                                    clSnapshotPath.getBytes(),
+                                    m_clSnapshotPath.getBytes(),
                                     Ids.OPEN_ACL_UNSAFE,
                                     CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
@@ -1165,9 +1159,7 @@ SnapshotCompletionInterest {
     private boolean isLowestHost() {
         // If this is null, it must be running test
         if (m_hostId != null) {
-            int lowestSite = m_context.siteTracker.getLowestLiveNonExecSiteId();
-            int lowestHost = m_context.siteTracker.getHostForSite(lowestSite);
-            return m_hostId == lowestHost;
+            return m_hostId == m_lowestHostId;
         } else {
             return false;
         }
@@ -1186,13 +1178,12 @@ SnapshotCompletionInterest {
          */
         List<String> paths = new ArrayList<String>();
         if (VoltDB.instance().getConfig().m_isEnterprise) {
-            CommandLog commandLogElement = m_context.cluster.getLogconfig().get("log");
-            if (commandLogElement != null) {
-                paths.add(commandLogElement.getInternalsnapshotpath());
+            if (m_clSnapshotPath != null) {
+                paths.add(m_clSnapshotPath);
             }
         }
-        if (m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
-            paths.add(m_context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath());
+        if (m_snapshotPath != null) {
+            paths.add(m_snapshotPath);
         }
         TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
         FileFilter filter = new SnapshotUtil.SnapshotFilter();

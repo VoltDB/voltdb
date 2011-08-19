@@ -30,6 +30,8 @@ public interface CommandLogReinitiator {
 
     public void setCallback(Callback callback);
 
+    public void setCatalogContext(CatalogContext context);
+
     /**
      * Generate the local replay plan. Call this before starting replay.
      *

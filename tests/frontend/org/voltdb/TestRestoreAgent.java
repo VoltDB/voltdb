@@ -36,7 +36,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -52,6 +54,7 @@ import org.junit.runner.RunWith;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Partition;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -399,28 +402,50 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         }
     }
 
+    protected RestoreAgent getRestoreAgent(MockInitiator initiator, int hostId) throws Exception {
+        String snapshotPath = null;
+        if (context.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
+            snapshotPath = context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
+        }
+
+        int lowestSite = context.siteTracker.getLowestLiveNonExecSiteId();
+        int lowestHostId = context.siteTracker.getHostForSite(lowestSite);
+
+        int[] allPartitions = new int[context.numberOfPartitions];
+        int i = 0;
+        for (Partition p : context.cluster.getPartitions()) {
+            allPartitions[i++] = Integer.parseInt(p.getTypeName());
+        }
+
+        org.voltdb.catalog.CommandLog cl = context.cluster.getLogconfig().get("log");
+
+        RestoreAgent restoreAgent = new RestoreAgent(initiator,
+                                                     getClient(0),
+                                                     snapshotMonitor, this,
+                                                     hostId, this.action,
+                                                     context.numberOfPartitions,
+                                                     cl.getEnabled(),
+                                                     cl.getLogpath(),
+                                                     cl.getInternalsnapshotpath(),
+                                                     snapshotPath,
+                                                     lowestHostId,
+                                                     allPartitions,
+                                                     context.siteTracker.getAllLiveHosts());
+        restoreAgent.setCatalogContext(context);
+        return restoreAgent;
+    }
+
+
     @Test
     public void testSingleHostEmptyRestore() throws Exception {
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         MockInitiator initiator = new MockInitiator(null);
-        RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
-                                                     getClient(0),
-                                                     snapshotMonitor,
-                                                     this,
-                                                     0, START_ACTION.START);
-        restoreAgent.restore();
-        while (!m_done) {
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {}
-        }
-
-        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
-
-        if (action == START_ACTION.CREATE) {
-            createCheck(initiator);
-        }
+        RestoreAgent restoreAgent = getRestoreAgent(initiator, 0);
+        restoreAgent.createZKDirectory(RestoreAgent.RESTORE);
+        restoreAgent.createZKDirectory(RestoreAgent.RESTORE_BARRIER);
+        restoreAgent.enterRestore();
+        assertNull(restoreAgent.generatePlans());
     }
 
     @Test
@@ -431,39 +456,49 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount; i++) {
-            agents.add(new RestoreAgent(context, initiator,
-                                        getClient(0), snapshotMonitor,
-                                        this, i, START_ACTION.START));
-        }
-        for (RestoreAgent agent : agents) {
-            agent.restore();
+            agents.add(getRestoreAgent(initiator, i));
         }
 
-        int count = 0;
-        while (!m_done && count++ < 50) {
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {}
-        }
+        ExecutorService ex = Executors.newFixedThreadPool(3);
+        final AtomicInteger failure = new AtomicInteger();
+        for (final RestoreAgent agent : agents) {
+            ex.submit(new Runnable() {
+                @Override
+                public void run() {
+                    agent.createZKDirectory(RestoreAgent.RESTORE);
+                    agent.createZKDirectory(RestoreAgent.RESTORE_BARRIER);
 
-        if (!m_done) {
-            fail("Timed out");
-        }
+                    agent.enterRestore();
 
-        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
+                    try {
+                        if (agent.generatePlans() != null) {
+                            failure.incrementAndGet();
+                        }
+                    } catch (Exception e) {
+                        failure.incrementAndGet();
+                    }
+                }
+            });
+        }
+        ex.shutdown();
+        assertTrue(ex.awaitTermination(10, TimeUnit.SECONDS));
+        assertEquals(0, failure.get());
     }
 
     @Test
     public void testMultipleHostAgreementFailure() throws Exception {
+        // Don't run this test if we are in recovery mode
+        if (action == START_ACTION.RECOVER) {
+            return;
+        }
+
         m_hostCount = 3;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         MockInitiator initiator = new MockInitiator(null);
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount - 1; i++) {
-            agents.add(new RestoreAgent(context, initiator,
-                                        getClient(0), snapshotMonitor,
-                                        this, i, START_ACTION.START));
+            agents.add(getRestoreAgent(initiator, i));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
@@ -481,10 +516,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         }
 
         // Start the last restore agent, should be able to reach agreement now
-        RestoreAgent agent = new RestoreAgent(context, initiator,
-                                              getClient(0), snapshotMonitor,
-                                              this, m_hostCount - 1,
-                                              START_ACTION.START);
+        RestoreAgent agent = getRestoreAgent(initiator, m_hostCount - 1);
         agent.restore();
 
         count = 0;
@@ -498,6 +530,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             fail();
         }
 
+        assertFalse(snapshotted);
         assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
     }
 
@@ -516,10 +549,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         HashSet<String> procs = new HashSet<String>();
         procs.add("@SnapshotRestore");
         MockInitiator initiator = new MockInitiator(procs);
-        RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
-                                                     getClient(0),
-                                                     snapshotMonitor, this,
-                                                     0, START_ACTION.START);
+        RestoreAgent restoreAgent = getRestoreAgent(initiator, 0);
         restoreAgent.restore();
         while (!m_done) {
             try {
@@ -527,9 +557,13 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             } catch (InterruptedException e) {}
         }
 
-        Long count = initiator.getProcCounts().get("@SnapshotRestore");
-        assertEquals(new Long(1), count);
-        assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
+        if (action != START_ACTION.CREATE) {
+            Long count = initiator.getProcCounts().get("@SnapshotRestore");
+            assertEquals(new Long(1), count);
+            assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
+        } else {
+            createCheck(initiator);
+        }
     }
 
     @Test
@@ -549,10 +583,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         HashSet<String> procs = new HashSet<String>();
         procs.add("@SnapshotRestore");
         MockInitiator initiator = new MockInitiator(procs);
-        RestoreAgent restoreAgent = new RestoreAgent(context, initiator,
-                                                     getClient(0),
-                                                     snapshotMonitor, this,
-                                                     0, this.action);
+        RestoreAgent restoreAgent = getRestoreAgent(initiator, 0);
         restoreAgent.restore();
         while (!m_done) {
             try {
@@ -590,9 +621,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         List<RestoreAgent> agents = new ArrayList<RestoreAgent>();
 
         for (int i = 0; i < m_hostCount; i++) {
-            agents.add(new RestoreAgent(context, initiator,
-                                        getClient(0), snapshotMonitor,
-                                        this, i, this.action));
+            agents.add(getRestoreAgent(initiator, i));
         }
         for (RestoreAgent agent : agents) {
             agent.restore();
@@ -639,21 +668,5 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             frags.put(txnid, si);
         }
         si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc));
-    }
-
-    @Test
-    public void testCurrySnapshotInfoJustSnapshots()
-    {
-        // Test that the snapshot info is un-curried if there's no command log,
-        // regardless of the CRC state
-        TreeMap<Long, Set<SnapshotInfo>> snapshotFragments =
-            new TreeMap<Long, Set<SnapshotInfo>>();
-
-        addSnapshotInfo(snapshotFragments, 1L, 12345678L);
-        addSnapshotInfo(snapshotFragments, 2L, 87654321L);
-
-        // Both should still be around for future restore processing
-        RestoreAgent.currySnapshotInfo(null, 12345678L, snapshotFragments);
-        assertEquals(2, snapshotFragments.size());
     }
 }

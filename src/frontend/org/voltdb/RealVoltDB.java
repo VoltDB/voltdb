@@ -43,6 +43,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Site;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -475,16 +476,44 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_restoreAgent = null;
 
             if (!isRejoin && !m_config.m_isRejoinTest) {
+                String snapshotPath = null;
+                if (m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
+                    snapshotPath = m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
+                }
+
+                int lowestSite = m_catalogContext.siteTracker.getLowestLiveNonExecSiteId();
+                int lowestHostId = m_catalogContext.siteTracker.getHostForSite(lowestSite);
+
+                int[] allPartitions = new int[m_catalogContext.numberOfPartitions];
+                int i = 0;
+                for (Partition p : m_catalogContext.cluster.getPartitions()) {
+                    allPartitions[i++] = Integer.parseInt(p.getTypeName());
+                }
+
+                org.voltdb.catalog.CommandLog cl = m_catalogContext.cluster.getLogconfig().get("log");
+
                 try {
-                    m_restoreAgent = new RestoreAgent(m_catalogContext, initiator,
+                    m_restoreAgent = new RestoreAgent(initiator,
                                                       m_zk, getSnapshotCompletionMonitor(),
                                                       this, m_myHostId,
-                                                      config.m_startAction);
+                                                      config.m_startAction,
+                                                      m_catalogContext.numberOfPartitions,
+                                                      cl.getEnabled(),
+                                                      cl.getLogpath(),
+                                                      cl.getInternalsnapshotpath(),
+                                                      snapshotPath,
+                                                      lowestHostId,
+                                                      allPartitions,
+                                                      m_catalogContext.siteTracker.getAllLiveHosts());
                 } catch (IOException e) {
                     hostLog.fatal("Unable to establish a ZooKeeper connection: " +
                                   e.getMessage());
                     VoltDB.crashVoltDB();
                 }
+
+                m_restoreAgent.setCatalogContext(m_catalogContext);
+                // Generate plans
+                String catalogPath = m_restoreAgent.findRestoreCatalog();
             } else {
                 onRestoreCompletion(Long.MIN_VALUE, !isRejoin);
             }
