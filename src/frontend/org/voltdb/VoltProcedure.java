@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import org.voltdb.Expectation.Type;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -81,6 +82,16 @@ public abstract class VoltProcedure {
     // And how much wood a woodchuck chucks.
     public static final String ANON_STMT_NAME = "sql";
 
+    public static final Expectation EXPECT_EMPTY = new Expectation(Type.EXPECT_EMPTY);
+    public static final Expectation EXPECT_ONE_ROW = new Expectation(Type.EXPECT_ONE_ROW);
+    public static final Expectation EXPECT_ZERO_OR_ONE_ROW = new Expectation(Type.EXPECT_ZERO_OR_ONE_ROW);
+    public static final Expectation EXPECT_NON_EMPTY = new Expectation(Type.EXPECT_NON_EMPTY);
+    public static final Expectation EXPECT_SCALAR = new Expectation(Type.EXPECT_SCALAR);
+    public static final Expectation EXPECT_SCALAR_LONG = new Expectation(Type.EXPECT_SCALAR_LONG);
+    public static final Expectation EXPECT_SCALAR_MATCH(long scalar) {
+        return new Expectation(Type.EXPECT_SCALAR_MATCH, scalar);
+    }
+
     protected HsqlBackend m_hsql;
 
     //For runtime statistics collection
@@ -124,6 +135,7 @@ public abstract class VoltProcedure {
     private final SQLStmt m_batchQueryStmts[] = new SQLStmt[MAX_BATCH_SIZE];
     private int m_batchQueryStmtIndex = 0;
     private Object[] m_batchQueryArgs[];
+    private Expectation[] m_batchQueryExpectations = new Expectation[MAX_BATCH_SIZE];
     private int m_batchQueryArgsIndex = 0;
     private final long m_fragmentIds[] = new long[MAX_BATCH_SIZE];
     private final int m_expectedDeps[] = new int[MAX_BATCH_SIZE];
@@ -322,7 +334,6 @@ public abstract class VoltProcedure {
 
         // in case sql was queued but executed
         m_batchQueryStmtIndex = 0;
-        m_batchQueryArgsIndex = 0;
 
         VoltTable[] results = new VoltTable[0];
         byte status = ClientResponseImpl.SUCCESS;
@@ -707,6 +718,23 @@ public abstract class VoltProcedure {
         return new Date(ts);
     }
 
+    public void checkExpectation(Expectation expectation, VoltTable table) {
+        Expectation.check(expectation, table);
+    }
+
+    public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
+        voltQueueSQL(stmt, args);
+
+        if (!m_isNative) {
+            VoltTable table = m_queryResults.get(m_queryResults.size() - 1);
+            Expectation.check(expectation, table);
+            return;
+        }
+
+        voltQueueSQL(stmt, args);
+        m_batchQueryExpectations[m_batchQueryStmtIndex - 1] = expectation;
+    }
+
     /**
      * Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list.
      *
@@ -727,8 +755,10 @@ public abstract class VoltProcedure {
                     "statements in a single batch.\n  You may use multiple batches of up to 1000 statements," +
                     "each,\n  but you may also want to consider dividing this work into multiple procedures.");
         } else {
-            m_batchQueryStmts[m_batchQueryStmtIndex++] = stmt;
-            m_batchQueryArgs[m_batchQueryArgsIndex++] = args;
+            m_batchQueryStmts[m_batchQueryStmtIndex] = stmt;
+            m_batchQueryArgs[m_batchQueryStmtIndex] = args;
+            m_batchQueryExpectations[m_batchQueryStmtIndex] = null; // may be set later
+            ++m_batchQueryStmtIndex;
         }
     }
 
@@ -759,15 +789,17 @@ public abstract class VoltProcedure {
             return batch_results;
         }
 
-        assert (m_batchQueryStmtIndex == m_batchQueryArgsIndex);
-
         VoltTable[] retval = null;
 
         retval = executeQueriesInABatch(
                 m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
 
+        // verify expectations, noop if expectation is null
+        for (int i = 0; i < retval.length; ++i) {
+            Expectation.check(m_batchQueryExpectations[i], retval[i]);
+        }
+
         m_batchQueryStmtIndex = 0;
-        m_batchQueryArgsIndex = 0;
         return retval;
     }
 
