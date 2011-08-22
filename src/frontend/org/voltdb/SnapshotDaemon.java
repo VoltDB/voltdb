@@ -411,6 +411,7 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
             params[1] = nonce;
             params[2] = 0;//don't block
             long handle = m_nextCallbackHandle++;
+
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
                 @Override
@@ -499,33 +500,26 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
             });
             m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
             return;
-        } else {
-            assert(event.getType() == EventType.NodeDeleted);
-            /*
-             * This will reset the watch it presumably fired because due to a delete
-             */
-            try {
-                truncationRequestExistenceCheck();
-            } catch (Exception e) {
-                loggingLog.error(e);
-            }
         }
     }
 
-    void truncationRequestExistenceCheck() throws KeeperException, InterruptedException {
-        if (m_zk.exists("/request_truncation_snapshot", new Watcher() {
+    private final Watcher m_truncationRequestExistenceWatcher = new Watcher() {
 
-            @Override
-            public void process(final WatchedEvent event) {
-                if (event.getState() == KeeperState.Disconnected) return;
-                m_es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        processTruncationRequestEvent(event);
-                    }
-                });
-            }
-        }) != null) {
+        @Override
+        public void process(final WatchedEvent event) {
+            if (event.getState() == KeeperState.Disconnected) return;
+
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    processTruncationRequestEvent(event);
+                }
+            });
+        }
+    };
+
+    void truncationRequestExistenceCheck() throws KeeperException, InterruptedException {
+        if (m_zk.exists("/request_truncation_snapshot", m_truncationRequestExistenceWatcher) != null) {
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,

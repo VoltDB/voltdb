@@ -551,7 +551,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         client.drain();
         assertTrue(callbackSuccess);
 
-        for (int i=0; i < 100; i++)
+        /*
+         * Reduced from 100 to 30 so that it doesn't take quite as long
+         * We run tests often enough that this will get plenty of fuzzing.
+         */
+        for (int i=0; i < 30; i++)
         {
             // add tables O1, O2, O3
             String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.jar");
