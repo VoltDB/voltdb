@@ -238,7 +238,7 @@ var IVoltDB = (function(){
 						  , '@SnapshotScan': ['varchar']
 						  , '@SnapshotStatus': []
 						  , '@Statistics': ['StatisticsComponent', 'bit' ]
-						  , '@SystemInformation': []
+						  , '@SystemInformation': ['SysInfoSelector']
 						  , '@UpdateApplicationCatalog': ['varchar', 'varchar']
 						  , '@UpdateLogging': ['xml']
 						};
@@ -334,7 +334,7 @@ var IVoltDB = (function(){
 												  , '@SnapshotScan': ['DirectoryPath (varchar)', 'Returns Table[]']
 												  , '@SnapshotStatus': ['Returns Table[]']
 												  , '@Statistics': ['Statitic (StatisticsComponent)', 'Interval (bit)', 'Returns Table[]' ]
-												  , '@SystemInformation': ['Returns Table[]']
+												  , '@SystemInformation': ['Selector (SysInfoSelector)', 'Returns Table[]']
 												  , '@UpdateApplicationCatalog': ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]']
 												  , '@UpdateLogging': ['Configuration (xml)', 'Returns Table[]']
 												  };

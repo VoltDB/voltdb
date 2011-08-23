@@ -479,6 +479,12 @@ public class SQLCommand
                             throw new Exception("Invalid Statistics Component: " + param);
                         objectParams[i] = param.toUpperCase();
                     }
+                    else if (paramType.equals("sysinfoselector"))
+                    {
+                        if (!SysInfoSelectors.contains(param.toUpperCase()))
+                            throw new Exception("Invalid SysInfo Selector: " + param);
+                        objectParams[i] = param.toUpperCase();
+                    }
                     else if (paramType.equals("varbinary"))
                     {
                         if (IsNull.matcher(param).matches())
@@ -695,6 +701,7 @@ public class SQLCommand
     private static Client VoltDB;
     private static final List<String> Types = Arrays.asList("tinyint","smallint","int","bigint","float","decimal","varchar","timestamp","varbinary");
     private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS");
+    private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static Map<String,List<String>> Procedures = new Hashtable<String,List<String>>();
     private static void loadSystemProcedures()
     {
@@ -707,7 +714,7 @@ public class SQLCommand
         Procedures.put("@SnapshotSave", Arrays.asList("varchar", "varchar", "bit"));
         Procedures.put("@SnapshotScan", Arrays.asList("varchar"));
         Procedures.put("@Statistics", Arrays.asList("statisticscomponent", "bit"));
-        Procedures.put("@SystemInformation", new ArrayList<String>());
+        Procedures.put("@SystemInformation", Arrays.asList("sysinfoselector"));
         Procedures.put("@UpdateApplicationCatalog", Arrays.asList("varchar", "varchar"));
         Procedures.put("@UpdateLogging", Arrays.asList("varchar"));
     }

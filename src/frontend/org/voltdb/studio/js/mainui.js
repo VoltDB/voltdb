@@ -505,6 +505,11 @@ this.AddConnection = function(connection, success)
 				for(var k in list)
 					src += '<li class="empty"><span>' + list[k] + '</span></li>';
 			src += '</ul></li>';
+			src += '<li class="type closed"><span>SysInfoSelector</span><ul>';
+				list = ['OVERVIEW','DEPLOYMENT'];
+				for(var k in list)
+					src += '<li class="empty"><span>' + list[k] + '</span></li>';
+			src += '</ul></li>';
 		src += '</ul></li>';
 		src += '<li class="folder closed"><span>Character Strings</span><ul>';
 			src += '<li class="type"><span>xml</span></li>';
