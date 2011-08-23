@@ -48,6 +48,10 @@ public abstract class TheHashinator {
      * distributed.
      */
     static int hashinate(long value, int partitionCount) {
+        // special case this hard to hash value to 0 (in both c++ and java)
+        if (value == Long.MIN_VALUE) return 0;
+
+        // hash the same way c++ does
         int index = (int)(value^(value>>>32));
         return java.lang.Math.abs(index % partitionCount);
     }

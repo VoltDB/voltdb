@@ -31,6 +31,7 @@ import junit.framework.TestCase;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
@@ -354,5 +355,30 @@ public class TestCatalogUtil extends TestCase {
                        commandlogsnapshotdir.getAbsolutePath() + " is not a directory",
                        commandlogsnapshotdir.isDirectory());
         }
+    }
+
+    public void testCompileDeploymentAgainstEmptyCatalog() {
+        Catalog catalog = new Catalog();
+        Cluster cluster = catalog.getClusters().add("cluster");
+        Database db = cluster.getDatabases().add("database");
+
+        String deploymentContent =
+            "<?xml version=\"1.0\"?>\n" +
+            "<deployment>\n" +
+            "    <cluster hostcount='1' sitesperhost='1' leader='localhost' kfactor='0' />\n" +
+            "    <httpd enabled='true'>\n" +
+            "        <jsonapi enabled='true' />\n" +
+            "    </httpd>\n" +
+            "    <export enabled='false'/>\n" +
+            "</deployment>\n";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(deploymentContent);
+        final String depPath = schemaFile.getPath();
+
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, depPath, false);
+
+        String commands = catalog.serialize();
+        System.out.println(commands);
+
     }
 }

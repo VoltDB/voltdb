@@ -225,6 +225,13 @@ public class Inits {
             HeartbeatType hbt = m_deployment.getHeartbeat();
             if (hbt != null)
                 m_config.m_deadHostTimeoutMS = hbt.getTimeout();
+
+            /*Catalog catalog = new Catalog();
+            Cluster cluster = catalog.getClusters().add("cluster");
+            cluster.getDatabases().add("database");
+
+            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
+            m_rvdb.m_catalogContext = new CatalogContext(0, catalog, CatalogContext.NO_PATH, depCRC, 0, 0);*/
         }
     }
 
@@ -423,6 +430,7 @@ public class Inits {
         InitExport() {
             dependsOn(LoadCatalog.class);
             dependsOn(JoinAndInitNetwork.class);
+            dependsOn(PostNetworkAndCatalogWork.class);
         }
 
         @Override

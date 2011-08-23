@@ -276,7 +276,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // VOLTDB_RESPONSE_SAMPLE_PATH to a valid path
             ResponseSampler.initializeIfEnabled();
 
-            Inits inits = new Inits(this, 4);
+            Inits inits = new Inits(this, 1);
             inits.doInitializationWork();
 
             // set up site structure

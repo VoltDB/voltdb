@@ -93,14 +93,11 @@ class TheHashinator {
      * distributed.
      */
     static int32_t hashinate(int64_t value, int32_t partitionCount) {
-        uint64_t uvalue = static_cast<uint64_t>(value);
+        // special case this hard to hash value to 0 (in both c++ and java)
+        if (value == INT64_MIN) return 0;
 
-        uint32_t shiftAmount = 32;
-
-        uint32_t left = static_cast<uint32_t>((uvalue >> shiftAmount) + (2 << ~shiftAmount));
-        uint32_t right = static_cast<uint32_t>(uvalue);
-
-        int32_t index = static_cast<int32_t>(left ^ right);
+        // hash the same way java does
+        int32_t index = static_cast<int32_t>(value^(static_cast<uint64_t>(value) >> 32));
         return abs(index % partitionCount);
     }
 

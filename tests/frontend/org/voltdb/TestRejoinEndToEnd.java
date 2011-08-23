@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.quarantine;
+package org.voltdb;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -37,7 +37,6 @@ import java.nio.channels.SocketChannel;
 import org.voltdb.BackendTarget;
 import org.voltdb.ExecutionSite;
 import org.voltdb.OperationMode;
-import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;

@@ -43,6 +43,24 @@ public class TestTheHashinator extends TestCase {
         VoltDB.instance().readBuildInfo("Test");
     }
 
+    public void testExpectNonZeroHash() {
+        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
+
+        int partitionCount = 3;
+        long valueToHash = 2;
+        int eehash = ee.hashinate(valueToHash, partitionCount);
+        int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        if (eehash != javahash) {
+            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+        }
+        assertEquals(eehash, javahash);
+        assertNotSame(0, eehash);
+        assertTrue(eehash < partitionCount);
+        assertTrue(eehash >= 0);
+
+        try { ee.release(); } catch (Exception e) {}
+    }
+
     public void testSameLongHash1() {
         ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
 
@@ -53,6 +71,9 @@ public class TestTheHashinator extends TestCase {
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
+        assertEquals(eehash, javahash);
+        assertTrue(eehash < partitionCount);
+        assertTrue(eehash >= 0);
 
         partitionCount = 2;
         valueToHash = 1;
@@ -61,6 +82,9 @@ public class TestTheHashinator extends TestCase {
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
+        assertEquals(eehash, javahash);
+        assertTrue(eehash < partitionCount);
+        assertTrue(eehash >= 0);
 
         partitionCount = 2;
         valueToHash = 2;
@@ -70,6 +94,8 @@ public class TestTheHashinator extends TestCase {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
         assertEquals(eehash, javahash);
+        assertTrue(eehash < partitionCount);
+        assertTrue(eehash >= 0);
 
         partitionCount = 2;
         valueToHash = 3;
@@ -79,6 +105,37 @@ public class TestTheHashinator extends TestCase {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
         assertEquals(eehash, javahash);
+        assertTrue(eehash < partitionCount);
+        assertTrue(eehash >= 0);
+
+        try { ee.release(); } catch (Exception e) {}
+    }
+
+    public void testEdgeCases() {
+        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
+
+        /**
+         *  Run with 100k of random values and make sure C++ and Java hash to
+         *  the same value.
+         */
+        for (int i = 0; i < 5; i++) {
+            int partitionCount = r.nextInt(1000) + 1;
+            long[] values = new long[] {
+                    Long.MIN_VALUE, Long.MAX_VALUE, Long.MAX_VALUE - 1, Long.MIN_VALUE + 1
+            };
+            for (long valueToHash : values) {
+                int eehash = ee.hashinate(valueToHash, partitionCount);
+                int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+                if (eehash != javahash) {
+                    System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+                }
+                assertEquals(eehash, javahash);
+                assertTrue(eehash < partitionCount);
+                assertTrue(eehash >= 0);
+            }
+        }
+
+        try { ee.release(); } catch (Exception e) {}
     }
 
     public void testSameLongHash() {
@@ -101,6 +158,8 @@ public class TestTheHashinator extends TestCase {
             assertTrue(eehash < partitionCount);
             assertTrue(eehash > -1);
         }
+
+        try { ee.release(); } catch (Exception e) {}
     }
 
     public void testSameStringHash() {
@@ -117,7 +176,10 @@ public class TestTheHashinator extends TestCase {
             }
             assertEquals(eehash, javahash);
             assertTrue(eehash < partitionCount);
+            assertTrue(eehash >= 0);
         }
+
+        try { ee.release(); } catch (Exception e) {}
     }
 
     public void testNulls() {
@@ -158,6 +220,8 @@ public class TestTheHashinator extends TestCase {
         assertEquals(0, jHash);
         assertEquals(jHash, cHash);
         System.out.println("jhash " + jHash + " chash " + cHash);
+
+        try { ee.release(); } catch (Exception e) {}
     }
 }
 
