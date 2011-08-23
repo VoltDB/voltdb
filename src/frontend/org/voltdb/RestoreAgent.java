@@ -884,7 +884,14 @@ SnapshotCompletionInterest {
         Long clStartTxnId = null;
         ByteBuffer buf;
         for (String node : children) {
-            int hostId = Integer.parseInt(node);
+            int hostId;
+            try {
+                hostId = Integer.parseInt(node);
+            } catch (NumberFormatException e) {
+                // If the node is not named using hostID, skip it
+                continue;
+            }
+
             byte[] data = null;
             try {
                 data = m_zk.getData(RESTORE + "/" + node, false, null);
