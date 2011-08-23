@@ -25,22 +25,24 @@
 
 <style type="text/css">
 html,body {height:100%;width:100%;}
-#top-1 {
+#top-1
+{
     background: url("img/bgslice.png") repeat-x scroll 0 0 #D4E1ED;
     clear: both;
     float: left;
     margin: 0 auto;
     width: 100%;
-min-height:262px;
+    height:262px;
 }
-#middle-1-front-pg {
+#middle-1-front-pg
+{
     background: url("img/bgslicemiddle.png") repeat-x scroll 0 0 white;
     clear: both;
     float: left;
     margin: 0;
     padding:0;
     width: 100%;
-overflow-x:hidden;
+    overflow-x:hidden;
 }
 
 h1 {color: #0E3355;font-size: 24px;}
@@ -48,21 +50,21 @@ h2 {color: #0E3355;font-size: 18px;}
 
 ul.chk
 {
-margin-left: 0;
-padding-left: 0;
-list-style: none;
+    margin-left: 0;
+    padding-left: 0;
+    list-style: none;
 }
 
 ul.chk li
 {
-padding-left: 25px;
-background-image: url(img/check.png);
-background-repeat: no-repeat;
-background-position: 3px 3px;
-margin-bottom:5px;
+    padding-left: 25px;
+    background-image: url(img/check.png);
+    background-repeat: no-repeat;
+    background-position: 3px 3px;
+    margin-bottom:5px;
 }
 
-ul.tabs { margin:0;width:600px; }
+ul.tabs { margin:0;width:750px; }
 ul.tabs li
 {
     background: url("img/tabpassive.png") no-repeat scroll 0 0 transparent;
@@ -82,10 +84,10 @@ ul.tabs li.active
     background: url("img/tabactive.png") no-repeat scroll 0 0 transparent;
     color:#fff;
 }
-.sec {font-size:1.5em;}
+.sec {font-size:1.5em;padding-left:25px;padding-right:25px;}
 
+iframe { display:block; border:none;margin:0; padding:0; height:100%; width:100%; }
 </style>
-
     </head>
 <body class="body" style="background-color:#fff;-moz-user-select:text;s:-moz-none;padding:0;margin:0;color:#333">
 <div id="top-1"><div style="padding-left:20px;padding-right:20px;">
@@ -108,10 +110,11 @@ ul.tabs li.active
 <li id="lnk_2">K/V Store</li>
 <li id="lnk_3">Next Steps</li>
 <li id="lnk_4">Cool Tools!</li>
+<li id="lnk_5">Extras...</li>
 </ul>
 </div>
 
-<div style="background-color:white;clear:both;padding-left:25px;padding-right:25px;">
+<div style="background-color:white;clear:both;position:absolute;top:301px;left:0px;bottom:0px;right:0px;">
 
     <div id="sec_0" class="sec">
 		This Demo Dashboard walks you through sample VoltDB applications and puts some useful tools at your fingertips.  As you click your way across the tabs:
@@ -182,6 +185,10 @@ ul.tabs li.active
 		SQL Command allows you to run SQL statements and procedures in a simple, convenient command-line interface.  You can even feed script files to the utility and save the result output to a data file, for your automation needs.
         You can find SQL Command in <u>/tools/sqlcmd</u> (then simply run ./sqlcmd)
 
+    </div>
+
+    <div id="sec_5" class="sec" style="display:none;">
+    		<iframe src="http://voltdb.com/resources" style="position:absolute;top:0px;left:0px;bottom:0px;right:2px;"><p><a href="http://voltdb.com/resources">http://voltdb.com/resources</a></p></iframe>
     </div>
 
 </div>
