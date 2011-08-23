@@ -27,6 +27,11 @@ begin Deployment   "Run-time deployment settings"
   int hostcount    "The number of hosts in the cluster"
   int kfactor      "The required k-safety factor"
   int sitesperhost "The number of execution sites per host"
+  Systemsettings* systemsettings  "Values from the systemsettings element"
+end
+
+begin Systemsettings  "Container for deployment systemsettings element"
+  int maxtemptablesize   "The maximum allocation size for temp tables in the EE"
 end
 
 begin Host      "A single host participating in the cluster"

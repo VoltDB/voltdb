@@ -155,17 +155,20 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
 #endif // LINUX
 }
 
-bool VoltDBEngine::initialize(
-        int32_t clusterIndex,
-        int32_t siteId,
-        int32_t partitionId,
-        int32_t hostId,
-        string hostname) {
+bool
+VoltDBEngine::initialize(int32_t clusterIndex,
+                         int32_t siteId,
+                         int32_t partitionId,
+                         int32_t hostId,
+                         string hostname,
+                         int64_t tempTableMemoryLimit)
+{
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_partitionId = partitionId;
+    m_tempTableMemoryLimit = tempTableMemoryLimit;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -882,11 +885,11 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
 
     // ENG-1333 HACK.  If the plan node fragment has a delete node,
     // then turn off the governors
-    int64_t frag_temptable_log_limit = -1;
-    int64_t frag_temptable_limit = MAX_NORMAL_TEMP_TABLE_MEMORY;
+    int64_t frag_temptable_log_limit = (m_tempTableMemoryLimit * 3) / 4;
+    int64_t frag_temptable_limit = m_tempTableMemoryLimit;
     if (pnf->hasDelete())
     {
-        frag_temptable_log_limit = MAX_NORMAL_TEMP_TABLE_MEMORY;
+        frag_temptable_log_limit = DEFAULT_TEMP_TABLE_MEMORY;
         frag_temptable_limit = -1;
     }
 

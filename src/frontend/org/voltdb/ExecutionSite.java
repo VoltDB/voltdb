@@ -800,7 +800,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         getSiteId(),
                         Integer.valueOf(site.getPartition().getTypeName()),
                         Integer.valueOf(site.getHost().getTypeName()),
-                        hostname);
+                        hostname,
+                        m_context.cluster.getDeployment().get("deployment").
+                        getSystemsettings().get("systemsettings").getMaxtemptablesize());
                 eeTemp.loadCatalog( txnId, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, txnId);
@@ -816,6 +818,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                             Integer.valueOf(site.getPartition().getTypeName()),
                             Integer.valueOf(site.getHost().getTypeName()),
                             hostname,
+                            m_context.cluster.getDeployment().get("deployment").
+                            getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             target,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0));
                 eeTemp.loadCatalog( 0, serializedCatalog);

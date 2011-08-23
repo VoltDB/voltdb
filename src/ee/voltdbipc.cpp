@@ -423,6 +423,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int64_t logLevels;
         int16_t hostnameLength;
         char hostname[0];
+        int64_t tempTableMemory;
     };
     struct initialize * cs = (struct initialize*) cmd;
 
@@ -433,6 +434,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
     cs->hostnameLength = ntohs(cs->hostnameLength);
+    cs->tempTableMemory = ntohll(cs->tempTableMemory);
     std::string hostname(cs->hostname, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
@@ -440,7 +442,12 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
         m_exceptionBuffer = new char[MAX_MSG_SZ];
         m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
-        if (m_engine->initialize( cs->clusterId, cs->siteId, cs->partitionId, cs->hostId, hostname) == true) {
+        if (m_engine->initialize(cs->clusterId,
+                                 cs->siteId,
+                                 cs->partitionId,
+                                 cs->hostId,
+                                 hostname,
+                                 cs->tempTableMemory) == true) {
             return kErrorCode_Success;
         }
     } catch (FatalException e) {

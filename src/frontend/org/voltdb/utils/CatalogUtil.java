@@ -60,6 +60,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
@@ -75,6 +76,8 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.logging.Level;
@@ -578,6 +581,18 @@ public abstract class CatalogUtil {
             sb.append(ht.getPort());
         }
 
+        sb.append(" SYSTEMSETTINGS ");
+        SystemSettingsType sst = deployment.getSystemsettings();
+        if (sst != null)
+        {
+            sb.append(" TEMPTABLES ");
+            Temptables ttt = sst.getTemptables();
+            if (ttt != null)
+            {
+                sb.append(ttt.getMaxsize()).append("\n");
+            }
+        }
+
         byte[] data = null;
         try {
             data = sb.toString().getBytes("UTF-8");
@@ -763,6 +778,8 @@ public abstract class CatalogUtil {
                 catCluster.setAdminstartup(false);
             }
 
+            setSystemSettings(deployment, catDeploy);
+
             if (deployment.getHeartbeat() != null)
             {
                 catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
@@ -773,6 +790,24 @@ public abstract class CatalogUtil {
                 catCluster.setHeartbeattimeout(10);
             }
         }
+    }
+
+    private static void setSystemSettings(DeploymentType deployment,
+                                          Deployment catDeployment)
+    {
+        // Create catalog Systemsettings
+        Systemsettings syssettings =
+            catDeployment.getSystemsettings().add("systemsettings");
+        int maxtemptablesize = 100;
+        if (deployment.getSystemsettings() != null)
+        {
+            Temptables temptables = deployment.getSystemsettings().getTemptables();
+            if (temptables != null)
+            {
+                maxtemptablesize = temptables.getMaxsize();
+            }
+        }
+        syssettings.setMaxtemptablesize(maxtemptablesize);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {

@@ -253,7 +253,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint siteId,
     jint partitionId,
     jint hostId,
-    jstring hostname) {
+    jstring hostname,
+    jlong tempTableMemory)
+{
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -271,12 +273,12 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         // never fails.
         VOLT_DEBUG("calling initialize...");
         bool success =
-                engine->initialize(
-                        clusterIndex,
-                        siteId,
-                        partitionId,
-                        hostId,
-                        hostString);
+                engine->initialize(clusterIndex,
+                                   siteId,
+                                   partitionId,
+                                   hostId,
+                                   hostString,
+                                   tempTableMemory);
 
         if (success) {
             VOLT_DEBUG("initialize succeeded");

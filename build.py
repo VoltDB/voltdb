@@ -180,6 +180,7 @@ CTX.INPUT['catalog'] = """
  site.cpp
  statement.cpp
  stmtparameter.cpp
+ systemsettings.cpp
  table.cpp
  user.cpp
  userref.cpp

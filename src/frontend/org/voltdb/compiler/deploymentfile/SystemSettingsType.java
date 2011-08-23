@@ -11,31 +11,29 @@ package org.voltdb.compiler.deploymentfile;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
 
 
 /**
- * <p>Java class for partitionDetectionType complex type.
+ * <p>Java class for systemSettingsType complex type.
  * 
  * <p>The following schema fragment specifies the expected content contained within this class.
  * 
  * <pre>
- * &lt;complexType name="partitionDetectionType">
+ * &lt;complexType name="systemSettingsType">
  *   &lt;complexContent>
  *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
  *       &lt;all>
- *         &lt;element name="snapshot">
+ *         &lt;element name="temptables" minOccurs="0">
  *           &lt;complexType>
  *             &lt;complexContent>
  *               &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
- *                 &lt;attribute name="prefix" use="required" type="{http://www.w3.org/2001/XMLSchema}string" />
+ *                 &lt;attribute name="maxsize" type="{}memorySizeType" default="100" />
  *               &lt;/restriction>
  *             &lt;/complexContent>
  *           &lt;/complexType>
  *         &lt;/element>
  *       &lt;/all>
- *       &lt;attribute name="enabled" type="{http://www.w3.org/2001/XMLSchema}boolean" default="true" />
  *     &lt;/restriction>
  *   &lt;/complexContent>
  * &lt;/complexType>
@@ -44,66 +42,35 @@ import javax.xml.bind.annotation.XmlType;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "partitionDetectionType", propOrder = {
+@XmlType(name = "systemSettingsType", propOrder = {
 
 })
-public class PartitionDetectionType {
+public class SystemSettingsType {
 
-    @XmlElement(required = true)
-    protected PartitionDetectionType.Snapshot snapshot;
-    @XmlAttribute
-    protected Boolean enabled;
+    protected SystemSettingsType.Temptables temptables;
 
     /**
-     * Gets the value of the snapshot property.
+     * Gets the value of the temptables property.
      * 
      * @return
      *     possible object is
-     *     {@link PartitionDetectionType.Snapshot }
+     *     {@link SystemSettingsType.Temptables }
      *     
      */
-    public PartitionDetectionType.Snapshot getSnapshot() {
-        return snapshot;
+    public SystemSettingsType.Temptables getTemptables() {
+        return temptables;
     }
 
     /**
-     * Sets the value of the snapshot property.
+     * Sets the value of the temptables property.
      * 
      * @param value
      *     allowed object is
-     *     {@link PartitionDetectionType.Snapshot }
+     *     {@link SystemSettingsType.Temptables }
      *     
      */
-    public void setSnapshot(PartitionDetectionType.Snapshot value) {
-        this.snapshot = value;
-    }
-
-    /**
-     * Gets the value of the enabled property.
-     * 
-     * @return
-     *     possible object is
-     *     {@link Boolean }
-     *     
-     */
-    public boolean isEnabled() {
-        if (enabled == null) {
-            return true;
-        } else {
-            return enabled;
-        }
-    }
-
-    /**
-     * Sets the value of the enabled property.
-     * 
-     * @param value
-     *     allowed object is
-     *     {@link Boolean }
-     *     
-     */
-    public void setEnabled(Boolean value) {
-        this.enabled = value;
+    public void setTemptables(SystemSettingsType.Temptables value) {
+        this.temptables = value;
     }
 
 
@@ -116,7 +83,7 @@ public class PartitionDetectionType {
      * &lt;complexType>
      *   &lt;complexContent>
      *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
-     *       &lt;attribute name="prefix" use="required" type="{http://www.w3.org/2001/XMLSchema}string" />
+     *       &lt;attribute name="maxsize" type="{}memorySizeType" default="100" />
      *     &lt;/restriction>
      *   &lt;/complexContent>
      * &lt;/complexType>
@@ -126,33 +93,37 @@ public class PartitionDetectionType {
      */
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "")
-    public static class Snapshot {
+    public static class Temptables {
 
-        @XmlAttribute(required = true)
-        protected String prefix;
+        @XmlAttribute
+        protected Integer maxsize;
 
         /**
-         * Gets the value of the prefix property.
+         * Gets the value of the maxsize property.
          * 
          * @return
          *     possible object is
-         *     {@link String }
+         *     {@link Integer }
          *     
          */
-        public String getPrefix() {
-            return prefix;
+        public int getMaxsize() {
+            if (maxsize == null) {
+                return  100;
+            } else {
+                return maxsize;
+            }
         }
 
         /**
-         * Sets the value of the prefix property.
+         * Sets the value of the maxsize property.
          * 
          * @param value
          *     allowed object is
-         *     {@link String }
+         *     {@link Integer }
          *     
          */
-        public void setPrefix(String value) {
-            this.prefix = value;
+        public void setMaxsize(Integer value) {
+            this.maxsize = value;
         }
 
     }

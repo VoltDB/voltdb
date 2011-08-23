@@ -78,6 +78,7 @@
 #include "catalog/constraint.h"
 
 using namespace std;
+using namespace voltdb;
 
 #define NUM_OF_COLUMNS 5
 #define NUM_OF_INDEXES 2
@@ -88,11 +89,11 @@ using namespace std;
 // This is useful because it will allow us to check different types and other
 // configurations without having to dig down into the code
 //
-voltdb::ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { voltdb::VALUE_TYPE_BIGINT,
-                                                    voltdb::VALUE_TYPE_BIGINT,
-                                                    voltdb::VALUE_TYPE_BIGINT,
-                                                    voltdb::VALUE_TYPE_BIGINT,
-                                                    voltdb::VALUE_TYPE_BIGINT };
+ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_BIGINT,
+                                                    VALUE_TYPE_BIGINT,
+                                                    VALUE_TYPE_BIGINT,
+                                                    VALUE_TYPE_BIGINT,
+                                                    VALUE_TYPE_BIGINT };
 int COLUMN_SIZES[NUM_OF_COLUMNS]                = { 8, 8, 8, 8, 8};
 bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { true, true, true, true, true };
 
@@ -155,8 +156,8 @@ class ExecutionEngineTest : public Test {
             /*
              * Initialize the engine
              */
-            engine = new voltdb::VoltDBEngine();
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, ""));
+            engine = new VoltDBEngine();
+            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY));
             ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
 
             /*
@@ -189,47 +190,47 @@ class ExecutionEngineTest : public Test {
         }
 
     protected:
-        voltdb::CatalogId cluster_id;
-        voltdb::CatalogId database_id;
-        voltdb::CatalogId site_id;
-        voltdb::VoltDBEngine *engine;
+        CatalogId cluster_id;
+        CatalogId database_id;
+        CatalogId site_id;
+        VoltDBEngine *engine;
         string catalog_string;
         catalog::Catalog *catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
         catalog::Cluster *cluster;
         catalog::Database *database;
         catalog::Constraint *constraint;
 
-        voltdb::Table* warehouse_table;
-        voltdb::Table* stock_table;
+        Table* warehouse_table;
+        Table* stock_table;
 
         int warehouse_table_id;
         int stock_table_id;
 
-        void compareTables(voltdb::Table *first, voltdb::Table* second);
+        void compareTables(Table *first, Table* second);
 };
 
 //Shouldn't this functionality go into table.h?
-void ExecutionEngineTest::compareTables(voltdb::Table *first, voltdb::Table *second) {
+void ExecutionEngineTest::compareTables(Table *first, Table *second) {
     ASSERT_TRUE(first->columnCount() == second->columnCount());
     ASSERT_TRUE(first->indexCount() == second->indexCount());
     ASSERT_TRUE(first->activeTupleCount() == second->activeTupleCount());
     ASSERT_TRUE(first->databaseId() == second->databaseId());
     ASSERT_TRUE(first->name() == second->name());
     ASSERT_TRUE(first->tableType() == second->tableType());
-    vector<voltdb::TableIndex*> firstAllIndexes = first->allIndexes();
-    vector<voltdb::TableIndex*> secondAllIndexes = second->allIndexes();
+    vector<TableIndex*> firstAllIndexes = first->allIndexes();
+    vector<TableIndex*> secondAllIndexes = second->allIndexes();
     ASSERT_TRUE(firstAllIndexes.size() == secondAllIndexes.size());
     for (size_t ii = 0; ii < firstAllIndexes.size(); ii++) {
         ASSERT_TRUE(firstAllIndexes[ii]->equals(secondAllIndexes[ii]));
     }
-    const voltdb::TupleSchema *firstSchema = first->schema();
-    const voltdb::TupleSchema *secondSchema = second->schema();
+    const TupleSchema *firstSchema = first->schema();
+    const TupleSchema *secondSchema = second->schema();
     ASSERT_TRUE(firstSchema->equals(secondSchema));
 
-    voltdb::TableIterator firstTI = first->iterator();
-    voltdb::TableIterator secondTI = second->iterator();
-    voltdb::TableTuple firstTuple(firstSchema);
-    voltdb::TableTuple secondTuple(secondSchema);
+    TableIterator firstTI = first->iterator();
+    TableIterator secondTI = second->iterator();
+    TableTuple firstTuple(firstSchema);
+    TableTuple secondTuple(secondSchema);
     while(firstTI.next(firstTuple)) {
         ASSERT_TRUE(secondTI.next(secondTuple));
         ASSERT_TRUE(firstTuple.equals(secondTuple));

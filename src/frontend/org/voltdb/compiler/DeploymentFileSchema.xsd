@@ -46,6 +46,8 @@
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
       <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
+      <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
+                  type="systemSettingsType" />
     </xs:all>
   </xs:complexType>
 
@@ -73,6 +75,23 @@
         <xs:element name="exportoverflow" type="pathEntry" minOccurs="0" maxOccurs="1"/>
         <xs:element name="commandlog" type="pathEntry" minOccurs="0" maxOccurs="1"/>
         <xs:element name="commandlogsnapshot" type="pathEntry" minOccurs="0" maxOccurs="1"/>
+    </xs:all>
+  </xs:complexType>
+
+  <xs:simpleType name="memorySizeType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- <systemsettings> -->
+  <xs:complexType name="systemSettingsType">
+    <xs:all>
+        <xs:element name="temptables" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="maxsize" type="memorySizeType" default="100"/>
+            </xs:complexType>
+        </xs:element>
     </xs:all>
   </xs:complexType>
 

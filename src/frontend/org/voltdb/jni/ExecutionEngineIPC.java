@@ -535,6 +535,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int partitionId,
             final int hostId,
             final String hostname,
+            final int tempTableMemory,
             final BackendTarget target,
             final int port) {
         super(site);
@@ -553,7 +554,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
-        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname);
+        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -584,7 +585,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int siteId,
             final int partitionId,
             final int hostId,
-            final String hostname
+            final String hostname,
+            final long tempTableMemory
             )
     {
         synchronized(printLockObject) {

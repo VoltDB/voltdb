@@ -105,7 +105,7 @@ class PlanNodeFragment;
 class ExecutorContext;
 class RecoveryProtoMsg;
 
-const int64_t MAX_NORMAL_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
+const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -129,12 +129,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
 
         VoltDBEngine(Topend *topend, LogProxy *logProxy);
-        bool initialize(
-                int32_t clusterIndex,
-                int32_t siteId,
-                int32_t partitionId,
-                int32_t hostId,
-                std::string hostname);
+        bool initialize(int32_t clusterIndex,
+                        int32_t siteId,
+                        int32_t partitionId,
+                        int32_t hostId,
+                        std::string hostname,
+                        int64_t tempTableMemoryLimit);
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }
@@ -427,6 +427,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int32_t m_clusterIndex;
         int m_totalPartitions;
         size_t m_startOfResultBuffer;
+        int64_t m_tempTableMemoryLimit;
 
         /*
          * Catalog delegates hashed by path.

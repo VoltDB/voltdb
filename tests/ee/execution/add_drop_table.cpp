@@ -53,7 +53,7 @@ class AddDropTableTest : public Test {
 
         m_engine->resetReusedResultOutputBuffer();
         m_engine->initialize(m_clusterId, m_siteId, m_partitionId,
-                             m_hostId, m_hostName);
+                             m_hostId, m_hostName, DEFAULT_TEMP_TABLE_MEMORY);
 
         std::string initialCatalog =
           "add / clusters cluster\n"
@@ -501,4 +501,3 @@ TEST_F(AddDropTableTest, BadAddTable)
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
-

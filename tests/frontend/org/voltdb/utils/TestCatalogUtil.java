@@ -36,6 +36,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.ConstraintType;
@@ -260,6 +261,40 @@ public class TestCatalogUtil extends TestCase {
         assertFalse(db.getSnapshotschedule().isEmpty());
         assertTrue(db.getSnapshotschedule().get("default").getEnabled());
         assertEquals(10, db.getSnapshotschedule().get("default").getRetain());
+    }
+
+    public void testSystemSettingsMaxTempTableSize() throws Exception
+    {
+        final String depOff =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"false\"/>" +
+            "</deployment>";
+
+        final String depOn =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"true\"/>" +
+            "   <systemsettings>" +
+            "      <temptables maxsize=\"200\"/>" +
+            "   </systemsettings>" +
+            "</deployment>";
+
+        final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
+        long crcDepOff = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath(), true);
+        Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
+        assertEquals(100, sysset.getMaxtemptablesize());
+
+        setUp();
+        final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
+        long crcDepOn = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath(), true);
+        sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
+        assertEquals(200, sysset.getMaxtemptablesize());
+        assertTrue(crcDepOff != crcDepOn);
     }
 
     // XXX Need to add command log paths here when command logging

@@ -55,6 +55,7 @@ import org.voltdb.compiler.deploymentfile.*;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
@@ -219,6 +220,8 @@ public class VoltProjectBuilder {
     private Boolean m_commandLogEnabled;
     private Integer m_commandLogFsyncInterval;
     private Integer m_commandLogMaxTxnsBeforeFsync;
+
+    private Integer m_maxTempTableMemory = 100;
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
             Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync) {
@@ -424,6 +427,11 @@ public class VoltProjectBuilder {
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
         m_compilerDebugPrintStream = out;
+    }
+
+    public void setMaxTempTableMemory(int max)
+    {
+        m_maxTempTableMemory = max;
     }
 
     /**
@@ -910,6 +918,13 @@ public class VoltProjectBuilder {
             admin.setPort(adminPort);
             admin.setAdminstartup(adminOnStartup);
         }
+
+        // <systemsettings>
+        SystemSettingsType systemSettingType = factory.createSystemSettingsType();
+        Temptables temptables = factory.createSystemSettingsTypeTemptables();
+        temptables.setMaxsize(m_maxTempTableMemory);
+        systemSettingType.setTemptables(temptables);
+        deployment.setSystemsettings(systemSettingType);
 
         // <users>
         if (m_users.size() > 0) {
