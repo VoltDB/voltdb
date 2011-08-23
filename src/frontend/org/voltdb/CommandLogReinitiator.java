@@ -34,11 +34,8 @@ public interface CommandLogReinitiator {
 
     /**
      * Generate the local replay plan. Call this before starting replay.
-     *
-     * @return the total partition count recorded in the logs, or 0 if there is
-     *         nothing to replay.
      */
-    public long generateReplayPlan();
+    public void generateReplayPlan();
 
     /**
      * Start replaying the log. Two threads will be started, one for reading the

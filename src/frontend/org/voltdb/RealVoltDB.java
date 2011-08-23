@@ -61,6 +61,7 @@ import org.voltdb.messaging.Messenger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.Pair;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.VoltSampler;
@@ -512,8 +513,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
 
                 m_restoreAgent.setCatalogContext(m_catalogContext);
-                // Generate plans
-                String catalogPath = m_restoreAgent.findRestoreCatalog();
+                // Generate plans and get (hostID, catalogPath) pair
+                Pair<Integer,String> catalog = m_restoreAgent.findRestoreCatalog();
             } else {
                 onRestoreCompletion(Long.MIN_VALUE, !isRejoin);
             }

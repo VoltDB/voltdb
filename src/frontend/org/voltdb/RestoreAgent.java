@@ -170,9 +170,7 @@ SnapshotCompletionInterest {
             return false;
         }
         @Override
-        public long generateReplayPlan() {
-            return 0;
-        }
+        public void generateReplayPlan() {}
         @Override
         public void setCatalogContext(CatalogContext context) {}
     };
@@ -342,15 +340,24 @@ SnapshotCompletionInterest {
         public final long catalogCrc;
         // All the partitions for partitioned tables in the local snapshot file
         public final Map<String, Set<Integer>> partitions = new TreeMap<String, Set<Integer>>();
+        // This is not serialized, the name of the ZK node already has the host ID embedded.
+        public final int hostId;
 
         public SnapshotInfo(long txnId, String path, String nonce, int partitions,
                             long catalogCrc)
+        {
+            this(txnId, path, nonce, partitions, catalogCrc, -1);
+        }
+
+        public SnapshotInfo(long txnId, String path, String nonce, int partitions,
+                            long catalogCrc, int hostId)
         {
             this.txnId = txnId;
             this.path = path;
             this.nonce = nonce;
             this.partitionCount = partitions;
             this.catalogCrc = catalogCrc;
+            this.hostId = hostId;
         }
 
         public int size() {
@@ -457,10 +464,10 @@ SnapshotCompletionInterest {
      * Generate restore and replay plans and return the catalog associated with
      * the snapshot to restore if there is anything to restore.
      *
-     * @return The absolute path to the catalog, or null if there is no snapshot
+     * @return The (host ID, catalog path) pair, or null if there is no snapshot
      *         to restore.
      */
-    public String findRestoreCatalog() {
+    public Pair<Integer, String> findRestoreCatalog() {
         createZKDirectory(RESTORE);
         createZKDirectory(RESTORE_BARRIER);
 
@@ -473,16 +480,15 @@ SnapshotCompletionInterest {
             VoltDB.crashVoltDB();
         }
 
-        String path = null;
         if (m_snapshotToRestore != null) {
+            int hostId = m_snapshotToRestore.hostId;
             File file = new File(m_snapshotToRestore.path,
                                  m_snapshotToRestore.nonce + ".jar");
-            if (file.exists() && file.canRead()) {
-                path = file.getAbsolutePath();
-            }
+            String path = file.getPath();
+            return Pair.of(hostId, path);
         }
 
-        return path;
+        return null;
     }
 
     /**
@@ -654,27 +660,16 @@ SnapshotCompletionInterest {
                 break;
             }
             assert(last != null);
+            assert(last.hostId != -1);
             LOG.debug("Snapshot to restore: " + last.txnId);
         }
 
         /*
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
-         *
-         * ENG-1678: Fail if the partition count in the cluster does not equal
-         * to the partition count recorded in the command logs.
          */
         if (m_action != START_ACTION.CREATE) {
-            long partitionCount = m_replayAgent.generateReplayPlan();
-            if (partitionCount > 0 &&
-                partitionCount != m_partitionCount) {
-                String msg = "Command logs can only be replayed on a cluster" +
-                        " with the same number of partitions. Command" +
-                        " logs recorded " + partitionCount +
-                        " partitions, but the cluster has " +
-                        m_partitionCount + " partitions";
-                throw new RuntimeException(msg);
-            }
+            m_replayAgent.generateReplayPlan();
         }
 
         return last;
@@ -764,14 +759,6 @@ SnapshotCompletionInterest {
      * @throws Exception
      */
     private Set<SnapshotInfo> getRestorePlan() throws Exception {
-        /*
-         * Only let the first host do the rest, so we don't end up having
-         * multiple hosts trying to initiate a snapshot restore
-         */
-        if (!isLowestHost()) {
-            return null;
-        }
-
         LOG.debug("Waiting for all hosts to send their snapshot information");
         List<String> children = null;
         while (true) {
@@ -897,6 +884,7 @@ SnapshotCompletionInterest {
         Long clStartTxnId = null;
         ByteBuffer buf;
         for (String node : children) {
+            int hostId = Integer.parseInt(node);
             byte[] data = null;
             try {
                 data = m_zk.getData(RESTORE + "/" + node, false, null);
@@ -944,7 +932,7 @@ SnapshotCompletionInterest {
                 SnapshotInfo info = new SnapshotInfo(txnId, new String(pathBytes),
                                                      new String(nonceBytes),
                                                      totalPartitionCount,
-                                                     catalogCrc);
+                                                     catalogCrc, hostId);
                 fragments.add(info);
 
                 int tableCount = buf.getInt();
