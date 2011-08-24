@@ -40,6 +40,8 @@ public interface CommandLog {
     public abstract void initForRejoin(CatalogContext context, long txnId,
                                        long faultSequenceNumber, Set<Integer> failedSites);
 
+    public abstract boolean needsInitialization();
+
     public abstract void log(InitiateTaskMessage message);
 
     public abstract void shutdown() throws InterruptedException;

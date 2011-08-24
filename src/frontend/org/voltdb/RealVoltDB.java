@@ -56,7 +56,6 @@ import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.HTTPAdminListener;
@@ -182,41 +181,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private long m_recoveryStartTime = System.currentTimeMillis();
 
-    CommandLog m_commandLog = new CommandLog() {
-
-        @Override
-        public void init(CatalogContext context, long txnId) {}
-
-        @Override
-        public void log(InitiateTaskMessage message) {}
-
-        @Override
-        public void shutdown() throws InterruptedException {}
-
-        @Override
-        public Semaphore logFault(Set<Integer> failedSites,
-                Set<Long> faultedTxns) {
-            return new Semaphore(1);
-        }
-
-        @Override
-        public void logHeartbeat(final long txnId) {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public long getFaultSequenceNumber() {
-            return 0;
-        }
-
-        @Override
-        public void initForRejoin(CatalogContext context, long txnId,
-                long faultSequenceNumber, Set<Integer> failedSites) {
-            // TODO Auto-generated method stub
-
-        }
-    };
+    CommandLog m_commandLog;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
     OperationMode m_startMode = null;
@@ -248,6 +213,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             m_config = config;
+
+            // set a bunch of things to null/empty/new for tests
+            // which reusue the process
+            m_clientInterfaces.clear();
+            m_agreementSite = null;
+            m_adminListener = null;
+            m_commandLog = new DummyCommandLog();
+            m_deployment = null;
+            m_messenger = null;
+            m_statsAgent = new StatsAgent();
+            m_faultManager = null;
+            m_instanceId = null;
+            m_zk = null;
+            m_snapshotCompletionMonitor = null;
+            m_catalogContext = null;
+            m_partitionCountStats = null;
+            m_ioStats = null;
+            m_memoryStats = null;
+            m_statsManager = null;
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)

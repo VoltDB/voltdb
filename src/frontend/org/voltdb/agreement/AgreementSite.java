@@ -16,6 +16,33 @@
  */
 package org.voltdb.agreement;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
+
+import org.apache.jute_voltpatches.BinaryInputArchive;
+import org.apache.jute_voltpatches.BinaryOutputArchive;
+import org.apache.zookeeper_voltpatches.ZooDefs.OpCode;
+import org.apache.zookeeper_voltpatches.server.NIOServerCnxn;
+import org.apache.zookeeper_voltpatches.server.Request;
+import org.apache.zookeeper_voltpatches.server.ServerCnxn;
+import org.apache.zookeeper_voltpatches.server.ZooKeeperServer;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.ExecutorTxnIdSafetyState;
@@ -27,34 +54,21 @@ import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.*;
-
-import java.io.IOException;
-import java.net.*;
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-
+import org.voltdb.messaging.AgreementTaskMessage;
+import org.voltdb.messaging.BinaryPayloadMessage;
+import org.voltdb.messaging.FailureSiteUpdateMessage;
+import org.voltdb.messaging.HeartbeatMessage;
+import org.voltdb.messaging.HeartbeatResponseMessage;
+import org.voltdb.messaging.LocalObjectMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.RecoveryMessage;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.TransactionInfoBaseMessage;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.DBBPool.BBContainer;
-
-import java.io.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.zip.*;
-
-import org.apache.jute_voltpatches.BinaryInputArchive;
-import org.apache.jute_voltpatches.BinaryOutputArchive;
-import org.apache.zookeeper_voltpatches.ZooDefs.OpCode;
-import org.apache.zookeeper_voltpatches.server.*;
+import org.voltdb.utils.MiscUtils;
 
 /*
  * A wrapper around a single node ZK server. The server is a modified version of ZK that speaks the ZK
@@ -879,7 +893,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         if (!m_recovering) {
             return;
         }
-        if (!m_recoveryComplete.await(10, TimeUnit.SECONDS)) {
+        // this timeout is totally arbitrary
+        // 30s is pretty long in general, but sometimes localcluster may need this long :-(
+        if (!m_recoveryComplete.await(30, TimeUnit.SECONDS)) {
             m_recoveryLog.fatal("Timed out waiting for the agreement site to recover");
             VoltDB.crashVoltDB();
         }

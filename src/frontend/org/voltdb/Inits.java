@@ -41,6 +41,8 @@ import java.util.concurrent.PriorityBlockingQueue;
 import org.voltdb.RealVoltDB.RejoinCallback;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Site;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -48,6 +50,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.NodeFailureFault;
@@ -226,18 +229,34 @@ public class Inits {
             if (hbt != null)
                 m_config.m_deadHostTimeoutMS = hbt.getTimeout();
 
-            /*Catalog catalog = new Catalog();
+            // create a dummy catalog to load deployment info into
+            Catalog catalog = new Catalog();
             Cluster cluster = catalog.getClusters().add("cluster");
-            cluster.getDatabases().add("database");
+            Database db = cluster.getDatabases().add("database");
+
+            // create groups as needed for users
+            if (m_deployment.getUsers() != null) {
+                for (User user : m_deployment.getUsers().getUser()) {
+                    String groupsCSV = user.getGroups();
+                    String[] groups = groupsCSV.split(",");
+                    for (String group : groups) {
+                        if (db.getGroups().get(group) == null) {
+                            db.getGroups().add(group);
+                        }
+                    }
+                }
+            }
 
             long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
-            m_rvdb.m_catalogContext = new CatalogContext(0, catalog, CatalogContext.NO_PATH, depCRC, 0, 0);*/
+            assert(depCRC != -1);
+            m_rvdb.m_catalogContext = new CatalogContext(0, catalog, CatalogContext.NO_PATH, depCRC, 0, -1);
         }
     }
 
     class LoadCatalog extends InitWork {
         LoadCatalog() {
             dependsOn(ReadDeploymentFile.class);
+            dependsOn(JoinAndInitNetwork.class);
         }
 
         @Override
@@ -256,7 +275,6 @@ public class Inits {
                 VoltDB.crashVoltDB();
 
             /* N.B. node recovery requires discovering the current catalog version. */
-            final int catalogVersion = 0;
             Catalog catalog = new Catalog();
             catalog.execute(m_rvdb.m_serializedCatalog);
 
@@ -270,10 +288,21 @@ public class Inits {
                 System.exit(-1);
             }
 
+            // copy the existing cluster up/down status to the new catalog
+            Cluster newCluster = catalog.getClusters().get("cluster");
+            Cluster oldCluster = m_rvdb.m_catalogContext.cluster;
+            for (Site site : oldCluster.getSites()) {
+                newCluster.getSites().get(site.getTypeName()).setIsup(site.getIsup());
+            }
+
+            // if the dummy catalog doesn't have a 0 txnid (like from a rejoin), use that one
+            long existingCatalogTxnId = m_rvdb.m_catalogContext.m_transactionId;
+            int existingCatalogVersion = m_rvdb.m_messenger.getDiscoveredCatalogVersion();
+
             m_rvdb.m_serializedCatalog = catalog.serialize();
             m_rvdb.m_catalogContext = new CatalogContext(
-                    0,
-                    catalog, m_config.m_pathToCatalog, m_rvdb.m_depCRC, catalogVersion, -1);
+                    existingCatalogTxnId,
+                    catalog, m_config.m_pathToCatalog, m_rvdb.m_depCRC, existingCatalogVersion, -1);
         }
     }
 
@@ -382,6 +411,7 @@ public class Inits {
     class SetupAdminMode extends InitWork {
         SetupAdminMode() {
             dependsOn(ReadDeploymentFile.class);
+            dependsOn(JoinAndInitNetwork.class);
         }
 
         @Override
@@ -390,8 +420,12 @@ public class Inits {
 
             // See if we should bring the server up in admin mode
             if (m_deployment.getAdminMode() != null) {
-                if (m_deployment.getAdminMode().isAdminstartup())
-                    m_rvdb.m_startMode = OperationMode.PAUSED;
+                // rejoining nodes figure out admin mode from other nodes
+                if (m_isRejoin == false) {
+                    if (m_deployment.getAdminMode().isAdminstartup()) {
+                        m_rvdb.setStartMode(OperationMode.PAUSED);
+                    }
+                }
 
                 // set the adminPort from the deployment file
                 adminPort = m_deployment.getAdminMode().getPort();
@@ -430,7 +464,6 @@ public class Inits {
         InitExport() {
             dependsOn(LoadCatalog.class);
             dependsOn(JoinAndInitNetwork.class);
-            dependsOn(PostNetworkAndCatalogWork.class);
         }
 
         @Override
@@ -447,7 +480,7 @@ public class Inits {
 
     class InitHashinator extends InitWork {
         InitHashinator() {
-            dependsOn(LoadCatalog.class);
+            dependsOn(ReadDeploymentFile.class);
         }
 
         @Override
@@ -529,8 +562,6 @@ public class Inits {
                 // rejoin case
                 m_rvdb.m_downHosts.addAll(initializeForRejoin(m_config, numberOfNodes, depCRC));
             }
-            //m_rvdb.m_catalogContext.m_transactionId = m_rvdb.m_messenger.getDiscoveredCatalogTxnId();
-            //assert(m_rvdb.m_messenger.getDiscoveredCatalogTxnId() != 0);
 
             // Use the host messenger's hostId.
             m_rvdb.m_myHostId = m_rvdb.m_messenger.getHostId();
@@ -538,6 +569,35 @@ public class Inits {
             // make sure the local entry for metadata is current
             // it's possible it could get overwritten in a rejoin scenario
             m_rvdb.m_clusterMetadata.put(m_rvdb.m_myHostId, m_rvdb.m_localMetadata);
+
+            if (m_isRejoin) {
+                /**
+                 * Whatever hosts were reported as being down on rejoin should
+                 * be reported to the fault manager so that the fault can be distributed.
+                 * The execution sites were informed on construction so they don't have
+                 * to go through the agreement process.
+                 */
+                for (Integer downHost : m_rvdb.m_downHosts) {
+                    m_rvdb.m_downNonExecSites.addAll(m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
+                    m_rvdb.m_downSites.addAll(m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
+                    m_rvdb.m_faultManager.reportFault(
+                            new NodeFailureFault(
+                                downHost,
+                                m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost),
+                                "UNKNOWN"));
+                }
+                try {
+                    m_rvdb.m_faultHandler.m_waitForFaultReported.acquire(m_rvdb.m_downHosts.size());
+                } catch (InterruptedException e) {
+                    VoltDB.crashVoltDB();
+                }
+                ExecutionSite.recoveringSiteCount.set(
+                        m_rvdb.m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_rvdb.m_messenger.getHostId()).size());
+                m_rvdb.m_downSites.addAll(m_rvdb.m_catalogContext.siteTracker.getAllSitesForHost(m_rvdb.m_messenger.getHostId()));
+            }
+
+            m_rvdb.m_catalogContext.m_transactionId = m_rvdb.m_messenger.getDiscoveredCatalogTxnId();
+            assert(m_rvdb.m_messenger.getDiscoveredCatalogTxnId() != 0);
         }
 
         HashSet<Integer> initializeForRejoin(VoltDB.Configuration config, int numberOfNodes, long deploymentCRC) {
@@ -670,61 +730,10 @@ public class Inits {
         }
     }
 
-    class PostNetworkAndCatalogWork extends InitWork {
-        public PostNetworkAndCatalogWork() {
-            dependsOn(ReadDeploymentFile.class);
-            dependsOn(LoadCatalog.class);
-            dependsOn(JoinAndInitNetwork.class);
-        }
-
-        @Override
-        public void run() {
-            if (m_isRejoin) {
-                long deploymentCRC = CatalogUtil.getDeploymentCRC(m_config.m_pathToDeployment);
-
-                m_rvdb.m_catalogContext = new CatalogContext(
-                        TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0),
-                        m_rvdb.m_catalogContext.catalog,
-                        m_rvdb.m_catalogContext.pathToCatalogJar,
-                        deploymentCRC,
-                        m_rvdb.m_messenger.getDiscoveredCatalogVersion(),
-                        0);
-
-                /**
-                 * Whatever hosts were reported as being down on rejoin should
-                 * be reported to the fault manager so that the fault can be distributed.
-                 * The execution sites were informed on construction so they don't have
-                 * to go through the agreement process.
-                 */
-                for (Integer downHost : m_rvdb.m_downHosts) {
-                    m_rvdb.m_downNonExecSites.addAll(m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
-                    m_rvdb.m_downSites.addAll(m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
-                    m_rvdb.m_faultManager.reportFault(
-                            new NodeFailureFault(
-                                downHost,
-                                m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost),
-                                "UNKNOWN"));
-                }
-                try {
-                    m_rvdb.m_faultHandler.m_waitForFaultReported.acquire(m_rvdb.m_downHosts.size());
-                } catch (InterruptedException e) {
-                    VoltDB.crashVoltDB();
-                }
-                ExecutionSite.recoveringSiteCount.set(
-                        m_rvdb.m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_rvdb.m_messenger.getHostId()).size());
-                m_rvdb.m_downSites.addAll(m_rvdb.m_catalogContext.siteTracker.getAllSitesForHost(m_rvdb.m_messenger.getHostId()));
-            }
-
-            m_rvdb.m_catalogContext.m_transactionId = m_rvdb.m_messenger.getDiscoveredCatalogTxnId();
-            assert(m_rvdb.m_messenger.getDiscoveredCatalogTxnId() != 0);
-        }
-    }
-
     class InitAgreementSite extends InitWork {
         InitAgreementSite() {
             dependsOn(LoadCatalog.class);
             dependsOn(JoinAndInitNetwork.class);
-            dependsOn(PostNetworkAndCatalogWork.class);
         }
 
         @Override

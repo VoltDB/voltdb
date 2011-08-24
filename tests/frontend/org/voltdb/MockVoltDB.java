@@ -31,7 +31,6 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.Configuration;
@@ -47,7 +46,6 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MockMailbox;
 import org.voltdb.network.VoltNetwork;
@@ -451,46 +449,7 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public CommandLog getCommandLog() {
-        return new CommandLog() {
-            @Override
-            public void shutdown() throws InterruptedException {
-            }
-
-            @Override
-            public void init(CatalogContext context, long txnId) {
-                // TODO Auto-generated method stub
-
-            }
-
-            @Override
-            public void log(InitiateTaskMessage message) {
-                // TODO Auto-generated method stub
-
-            }
-
-            @Override
-            public Semaphore logFault(Set<Integer> failedSites, Set<Long> faultedTxns) {
-                return new Semaphore(1);
-            }
-
-            @Override
-            public void logHeartbeat(long txnId) {
-                // TODO Auto-generated method stub
-
-            }
-
-            @Override
-            public long getFaultSequenceNumber() {
-                return 0;
-            }
-
-            @Override
-            public void initForRejoin(CatalogContext context, long txnId,
-                    long faultSequenceNumber, Set<Integer> failedSites) {
-                // TODO Auto-generated method stub
-
-            }
-        };
+        return new DummyCommandLog();
     }
 
     @Override
