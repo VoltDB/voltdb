@@ -22,6 +22,7 @@ import java.util.*;
 import java.util.regex.*;
 import org.voltdb.*;
 import org.voltdb.client.*;
+import org.voltdb.clientutils.ClientConnection;
 import java.math.BigDecimal;
 
 public class JDBC4Statement implements java.sql.Statement
@@ -77,14 +78,14 @@ public class JDBC4Statement implements java.sql.Statement
             return false;
         }
 
-        protected VoltTable[] execute(Client connection) throws SQLException
+        protected VoltTable[] execute(ClientConnection connection) throws SQLException
         {
             try
             {
                 if (this.type == TYPE_EXEC)
-                    return connection.callProcedure(this.sql[0], this.parameters).getResults();
+                    return connection.execute(this.sql[0], this.parameters).getResults();
                 else
-                    return connection.callProcedure("@AdHoc", this.sql[0]).getResults();
+                    return connection.execute("@AdHoc", this.sql[0]).getResults();
             }
             catch(Exception x)
             {

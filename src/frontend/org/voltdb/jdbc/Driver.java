@@ -61,7 +61,7 @@ public class Driver implements java.sql.Driver
                     String user = "";
                     String password = "";
                     boolean heavyweight = false;
-                    int maxoutstandingtxns = -1;
+                    int maxoutstandingtxns = 0;
                     for (Enumeration e = info.propertyNames(); e.hasMoreElements();)
                     {
                         String key = (String) e.nextElement();

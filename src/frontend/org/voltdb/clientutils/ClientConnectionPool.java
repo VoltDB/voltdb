@@ -21,18 +21,35 @@ import java.util.HashMap;
 
 public class ClientConnectionPool
 {
+    private static final HashMap<String,PerfCounterMap> Statistics = new HashMap<String,PerfCounterMap>();
     private static final short MAX_USERS_PER_CLIENT = 50;
     private static final HashMap<String,ClientConnection> ClientConnections = new HashMap<String,ClientConnection>();
+
+    private static String getClientConnectionKeyBase(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+    {
+        String clientConnectionKeyBase = user + ":" + password + "@";
+        for(int i=0;i<servers.length;i++)
+            clientConnectionKeyBase += servers[i].trim() + ",";
+        clientConnectionKeyBase += ":" + Integer.toString(port) + "{" + Boolean.toString(isHeavyWeight) + ":" + Integer.toString(maxOutstandingTxns) + "}";
+        return clientConnectionKeyBase;
+    }
+
+    public static synchronized ClientConnection get(String servers, int port) throws Exception
+    {
+        return get(servers.split(","), port, "", "", false, 0);
+    }
     public static synchronized ClientConnection get(String[] servers, int port) throws Exception
     {
         return get(servers, port, "", "", false, 0);
     }
+    public static synchronized ClientConnection get(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    {
+        return get(servers.split(","), port, user, password, isHeavyWeight, maxOutstandingTxns);
+    }
     public static synchronized ClientConnection get(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
     {
-        String clientConnectionKey = user + ":" + password + "@";
-        for(int i=0;i<servers.length;i++)
-            clientConnectionKey += servers[i] + ",";
-        clientConnectionKey += ":" + Integer.toString(port) + "{" + Boolean.toString(isHeavyWeight) + ":" + Integer.toString(maxOutstandingTxns) + "}";
+        String clientConnectionKeyBase = getClientConnectionKeyBase(servers, port, user, password, isHeavyWeight, maxOutstandingTxns);
+        String clientConnectionKey = clientConnectionKeyBase;
         int cnt = 1;
         while(ClientConnections.containsKey(clientConnectionKey))
         {
@@ -42,7 +59,7 @@ public class ClientConnectionPool
                 break;
         }
         if (!ClientConnections.containsKey(clientConnectionKey))
-            ClientConnections.put(clientConnectionKey, new ClientConnection(clientConnectionKey, servers, port, user, password, isHeavyWeight, maxOutstandingTxns));
+            ClientConnections.put(clientConnectionKey, new ClientConnection(clientConnectionKeyBase, clientConnectionKey, servers, port, user, password, isHeavyWeight, maxOutstandingTxns));
         return ClientConnections.get(clientConnectionKey).use();
     }
     public static synchronized void dispose(ClientConnection clientConnection)
@@ -50,5 +67,35 @@ public class ClientConnectionPool
         clientConnection.dispose();
         if (clientConnection.Users == 0)
             ClientConnections.remove(clientConnection.Key);
+    }
+
+    public static synchronized PerfCounterMap getStatistics(ClientConnection connection)
+    {
+        return getStatistics(connection.KeyBase);
+    }
+
+    public static synchronized PerfCounterMap getStatistics(String servers, int port)
+    {
+        return getStatistics(getClientConnectionKeyBase(servers.split(","), port, "", "", false, 0));
+    }
+    public static synchronized PerfCounterMap getStatistics(String[] servers, int port)
+    {
+        return getStatistics(getClientConnectionKeyBase(servers, port, "", "", false, 0));
+    }
+    public static synchronized PerfCounterMap getStatistics(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+    {
+        return getStatistics(getClientConnectionKeyBase(servers.split(","), port, user, password, isHeavyWeight, maxOutstandingTxns));
+    }
+    public static synchronized PerfCounterMap getStatistics(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+    {
+        return getStatistics(getClientConnectionKeyBase(servers, port, user, password, isHeavyWeight, maxOutstandingTxns));
+    }
+
+
+    protected static synchronized PerfCounterMap getStatistics(String clientConnectionKeyBase)
+    {
+        if(!Statistics.containsKey(clientConnectionKeyBase))
+            Statistics.put(clientConnectionKeyBase, new PerfCounterMap());
+        return Statistics.get(clientConnectionKeyBase);
     }
 }

@@ -21,12 +21,16 @@ import java.util.HashMap;
 
 public class ClientConnection
 {
+    private final PerfCounterMap Statistics;
+    protected final String KeyBase;
     protected final String Key;
-    public final Client Client;
+    protected final Client Client;
     protected short Users;
-    protected ClientConnection(String clientConnectionKey, String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    protected ClientConnection(String clientConnectionKeyBase, String clientConnectionKey, String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
     {
+        this.KeyBase = clientConnectionKeyBase;
         this.Key = clientConnectionKey;
+        this.Statistics = ClientConnectionPool.getStatistics(clientConnectionKeyBase);
 
         // Create configuration
         final ClientConfig config = new ClientConfig(user, password);
@@ -57,6 +61,54 @@ public class ClientConnection
         {
             try { this.Client.close(); } catch(Exception x) {}
         }
+    }
+    public ClientResponse execute(String procedure, Object... parameters) throws Exception
+    {
+        long start = System.currentTimeMillis();
+        try
+        {
+            ClientResponse response = this.Client.callProcedure(procedure, parameters);
+            Statistics.update(procedure, response);
+            return response;
+        }
+        catch(ProcCallException pce)
+        {
+            Statistics.update(procedure, System.currentTimeMillis()-start,false);
+            throw pce;
+        }
+        catch(Exception x)
+        {
+            throw x;
+        }
+    }
+
+    private static class TrackingCallback  implements ProcedureCallback
+    {
+        private final ClientConnection Owner;
+        private final String Procedure;
+        private final ProcedureCallback UserCallback;
+        public TrackingCallback(ClientConnection owner, String procedure, ProcedureCallback userCallback)
+        {
+            this.Owner = owner;
+            this.Procedure = procedure;
+            this.UserCallback = userCallback;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse response)
+        {
+            try
+            {
+                this.Owner.Statistics.update(this.Procedure, response);
+                if (this.UserCallback != null)
+                    this.UserCallback.clientCallback(response);
+            }
+            catch(Exception x) {} // If the user callback crashes, nothign we can do (user should handle exceptions on his own, we're just wrapping around for tracking!)
+        }
+    }
+    public boolean executeAsync(ProcedureCallback callback, String procedure, Object... parameters) throws Exception
+    {
+        return this.Client.callProcedure(new TrackingCallback(this, procedure, callback), procedure, parameters);
     }
 }
 

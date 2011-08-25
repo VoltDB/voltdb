@@ -26,15 +26,13 @@ import org.voltdb.clientutils.*;
 
 public class JDBC4Connection implements java.sql.Connection
 {
-    protected final ClientConnection NativeConnectionWrapper;
-    protected final Client NativeConnection;
+    protected final ClientConnection NativeConnection;
     protected final String User;
     private boolean isClosed = false;
 
     public JDBC4Connection(ClientConnection connection, String user)
     {
-        this.NativeConnectionWrapper = connection;
-        this.NativeConnection = connection.Client;
+        this.NativeConnection = connection;
         this.User = user;
     }
 
@@ -57,7 +55,7 @@ public class JDBC4Connection implements java.sql.Connection
         try
         {
             isClosed = true;
-            ClientConnectionPool.dispose(NativeConnectionWrapper);
+            ClientConnectionPool.dispose(NativeConnection);
         }
         catch(Exception x)
         {
