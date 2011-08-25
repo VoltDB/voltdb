@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import org.voltdb.dtxn.TransactionInitiator;
+
 public interface CommandLogReinitiator {
     public interface Callback {
         public void onReplayCompletion();
@@ -31,6 +33,8 @@ public interface CommandLogReinitiator {
     public void setCallback(Callback callback);
 
     public void setCatalogContext(CatalogContext context);
+
+    public void setInitiator(TransactionInitiator initiator);
 
     /**
      * Generate the local replay plan. Call this before starting replay.

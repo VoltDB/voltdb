@@ -172,6 +172,8 @@ SnapshotCompletionInterest {
         public void generateReplayPlan() {}
         @Override
         public void setCatalogContext(CatalogContext context) {}
+        @Override
+        public void setInitiator(TransactionInitiator initiator) {}
     };
 
     /*
@@ -428,7 +430,6 @@ SnapshotCompletionInterest {
                 Constructor<?> constructor =
                     replayClass.getConstructor(int.class,
                                                START_ACTION.class,
-                                               TransactionInitiator.class,
                                                ZooKeeper.class,
                                                int.class,
                                                String.class,
@@ -439,7 +440,6 @@ SnapshotCompletionInterest {
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
-                                                                    m_initiator,
                                                                     m_zk,
                                                                     m_partitionCount,
                                                                     m_clPath,
@@ -460,6 +460,8 @@ SnapshotCompletionInterest {
 
     public void setInitiator(TransactionInitiator initiator) {
         m_initiator = initiator;
+        if (m_replayAgent != null)
+            m_replayAgent.setInitiator(initiator);
     }
 
     /**
