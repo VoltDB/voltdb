@@ -55,6 +55,7 @@ public class CatalogContext {
     public final long catalogCRC;
     public final long deploymentCRC;
     public long m_transactionId;
+    public final JdbcDatabaseMetaDataGenerator m_jdbc;
 
     // PRIVATE
     //private final String m_path;
@@ -102,6 +103,7 @@ public class CatalogContext {
         sites = cluster.getSites();
         siteTracker = new SiteTracker(cluster.getSites());
         this.deploymentCRC = deploymentCRC;
+        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
 
         // count nodes
         numberOfNodes = cluster.getHosts().size();

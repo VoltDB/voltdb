@@ -106,6 +106,7 @@ public class SystemProcedureCatalog {
         listing.put("@Shutdown",                new Config("org.voltdb.sysprocs.Shutdown",          false, false, false));
         listing.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",           false, false, false));
         listing.put("@Statistics",              new Config("org.voltdb.sysprocs.Statistics",        true,  false, false));
+        listing.put("@SystemCatalog",           new Config("org.voltdb.sysprocs.SystemCatalog",     true,  false, false));
         listing.put("@SystemInformation",       new Config("org.voltdb.sysprocs.SystemInformation", true,  false, false));
         listing.put("@UpdateLogging",           new Config("org.voltdb.sysprocs.UpdateLogging",     false, true,  false));
         listing.put("@BalancePartitions",       new Config("org.voltdb.sysprocs.BalancePartitions", false, false, true));
