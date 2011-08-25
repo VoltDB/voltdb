@@ -289,13 +289,13 @@ public class HostMessenger implements Messenger {
 
         if (!fhost.isUp())
         {
-            Throwable t = new Throwable();
-            java.io.StringWriter sw = new java.io.StringWriter();
-            java.io.PrintWriter pw = new java.io.PrintWriter(sw);
-            t.printStackTrace(pw);
-            pw.flush();
+            //Throwable t = new Throwable();
+            //java.io.StringWriter sw = new java.io.StringWriter();
+            //java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+            //t.printStackTrace(pw);
+            //pw.flush();
             m_logger.warn("Attempted delivery of message to failed site: " + siteId);
-            m_logger.warn(sw.toString());
+            //m_logger.warn(sw.toString());
             return null;
         }
         return fhost;

@@ -17,18 +17,10 @@
 
 package org.voltdb;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Constructor;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URLDecoder;
-import java.net.UnknownHostException;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,32 +30,21 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
-import org.voltdb.RealVoltDB.RejoinCallback;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Site;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.export.ExportManager;
-import org.voltdb.fault.FaultDistributor;
-import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Mailbox;
-import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.Pair;
 import org.voltdb.utils.PlatformProperties;
 
 /**
@@ -114,6 +95,7 @@ public class Inits {
                 }
                 if (iw instanceof COMPLETION_WORK)
                     return;
+                //hostLog.info("Running InitWorker: " + iw.getClass().getName());
                 iw.run();
                 completeInitWork(iw);
             }
@@ -127,6 +109,7 @@ public class Inits {
         // (used for license check and later the actual rejoin)
         m_isRejoin = m_config.m_rejoinToHostAndPort != null;
         m_threadCount = threadCount;
+        m_deployment = rvdb.m_deployment;
 
         // find all the InitWork subclasses using reflection and load them up
         Class<?>[] declaredClasses = Inits.class.getDeclaredClasses();
@@ -215,48 +198,8 @@ public class Inits {
         }
     }
 
-    class ReadDeploymentFile extends InitWork {
-        @Override
-        public void run() {
-            m_deployment = CatalogUtil.parseDeployment(m_config.m_pathToDeployment);
-            // wasn't a valid xml deployment file
-            if (m_deployment == null) {
-                hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
-                VoltDB.crashVoltDB();
-            }
-            m_rvdb.m_deployment = m_deployment;
-            HeartbeatType hbt = m_deployment.getHeartbeat();
-            if (hbt != null)
-                m_config.m_deadHostTimeoutMS = hbt.getTimeout();
-
-            // create a dummy catalog to load deployment info into
-            Catalog catalog = new Catalog();
-            Cluster cluster = catalog.getClusters().add("cluster");
-            Database db = cluster.getDatabases().add("database");
-
-            // create groups as needed for users
-            if (m_deployment.getUsers() != null) {
-                for (User user : m_deployment.getUsers().getUser()) {
-                    String groupsCSV = user.getGroups();
-                    String[] groups = groupsCSV.split(",");
-                    for (String group : groups) {
-                        if (db.getGroups().get(group) == null) {
-                            db.getGroups().add(group);
-                        }
-                    }
-                }
-            }
-
-            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
-            assert(depCRC != -1);
-            m_rvdb.m_catalogContext = new CatalogContext(0, catalog, CatalogContext.NO_PATH, depCRC, 0, -1);
-        }
-    }
-
     class LoadCatalog extends InitWork {
         LoadCatalog() {
-            dependsOn(ReadDeploymentFile.class);
-            dependsOn(JoinAndInitNetwork.class);
         }
 
         @Override
@@ -308,7 +251,6 @@ public class Inits {
 
     class EnforceLicensing extends InitWork {
         EnforceLicensing() {
-            dependsOn(ReadDeploymentFile.class);
         }
 
         @Override
@@ -366,7 +308,6 @@ public class Inits {
 
     class StartHTTPServer extends InitWork {
         StartHTTPServer() {
-            dependsOn(ReadDeploymentFile.class);
         }
 
         @Override
@@ -410,8 +351,6 @@ public class Inits {
 
     class SetupAdminMode extends InitWork {
         SetupAdminMode() {
-            dependsOn(ReadDeploymentFile.class);
-            dependsOn(JoinAndInitNetwork.class);
         }
 
         @Override
@@ -439,31 +378,9 @@ public class Inits {
         }
     }
 
-    class InitFaultManager extends InitWork {
-        InitFaultManager() {
-            dependsOn(LoadCatalog.class);
-        }
-
-        @Override
-        public void run() {
-            // requires a catalog context.
-            m_rvdb.m_faultManager = new FaultDistributor(m_rvdb);
-            // Install a handler for NODE_FAILURE faults to update the catalog
-            // This should be the first handler to run when a node fails
-            m_rvdb.m_faultManager.registerFaultHandler(NodeFailureFault.NODE_FAILURE_CATALOG,
-                    m_rvdb.m_faultHandler,
-                    FaultType.NODE_FAILURE);
-            if (!m_rvdb.m_faultManager.testPartitionDetectionDirectory(
-                    m_rvdb.m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
-                VoltDB.crashVoltDB();
-            }
-        }
-    }
-
     class InitExport extends InitWork {
         InitExport() {
             dependsOn(LoadCatalog.class);
-            dependsOn(JoinAndInitNetwork.class);
         }
 
         @Override
@@ -480,7 +397,6 @@ public class Inits {
 
     class InitHashinator extends InitWork {
         InitHashinator() {
-            dependsOn(ReadDeploymentFile.class);
         }
 
         @Override
@@ -494,246 +410,9 @@ public class Inits {
         }
     }
 
-    class CollectLocalNetworkMetadata extends InitWork {
-        CollectLocalNetworkMetadata() {
-            dependsOn(StartHTTPServer.class);
-            dependsOn(SetupAdminMode.class);
-        }
-
-        @Override
-        public void run() {
-         // create the string that describes the public interface
-            // format "XXX.XXX.XXX.XXX:clientport:adminport:httpport"
-            InetAddress addr = null;
-            try {
-                addr = InetAddress.getLocalHost();
-            } catch (UnknownHostException e1) {
-                hostLog.fatal("Unable to discover local IP address by invoking Java's InetAddress.getLocalHost() method. Usually this is because the hostname of this node fails to resolve (for example \"ping `hostname`\" would fail). VoltDB requires that the hostname of every node resolves correctly at that node as well as every other node.");
-                VoltDB.crashVoltDB();
-            }
-            String localMetadata = addr.getHostAddress();
-            localMetadata += ":" + Integer.valueOf(m_config.m_port);
-            localMetadata += ":" + Integer.valueOf(m_config.m_adminPort);
-            localMetadata += ":" + Integer.valueOf(m_config.m_httpPort); // json
-            // possibly atomic swap from null to realz
-            m_rvdb.m_localMetadata = localMetadata;
-        }
-    }
-
-    class JoinAndInitNetwork extends InitWork {
-        JoinAndInitNetwork() {
-            dependsOn(ReadDeploymentFile.class);
-        }
-
-        @Override
-        public void run() {
-            // Prepare the network socket manager for work
-            m_rvdb.m_network = new VoltNetwork();
-
-            String leaderAddress = m_deployment.getCluster().getLeader();
-            int numberOfNodes = m_deployment.getCluster().getHostcount();
-            long depCRC = CatalogUtil.getDeploymentCRC(m_config.m_pathToDeployment);
-
-            if (!m_isRejoin) {
-                // Create the intra-cluster mesh
-                InetAddress leader = null;
-                try {
-                    leader = InetAddress.getByName(leaderAddress);
-                } catch (UnknownHostException ex) {
-                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(),
-                            new Object[] { leaderAddress }, null);
-                    VoltDB.crashVoltDB();
-                }
-                // ensure at least one host (catalog compiler should check this too
-                if (numberOfNodes <= 0) {
-                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(),
-                            new Object[] { numberOfNodes }, null);
-                    VoltDB.crashVoltDB();
-                }
-
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { numberOfNodes, leader }, null);
-                hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
-                m_rvdb.m_messenger = new HostMessenger(m_rvdb.m_network, leader,
-                        numberOfNodes, 0, depCRC, hostLog);
-                Object retval[] = m_rvdb.m_messenger.waitForGroupJoin();
-                m_rvdb.m_instanceId = new Object[] { retval[0], retval[1] };
-            }
-            else {
-                // rejoin case
-                m_rvdb.m_downHosts.addAll(initializeForRejoin(m_config, numberOfNodes, depCRC));
-            }
-
-            // Use the host messenger's hostId.
-            m_rvdb.m_myHostId = m_rvdb.m_messenger.getHostId();
-
-            // make sure the local entry for metadata is current
-            // it's possible it could get overwritten in a rejoin scenario
-            m_rvdb.m_clusterMetadata.put(m_rvdb.m_myHostId, m_rvdb.m_localMetadata);
-
-            if (m_isRejoin) {
-                /**
-                 * Whatever hosts were reported as being down on rejoin should
-                 * be reported to the fault manager so that the fault can be distributed.
-                 * The execution sites were informed on construction so they don't have
-                 * to go through the agreement process.
-                 */
-                for (Integer downHost : m_rvdb.m_downHosts) {
-                    m_rvdb.m_downNonExecSites.addAll(m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
-                    m_rvdb.m_downSites.addAll(m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
-                    m_rvdb.m_faultManager.reportFault(
-                            new NodeFailureFault(
-                                downHost,
-                                m_rvdb.m_catalogContext.siteTracker.getNonExecSitesForHost(downHost),
-                                "UNKNOWN"));
-                }
-                try {
-                    m_rvdb.m_faultHandler.m_waitForFaultReported.acquire(m_rvdb.m_downHosts.size());
-                } catch (InterruptedException e) {
-                    VoltDB.crashVoltDB();
-                }
-                ExecutionSite.recoveringSiteCount.set(
-                        m_rvdb.m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_rvdb.m_messenger.getHostId()).size());
-                m_rvdb.m_downSites.addAll(m_rvdb.m_catalogContext.siteTracker.getAllSitesForHost(m_rvdb.m_messenger.getHostId()));
-            }
-
-            m_rvdb.m_catalogContext.m_transactionId = m_rvdb.m_messenger.getDiscoveredCatalogTxnId();
-            assert(m_rvdb.m_messenger.getDiscoveredCatalogTxnId() != 0);
-        }
-
-        HashSet<Integer> initializeForRejoin(VoltDB.Configuration config, int numberOfNodes, long deploymentCRC) {
-            // sensible defaults (sorta)
-            String rejoinHostCredentialString = null;
-            String rejoinHostAddressString = null;
-
-            //Client interface port of node that will receive @Rejoin invocation
-            int rejoinPort = config.m_port;
-            String rejoinHost = null;
-            String rejoinUser = null;
-            String rejoinPass = null;
-
-            // this will cause the ExecutionSites to start in recovering mode
-            m_rvdb.m_recovering = true;
-
-            // split a "user:pass@host:port" string into "user:pass" and "host:port"
-            int atSignIndex = config.m_rejoinToHostAndPort.indexOf('@');
-            if (atSignIndex == -1) {
-                rejoinHostAddressString = config.m_rejoinToHostAndPort;
-            }
-            else {
-                rejoinHostCredentialString = config.m_rejoinToHostAndPort.substring(0, atSignIndex).trim();
-                rejoinHostAddressString = config.m_rejoinToHostAndPort.substring(atSignIndex + 1).trim();
-            }
-
-            int colonIndex = -1;
-            // split a "user:pass" string into "user" and "pass"
-            if (rejoinHostCredentialString != null) {
-                colonIndex = rejoinHostCredentialString.indexOf(':');
-                if (colonIndex == -1) {
-                    rejoinUser = rejoinHostCredentialString.trim();
-                    System.out.print("password: ");
-                    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-                    try {
-                        rejoinPass = br.readLine();
-                    } catch (IOException e) {
-                        hostLog.error("Unable to read passord for rejoining credentials from console.");
-                        System.exit(-1);
-                    }
-                }
-                else {
-                    rejoinUser = rejoinHostCredentialString.substring(0, colonIndex).trim();
-                    rejoinPass = rejoinHostCredentialString.substring(colonIndex + 1).trim();
-                }
-            }
-
-            // split a "host:port" string into "host" and "port"
-            colonIndex = rejoinHostAddressString.indexOf(':');
-            if (colonIndex == -1) {
-                rejoinHost = rejoinHostAddressString.trim();
-                // note rejoinPort has a default
-            }
-            else {
-                rejoinHost = rejoinHostAddressString.substring(0, colonIndex).trim();
-                rejoinPort = Integer.parseInt(rejoinHostAddressString.substring(colonIndex + 1).trim());
-            }
-
-            hostLog.info(String.format("Inter-node communication will use port %d.", config.m_internalPort));
-            ServerSocketChannel listener = null;
-            try {
-                listener = ServerSocketChannel.open();
-                listener.socket().bind(new InetSocketAddress(config.m_internalPort));
-            } catch (IOException e) {
-                hostLog.error("Problem opening listening rejoin socket: " + e.getMessage());
-                System.exit(-1);
-            }
-            m_rvdb.m_messenger = new HostMessenger(m_rvdb.m_network, listener, numberOfNodes, 0, deploymentCRC, hostLog);
-
-            // make empty strings null
-            if ((rejoinUser != null) && (rejoinUser.length() == 0)) rejoinUser = null;
-            if ((rejoinPass != null) && (rejoinPass.length() == 0)) rejoinPass = null;
-
-            // URL Decode so usernames/passwords can contain weird stuff
-            try {
-                if (rejoinUser != null) rejoinUser = URLDecoder.decode(rejoinUser, "UTF-8");
-                if (rejoinPass != null) rejoinPass = URLDecoder.decode(rejoinPass, "UTF-8");
-            } catch (UnsupportedEncodingException e) {
-                hostLog.error("Problem URL-decoding credentials for rejoin authentication: " + e.getMessage());
-                System.exit(-1);
-            }
-
-            ClientConfig clientConfig = new ClientConfig(rejoinUser, rejoinPass);
-            Client client = ClientFactory.createClient(clientConfig);
-            ClientResponse response = null;
-            RejoinCallback rcb = new RejoinCallback() {
-
-            };
-            try {
-                client.createConnection(rejoinHost, rejoinPort);
-                InetSocketAddress inetsockaddr = new InetSocketAddress(rejoinHost, rejoinPort);
-                SocketChannel socket = SocketChannel.open(inetsockaddr);
-                String ip_addr = socket.socket().getLocalAddress().getHostAddress();
-                socket.close();
-                config.m_selectedRejoinInterface =
-                    config.m_internalInterface.isEmpty() ? ip_addr : config.m_internalInterface;
-                client.callProcedure(
-                        rcb,
-                        "@Rejoin",
-                        config.m_selectedRejoinInterface,
-                        config.m_internalPort);
-            }
-            catch (Exception e) {
-                hostLog.fatal("Problem connecting client: " + e.getMessage());
-                VoltDB.crashVoltDB();
-            }
-
-            Object retval[] = m_rvdb.m_messenger.waitForGroupJoin(60 * 1000);
-
-            m_rvdb.m_instanceId = new Object[] { retval[0], retval[1] };
-
-            @SuppressWarnings("unchecked")
-            HashSet<Integer> downHosts = (HashSet<Integer>)retval[2];
-            hostLog.info("Down hosts are " + downHosts.toString());
-
-            try {
-                //Callback validates response asynchronously. Just wait for the response before continuing.
-                //Timeout because a failure might result in the response not coming.
-                response = rcb.waitForResponse(3000);
-                if (response == null) {
-                    hostLog.fatal("Recovering node timed out rejoining");
-                    VoltDB.crashVoltDB();
-                }
-            }
-            catch (InterruptedException e) {
-                hostLog.fatal("Interrupted while attempting to rejoin cluster");
-                VoltDB.crashVoltDB();
-            }
-            return downHosts;
-        }
-    }
-
     class InitAgreementSite extends InitWork {
         InitAgreementSite() {
             dependsOn(LoadCatalog.class);
-            dependsOn(JoinAndInitNetwork.class);
         }
 
         @Override
@@ -784,6 +463,60 @@ public class Inits {
             } catch (Exception e) {
                 hostLog.fatal(null, e);
                 System.exit(-1);
+            }
+        }
+    }
+
+    class CreateRestoreAgentAndPlan extends InitWork {
+        public CreateRestoreAgentAndPlan() {
+            dependsOn(InitAgreementSite.class);
+        }
+
+        @Override
+        public void run() {
+            if (!m_isRejoin && !m_config.m_isRejoinTest) {
+                m_rvdb.startNetworkAndCreateZKClient();
+
+                String snapshotPath = null;
+                if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
+                    snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
+                }
+
+                int lowestSite = m_rvdb.m_catalogContext.siteTracker.getLowestLiveNonExecSiteId();
+                int lowestHostId = m_rvdb.m_catalogContext.siteTracker.getHostForSite(lowestSite);
+
+                int[] allPartitions = new int[m_rvdb.m_catalogContext.numberOfPartitions];
+                int i = 0;
+                for (Partition p : m_rvdb.m_catalogContext.cluster.getPartitions()) {
+                    allPartitions[i++] = Integer.parseInt(p.getTypeName());
+                }
+
+                org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
+
+                try {
+                    m_rvdb.m_restoreAgent = new RestoreAgent(
+                                                      m_rvdb.m_zk,
+                                                      m_rvdb.getSnapshotCompletionMonitor(),
+                                                      m_rvdb,
+                                                      m_rvdb.m_myHostId,
+                                                      m_config.m_startAction,
+                                                      m_rvdb.m_catalogContext.numberOfPartitions,
+                                                      cl.getEnabled(),
+                                                      cl.getLogpath(),
+                                                      cl.getInternalsnapshotpath(),
+                                                      snapshotPath,
+                                                      lowestHostId,
+                                                      allPartitions,
+                                                      m_rvdb.m_catalogContext.siteTracker.getAllLiveHosts());
+                } catch (IOException e) {
+                    hostLog.fatal("Unable to establish a ZooKeeper connection: " +
+                                  e.getMessage());
+                    VoltDB.crashVoltDB();
+                }
+
+                m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
+                // Generate plans and get (hostID, catalogPath) pair
+                Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
             }
         }
     }

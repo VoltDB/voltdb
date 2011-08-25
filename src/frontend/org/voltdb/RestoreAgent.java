@@ -82,10 +82,8 @@ SnapshotCompletionInterest {
          * @param txnId
          *            The txnId of the truncation snapshot at the end of the
          *            restore, or Long.MIN if there is none.
-         * @param initCommandLog
-         *            Whether or not to initialize the command log module
          */
-        public void onRestoreCompletion(long txnId, boolean initCommandLog);
+        public void onRestoreCompletion(long txnId);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
@@ -100,7 +98,6 @@ SnapshotCompletionInterest {
     private final static long RESTORE_TXNID = 1l;
 
     private final Integer m_hostId;
-    private final TransactionInitiator m_initiator;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final START_ACTION m_action;
@@ -111,6 +108,8 @@ SnapshotCompletionInterest {
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
     private final int m_lowestHostId;
+
+    private TransactionInitiator m_initiator;
 
     // The snapshot to restore
     private SnapshotInfo m_snapshotToRestore = null;
@@ -393,8 +392,7 @@ SnapshotCompletionInterest {
         }
     }
 
-    public RestoreAgent(TransactionInitiator initiator,
-                        ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
+    public RestoreAgent(ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
                         Callback callback, int hostId, START_ACTION action,
                         int partitionCount, boolean clEnabled,
                         String clPath, String clSnapshotPath,
@@ -402,7 +400,7 @@ SnapshotCompletionInterest {
                         Set<Integer> liveHosts)
     throws IOException {
         m_hostId = hostId;
-        m_initiator = initiator;
+        m_initiator = null;
         m_snapshotMonitor = snapshotMonitor;
         m_callback = callback;
         m_action = action;
@@ -458,6 +456,10 @@ SnapshotCompletionInterest {
 
     public void setCatalogContext(CatalogContext context) {
         m_replayAgent.setCatalogContext(context);
+    }
+
+    public void setInitiator(TransactionInitiator initiator) {
+        m_initiator = initiator;
     }
 
     /**
@@ -1101,7 +1103,7 @@ SnapshotCompletionInterest {
         } else if (m_state == State.TRUNCATE) {
             m_snapshotMonitor.removeInterest(this);
             if (m_callback != null) {
-                m_callback.onRestoreCompletion(m_truncationSnapshot, true);
+                m_callback.onRestoreCompletion(m_truncationSnapshot);
             }
         }
     }

@@ -23,7 +23,12 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,10 +52,10 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.voltdb.RestoreAgent.SnapshotInfo;
+import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.junit.runner.RunWith;
+import org.voltdb.RestoreAgent.SnapshotInfo;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
@@ -87,6 +92,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     class MockSnapshotMonitor extends SnapshotCompletionMonitor {
+        @Override
         public void init(final ZooKeeper zk) {
             try {
                 Watcher watcher = new Watcher() {
@@ -419,8 +425,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         org.voltdb.catalog.CommandLog cl = context.cluster.getLogconfig().get("log");
 
-        RestoreAgent restoreAgent = new RestoreAgent(initiator,
-                                                     getClient(0),
+        RestoreAgent restoreAgent = new RestoreAgent(getClient(0),
                                                      snapshotMonitor, this,
                                                      hostId, this.action,
                                                      context.numberOfPartitions,
@@ -432,6 +437,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                      allPartitions,
                                                      context.siteTracker.getAllLiveHosts());
         restoreAgent.setCatalogContext(context);
+        restoreAgent.setInitiator(initiator);
         return restoreAgent;
     }
 
@@ -643,7 +649,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     @Override
-    public void onRestoreCompletion(long txnId, boolean initCommandLog) {
+    public void onRestoreCompletion(long txnId) {
         if (snapshotTxnId != null) {
             assertEquals(snapshotTxnId.longValue(), txnId);
         }
