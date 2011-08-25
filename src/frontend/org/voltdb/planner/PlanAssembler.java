@@ -910,7 +910,7 @@ public class PlanAssembler {
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         boolean containsAggregateExpression = false;
-        HashAggregatePlanNode aggNode = null;
+        AggregatePlanNode aggNode = null;
 
         /* Check if any aggregate expressions are present */
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
@@ -934,8 +934,15 @@ public class PlanAssembler {
         }
 
         if (containsAggregateExpression) {
-            aggNode = new HashAggregatePlanNode();
-            HashAggregatePlanNode topAggNode = new HashAggregatePlanNode();
+            AggregatePlanNode topAggNode;
+            if (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
+                ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID) {
+                aggNode = new HashAggregatePlanNode();
+                topAggNode = new HashAggregatePlanNode();
+            } else {
+                aggNode = new AggregatePlanNode();
+                topAggNode = new AggregatePlanNode();
+            }
 
             int outputColumnIndex = 0;
             int topOutputColumnIndex = 0;
@@ -1151,8 +1158,6 @@ public class PlanAssembler {
         return root;
     }
 
-
-
     /**
      * Push the given aggregate if the plan is distributed, then add the
      * coordinator node on top of the send/receive pair. If the plan
@@ -1174,8 +1179,8 @@ public class PlanAssembler {
      * @return The new root node.
      */
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
-                                       HashAggregatePlanNode distNode,
-                                       HashAggregatePlanNode coordNode) {
+                                       AggregatePlanNode distNode,
+                                       AggregatePlanNode coordNode) {
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators

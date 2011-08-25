@@ -259,7 +259,7 @@ public abstract class SubPlanAssembler {
                     AbstractExpression expr = gtColumns.get(col).remove(0);
                     if (retval.sortDirection != SortDirectionType.DESC)
                         retval.indexExprs.add(expr);
-                    if (retval.sortDirection != SortDirectionType.ASC)
+                    if (retval.sortDirection == SortDirectionType.DESC)
                         retval.endExprs.add(expr);
 
                     if (expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN)
@@ -582,11 +582,15 @@ public abstract class SubPlanAssembler {
         scanNode.setTargetTableAlias(table.getTypeName());
         scanNode.setTargetIndexName(index.getTypeName());
         if (path.sortDirection != SortDirectionType.DESC) {
-            scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+            List<AbstractExpression> predicate = new ArrayList<AbstractExpression>();
+            predicate.addAll(path.indexExprs);
+            predicate.addAll(path.otherExprs);
+            scanNode.setPredicate(ExpressionUtil.combine(predicate));
             scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         }
         else {
             List<AbstractExpression> predicate = new ArrayList<AbstractExpression>();
+            predicate.addAll(path.indexExprs);
             predicate.addAll(path.endExprs);
             predicate.addAll(path.otherExprs);
             scanNode.setPredicate(ExpressionUtil.combine(predicate));

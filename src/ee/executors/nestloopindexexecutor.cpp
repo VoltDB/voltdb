@@ -172,6 +172,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(inline_node);
     join_type = node->getJoinType();
     m_lookupType = inline_node->getLookupType();
+    m_sortDirection = inline_node->getSortDirection();
 
     //
     // We need exactly one input table and a target table
@@ -200,12 +201,14 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     // Make sure that we actually have search keys
     //
     int num_of_searchkeys = (int)inline_node->getSearchKeyExpressions().size();
-    if (num_of_searchkeys == 0) {
-        VOLT_ERROR("There are no search key expressions for the internal"
-                   " PlanNode '%s' of PlanNode '%s'",
-                   inline_node->debug().c_str(), node->debug().c_str());
-        return false;
-    }
+    //nshi commented this out in revision 4495 of the old repo in index scan executor
+    //the code is cut and paste in nest loop and the change is necessary here as well
+//    if (num_of_searchkeys == 0) {
+//        VOLT_ERROR("There are no search key expressions for the internal"
+//                   " PlanNode '%s' of PlanNode '%s'",
+//                   inline_node->debug().c_str(), node->debug().c_str());
+//        return false;
+//    }
     for (int ctr = 0; ctr < num_of_searchkeys; ctr++) {
         if (inline_node->getSearchKeyExpressions()[ctr] == NULL) {
             VOLT_ERROR("The search key expression at position '%d' is NULL for"
@@ -339,7 +342,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         // Now use the outer table tuple to construct the search key
         // against the inner table
         //
-        assert (index_values.getSchema()->columnCount() == num_of_searchkeys || m_lookupType == INDEX_LOOKUP_TYPE_GT);
+        //nshi commented this out in revision 4495 of the old repo in index scan executor
+        //the code is cut and paste in nest loop and the change is necessary here as well
+        //assert (index_values.getSchema()->columnCount() == num_of_searchkeys || m_lookupType == INDEX_LOOKUP_TYPE_GT);
         for (int ctr = num_of_searchkeys - 1; ctr >= 0 ; --ctr) {
             index_values.
                 setNValue(ctr,
@@ -362,20 +367,48 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         // Use our search key to prime the index iterator
         // The loop through each tuple given to us by the iterator
         //
-        if (m_lookupType == INDEX_LOOKUP_TYPE_EQ) {
-            index->moveToKey(&index_values);
-        } else if (m_lookupType == INDEX_LOOKUP_TYPE_GT) {
-            index->moveToGreaterThanKey(&index_values);
-        } else if (m_lookupType == INDEX_LOOKUP_TYPE_GTE) {
-            index->moveToKeyOrGreater(&index_values);
-        } else {
+        // Essentially cut and pasted this if ladder from
+        // index scan executor
+        if (num_of_searchkeys > 0)
+        {
+            if (m_lookupType == INDEX_LOOKUP_TYPE_EQ)
+            {
+                index->moveToKey(&index_values);
+            }
+            else if (m_lookupType == INDEX_LOOKUP_TYPE_GT)
+            {
+                index->moveToGreaterThanKey(&index_values);
+            }
+            else if (m_lookupType == INDEX_LOOKUP_TYPE_GTE)
+            {
+                index->moveToKeyOrGreater(&index_values);
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        if (m_sortDirection != SORT_DIRECTION_TYPE_INVALID) {
+            bool order_by_asc = true;
+
+            if (m_sortDirection == SORT_DIRECTION_TYPE_ASC) {
+                // nothing now
+            } else {
+                order_by_asc = false;
+            }
+
+            if (num_of_searchkeys == 0)
+                index->moveToEnd(order_by_asc);
+        } else if (m_sortDirection == SORT_DIRECTION_TYPE_INVALID &&
+                num_of_searchkeys == 0) {
             return false;
         }
 
         bool match = false;
         while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
                 !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
-               (m_lookupType != INDEX_LOOKUP_TYPE_EQ &&
+               ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
                 !(inner_tuple = index->nextValue()).isNullTuple()))
         {
             match = true;

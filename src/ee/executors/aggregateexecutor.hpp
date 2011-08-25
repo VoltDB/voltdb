@@ -748,7 +748,8 @@ public:
         if (m_startNewAgg)
         {
             VOLT_TRACE("new group!");
-            if (!helper(m_node, m_aggs, m_outputTable, m_inputTable,
+            if (!prevTuple.isNullTuple() &&
+                !helper(m_node, m_aggs, m_outputTable, m_inputTable,
                         prevTuple, m_passThroughColumns))
             {
                 return false;
@@ -780,7 +781,8 @@ public:
 
     inline bool finalize(TableTuple prevTuple)
     {
-        if (!helper(m_node, m_aggs, m_outputTable, m_inputTable,
+        if (!prevTuple.isNullTuple() &&
+            !helper(m_node, m_aggs, m_outputTable, m_inputTable,
                     prevTuple, m_passThroughColumns))
         {
             return false;
@@ -818,7 +820,10 @@ public:
     {
         for (int ii = 0; ii < m_aggTypes->size(); ii++)
         {
-            m_aggs[ii]->~Agg();
+            if (m_aggs[ii] != NULL)
+            {
+                m_aggs[ii]->~Agg();
+            }
         }
     }
 

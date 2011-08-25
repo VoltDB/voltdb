@@ -103,6 +103,7 @@ protected:
     Table* outer_table;
     JoinType join_type;
     std::vector<AbstractExpression*> m_outputExpressions;
+    SortDirectionType m_sortDirection;
 
     //So valgrind doesn't report the data as lost.
     char *index_values_backing_store;

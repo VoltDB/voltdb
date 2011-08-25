@@ -643,14 +643,7 @@ public class DDLCompiler {
         }
         else
         {
-            if (!has_nonint_col)
-            {
-                index.setType(IndexType.HASH_TABLE.getValue());
-            }
-            else
-            {
-                index.setType(IndexType.BALANCED_TREE.getValue());
-            }
+            index.setType(IndexType.BALANCED_TREE.getValue());
         }
 
         // need to set other index data here (column, etc)

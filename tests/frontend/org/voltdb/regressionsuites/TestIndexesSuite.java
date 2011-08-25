@@ -68,6 +68,26 @@ public class TestIndexesSuite extends RegressionSuite {
         }
     }
 
+    public void testPushDownAggregateWithLimit() throws Exception {
+        String[] tables = {"R1", "P1", "P2", "R2"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+            client.callProcedure("Insert", table, 9, "h", 300, 8, 19.5);
+            VoltTable results =
+                client.callProcedure(
+                        "@AdHoc",
+                        "SELECT R1.ID, MIN(R1.ID) from R1 group by R1.ID order by R1.ID limit 4").getResults()[0];
+            System.out.println(results);
+        }
+    }
+
     public void testOrderedUniqueOneColumnIntIndex()
     throws IOException, ProcCallException
     {

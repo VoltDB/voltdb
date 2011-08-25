@@ -1232,13 +1232,13 @@ public class TestVoltCompiler extends TestCase {
     String[] column_types = {"tinyint", "smallint", "integer", "bigint",
                              "float", "varchar(10)", "timestamp", "decimal"};
 
-    IndexType[] default_index_types = {IndexType.HASH_TABLE,
-                                       IndexType.HASH_TABLE,
-                                       IndexType.HASH_TABLE,
-                                       IndexType.HASH_TABLE,
+    IndexType[] default_index_types = {IndexType.BALANCED_TREE,
                                        IndexType.BALANCED_TREE,
                                        IndexType.BALANCED_TREE,
-                                       IndexType.HASH_TABLE,
+                                       IndexType.BALANCED_TREE,
+                                       IndexType.BALANCED_TREE,
+                                       IndexType.BALANCED_TREE,
+                                       IndexType.BALANCED_TREE,
                                        IndexType.BALANCED_TREE};
 
     boolean[] can_be_hash = {true, true, true, true, false, false, true, false};
