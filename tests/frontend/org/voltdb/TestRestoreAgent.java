@@ -252,6 +252,11 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         public boolean isOnBackPressure() {
             return false;
         }
+
+        @Override
+        public void removeConnectionStats(long connectionId) {
+
+        }
     }
 
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,

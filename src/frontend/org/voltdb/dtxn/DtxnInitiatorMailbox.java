@@ -189,6 +189,10 @@ public class DtxnInitiatorMailbox implements Mailbox
         c.writeStream().enqueue(response);
     }
 
+    public void removeConnectionStats(long connectionId) {
+        m_stats.removeConnectionStats(connectionId);
+    }
+
     /**
      * Currently used to provide object state for the dump manager
      * @return A list of outstanding transaction state objects

@@ -291,6 +291,12 @@ public class TestDtxnInitiatorMailbox extends TestCase
             // TODO Auto-generated method stub
             return false;
         }
+
+        @Override
+        public void removeConnectionStats(long connectionId) {
+            // TODO Auto-generated method stub
+
+        }
     }
 
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,

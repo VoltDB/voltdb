@@ -488,4 +488,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public boolean isOnBackPressure() {
         return m_hadBackPressure.get();
     }
+
+    @Override
+    public void removeConnectionStats(long connectionId) {
+        m_mailbox.removeConnectionStats(connectionId);
+    }
 }

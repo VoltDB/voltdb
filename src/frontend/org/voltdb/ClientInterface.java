@@ -669,6 +669,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void stopped(Connection c) {
             m_numConnections.decrementAndGet();
+            m_initiator.removeConnectionStats(connectionId());
         }
 
         @Override

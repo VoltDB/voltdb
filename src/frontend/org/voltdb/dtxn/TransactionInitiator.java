@@ -160,4 +160,10 @@ public abstract class TransactionInitiator {
      * @return
      */
     public abstract boolean isOnBackPressure();
+
+    /**
+     * Removes client connection statistics when the connection dies
+     * @param connectionId
+     */
+    public abstract void removeConnectionStats(long connectionId);
 }
