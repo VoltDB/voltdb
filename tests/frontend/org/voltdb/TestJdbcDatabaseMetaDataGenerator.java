@@ -159,13 +159,15 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                             columns);
         assertEquals("Null mismatch for column " + columnName,
                      expected[5], columns.get("NULLABLE", VoltType.INTEGER));
-        assertWithNullCheck(expected[6],
-                            columns.get("COLUMN_DEF", VoltType.STRING),
+        assertWithNullCheck(expected[6], columns.get("REMARKS", VoltType.STRING),
                             columns);
         assertWithNullCheck(expected[7],
+                            columns.get("COLUMN_DEF", VoltType.STRING),
+                            columns);
+        assertWithNullCheck(expected[8],
                             columns.get("CHAR_OCTET_LENGTH", VoltType.INTEGER),
                             columns);
-        assertEquals(expected[8],
+        assertEquals(expected[9],
                      columns.get("ORDINAL_POSITION", VoltType.INTEGER));
     }
 
@@ -179,6 +181,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 null,
                                                 java.sql.DatabaseMetaData.columnNoNulls,
                                                 null,
+                                                null,
                                                 200,
                                                 1,
                                                 "NO"});
@@ -190,6 +193,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 java.sql.DatabaseMetaData.columnNullable,
                                                 null,
                                                 null,
+                                                null,
                                                 2,
                                                 "YES"});
         refcolumns.put("Column3", new Object[] {java.sql.Types.SMALLINT,
@@ -198,6 +202,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 null,
                                                 2,
                                                 java.sql.DatabaseMetaData.columnNoNulls,
+                                                "PARTITION_COLUMN",
                                                 null,
                                                 null,
                                                 1,
@@ -210,6 +215,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 java.sql.DatabaseMetaData.columnNullable,
                                                 null,
                                                 null,
+                                                null,
                                                 2,
                                                 "YES"});
         refcolumns.put("Column5", new Object[] {java.sql.Types.BIGINT,
@@ -218,6 +224,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 null,
                                                 2,
                                                 java.sql.DatabaseMetaData.columnNoNulls,
+                                                null,
                                                 null,
                                                 null,
                                                 3,
@@ -230,6 +237,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 java.sql.DatabaseMetaData.columnNullable,
                                                 null,
                                                 null,
+                                                null,
                                                 1,
                                                 "YES"});
         refcolumns.put("Column7", new Object[] {java.sql.Types.TIMESTAMP,
@@ -238,6 +246,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 null,
                                                 2,
                                                 java.sql.DatabaseMetaData.columnNoNulls,
+                                                null,
                                                 null,
                                                 null,
                                                 2,
@@ -250,6 +259,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 java.sql.DatabaseMetaData.columnNullable,
                                                 null,
                                                 null,
+                                                null,
                                                 3,
                                                 "YES"});
         refcolumns.put("Column9", new Object[] {java.sql.Types.VARBINARY,
@@ -258,6 +268,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 null,
                                                 null,
                                                 java.sql.DatabaseMetaData.columnNoNulls,
+                                                null,
                                                 null,
                                                 250,
                                                 1,
@@ -268,6 +279,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                  null,
                                                  null,
                                                  java.sql.DatabaseMetaData.columnNullable,
+                                                 null,
                                                  null,
                                                  200,
                                                  1,
@@ -280,6 +292,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                  java.sql.DatabaseMetaData.columnNullable,
                                                  null,
                                                  null,
+                                                 null,
                                                  2,
                                                  "YES"});
         refcolumns.put("Default1", new Object[] {java.sql.Types.TINYINT,
@@ -288,6 +301,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                  null,
                                                  2,
                                                  java.sql.DatabaseMetaData.columnNullable,
+                                                 null,
                                                  "10",
                                                  null,
                                                  1,
@@ -298,6 +312,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                  null,
                                                  null,
                                                  java.sql.DatabaseMetaData.columnNullable,
+                                                 null,
                                                  "'DUDE'",
                                                  50,
                                                  2,
@@ -316,6 +331,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "  <database name='database'>" +
             "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
             "    <procedures><procedure class='sample'><sql>select * from Table1</sql></procedure></procedures>" +
+            "    <partitions><partition table='Table2' column='Column3'/></partitions>" +
             "  </database>" +
             "</project>";
 
@@ -331,5 +347,115 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         {
             verifyColumnData(entry.getKey(), columns, entry.getValue());
         }
+    }
+
+    public void testGetIndexInfo()
+    {
+        String schema =
+            "create table Table1 (Column1 smallint, Column2 integer, Column3 bigint not null, Column4 integer, Column5 integer, " +
+            "  constraint pk_tree primary key (Column1));" +
+            "create index Index1_tree on Table1 (Column2, Column3);" +
+            "create index Index2_hash on Table1 (Column4, Column5);";
+        String project =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "  <database name='database'>" +
+            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
+            "    <procedures><procedure class='sample'><sql>select * from Table1</sql></procedure></procedures>" +
+            "    <partitions><partition table='Table1' column='Column3'/></partitions>" +
+            "  </database>" +
+            "</project>";
+
+        VoltCompiler c = compileForDDLTest(project);
+        System.out.println(c.getCatalog().serialize());
+        JdbcDatabaseMetaDataGenerator dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), testout_jar);
+        VoltTable indexes = dut.getMetaData("IndexInfo");
+        System.out.println(indexes);
+        assertEquals(13, indexes.getColumnCount());
+        assertEquals(5, indexes.getRowCount());
+        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column2"));
+        assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
+        assertEquals("INDEX1_TREE", indexes.get("INDEX_NAME", VoltType.STRING));
+        assertEquals((short)java.sql.DatabaseMetaData.tableIndexOther,
+                     indexes.get("TYPE", VoltType.SMALLINT));
+        assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
+        assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
+        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column3"));
+        assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
+        assertEquals("INDEX1_TREE", indexes.get("INDEX_NAME", VoltType.STRING));
+        assertEquals((short)java.sql.DatabaseMetaData.tableIndexOther,
+                     indexes.get("TYPE", VoltType.SMALLINT));
+        assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
+        assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
+        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column4"));
+        assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
+        assertEquals("INDEX2_HASH", indexes.get("INDEX_NAME", VoltType.STRING));
+        assertEquals((short)java.sql.DatabaseMetaData.tableIndexHashed,
+                     indexes.get("TYPE", VoltType.SMALLINT));
+        assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
+        assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
+        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column5"));
+        assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
+        assertEquals("INDEX2_HASH", indexes.get("INDEX_NAME", VoltType.STRING));
+        assertEquals((short)java.sql.DatabaseMetaData.tableIndexHashed,
+                     indexes.get("TYPE", VoltType.SMALLINT));
+        assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
+        assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
+        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column1"));
+        assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
+        assertTrue(((String)indexes.get("INDEX_NAME", VoltType.STRING)).contains("PK_TREE"));
+        assertEquals((short)java.sql.DatabaseMetaData.tableIndexOther,
+                     indexes.get("TYPE", VoltType.SMALLINT));
+        assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
+        assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
+        assertFalse(moveToMatchingRow(indexes, "COLUMN_NAME", "NotAColumn"));
+    }
+
+    public void testGetPrimaryKeys()
+    {
+        String schema =
+            "create table Table1 (Column1 smallint not null, constraint primary1 primary key (Column1));" +
+            "create table Table2 (Column2 smallint not null, Column3 smallint not null, Column4 smallint not null, " +
+            "  constraint primary2 primary key (Column2, Column3, Column4));";
+        String project =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "  <database name='database'>" +
+            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
+            "    <procedures><procedure class='sample'><sql>select * from Table1</sql></procedure></procedures>" +
+            "    <partitions><partition table='Table1' column='Column1'/></partitions>" +
+            "  </database>" +
+            "</project>";
+
+        VoltCompiler c = compileForDDLTest(project);
+        System.out.println(c.getCatalog().serialize());
+        JdbcDatabaseMetaDataGenerator dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), testout_jar);
+        VoltTable pkeys = dut.getMetaData("PrimaryKeys");
+        System.out.println(pkeys);
+        assertEquals(6, pkeys.getColumnCount());
+        assertEquals(4, pkeys.getRowCount());
+        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column1"));
+        assertEquals("TABLE1", pkeys.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((short)1, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
+        assertEquals("PRIMARY1", pkeys.get("PK_NAME", VoltType.STRING));
+        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column2"));
+        assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((short)1, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
+        assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
+        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column3"));
+        assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((short)2, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
+        assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
+        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column4"));
+        assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((short)3, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
+        assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
     }
 }

@@ -20,11 +20,15 @@ package org.voltdb;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.types.ConstraintType;
+import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
 
 public class JdbcDatabaseMetaDataGenerator
@@ -362,6 +366,17 @@ public class JdbcDatabaseMetaDataGenerator
         return nullable;
     }
 
+    private String getRemarks(Column column, Table table)
+    {
+        String remarks = null;
+        if (table.getPartitioncolumn() != null &&
+            table.getPartitioncolumn().getTypeName().equals(column.getTypeName()))
+        {
+            remarks = "PARTITION_COLUMN";
+        }
+        return remarks;
+    }
+
     private String getDefaultValue(Column column)
     {
         String value = column.getDefaultvalue();
@@ -414,7 +429,7 @@ public class JdbcDatabaseMetaDataGenerator
                                getColumnDecimalDigits(column),
                                getColumnSizeAndRadix(column)[1],
                                getNullable(column),
-                               null, // REMARKS
+                               getRemarks(column, table), // REMARKS
                                getDefaultValue(column), // default value
                                null, // unused SQL_DATA_TYPE
                                null, // unused SQL_DATETIME_SUB
@@ -432,6 +447,26 @@ public class JdbcDatabaseMetaDataGenerator
         return results;
     }
 
+    private short getIndexType(Index index)
+    {
+        short type = java.sql.DatabaseMetaData.tableIndexOther;
+        if (index.getType() == IndexType.HASH_TABLE.getValue())
+        {
+            type = java.sql.DatabaseMetaData.tableIndexHashed;
+        }
+        return type;
+    }
+
+    private String getSortOrder(Index index)
+    {
+        String sort_order = null;
+        if (index.getType() == IndexType.BALANCED_TREE.getValue())
+        {
+            sort_order = "A";
+        }
+        return sort_order;
+    }
+
     VoltTable getIndexInfo()
     {
         VoltTable results = new VoltTable(INDEXINFO_SCHEMA);
@@ -439,22 +474,23 @@ public class JdbcDatabaseMetaDataGenerator
         {
             for (Index index : table.getIndexes())
             {
-                // XXX-IZZY ugh, need to iterate through index.getColumns and generate a separate
-                // row here for each.  Later.
-                results.addRow(m_jarFilename, // table catalog
-                               null, // table_schema
-                               table.getTypeName(), // table name
-                               index.getUnique() ? 1 : 0, // non-unique, 1 is unique, 0 is not
-                               null, // index qualifier (always null for us)
-                               index.getTypeName(), // index name
-                               null, // type
-                               null, // ordinal position
-                               null, // column name
-                               null, // ascending or descending
-                               null, // cardinality
-                               null, // pages (always null for us)
-                               null  // filter condition, also null for us
+                for (ColumnRef column : index.getColumns())
+                {
+                    results.addRow(m_jarFilename, // table catalog
+                                   null, // table_schema
+                                   table.getTypeName(), // table name
+                                   index.getUnique() ? 0 : 1, // non-unique, 1 is unique, 0 is not
+                                   null, // index qualifier (always null for us)
+                                   index.getTypeName(), // index name
+                                   getIndexType(index), // type
+                                   column.getRelativeIndex(), // ordinal position
+                                   column.getTypeName(), // column name
+                                   getSortOrder(index), // ascending or descending
+                                   null, // cardinality
+                                   null, // pages (always null for us)
+                                   null  // filter condition, also null for us
                               );
+                }
             }
         }
         return results;
@@ -465,19 +501,20 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(PRIMARYKEYS_SCHEMA);
         for (Table table : m_database.getTables())
         {
-            for (Index index : table.getIndexes())
+            for (Constraint c : table.getConstraints())
             {
-                if (index.getTypeName().contains("_PK_"))
+                if (c.getType() == ConstraintType.PRIMARY_KEY.getValue())
                 {
-                    // XXX-IZZY ugh, need to iterate through index.getColumns and generate a separate
-                    // row here for each.  Later.
-                    results.addRow(m_jarFilename, // table catalog
-                                   null, // table schema
-                                   table.getTypeName(), // table name
-                                   null, // column name
-                                   null, // key_seq
-                                   index.getTypeName() // PK_NAME
-                                  );
+                    for (ColumnRef column : c.getIndex().getColumns())
+                    {
+                        results.addRow(m_jarFilename, // table catalog
+                                       null, // table schema
+                                       table.getTypeName(), // table name
+                                       column.getTypeName(), // column name
+                                       column.getRelativeIndex(), // key_seq
+                                       c.getTypeName() // PK_NAME
+                                      );
+                    }
                 }
             }
         }
@@ -497,8 +534,8 @@ public class JdbcDatabaseMetaDataGenerator
                            null, // reserved
                            null, // reserved
                            null, // REMARKS
-                           null, // procedure type
-                           null // specific name
+                           java.sql.DatabaseMetaData.procedureResultUnknown, // procedure time
+                           proc.getTypeName() // specific name
                           );
         }
         return results;
