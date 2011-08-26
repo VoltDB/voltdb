@@ -487,7 +487,6 @@ DISTRIBUTION
         <fileset dir="tools" defaultexcludes="yes">
             <include name="demo/**"/>
             <include name="sqlcmd/**"/>
-            <include name="browser_adhoc/**"/>
         </fileset>
     </copy>
 
@@ -526,10 +525,6 @@ DISTRIBUTION
             <include name="sqlcmd"/>
         </fileset>
     </chmod>
-
-    <!-- copy voltdbclient.py for python examples -->
-    <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/voltdbclient.py"/>
-    <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/Query.py"/>
 
     <!-- populate project generator -->
     <exec dir="src/proj_gen/" executable="python">
@@ -669,7 +664,6 @@ DISTRIBUTION
             <include name="studio.web/**"/>
             <include name="demo/**"/>
             <include name="sqlcmd/**"/>
-            <include name="browser_adhoc/**"/>
         </fileset>
     </copy>
 
@@ -697,10 +691,6 @@ DISTRIBUTION
             <include name="sqlcmd"/>
         </fileset>
     </chmod>
-
-    <!-- copy voltdbclient.py for python examples -->
-    <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/voltdbclient.py"/>
-    <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/Query.py"/>
 
     <!-- populate project generator -->
     <exec dir="src/proj_gen/" executable="python">
