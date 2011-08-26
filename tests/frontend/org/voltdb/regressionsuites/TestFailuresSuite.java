@@ -561,10 +561,10 @@ public class TestFailuresSuite extends RegressionSuite {
         config = new LocalSingleProcessServer("failures-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile (note the reuse of the TPCC project)
-        //config.compile(project);
+        config.compile(project);
 
         // add this config to the set of tests to run
-        //builder.addServerConfig(config);
+        builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #3: 1 Local Site/Partition running on HSQL backend
@@ -574,10 +574,10 @@ public class TestFailuresSuite extends RegressionSuite {
         config = new LocalSingleProcessServer("failures-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
 
         // build the jarfile (note the reuse of the TPCC project)
-        //config.compile(project);
+        config.compile(project);
 
         // add this config to the set of tests to run
-        //builder.addServerConfig(config);
+        builder.addServerConfig(config);
 
         // CLUSTER?
         config = new LocalCluster("failures-cluster.jar", 2, 2,
