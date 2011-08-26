@@ -41,6 +41,11 @@ import org.voltdb.utils.EstTime;
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    // special magic mailbox ids that get handled specially (and magically)
+    public static final int READY_SIGNAL = -1;
+    public static final int CATALOG_SIGNAL = -2;
+    public static final int POISON_SIGNAL = -3;
+
     private final Connection m_connection;
     final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
@@ -296,9 +301,10 @@ public class ForeignHost {
 
     /**
      * Send the message to the foreign host that this host is ready.
-     * This should be the first message sent by this system.
+     * This should be the first or second message sent by this system.
+     * It may be preceded by a catalog send.
      * It is differentiated from other messages because it is sent
-     * to mailbox -1.
+     * to mailbox -1 (READY_SIGNAL)
      */
     void sendReadyMessage() {
         String hostname = ConnectionUtil.getHostnameOrAddress();
@@ -307,10 +313,26 @@ public class ForeignHost {
         // length prefix int
         out.putInt(8  + hostnameBytes.length);
         // sign that this is a ready message
-        out.putInt(-1);
+        out.putInt(READY_SIGNAL);
         // host id of the sender
         out.putInt(m_hostMessenger.getHostId());
         out.put(hostnameBytes);
+        out.rewind();
+        m_connection.writeStream().enqueue(out);
+    }
+
+    /**
+     * Send raw bytes to a mailbox, usually a catalog handler
+     * mailbox or a poison pill handler mailbox.
+     */
+    void sendBytesToMailbox(int mailboxId, byte[] bytes) {
+        ByteBuffer out = ByteBuffer.allocate(8 + bytes.length);
+        // length prefix int
+        out.putInt(bytes.length + 4);
+
+        out.putInt(mailboxId);
+        // byte data itself
+        out.put(bytes);
         out.rewind();
         m_connection.writeStream().enqueue(out);
     }
@@ -357,15 +379,27 @@ public class ForeignHost {
         int mailboxId = in.getInt();
 
         // handle the ready message
-        // this should be the first message recieved
+        // this should be the first message received
         // it is sent to mailbox -1 and contains just the sender's host id
-        if (mailboxId == -1) {
+        if (mailboxId == READY_SIGNAL) {
             int readyHost = in.getInt();
             byte hostnameBytes[] = new byte[in.remaining()];
             in.get(hostnameBytes);
             m_remoteHostname = new String(hostnameBytes);
             m_hostMessenger.hostIsReady(readyHost);
+            return;
+        }
 
+        // handle a node sending us a catalog
+        if (mailboxId == CATALOG_SIGNAL) {
+            byte catalogBytes[] = new byte[in.remaining()];
+            in.get(catalogBytes);
+            VoltDB.instance().writeNetworkCatalogToTmp(catalogBytes);
+            return;
+        }
+
+        if (mailboxId == POISON_SIGNAL) {
+            VoltDB.crashVoltDB();
             return;
         }
 

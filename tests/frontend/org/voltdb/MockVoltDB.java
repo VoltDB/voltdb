@@ -481,10 +481,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void setStartMode(OperationMode mode) {
-        // TODO Auto-generated method stub
-
-    }
+    public void setStartMode(OperationMode mode) {}
 
     @Override
     public ZooKeeper getZK() {
@@ -492,10 +489,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onAgreementSiteRecoveryCompletion() {
-        // TODO Auto-generated method stub
-
-    }
+    public void onAgreementSiteRecoveryCompletion() {}
 
     @Override
     public AgreementSite getAgreementSite() {
@@ -508,8 +502,8 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void recoveryComplete() {
-        // TODO Auto-generated method stub
+    public void recoveryComplete() {}
 
-    }
+    @Override
+    public void writeNetworkCatalogToTmp(byte[] catalogBytes) {}
 }

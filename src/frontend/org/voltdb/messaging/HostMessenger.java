@@ -18,6 +18,7 @@
 package org.voltdb.messaging;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
@@ -431,6 +432,32 @@ public class HostMessenger implements Messenger {
                 host.sendReadyMessage();
     }
 
+    public void sendCatalog(byte[] catalogBytes) {
+        VoltDB.instance().writeNetworkCatalogToTmp(catalogBytes);
+        for (ForeignHost host : m_foreignHosts) {
+            if (host != null) {
+                host.sendBytesToMailbox(ForeignHost.CATALOG_SIGNAL, catalogBytes);
+            }
+        }
+    }
+
+    public void sendPoisonPill(String msg) {
+        byte[] msgBytes = null;
+        try {
+            msgBytes = msg.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            m_logger.fatal("Missing UTF-8 encoding. Broken JVM.");
+            e.printStackTrace();
+            VoltDB.crashVoltDB();
+        }
+
+        for (ForeignHost host : m_foreignHosts) {
+            if (host != null) {
+                host.sendBytesToMailbox(ForeignHost.POISON_SIGNAL, msgBytes);
+            }
+        }
+    }
+
     /**
      * Block on this call until the number of ready hosts is
      * equal to the number of expected hosts.
@@ -462,7 +489,8 @@ public class HostMessenger implements Messenger {
                                          Set<Integer> liveHosts,
                                          long faultSequenceNumber,
                                          int catalogVersionNumber,
-                                         long catalogTxnId) throws Exception {
+                                         long catalogTxnId,
+                                         byte[] catalogBytes) throws Exception {
         if (hostId < 0)
             throw new Exception("Rejoin HostId can be negative.");
         if (m_foreignHosts.length <= hostId)
@@ -473,7 +501,8 @@ public class HostMessenger implements Messenger {
 
         SocketChannel sock = SocketJoiner.connect(
                 m_localHostId, hostId, addr, catalogCRC, deploymentCRC,
-                liveHosts, faultSequenceNumber, catalogVersionNumber, catalogTxnId);
+                liveHosts, faultSequenceNumber, catalogVersionNumber,
+                catalogTxnId, catalogBytes);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
         m_tempNewFH.sendReadyMessage();

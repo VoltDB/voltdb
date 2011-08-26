@@ -180,4 +180,6 @@ public interface VoltDBInterface
     ZooKeeper getZK();
 
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
+
+    public void writeNetworkCatalogToTmp(byte[] catalogBytes);
 }

@@ -18,10 +18,15 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -95,7 +100,7 @@ public class Inits {
                 }
                 if (iw instanceof COMPLETION_WORK)
                     return;
-                //hostLog.info("Running InitWorker: " + iw.getClass().getName());
+                hostLog.info("Running InitWorker: " + iw.getClass().getName());
                 iw.run();
                 completeInitWork(iw);
             }
@@ -198,12 +203,62 @@ public class Inits {
         }
     }
 
-    class LoadCatalog extends InitWork {
-        LoadCatalog() {
+    class DistributeCatalog extends InitWork {
+        DistributeCatalog() {
+            dependsOn(InitAgreementSite.class);
+            dependsOn(CreateRestoreAgentAndPlan.class);
         }
 
         @Override
         public void run() {
+            // if I'm the leader, send out the catalog
+            if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
+                final int MAX_CATALOG_SIZE = 40 * 1024 * 1024; // 40mb
+
+                try {
+                    InputStream fin = null;
+                    try {
+                        URL url = new URL(m_rvdb.m_pathToStartupCatalog);
+                        fin = url.openStream();
+                    } catch (MalformedURLException ex) {
+                        // Invalid URL. Try as a file.
+                        fin = new FileInputStream(m_rvdb.m_pathToStartupCatalog);
+                    }
+                    byte[] buffer = new byte[MAX_CATALOG_SIZE];
+                    int readBytes = 0;
+                    int totalBytes = 0;
+                    while (readBytes >= 0) {
+                        totalBytes += readBytes;
+                        readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
+                    }
+                    byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
+                    hostLog.info(String.format("Sending %d catalog bytes", catalogBytes.length));
+
+                    m_rvdb.m_messenger.sendCatalog(catalogBytes);
+                }
+                catch (IOException e) {
+                    m_rvdb.m_messenger.sendPoisonPill("Unable to distribute catalog.");
+                    VoltDB.crashVoltDB();
+                }
+            }
+        }
+    }
+
+    class LoadCatalog extends InitWork {
+        LoadCatalog() {
+            dependsOn(DistributeCatalog.class);
+        }
+
+        @Override
+        public void run() {
+            // wait till RealVoltDB says a catalog has been found
+            try {
+                m_rvdb.m_hasCatalog.await();
+            } catch (InterruptedException e1) {
+                hostLog.fatal("System was interrupted while waiting for a catalog.");
+                VoltDB.crashVoltDB();
+            }
+
             // Initialize the catalog and some common shortcuts
             if (m_config.m_pathToCatalog.startsWith("http")) {
                 hostLog.info("Loading application catalog jarfile from " + m_config.m_pathToCatalog);
@@ -412,7 +467,6 @@ public class Inits {
 
     class InitAgreementSite extends InitWork {
         InitAgreementSite() {
-            dependsOn(LoadCatalog.class);
         }
 
         @Override
@@ -517,6 +571,15 @@ public class Inits {
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
+
+                // if the restore agent found a catalog, set the following info
+                // so the right node can send it out to the others
+                if (catalog != null) {
+                    m_rvdb.m_hostIdWithStartupCatalog = catalog.getFirst().intValue();
+                    assert(m_rvdb.m_hostIdWithStartupCatalog > 0);
+                    m_rvdb.m_pathToStartupCatalog = catalog.getSecond();
+                    assert(m_rvdb.m_pathToStartupCatalog != null);
+                }
             }
         }
     }

@@ -585,6 +585,13 @@ public class SocketJoiner extends Thread {
                 // set the admin mode here, not in the local deployment file for rejoining nodes
                 VoltDB.instance().setStartMode(in.readBoolean() ? OperationMode.PAUSED
                                                                 : OperationMode.RUNNING);
+                // read the current catalog
+                int catalogLength = in.readInt();
+                byte[] catalogBytes = new byte[catalogLength];
+                in.readFully(catalogBytes);
+                VoltDB.instance().writeNetworkCatalogToTmp(catalogBytes);
+
+                // read the metadata (topology) of the cluster
                 readClusterPublicMetadata(in);
                 m_sockets.put(hostId, socket);
                 recoveryLog.info("Have " + m_sockets.size() + " of " + (m_expectedHosts - 1) + " with hostId " + hostId);
@@ -779,7 +786,8 @@ public class SocketJoiner extends Thread {
             Set<Integer> liveHosts,
             long faultSequenceNumber,
             int catalogVersionNumber,
-            long catalogTxnId) throws Exception {
+            long catalogTxnId,
+            byte[] catalogBytes) throws Exception {
         SocketChannel remoteConnection = null;
         try {
             // open a connection to the re-joining node
@@ -801,6 +809,9 @@ public class SocketJoiner extends Thread {
             }
             // send the admin mode here, don't use local deployment file for rejoining nodes
             out.writeBoolean(VoltDB.instance().getMode() == OperationMode.PAUSED);
+            // write the catalog contents
+            out.writeInt(catalogBytes.length);
+            out.write(catalogBytes);
             writeClusterPublicMetadata(out);
             out.flush();
 

@@ -166,6 +166,10 @@ public class CatalogContext {
         return m_jarfile.writeToFile(catalog_file);
     }
 
+    public byte[] getCatalogJarBytes() throws IOException {
+        return m_jarfile.getFullJarBytes();
+    }
+
     /**
      * Given a class name in the catalog jar, loads it from the jar, even if the
      * jar is served from a url and isn't in the classpath.

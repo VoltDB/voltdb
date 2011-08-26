@@ -18,7 +18,9 @@
 package org.voltdb;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -40,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -151,6 +154,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     String m_serializedCatalog;
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
+    CountDownLatch m_hasCatalog;
 
     DeploymentType m_deployment;
 
@@ -172,6 +176,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private boolean m_agreementSiteRecovered = false;
     private long m_executionSiteRecoveryFinish;
     private long m_executionSiteRecoveryTransferred;
+
+    int m_hostIdWithStartupCatalog;
+    String m_pathToStartupCatalog;
 
     // Synchronize initialize and shutdown.
     private final Object m_startAndStopLock = new Object();
@@ -246,6 +253,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_memoryStats = null;
             m_statsManager = null;
             m_restoreAgent = null;
+            m_hasCatalog = new CountDownLatch(1);
+            m_hostIdWithStartupCatalog = 0;
+            m_pathToStartupCatalog = m_config.m_pathToCatalog;
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -828,6 +838,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
     }
 
+    @Override
+    public void writeNetworkCatalogToTmp(byte[] catalogBytes) {
+        hostLog.info("Got a catalog!");
+
+        hostLog.info(String.format("Got %d catalog bytes", catalogBytes.length));
+
+        String prefix = String.format("catalog-host%d-", m_myHostId);
+
+        try {
+            File catalogFile = File.createTempFile(prefix, ".jar");
+            catalogFile.deleteOnExit();
+            FileOutputStream fos = new FileOutputStream(catalogFile);
+            fos.write(catalogBytes);
+            fos.flush();
+            fos.close();
+            m_config.m_pathToCatalog = catalogFile.getCanonicalPath();
+        } catch (IOException e) {
+            m_messenger.sendPoisonPill("Failed to write a temp catalog.");
+            VoltDB.crashVoltDB();
+        }
+
+        // anyone waiting for a catalog can now zoom zoom
+        m_hasCatalog.countDown();
+    }
+
     public static String[] extractBuildInfo() {
         StringBuilder sb = new StringBuilder(64);
         String buildString = "VoltDB";
@@ -1041,6 +1076,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             throw new RuntimeException("Trying to rejoin (prepare) with an old transaction.");
         }
 
+        // get the contents of the catalog for the rejoining node
+        byte[] catalogBytes = null;
+        try {
+            catalogBytes = m_catalogContext.getCatalogJarBytes();
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         // connect to the joining node, build a foreign host
         InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
         String ipAddr = addr.getAddress().toString();
@@ -1056,7 +1100,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         try {
             messenger.rejoinForeignHostPrepare(rejoinHostId, addr, 0,
                     m_catalogContext.deploymentCRC, liveHosts, m_commandLog.getFaultSequenceNumber(),
-                    m_catalogContext.catalogVersion, m_catalogContext.m_transactionId);
+                    m_catalogContext.catalogVersion, m_catalogContext.m_transactionId, catalogBytes);
             return null;
         } catch (Exception e) {
             //e.printStackTrace();

@@ -33,7 +33,6 @@ import java.util.HashSet;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.client.ClientConfig;
@@ -164,13 +163,16 @@ public class RejoinTestBase extends TestCase {
         long deploymentCRC = CatalogUtil.getDeploymentCRC(builder.getPathToDeployment());
 
         // start the fake HostMessenger
-        retval.catalogCRC = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar")).getCRC();
+        InMemoryJarfile jarFile = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar"));
+        retval.catalogCRC = jarFile.getCRC();
         VoltNetwork network2 = new VoltNetwork();
         InetAddress leader = InetAddress.getByName("localhost");
         HostMessenger host2 = new HostMessenger(network2, leader, 2, 0, deploymentCRC, null);
 
         retval.localServer.start();
         host2.waitForGroupJoin();
+        if (host2.getHostId() == 0)
+            host2.sendCatalog(jarFile.getFullJarBytes());
         network2.start();
 
         int myHostId = host2.getHostId() * 100;
