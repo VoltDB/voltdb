@@ -134,10 +134,11 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("SPECIFIC_NAME", VoltType.STRING)
         };
 
-    JdbcDatabaseMetaDataGenerator(Catalog catalog)
+    JdbcDatabaseMetaDataGenerator(Catalog catalog, String pathToCatalogJar)
     {
         m_catalog = catalog;
         m_database = m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        m_jarFilename = pathToCatalogJar;
     }
 
     public VoltTable getMetaData(String selector)
@@ -193,7 +194,7 @@ public class JdbcDatabaseMetaDataGenerator
         for (Table table : m_database.getTables())
         {
             // REMARKS and all following columns are always null for us.
-            results.addRow(null, // XXX-izzy need jarfile name.
+            results.addRow(m_jarFilename, // XXX-izzy need jarfile name.
                            null, // no schema name
                            table.getTypeName(),
                            getTableType(table),
@@ -361,6 +362,39 @@ public class JdbcDatabaseMetaDataGenerator
         return nullable;
     }
 
+    private String getDefaultValue(Column column)
+    {
+        String value = column.getDefaultvalue();
+        if (value != null &&
+            VoltType.get((byte)column.getDefaulttype()) == VoltType.STRING)
+        {
+            value = "'" + value + "'";
+        }
+        return value;
+    }
+
+    private Integer getCharOctetLength(Column column)
+    {
+        Integer length = null;
+        VoltType type = VoltType.get((byte)column.getType());
+        if (type == VoltType.STRING || type == VoltType.VARBINARY)
+        {
+            length = column.getSize();
+        }
+
+        return length;
+    }
+
+    private String getIsNullable(Column column)
+    {
+        String is_nullable = "NO";
+        if (column.getNullable())
+        {
+            is_nullable = "YES";
+        }
+        return is_nullable;
+    }
+
     VoltTable getColumns()
     {
         VoltTable results = new VoltTable(COLUMN_SCHEMA);
@@ -369,7 +403,7 @@ public class JdbcDatabaseMetaDataGenerator
             for (Column column: table.getColumns())
             {
                 results.addRow(
-                               null, // XXX need jarfile name
+                               m_jarFilename, // XXX need jarfile name
                                null, // no schema name
                                table.getTypeName(),
                                column.getTypeName(),
@@ -380,13 +414,13 @@ public class JdbcDatabaseMetaDataGenerator
                                getColumnDecimalDigits(column),
                                getColumnSizeAndRadix(column)[1],
                                getNullable(column),
-                               null, // XXX REMARKS
-                               null, // XXX default value
+                               null, // REMARKS
+                               getDefaultValue(column), // default value
                                null, // unused SQL_DATA_TYPE
                                null, // unused SQL_DATETIME_SUB
-                               null, // XXX char_octet_length
-                               null, // XXX ordinal position
-                               null, // XXX IS_NULLABLE
+                               getCharOctetLength(column), // char_octet_length
+                               column.getIndex() + 1, // ordinal position, starts from 1
+                               getIsNullable(column), // IS_NULLABLE
                                null, // unused SCOPE_CATALOG
                                null, // unused SCOPE_SCHEMA
                                null, // unused SCOPE_TABLE
@@ -407,7 +441,7 @@ public class JdbcDatabaseMetaDataGenerator
             {
                 // XXX-IZZY ugh, need to iterate through index.getColumns and generate a separate
                 // row here for each.  Later.
-                results.addRow(null, // table catalog
+                results.addRow(m_jarFilename, // table catalog
                                null, // table_schema
                                table.getTypeName(), // table name
                                index.getUnique() ? 1 : 0, // non-unique, 1 is unique, 0 is not
@@ -437,7 +471,7 @@ public class JdbcDatabaseMetaDataGenerator
                 {
                     // XXX-IZZY ugh, need to iterate through index.getColumns and generate a separate
                     // row here for each.  Later.
-                    results.addRow(null, // table catalog
+                    results.addRow(m_jarFilename, // table catalog
                                    null, // table schema
                                    table.getTypeName(), // table name
                                    null, // column name
@@ -456,7 +490,7 @@ public class JdbcDatabaseMetaDataGenerator
         for (Procedure proc : m_database.getProcedures())
         {
             results.addRow(
-                           null, // procedure catalog
+                           m_jarFilename, // procedure catalog
                            null, // procedure schema
                            proc.getTypeName(), // procedure name
                            null, // reserved
@@ -478,7 +512,7 @@ public class JdbcDatabaseMetaDataGenerator
             for (ProcParameter param : proc.getParameters())
             {
                 results.addRow(
-                               null, // procedure catalog
+                               m_jarFilename, // procedure catalog
                                null, // procedure schema
                                proc.getTypeName(), // procedure name
                                param.getTypeName(), // param name
@@ -506,4 +540,5 @@ public class JdbcDatabaseMetaDataGenerator
 
     private Catalog m_catalog;
     private Database m_database;
+    private String m_jarFilename;
 }

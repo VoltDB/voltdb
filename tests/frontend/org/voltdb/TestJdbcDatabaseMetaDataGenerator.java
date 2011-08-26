@@ -56,7 +56,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 
     public void setUp() throws Exception
     {
-        testout_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "jdbctestout.jar";
+        testout_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.separator + "jdbctestout.jar";
     }
 
     public void tearDown() throws Exception
@@ -101,8 +101,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest(project);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
-        VoltTable tables = dut.getTables();
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), testout_jar);
+        VoltTable tables = dut.getMetaData("tables");
         System.out.println(tables);
         assertEquals(10, tables.getColumnCount());
         assertEquals(4, tables.getRowCount());
@@ -148,10 +148,25 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals(expected[0], columns.get("DATA_TYPE", VoltType.INTEGER));
         assertTrue("SQL Typename mismatch",
                    columns.get("TYPE_NAME", VoltType.STRING).equals(expected[1]));
-        assertWithNullCheck(expected[2], columns.get("COLUMN_SIZE", VoltType.INTEGER), columns);
-        assertWithNullCheck(expected[3], columns.get("DECIMAL_DIGITS", VoltType.INTEGER), columns);
-        assertWithNullCheck(expected[4], columns.get("NUM_PREC_RADIX", VoltType.INTEGER), columns);
-        assertEquals(expected[5], columns.get("NULLABLE", VoltType.INTEGER));
+        assertWithNullCheck(expected[2],
+                            columns.get("COLUMN_SIZE", VoltType.INTEGER),
+                            columns);
+        assertWithNullCheck(expected[3],
+                            columns.get("DECIMAL_DIGITS", VoltType.INTEGER),
+                            columns);
+        assertWithNullCheck(expected[4],
+                            columns.get("NUM_PREC_RADIX", VoltType.INTEGER),
+                            columns);
+        assertEquals("Null mismatch for column " + columnName,
+                     expected[5], columns.get("NULLABLE", VoltType.INTEGER));
+        assertWithNullCheck(expected[6],
+                            columns.get("COLUMN_DEF", VoltType.STRING),
+                            columns);
+        assertWithNullCheck(expected[7],
+                            columns.get("CHAR_OCTET_LENGTH", VoltType.INTEGER),
+                            columns);
+        assertEquals(expected[8],
+                     columns.get("ORDINAL_POSITION", VoltType.INTEGER));
     }
 
     public void testGetColumns()
@@ -162,74 +177,139 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 200,
                                                 null,
                                                 null,
-                                                java.sql.DatabaseMetaData.columnNoNulls});
+                                                java.sql.DatabaseMetaData.columnNoNulls,
+                                                null,
+                                                200,
+                                                1,
+                                                "NO"});
         refcolumns.put("Column2", new Object[] {java.sql.Types.TINYINT,
                                                 "TINYINT",
                                                 7,
                                                 null,
                                                 2,
-                                                java.sql.DatabaseMetaData.columnNullable});
+                                                java.sql.DatabaseMetaData.columnNullable,
+                                                null,
+                                                null,
+                                                2,
+                                                "YES"});
         refcolumns.put("Column3", new Object[] {java.sql.Types.SMALLINT,
                                                 "SMALLINT",
                                                 15,
                                                 null,
                                                 2,
-                                                java.sql.DatabaseMetaData.columnNoNulls});
+                                                java.sql.DatabaseMetaData.columnNoNulls,
+                                                null,
+                                                null,
+                                                1,
+                                                "NO"});
         refcolumns.put("Column4", new Object[] {java.sql.Types.INTEGER,
                                                 "INTEGER",
                                                 31,
                                                 null,
                                                 2,
-                                                java.sql.DatabaseMetaData.columnNullable});
+                                                java.sql.DatabaseMetaData.columnNullable,
+                                                null,
+                                                null,
+                                                2,
+                                                "YES"});
         refcolumns.put("Column5", new Object[] {java.sql.Types.BIGINT,
                                                 "BIGINT",
                                                 63,
                                                 null,
                                                 2,
-                                                java.sql.DatabaseMetaData.columnNoNulls});
+                                                java.sql.DatabaseMetaData.columnNoNulls,
+                                                null,
+                                                null,
+                                                3,
+                                                "NO"});
         refcolumns.put("Column6", new Object[] {java.sql.Types.DOUBLE,
                                                 "DOUBLE",
                                                 53,
                                                 null,
                                                 2,
-                                                java.sql.DatabaseMetaData.columnNullable});
+                                                java.sql.DatabaseMetaData.columnNullable,
+                                                null,
+                                                null,
+                                                1,
+                                                "YES"});
         refcolumns.put("Column7", new Object[] {java.sql.Types.TIMESTAMP,
                                                 "TIMESTAMP",
                                                 63,
                                                 null,
                                                 2,
-                                                java.sql.DatabaseMetaData.columnNoNulls});
+                                                java.sql.DatabaseMetaData.columnNoNulls,
+                                                null,
+                                                null,
+                                                2,
+                                                "NO"});
         refcolumns.put("Column8", new Object[] {java.sql.Types.DECIMAL,
                                                 "DECIMAL",
                                                 VoltDecimalHelper.kDefaultPrecision,
                                                 VoltDecimalHelper.kDefaultScale,
                                                 10,
-                                                java.sql.DatabaseMetaData.columnNullable});
+                                                java.sql.DatabaseMetaData.columnNullable,
+                                                null,
+                                                null,
+                                                3,
+                                                "YES"});
         refcolumns.put("Column9", new Object[] {java.sql.Types.VARBINARY,
                                                 "VARBINARY",
                                                 250,
                                                 null,
                                                 null,
-                                                java.sql.DatabaseMetaData.columnNoNulls});
+                                                java.sql.DatabaseMetaData.columnNoNulls,
+                                                null,
+                                                250,
+                                                1,
+                                                "NO"});
         refcolumns.put("Column10", new Object[] {java.sql.Types.VARCHAR,
                                                  "VARCHAR",
                                                  200,
                                                  null,
                                                  null,
-                                                 java.sql.DatabaseMetaData.columnNullable});
+                                                 java.sql.DatabaseMetaData.columnNullable,
+                                                 null,
+                                                 200,
+                                                 1,
+                                                 "YES"});
         refcolumns.put("Column11", new Object[] {java.sql.Types.INTEGER,
                                                  "INTEGER",
                                                  31,
                                                  null,
                                                  2,
-                                                 java.sql.DatabaseMetaData.columnNullable});
+                                                 java.sql.DatabaseMetaData.columnNullable,
+                                                 null,
+                                                 null,
+                                                 2,
+                                                 "YES"});
+        refcolumns.put("Default1", new Object[] {java.sql.Types.TINYINT,
+                                                 "TINYINT",
+                                                 7,
+                                                 null,
+                                                 2,
+                                                 java.sql.DatabaseMetaData.columnNullable,
+                                                 "10",
+                                                 null,
+                                                 1,
+                                                 "YES"});
+        refcolumns.put("Default2", new Object[] {java.sql.Types.VARCHAR,
+                                                 "VARCHAR",
+                                                 50,
+                                                 null,
+                                                 null,
+                                                 java.sql.DatabaseMetaData.columnNullable,
+                                                 "'DUDE'",
+                                                 50,
+                                                 2,
+                                                 "YES"});
 
         String schema =
             "create table Table1 (Column1 varchar(200) not null, Column2 tinyint);" +
             "create table Table2 (Column3 smallint not null, Column4 integer, Column5 bigint not null);" +
             "create table Table3 (Column6 float, Column7 timestamp not null, Column8 decimal);" +
             "create table Table4 (Column9 varbinary(250) not null);" +
-            "create view View1 (Column10, Column11) as select Column1, count(*) from Table1 group by Column1;";
+            "create view View1 (Column10, Column11) as select Column1, count(*) from Table1 group by Column1;" +
+            "create table Table5 (Default1 tinyint default 10, Default2 varchar(50) default 'DUDE');";
         String project =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
@@ -242,11 +322,11 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest(project);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
-        VoltTable columns = dut.getColumns();
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), testout_jar);
+        VoltTable columns = dut.getMetaData("ColUmns");
         System.out.println(columns);
         assertEquals(23, columns.getColumnCount());
-        assertEquals(11, columns.getRowCount());
+        assertEquals(13, columns.getRowCount());
         for (Map.Entry<String, Object[]> entry : refcolumns.entrySet())
         {
             verifyColumnData(entry.getKey(), columns, entry.getValue());

@@ -103,7 +103,7 @@ public class CatalogContext {
         sites = cluster.getSites();
         siteTracker = new SiteTracker(cluster.getSites());
         this.deploymentCRC = deploymentCRC;
-        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
+        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, pathToCatalogJar);
 
         // count nodes
         numberOfNodes = cluster.getHosts().size();
