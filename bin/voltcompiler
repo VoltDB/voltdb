@@ -40,9 +40,9 @@ fi
 # Allow alternate conf dir location.
 VOLTDB_CONF_DIR="${VOLTDB_CONF_DIR:-$VOLTDB_HOME/conf}"
 
-# get arguments
-#COMMAND=$1
-#shift
+# get classpath and pass other args to voltcompiler
+EXTRA_CLASSPATH=$1
+shift
 
 JAVA=`which java`
 JAVA_HEAP_MAX=-Xmx1024m
@@ -74,6 +74,8 @@ fi
 for f in $VOLTDB_HOME/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
+
+CLASSPATH=${CLASSPATH}:${EXTRA_CLASSPATH}
 
 # run it
 export CMDVAL="$JAVA -Xmx512m $VOLTDB_OPTS -classpath $CLASSPATH org.voltdb.compiler.VoltCompiler $@"
