@@ -166,6 +166,9 @@ public class CatalogContext {
         return m_jarfile.writeToFile(catalog_file);
     }
 
+    /**
+     * Get the raw bytes of a catalog file for shipping around.
+     */
     public byte[] getCatalogJarBytes() throws IOException {
         return m_jarfile.getFullJarBytes();
     }

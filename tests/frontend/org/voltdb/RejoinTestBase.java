@@ -171,6 +171,8 @@ public class RejoinTestBase extends TestCase {
 
         retval.localServer.start();
         host2.waitForGroupJoin();
+        // whomever is host zero has to send the catalog out,
+        //  so check and fufil this duty if needed
         if (host2.getHostId() == 0)
             host2.sendCatalog(jarFile.getFullJarBytes());
         network2.start();

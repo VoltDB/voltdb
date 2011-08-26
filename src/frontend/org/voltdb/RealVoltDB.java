@@ -177,6 +177,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private long m_executionSiteRecoveryFinish;
     private long m_executionSiteRecoveryTransferred;
 
+    // the id of the host that is the leader, or the restore planner
+    // says has the catalog
     int m_hostIdWithStartupCatalog;
     String m_pathToStartupCatalog;
 

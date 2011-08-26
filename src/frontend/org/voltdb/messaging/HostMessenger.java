@@ -141,22 +141,33 @@ public class HostMessenger implements Messenger {
         return m_network;
     }
 
+    /** For rejoin */
     public int getDiscoveredCatalogVersion() {
         return m_joiner.getDiscoveredCatalogVersionId();
     }
 
+    /** For rejoin */
     public long getDiscoveredFaultSequenceNumber() {
         return m_joiner.m_discoveredFaultSequenceNumber;
     }
 
+    /** For rejoin */
     public long getDiscoveredCatalogTxnId() {
         return m_joiner.getDiscoveredCatalogTxnId();
     }
 
+    /**
+     * Wait until all the nodes have built a mesh.
+     * Return metadata in an object array.
+     */
     public synchronized Object[] waitForGroupJoin() {
          return waitForGroupJoin(0);
     }
 
+    /**
+     * Wait until all the nodes have built a mesh.
+     * Return metadata in an object array.
+     */
     public synchronized Object[] waitForGroupJoin(int timeout) {
         // no-op if called from another thread after the first init
         if (!m_initialized) {
@@ -164,21 +175,20 @@ public class HostMessenger implements Messenger {
             try {
                 m_joiner.join(timeout);
                 if (!m_joiner.getSuccess()) {
+                    String errMsg;
                     if (timeout == 0) {
-                        new VoltLogger("HOST").
-                            fatal("The joiner thread was not successful");
+                        errMsg = "The joiner thread was not successful";
                     } else {
-                        new VoltLogger("HOST").
-                            fatal("Timed out waiting for other nodes to connect. It is safe to retry rejoin.");
+                        errMsg = "Timed out waiting for other nodes to connect. It is safe to retry rejoin.";
                     }
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB(errMsg, false, null);
                 }
                 //timeout
                 if (m_joiner.isAlive()) {
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("SockeJoiner is alive after join call.", true, null);
                 }
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                VoltDB.crashLocalVoltDB("SockeJoiner was interrupted.", false, e);
             }
 
             m_localHostId = m_joiner.getLocalHostId();
@@ -233,6 +243,9 @@ public class HostMessenger implements Messenger {
         return m_messengerSites[localSiteId];
     }
 
+    /**
+     * Given a hostid, return the hostname for it
+     */
     public String getHostnameForHostID(int hostId) {
         ForeignHost fh = m_foreignHosts[hostId];
         return fh == null ? "UNKNOWN" : m_foreignHosts[hostId].hostname();
@@ -432,6 +445,10 @@ public class HostMessenger implements Messenger {
                 host.sendReadyMessage();
     }
 
+    /**
+     * Send a catalog (as a byte array) to all known foreign hosts.
+     * Uses a special negative mailbox id to bypass the mailbox system.
+     */
     public void sendCatalog(byte[] catalogBytes) {
         VoltDB.instance().writeNetworkCatalogToTmp(catalogBytes);
         for (ForeignHost host : m_foreignHosts) {
@@ -441,14 +458,16 @@ public class HostMessenger implements Messenger {
         }
     }
 
+    /**
+     * Tell other nodes to die, with a handy message.
+     * Uses a special negative mailbox id to bypass the mailbox system.
+     */
     public void sendPoisonPill(String msg) {
         byte[] msgBytes = null;
         try {
             msgBytes = msg.getBytes("UTF-8");
         } catch (UnsupportedEncodingException e) {
-            m_logger.fatal("Missing UTF-8 encoding. Broken JVM.");
-            e.printStackTrace();
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Missing UTF-8 encoding. Broken JVM.", false, e);
         }
 
         for (ForeignHost host : m_foreignHosts) {

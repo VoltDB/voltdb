@@ -27,7 +27,13 @@ import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
@@ -44,7 +50,18 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportType;
@@ -337,6 +354,7 @@ public class VoltCompiler {
                 m_jarOutput.put("plans/" + e.getKey(), e.getValue());
             m_jarOutput.writeToFile(new File(jarOutputPath)).run();
         } catch (final Exception e) {
+            e.printStackTrace();
             return false;
         }
 

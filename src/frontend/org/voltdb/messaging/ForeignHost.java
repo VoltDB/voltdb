@@ -18,6 +18,7 @@
 package org.voltdb.messaging;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -398,8 +399,18 @@ public class ForeignHost {
             return;
         }
 
+        // handle a request to crash the node
         if (mailboxId == POISON_SIGNAL) {
-            VoltDB.crashVoltDB();
+            byte messageBytes[] = new byte[in.remaining()];
+            in.get(messageBytes);
+            try {
+                String msg = new String(messageBytes, "UTF-8");
+                msg = String.format("Fatal error from id,hostname(%d,%s): %s",
+                        m_hostId, hostname(), msg);
+                VoltDB.crashLocalVoltDB(msg, false, null);
+            } catch (UnsupportedEncodingException e) {
+                VoltDB.crashLocalVoltDB("Should never get here", false, e);
+            }
             return;
         }
 

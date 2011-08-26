@@ -21,19 +21,19 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.utils;
+package org.voltdb;
 
-import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import junit.framework.TestCase;
+
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
-public class HTTPAdminListenerStarter {
-    /**
-     * Added a main here for manual test purposes. It just starts up
-     * a brain-dead VoltDB server so you can look at the admin page.
-     */
-    public static void main(String[] args) throws Exception {
+public class CrashVoltDBTest extends TestCase {
+
+    public void testSimple() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
@@ -41,21 +41,34 @@ public class HTTPAdminListenerStarter {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
-        builder.setHTTPDPort(8080);
-        builder.setJSONAPIEnabled(true);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost");
+        builder.addProcedures(CrashVoltDBProc.class);
+        /*boolean success = builder.compile(Configuration.getPathToCatalogForTest("crash.jar"), 1, 1, 0, "localhost");
         assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("crash.xml"));*/
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
+        LocalCluster cluster = new LocalCluster("crash.jar",
+                2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        cluster.setHasLocalServer(true);
+        boolean success = cluster.compile(builder);
+        assert (success);
+        cluster.startUp(true);
 
-        Thread.sleep(240000);
+        final String listener = cluster.getListenerAddresses().get(0);
+        final Client client = ClientFactory.createClient();
+        //client.createConnection(listener);
+        client.createConnection(listener, VoltDB.DEFAULT_PORT + 1);
+
+        try {
+            client.callProcedure("CrashVoltDBProc");
+        }
+        catch (Exception e) {
+
+        }
+
+        Thread.sleep(10000);
+
+        client.close();
+        cluster.shutDown();
     }
+
 }

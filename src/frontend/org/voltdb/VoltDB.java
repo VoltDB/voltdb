@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.TimeZone;
 
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.HostMessenger;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -388,24 +389,62 @@ public class VoltDB {
     }
 
     /**
-     * Exit the process, dumping any useful info and notifying any
-     * important parties beforehand.
-     *
-     * For now, just die.
+     * Wrapper for crashLocalVoltDB() to keep compatibility with >100 calls.
      */
+    @Deprecated
     public static void crashVoltDB() {
+        crashLocalVoltDB("Unexpected crash", true, null);
+    }
+
+    /**
+     * Exit the process with an error message, optionally with a stack trace.
+     *
+     * In the future it would be nice to notify any non-failed subsystems
+     * that the node is going down. For now, just die.
+     */
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
         if (instance().ignoreCrash()) {
             return;
         }
-        Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
-        StackTraceElement[] myTrace = traces.get(Thread.currentThread());
-        for (StackTraceElement t : myTrace) {
-            System.err.println(t.toString());
+
+        VoltLogger log = new VoltLogger("HOST");
+
+        if (t != null)
+            log.fatal(errMsg, t);
+        else
+            log.fatal(errMsg);
+
+        if (stackTrace) {
+            StringBuilder sb = new StringBuilder("Stack trace from crashVoltDB() method:\n");
+
+            Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
+            StackTraceElement[] myTrace = traces.get(Thread.currentThread());
+            for (StackTraceElement ste : myTrace) {
+                sb.append(ste.toString()).append("\n");
+            }
+
+            log.fatal(sb);
         }
 
         System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
         System.err.println("The log may contain additional information.");
         System.exit(-1);
+    }
+
+    /**
+     * Exit the process with an error message, optionally with a stack trace.
+     * Also notify all connected peers that the node is going down.
+     *
+     * In the future it would be nice to notify any non-failed subsystems
+     * that the node is going down. For now, just die.
+     */
+    public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
+        if (instance().ignoreCrash()) {
+            return;
+        }
+        ((HostMessenger) instance().getMessenger()).sendPoisonPill(errMsg);
+        try { Thread.sleep(500); } catch (InterruptedException e) {}
+        crashLocalVoltDB(errMsg, stackTrace, t);
     }
 
     /**
@@ -428,9 +467,7 @@ public class VoltDB {
         }
         catch (OutOfMemoryError e) {
             String errmsg = "VoltDB Main thread: ran out of Java memory. This node will shut down.";
-            VoltLogger hostLog = new VoltLogger("HOST");
-            hostLog.fatal(errmsg, e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(errmsg, false, e);
         }
     }
 

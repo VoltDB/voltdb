@@ -100,7 +100,7 @@ public class Inits {
                 }
                 if (iw instanceof COMPLETION_WORK)
                     return;
-                hostLog.info("Running InitWorker: " + iw.getClass().getName());
+                //hostLog.info("Running InitWorker: " + iw.getClass().getName());
                 iw.run();
                 completeInitWork(iw);
             }
@@ -237,8 +237,7 @@ public class Inits {
                     m_rvdb.m_messenger.sendCatalog(catalogBytes);
                 }
                 catch (IOException e) {
-                    m_rvdb.m_messenger.sendPoisonPill("Unable to distribute catalog.");
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
                 }
             }
         }

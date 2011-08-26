@@ -629,6 +629,7 @@ public class TestMessaging extends TestCase {
 
         HashSet<Integer> liveHosts = new HashSet<Integer>();
         liveHosts.add(msg1.getHostId());
+        // the last byte array below is the bytes of a dummy catalog
         msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), 0, 0, liveHosts, 0, 1, 0, new byte[] { 'a' });
         msg1.rejoinForeignHostCommit();
 

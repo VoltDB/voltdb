@@ -351,9 +351,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     }
 
                     if (ot.txnId <= m_minTxnIdAfterRecovery) {
-                        m_recoveryLog.fatal("Transaction queue released a transaction from before this " +
-                                " node was recovered was complete");
-                        VoltDB.crashVoltDB();
+                        String errMsg = "Transaction queue released a transaction from before this " +
+                                " node was recovered was complete";
+                        VoltDB.crashLocalVoltDB(errMsg, false, null);
                     }
                     m_transactionsById.remove(ot.txnId);
 
@@ -377,8 +377,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 }
             }
         } catch (Exception e) {
-            m_agreementLog.fatal("Error in agreement site", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Error in agreement site", false, e);
         } finally {
             try {
                 shutdownInternal();
@@ -504,13 +503,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             assert(m_recovering);
             assert(m_recoveryStage == RecoveryStage.SENT_PROPOSAL);
             if (m_recoveryStage != RecoveryStage.SENT_PROPOSAL) {
-                m_recoveryLog.fatal("Received a recovery snapshot in stage " + m_recoveryStage);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Received a recovery snapshot in stage " + m_recoveryStage.toString(), true, null);
             }
             long selectedRecoverBeforeTxn = ByteBuffer.wrap(bpm.m_metadata).getLong();
             if (selectedRecoverBeforeTxn < m_recoverBeforeTxn) {
-                m_recoveryLog.fatal("Selected recover before txn was earlier than the  proposed recover before txn");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Selected recover before txn was earlier than the  proposed recover before txn", true, null);
             }
             m_recoverBeforeTxn = selectedRecoverBeforeTxn;
             m_recoverySnapshot = bpm.m_payload;
@@ -544,8 +541,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             m_server.getZKDatabase().deserializeSnapshot(bia);
             m_server.createSessionTracker();
         } catch (Exception e) {
-            m_recoveryLog.fatal("Error loading agreement database", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Error loading agreement database", false, e);
         }
         m_recoverySnapshot = null;
         m_recoveryStage = RecoveryStage.RECOVERED;
@@ -590,8 +586,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private void discoverGlobalFaultData(FaultMessage faultMessage) {
         //Keep it simple and don't try to recover on the recovering node.
         if (m_recovering) {
-            m_recoveryLog.fatal("Aborting recovery due to a remote node failure. Retry again.");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Aborting recovery due to a remote node failure. Retry again.", true, null);
         }
         Set<NodeFailureFault> failures = faultMessage.nodeFaults;
 
@@ -701,9 +696,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             }
         }
         catch (MessagingException e) {
-            // TODO: unsure what to do with this. maybe it implies concurrent failure?
-            e.printStackTrace();
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
         m_recoveryLog.info("Agreement, Sent fault data. Expecting " + (survivors.length * m_knownFailedSites.size()) + " responses.");
         return (survivors.length * m_knownFailedSites.size());
