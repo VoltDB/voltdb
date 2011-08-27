@@ -184,8 +184,11 @@ public class ExportToFileClient extends ExportClientBase {
             if (m_batched) {
                 m_dirContainingFiles = new File(getPathOfBatchDir(ACTIVE_PREFIX));
                 m_logger.trace(String.format("Creating dir for batch at %s", m_dirContainingFiles.getPath()));
-                boolean created = m_dirContainingFiles.mkdirs();
-                assert(created);
+                m_dirContainingFiles.mkdirs();
+                if (m_dirContainingFiles.exists() == false) {
+                    m_logger.error("Error: Unable to create batch directory at path: " + m_dirContainingFiles.getPath());
+                    throw new RuntimeException("Unable to create batch directory.");
+                }
             }
             else {
                 m_dirContainingFiles = m_outDir;
@@ -307,8 +310,14 @@ public class ExportToFileClient extends ExportClientBase {
 
             String path = handle.getPath(ACTIVE_PREFIX);
             File newFile = new File(path);
+            if (newFile.exists()) {
+                m_logger.error("Error: Output file for next period already exists at path: " + newFile.getPath());
+                m_logger.error("Consider using a more specific timestamp in your filename or cleaning up your export data directory.");
+                m_logger.error("ExportToFileClient will stop to prevent data loss.");
+                throw new RuntimeException();
+            }
             try {
-                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, true), "UTF-8");
+                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
                 if (m_fullDelimiters != null) {
                     writer = new CSVWriter(new BufferedWriter(osw, 1048576),
                             m_fullDelimiters[0], m_fullDelimiters[1], m_fullDelimiters[2], String.valueOf(m_fullDelimiters[3]));
@@ -351,7 +360,7 @@ public class ExportToFileClient extends ExportClientBase {
 
             File newFile = new File(path);
             try {
-                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, true), "UTF-8");
+                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
                 BufferedWriter writer = new BufferedWriter(osw, 1048576);
                 writer.write(schema);
                 writer.flush();
