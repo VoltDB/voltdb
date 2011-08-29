@@ -11,22 +11,22 @@ fi
 # if the system thinks it has an gnome-terminal in the path it's gnome linux
 if [ ! -z `which gnome-terminal` ]; then
     # start the server
-    gnome-terminal -e 'bash -c "cd '`dirname $0`'/../../examples/'$1';ant;"' --geometry=120x10+0+0 --active
+    gnome-terminal -e 'bash -c "cd '`dirname $0`'/../../examples/'$1';make;"' --geometry=120x10+0+0 --active
     # wait for voltdb to start (hack)
     sleep 7
     # start the client
-    gnome-terminal -e 'bash -c "cd '`dirname $0`'/../../examples/'$1';ant client;exec bash"' --geometry=120x10+0+150
+    gnome-terminal -e 'bash -c "cd '`dirname $0`'/../../examples/'$1';make client;exec bash"' --geometry=120x10+0+150
     exit 0
 fi
 
 # if the system thinks it has an osascript in the path it's a mac
 if [ ! -z `which osascript` ]; then
     # start the server
-    osascript -e "tell app \"Terminal\" to do script \"bash -c \\\"cd '`dirname $0`'/../../examples/'$1';ant;\\\"\""
+    osascript -e "tell app \"Terminal\" to do script \"bash -c \\\"cd '`dirname $0`'/../../examples/'$1';make;\\\"\""
     # wait for voltdb to start (hack)
     sleep 7
     # start the client
-    osascript -e "tell app \"Terminal\" to do script \"bash -c \\\"cd '`dirname $0`'/../../examples/'$1';ant client;exec bash\\\"\""
+    osascript -e "tell app \"Terminal\" to do script \"bash -c \\\"cd '`dirname $0`'/../../examples/'$1';make client;exec bash\\\"\""
     exit 0
 fi
 

@@ -352,23 +352,22 @@ DISTRIBUTION
 <macrodef name="distribute-example">
     <attribute name="exampledir"/>
     <sequential>
-        <copy todir="${dist.dir}/examples/@{exampledir}" >
+        <mkdir dir="${dist.dir}/examples/@{exampledir}" />
+        <copy todir="${dist.dir}/examples/@{exampledir}">
             <fileset dir="examples/@{exampledir}" defaultexcludes="yes">
                 <include name="**/*"/>
             </fileset>
         </copy>
 
-        <!-- Perform any post processing required -->
-        <exec dir="tools" executable="python" failonerror="true">
-            <arg line="example-dist-cleanup.py"/>
-            <arg line="${base.dir}/examples/includes/basebuild.xml"/>
-            <arg line="${dist.dir}/examples/@{exampledir}"/>
-        </exec>
-
         <replace
             file="${dist.dir}/examples/@{exampledir}/makefile"
             token="CLASSPATH = ../../obj/release/prod:../../lib"
             value="CLASSPATH = ../../voltdb/voltdb-${dist.version}.jar:../../lib"
+        />
+        <replace
+            file="${dist.dir}/examples/@{exampledir}/makefile"
+            token="CLASSPATH = ../../../obj/release/prod:../../../lib"
+            value="CLASSPATH = ../../../voltdb/voltdb-${dist.version}.jar:../../../lib"
         />
     </sequential>
 </macrodef>
@@ -479,13 +478,10 @@ DISTRIBUTION
     <!-- populate examples top level README -->
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
 
-    <!-- populate the other examples -->
-    <distribute-example exampledir="auction"/>
-    <distribute-example exampledir="game_of_life"/>
-    <distribute-example exampledir="helloworld"/>
+    <!-- populate the examples -->
+    <distribute-example exampledir="tutorial/auction"/>
+    <distribute-example exampledir="tutorial/helloworld"/>
     <distribute-example exampledir="key_value"/>
-    <distribute-example exampledir="satellite"/>
-    <distribute-example exampledir="twitter"/>
     <distribute-example exampledir="voter"/>
 
     <!-- populate the tools -->
@@ -655,13 +651,10 @@ DISTRIBUTION
     <!-- populate examples top level README -->
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
 
-    <!-- populate the other examples -->
-    <distribute-example exampledir="auction"/>
-    <distribute-example exampledir="game_of_life"/>
-    <distribute-example exampledir="helloworld"/>
+    <!-- populate the examples -->
+    <distribute-example exampledir="tutorial/auction"/>
+    <distribute-example exampledir="tutorial/helloworld"/>
     <distribute-example exampledir="key_value"/>
-    <distribute-example exampledir="satellite"/>
-    <distribute-example exampledir="twitter"/>
     <distribute-example exampledir="voter"/>
 
     <!-- populate the tools -->

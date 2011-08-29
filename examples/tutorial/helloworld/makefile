@@ -1,6 +1,6 @@
-CLASSPATH = ../../obj/release/prod:../../lib
-VOLTDB = ../../bin/voltdb
-VOLTCOMPILER = ../../bin/voltcompiler
+CLASSPATH = ../../../obj/release/prod:../../../lib
+VOLTDB = ../../../bin/voltdb
+VOLTCOMPILER = ../../../bin/voltcompiler
 
 .PHONY: main clean srccompile compile server client
 

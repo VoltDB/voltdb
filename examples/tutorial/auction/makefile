@@ -1,7 +1,7 @@
-CLASSPATH = ../../obj/release/prod:../../lib
-VOLTDB = ../../bin/voltdb
-VOLTCOMPILER = ../../bin/voltcompiler
-EXPORTTOFILE = ../../bin/exporttofile
+CLASSPATH = ../../../obj/release/prod:../../../lib
+VOLTDB = ../../../bin/voltdb
+VOLTCOMPILER = ../../../bin/voltcompiler
+EXPORTTOFILE = ../../../bin/exporttofile
 
 .PHONY: main clean srccompile compile server client export
 
