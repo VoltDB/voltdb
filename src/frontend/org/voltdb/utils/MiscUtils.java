@@ -140,6 +140,7 @@ public class MiscUtils {
                 return false;
             }
             else {
+                // Expired commercial licenses are allowed but generate log messages.
                 hostLog.error("Warning, VoltDB commercial license expired on " + expiresStr + ".");
                 valid = false;
             }
@@ -153,7 +154,15 @@ public class MiscUtils {
 
         // ASSUME CUSTOMER LICENSE HERE
 
-        if (numberOfNodes > licenseApi.maxHostcount()) {
+        // single node product strictly enforces the single node detail...
+        if (licenseApi.maxHostcount() == 1 && numberOfNodes > 1) {
+            hostLog.fatal("Warning, VoltDB commercial license for a 1 node " +
+                    "attempted for use with a " + numberOfNodes + " node cluster." +
+                    " A single node subscription is only valid with a single node cluster.");
+            return false;
+        }
+        // multi-node commercial licenses only warn
+        else if (numberOfNodes > licenseApi.maxHostcount()) {
             hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
                           " nodes, starting cluster with " + numberOfNodes + " nodes.");
             valid = false;

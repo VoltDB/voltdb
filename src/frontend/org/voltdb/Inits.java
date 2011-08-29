@@ -314,9 +314,7 @@ public class Inits {
                 assert(m_config != null);
                 if (!MiscUtils.validateLicense(m_config.m_pathToLicense, m_deployment.getCluster().getHostcount())) {
                     // validateLicense logs as appropriate. Exit call is here for testability.
-
-                    // TOOD: Stop running here!
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
                 }
             }
         }
