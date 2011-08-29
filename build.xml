@@ -364,6 +364,12 @@ DISTRIBUTION
             <arg line="${base.dir}/examples/includes/basebuild.xml"/>
             <arg line="${dist.dir}/examples/@{exampledir}"/>
         </exec>
+
+        <replace
+            file="${dist.dir}/examples/@{exampledir}/makefile"
+            token="CLASSPATH = ../../obj/release/prod:../../lib"
+            value="CLASSPATH = ../../voltdb/voltdb-${dist.version}.jar:../../lib"
+        />
     </sequential>
 </macrodef>
 
