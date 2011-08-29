@@ -1623,22 +1623,18 @@ TEST CASES
     <attribute name="app"/>
     <!-- make sure example application compiles -->
     <sequential>
-        <ant dir='${dist.examples.dir}/@{app}'
-            inheritAll='false'
-            inheritRefs='false'
-            target='srccompile'
-        />
+        <exec dir="${dist.examples.dir}/@{app}" executable="/usr/bin/env" failonerror='true'>
+            <arg value='make' />
+            <arg value="srccompile"/>
+        </exec>
     </sequential>
 </macrodef>
 
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
 
-    <samplecheck app="auction" />
-    <samplecheck app="game_of_life" />
+    <samplecheck app="tutorial/auction" />
     <samplecheck app="key_value" />
-    <samplecheck app="satellite" />
-    <samplecheck app="twitter" />
     <samplecheck app="voter" />
 
     <!-- test the generator -->

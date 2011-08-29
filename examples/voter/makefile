@@ -26,24 +26,46 @@ server: compile
 
 client: srccompile
 	java -classpath obj:$(CLASSPATH):obj com.ClientVoter \
-		6 \         # total number of contestants (maximum 12)
-		2 \         # number of votes allowed per phone number
-		1000000 \   # maximum number of votes per second this client can generate (used as starting point only when auto-tuning is on) NOTE: Rounded to thousands
-		5 \         # client application feedback interval (seconds)
-		120 \       # client application duration (seconds)
-		3 \         # number of seconds to wait before recording latency information
-		localhost \ # comma separated list of servers to connect to
-		true        # Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
-		10.0        # Target average transaction call latency (in milliseconds)
-		0.99        # Adjustment rate: the tuning process decreases the number of requested transactions per second to FACTOR*<observed-TPS> until the target latency is reached
-		2           # Auto-tuning interval (in seconds)
+		6 \
+		2 \
+		1000000 \
+		5 \
+		120 \
+		3 \
+		localhost \
+		true \
+		10.0 \
+		0.99 \
+		2
+
+# CLIENT ARGS IN ORDER
+# total number of contestants (maximum 12)
+# number of votes allowed per phone number
+# maximum number of votes per second this client can generate (used as starting point only when auto-tuning is on) NOTE: Rounded to thousands
+# client application feedback interval (seconds)
+# client application duration (seconds)
+# number of seconds to wait before recording latency information
+# comma separated list of servers to connect to
+# Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
+# Target average transaction call latency (in milliseconds)
+# Adjustment rate: the tuning process decreases the number of requested transactions per second to FACTOR*<observed-TPS> until the target latency is reached
+# Auto-tuning interval (in seconds)
 
 sync-client: srccompile
 	java -classpath obj:$(CLASSPATH):obj com.SyncClientVoter \
-		6 \         # total number of contestants (maximum 12)
-		2  \        # number of votes allowed per phone number
-		5000 \      # maximum number of votes per second this client can generate
-		5 \         # client application feedback interval (seconds)
-		120 \       # client application duration (seconds)
-		3 \         # number of seconds to wait before recording latency information
-		localhost \ # comma separated list of servers to connect to
+		6 \
+		2  \
+		5000 \
+		5 \
+		120 \
+		3 \
+		localhost
+
+# SYNC-CLIENT ARGS IN ORDER
+# total number of contestants (maximum 12)
+# number of votes allowed per phone number
+# maximum number of votes per second this client can generate
+# client application feedback interval (seconds)
+# client application duration (seconds)
+# number of seconds to wait before recording latency information
+# comma separated list of servers to connect to
