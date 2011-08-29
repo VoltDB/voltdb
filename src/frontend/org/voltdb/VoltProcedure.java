@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 
 import org.voltdb.Expectation.Type;
 import org.voltdb.catalog.Cluster;
@@ -94,6 +93,9 @@ public abstract class VoltProcedure {
 
     protected HsqlBackend m_hsql;
 
+    // simple name of this procedure gets set in init()
+    private String m_procedureName = "UNKNOWN";
+
     //For runtime statistics collection
     private ProcedureStatsCollector m_statsCollector;
 
@@ -126,17 +128,11 @@ public abstract class VoltProcedure {
     // cached fake SQLStmt array for single statement non-java procs
     SQLStmt[] m_cachedSingleStmt = { null };
 
-    // Workload Trace Handles
-    private Object m_workloadXactHandle = null;
-    private Integer m_workloadBatchId = null;
-    private Set<Object> m_workloadQueryHandles;
-
     // data copied from EE proc wrapper
     private final SQLStmt m_batchQueryStmts[] = new SQLStmt[MAX_BATCH_SIZE];
     private int m_batchQueryStmtIndex = 0;
     private Object[] m_batchQueryArgs[];
     private Expectation[] m_batchQueryExpectations = new Expectation[MAX_BATCH_SIZE];
-    private int m_batchQueryArgsIndex = 0;
     private final long m_fragmentIds[] = new long[MAX_BATCH_SIZE];
     private final int m_expectedDeps[] = new int[MAX_BATCH_SIZE];
     private ParameterSet m_parameterSets[];
@@ -179,6 +175,7 @@ public abstract class VoltProcedure {
             m_initialized = true;
         }
 
+        m_procedureName = getClass().getSimpleName();
         m_catProc = catProc;
         m_site = site;
         m_isNative = (eeType != BackendTarget.HSQLDB_BACKEND);
@@ -236,7 +233,7 @@ public abstract class VoltProcedure {
             // iterate through the fields and deal with
             Map<String, Field> stmtMap = null;
             try {
-                stmtMap = ProcedureCompiler.getValidSQLStmts(null, getClass().getSimpleName(), getClass(), true);
+                stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, getClass(), true);
             } catch (Exception e1) {
                 // shouldn't throw anything outside of the compiler
                 e1.printStackTrace();
@@ -719,7 +716,7 @@ public abstract class VoltProcedure {
     }
 
     public void checkExpectation(Expectation expectation, VoltTable table) {
-        Expectation.check(expectation, table);
+        Expectation.check(m_procedureName, "NO STMT", 0, expectation, table);
     }
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
@@ -727,11 +724,10 @@ public abstract class VoltProcedure {
 
         if (!m_isNative) {
             VoltTable table = m_queryResults.get(m_queryResults.size() - 1);
-            Expectation.check(expectation, table);
+            Expectation.check(m_procedureName, stmt.getText(), m_queryResults.size() - 1, expectation, table);
             return;
         }
 
-        voltQueueSQL(stmt, args);
         m_batchQueryExpectations[m_batchQueryStmtIndex - 1] = expectation;
     }
 
@@ -791,15 +787,20 @@ public abstract class VoltProcedure {
 
         VoltTable[] retval = null;
 
-        retval = executeQueriesInABatch(
-                m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
+        try {
+            retval = executeQueriesInABatch(
+                    m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
 
-        // verify expectations, noop if expectation is null
-        for (int i = 0; i < retval.length; ++i) {
-            Expectation.check(m_batchQueryExpectations[i], retval[i]);
+            // verify expectations, noop if expectation is null
+            for (int i = 0; i < retval.length; ++i) {
+                Expectation.check(m_procedureName, m_batchQueryStmts[i].getText(),
+                        i, m_batchQueryExpectations[i], retval[i]);
+            }
+        }
+        finally {
+            m_batchQueryStmtIndex = 0;
         }
 
-        m_batchQueryStmtIndex = 0;
         return retval;
     }
 

@@ -20,6 +20,7 @@ package org.voltdb;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
 public class Expectation {
+
     static enum Type {
         EXPECT_EMPTY,
         EXPECT_ONE_ROW,
@@ -44,25 +45,81 @@ public class Expectation {
         m_scalar = scalar;
     }
 
-    static void check(Expectation expectation, VoltTable table) throws VoltAbortException {
+    static void fail(String procedureName, String stmtName, int batchIndex,
+            String errMsg) throws VoltAbortException {
+
+        String fullMsg = "Expectation failing in procedure: " + procedureName + "\n";
+        fullMsg += "  Running SQL: " + stmtName + "\n";
+        fullMsg += "  Error message: " + errMsg;
+
+        throw new VoltAbortException(fullMsg);
+    }
+
+    static void check(String procedureName, String stmtName, int batchIndex,
+            Expectation expectation, VoltTable table) throws VoltAbortException {
         if (expectation == null)
             return;
 
+        assert(table != null);
+        int rowCount = table.getRowCount();
+
         switch (expectation.m_type) {
         case EXPECT_EMPTY:
+            if (rowCount != 0) {
+                fail(procedureName, stmtName, batchIndex,
+                     String.format("Expected one row, but got %d", rowCount));
+            }
             return;
         case EXPECT_ONE_ROW:
+            if (rowCount != 1) {
+                fail(procedureName, stmtName, batchIndex,
+                     String.format("Expected one row, but got %d", rowCount));
+            }
             return;
         case EXPECT_ZERO_OR_ONE_ROW:
+            if (rowCount > 1) {
+                fail(procedureName, stmtName, batchIndex,
+                     String.format("Expected zero or one rows, but got %d", rowCount));
+            }
             return;
         case EXPECT_NON_EMPTY:
+            if (rowCount == 0) {
+                fail(procedureName, stmtName, batchIndex,
+                     String.format("Expected zero rows, but got %d", rowCount));
+            }
             return;
         case EXPECT_SCALAR:
+            if (checkScalar(table) == false) {
+                fail(procedureName, stmtName, batchIndex, "Expected scalar value");
+            }
             return;
         case EXPECT_SCALAR_LONG:
+            if (checkScalarLong(table) == false) {
+                fail(procedureName, stmtName, batchIndex, "Expected scalar long value");
+            }
             return;
         case EXPECT_SCALAR_MATCH:
+            if (checkScalarLong(table) == false) {
+                fail(procedureName, stmtName, batchIndex, "Expected scalar long value");
+            }
+            if (table.asScalarLong() != expectation.m_scalar) {
+                fail(procedureName, stmtName, batchIndex,
+                        String.format("Expected scalar %d, but got %d", expectation.m_scalar, table.asScalarLong()));
+            }
             return;
         }
+    }
+
+    static boolean checkScalar(VoltTable table) {
+        if (table.getRowCount() != 1) return false;
+        if (table.getColumnCount() != 1) return false;
+        return true;
+    }
+
+    static boolean checkScalarLong(VoltTable table) {
+        if (table.getRowCount() != 1) return false;
+        if (table.getColumnCount() != 1) return false;
+        if (table.getColumnType(0) != VoltType.BIGINT) return false;
+        return true;
     }
 }
