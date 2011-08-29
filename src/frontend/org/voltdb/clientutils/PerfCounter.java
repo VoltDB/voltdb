@@ -35,15 +35,76 @@ public class PerfCounter implements Cloneable
             return format;
         }
     };
-    public AtomicLong StartTime = new AtomicLong(0);
-    public AtomicLong EndTime   = new AtomicLong(0);
-    public AtomicLong min   = new AtomicLong(999999999l);
-    public AtomicLong max   = new AtomicLong(-1l);
-    public AtomicLong tot   = new AtomicLong(0);
-    public AtomicLong cnt   = new AtomicLong(0);
-    public AtomicLong err   = new AtomicLong(0);
-    public AtomicLongArray lat = new AtomicLongArray(9);
+
+    private AtomicLong StartTime = new AtomicLong(0);
+    private AtomicLong EndTime   = new AtomicLong(0);
+    private AtomicLong min   = new AtomicLong(999999999l);
+    private AtomicLong max   = new AtomicLong(-1l);
+    private AtomicLong tot   = new AtomicLong(0);
+    private AtomicLong cnt   = new AtomicLong(0);
+    private AtomicLong err   = new AtomicLong(0);
+    private AtomicLongArray lat = new AtomicLongArray(9);
+
     public PerfCounter() { this(true); }
+
+    public long getStartTime()
+    {
+        return StartTime.get();
+    }
+    public long getEndTime()
+    {
+        return EndTime.get();
+    }
+    public long getMinLatency()
+    {
+        return min.get();
+    }
+    public long getMaxLatency()
+    {
+        return max.get();
+    }
+    public long getTotalExecutionDuration()
+    {
+        return tot.get();
+    }
+    public long getExecutionCount()
+    {
+        return cnt.get();
+    }
+    public long getErrorCount()
+    {
+        return cnt.get();
+    }
+    public long[] getLatencyBuckets()
+    {
+        return new long[]
+        {
+          this.lat.get(0)
+        , this.lat.get(1)
+        , this.lat.get(2)
+        , this.lat.get(3)
+        , this.lat.get(4)
+        , this.lat.get(5)
+        , this.lat.get(6)
+        , this.lat.get(7)
+        , this.lat.get(8)
+        };
+    }
+    public long getElapsedDuration()
+    {
+        return this.EndTime.get()-this.StartTime.get();
+    }
+
+    public double getTransactionRatePerSecond()
+    {
+        return getExecutionCount()*1000d/getElapsedDuration();
+    }
+
+    public double getAverageLatency()
+    {
+        return (double)getTotalExecutionDuration()/(double)getExecutionCount();
+    }
+
     public PerfCounter(boolean autoStart)
     {
         if (autoStart)
@@ -61,7 +122,7 @@ public class PerfCounter implements Cloneable
     {
         EndTime.set(System.currentTimeMillis());
         if (StartTime.get() == 0)
-            StartTime.set(EndTime.get());
+            StartTime.set(EndTime.get()-executionDuration);
         cnt.incrementAndGet();
         tot.addAndGet(executionDuration);
         if (min.get() > executionDuration)
@@ -86,7 +147,7 @@ public class PerfCounter implements Cloneable
                                 , this.DateFormat.get().format(new Date(Math.round(elapsedDuration/1000d)*1000l))
                                 , this.cnt.get()
                                 , this.err.get() > 0 ? String.format(" [!%,11d]", this.err.get()) : ""
-                                , (this.cnt.get()*1000f / (double)elapsedDuration)
+                                , (this.cnt.get()*1000d / (double)elapsedDuration)
                                 , this.min.get() == 999999999l ? 0l : this.min.get()
                                 , (double)this.tot.get()/(double)this.cnt.get()
                                 , this.max.get() == -1l ? 0l : this.max.get()
@@ -96,7 +157,7 @@ public class PerfCounter implements Cloneable
                                    "-------------------------------------------------------------------------------------\nFinal:   | Txn.: %,11d%s @ %,11.1f TPS | Lat. = %7d <  %7.2f < %7d\n-------------------------------------------------------------------------------------\nLat.:     25 <     50 <     75 <    100 <    125 <    150 <    175 <    200 <    200+\n-------------------------------------------------------------------------------------\n%%     %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f\n"
                                 , this.cnt.get()
                                 , this.err.get() > 0 ? String.format(" [!%,11d]", this.err.get()) : ""
-                                , (this.cnt.get()*1000f / elapsedDuration)
+                                , (this.cnt.get()*1000d / elapsedDuration)
                                 , this.min.get() == 999999999l ? 0l : this.min.get()
                                 , (double)this.tot.get()/(double)this.cnt.get()
                                 , this.max.get() == -1l ? 0l : this.max.get()
@@ -147,6 +208,20 @@ public class PerfCounter implements Cloneable
         for(int i=1;i<counters.length;i++)
             counter.mergeWith(counters[i]);
         return counter;
+    }
+    public PerfCounter difference(PerfCounter previous)
+    {
+        PerfCounter diff = (PerfCounter)this.clone();
+        if (previous != null)
+        {
+            diff.StartTime.set(previous.EndTime.get());
+            diff.tot.set(this.tot.get()-previous.tot.get());
+            diff.cnt.set(this.cnt.get()-previous.cnt.get());
+            diff.err.set(this.err.get()-previous.err.get());
+            for(int i=0;i<9;i++)
+                diff.lat.set(i, this.lat.get(i)-previous.lat.get(i));
+        }
+        return diff;
     }
 }
 
