@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.io.File;
+
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -138,11 +140,10 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("SPECIFIC_NAME", VoltType.STRING)
         };
 
-    JdbcDatabaseMetaDataGenerator(Catalog catalog, String pathToCatalogJar)
+    JdbcDatabaseMetaDataGenerator(Catalog catalog)
     {
         m_catalog = catalog;
         m_database = m_catalog.getClusters().get("cluster").getDatabases().get("database");
-        m_jarFilename = pathToCatalogJar;
     }
 
     public VoltTable getMetaData(String selector)
@@ -198,7 +199,7 @@ public class JdbcDatabaseMetaDataGenerator
         for (Table table : m_database.getTables())
         {
             // REMARKS and all following columns are always null for us.
-            results.addRow(m_jarFilename, // XXX-izzy need jarfile name.
+            results.addRow(null,
                            null, // no schema name
                            table.getTypeName(),
                            getTableType(table),
@@ -214,10 +215,9 @@ public class JdbcDatabaseMetaDataGenerator
     }
 
     // Might consider consolidating this into VoltType if we go big on JDBC stuff.
-    private int getColumnSqlDataType(Column column)
+    private int getColumnSqlDataType(VoltType type)
     {
-        int jdbc_sql_type = java.sql.Types.INTEGER;
-        VoltType type = VoltType.get((byte) column.getType());
+        int jdbc_sql_type = java.sql.Types.OTHER;
         switch(type)
         {
         case TINYINT:
@@ -253,10 +253,9 @@ public class JdbcDatabaseMetaDataGenerator
         return jdbc_sql_type;
     }
 
-    private String getColumnSqlTypeName(Column column)
+    private String getColumnSqlTypeName(VoltType type)
     {
-        String jdbc_sql_typename = "INTEGER";
-        VoltType type = VoltType.get((byte) column.getType());
+        String jdbc_sql_typename = "OTHER";
         switch(type)
         {
         case TINYINT:
@@ -295,7 +294,7 @@ public class JdbcDatabaseMetaDataGenerator
     // Integer[0] is the column size and Integer[1] is the radix
     private Integer[] getColumnSizeAndRadix(Column column)
     {
-        Integer[] col_size_radix = {0, 0};
+        Integer[] col_size_radix = {null, null};
         VoltType type = VoltType.get((byte) column.getType());
         switch(type)
         {
@@ -330,10 +329,9 @@ public class JdbcDatabaseMetaDataGenerator
         return col_size_radix;
     }
 
-    private Integer getColumnDecimalDigits(Column column)
+    private Integer getColumnDecimalDigits(VoltType type)
     {
         Integer num_dec_digits = null;
-        VoltType type = VoltType.get((byte) column.getType());
         switch(type)
         {
         //
@@ -356,7 +354,7 @@ public class JdbcDatabaseMetaDataGenerator
         return num_dec_digits;
     }
 
-    private int getNullable(Column column)
+    private int getColumnNullable(Column column)
     {
         int nullable = java.sql.DatabaseMetaData.columnNoNulls;
         if (column.getNullable())
@@ -366,7 +364,7 @@ public class JdbcDatabaseMetaDataGenerator
         return nullable;
     }
 
-    private String getRemarks(Column column, Table table)
+    private String getColumnRemarks(Column column, Table table)
     {
         String remarks = null;
         if (table.getPartitioncolumn() != null &&
@@ -400,7 +398,7 @@ public class JdbcDatabaseMetaDataGenerator
         return length;
     }
 
-    private String getIsNullable(Column column)
+    private String getColumnIsNullable(Column column)
     {
         String is_nullable = "NO";
         if (column.getNullable())
@@ -418,24 +416,24 @@ public class JdbcDatabaseMetaDataGenerator
             for (Column column: table.getColumns())
             {
                 results.addRow(
-                               m_jarFilename, // XXX need jarfile name
+                               null,
                                null, // no schema name
                                table.getTypeName(),
                                column.getTypeName(),
-                               getColumnSqlDataType(column),
-                               getColumnSqlTypeName(column),
+                               getColumnSqlDataType(VoltType.get((byte) column.getType())),
+                               getColumnSqlTypeName(VoltType.get((byte) column.getType())),
                                getColumnSizeAndRadix(column)[0],
                                null,
-                               getColumnDecimalDigits(column),
+                               getColumnDecimalDigits(VoltType.get((byte) column.getType())),
                                getColumnSizeAndRadix(column)[1],
-                               getNullable(column),
-                               getRemarks(column, table), // REMARKS
+                               getColumnNullable(column),
+                               getColumnRemarks(column, table), // REMARKS
                                getDefaultValue(column), // default value
                                null, // unused SQL_DATA_TYPE
                                null, // unused SQL_DATETIME_SUB
                                getCharOctetLength(column), // char_octet_length
                                column.getIndex() + 1, // ordinal position, starts from 1
-                               getIsNullable(column), // IS_NULLABLE
+                               getColumnIsNullable(column), // IS_NULLABLE
                                null, // unused SCOPE_CATALOG
                                null, // unused SCOPE_SCHEMA
                                null, // unused SCOPE_TABLE
@@ -476,7 +474,7 @@ public class JdbcDatabaseMetaDataGenerator
             {
                 for (ColumnRef column : index.getColumns())
                 {
-                    results.addRow(m_jarFilename, // table catalog
+                    results.addRow(null,
                                    null, // table_schema
                                    table.getTypeName(), // table name
                                    index.getUnique() ? 0 : 1, // non-unique, 1 is unique, 0 is not
@@ -507,7 +505,7 @@ public class JdbcDatabaseMetaDataGenerator
                 {
                     for (ColumnRef column : c.getIndex().getColumns())
                     {
-                        results.addRow(m_jarFilename, // table catalog
+                        results.addRow(null,
                                        null, // table schema
                                        table.getTypeName(), // table name
                                        column.getTypeName(), // column name
@@ -527,7 +525,7 @@ public class JdbcDatabaseMetaDataGenerator
         for (Procedure proc : m_database.getProcedures())
         {
             results.addRow(
-                           m_jarFilename, // procedure catalog
+                           null,
                            null, // procedure schema
                            proc.getTypeName(), // procedure name
                            null, // reserved
@@ -541,6 +539,119 @@ public class JdbcDatabaseMetaDataGenerator
         return results;
     }
 
+    private String getProcedureColumnRemarks(ProcParameter param, Procedure proc)
+    {
+        String remarks = null;
+        if (proc.getPartitioncolumn() != null)
+        {
+            if (proc.getPartitionparameter() == param.getIndex())
+            {
+                remarks = "PARTITION_PARAMETER";
+            }
+        }
+        if (param.getIsarray())
+        {
+            if (remarks != null)
+            {
+                remarks = remarks + ",";
+            }
+            else
+            {
+                remarks = "";
+            }
+            remarks = remarks + "ARRAY_PARAMETER";
+        }
+        return remarks;
+    }
+
+    // Integer[0] is the column size and Integer[1] is the radix
+    private Integer[] getParamPrecisionAndRadix(ProcParameter param)
+    {
+        Integer[] col_size_radix = {null, null};
+        VoltType type = VoltType.get((byte) param.getType());
+        switch(type)
+        {
+        //
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
+            col_size_radix[0] = (type.getLengthInBytesForFixedTypes() * 8) - 1;
+            col_size_radix[1] = 2;
+            break;
+        case FLOAT:
+            col_size_radix[0] = 53;  // magic for double
+            col_size_radix[1] = 2;
+            break;
+        case STRING:
+            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
+            col_size_radix[1] = null;
+            break;
+        case DECIMAL:
+            col_size_radix[0] = VoltDecimalHelper.kDefaultPrecision;
+            col_size_radix[1] = 10;
+            break;
+        case VARBINARY:
+            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
+            col_size_radix[1] = null;
+            break;
+        default:
+            // XXX What's the right behavior here?
+        }
+        return col_size_radix;
+    }
+
+    private int getParamLength(ProcParameter param)
+    {
+        int length = 0;
+        VoltType type = VoltType.get((byte) param.getType());
+        switch(type)
+        {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
+        case FLOAT:
+        case DECIMAL:
+            length = type.getLengthInBytesForFixedTypes();
+            break;
+        case STRING:
+        case VARBINARY:
+            length = VoltType.MAX_VALUE_LENGTH;
+            break;
+        default:
+            // XXX What's the right behavior here?
+        }
+        return length;
+    }
+
+    private Integer getParamCharOctetLength(ProcParameter param)
+    {
+        Integer length = null;
+        VoltType type = VoltType.get((byte) param.getType());
+        switch(type)
+        {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
+        case FLOAT:
+        case DECIMAL:
+            length = null;
+            break;
+        case STRING:
+        case VARBINARY:
+            length = VoltType.MAX_VALUE_LENGTH;
+            break;
+        default:
+            // XXX What's the right behavior here?
+        }
+        return length;
+    }
+
     VoltTable getProcedureColumns()
     {
         VoltTable results = new VoltTable(PROCEDURECOLUMNS_SCHEMA);
@@ -549,26 +660,26 @@ public class JdbcDatabaseMetaDataGenerator
             for (ProcParameter param : proc.getParameters())
             {
                 results.addRow(
-                               m_jarFilename, // procedure catalog
+                               null, // procedure catalog
                                null, // procedure schema
                                proc.getTypeName(), // procedure name
                                param.getTypeName(), // param name
                                java.sql.DatabaseMetaData.procedureColumnIn, // param type, all are IN
-                               null, // data type
-                               null, // type name
-                               null, // precision
-                               null, // length
-                               null, // scale
-                               null, // radix
-                               null, // nullable
-                               null, // remarks
-                               null, // column default
+                               getColumnSqlDataType(VoltType.get((byte)param.getType())), // data type
+                               getColumnSqlTypeName(VoltType.get((byte)param.getType())), // type name
+                               getParamPrecisionAndRadix(param)[0], // precision
+                               getParamLength(param), // length
+                               getColumnDecimalDigits(VoltType.get((byte)param.getType())),
+                               getParamPrecisionAndRadix(param)[1], // radix
+                               java.sql.DatabaseMetaData.procedureNullableUnknown, // nullable
+                               getProcedureColumnRemarks(param, proc), // remarks
+                               null, // column default.  always null for us
                                null, // reserved
                                null, // reserved
-                               null, // char octet length
-                               null, // ordinal position
-                               null, // is_nullable
-                               null  // specific name
+                               getParamCharOctetLength(param), // char octet length
+                               param.getIndex() + 1, // ordinal position
+                               "", // is_nullable
+                               proc.getTypeName()  // specific name
                 );
             }
         }
@@ -577,5 +688,4 @@ public class JdbcDatabaseMetaDataGenerator
 
     private Catalog m_catalog;
     private Database m_database;
-    private String m_jarFilename;
 }

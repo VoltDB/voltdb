@@ -72,7 +72,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         table.resetRowPosition();
         while (table.advanceRow())
         {
-            if (table.get(columnName, VoltType.STRING).equals(columnValue.toUpperCase()))
+            if (((String)table.get(columnName, VoltType.STRING)).
+                    equalsIgnoreCase(columnValue.toUpperCase()))
             {
                 found = true;
                 break;
@@ -101,7 +102,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest(project);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), testout_jar);
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
         VoltTable tables = dut.getMetaData("tables");
         System.out.println(tables);
         assertEquals(10, tables.getColumnCount());
@@ -338,7 +339,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest(project);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), testout_jar);
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
         VoltTable columns = dut.getMetaData("ColUmns");
         System.out.println(columns);
         assertEquals(23, columns.getColumnCount());
@@ -369,7 +370,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest(project);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), testout_jar);
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
         VoltTable indexes = dut.getMetaData("IndexInfo");
         System.out.println(indexes);
         assertEquals(13, indexes.getColumnCount());
@@ -436,7 +437,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest(project);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), testout_jar);
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
         VoltTable pkeys = dut.getMetaData("PrimaryKeys");
         System.out.println(pkeys);
         assertEquals(6, pkeys.getColumnCount());
@@ -457,5 +458,46 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)3, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
+    }
+
+    public void testGetProcedureColumns()
+    {
+        String schema =
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
+        String project =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "  <database name='database'>" +
+            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
+            "    <procedures>" +
+            "      <procedure class='proc1' partitioninfo=\"Table1.Column1:0\"><sql>select * from Table1 where Column1=?</sql></procedure>" +
+            "      <procedure class='proc2'><sql>select * from Table1 where Column2=?</sql></procedure>" +
+            "    </procedures>" +
+            "    <partitions><partition table='Table1' column='Column1'/></partitions>" +
+            "  </database>" +
+            "</project>";
+
+        VoltCompiler c = compileForDDLTest(project);
+        System.out.println(c.getCatalog().serialize());
+        JdbcDatabaseMetaDataGenerator dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
+        VoltTable params = dut.getMetaData("ProcedureColumns");
+        System.out.println(params);
+        assertEquals(20, params.getColumnCount());
+        assertEquals(2, params.getRowCount());
+        assertTrue(moveToMatchingRow(params, "PROCEDURE_NAME", "proc1"));
+        assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
+        assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("PRECISION", VoltType.INTEGER));
+        assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("LENGTH", VoltType.INTEGER));
+        assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("CHAR_OCTET_LENGTH", VoltType.INTEGER));
+        assertEquals("PARTITION_PARAMETER", params.get("REMARKS", VoltType.STRING));
+        assertTrue(moveToMatchingRow(params, "PROCEDURE_NAME", "proc2"));
+        assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
+        assertEquals(VoltType.INTEGER.getLengthInBytesForFixedTypes() * 8 - 1,
+                     params.get("PRECISION", VoltType.INTEGER));
+        assertEquals(VoltType.INTEGER.getLengthInBytesForFixedTypes(),
+                     params.get("LENGTH", VoltType.INTEGER));
+        assertWithNullCheck(null, params.get("CHAR_OCTET_LENGTH", VoltType.INTEGER), params);
+        assertWithNullCheck(null, params.get("REMARKS", VoltType.STRING), params);
     }
 }
