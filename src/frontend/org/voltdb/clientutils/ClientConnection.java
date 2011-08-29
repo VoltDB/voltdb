@@ -18,8 +18,9 @@ package org.voltdb.clientutils;
 
 import org.voltdb.client.*;
 import java.util.HashMap;
+import java.io.Closeable;
 
-public class ClientConnection
+public class ClientConnection implements Closeable
 {
     private final PerfCounterMap Statistics;
     protected final String KeyBase;
@@ -61,6 +62,11 @@ public class ClientConnection
         {
             try { this.Client.close(); } catch(Exception x) {}
         }
+    }
+    @Override
+    public void close()
+    {
+        ClientConnectionPool.dispose(this);
     }
     public ClientResponse execute(String procedure, Object... parameters) throws Exception
     {
@@ -109,6 +115,15 @@ public class ClientConnection
     public boolean executeAsync(ProcedureCallback callback, String procedure, Object... parameters) throws Exception
     {
         return this.Client.callProcedure(new TrackingCallback(this, procedure, callback), procedure, parameters);
+    }
+
+    public PerfCounterMap getStatistics()
+    {
+        return ClientConnectionPool.getStatistics(this);
+    }
+    public PerfCounter getStatistics(String procedure)
+    {
+        return ClientConnectionPool.getStatistics(this).get(procedure);
     }
 }
 
