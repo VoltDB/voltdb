@@ -132,8 +132,8 @@ public class AsyncCompilerWorkThread extends Thread {
     }
 
     public void prepareCatalogUpdate(
-            String catalogURL,
-            String deploymentURL,
+            byte[] catalogBytes,
+            String deploymentString,
             long clientHandle,
             long connectionId,
             String hostname,
@@ -146,8 +146,8 @@ public class AsyncCompilerWorkThread extends Thread {
         work.hostname = hostname;
         work.adminConnection = adminConnection;
         work.clientData = clientData;
-        work.catalogURL = catalogURL;
-        work.deploymentURL = deploymentURL;
+        work.catalogBytes = catalogBytes;
+        work.deploymentString = deploymentString;
         m_work.add(work);
     }
 
@@ -242,15 +242,15 @@ public class AsyncCompilerWorkThread extends Thread {
         retval.hostname = work.hostname;
 
         // catalog change specific boiler plate
-        retval.catalogURL = work.catalogURL;
-        retval.deploymentURL = work.deploymentURL;
+        retval.catalogBytes = work.catalogBytes;
+        retval.deploymentString = work.deploymentString;
 
         // get the diff between catalogs
         try {
             // try to get the new catalog from the params
-            String newCatalogCommands = CatalogUtil.loadCatalogFromJar(work.catalogURL, null);
+            String newCatalogCommands = CatalogUtil.loadCatalogFromJar(work.catalogBytes, null);
             if (newCatalogCommands == null) {
-                retval.errorMsg = "Unable to read from catalog at: " + work.catalogURL;
+                retval.errorMsg = "Unable to read from catalog bytes";
                 return retval;
             }
             Catalog newCatalog = new Catalog();
@@ -258,10 +258,11 @@ public class AsyncCompilerWorkThread extends Thread {
 
             // If VoltProjectBuilder was used, work.deploymentURL will be null. No deployment.xml file was
             // given to the server in this case because its deployment info has already been added to the catalog.
-            if (work.deploymentURL != null) {
-                retval.deploymentCRC = CatalogUtil.compileDeploymentAndGetCRC(newCatalog, work.deploymentURL, false);
+            if (work.deploymentString != null) {
+                retval.deploymentCRC =
+                        CatalogUtil.compileDeploymentStringAndGetCRC(newCatalog, work.deploymentString, false);
                 if (retval.deploymentCRC < 0) {
-                    retval.errorMsg = "Unable to read from deployment file at: " + work.deploymentURL;
+                    retval.errorMsg = "Unable to read from deployment file string";
                     return retval;
                 }
             }

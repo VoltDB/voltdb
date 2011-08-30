@@ -315,18 +315,15 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             cat_to_use = catalogJarFile;
         }
 
-        String serializedCat =
-            CatalogUtil.loadCatalogFromJar(cat_to_use.getAbsolutePath(),
-                                           null);
+        byte[] bytes = CatalogUtil.toBytes(cat_to_use);
+        String serializedCat = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCat);
 
         long crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath,
                                                           true);
-        context = new CatalogContext(0, catalog,
-                                     cat_to_use.getAbsolutePath(),
-                                     crc, 0, 0);
+        context = new CatalogContext(0, catalog, bytes, crc, 0, 0);
     }
 
     /**
@@ -550,7 +547,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     public void testSingleHostSnapshotRestore() throws Exception {
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
-        ServerThread server = new ServerThread(context.pathToCatalogJar,
+        ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
@@ -583,7 +580,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         m_hostCount = 1;
         String voltroot = newVoltRoot(null);
         buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
-        ServerThread server = new ServerThread(context.pathToCatalogJar,
+        ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
@@ -617,7 +614,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         m_hostCount = 1;
         String voltroot = newVoltRoot(null);
         buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
-        ServerThread server = new ServerThread(context.pathToCatalogJar,
+        ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();

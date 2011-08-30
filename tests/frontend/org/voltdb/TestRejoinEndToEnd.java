@@ -402,11 +402,11 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             client.createConnection("localhost");
 
             // Also make sure a catalog update doesn't reset m_haveDoneRestore
-            String newCatalogURL = Configuration.getPathToCatalogForTest("rejoin.jar");
-            String deploymentURL = Configuration.getPathToCatalogForTest("rejoin.xml");
+            File newCatalog = new File(Configuration.getPathToCatalogForTest("rejoin.jar"));
+            File deployment = new File(Configuration.getPathToCatalogForTest("rejoin.xml"));
 
             VoltTable[] results =
-                client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+                client.updateApplicationCatalog(newCatalog, deployment).getResults();
             assertTrue(results.length == 1);
 
             client.close();
@@ -438,14 +438,14 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 Thread.sleep(1000);
                 cluster.recoverOne( 1, 0, "localhost");
 
-                String newCatalogURL = Configuration.getPathToCatalogForTest("rejoin.jar");
-                String deploymentURL = Configuration.getPathToCatalogForTest("rejoin.xml");
+                File newCatalog = new File(Configuration.getPathToCatalogForTest("rejoin.jar"));
+                File deployment = new File(Configuration.getPathToCatalogForTest("rejoin.xml"));
 
                 Client client = ClientFactory.createClient();
                 client.createConnection("localhost");
 
                 VoltTable[] results =
-                    client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+                    client.updateApplicationCatalog(newCatalog, deployment).getResults();
                 assertTrue(results.length == 1);
                 client.close();
             }

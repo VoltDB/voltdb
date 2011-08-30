@@ -389,8 +389,8 @@ SnapshotCompletionInterest {
                 }
             }
         } catch (Exception e) {
-            LOG.fatal("Failed to create Zookeeper node: " + e.getMessage());
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
+                                     false, e);
         }
     }
 
@@ -448,8 +448,8 @@ SnapshotCompletionInterest {
                                                                     RESTORE_TXNID + 1);
             }
         } catch (Exception e) {
-            LOG.fatal("Unable to instantiate command log reinitiator", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
+                                     false, e);
         }
         m_replayAgent.setCallback(this);
     }
@@ -480,8 +480,7 @@ SnapshotCompletionInterest {
         try {
             m_snapshotToRestore = generatePlans();
         } catch (Exception e) {
-            LOG.fatal(e.getMessage());
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB(e.getMessage(), false, e);
         }
 
         if (m_snapshotToRestore != null) {
@@ -503,8 +502,8 @@ SnapshotCompletionInterest {
             m_zk.create(zkBarrierNode, new byte[0],
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
-            LOG.fatal("Failed to create Zookeeper node: " + e.getMessage());
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
+                                     false, e);
         }
     }
 
@@ -523,8 +522,7 @@ SnapshotCompletionInterest {
             try {
                 children = m_zk.getChildren(RESTORE_BARRIER, false);
             } catch (KeeperException e2) {
-                LOG.fatal(e2.getMessage());
-                VoltDB.crashVoltDB();
+                VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
             } catch (InterruptedException e2) {
                 continue;
             }
@@ -694,8 +692,8 @@ SnapshotCompletionInterest {
             m_zk.create(SNAPSHOT_ID, buf.array(),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
-            LOG.fatal("Failed to create Zookeeper node: " + e.getMessage());
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
+                                     false, e);
         }
     }
 
@@ -717,8 +715,7 @@ SnapshotCompletionInterest {
                     break;
                 }
             } catch (KeeperException e2) {
-                LOG.fatal(e2.getMessage());
-                VoltDB.crashVoltDB();
+                VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
             } catch (InterruptedException e2) {
                 continue;
             }
@@ -1073,9 +1070,8 @@ SnapshotCompletionInterest {
         }
 
         if (failure) {
-            LOG.fatal("Failed to restore from snapshot: " +
-                      res.getStatusString());
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
+                                     res.getStatusString(), false, null);
         } else {
             changeState();
         }
@@ -1118,8 +1114,7 @@ SnapshotCompletionInterest {
              * This means we didn't restore any snapshot, and there's no command
              * log to replay. But the user asked for recover
              */
-            LOG.fatal("Nothing to recover from");
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB("Nothing to recover from", false, null);
         } else if (!m_clEnabled && !m_replayAgent.hasReplayedTxns()) {
             // Nothing was replayed, so no need to initiate truncation snapshot
             m_state = State.TRUNCATE;
@@ -1148,8 +1143,9 @@ SnapshotCompletionInterest {
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                 } catch (Exception e) {
-                    LOG.fatal("Requesting a truncation snapshot via ZK should always succeed", e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashGlobalVoltDB("Requesting a truncation snapshot " +
+                                             "via ZK should always succeed",
+                                             false, e);
                 }
             }
         }
@@ -1220,8 +1216,8 @@ SnapshotCompletionInterest {
     public CountDownLatch snapshotCompleted(long txnId,
                                             boolean truncationSnapshot) {
         if (!truncationSnapshot) {
-            LOG.fatal("Failed to truncate command logs by snapshot");
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",
+                                     false, null);
         } else {
             m_truncationSnapshot = txnId;
             m_replayAgent.returnAllSegments();

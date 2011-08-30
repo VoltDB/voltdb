@@ -67,12 +67,13 @@ public class TestOutOfProcessPlanning extends TestCase {
 
     }
 
-    public void testSimple() {
+    public void testSimple() throws IOException {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addAllDefaults();
         builder.compile("tpcc-oop.jar");
 
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar("tpcc-oop.jar", null);
+        byte[] bytes = CatalogUtil.toBytes(new File("tpcc-oop.jar"));
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
 
         m_pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
 
@@ -139,7 +140,8 @@ public class TestOutOfProcessPlanning extends TestCase {
                                  "A.C1: 0");
 
         builder.compile("testbadddl-oop.jar");
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar("testbadddl-oop.jar", null);
+        byte[] bytes = CatalogUtil.toBytes(new File("testbadddl-oop.jar"));
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);

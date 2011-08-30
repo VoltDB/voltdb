@@ -17,6 +17,7 @@
 
 package org.voltdb.client;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
@@ -27,6 +28,7 @@ import java.util.logging.Logger;
 
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
@@ -262,6 +264,7 @@ final class ClientImpl implements Client {
         if (m_isShutdown) {
             return false;
         }
+
         if (callback == null) {
             callback = new NullCallback();
         } else if (callback instanceof ProcedureArgumentCacher) {
@@ -308,6 +311,40 @@ final class ClientImpl implements Client {
                     expectedSerializedSize,
                     isBlessed);
         }
+    }
+
+    /**
+     * Serializes catalog and deployment file for UpdateApplicationCatalog.
+     * Catalog is serialized into byte array, deployment file is serialized into
+     * string.
+     *
+     * @param catalogPath
+     * @param deploymentPath
+     * @return Parameters that can be passed to UpdateApplicationCatalog
+     * @throws IOException If either of the files cannot be read
+     */
+    private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
+    throws IOException {
+        Object[] params = new Object[2];
+        params[0] = CatalogUtil.toBytes(catalogPath);
+        params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+        return params;
+    }
+
+    @Override
+    public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
+    throws IOException, NoConnectionsException, ProcCallException {
+        Object[] params = getUpdateCatalogParams(catalogPath, deploymentPath);
+        return callProcedure("@UpdateApplicationCatalog", params);
+    }
+
+    @Override
+    public boolean updateApplicationCatalog(ProcedureCallback callback,
+                                            File catalogPath,
+                                            File deploymentPath)
+    throws IOException, NoConnectionsException {
+        Object[] params = getUpdateCatalogParams(catalogPath, deploymentPath);
+        return callProcedure(callback, "@UpdateApplicationCatalog", params);
     }
 
     @Override

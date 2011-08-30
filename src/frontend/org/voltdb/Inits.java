@@ -227,9 +227,13 @@ public class Inits {
                     byte[] buffer = new byte[MAX_CATALOG_SIZE];
                     int readBytes = 0;
                     int totalBytes = 0;
-                    while (readBytes >= 0) {
-                        totalBytes += readBytes;
-                        readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
+                    try {
+                        while (readBytes >= 0) {
+                            totalBytes += readBytes;
+                            readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
+                        }
+                    } finally {
+                        fin.close();
                     }
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
                     hostLog.info(String.format("Sending %d catalog bytes", catalogBytes.length));
@@ -267,7 +271,14 @@ public class Inits {
                 hostLog.info("Loading application catalog jarfile from " + f.getAbsolutePath());
             }
 
-            m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(m_config.m_pathToCatalog, hostLog);
+            byte[] catalogBytes = null;
+            try {
+                catalogBytes = CatalogUtil.toBytes(new File(m_config.m_pathToCatalog));
+            } catch (IOException e) {
+                hostLog.fatal("Failed to read catalog: " + e.getMessage());
+                VoltDB.crashVoltDB();
+            }
+            m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
                 VoltDB.crashVoltDB();
 
@@ -299,7 +310,7 @@ public class Inits {
             m_rvdb.m_serializedCatalog = catalog.serialize();
             m_rvdb.m_catalogContext = new CatalogContext(
                     existingCatalogTxnId,
-                    catalog, m_config.m_pathToCatalog, m_rvdb.m_depCRC, existingCatalogVersion, -1);
+                    catalog, catalogBytes, m_rvdb.m_depCRC, existingCatalogVersion, -1);
         }
     }
 

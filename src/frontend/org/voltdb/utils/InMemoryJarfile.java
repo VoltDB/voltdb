@@ -18,6 +18,7 @@
 package org.voltdb.utils;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -72,6 +73,10 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
     public InMemoryJarfile(File file) throws IOException {
         loadFromStream(new FileInputStream(file));
+    }
+
+    public InMemoryJarfile(byte[] bytes) throws IOException {
+        loadFromStream(new ByteArrayInputStream(bytes));
     }
 
     private void loadFromStream(InputStream in) throws IOException {

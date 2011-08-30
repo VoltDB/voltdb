@@ -24,6 +24,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.IOException;
 
 import junit.framework.TestCase;
 
@@ -135,8 +136,9 @@ public class TestVoltDB extends TestCase {
      *
      * This test tries to assign a user in the deployment file to a group that does not exist and asserts that
      * deployment file compilation fails.
+     * @throws IOException
      */
-    public void testCompileDeploymentAddUserToNonExistentGroup() {
+    public void testCompileDeploymentAddUserToNonExistentGroup() throws IOException {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -160,7 +162,8 @@ public class TestVoltDB extends TestCase {
         String catalogJar = testDir + File.separator + jarName;
         assertTrue("Project failed to compile", project.compile(catalogJar));
 
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogJar, null);
+        byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull("Error loading catalog from jar", serializedCatalog);
 
         Catalog catalog = new Catalog();
@@ -175,8 +178,9 @@ public class TestVoltDB extends TestCase {
      * ENG-720: NullPointerException when trying to start server with no users
      *
      * This test makes sure deployment validation passes when there are no users.
+     * @throws IOException
      */
-    public void testCompileDeploymentNoUsers() {
+    public void testCompileDeploymentNoUsers() throws IOException {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -196,7 +200,8 @@ public class TestVoltDB extends TestCase {
         String catalogJar = testDir + File.separator + jarName;
         assertTrue("Project failed to compile", project.compile(catalogJar));
 
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogJar, null);
+        byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull("Error loading catalog from jar", serializedCatalog);
 
         Catalog catalog = new Catalog();

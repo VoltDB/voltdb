@@ -71,6 +71,7 @@ import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.Pair;
@@ -1053,16 +1054,34 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                new VoltTable[0],
                                                "UpdateApplicationCatalog system procedure requires exactly " +
-                                               "two parameters, the URL of the catalog to load and the URL " +
-                                               "of a deployment file.",
+                                               "two parameters, the catalog bytes and the deployment file " +
+                                               "string.",
                                                task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
-                String catalogURL = (String) params.m_params[0];
-                String deploymentURL = (String) params.m_params[1];
-                m_asyncCompilerWorkThread.prepareCatalogUpdate(catalogURL,
-                                                               deploymentURL,
+
+                byte[] catalogBytes = null;
+                if (params.m_params[0] instanceof String &&
+                    Encoder.isHexEncodedString((String) params.m_params[0])) {
+                    catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
+                } else if (params.m_params[0] instanceof byte[]) {
+                    catalogBytes = (byte[]) params.m_params[0];
+                } else {
+                    final ClientResponseImpl errorResp =
+                            new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                                   new VoltTable[0],
+                                                   "UpdateApplicationCatalog system procedure takes the " +
+                                                   "catalog bytes as a byte array. The received parameter " +
+                                                   "is of type " + params.m_params[0].getClass() + ".",
+                                                   task.clientHandle);
+                    c.writeStream().enqueue(errorResp);
+                    return;
+                }
+                String deploymentString = (String) params.m_params[1];
+
+                m_asyncCompilerWorkThread.prepareCatalogUpdate(catalogBytes,
+                                                               deploymentString,
                                                                task.clientHandle,
                                                                handler.connectionId(),
                                                                handler.m_hostname,
@@ -1241,8 +1260,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         public ParameterSet call() {
                             ParameterSet params = new ParameterSet();
                             params.m_params = new Object[] {
-                                    changeResult.encodedDiffCommands, changeResult.catalogURL,
-                                    changeResult.expectedCatalogVersion, changeResult.deploymentURL,
+                                    changeResult.encodedDiffCommands, changeResult.catalogBytes,
+                                    changeResult.expectedCatalogVersion, changeResult.deploymentString,
                                     changeResult.deploymentCRC
                             };
                             return params;

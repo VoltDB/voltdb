@@ -257,7 +257,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public CatalogContext getCatalogContext()
     {
-        m_context = new CatalogContext( System.currentTimeMillis(), m_catalog, CatalogContext.NO_PATH, 0, 0, 0);
+        m_context = new CatalogContext( System.currentTimeMillis(), m_catalog, null, 0, 0, 0);
         return m_context;
     }
 
@@ -398,7 +398,7 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public CatalogContext catalogUpdate(String diffCommands,
-            String newCatalogURL, int expectedCatalogVersion,
+            byte[] catalogBytes, int expectedCatalogVersion,
             long currentTxnId, long deploymentCRC)
     {
         throw new UnsupportedOperationException("unimplemented");
@@ -416,8 +416,8 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void clusterUpdate(String diffCommands) {
-        m_context = m_context.update( System.currentTimeMillis(),
-                                     CatalogContext.NO_PATH,
+        m_context = m_context.update(System.currentTimeMillis(),
+                                     null,
                                      diffCommands, false, -1);
     }
 

@@ -179,7 +179,8 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         assert(status);
 
         // read in the catalog
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogJar, null);
+        byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assert(serializedCatalog != null);
 
         // create the catalog (that will be passed to the ClientInterface

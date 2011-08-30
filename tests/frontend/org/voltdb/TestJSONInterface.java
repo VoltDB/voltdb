@@ -85,6 +85,7 @@ import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 public class TestJSONInterface extends TestCase {
@@ -631,7 +632,8 @@ public class TestJSONInterface extends TestCase {
         assertTrue(success);
 
         pset = new ParameterSet();
-        pset.setParameters(config.m_pathToCatalog, builder2.getPathToDeployment());
+        pset.setParameters(Encoder.hexEncode(CatalogUtil.toBytes(new File(config.m_pathToCatalog))),
+                           new String(CatalogUtil.toBytes(new File(builder2.getPathToDeployment())), "UTF-8"));
         response = callProcOverJSON("@UpdateApplicationCatalog", pset,
                                     ui[0].name, ui[0].password, true);
         r = responseFromJSON(response);

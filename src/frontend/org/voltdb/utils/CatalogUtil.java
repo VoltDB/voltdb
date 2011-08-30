@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -95,12 +96,12 @@ public abstract class CatalogUtil {
 
     public static final String CATALOG_FILENAME = "catalog.txt";
 
-    public static String loadCatalogFromJar(String pathToCatalog, VoltLogger log) {
-        assert(pathToCatalog != null);
+    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) {
+        assert(catalogBytes != null);
 
         String serializedCatalog = null;
         try {
-            InMemoryJarfile jarfile = new InMemoryJarfile(pathToCatalog);
+            InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
             byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
             serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
         } catch (Exception e) {
@@ -110,6 +111,28 @@ public abstract class CatalogUtil {
         }
 
         return serializedCatalog;
+    }
+
+    /**
+     * Serialize a file into bytes. Used to serialize catalog and deployment
+     * file for UpdateApplicationCatalog on the client.
+     *
+     * @param path
+     * @return a byte array of the file
+     * @throws IOException
+     *             If there are errors reading the file
+     */
+    public static byte[] toBytes(File path) throws IOException {
+        FileInputStream fin = new FileInputStream(path);
+        byte[] buffer = new byte[(int) fin.getChannel().size()];
+        try {
+            if (fin.read(buffer) == -1) {
+                throw new IOException("File " + path.getAbsolutePath() + " is empty");
+            }
+        } finally {
+            fin.close();
+        }
+        return buffer;
     }
 
     /**
@@ -430,6 +453,14 @@ public abstract class CatalogUtil {
         return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
     }
 
+    public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString, boolean crashOnFailedValidation) {
+        DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
+        if (deployment == null) {
+            return -1;
+        }
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
+    }
+
     /**
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
@@ -638,13 +669,29 @@ public abstract class CatalogUtil {
             hostLog.info("URL of deployment info: " + deploymentURL);
         }
 
-        // get deployment info from xml file
         return getDeployment(deployIS);
     }
 
     /**
+     * Parses the deployment XML string.
+     * @param deploymentString The deployment file content.
+     * @return a reference to the root <deployment> element.
+     */
+    public static DeploymentType parseDeploymentFromString(String deploymentString) {
+        ByteArrayInputStream byteIS;
+        try {
+            byteIS = new ByteArrayInputStream(deploymentString.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            hostLog.warn("Unable to read deployment string: " + e.getMessage());
+            return null;
+        }
+        // get deployment info from xml file
+        return getDeployment(byteIS);
+    }
+
+    /**
      * Get a reference to the root <deployment> element from the deployment.xml file.
-     * @param pathToDeployment Path to the deployment.xml file.
+     * @param deployIS
      * @return Returns a reference to the root <deployment> element.
      */
     @SuppressWarnings("unchecked")

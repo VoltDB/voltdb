@@ -50,6 +50,7 @@
 
 package org.voltdb.client;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
 
@@ -256,5 +257,22 @@ public class MockVoltClient implements Client {
     public VoltTable getClusterRTTLatencies() {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    @Override
+    public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath) throws IOException,
+                                                                                         NoConnectionsException,
+                                                                                         ProcCallException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean updateApplicationCatalog(ProcedureCallback callback,
+                                            File catalogPath,
+                                            File deploymentPath) throws IOException,
+                                                                NoConnectionsException {
+        // TODO Auto-generated method stub
+        return false;
     }
 }

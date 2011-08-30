@@ -124,13 +124,13 @@ public interface VoltDBInterface
      * Updates the catalog context stored by this VoltDB without destroying the old one,
      * in case anything still links to it.
      *
-     * @param newCatalogURL A URL for the new catalog (http: or file:).
+     * @param newCatalogBytes The catalog bytes.
      * @param diffCommands The commands to update the current catalog to the new one.
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentCRC The CRC of the deployment file
      */
-    public CatalogContext catalogUpdate(String diffCommands, String newCatalogURL,
+    public CatalogContext catalogUpdate(String diffCommands, byte[] newCatalogBytes,
            int expectedCatalogVersion, long currentTxnId, long deploymentCRC);
 
    /**

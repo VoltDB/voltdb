@@ -33,9 +33,7 @@ import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
 public class CatalogContext {
-
-    /** Pass this to constructor for catalog path in tests */
-    public static final String NO_PATH = "EMPTY_PATH";
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // THE CATALOG!
     public final Catalog catalog;
@@ -51,7 +49,6 @@ public class CatalogContext {
     public final int numberOfNodes;
     public final SiteTracker siteTracker;
     public final int catalogVersion;
-    public final String pathToCatalogJar;
     public final long catalogCRC;
     public final long deploymentCRC;
     public long m_transactionId;
@@ -64,25 +61,21 @@ public class CatalogContext {
     public CatalogContext(
             long transactionId,
             Catalog catalog,
-            String pathToCatalogJar,
+            byte[] catalogBytes,
             long deploymentCRC,
             int version,
             long prevCRC) {
         m_transactionId = transactionId;
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
-        assert(pathToCatalogJar != null);
-        this.pathToCatalogJar = pathToCatalogJar;
         if (catalog == null)
             throw new RuntimeException("Can't create CatalogContext with null catalog.");
-        if (pathToCatalogJar == null)
-            throw new RuntimeException("Can't create CatalogContext with null jar path.");
 
         //m_path = pathToCatalogJar;
         long tempCRC = 0;
-        if (pathToCatalogJar.startsWith(NO_PATH) == false) {
+        if (catalogBytes != null) {
             try {
-                m_jarfile = new InMemoryJarfile(pathToCatalogJar);
+                m_jarfile = new InMemoryJarfile(catalogBytes);
                 tempCRC = m_jarfile.getCRC();
             }
             catch (Exception e) {
@@ -125,7 +118,7 @@ public class CatalogContext {
 
     public CatalogContext update(
             long txnId,
-            String pathToNewJar,
+            byte[] catalogBytes,
             String diffCommands,
             boolean incrementVersion,
             long deploymentCRC) {
@@ -133,17 +126,22 @@ public class CatalogContext {
         newCatalog.execute(diffCommands);
         int incValue = incrementVersion ? 1 : 0;
         long realDepCRC = deploymentCRC > 0 ? deploymentCRC : this.deploymentCRC;
-        String realPathToNewJar = pathToNewJar;
-        // If there's no new catalog path, preserve the old one rather than
+        // If there's no new catalog bytes, preserve the old one rather than
         // bashing it
-        if (realPathToNewJar.startsWith(NO_PATH)) {
-            realPathToNewJar = this.pathToCatalogJar;
+        byte[] bytes = catalogBytes;
+        if (bytes == null) {
+            try {
+                bytes = this.getCatalogJarBytes();
+            } catch (IOException e) {
+                // Failure is not an option
+                hostLog.fatal(e.getMessage());
+            }
         }
         CatalogContext retval =
             new CatalogContext(
                     txnId,
                     newCatalog,
-                    realPathToNewJar,
+                    bytes,
                     realDepCRC,
                     catalogVersion + incValue,
                     catalogCRC);
@@ -170,6 +168,9 @@ public class CatalogContext {
      * Get the raw bytes of a catalog file for shipping around.
      */
     public byte[] getCatalogJarBytes() throws IOException {
+        if (m_jarfile == null) {
+            return null;
+        }
         return m_jarfile.getFullJarBytes();
     }
 

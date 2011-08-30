@@ -21,10 +21,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
@@ -37,16 +33,12 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     @Override
     public void init(int numberOfPartitions, SiteProcedureConnection site,
             Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
@@ -87,13 +79,10 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * @return Standard STATUS table.
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String catalogDiffCommands, String catalogURL,
-            int expectedCatalogVersion, String deploymentURL,
+            String catalogDiffCommands, byte[] catalogBytes,
+            int expectedCatalogVersion, String deploymentString,
             long deploymentCRC)
     {
-        CatalogContext oldContext = VoltDB.instance().getCatalogContext();
-        CommandLog commandLog = oldContext.cluster.getLogconfig().get("log");
-
         // TODO: compute CRC for catalog vs. a crc provided by the initiator.
         // validateCRC(catalogURL, initiatorsCRC);
 
@@ -102,27 +91,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // then update data at the local site.
         String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
         CatalogContext context =
-            VoltDB.instance().catalogUpdate(commands, catalogURL, expectedCatalogVersion, getTransactionId(), deploymentCRC);
+            VoltDB.instance().catalogUpdate(commands, catalogBytes, expectedCatalogVersion, getTransactionId(), deploymentCRC);
         ctx.getExecutionSite().updateCatalog(commands, context);
-
-        /*
-         * Take a local snapshot to truncate the command log. This is done on
-         * each host, no need to coordinate. The sysproc already provides
-         * sufficient coordination. This will be reverted once PRO-393 is done.
-         */
-        if (commandLog != null && commandLog.getEnabled()) {
-            // This doesn't check if there's any ongoing cl truncation snapshots
-            ZooKeeper zk = VoltDB.instance().getZK();
-            try {
-                zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE,
-                          CreateMode.PERSISTENT);
-            } catch (NodeExistsException e) {
-
-            } catch (Exception e) {
-                hostLog.fatal("Requesting a truncation snapshot via ZK should always succeed", e);
-                VoltDB.crashVoltDB();
-            }
-        }
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);

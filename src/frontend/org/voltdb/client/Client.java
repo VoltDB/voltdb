@@ -17,6 +17,7 @@
 
 package org.voltdb.client;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
 
@@ -184,6 +185,43 @@ public interface Client {
      * @return The size of the invocation once serialized
      */
     public int calculateInvocationSerializedSize(String procName, Object... parameters);
+
+    /**
+     * Synchronously invokes UpdateApplicationCatalog procedure. Blocks until a
+     * result is available. A {@link ProcCallException} is thrown if the
+     * response is anything other then success.
+     *
+     * @param catalogPath Path to the catalog jar file.
+     * @param deploymentPath Path to the deployment file
+     * @return array of VoltTable results
+     * @throws IOException If the files cannot be serialized
+     * @throws NoConnectionException
+     * @throws ProcCallException
+     */
+    public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
+    throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
+     * Asynchronously invokes UpdateApplicationCatalog procedure. Does not
+     * guarantee that the invocation is actually queued. If there is
+     * backpressure on all connections to the cluster then the invocation will
+     * not be queued. Check the return value to determine if queuing actually
+     * took place.
+     *
+     * @param callback
+     *            ProcedureCallback that will be invoked with procedure results.
+     * @param catalogPath
+     *            Path to the catalog jar file.
+     * @param deploymentPath
+     *            Path to the deployment file
+     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise
+     * @throws IOException If the files cannot be serialized
+     * @throws NoConnectionException
+     */
+    public boolean updateApplicationCatalog(ProcedureCallback callback,
+                                            File catalogPath,
+                                            File deploymentPath)
+    throws IOException, NoConnectionsException;
 
 
     /**

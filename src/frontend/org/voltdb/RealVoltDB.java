@@ -511,7 +511,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
         assert(depCRC != -1);
-        m_catalogContext = new CatalogContext(0, catalog, CatalogContext.NO_PATH, depCRC, 0, -1);
+        m_catalogContext = new CatalogContext(0, catalog, null, depCRC, 0, -1);
     }
 
     void collectLocalNetworkMetadata() {
@@ -1243,7 +1243,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public CatalogContext catalogUpdate(
             String diffCommands,
-            String newCatalogURL,
+            byte[] newCatalogBytes,
             int expectedCatalogVersion,
             long currentTxnId,
             long deploymentCRC)
@@ -1270,7 +1270,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // 0. A new catalog! Update the global context and the context tracker
             m_catalogContext =
-                m_catalogContext.update(currentTxnId, newCatalogURL, diffCommands, true, deploymentCRC);
+                m_catalogContext.update(currentTxnId, newCatalogBytes, diffCommands, true, deploymentCRC);
             m_txnIdToContextTracker.put(currentTxnId, new ContextTracker(m_catalogContext));
             m_catalogContext.logDebuggingInfoFromCatalog();
 
@@ -1301,7 +1301,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         synchronized(m_catalogUpdateLock)
         {
             //Reuse the txn id since this doesn't change schema/procs/export
-            m_catalogContext = m_catalogContext.update( m_catalogContext.m_transactionId, CatalogContext.NO_PATH,
+            m_catalogContext = m_catalogContext.update(m_catalogContext.m_transactionId, null,
                                                        diffCommands, false, -1);
         }
 
