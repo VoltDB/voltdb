@@ -487,9 +487,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
             VoltDB.crashVoltDB();
         }
+
+        // note the heatbeats are specified in seconds in xml, but ms internally
         HeartbeatType hbt = m_deployment.getHeartbeat();
         if (hbt != null)
-            m_config.m_deadHostTimeoutMS = hbt.getTimeout();
+            m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
 
         // create a dummy catalog to load deployment info into
         Catalog catalog = new Catalog();

@@ -100,6 +100,10 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
         new Thread() {
             @Override
             public void run() {
+                // if we see an early fault (during startup), then it's ok not to
+                // notify the export manager
+                if (ExportManager.instance() == null)
+                    return;
                 //Notify the export manager the cluster topology has changed
                 ExportManager.instance().notifyOfClusterTopologyChange();
             }
