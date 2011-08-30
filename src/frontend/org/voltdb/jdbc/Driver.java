@@ -22,7 +22,7 @@ import java.util.*;
 import java.util.regex.*;
 import org.voltdb.*;
 import org.voltdb.client.*;
-import org.voltdb.clientutils.*;
+import org.voltdb.client.exampleutils.*;
 
 public class Driver implements java.sql.Driver
 {

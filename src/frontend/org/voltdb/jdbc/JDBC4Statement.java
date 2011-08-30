@@ -22,7 +22,7 @@ import java.util.*;
 import java.util.regex.*;
 import org.voltdb.*;
 import org.voltdb.client.*;
-import org.voltdb.clientutils.ClientConnection;
+import org.voltdb.client.exampleutils.ClientConnection;
 import java.math.BigDecimal;
 
 public class JDBC4Statement implements java.sql.Statement
