@@ -29,11 +29,11 @@ client: async-benchmark
 # Asynchronous benchmark sample
 # Use this target for argument help
 async-benchmark-help: srccompile
-	java -classpath obj:$(CLASSPATH):obj com.AsyncVoterBenchmark \
+	java -classpath obj:$(CLASSPATH):obj com.AsyncBenchmark \
 	    --help
 
 async-benchmark: srccompile
-	java -classpath obj:$(CLASSPATH):obj com.AsyncVoterBenchmark \
+	java -classpath obj:$(CLASSPATH):obj com.AsyncBenchmark \
 	    --display-interval=5 \
 	    --duration=120 \
 	    --servers=localhost \
@@ -47,11 +47,11 @@ async-benchmark: srccompile
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 sync-benchmark-help: srccompile
-	java -classpath obj:$(CLASSPATH):obj com.SyncVoterBenchmark \
+	java -classpath obj:$(CLASSPATH):obj com.SyncBenchmark \
 	    --help
 
 sync-benchmark: srccompile
-	java -classpath obj:$(CLASSPATH):obj com.SyncVoterBenchmark \
+	java -classpath obj:$(CLASSPATH):obj com.SyncBenchmark \
 	    --threads=40 \
 	    --display-interval=5 \
 	    --duration=120 \
@@ -63,11 +63,11 @@ sync-benchmark: srccompile
 # JDBC benchmark sample
 # Use this target for argument help
 jdbc-benchmark-help: srccompile
-	java -classpath obj:$(CLASSPATH):obj com.JDBCVoterBenchmark \
+	java -classpath obj:$(CLASSPATH):obj com.JDBCBenchmark \
 	    --help
 
 jdbc-benchmark: srccompile
-	java -classpath obj:$(CLASSPATH):obj com.JDBCVoterBenchmark \
+	java -classpath obj:$(CLASSPATH):obj com.JDBCBenchmark \
 	    --threads=40 \
 	    --display-interval=5 \
 	    --duration=120 \

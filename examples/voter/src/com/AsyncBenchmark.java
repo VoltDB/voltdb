@@ -21,89 +21,47 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * This samples uses multiple threads to post synchronous requests to the
- * VoltDB server, simulating multiple client application posting
- * synchronous requests to the database, using the native VoltDB client
- * library.
+ * This samples uses the native asynchronous request processing protocol
+ * to post requests to the VoltDB server, thus leveraging to the maximum
+ * VoltDB's ability to run requests in parallel on multiple database
+ * partitions, and multiple servers.
  *
- * While synchronous processing can cause performance bottlenecks (each
- * caller waits for a transaction answer before calling another
- * transaction), the VoltDB cluster at large is still able to perform at
- * blazing speeds when many clients are connected to it.
+ * While asynchronous processing is (marginally) more convoluted to work
+ * with and not adapted to all workloads, it is the preferred interaction
+ * model to VoltDB as it guarantees blazing performance.
+ *
+ * Because there is a risk of 'firehosing' a database cluster (if the
+ * cluster is too slow (slow or too few CPUs), this sample performs
+ * self-tuning to target a specific latency (10ms by default).
+ * This tuning process, as demonstrated here, is important and should be
+ * part of your pre-launch evalution so you can adequately provision your
+ * VoltDB cluster with the number of servers required for your needs.
  */
 package com;
 
-import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.client.exampleutils.ClientConnection;
 import org.voltdb.client.exampleutils.ClientConnectionPool;
+import org.voltdb.client.exampleutils.IRateLimiter;
+import org.voltdb.client.exampleutils.LatencyLimiter;
+import org.voltdb.client.exampleutils.RateLimiter;
 
-public class SyncVoterBenchmark
+public class AsyncBenchmark
 {
-    // Initialize some common constants and variables
+    // Initialize some commong constants and variables
     private static final String ContestantNamesCSV = "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway,Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster,Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
     private static final AtomicLongArray VotingBoardResults = new AtomicLongArray(4);
 
-    // Reference to the database connection we will use in them main thread
+    // Reference to the database connection we will use
     private static ClientConnection Con;
-
-    // Class for each thread that will be run in parallel, performing requests against the VoltDB server
-    private static class ClientThread implements Runnable
-    {
-        private final String servers;
-        private final int port;
-        private final long duration;
-        private final PhoneCallGenerator switchboard;
-        private final int maxVoteCount;
-        public ClientThread(String servers, int port, PhoneCallGenerator switchboard, long duration, int maxVoteCount) throws Exception
-        {
-            this.servers = servers;
-            this.port = port;
-            this.duration = duration;
-            this.switchboard = switchboard;
-            this.maxVoteCount = maxVoteCount;
-        }
-
-        @Override
-        public void run()
-        {
-            // Each thread gets its dedicated JDBC connection, and posts votes against it.
-            ClientConnection con = null;
-            try
-            {
-                con = ClientConnectionPool.get(servers, port);
-                long endTime = System.currentTimeMillis() + (1000l * this.duration);
-                while (endTime > System.currentTimeMillis())
-                {
-                    PhoneCallGenerator.PhoneCall call = this.switchboard.receive();
-                    try
-                    {
-                        VotingBoardResults.incrementAndGet((int)con.execute("Vote", call.PhoneNumber, call.ContestantNumber, this.maxVoteCount).getResults()[0].fetchRow(0).getLong(0));
-                    }
-                    catch(Exception x)
-                    {
-                        VotingBoardResults.incrementAndGet(3);
-                    }
-                }
-            }
-            catch(Exception x)
-            {
-                System.err.println("Exception: " + x);
-                x.printStackTrace();
-            }
-            finally
-            {
-                try { con.close(); } catch (Exception x) {}
-            }
-        }
-    }
 
     // Application entry point
     public static void main(String[] args)
@@ -116,30 +74,36 @@ public class SyncVoterBenchmark
             // Use the AppHelper utility class to retrieve command line application parameters
 
             // Define parameters and pull from command line
-            AppHelper apph = new AppHelper(SyncVoterBenchmark.class.getCanonicalName())
-                .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
+            AppHelper apph = new AppHelper(AsyncBenchmark.class.getCanonicalName())
                 .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
                 .add("contestants", "contestant_count", "Number of contestants in the voting contest (from 1 to 10).", 6)
                 .add("max-votes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
+                .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
+                .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
+                .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
                 .setArguments(args)
             ;
 
             // Retrieve parameters
-            int threadCount      = apph.intValue("threads");
             long displayInterval = apph.longValue("display-interval");
             long duration        = apph.longValue("duration");
             String servers       = apph.stringValue("servers");
             int port             = apph.intValue("port");
             int contestantCount  = apph.intValue("contestants");
             int maxVoteCount     = apph.intValue("max-votes");
+            long rateLimit       = apph.longValue("rate-limit");
+            boolean autoTune     = apph.booleanValue("auto-tune");
+            double latencyTarget = apph.doubleValue("latency-target");
+
 
             // Validate parameters
-            apph.validate("threads", (threadCount > 0))
-                .validate("contestants", (contestantCount > 0))
+            apph.validate("contestants", (contestantCount > 0))
                 .validate("max-votes", (maxVoteCount > 0))
+                .validate("rate-limit", (rateLimit > 0))
+                .validate("latency-target", (latencyTarget > 0))
             ;
 
             // Display actual parameters, for reference
@@ -191,18 +155,42 @@ public class SyncVoterBenchmark
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // Create multiple processing threads
-            ArrayList<Thread> threads = new ArrayList<Thread>();
-            for (int i = 0; i < threadCount; i++)
-                threads.add(new Thread(new ClientThread(servers, port, switchboard, duration, maxVoteCount)));
+            // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
+            IRateLimiter limiter = null;
+            if (autoTune)
+                limiter = (IRateLimiter)new LatencyLimiter(Con, "Vote", latencyTarget, rateLimit);
+            else
+                limiter = (IRateLimiter)new RateLimiter(rateLimit);
 
-            // Start threads
-            for (Thread thread : threads)
-                thread.start();
+            // Run the benchmark loop for the requested duration
+            long endTime = System.currentTimeMillis() + (1000l * duration);
+            while (endTime > System.currentTimeMillis())
+            {
+                // Get the next phone call
+                PhoneCallGenerator.PhoneCall call = switchboard.receive();
 
-            // Wait for threads to complete
-            for (Thread thread : threads)
-                thread.join();
+                // Post the vote, asynchronously
+                Con.executeAsync(new ProcedureCallback()
+                {
+                    @Override
+                    public void clientCallback(ClientResponse response) throws Exception
+                    {
+                        // Track the result of the vote (Accepted, Rejected, Failure...)
+                        if (response.getStatus() == ClientResponse.SUCCESS)
+                            VotingBoardResults.incrementAndGet((int)response.getResults()[0].fetchRow(0).getLong(0));
+                        else
+                            VotingBoardResults.incrementAndGet(3);
+                    }
+                }
+                , "Vote"
+                , call.PhoneNumber
+                , call.ContestantNumber
+                , maxVoteCount
+                );
+
+                // Use the limiter to throttle client activity
+                limiter.throttle();
+            }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 

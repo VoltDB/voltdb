@@ -52,7 +52,7 @@ import org.voltdb.jdbc.IVoltDBConnection;
 // Java and JDBC statements.
 import org.voltdb.client.exampleutils.AppHelper;
 
-public class JDBCVoterBenchmark
+public class JDBCBenchmark
 {
     // Initialize some common constants and variables
     private static final String ContestantNamesCSV = "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway,Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster,Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
@@ -125,7 +125,7 @@ public class JDBCVoterBenchmark
             // Use the AppHelper utility class to retrieve command line application parameters
 
             // Define parameters and pull from command line
-            AppHelper apph = new AppHelper(JDBCVoterBenchmark.class.getCanonicalName())
+            AppHelper apph = new AppHelper(JDBCBenchmark.class.getCanonicalName())
                 .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
                 .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
