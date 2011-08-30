@@ -24,15 +24,15 @@ compile: srccompile
 server: compile
 	$(VOLTDB) create catalog voter.jar deployment deployment.xml
 
-client: benchmark
+client: async-benchmark
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-benchmark-help: srccompile
+async-benchmark-help: srccompile
 	java -classpath obj:$(CLASSPATH):obj com.AsyncVoterBenchmark \
 	    --help
 
-benchmark: srccompile
+async-benchmark: srccompile
 	java -classpath obj:$(CLASSPATH):obj com.AsyncVoterBenchmark \
 	    --display-interval=5 \
 	    --duration=120 \
