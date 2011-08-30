@@ -24,6 +24,8 @@ compile: srccompile
 server: compile
 	$(VOLTDB) create catalog voter.jar deployment deployment.xml
 
+client: benchmark
+
 # Asynchronous benchmark sample
 # Use this target for argument help
 benchmark-help: srccompile
@@ -52,7 +54,7 @@ sync-benchmark: srccompile
 	java -classpath obj:$(CLASSPATH):obj com.SyncVoterBenchmark \
 	    --threads=100 \
 	    --display-interval=5 \
-	    --duration=10 \
+	    --duration=120 \
 	    --servers=localhost \
 	    --port=21212 \
 	    --contestants=6 \
@@ -68,7 +70,7 @@ jdbc-benchmark: srccompile
 	java -classpath obj:$(CLASSPATH):obj com.JDBCVoterBenchmark \
 	    --threads=100 \
 	    --display-interval=5 \
-	    --duration=10 \
+	    --duration=120 \
 	    --servers=localhost \
 	    --port=21212 \
 	    --contestants=6 \
