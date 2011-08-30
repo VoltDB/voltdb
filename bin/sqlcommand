@@ -22,30 +22,11 @@ script=`basename "$this"`
 bin=`cd "$bin"; pwd`
 this="$bin/$script"
 
-# the root of the Hadoop installation
+# the root of the VoltDB installation
 export VOLTDB_HOME=`dirname "$this"`/..
 
-#check to see if the conf dir is given as an optional argument
-if [ $# -gt 1 ]
-then
-    if [ "--config" = "$1" ]
-	  then
-	      shift
-	      confdir=$1
-	      shift
-	      VOLTDB_CONF_DIR=$confdir
-    fi
-fi
-
-# Allow alternate conf dir location.
-VOLTDB_CONF_DIR="${VOLTDB_CONF_DIR:-$VOLTDB_HOME/conf}"
-
-# get arguments
-#COMMAND=$1
-#shift
-
 JAVA=`which java`
-JAVA_HEAP_MAX=-Xmx1024m
+JAVA_HEAP_MAX=-Xmx256m
 
 # some Java parameters
 if [ "$JAVA_HOME" != "" ]; then
@@ -63,8 +44,8 @@ elif [ -d "$VOLTDB_HOME/obj/debug/prod" ]; then
   for f in $VOLTDB_HOME/third_party/java/jars/*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
-elif [ -f "$VOLTDB_HOME/voltdb/voltdb-1.3.6.jar" ]; then
-  CLASSPATH=$VOLTDB_HOME/voltdb/voltdb-1.3.6.jar
+elif [ -f "$VOLTDB_HOME/voltdb/voltdb-2.0.jar" ]; then
+  CLASSPATH=$VOLTDB_HOME/voltdb/voltdb-2.0.jar
 else
   echo "Couldn't find compiled VoltDB to run."
   exit 1

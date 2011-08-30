@@ -22,31 +22,28 @@ script=`basename "$this"`
 bin=`cd "$bin"; pwd`
 this="$bin/$script"
 
-# the root of the Hadoop installation
+# the root of the VoltDB installation
 export VOLTDB_HOME=`dirname "$this"`/..
 
-#check to see if the conf dir is given as an optional argument
-if [ $# -gt 1 ]
-then
-    if [ "--config" = "$1" ]
-	  then
-	      shift
-	      confdir=$1
-	      shift
-	      VOLTDB_CONF_DIR=$confdir
-    fi
-fi
-
-# Allow alternate conf dir location.
-VOLTDB_CONF_DIR="${VOLTDB_CONF_DIR:-$VOLTDB_HOME/conf}"
-
 JAVA=`which java`
-JAVA_HEAP_MAX=-Xmx1024m
+JAVA_HEAP_MAX=-Xmx512m
 
 # some Java parameters
 if [ "$JAVA_HOME" != "" ]; then
   #echo "run java in $JAVA_HOME"
   JAVA=$JAVA_HOME/bin/java
+fi
+
+# check envvars to see if a user overrides log4j conf
+if [ -n "${LOG4J_CONFIG_PATH:-x}" ]; then
+  if [ -f "$VOLTDB_HOME/src/frontend/log4j.xml" ]; then
+    LOG4J_CONFIG_PATH=$VOLTDB_HOME/src/frontend/log4j.xml
+  elif [ -f "$VOLTDB_HOME/voltdb/log4j.xml" ]; then
+    LOG4J_CONFIG_PATH=$VOLTDB_HOME/voltdb/log4j.xml
+  else
+    echo "Couldn't find log4j configuration file."
+    exit 1
+  fi
 fi
 
 if [ -d "$VOLTDB_HOME/obj/release/prod" ]; then
@@ -59,8 +56,8 @@ elif [ -d "$VOLTDB_HOME/obj/debug/prod" ]; then
   for f in $VOLTDB_HOME/third_party/java/jars/*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
-elif [ -f "$VOLTDB_HOME/voltdb/voltdb-1.3.6.jar" ]; then
-  CLASSPATH=$VOLTDB_HOME/voltdb/voltdb-1.3.6.jar
+elif [ -f "$VOLTDB_HOME/voltdb/voltdb-2.0.jar" ]; then
+  CLASSPATH=$VOLTDB_HOME/voltdb/voltdb-2.0.jar
 else
   echo "Couldn't find compiled VoltDB to run."
   exit 1
@@ -74,6 +71,7 @@ done
 CLASSPATH=${CLASSPATH}:${EXTRA_CLASSPATH}
 
 # run it
-export CMDVAL="$JAVA -Xmx512m $VOLTDB_OPTS -classpath $CLASSPATH org.voltdb.export.ExportToFileClient $@"
+export CMDVAL="$JAVA -Xmx512m $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
+export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.exportclient.ExportToFileClient $@"
 #echo $CMDVAL
 exec $CMDVAL

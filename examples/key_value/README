@@ -3,7 +3,7 @@ Key-Value application
 
 This example application demonstrates how to create a "Key-Value" in VoltDB.
 
-Many attributes of the application are customizable through arguments passed to the client, including: 
+Many attributes of the application are customizable through arguments passed to the client, including:
 
   - The maximum number of transactions the client will attempt per second
   - How long the sample client runs
@@ -14,7 +14,7 @@ Many attributes of the application are customizable through arguments passed to 
   - Percentage of transactions that are "Gets" (out of 100%, the rest are "Puts")
   - Store the "Value" as is (text), Base64 encode the "Value" (uncompressible binary), or Compress/Base64 encode the "Value" (compressible binary)
 
-These attributes can be adjusted by modifying the arguments to the "client" and "client-threaded" targets in the Ant build script.
+These attributes can be adjusted by modifying the arguments to the "client" and "client-threaded" targets in the makefile.
 
 Additional arguments allow the client to automatically "tune" itself for optimal performance ("client" target only).
 
@@ -62,18 +62,18 @@ Multi-Threaded Client
 We have included a multi-threaded client (ClientThreadedKV.java) that creates a pool of threads to perform the compression and Base64 encoding (and Base64 decoding and decompression).
 
 
-ant targets described
+make targets described
 ---------------------
 
-ant                   : compile all Java clients and stored procedures, build the catalog, and start the server
+make                   : compile all Java clients and stored procedures, build the catalog, and start the server
 
-ant server            : start the server
+make server            : start the server
 
-ant client            : start the client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
+make client            : start the client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
 
-ant client-threaded   : start the multi-threaded client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
+make client-threaded   : start the multi-threaded client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
 
-ant catalog           : compile sources and build the catalog
+make catalog           : compile sources and build the catalog
 
-ant clean             : remove compiled files
-    
+make clean             : remove compiled files
+

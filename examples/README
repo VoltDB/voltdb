@@ -8,9 +8,6 @@ auction
   This example contains a set of schema, clients, and procedures
   for running auction related transactions.
 
-game_of_life
-  This example implements Conway's Game of Life.
-
 helloworld
  This directory contains the sources for the "Hello World" tutorial
  from the book Getting Started With VoltDB.
@@ -19,30 +16,21 @@ key_value
   This directory contains the sources for the "Key-Value" implementation
   in VoltDB.
 
-satellite
-  This example is a simulation of satellite tracking.
-
-twitter
-  This example receives tweets from Twitter, extracts hashtags, and
-  displays trends in a browser.
-
 voter
   This example is a simulation of a telephone based voting process
   where callers are allowed a limited number of votes.
 
 
 Each example includes a DDL file and a project.xml that lists the DDL
-file and the stored procedures names, as well as an Ant build file 
+file and the stored procedures names, as well as a makefile 
 to simplify the build process.
 
-The command "ant -p" will print a description of the available targets
-for each example. The targets "client" and "server" let you run a
-client and server for each example. (The satellite example contains
-the additional target "tracker".)
+Examining the makefile will show the available targets for each example. 
+The targets "client" and "server" let you run a client and server for each example.
 
 To run an example project, 'cd' to that example's directory and:
-- In a terminal window, run ant (no target) to compile the Java and start the VoltDB server
-- In a separate terminal window, run ant client, where you will see the results
+- In a terminal window, run "make" (no target) to compile the Java and start the VoltDB server
+- In a separate terminal window, run "make client", where you will see the results
 - When complete, hit Ctrl C in the server terminal window to stop the VoltDB database
 
 See the README file in each example directory for more details.
