@@ -9,7 +9,8 @@ main: server
 clean:
 	rm -rf obj
 	rm -rf debugoutput
-	rm voter.jar
+	rm -rf voter.jar
+	rm -rf plannerlog.txt
 	rm -rf voltdbroot
 
 srccompile:
