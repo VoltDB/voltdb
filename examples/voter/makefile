@@ -24,48 +24,54 @@ compile: srccompile
 server: compile
 	$(VOLTDB) create catalog voter.jar deployment deployment.xml
 
-client: srccompile
-	java -classpath obj:$(CLASSPATH):obj com.ClientVoter \
-		6 \
-		2 \
-		1000000 \
-		5 \
-		120 \
-		3 \
-		localhost \
-		true \
-		10.0 \
-		0.99 \
-		2
+# Asynchronous benchmark sample
+# Use this target for argument help
+benchmark-help: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.AsyncVoterBenchmark \
+	    --help
 
-# CLIENT ARGS IN ORDER
-# total number of contestants (maximum 12)
-# number of votes allowed per phone number
-# maximum number of votes per second this client can generate (used as starting point only when auto-tuning is on) NOTE: Rounded to thousands
-# client application feedback interval (seconds)
-# client application duration (seconds)
-# number of seconds to wait before recording latency information
-# comma separated list of servers to connect to
-# Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
-# Target average transaction call latency (in milliseconds)
-# Adjustment rate: the tuning process decreases the number of requested transactions per second to FACTOR*<observed-TPS> until the target latency is reached
-# Auto-tuning interval (in seconds)
+benchmark: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.AsyncVoterBenchmark \
+	    --display-interval=5 \
+	    --duration=120 \
+	    --servers=localhost \
+	    --port=21212 \
+	    --contestants=6 \
+	    --max-votes=2 \
+	    --rate-limit=100000 \
+	    --auto-tune=true \
+	    --latency-target=10.0
 
-sync-client: srccompile
-	java -classpath obj:$(CLASSPATH):obj com.SyncClientVoter \
-		6 \
-		2  \
-		5000 \
-		5 \
-		120 \
-		3 \
-		localhost
+# Multi-threaded synchronous benchmark sample
+# Use this target for argument help
+sync-benchmark-help: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.SyncVoterBenchmark \
+	    --help
 
-# SYNC-CLIENT ARGS IN ORDER
-# total number of contestants (maximum 12)
-# number of votes allowed per phone number
-# maximum number of votes per second this client can generate
-# client application feedback interval (seconds)
-# client application duration (seconds)
-# number of seconds to wait before recording latency information
-# comma separated list of servers to connect to
+sync-benchmark: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.SyncVoterBenchmark \
+	    --threads=100 \
+	    --display-interval=5 \
+	    --duration=10 \
+	    --servers=localhost \
+	    --port=21212 \
+	    --contestants=6 \
+	    --max-votes=2
+
+# JDBC benchmark sample
+# Use this target for argument help
+jdbc-benchmark-help: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.JDBCVoterBenchmark \
+	    --help
+
+jdbc-benchmark: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.JDBCVoterBenchmark \
+	    --threads=100 \
+	    --display-interval=5 \
+	    --duration=10 \
+	    --servers=localhost \
+	    --port=21212 \
+	    --contestants=6 \
+	    --max-votes=2
+
+
