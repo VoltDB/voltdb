@@ -52,7 +52,7 @@ sync-benchmark-help: srccompile
 
 sync-benchmark: srccompile
 	java -classpath obj:$(CLASSPATH):obj com.SyncVoterBenchmark \
-	    --threads=100 \
+	    --threads=40 \
 	    --display-interval=5 \
 	    --duration=120 \
 	    --servers=localhost \
@@ -68,7 +68,7 @@ jdbc-benchmark-help: srccompile
 
 jdbc-benchmark: srccompile
 	java -classpath obj:$(CLASSPATH):obj com.JDBCVoterBenchmark \
-	    --threads=100 \
+	    --threads=40 \
 	    --display-interval=5 \
 	    --duration=120 \
 	    --servers=localhost \
