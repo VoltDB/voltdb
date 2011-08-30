@@ -24,7 +24,7 @@ import org.voltdb.*;
 import org.voltdb.client.*;
 import org.voltdb.client.exampleutils.*;
 
-public class JDBC4Connection implements java.sql.Connection
+public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
     protected final ClientConnection NativeConnection;
     protected final String User;
@@ -406,6 +406,19 @@ public class JDBC4Connection implements java.sql.Connection
          {
             throw SQLError.get(SQLError.ILLEGAL_ARGUMENT, iface.toString());
         }
+    }
+
+    // IVoltDBConnection extended method
+    // Return global performance statistics for the underlying connection (pooled information)
+    public PerfCounterMap getStatistics()
+    {
+        return this.NativeConnection.getStatistics();
+    }
+
+    // Return performance statistics for a specific procedure, for the underlying connection (pooled information)
+    public PerfCounter getStatistics(String procedure)
+    {
+        return this.NativeConnection.getStatistics(procedure);
     }
 }
 
