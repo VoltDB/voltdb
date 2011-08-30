@@ -17,7 +17,7 @@
 		<link type="text/css" href="../studio.web/css/voltdb.css" rel="stylesheet" />
 		<link type="text/css" href="css/demo.css" rel="stylesheet" />
 		<script type="text/javascript">var root = window.location.pathname.replace('guide.htm','');$(document).ready(function() {
-    $('ul.tabs li').click(function(){var active=this.id.replace('lnk_','');$('.sec').css('display','none');$('#sec_'+active).css('display','');$('ul.tabs li').removeClass('active');$('#lnk_'+active).addClass('active');parent.frames['info'].location.href = 'guide.htm?s=' + active;});
+    $('ul.tabs li').click(function(){var active=this.id.replace('lnk_','');if (active!=5) {$('.sec').css('display','none');$('#sec_'+active).css('display','');$('ul.tabs li').removeClass('active');$('#lnk_'+active).addClass('active');parent.frames['info'].location.href = 'guide.htm?s=' + active;}});
     if (window.location.search != '') {var active=window.location.search.replace('?s=','');$('.sec').css('display','none');$('#sec_'+active).css('display','');$('ul.tabs li').removeClass('active');$('#lnk_'+active).addClass('active');}
 	$(document).unload(function() {$('*').unbind(); });
 });</script>
@@ -86,6 +86,7 @@ ul.tabs li.active
 }
 .sec {font-size:1.5em;padding-left:25px;padding-right:25px;}
 
+ul.tabs li a {text-decoration:none;color:#333;}
 iframe { display:block; border:none;margin:0; padding:0; height:100%; width:100%; }
 </style>
     </head>
@@ -110,7 +111,7 @@ iframe { display:block; border:none;margin:0; padding:0; height:100%; width:100%
 <li id="lnk_2">K/V Store</li>
 <li id="lnk_3">Next Steps</li>
 <li id="lnk_4">Cool Tools!</li>
-<li id="lnk_5">Extras...</li>
+<li id="lnk_5"><a href="http://voltdb.com/getting-started-now-voltdb" target="_voltdb">Getting Started</a></li>
 </ul>
 </div>
 
@@ -187,10 +188,11 @@ iframe { display:block; border:none;margin:0; padding:0; height:100%; width:100%
 
     </div>
 
+<!--
     <div id="sec_5" class="sec" style="display:none;">
     		<iframe src="http://voltdb.com/resources" style="position:absolute;top:0px;left:0px;bottom:0px;right:2px;"><p><a href="http://voltdb.com/resources">http://voltdb.com/resources</a></p></iframe>
     </div>
-
+-->
 </div>
 
 
