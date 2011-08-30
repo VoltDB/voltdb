@@ -27,9 +27,6 @@ import java.util.ArrayList;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.clientutils.AppMonitor;
-import org.voltdb.clientutils.ClientExtensions;
-import org.voltdb.clientutils.ClientThread;
 
 // Multi-Threaded Synchronous Client
 public class JiggleClient

@@ -25,7 +25,6 @@ package com;
 import java.util.Random;
 
 import org.voltdb.client.Client;
-import org.voltdb.clientutils.ClientExtensions;
 import org.voltdb.*;
 
 public class WaitClient
