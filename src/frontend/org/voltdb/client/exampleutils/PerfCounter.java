@@ -174,7 +174,7 @@ public class PerfCounter implements Cloneable
     }
 
     @Override
-    public Object clone()
+    public PerfCounter clone()
     {
         PerfCounter counter = new PerfCounter(false);
         counter.StartTime.set(this.StartTime.get());
@@ -189,7 +189,7 @@ public class PerfCounter implements Cloneable
         return counter;
     }
 
-    public void merge(PerfCounter other)
+    public PerfCounter merge(PerfCounter other)
     {
         this.StartTime.set(Math.min(this.StartTime.get(), other.StartTime.get()));
         this.EndTime.set(Math.max(this.EndTime.get(), other.EndTime.get()));
@@ -200,18 +200,19 @@ public class PerfCounter implements Cloneable
         this.err.set(this.err.get()+other.err.get());
         for(int i=0;i<9;i++)
             this.lat.set(i, this.lat.get(i)+other.lat.get(i));
+        return this;
     }
 
     public static PerfCounter merge(PerfCounter[] counters)
     {
-        PerfCounter counter = (PerfCounter)counters[0].clone();
+        PerfCounter counter = counters[0].clone();
         for(int i=1;i<counters.length;i++)
             counter.merge(counters[i]);
         return counter;
     }
     public PerfCounter difference(PerfCounter previous)
     {
-        PerfCounter diff = (PerfCounter)this.clone();
+        PerfCounter diff = this.clone();
         if (previous != null)
         {
             diff.StartTime.set(previous.EndTime.get());
