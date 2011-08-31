@@ -49,15 +49,15 @@ public class SQLCommand
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute|declare|undeclare)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     public static List<String> parseQuery(String query)
     {
         if (query == null)
             return null;
 
-        String[] command = new String[] {"exec", "execute", "undeclare proc", "undeclare procedure", "declare proc", "declare procedure"};
-        String[] keyword = new String[] {"select", "insert", "update", "delete", "undeclare", "declare"};
+        String[] command = new String[] {"exec", "execute"};
+        String[] keyword = new String[] {"select", "insert", "update", "delete"};
         for(int i = 0;i<command.length;i++)
         {
             for(int j = 0;j<command.length;j++)
@@ -381,8 +381,6 @@ public class SQLCommand
 
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile("^(exec|execute) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    private static final Pattern DeclareCall = Pattern.compile("^declare (proc|procedure) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    private static final Pattern UndeclareCall = Pattern.compile("^undeclare (proc|procedure) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern StripCRLF = Pattern.compile("[\r\n]+", Pattern.MULTILINE);
     private static final Pattern IsNull = Pattern.compile("null", Pattern.CASE_INSENSITIVE);
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -505,29 +503,6 @@ public class SQLCommand
                 }
             }
             printResponse(VoltDB.callProcedure(procedure, objectParams));
-        }
-        else if (DeclareCall.matcher(query).find())
-        {
-            query = DeclareCall.matcher(query).replaceFirst("");
-            List<String> params = parseQueryProcedureCallParameters(query);
-            String procedure = params.remove(0);
-            if (procedure.startsWith("@"))
-                return;
-            for(int i=0;i<params.size();i++)
-            {
-                params.set(i, params.get(i).trim().toLowerCase());
-                if (!Types.contains(params.get(i)))
-                    throw new Exception("Invalid Parameter Type: " + params.get(i));
-            }
-            Procedures.put(procedure, params);
-        }
-        else if (UndeclareCall.matcher(query).find())
-        {
-            query = UndeclareCall.matcher(query).replaceFirst("");
-            String procedure = parseQueryProcedureCallParameters(query).remove(0);
-            if (procedure.startsWith("@"))
-                return;
-            Procedures.remove(procedure);
         }
         else
         {
@@ -707,7 +682,7 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> Types = Arrays.asList("tinyint","smallint","int","bigint","float","decimal","varchar","timestamp","varbinary");
+    private static final List<String> Types = Arrays.asList("tinyint","smallint","integer","bigint","float","decimal","varchar","timestamp","varbinary");
     private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
@@ -951,7 +926,7 @@ public class SQLCommand
             Input = new ConsoleReader(in, out);
 
             Input.setBellEnabled(false);
-            Input.addCompletor(new SimpleCompletor(new String[] {"select", "update", "insert", "delete", "exec", "declare proc", "undeclare proc", "file", "recall", "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "DECLARE PROC", "UNDECLARE PROC", "FILE", "RECALL" }));
+            Input.addCompletor(new SimpleCompletor(new String[] {"select", "update", "insert", "delete", "exec", "file", "recall", "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" }));
 
             // If Standard input comes loaded with data, run in non-interactive mode
             if (System.in.available() > 0)
