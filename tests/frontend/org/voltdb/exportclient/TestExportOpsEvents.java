@@ -83,7 +83,7 @@ public class TestExportOpsEvents extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("create table blah (ival bigint default 0 not null, PRIMARY KEY(ival));");
         builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("disabled-export.jar"), 1, 1, 0, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("disabled-export.jar"), 1, 1, 0);
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("disabled-export.xml"));
 

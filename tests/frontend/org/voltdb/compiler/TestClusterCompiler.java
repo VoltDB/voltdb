@@ -34,7 +34,7 @@ public class TestClusterCompiler extends TestCase
 {
     public void testNonZeroReplicationFactor()
     {
-        ClusterConfig config = new ClusterConfig(3, 1, 2, "localhost");
+        ClusterConfig config = new ClusterConfig(3, 1, 2);
         Catalog catalog = new Catalog();
         catalog.execute("add / clusters cluster");
         ClusterCompiler.compile(catalog, config);
@@ -58,7 +58,7 @@ public class TestClusterCompiler extends TestCase
     {
         // 2 hosts, 6 sites per host, 2 copies of each partition.
         // there are sufficient execution sites, but insufficient hosts
-        ClusterConfig config = new ClusterConfig(2, 6, 2, "localhost");
+        ClusterConfig config = new ClusterConfig(2, 6, 2);
         Catalog catalog = new Catalog();
         catalog.execute("add / clusters cluster");
         boolean caught = false;

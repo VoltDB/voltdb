@@ -224,7 +224,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompiler.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeploymentAndGetCRC( cat, builder.getPathToDeployment(), true);
+            CatalogUtil.compileDeploymentAndGetCRC(cat, builder.getPathToDeployment(), true);
             SnapshotSchedule schedule =
                 cat.getClusters().get("cluster").getDatabases().
                     get("database").getSnapshotschedule().get("default");
@@ -300,7 +300,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeploymentAndGetCRC( cat, project.getPathToDeployment(), true);
+            CatalogUtil.compileDeploymentAndGetCRC(cat, project.getPathToDeployment(), true);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
                 get("database").getConnectors().get("0");
             assertTrue(connector.getEnabled());
@@ -466,11 +466,11 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadClusterConfig() throws IOException {
         // check no hosts
-        ClusterConfig cluster_config = new ClusterConfig(0, 1, 0, "localhost");
+        ClusterConfig cluster_config = new ClusterConfig(0, 1, 0);
         assertFalse(cluster_config.validate());
 
         // check no sites-per-hosts
-        cluster_config = new ClusterConfig(1, 0, 0, "localhost");
+        cluster_config = new ClusterConfig(1, 0, 0);
         assertFalse(cluster_config.validate());
     }
 

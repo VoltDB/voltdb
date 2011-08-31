@@ -456,7 +456,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     public void testRejoinSysprocButFail() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
 

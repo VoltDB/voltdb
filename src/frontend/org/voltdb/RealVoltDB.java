@@ -576,7 +576,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         // get local host info
         collectLocalNetworkMetadata();
 
-        String leaderAddress = m_deployment.getCluster().getLeader();
+        String leaderAddress = m_config.m_leader;
         int numberOfNodes = m_deployment.getCluster().getHostcount();
         long depCRC = CatalogUtil.getDeploymentCRC(m_config.m_pathToDeployment);
 

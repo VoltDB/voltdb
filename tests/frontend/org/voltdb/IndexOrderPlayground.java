@@ -56,7 +56,7 @@ public class IndexOrderPlayground extends TestCase {
         builder.addStmtProcedure("SelectT1", "select * from table1 where column1 = ? and column2 = ?;", "table1.column1:0");
         builder.addStmtProcedure("SelectT2", "select * from table2 where column1 = ? and column2 = ?;", "table1.column1:0");
         builder.addStmtProcedure("SelectT3", "select * from table3 where column1 = ? and column2 = ?;", "table1.column1:0");
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("indexordertest.jar"), 1, 1, 0, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("indexordertest.jar"), 1, 1, 0);
         assertTrue(success);
     }
 }

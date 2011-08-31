@@ -42,8 +42,6 @@ public class ClusterCompiler
 
         // add all the hosts
         Cluster cluster = catalog.getClusters().get("cluster");
-        // set the address of the coordinator
-        cluster.setLeaderaddress(clusterConfig.getLeaderAddress().trim());
         for (int i = 0; i < hostCount; i++) {
             cluster.getHosts().add(String.valueOf(i));
         }

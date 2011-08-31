@@ -95,38 +95,48 @@ public class TestVoltDB extends TestCase {
     public void testConfigurationValidate() {
         VoltDB.Configuration config;
 
-        // missing catalog and missing deployment
+        // missing leader, catalog and missing deployment
         String[] args1 = {};
         config = new VoltDB.Configuration(args1);
         assertFalse(config.validate());
 
+        // missing leader
+        String[] argsya = {"catalog", "qwerty", "deployment", "qwerty"};
+        config = new VoltDB.Configuration(argsya);
+        assertFalse(config.validate());
+
         // missing catalog
-        String[] args2 = {"deployment", "teststring1"};
+        String[] args2 = {"leader", "hola", "deployment", "teststring1"};
         config = new VoltDB.Configuration(args2);
         assertFalse(config.validate());
 
         // missing deployment
-        String[] args3 = {"catalog", "teststring2"};
+        String[] args3 = {"leader", "hola", "catalog", "teststring2"};
         config = new VoltDB.Configuration(args3);
         assertFalse(config.validate());
 
         // empty catalog and empty deployment
-        String[] args4 = {"catalog", "", "deployment", ""};
+        String[] args4 = {"leader", "hola", "catalog", "", "deployment", ""};
         config = new VoltDB.Configuration(args4);
         assertFalse(config.validate());
 
+        // empty leader
+        String[] argsyo = {"leader", "", "catalog", "sdfs", "deployment", "sdfsd"};
+        config = new VoltDB.Configuration(argsyo);
+        assertFalse(config.validate());
+
         // empty catalog
-        String[] args5 = {"catalog", "", "deployment", "teststring5"};
+        String[] args5 = {"leader", "hola", "catalog", "", "deployment", "teststring5"};
         config = new VoltDB.Configuration(args5);
         assertFalse(config.validate());
 
         // empty deployment
-        String[] args6 = {"catalog", "teststring6", "deployment", ""};
+        String[] args6 = {"leader", "hola", "catalog", "teststring6", "deployment", ""};
         config = new VoltDB.Configuration(args6);
         assertFalse(config.validate());
 
         // valid config
-        String[] args7 = {"catalog", "teststring3", "deployment", "teststring4"};
+        String[] args7 = {"leader", "hola", "catalog", "teststring3", "deployment", "teststring4"};
         config = new VoltDB.Configuration(args7);
         assertTrue(config.validate());
     }

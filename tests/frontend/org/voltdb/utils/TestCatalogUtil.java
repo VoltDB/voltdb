@@ -119,7 +119,7 @@ public class TestCatalogUtil extends TestCase {
     public void testDeploymentCRCs() {
         final String dep1 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
-                            "<cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
                             "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "<httpd port='0'>" +
                             "<jsonapi enabled='true'/>" +
@@ -129,7 +129,7 @@ public class TestCatalogUtil extends TestCase {
         // differs in a meaningful way from dep1
         final String dep2 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
-                            "<cluster hostcount='4' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "<cluster hostcount='4' kfactor='1' sitesperhost='2'/>" +
                             "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "<httpd port='0'>" +
                             "<jsonapi enabled='true'/>" +
@@ -139,7 +139,7 @@ public class TestCatalogUtil extends TestCase {
         // differs in whitespace and attribute order from dep1
         final String dep3 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
-                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2' />" +
+                            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' />" +
                             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "   <httpd port='0' >" +
                             "       <jsonapi enabled='true'/>" +
@@ -149,7 +149,7 @@ public class TestCatalogUtil extends TestCase {
         // admin-mode section actually impacts CRC, dupe above and add it
         final String dep4 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
-                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
                             "   <admin-mode port='32323' adminstartup='true'/>" +
                             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
                             "   <httpd port='0' >" +
@@ -160,7 +160,7 @@ public class TestCatalogUtil extends TestCase {
         // hearbeat-config section actually impacts CRC, dupe above and add it
         final String dep5 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
-                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
                             "       <admin-mode port='32323' adminstartup='true'/>" +
                             "   <heartbeat timeout='30'/>" +
                             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
@@ -198,7 +198,7 @@ public class TestCatalogUtil extends TestCase {
         final String dep =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <admin-mode port='32323' adminstartup='true'/>" +
             "   <heartbeat timeout='30'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
@@ -211,7 +211,7 @@ public class TestCatalogUtil extends TestCase {
         final String boom =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <admin-mode port='32323' adminstartup='true'/>" +
             "   <heartbeat timeout='0'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
@@ -237,7 +237,7 @@ public class TestCatalogUtil extends TestCase {
         final String depOff =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"false\"/>" +
             "</deployment>";
@@ -245,7 +245,7 @@ public class TestCatalogUtil extends TestCase {
         final String depOn =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"true\"/>" +
             "</deployment>";
@@ -269,7 +269,7 @@ public class TestCatalogUtil extends TestCase {
         final String depOff =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"false\"/>" +
             "</deployment>";
@@ -277,7 +277,7 @@ public class TestCatalogUtil extends TestCase {
         final String depOn =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"true\"/>" +
             "   <systemsettings>" +
@@ -317,7 +317,7 @@ public class TestCatalogUtil extends TestCase {
         final String deploy =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths>" +
             "       <voltdbroot path=\"" + voltdbroot + "\" />" +
             "       <snapshots path=\"" + snappath + "\"/>" +
@@ -360,12 +360,12 @@ public class TestCatalogUtil extends TestCase {
     public void testCompileDeploymentAgainstEmptyCatalog() {
         Catalog catalog = new Catalog();
         Cluster cluster = catalog.getClusters().add("cluster");
-        Database db = cluster.getDatabases().add("database");
+        cluster.getDatabases().add("database");
 
         String deploymentContent =
             "<?xml version=\"1.0\"?>\n" +
             "<deployment>\n" +
-            "    <cluster hostcount='1' sitesperhost='1' leader='localhost' kfactor='0' />\n" +
+            "    <cluster hostcount='1' sitesperhost='1' kfactor='0' />\n" +
             "    <httpd enabled='true'>\n" +
             "        <jsonapi enabled='true' />\n" +
             "    </httpd>\n" +

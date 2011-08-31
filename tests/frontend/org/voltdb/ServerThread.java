@@ -36,6 +36,7 @@ public class ServerThread extends Thread {
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
         m_config.m_pathToLicense = getTestLicensePath();
+        m_config.m_leader = "localhost";
 
         if (!m_config.validate()) {
             m_config.usage();
@@ -50,6 +51,7 @@ public class ServerThread extends Thread {
         m_config.m_pathToCatalog = pathToCatalog;
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
+        m_config.m_leader = "localhost";
 
         setName("ServerThread");
     }
@@ -60,6 +62,7 @@ public class ServerThread extends Thread {
         m_config.m_pathToDeployment = pathToDeployment;
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
+        m_config.m_leader = "localhost";
 
         if (!m_config.validate()) {
             m_config.usage();

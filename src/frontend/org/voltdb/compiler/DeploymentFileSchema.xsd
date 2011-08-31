@@ -55,7 +55,6 @@
   <xs:complexType name="clusterType">
     <xs:attribute name="hostcount" type="xs:int" default="1"/>
     <xs:attribute name="sitesperhost" type="xs:int" default="2"/>
-    <xs:attribute name="leader" type="xs:string" use="required"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
   </xs:complexType>
 

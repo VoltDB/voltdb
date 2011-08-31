@@ -28,14 +28,13 @@ public class TPCCCompiler {
     public static void main(String[] args) throws Exception {
         int hostCount = Integer.parseInt(args[0]);
         int siteCount = Integer.parseInt(args[1]);
-        String leaderAddress = args[2];
         String outpath = args.length > 3 ? args[3] : "tpcc.jar";
 
         TPCCProjectBuilder pb = new TPCCProjectBuilder();
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
         pb.addDefaultProcedures();
-        pb.compile(outpath, siteCount, hostCount, 0, leaderAddress);
+        pb.compile(outpath, siteCount, hostCount, 0);
     }
 
 }

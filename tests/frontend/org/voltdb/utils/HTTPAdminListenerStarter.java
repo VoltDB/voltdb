@@ -45,7 +45,7 @@ public class HTTPAdminListenerStarter {
         builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
         builder.setHTTPDPort(8080);
         builder.setJSONAPIEnabled(true);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0);
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
 

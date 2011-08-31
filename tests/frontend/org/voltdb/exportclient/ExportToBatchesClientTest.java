@@ -47,7 +47,7 @@ public class ExportToBatchesClientTest {
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", "blah.ival: 0");
         builder.setTableAsExportOnly("blah");
         builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("sqexport.jar"), 1, 1, 0, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("sqexport.jar"), 1, 1, 0);
         if (!success) {
             System.err.println("Failed to compile");
             System.exit(-1);

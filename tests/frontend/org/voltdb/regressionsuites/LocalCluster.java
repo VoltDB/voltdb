@@ -24,13 +24,10 @@ package org.voltdb.regressionsuites;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -321,27 +318,29 @@ public class LocalCluster implements VoltServerConfig {
                                            "adminport",
                                            "-1",
                                            "rejoinhost",
-                                           "-1");
+                                           "-1",
+                                           "leader",
+                                           "localhost");
 
         List<String> command = m_procBuilder.command();
         // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = command.size() - 19;
-        m_debugOffset2 = command.size() - 18;
+        m_debugOffset1 = command.size() - 21;
+        m_debugOffset2 = command.size() - 20;
         if (m_debug) {
             command.add(m_debugOffset1, "");
             command.add(m_debugOffset1, "");
         }
 
-        m_voltFilePrefixOffset = command.size() - 19;
+        m_voltFilePrefixOffset = command.size() - 21;
         command.add(m_voltFilePrefixOffset, "");
 
-        m_licensePathOffset = command.size() - 15;
-        m_zkPortOffset = command.size() - 13;
-        m_timestampSaltOffset = command.size() - 11;
-        m_pathToDeploymentOffset = command.size() - 7;
-        m_portOffset = command.size() - 5;
-        m_adminPortOffset = command.size() - 3;
-        m_rejoinOffset = command.size() - 1;
+        m_licensePathOffset = command.size() - 17;
+        m_zkPortOffset = command.size() - 15;
+        m_timestampSaltOffset = command.size() - 13;
+        m_pathToDeploymentOffset = command.size() - 9;
+        m_portOffset = command.size() - 7;
+        m_adminPortOffset = command.size() - 5;
+        m_rejoinOffset = command.size() - 3;
 
         if (m_target.isIPC) {
             command.add("");
@@ -378,7 +377,7 @@ public class LocalCluster implements VoltServerConfig {
             return true;
         }
 
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost");
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
 
@@ -390,7 +389,7 @@ public class LocalCluster implements VoltServerConfig {
         if (m_compiled) {
             return true;
         }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication,
                                      null, true, snapshotPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
@@ -405,7 +404,7 @@ public class LocalCluster implements VoltServerConfig {
             return true;
         }
         m_baseAdminPort = adminPort;
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication,
                                      m_baseAdminPort, adminOnStartup);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();

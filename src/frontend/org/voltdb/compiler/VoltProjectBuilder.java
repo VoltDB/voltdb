@@ -34,8 +34,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.math.BigInteger;
-
 import javax.xml.bind.*;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -241,14 +239,13 @@ public class VoltProjectBuilder {
      * @param sitesPerHost
      * @param length
      * @param kFactor
-     * @param string
      * @param voltRoot  where to put the compiled catalogs
      * @return a list of jar filenames that were compiled. The benchmark will
      * be started using the filename at index 0.
      */
     public String[] compileAllCatalogs(
             int sitesPerHost, int length,
-            int kFactor, String string, String voltRoot)
+            int kFactor, String voltRoot)
     {
         throw new NotImplementedException("This project builder does not support compileAllCatalogs");
     }
@@ -448,58 +445,56 @@ public class VoltProjectBuilder {
     }
 
     public boolean compile(final String jarPath) {
-        return compile(jarPath, 1, 1, 0, "localhost", null);
+        return compile(jarPath, 1, 1, 0, null);
     }
 
     public boolean compile(final String jarPath,
                            final int sitesPerHost,
                            final int replication) {
         return compile(jarPath, sitesPerHost, 1,
-                       replication, "localhost", null);
+                       replication, null);
     }
 
     public boolean compile(final String jarPath,
                            final int sitesPerHost,
                            final int hostCount,
-                           final int replication,
-                           final String leaderAddress) {
+                           final int replication) {
         return compile(jarPath, sitesPerHost, hostCount,
-                       replication, leaderAddress, null);
+                       replication, null);
     }
 
     public boolean compile(final String jarPath,
                            final int sitesPerHost,
                            final int hostCount,
                            final int replication,
-                           final String leaderAddress,
                            final String voltRoot) {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount,
-                       replication, leaderAddress, voltRoot,
+                       replication, voltRoot,
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix, false, 0, false);
     }
 
     public boolean compile(
             final String jarPath, final int sitesPerHost,
-            final int hostCount, final int replication, final String leaderAddress,
+            final int hostCount, final int replication,
             final String voltRoot, final boolean ppdEnabled, final String snapshotPath, final String ppdPrefix)
     {
         VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
+        return compile(compiler, jarPath, sitesPerHost, hostCount, replication,
                        voltRoot, ppdEnabled, snapshotPath, ppdPrefix, false, 0, false);
     }
 
     public boolean compile(final String jarPath, final int sitesPerHost,
-            final int hostCount, final int replication, final String leaderAddress,
+            final int hostCount, final int replication,
             final int adminPort, final boolean adminOnStartup)
     {
         VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
+        return compile(compiler, jarPath, sitesPerHost, hostCount, replication,
                        null, m_ppdEnabled, m_snapshotPath, m_ppdPrefix, true, adminPort, adminOnStartup);
     }
 
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
-                           final int hostCount, final int replication, final String leaderAddress,
+                           final int hostCount, final int replication,
                            String voltRoot, final boolean ppdEnabled,
                            final String snapshotPath, final String ppdPrefix,
                            final boolean useCustomAdmin, final int adminPort,
@@ -508,7 +503,6 @@ public class VoltProjectBuilder {
         assert(jarPath != null);
         assert(sitesPerHost >= 1);
         assert(hostCount >= 1);
-        assert(leaderAddress != null);
 
         if (voltRoot == null) {
             String voltRootPath = "/tmp/" + System.getProperty("user.name");
@@ -598,7 +592,7 @@ public class VoltProjectBuilder {
         boolean success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides);
         try {
             m_pathToDeployment = writeDeploymentFile(
-                    hostCount, sitesPerHost, leaderAddress,
+                    hostCount, sitesPerHost,
                     replication, voltRoot,
                     useCustomAdmin, adminPort, adminOnStartup);
         } catch (Exception e) {
@@ -606,7 +600,6 @@ public class VoltProjectBuilder {
             e.printStackTrace();
             System.out.println("hostcount: " + hostCount);
             System.out.println("sitesPerHost: " + sitesPerHost);
-            System.out.println("leaderAddress: " + leaderAddress);
             System.out.println("replication: " + replication);
             System.out.println("voltRoot: " + voltRoot);
             System.out.println("ppdEnabled: " + ppdEnabled);
@@ -819,14 +812,13 @@ public class VoltProjectBuilder {
      * field.
      * @param hostCount Number of hosts.
      * @param sitesPerHost Sites per host.
-     * @param leader Leader address.
      * @param kFactor Replication factor.
      * @return Returns the path the temporary file was written to.
      * @throws IOException
      * @throws JAXBException
      */
     private String writeDeploymentFile(
-            int hostCount, int sitesPerHost, String leader, int kFactor, String voltRoot,
+            int hostCount, int sitesPerHost, int kFactor, String voltRoot,
             boolean useCustomAdmin, int adminPort, boolean adminOnStartup) throws IOException, JAXBException
     {
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
@@ -841,7 +833,6 @@ public class VoltProjectBuilder {
         deployment.setCluster(cluster);
         cluster.setHostcount(hostCount);
         cluster.setSitesperhost(sitesPerHost);
-        cluster.setLeader(leader);
         cluster.setKfactor(kFactor);
 
         // <paths>

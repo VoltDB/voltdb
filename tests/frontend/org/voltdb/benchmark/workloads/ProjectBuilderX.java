@@ -66,11 +66,10 @@ public class ProjectBuilderX extends WorkloadProjectBuilder
     public String[] compileAllCatalogs(int sitesPerHost,
                                        int length,
                                        int kFactor,
-                                       String leader,
                                        String voltRoot) {
         addAllDefaults();
         boolean compile = compile(m_jarFileName, sitesPerHost,
-                                  length, kFactor, leader, voltRoot);
+                                  length, kFactor, voltRoot);
         if (!compile) {
             throw new RuntimeException("Bingo project builder failed app compilation.");
         }

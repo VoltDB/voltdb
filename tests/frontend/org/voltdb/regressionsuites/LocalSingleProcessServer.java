@@ -78,7 +78,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
             return true;
         }
 
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0, "localhost");
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
 
@@ -95,7 +95,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         if (m_compiled) {
             return true;
         }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, "localhost",
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
                                      null, true, snapshotPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
@@ -113,7 +113,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         if (m_compiled) {
             return true;
         }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, "localhost",
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
                                      adminPort, adminOnStartup);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;

@@ -271,7 +271,7 @@ public class TestJSONInterface extends TestCase {
         builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
         builder.addProcedures(CrazyBlahProc.class);
         builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, "localhost", 21213, false);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false);
         assertTrue(success);
 
         config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
@@ -839,7 +839,7 @@ public class TestJSONInterface extends TestCase {
         builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
         builder.addProcedures(CrazyBlahProc.class);
         builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, "localhost", 21213, true);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true);
         assertTrue(success);
 
         config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");

@@ -80,6 +80,9 @@ public class VoltDB {
         /** use normal JNI backend or optional IPC or HSQLDB backends */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
+        /** leader hostname */
+        public String m_leader = null;
+
         /** name of the m_catalog JAR file */
         public String m_pathToCatalog = null;
 
@@ -215,6 +218,18 @@ public class VoltDB {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
                 }
 
+                else if (arg.equals("leader")) {
+                    m_leader = args[++i].trim();
+                    if (m_leader.compareTo("") == 0) {
+                        m_leader = null;
+                    }
+                } else if (arg.startsWith("leader")) {
+                    m_leader = arg.substring("leader ".length()).trim();
+                    if (m_leader.compareTo("") == 0) {
+                        m_leader = null;
+                    }
+                }
+
                 else if (arg.equals("rejoinhost")) {
                     m_rejoinToHostAndPort = args[++i].trim();
                     if (m_rejoinToHostAndPort.compareTo("") == 0)
@@ -277,6 +292,11 @@ public class VoltDB {
         public boolean validate() {
             boolean isValid = true;
 
+            if (m_leader == null && m_rejoinToHostAndPort == null) {
+                isValid = false;
+                hostLog.fatal("The leader hostname is missing.");
+            }
+
             // require catalog file location
             if (m_pathToCatalog == null) {
                 isValid = false;
@@ -313,7 +333,7 @@ public class VoltDB {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
-            hostLog.fatal("Usage: org.voltdb.VoltDB catalog <action> <catalog.jar> deployment <deployment.xml> license <license.xml>");
+            hostLog.fatal("Usage: org.voltdb.VoltDB <action> leader <hostname> catalog <catalog.jar> deployment <deployment.xml> license <license.xml>");
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 

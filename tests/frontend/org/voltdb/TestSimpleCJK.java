@@ -89,7 +89,7 @@ public class TestSimpleCJK extends TestCase {
         builder.addStmtProcedure("Insert", "insert into cjk values (?,?,?);");
         builder.addStmtProcedure("Select", "select * from cjk;");
         builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0);
         assertTrue(success);
 
         VoltDB.Configuration config = new VoltDB.Configuration();

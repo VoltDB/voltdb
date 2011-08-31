@@ -91,7 +91,7 @@ public class TestHSQLBackend extends TestCase {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
 
-        builder.compile(catalogJar, 1, 1, 0, "localhost");
+        builder.compile(catalogJar, 1, 1, 0);
 
         ServerThread server = new ServerThread(catalogJar, builder.getPathToDeployment(), BackendTarget.HSQLDB_BACKEND);
         server.start();
@@ -121,7 +121,7 @@ public class TestHSQLBackend extends TestCase {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
 
-        builder.compile(catalogJar, 1, 1, 0, "localhost");
+        builder.compile(catalogJar, 1, 1, 0);
         String pathToDeployment = builder.getPathToDeployment();
 
         ServerThread server = new ServerThread(catalogJar, pathToDeployment, BackendTarget.HSQLDB_BACKEND);
@@ -152,7 +152,7 @@ public class TestHSQLBackend extends TestCase {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
 
-        builder.compile(catalogJar, 1, 1, 0, "localhost");
+        builder.compile(catalogJar, 1, 1, 0);
 
         ServerThread server = new ServerThread(catalogJar, builder.getPathToDeployment(), BackendTarget.HSQLDB_BACKEND);
         server.start();
@@ -184,7 +184,7 @@ public class TestHSQLBackend extends TestCase {
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("hsqldbbin.jar"), 1, 1, 0, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("hsqldbbin.jar"), 1, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
 

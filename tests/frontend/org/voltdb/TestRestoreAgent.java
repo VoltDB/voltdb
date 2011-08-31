@@ -301,8 +301,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         File cat = File.createTempFile("temp-restore", "catalog");
         cat.deleteOnExit();
         assertTrue(builder.compile(cat.getAbsolutePath(), sitesPerHost,
-                                   hostCount, kfactor, "localhost",
-                                   voltroot));
+                                   hostCount, kfactor, voltroot));
         deploymentPath = builder.getPathToDeployment();
 
         File cat_to_use = cat;

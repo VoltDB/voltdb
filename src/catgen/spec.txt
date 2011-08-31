@@ -8,7 +8,6 @@ begin Cluster           "A set of connected hosts running one or more database a
   Site* sites           "The set of physical execution contexts executing on this cluster"
   Partition* partitions "The set of logical partitions in this cluster"
   Deployment* deployment "Storage for settings passed in on deployment"
-  string leaderaddress  "The ip or hostname of the cluster 'leader' - see docs for details"
   int localepoch        "The number of seconds since the epoch that we're calling our local epoch"
   bool securityEnabled  "Whether security and authentication should be enabled/disabled"
   int httpdportno       "The port number httpd will listen on. A 0 value implies 8080."

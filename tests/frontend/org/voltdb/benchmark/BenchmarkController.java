@@ -299,7 +299,6 @@ public class BenchmarkController {
                 m_config.sitesPerHost,
                 m_config.hosts.length,
                 m_config.k_factor,
-                m_config.hosts[0].getHostName(),
                 m_config.voltRoot
         );
         m_jarFileName = jarFileNames[0];
@@ -431,7 +430,8 @@ public class BenchmarkController {
                         "deployment", new File(m_pathToDeployment).getName(),
                         m_config.useProfile,
                         m_config.backend,
-                        "port", Integer.toString(host.getPort())};
+                        "port", Integer.toString(host.getPort()),
+                        "leader", m_config.hosts[0].getHostName()};
 
                 command = ssh.convert(host.getHostName(), m_config.remotePath,
                                       command);

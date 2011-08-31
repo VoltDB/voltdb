@@ -467,7 +467,9 @@ public abstract class CatalogUtil {
      * @param deployment Parsed representation of the deployment.xml file.
      * @return CRC of the deployment contents (>0) or -1 on failure.
      */
-    public static long compileDeploymentAndGetCRC(Catalog catalog, DeploymentType deployment, boolean crashOnFailedValidation) {
+    public static long compileDeploymentAndGetCRC(Catalog catalog,
+                                                  DeploymentType deployment,
+                                                  boolean crashOnFailedValidation) {
 
         if (!validateDeployment(catalog, deployment)) {
             return -1;
@@ -561,7 +563,6 @@ public abstract class CatalogUtil {
         ClusterType ct = deployment.getCluster();
         sb.append(ct.getHostcount()).append(",");
         sb.append(ct.getKfactor()).append(",");
-        sb.append(ct.getLeader()).append(",");
         sb.append(ct.getSitesperhost()).append(",");
 
         sb.append(" PARTITIONDETECTION ");
@@ -762,21 +763,19 @@ public abstract class CatalogUtil {
 
     /**
      * Set cluster info in the catalog.
+     * @param leader The leader hostname
      * @param catalog The catalog to be updated.
-     * @param cluster A reference to the <cluster> element of the deployment.xml file.
      */
     private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
         ClusterType cluster = deployment.getCluster();
         int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
-        String leader = cluster.getLeader();
         int kFactor = cluster.getKfactor();
 
-        ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor, leader);
+        ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
         hostLog.l7dlog(Level.INFO,
                        LogKeys.compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost.name(),
                        new Object[] { config.getHostCount(),
-                                      config.getLeaderAddress(),
                                       config.getSitesPerHost(),
                                       config.getReplicationFactor() },
                        null);

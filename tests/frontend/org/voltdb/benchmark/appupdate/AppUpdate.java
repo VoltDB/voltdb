@@ -103,7 +103,7 @@ public class AppUpdate extends ClientMain {
          */
         @Override
         public String[] compileAllCatalogs(int sitesPerHost, int length,
-                int kFactor, String leader, String voltRoot) {
+                int kFactor, String voltRoot) {
             String tableA = "CREATE TABLE A (PID INTEGER NOT NULL, I INTEGER, PAYLOAD VARCHAR(128));";
             String tableB = "CREATE TABLE B (PID INTEGER NOT NULL, S VARCHAR(6), PAYLOAD VARCHAR(128));";
             String tableFK = "CREATE TABLE FK (I INTEGER, S VARCHAR(6), PAYLOAD VARCHAR(128));";
@@ -118,7 +118,7 @@ public class AppUpdate extends ClientMain {
                 pba.addLiteralSchema(tableFK);
                 pba.addPartitionInfo("A", "PID");
                 if (!pba.compile(Transaction.CatalogA.name, sitesPerHost,
-                        length, kFactor, leader)) {
+                        length, kFactor)) {
                     throw new RuntimeException(
                             "AppUpdate project builder failed app compilation (a).");
                 }
@@ -130,7 +130,7 @@ public class AppUpdate extends ClientMain {
                 pbb.addLiteralSchema(tableFK);
                 pbb.addPartitionInfo("B", "PID");
                 if (!pbb.compile(Transaction.CatalogB.name, sitesPerHost,
-                        length, kFactor, leader)) {
+                        length, kFactor)) {
                     throw new RuntimeException(
                             "AppUpdate project builder failed app compilation (b)");
                 }
@@ -145,7 +145,7 @@ public class AppUpdate extends ClientMain {
                 pb.addPartitionInfo("B", "PID");
 
                 if (!pb.compile(Transaction.CatalogAB.name, sitesPerHost,
-                        length, kFactor, leader)) {
+                        length, kFactor)) {
                     throw new RuntimeException(
                             "AppUpdate project builder failed app compilation (ab)");
                 }

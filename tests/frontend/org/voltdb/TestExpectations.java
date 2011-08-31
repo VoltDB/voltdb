@@ -47,7 +47,7 @@ public class TestExpectations extends TestCase {
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
         builder.addProcedures(CrushExpectations.class);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("expectations.jar"), 1, 1, 0, "localhost");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("expectations.jar"), 1, 1, 0);
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("expectations.xml"));
 

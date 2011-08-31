@@ -103,7 +103,7 @@ public class VoltDBFickleCluster extends LocalCluster {
         builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
         builder.setTableAsExportOnly("blah2");
         //boolean success = m_cluster.compile(builder);
-        success = builder.compile(jar2Path, 2, 2, 1, "localhost");
+        success = builder.compile(jar2Path, 2, 2, 1);
         assert(success);
         depPath = builder.getPathToDeployment();
     }
