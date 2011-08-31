@@ -28,6 +28,7 @@ public class ClientConnection implements Closeable
     protected final String Key;
     protected final Client Client;
     protected short Users;
+    public long DefaultAsyncTimeout = 60000;
     protected ClientConnection(String clientConnectionKeyBase, String clientConnectionKey, String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
     {
         this.KeyBase = clientConnectionKeyBase;
@@ -120,7 +121,7 @@ public class ClientConnection implements Closeable
 
     public Future<ClientResponse> executeAsync(String procedure, Object... parameters) throws Exception
     {
-        final ExecutionFuture future = new ExecutionFuture(25000);
+        final ExecutionFuture future = new ExecutionFuture(DefaultAsyncTimeout);
         this.Client.callProcedure(
                                    new TrackingCallback( this
                                                        , procedure
