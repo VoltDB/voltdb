@@ -189,7 +189,7 @@ public class PerfCounter implements Cloneable
         return counter;
     }
 
-    public void mergeWith(PerfCounter other)
+    public void merge(PerfCounter other)
     {
         this.StartTime.set(Math.min(this.StartTime.get(), other.StartTime.get()));
         this.EndTime.set(Math.max(this.EndTime.get(), other.EndTime.get()));
@@ -202,11 +202,11 @@ public class PerfCounter implements Cloneable
             this.lat.set(i, this.lat.get(i)+other.lat.get(i));
     }
 
-    public PerfCounter merge(PerfCounter[] counters)
+    public static PerfCounter merge(PerfCounter[] counters)
     {
         PerfCounter counter = (PerfCounter)counters[0].clone();
         for(int i=1;i<counters.length;i++)
-            counter.mergeWith(counters[i]);
+            counter.merge(counters[i]);
         return counter;
     }
     public PerfCounter difference(PerfCounter previous)
