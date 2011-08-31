@@ -783,35 +783,27 @@ public class SQLCommand
         }
     }
 
-    // XXX this should get converted to use @SystemCatalog TABLES
     private static Object[] GetTableList() throws Exception
     {
-        VoltTable tableData = VoltDB.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
-        VoltTable indexData = VoltDB.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+        VoltTable tableData = VoltDB.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
         TreeSet<String> tables = new TreeSet<String>();
         TreeSet<String> exports = new TreeSet<String>();
         TreeSet<String> views = new TreeSet<String>();
         for(int i = 0; i < tableData.getRowCount(); i++)
         {
-            String tableName = tableData.fetchRow(i).getString(5);
-            if (tableData.fetchRow(i).getString(6).equals("StreamedTable"))
+            String tableName = tableData.fetchRow(i).getString("TABLE_NAME");
+            String tableType = tableData.fetchRow(i).getString("TABLE_TYPE");
+            if (tableType.equalsIgnoreCase("EXPORT"))
+            {
                 exports.add(tableName);
+            }
+            else if (tableType.equalsIgnoreCase("VIEW"))
+            {
+                views.add(tableName);
+            }
             else
             {
-                boolean isView = false;
-                for(int j = 0; j < indexData.getRowCount(); j++)
-                {
-                    if (indexData.fetchRow(j).getString(6).toUpperCase().equals(tableName.toUpperCase()))
-                    {
-                        String indexName = indexData.fetchRow(j).getString(5);
-                        if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
-                            isView = true;
-                    }
-                }
-                if (isView)
-                    views.add(tableName);
-                else
-                    tables.add(tableName);
+                tables.add(tableName);
             }
         }
         return new Object[] {tables, views, exports};
