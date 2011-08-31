@@ -2,6 +2,7 @@ CLASSPATH = ../../../obj/release/prod:../../../lib
 VOLTDB = ../../../bin/voltdb
 VOLTCOMPILER = ../../../bin/voltcompiler
 EXPORTTOFILE = ../../../bin/exporttofile
+LICENSE = ../../voltdb/license.xml
 
 .PHONY: main clean srccompile compile server client export
 
@@ -25,8 +26,9 @@ catalog: srccompile
 	$(VOLTCOMPILER) obj project.xml auction.jar
 
 server: catalog
-	$(VOLTDB) create catalog auction.jar deployment deployment.xml \
-        leader localhost
+	$(VOLTDB) create catalog auction.jar \
+	    deployment deployment.xml license $(LICENSE) \
+	    leader localhost
 
 client: srccompile
 	java -classpath obj:$(CLASSPATH) com.auctionexample.Client

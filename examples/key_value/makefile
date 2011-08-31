@@ -1,6 +1,7 @@
 CLASSPATH = ../../obj/release/prod:../../lib
 VOLTDB = ../../bin/voltdb
 VOLTCOMPILER = ../../bin/voltcompiler
+LICENSE = ../../voltdb/license.xml
 
 .PHONY: main clean srccompile compile server client client-threaded
 
@@ -23,8 +24,9 @@ compile: srccompile
 	$(VOLTCOMPILER) obj project.xml key_value_catalog.jar
 
 server: compile
-	$(VOLTDB) create catalog key_value_catalog.jar deployment deployment.xml \
-        leader localhost
+	$(VOLTDB) create catalog key_value_catalog.jar \
+	    deployment deployment.xml license $(LICENSE) \
+	    leader localhost
 
 client: async-benchmark
 
