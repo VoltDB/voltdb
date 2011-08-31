@@ -379,7 +379,7 @@ public class Inits {
             // by the deployment.xml configuration.
             int httpPort = -1;
             m_rvdb.m_jsonEnabled = false;
-            if (m_deployment.getHttpd().isEnabled()) {
+            if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
                 httpPort = m_deployment.getHttpd().getPort();
                 m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
             }
