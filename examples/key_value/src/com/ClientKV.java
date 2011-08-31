@@ -167,7 +167,7 @@ public class ClientKV {
                         if (clientResponse.getResults()[0].getRowCount() == 0) {
                             m_logger.info("Get Miss, key = " + cbKeyValue);
                         } else {
-                            byte[] baGetValue = clientResponse.getResults()[0].fetchRow(0).getVarbinary(0);
+                            byte[] baGetValue = clientResponse.getResults()[0].fetchRow(0).getVarbinary(1);
                             get_value_compressed_bytes += baGetValue.length;
 
                             if (behavior == Behavior.NONE) {

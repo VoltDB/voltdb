@@ -21,31 +21,29 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-// Results stored procedure
 //
-//   Returns results of vote.
-
+// Returns the top 10 area codes for a given contestant.
+//
 package com.procedures;
 
 import org.voltdb.*;
 
-@ProcInfo(
-    singlePartition = false
+@ProcInfo
+(
+  singlePartition = false
 )
 
-public class ContestantResultsByAreaCode extends VoltProcedure {
-    // get the results
-
-    public final SQLStmt getResults = new SQLStmt( "select top 10 area_code, "
-                                                 + "       SUM(num_votes) AS total_votes "
-                                                 + "  from v_votes_by_contestant_number_area_code "
-                                                 + " where contestant_number = ? "
-                                                 + " group by area_code "
-                                                 + " order by total_votes desc;");
-
-    public VoltTable[] run(int contestantNumber) {
-        voltQueueSQL(getResults,contestantNumber);
+public class ContestantResultsByAreaCode extends VoltProcedure
+{
+    public final SQLStmt resultStmt = new SQLStmt( "   SELECT TOP 10 area_code"
+                                                 + "        , SUM(num_votes) AS total_votes"
+                                                 + "     FROM v_votes_by_contestant_number_area_code"
+                                                 + "    WHERE contestant_number = ?"
+                                                 + " GROUP BY area_code"
+                                                 + " ORDER BY total_votes DESC;");
+    public VoltTable[] run(int contestantNumber)
+    {
+        voltQueueSQL(resultStmt,contestantNumber);
         return voltExecuteSQL(true);
     }
 }

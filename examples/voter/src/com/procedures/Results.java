@@ -21,33 +21,34 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-// Results stored procedure
 //
-//   Returns results of vote.
-
+// Returns the results of the votes.
+//
 package com.procedures;
 
 import org.voltdb.*;
 
-@ProcInfo(
+@ProcInfo
+(
     singlePartition = false
 )
 
-public class Results extends VoltProcedure {
-    // get the results
-
-    public final SQLStmt getResults = new SQLStmt("select a.contestant_name contestant_name, " +
-                                                  "       a.contestant_number contestant_number, " +
-                                                  "       sum(b.num_votes) total_votes " +
-                                                  "from v_votes_by_contestant_number b, " +
-                                                  "     contestants a " +
-                                                  "where a.contestant_number = b.contestant_number " +
-                                                  "group by a.contestant_name, a.contestant_number " +
-                                                  "order by total_votes asc;");
-
-    public VoltTable[] run() {
-        voltQueueSQL(getResults);
+public class Results extends VoltProcedure
+{
+    // Gets the results
+    public final SQLStmt resultStmt = new SQLStmt( "   SELECT a.contestant_name   AS contestant_name"
+                                                 + "        , a.contestant_number AS contestant_number"
+                                                 + "        , SUM(b.num_votes)    AS total_votes"
+                                                 + "     FROM v_votes_by_contestant_number AS b"
+                                                 + "        , contestants AS a"
+                                                 + "    WHERE a.contestant_number = b.contestant_number"
+                                                 + " GROUP BY a.contestant_name"
+                                                 + "        , a.contestant_number"
+                                                 + " ORDER BY total_votes DESC;"
+                                                 );
+    public VoltTable[] run()
+    {
+        voltQueueSQL(resultStmt);
         return voltExecuteSQL(true);
     }
 }

@@ -3,7 +3,7 @@ CREATE TABLE contestants
 (
   contestant_number integer     NOT NULL
 , contestant_name   varchar(50) NOT NULL
-, PRIMARY KEY
+, CONSTRAINT PK_contestants_Hash_index PRIMARY KEY
   (
     contestant_number
   )
@@ -25,14 +25,14 @@ CREATE TABLE area_code_state
 (
   area_code smallint   NOT NULL
 , state     varchar(2) NOT NULL
-, PRIMARY KEY
+, CONSTRAINT PK_area_code_state_hash_index PRIMARY KEY
   (
     area_code
   )
 );
 
 -- Supporting index on the vote table for business rule validation ("no more than <x> votes per phone number")
-CREATE INDEX idx_votes ON votes (phone_number);
+CREATE INDEX idx_votes_hash_index ON votes (phone_number);
 
 -- rollup of votes by phone number, used to reject excessive voting
 CREATE VIEW v_votes_by_phone_number
@@ -60,19 +60,6 @@ AS
  GROUP BY contestant_number
 ;
 
--- rollup of votes by area-code
-CREATE VIEW v_votes_by_area_code
-(
-  area_code
-, num_votes
-)
-AS
-   SELECT area_code
-        , COUNT(*)
-     FROM votes
- GROUP BY area_code
-;
-
 -- rollup of votes by contestant and area-code
 CREATE VIEW v_votes_by_contestant_number_area_code
 (
@@ -87,19 +74,6 @@ AS
      FROM votes
  GROUP BY contestant_number
         , area_code
-;
-
--- rollup of votes by state
-CREATE VIEW v_votes_by_state
-(
-  state
-, num_votes
-)
-AS
-   SELECT state
-        , COUNT(*)
-     FROM votes
- GROUP BY state
 ;
 
 -- rollup of votes by contestant and state
@@ -118,4 +92,28 @@ AS
         , state
 ;
 
+-- rollup of votes by area-code
+CREATE VIEW v_votes_by_area_code
+(
+  area_code
+, num_votes
+)
+AS
+   SELECT area_code
+        , COUNT(*)
+     FROM votes
+ GROUP BY area_code
+;
+-- rollup of votes by state
+CREATE VIEW v_votes_by_state
+(
+  state
+, num_votes
+)
+AS
+   SELECT state
+        , COUNT(*)
+     FROM votes
+ GROUP BY state
+;
 

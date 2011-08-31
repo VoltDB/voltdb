@@ -10,6 +10,7 @@ clean:
 	rm -rf obj
 	rm -rf debugoutput
 	rm key_value_catalog.jar
+    rm -rf plannerlog.txt
 	rm -rf voltdbroot
 
 srccompile:
@@ -24,65 +25,71 @@ compile: srccompile
 server: compile
 	$(VOLTDB) create catalog key_value_catalog.jar deployment deployment.xml
 
-client: srccompile
-	java -classpath obj:$(CLASSPATH) com.ClientKV \
-		999999999 \
-		5 \
-		120 \
-		3 \
-		localhost \
-		50 \
-		12000 \
-		12000 \
-		100000 \
-		75 \
-		2 \
-		true \
-		10.0 \
-		0.95 \
-		1
+client: async-benchmark
 
-# CLIENT ARGS IN ORDER
-# maximum transactions per second (used as starting point only when auto-tuning is on) NOTE: Rounded to thousands
-# feedback interval (seconds)
-# test duration after initialization (seconds)
-# seconds to wait before recording latency information
-# servers to connect to
-# key size (max 250)
-# min value size (max 1048576)
-# max value size (max 1048576)
-# number of initial keys/values to populate
-# percentage of gets (vs. puts) once populated
-# 1 = store payload, 2 = gzip payload
-# Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
-# Target average transaction call latency (in milliseconds)
-# Adjustment rate: the tuning process decreases the number of requested transactions per second to FACTOR*<observed-TPS> until the target latency is reached
-# Auto-tuning interval (in seconds)
+# Asynchronous benchmark sample
+# Use this target for argument help
+async-benchmark-help: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.AsyncBenchmark \
+	    --help
+
+async-benchmark: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.AsyncBenchmark \
+	    --display-interval=5 \
+	    --duration=120 \
+	    --servers=localhost \
+	    --port=21212 \
+	    --pool-size=100000 \
+	    --preload=true \
+	    --get-put-ratio=0.90 \
+	    --key-size=32 \
+	    --min-value-size=1024 \
+	    --max-value-size=1024 \
+	    --use-compression=false \
+	    --rate-limit=100000 \
+	    --auto-tune=true \
+	    --latency-target=10.0
 
 
-client-threaded: srccompile
-	java -classpath obj:$(CLASSPATH) com.ClientThreadedKV \
-		999999999 \
-		5 \
-		120 \
-		3 \
-		localhost \
-		50 \
-		12000 \
-		12000 \
-		100000 \
-		75 \
-		2
+# Multi-threaded synchronous benchmark sample
+# Use this target for argument help
+sync-benchmark-help: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.SyncBenchmark \
+	    --help
 
-# CLIENT-THREADED ARGS IN ORDER
-# maximum transactions per second (no autu-tuning available for this client - use output from simple client as baseline )
-# feedback interval (seconds)
-# test duration after initialization (seconds)
-# seconds to wait before recording latency information
-# servers to connect to
-# key size (max 250)
-# min value size (max 1048576)
-# max value size (max 1048576)
-# number of initial keys/values to populate
-# percentage of gets (vs. puts) once populated
-# 1 = store payload, 2 = gzip payload
+sync-benchmark: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.SyncBenchmark \
+	    --threads=40 \
+	    --display-interval=5 \
+	    --duration=120 \
+	    --servers=localhost \
+	    --port=21212 \
+	    --pool-size=100000 \
+	    --preload=true \
+	    --get-put-ratio=0.90 \
+	    --key-size=32 \
+	    --min-value-size=1024 \
+	    --max-value-size=1024 \
+	    --use-compression=false
+
+# JDBC benchmark sample
+# Use this target for argument help
+jdbc-benchmark-help: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.JDBCBenchmark \
+	    --help
+
+jdbc-benchmark: srccompile
+	java -classpath obj:$(CLASSPATH):obj com.JDBCBenchmark \
+	    --threads=40 \
+	    --display-interval=5 \
+	    --duration=120 \
+	    --servers=localhost \
+	    --port=21212 \
+	    --pool-size=100000 \
+	    --preload=true \
+	    --get-put-ratio=0.90 \
+	    --key-size=32 \
+	    --min-value-size=1024 \
+	    --max-value-size=1024 \
+	    --use-compression=false
+

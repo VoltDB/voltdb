@@ -20,29 +20,24 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-// Remove stored procedure
-//
-//   Removes the key-value pair associated with the given key
-
-
 package com.procedures;
 
 import org.voltdb.*;
 
-@ProcInfo(
-        partitionInfo = "KEY_VALUE.KEY_COLUMN: 0",
-        singlePartition = true
+@ProcInfo
+(
+  partitionInfo   = "store.key:0"
+, singlePartition = true
 )
 
-public class Remove extends VoltProcedure {
-    public final SQLStmt removeData = new SQLStmt("delete from key_value where key_column = ?;");
+public class Remove extends VoltProcedure
+{
+    // Deletes a key/value pair
+    public final SQLStmt deleteStmt = new SQLStmt("DELETE FROM store WHERE key = ?;");
 
-    public VoltTable[] run(
-            String strKey
-    ) {
-        voltQueueSQL(removeData, strKey);
-
+    public VoltTable[] run(String key)
+    {
+        voltQueueSQL(deleteStmt, key);
         return voltExecuteSQL(true);
     }
 }

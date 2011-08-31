@@ -21,11 +21,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-// Results stored procedure
 //
-//   Returns results of vote.
-
+// Returns the N first winning states for each contestant
+//
 package com.procedures;
 
 import org.voltdb.*;
@@ -33,14 +31,14 @@ import java.util.Comparator;
 import java.util.Arrays;
 import java.util.ArrayList;
 
-@ProcInfo(
-    singlePartition = false
+@ProcInfo
+(
+  singlePartition = false
 )
 
-public class ContestantWinningStates extends VoltProcedure {
-    // get the results
-
-    public final SQLStmt getStateSummaryByContestant = new SQLStmt( "select contestant_number, state, sum(num_votes) AS num_votes from v_votes_by_contestant_number_state group by contestant_number, state order by 2 asc, 3 desc;");
+public class ContestantWinningStates extends VoltProcedure
+{
+    public final SQLStmt resultStmt = new SQLStmt( "SELECT contestant_number, state, SUM(num_votes) AS num_votes FROM v_votes_by_contestant_number_state GROUP BY contestant_number, state ORDER BY 2 ASC, 3 DESC;");
 
     static class Result
     {
@@ -70,7 +68,7 @@ public class ContestantWinningStates extends VoltProcedure {
     public VoltTable[] run(int contestantNumber, int max)
     {
         ArrayList<Result> results = new ArrayList<Result>();
-        voltQueueSQL(getStateSummaryByContestant);
+        voltQueueSQL(resultStmt);
         VoltTable summary = voltExecuteSQL()[0];
         String state = "";
         while(summary.advanceRow())

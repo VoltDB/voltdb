@@ -22,10 +22,11 @@
  */
 
 
-// Vote stored procedure
 //
-//   Accept a vote.  Make sure it is for a valid contestant and that the voter is not above the number of allowed votes.
-
+// Accepts a vote, enforcing business logic: make sure the vote is for a valid
+// contestant and that the voter (phone number of the caller) is not above the
+// number of allowed votes.
+//
 package com.procedures;
 
 import org.voltdb.ProcInfo;
@@ -34,34 +35,34 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-@ProcInfo(
-    partitionInfo = "VOTES.PHONE_NUMBER: 0",
-    singlePartition = true
+@ProcInfo
+(
+  partitionInfo = "votes.phone_number:0"
+, singlePartition = true
 )
 
-public class Vote extends VoltProcedure {
-    // check if the vote is for a valid contestant
-    public final SQLStmt checkContestant = new SQLStmt("select contestant_number from contestants where contestant_number = ?;");
+public class Vote extends VoltProcedure
+{
+    // Checks if the vote is for a valid contestant
+    public final SQLStmt checkContestantStmt = new SQLStmt("SELECT contestant_number FROM contestants WHERE contestant_number = ?;");
 
-    // check if the voter has exceeded their allowed number of votes
-    public final SQLStmt checkVoter = new SQLStmt("select num_votes from v_votes_by_phone_number where phone_number = ?;");
+    // Checks if the voter has exceeded their allowed number of votes
+    public final SQLStmt checkVoterStmt = new SQLStmt("SELECT num_votes FROM v_votes_by_phone_number WHERE phone_number = ?;");
 
-    // record the vote
-    public final SQLStmt insertVote = new SQLStmt("insert into votes (phone_number, area_code, state, contestant_number) values (?, ?, ?, ?);");
+    // Retrieves the state for a given area code
+    public final SQLStmt getStateStmt = new SQLStmt("SELECT state FROM area_code_state WHERE area_code = ?;");
 
-    public final SQLStmt getState = new SQLStmt("SELECT state FROM area_code_state WHERE area_code = ?;");
+    // Records a vote
+    public final SQLStmt insertVoteStmt = new SQLStmt("INSERT INTO votes (phone_number, area_code, state, contestant_number) VALUES (?, ?, ?, ?);");
 
-    public VoltTable[] run(
-            long phoneNumber,
-            int contestantNumber,
-            long maxVotesPerPhoneNumber
-    ) {
+    public VoltTable[] run(long phoneNumber, int contestantNumber, long maxVotesPerPhoneNumber)
+    {
         boolean validVoter = false;
         boolean validContestant = false;
         int returnValue = 0;
         short areaCode = (short)(phoneNumber / 10000000l);
-        voltQueueSQL(checkContestant, contestantNumber);
-        voltQueueSQL(checkVoter, phoneNumber);
+        voltQueueSQL(checkContestantStmt, contestantNumber);
+        voltQueueSQL(checkVoterStmt, phoneNumber);
         VoltTable resultsCheck[] = voltExecuteSQL();
 
         if (resultsCheck[0].getRowCount() > 0) {
@@ -78,17 +79,19 @@ public class Vote extends VoltProcedure {
         }
 
         if (validContestant && validVoter) {
-            voltQueueSQL(getState, areaCode);
 
-            // not all example clients produce valid area code inputs.
-            // assign all non-initialized area codes to the EU for now.
+            // Some sample client libraries use the legacy random phone generation that mostly
+            // created invalid phone numbers. Until refactoring, re-assign all such votes to
+            // the "EU" fake state (those votes will not appear on the Live Statistics dashboard,
+            // but are tracked as legitimate instead of invalid, as old client would mostly get
+            // it wrong and see all their transactions rejected).
             String state = "EU";
+            voltQueueSQL(getStateStmt, areaCode);
             VoltTable r1 = voltExecuteSQL()[0];
-            if (r1.getRowCount() > 0) {
+            if (r1.getRowCount() > 0)
                 state = r1.fetchRow(0).getString(0);
-            }
-            voltQueueSQL(insertVote, phoneNumber, areaCode, state, contestantNumber);
-            voltExecuteSQL();
+            voltQueueSQL(insertVoteStmt, phoneNumber, areaCode, state, contestantNumber);
+            voltExecuteSQL(true);
             returnValue = 0;
         } else if (!validContestant) {
             returnValue = 1;

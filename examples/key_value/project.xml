@@ -5,12 +5,13 @@
             <schema path='ddl.sql' />
         </schemas>
         <procedures>
+            <procedure class='com.procedures.Initialize' />
             <procedure class='com.procedures.Get' />
             <procedure class='com.procedures.Put' />
             <procedure class='com.procedures.Remove' />
         </procedures>
         <partitions>
-            <partition table='key_value' column='key_column' />
+            <partition table='store' column='key' />
         </partitions>
     </database>
 </project>

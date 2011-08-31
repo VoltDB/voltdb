@@ -56,7 +56,7 @@ import org.voltdb.client.exampleutils.RateLimiter;
 
 public class AsyncBenchmark
 {
-    // Initialize some commong constants and variables
+    // Initialize some common constants and variables
     private static final String ContestantNamesCSV = "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway,Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster,Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
     private static final AtomicLongArray VotingBoardResults = new AtomicLongArray(4);
 

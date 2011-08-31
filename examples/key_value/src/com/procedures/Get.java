@@ -20,30 +20,24 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-
-// Get stored procedure
-//
-//   Gets and returns the value associated with the given key
-
-
 package com.procedures;
 
 import org.voltdb.*;
 
-@ProcInfo(
-        partitionInfo = "KEY_VALUE.KEY_COLUMN: 0",
-        singlePartition = true
+@ProcInfo
+(
+  partitionInfo   = "store.key:0"
+, singlePartition = true
 )
 
-public class Get extends VoltProcedure {
-    public final SQLStmt getData = new SQLStmt("select value_column from key_value where key_column = ?;");
+public class Get extends VoltProcedure
+{
+    // Selects a key/value pair's value
+    public final SQLStmt selectStmt = new SQLStmt("SELECT key, value FROM store WHERE key = ?;");
 
-    public VoltTable[] run(
-            String strKey
-    ) {
-        voltQueueSQL(getData, strKey);
-
+    public VoltTable[] run(String key)
+    {
+        voltQueueSQL(selectStmt, key);
         return voltExecuteSQL(true);
     }
 }

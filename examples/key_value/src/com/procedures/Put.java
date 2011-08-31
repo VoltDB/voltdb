@@ -30,37 +30,33 @@ package com.procedures;
 
 import org.voltdb.*;
 
-@ProcInfo(
-        partitionInfo = "KEY_VALUE.KEY_COLUMN: 0",
-        singlePartition = true
+@ProcInfo
+(
+  partitionInfo   = "store.key:0"
+, singlePartition = true
 )
 
-public class Put extends VoltProcedure {
-    // check if key exists
-    public final SQLStmt checkKey = new SQLStmt("select key_column from key_value where key_column = ?;");
+public class Put extends VoltProcedure
+{
+    // Checks if key exists
+    public final SQLStmt checkStmt = new SQLStmt("SELECT key FROM store WHERE key = ?;");
 
-    // update key/value
-    public final SQLStmt updateKeyValue = new SQLStmt("update key_value set value_column = ? where key_column = ?;");
+    // Updates a key/value pair
+    public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ? WHERE key = ?;");
 
-    // insert key/value
-    public final SQLStmt insertKeyValue = new SQLStmt("insert into key_value (key_column, value_column) values (?, ?);");
+    // Inserts a key/value pair
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
 
-    public VoltTable[] run(
-            String strKey,
-            byte[] baValue
-    ) {
-        voltQueueSQL(checkKey, strKey);
+    public VoltTable[] run(String key, byte[] value)
+    {
+        // Check whether the pair exists
+        voltQueueSQL(checkStmt, key);
 
-        VoltTable results1[] = voltExecuteSQL();
-
-        if (results1[0].getRowCount() == 0) {
-            // key does not exist, insert
-            voltQueueSQL(insertKeyValue, strKey, baValue);
-        } else {
-            // key exists, update
-            voltQueueSQL(updateKeyValue, baValue, strKey);
-        }
-
+        // Insert new or update existing key depending on result
+        if (voltExecuteSQL()[0].getRowCount() == 0)
+            voltQueueSQL(insertStmt, key, value);
+        else
+            voltQueueSQL(updateStmt, value, key);
         return voltExecuteSQL(true);
     }
 }
