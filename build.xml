@@ -64,6 +64,7 @@
 <property name='src.jetty.dir'               location='src/jetty716' />
 <property name='src.test.dir'                location='tests/frontend' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
+<property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
 <property name='lib.dir'                     location='lib' />
@@ -567,6 +568,13 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
+
+    <!-- package up studio web trivially -->
+    <zip destfile="${raw.dist.dir}/voltdb-studio.web-${dist.version}.zip">
+        <fileset dir="${src.studio.dir}" defaultexcludes="yes">
+            <include name="**/*" />
+        </fileset>
+    </zip>
 </target>
 
 <target name="dist_client" depends="compile, voltdbclient.jar"
