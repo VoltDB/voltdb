@@ -314,9 +314,12 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         checkColumnBounds(columnIndex);
         try
         {
-            if (table.getColumnType(columnIndex-1) != VoltType.STRING)
+            if (table.getColumnType(columnIndex-1) == VoltType.STRING)
+                return table.getStringAsBytes(columnIndex-1);
+            else if (table.getColumnType(columnIndex-1) == VoltType.VARBINARY)
+                return table.getVarbinary(columnIndex-1);
+            else
                 throw SQLError.get(SQLError.CONVERSION_NOT_FOUND, table.getColumnType(columnIndex-1), "byte[]");
-            return table.getStringAsBytes(columnIndex-1);
         }
          catch(SQLException x)
          {
