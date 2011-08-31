@@ -24,6 +24,10 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.HashMap;
 
 import junit.framework.Test;
@@ -35,6 +39,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.jdbc.Driver;
 
 public class TestSystemCatalogSuite extends RegressionSuite {
 
@@ -103,6 +108,57 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         VoltTable[] results = client.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults();
         assertEquals(20, results[0].getColumnCount());
         System.out.println(results[0]);
+    }
+
+    public void testJdbcAccess() throws IOException, ProcCallException, ClassNotFoundException, SQLException
+    {
+        String url = "jdbc:voltdb://localhost:21212";
+        String db = "jdbc";
+        String driver = "org.voltdb.jdbc.Driver";
+        Class.forName(driver);
+        Connection huh = DriverManager.getConnection(url, "", "");
+        // Not really a correctness test, just want to make sure we can
+        // get real result sets back through the JDBC driver.
+        // Just get a bunch of easy stupid stuff to verify for now
+        ResultSet blah = huh.getMetaData().getColumns(null, null, null, null);
+        while (blah.next())
+        {
+            assertEquals("T", blah.getString("TABLE_NAME"));
+        }
+        blah.close();
+        blah = huh.getMetaData().getTables(null, null, null, null);
+        while (blah.next())
+        {
+            assertEquals("T", blah.getString("TABLE_NAME"));
+            assertEquals("TABLE", blah.getString("TABLE_TYPE"));
+        }
+        blah.close();
+        blah = huh.getMetaData().getIndexInfo(null, null, null, false, false);
+        while (blah.next())
+        {
+            assertEquals("T", blah.getString("TABLE_NAME"));
+        }
+        blah.close();
+        blah = huh.getMetaData().getPrimaryKeys(null, null, null);
+        while (blah.next())
+        {
+            assertEquals("T", blah.getString("TABLE_NAME"));
+        }
+        blah.close();
+        blah = huh.getMetaData().getProcedures(null, null, null);
+        while (blah.next())
+        {
+            System.out.println(blah.getString(3));
+            System.out.println(blah.getString(4));
+        }
+        blah.close();
+        blah = huh.getMetaData().getProcedureColumns(null, null, null, null);
+        while (blah.next())
+        {
+            System.out.println(blah.getString(3));
+            System.out.println(blah.getString(4));
+        }
+        blah.close();
     }
 
     //

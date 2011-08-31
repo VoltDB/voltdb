@@ -160,10 +160,19 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of table columns available in the specified catalog.
+    // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
+        if (catalog != null || schemaPattern != null ||
+            tableNamePattern != null || columnNamePattern != null)
+        {
+            throw new SQLException("getColumns() does not support pattern filtering");
+        }
         checkClosed();
-        throw SQLError.noSupport();
+        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
+        sysinfo.setString(1, "COLUMNS");
+        ResultSet res = sysinfo.executeQuery();
+        return res;
     }
 
     // Retrieves the connection that produced this metadata object.
@@ -284,10 +293,20 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the given table's indices and statistics.
+    // NOTE: currently returns the NON_UNIQUE column as a TINYINT due
+    // to lack of boolean support in VoltTable schemas.
+    // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) throws SQLException
     {
+        if (catalog != null || schema != null || table != null)
+        {
+            throw new SQLException("getIndexInfo() does not support pattern filtering");
+        }
         checkClosed();
-        throw SQLError.noSupport();
+        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
+        sysinfo.setString(1, "INDEXINFO");
+        ResultSet res = sysinfo.executeQuery();
+        return res;
     }
 
     // Retrieves the major JDBC version number for this driver.
@@ -452,24 +471,50 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the given table's primary key columns.
+    // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException
     {
+        if (catalog != null || schema != null || table != null)
+        {
+            throw new SQLException("getPrimaryKeys() does not support pattern filtering");
+        }
         checkClosed();
-        throw SQLError.noSupport();
+        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
+        sysinfo.setString(1, "PRIMARYKEYS");
+        ResultSet res = sysinfo.executeQuery();
+        return res;
     }
 
     // Retrieves a description of the given catalog's stored procedure parameter and result columns.
+    // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern, String columnNamePattern) throws SQLException
     {
+        if (catalog != null || schemaPattern != null ||
+            procedureNamePattern != null || columnNamePattern != null)
+        {
+            throw new SQLException("getProcedureColumns() does not support pattern filtering");
+        }
         checkClosed();
-        throw SQLError.noSupport();
+        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
+        sysinfo.setString(1, "PROCEDURECOLUMNS");
+        ResultSet res = sysinfo.executeQuery();
+        return res;
     }
 
     // Retrieves a description of the stored procedures available in the given catalog.
+    // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern) throws SQLException
     {
+        if (catalog != null || schemaPattern != null ||
+            procedureNamePattern != null)
+        {
+            throw new SQLException("getProcedures() does not support pattern filtering");
+        }
         checkClosed();
-        throw SQLError.noSupport();
+        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
+        sysinfo.setString(1, "PROCEDURES");
+        ResultSet res = sysinfo.executeQuery();
+        return res;
     }
 
     // Retrieves the database vendor's preferred term for "procedure".
@@ -571,10 +616,19 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the tables available in the given catalog.
+    // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types) throws SQLException
     {
+        if (catalog != null || schemaPattern != null ||
+            tableNamePattern != null || types != null)
+        {
+            throw new SQLException("getTables() does not support pattern filtering");
+        }
         checkClosed();
-        throw SQLError.noSupport();
+        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
+        sysinfo.setString(1, "TABLES");
+        ResultSet res = sysinfo.executeQuery();
+        return res;
     }
 
     // Retrieves the table types available in this database.
