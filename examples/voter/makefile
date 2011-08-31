@@ -10,7 +10,7 @@ main: server
 clean:
 	rm -rf obj
 	rm -rf debugoutput
-	rm -rf voter.jar
+	rm -f voter.jar
 	rm -rf plannerlog.txt
 	rm -rf voltdbroot
 

@@ -10,7 +10,7 @@ main: server
 clean:
 	rm -rf obj
 	rm -rf debugoutput
-	rm helloworld.jar
+	rm -f helloworld.jar
 	rm -rf voltdbroot
 
 srccompile:
@@ -22,8 +22,8 @@ compile: srccompile
 
 server: compile
 	$(VOLTDB) create catalog helloworld.jar \
-	    deployment deployment.xml license $(LICENSE) \
-	    leader localhost
+		deployment deployment.xml license $(LICENSE) \
+		leader localhost
 
 client: srccompile
 	java -classpath obj:$(CLASSPATH) Client

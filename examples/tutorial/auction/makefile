@@ -11,7 +11,7 @@ main: server
 clean:
 	rm -rf obj
 	rm -rf debugoutput
-	rm auction.jar
+	rm -f auction.jar
 	rm -rf voltdbroot
 
 srccompile:
@@ -27,8 +27,8 @@ catalog: srccompile
 
 server: catalog
 	$(VOLTDB) create catalog auction.jar \
-	    deployment deployment.xml license $(LICENSE) \
-	    leader localhost
+		deployment deployment.xml license $(LICENSE) \
+		leader localhost
 
 client: srccompile
 	java -classpath obj:$(CLASSPATH) com.auctionexample.Client

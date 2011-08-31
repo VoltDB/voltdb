@@ -69,9 +69,8 @@ public class SocketJoiner extends Thread {
     static final int HOSTID_FAILURE = 4;
     static final int CATVER_FAILURE = 8;
     static final int DEPCRC_FAILURE = 16;
-    static final int HAVE_DONE_RESTORE_FAILURE = 32;
-    static final int CATTXNID_FAILURE = 64;
-    static final int FAULT_MISMATCH_FAILURE = 128;
+    static final int CATTXNID_FAILURE = 32;
+    static final int FAULT_MISMATCH_FAILURE = 64;
 
     static final int PING = 333;
     InetAddress m_coordIp = null;
@@ -693,12 +692,28 @@ public class SocketJoiner extends Thread {
                 }
             }
 
+            // check if a restore has been done on the rest of the cluster
             boolean b_haveDoneRestore = haveDoneRestore[0];
+            // and check if all nodes agree about this
+            boolean restoreAgreement = true;
             for (boolean b__haveDoneRestore : haveDoneRestore) {
                 if (b_haveDoneRestore != b__haveDoneRestore) {
-                    errors |= HAVE_DONE_RESTORE_FAILURE;
+                    restoreAgreement = false;
+                    break;
                 }
             }
+            // if they agree, great
+            if (restoreAgreement) {
+                org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore = b_haveDoneRestore;
+            }
+            // if not...
+            else {
+                if (m_hostLog != null)
+                    m_hostLog.error("Cluster does not agree on whether a restore has been performed");
+                // just assume a restore has been done
+                org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore = true;
+            }
+
 
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
@@ -739,12 +754,6 @@ public class SocketJoiner extends Thread {
             if ((errors & DEPCRC_FAILURE) != 0) {
                 if (m_hostLog != null)
                     m_hostLog.error("Deployment file checksums do not match across cluster");
-            }
-            if ((errors & HAVE_DONE_RESTORE_FAILURE) != 0) {
-                if (m_hostLog != null)
-                    m_hostLog.error("Cluster does not agree on whether a restore has been performed");
-            } else {
-                org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore = b_haveDoneRestore;
             }
             if ((errors & FAULT_MISMATCH_FAILURE) != 0) {
                 if (m_hostLog != null)
