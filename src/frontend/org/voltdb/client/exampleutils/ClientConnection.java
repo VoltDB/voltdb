@@ -125,5 +125,13 @@ public class ClientConnection implements Closeable
     {
         return ClientConnectionPool.getStatistics(this).get(procedure);
     }
+    public PerfCounter getStatistics(String... procedures)
+    {
+        PerfCounterMap map = ClientConnectionPool.getStatistics(this);
+        PerfCounter result = new PerfCounter(false);
+        for(String procedure : procedures)
+            result.merge(map.get(procedure));
+        return result;
+    }
 }
 

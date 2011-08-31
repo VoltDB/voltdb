@@ -36,8 +36,8 @@ public class PerfCounter implements Cloneable
         }
     };
 
-    private AtomicLong StartTime = new AtomicLong(0);
-    private AtomicLong EndTime   = new AtomicLong(0);
+    private AtomicLong StartTime = new AtomicLong(Long.MAX_VALUE);
+    private AtomicLong EndTime   = new AtomicLong(Long.MIN_VALUE);
     private AtomicLong min   = new AtomicLong(999999999l);
     private AtomicLong max   = new AtomicLong(-1l);
     private AtomicLong tot   = new AtomicLong(0);
@@ -121,7 +121,7 @@ public class PerfCounter implements Cloneable
     public void update(long executionDuration, boolean success)
     {
         EndTime.set(System.currentTimeMillis());
-        if (StartTime.get() == 0)
+        if (StartTime.get() == Long.MAX_VALUE)
             StartTime.set(EndTime.get()-executionDuration);
         cnt.incrementAndGet();
         tot.addAndGet(executionDuration);
@@ -140,7 +140,7 @@ public class PerfCounter implements Cloneable
     }
     public String toString(boolean useSimpleFormat)
     {
-        long elapsedDuration = this.EndTime.get()-this.StartTime.get();
+        long elapsedDuration = (this.StartTime.get() == Long.MAX_VALUE) ? 1 : this.EndTime.get()-this.StartTime.get();
         if (useSimpleFormat)
             return String.format(
                                   "%8s | Txn.: %,11d%s @ %,11.1f TPS | Lat. = %7d <  %7.2f < %7d\n"
