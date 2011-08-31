@@ -483,21 +483,28 @@ this.AddConnection = function(connection, success)
     // User Procedures
     for (var i = 0; i < connection.Metadata['procedures'].data.length; ++i)
     {
+        var connTypeParams = [];
         var procParams = [];
         var procName = connection.Metadata['procedures'].data[i][2];
+        for (var p = 0; p < connection.Metadata['procedurecolumns'].data.length; ++p)
+        {
+            if (connection.Metadata['procedurecolumns'].data[p][2] == procName)
+            {
+                paramType = connection.Metadata['procedurecolumns'].data[p][6];
+                paramName = connection.Metadata['procedurecolumns'].data[p][3];
+                procParams[procParams.length] = {'name': paramName, 'type': paramType.toLowerCase()};
+            }
+        }
+        // the name field is really ordinal position: 1, 2, 3...
+        procParams.sort(function(a,b) {return a.name - b.name;});
+
         src += '<li class="procedure closed"><span>' + procName + '</span>';
           src += '<ul>'
             src += '<li class="folder closed"><span>Parameters</span>';
               src += '<ul>'
-                for (var p = 0; p < connection.Metadata['procedurecolumns'].data.length; ++p)
-                {
-                    if (connection.Metadata['procedurecolumns'].data[p][2] == procName)
-                    {
-                        paramType = connection.Metadata['procedurecolumns'].data[p][6];
-                        paramType = paramType.toLowerCase();
-                        src += '<li>' + paramType + '</li>';
-                        procParams[procParams.length] = paramType;
-                    }
+                for (var p = 0; p < procParams.length; ++p) {
+                    connTypeParams[connTypeParams.length] = procParams[p].type;
+                    src += '<li>' + procParams[p].type + '</li>';
                 }
               src += '</ul>'
             src += '</li>'
