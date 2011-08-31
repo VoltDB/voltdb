@@ -19,6 +19,7 @@ package org.voltdb.client.exampleutils;
 import org.voltdb.client.*;
 import java.util.HashMap;
 import java.io.Closeable;
+import java.util.concurrent.Future;
 
 public class ClientConnection implements Closeable
 {
@@ -117,6 +118,30 @@ public class ClientConnection implements Closeable
         return this.Client.callProcedure(new TrackingCallback(this, procedure, callback), procedure, parameters);
     }
 
+    public Future<ClientResponse> executeAsync(String procedure, Object... parameters) throws Exception
+    {
+        final ExecutionFuture future = new ExecutionFuture(25000);
+        this.Client.callProcedure(
+                                   new TrackingCallback( this
+                                                       , procedure
+                                                       , new ProcedureCallback()
+                                                         {
+                                                             final ExecutionFuture result;
+                                                             {
+                                                                 this.result = future;
+                                                             }
+                                                             @Override
+                                                             public void clientCallback(ClientResponse response) throws Exception
+                                                             {
+                                                                 future.set(response);
+                                                             }
+                                                         }
+                                                       )
+                                 , procedure
+                                 , parameters
+                                 );
+        return future;
+    }
     public PerfCounterMap getStatistics()
     {
         return ClientConnectionPool.getStatistics(this);
