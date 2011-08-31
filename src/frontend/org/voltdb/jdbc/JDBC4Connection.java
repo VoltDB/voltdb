@@ -420,5 +420,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     {
         return this.NativeConnection.getStatistics(procedure);
     }
+
+    // Return performance statistics for a list of procedures, for the underlying connection (pooled information)
+    public PerfCounter getStatistics(String... procedures)
+    {
+        return this.NativeConnection.getStatistics(procedures);
+    }
 }
 

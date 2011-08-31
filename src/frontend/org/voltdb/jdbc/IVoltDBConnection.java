@@ -24,5 +24,6 @@ public interface IVoltDBConnection
 {
     PerfCounterMap getStatistics();
     PerfCounter getStatistics(String procedure);
+    PerfCounter getStatistics(String... procedures);
 }
 
