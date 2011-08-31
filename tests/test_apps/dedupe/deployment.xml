@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <deployment>
-    <cluster hostcount="4" sitesperhost="2" leader="volt7b" kfactor="1" />
+    <cluster hostcount="4" sitesperhost="2" kfactor="1" />
     <paths>
         <voltdbroot path="/tmp/tmc" />
     </paths>
@@ -11,6 +11,6 @@
     <admin-mode port="21211" />
     -->
     <export enabled="true"/>
-    
+
     <snapshot frequency='15s' prefix='dedupesnapshot' retain='2' />
 </deployment>

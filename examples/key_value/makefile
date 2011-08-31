@@ -23,7 +23,8 @@ compile: srccompile
 	$(VOLTCOMPILER) obj project.xml key_value_catalog.jar
 
 server: compile
-	$(VOLTDB) create catalog key_value_catalog.jar deployment deployment.xml
+	$(VOLTDB) create catalog key_value_catalog.jar deployment deployment.xml \
+        leader localhost
 
 client: async-benchmark
 

@@ -25,7 +25,8 @@ catalog: srccompile
 	$(VOLTCOMPILER) obj project.xml auction.jar
 
 server: catalog
-	$(VOLTDB) create catalog auction.jar deployment deployment.xml
+	$(VOLTDB) create catalog auction.jar deployment deployment.xml \
+        leader localhost
 
 client: srccompile
 	java -classpath obj:$(CLASSPATH) com.auctionexample.Client

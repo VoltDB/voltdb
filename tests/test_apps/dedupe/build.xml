@@ -30,7 +30,7 @@ PATHS AND PROPERTIES
 PRIMARY ENTRY POINTS
 ***************************************
 -->
-    
+
 <target name="main" depends="srccompile, catalog" description="default. Compile Java stored procedures and then run the VoltDB compiler on the stored procedures and schema to generate a catalog" />
 
 <target name="server" depends="srccompile" description="Start a VoltDB Server.">
@@ -47,6 +47,8 @@ PRIMARY ENTRY POINTS
         <arg value="catalog.jar"/>
         <arg value="deployment"/>
         <arg value="deployment.xml"/>
+        <arg value="leader"/>
+        <arg value="volt7b"/>
         <classpath refid='project.classpath'/>
         <assertions><disable/></assertions>
     </java>

@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <project name="General QA Application Build File" default="default">
-    
+
     <!-- Load environment -->
     <property environment="env"/>
 
@@ -43,7 +43,7 @@
         <pathelement location="${build.dir}"/>
         <pathelement path="${java.class.path}"/>
     </path>
-    
+
     <macrodef name="invoke-java-client">
         <attribute name="classname"/>
         <element name="javac" optional="true" implicit="true"/>
@@ -62,7 +62,7 @@
             </java>
         </sequential>
     </macrodef>
-    
+
     <macrodef name="invoke-java-server">
         <element name="javac" optional="true" implicit="true"/>
         <sequential>
@@ -89,13 +89,15 @@
                 <arg value="${port}" />
                 <arg value="internalport" />
                 <arg value="${internalport}" />
+                <arg value="leader"/>
+                <arg value="localhost"/>
             </java>
         </sequential>
     </macrodef>
-    
+
     <target name="default" depends="srccompile, proccompile, catalog, server" description="Compile and start server."/>
     <target name="build" depends="srccompile, proccompile, catalog" description="Compile everything."/>
-    
+
     <target name="clean" depends="config" description="Remove compilation artifacts">
         <delete failonerror="false" includeemptydirs="true">
             <fileset dir="${deployment.voltroot}"/>
@@ -107,20 +109,20 @@
             </fileset>
         </delete>
     </target>
-    
+
     <target name="srccompile">
         <mkdir dir="${build.dir}"/>
         <javac srcdir="${src.dir}" destdir="${build.dir}" debug="true" target="1.6" includeantruntime="false">
             <classpath refid="project.classpath"/>
         </javac>
     </target>
-    
+
     <target name="proccompile" if="procedures.dir">
         <javac srcdir="${procedures.dir}" destdir="${build.dir}" debug="true" target="1.6" includeantruntime="false">
             <classpath refid="project.classpath"/>
         </javac>
     </target>
-    
+
     <target name="catalog" depends="srccompile, proccompile" description="Compile the catalog using the schema and the DDL file">
         <java classname="org.voltdb.compiler.VoltCompiler" fork="yes" failonerror="true">
             <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
@@ -132,12 +134,12 @@
             </assertions>
         </java>
     </target>
-    
+
     <target name="server" description="Start the server and load the catalog.">
         <mkdir dir="${deployment.voltroot}" />
         <invoke-java-server />
     </target>
-    
+
     <target name="rejoin" description="Start the server and load the catalog.">
         <mkdir dir="${deployment.voltroot}" />
         <invoke-java-server>
@@ -145,7 +147,7 @@
             <arg value="${host}"/>
         </invoke-java-server>
     </target>
-    
+
     <target name="jiggle" description="Start the voter multi-threaded SyncClient application.">
         <invoke-java-client classname="com.JiggleClient">
             <arg value="--pool=50000000"/>
@@ -297,7 +299,7 @@ case $startStop in
         exit 1
       fi
     fi
-    
+
     if [ "$2" == "" ]; then
         nohup nice -n $VOLTDB_NICENESS $command &> "$log" < /dev/null &
     else
@@ -308,7 +310,7 @@ case $startStop in
     ;;
 
   (stop)
-    
+
     if [ -f $pid ]; then
       if kill -0 `cat $pid` > /dev/null 2>&1; then
         echo stopping

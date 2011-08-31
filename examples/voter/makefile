@@ -23,7 +23,8 @@ compile: srccompile
 	$(VOLTCOMPILER) obj project.xml voter.jar
 
 server: compile
-	$(VOLTDB) create catalog voter.jar deployment deployment.xml
+	$(VOLTDB) create catalog voter.jar deployment deployment.xml \
+        leader localhost
 
 client: async-benchmark
 

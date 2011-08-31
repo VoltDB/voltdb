@@ -20,7 +20,8 @@ compile: srccompile
 	$(VOLTCOMPILER) obj project.xml helloworld.jar
 
 server: compile
-	$(VOLTDB) create catalog helloworld.jar deployment deployment.xml
+	$(VOLTDB) create catalog helloworld.jar deployment deployment.xml \
+        leader localhost
 
 client: srccompile
 	java -classpath obj:$(CLASSPATH) Client
