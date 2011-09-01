@@ -77,7 +77,7 @@ public class SyncBenchmark
         @Override
         public void run()
         {
-            // Each thread gets its dedicated JDBC connection, and posts operations against it.
+            // Each thread gets its dedicated connection, and posts operations against it.
             ClientConnection con = null;
             try
             {

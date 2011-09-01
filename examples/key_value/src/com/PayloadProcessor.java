@@ -91,7 +91,12 @@ public class PayloadProcessor
 
     public Pair generateForStore()
     {
-        final String key = String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
+        return generateForStore(this.Rand.nextInt(this.PoolSize));
+    }
+
+    public Pair generateForStore(int index)
+    {
+        final String key = String.format(this.KeyFormat, index);
         final byte[] rawValue = Arrays.copyOfRange(this.ValueBase,0,this.MinValueSize+this.Rand.nextInt(this.MaxValueSize-this.MinValueSize+1));
         if (this.UseCompression)
             return new Pair(key, rawValue, gzip(rawValue));

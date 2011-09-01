@@ -20,12 +20,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-// Put stored procedure
-//
-//   Puts the given Key-Value pair
-
-
 package com.procedures;
 
 import org.voltdb.*;

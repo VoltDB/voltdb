@@ -1,5 +1,10 @@
 <?xml version="1.0"?>
 <project>
+    <info>
+        <name>VoltKV</name>
+        <version>1.0</version>
+        <description>High performance Key/Value data store implementation sample using VoltDB.</description>
+    </info>
     <database>
         <schemas>
             <schema path='ddl.sql' />

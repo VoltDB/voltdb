@@ -1,3 +1,4 @@
+-- Data store table
 CREATE TABLE store
 (
   key      varchar(250) not null
