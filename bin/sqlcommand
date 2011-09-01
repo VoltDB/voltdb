@@ -34,20 +34,11 @@ if [ "$JAVA_HOME" != "" ]; then
   JAVA=$JAVA_HOME/bin/java
 fi
 
-if [ -d "$VOLTDB_HOME/obj/release/prod" ]; then
-  CLASSPATH=$VOLTDB_HOME/obj/release/prod:$VOLTDB_HOME/third_party/java/obj
-  for f in $VOLTDB_HOME/third_party/java/jars/*.jar; do
-    CLASSPATH=${CLASSPATH}:$f;
-  done
-elif [ -d "$VOLTDB_HOME/obj/debug/prod" ]; then
-  CLASSPATH=$VOLTDB_HOME/obj/debug/prod:$VOLTDB_HOME/third_party/java/obj
-  for f in $VOLTDB_HOME/third_party/java/jars/*.jar; do
-    CLASSPATH=${CLASSPATH}:$f;
-  done
-elif [ -f "$VOLTDB_HOME/voltdb/voltdb-2.0.jar" ]; then
-  CLASSPATH=$VOLTDB_HOME/voltdb/voltdb-2.0.jar
+VOLTDBJAR=`ls $VOLTDB_HOME/voltdb/voltdb-2.*.jar`
+if [ -n "${VOLTDBJAR:+x}" ]; then
+  CLASSPATH=$VOLTDBJAR
 else
-  echo "Couldn't find compiled VoltDB to run."
+  echo "Couldn't find compiled VoltDB jar to run."
   exit 1
 fi
 
