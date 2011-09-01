@@ -467,7 +467,7 @@ DISTRIBUTION
     <copy tofile="${dist.dir}/README" file="README"/>
 
     <!-- populate top level thirdparty readme by copying it -->
-    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty.txt"/>
+    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty"/>
 
     <!-- populate the bin dir -->
     <copy todir="${dist.dir}/bin" >
@@ -654,7 +654,7 @@ DISTRIBUTION
     <copy tofile="${dist.dir}/README" file="README"/>
 
     <!-- populate top level thirdparty readmy by copying it -->
-    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty.txt"/>
+    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty"/>
 
     <!-- populate examples top level README -->
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
