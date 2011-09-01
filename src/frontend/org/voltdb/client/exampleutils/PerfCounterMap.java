@@ -16,16 +16,17 @@
  */
 package org.voltdb.client.exampleutils;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.voltdb.client.ClientResponse;
 
 public class PerfCounterMap
 {
-    private final HashMap<String,PerfCounter> Counters = new HashMap<String,PerfCounter>();
+    private final ConcurrentHashMap<String,PerfCounter> Counters = new ConcurrentHashMap<String,PerfCounter>();
 
     public PerfCounter get(String counter)
     {
+        // Admited: could get a little race condition at the very beginning, but all that'll happen is that we'll lose a handful of tracking event, a loss far outweighed by overall reduced contention.
         if (!this.Counters.containsKey(counter))
             this.Counters.put(counter, new PerfCounter(false));
         return this.Counters.get(counter);
