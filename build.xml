@@ -373,21 +373,10 @@ DISTRIBUTION
     </sequential>
 </macrodef>
 
-<target name="dist_internal" depends="compile, ee, voltdb.jar, voltdbclient.jar">
-    <!-- prepare release directory for new content -->
-    <delete includeemptydirs="true" failonerror='false'>
-        <fileset dir="${dist.dir}" includes="**/*" />
-    </delete>
-    <mkdir dir="${dist.dir}" />
-
-    <mkdir dir="${dist.dir}/doc" />
-    <mkdir dir="${dist.dir}/tools" />
-    <mkdir dir="${dist.dir}/voltdb" />
-    <mkdir dir="${dist.dir}/bin" />
-
+<target name="javadoc">
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
-        destdir="${dist.dir}/doc/procedure-api"
+        destdir="doc/javadoc/procedure-api"
         Public="true"
         version="true"
         use="true"
@@ -408,7 +397,7 @@ DISTRIBUTION
 
     <!-- populate selected client javadoc documentation -->
     <javadoc
-        destdir="${dist.dir}/doc/java-client-api"
+        destdir="doc/javadoc/java-client-api"
         access="protected"
         version="true"
         use="true"
@@ -434,6 +423,26 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
         </fileset>
     </javadoc>
+</target>
+
+<target name="dist_internal" depends="compile, ee, javadoc, voltdb.jar, voltdbclient.jar">
+    <!-- prepare release directory for new content -->
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${dist.dir}" includes="**/*" />
+    </delete>
+    <mkdir dir="${dist.dir}" />
+
+    <mkdir dir="${dist.dir}/doc" />
+    <mkdir dir="${dist.dir}/tools" />
+    <mkdir dir="${dist.dir}/voltdb" />
+    <mkdir dir="${dist.dir}/bin" />
+
+    <!-- populate the javadoc in the dist directory -->
+    <copy todir="${dist.dir}/doc/javadoc">
+        <fileset dir="doc/javadoc" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </copy>
 
     <!-- populate the logging configuration files -->
     <copy tofile="${dist.dir}/voltdb/log4j.properties" file="${src.gpl.dir}/log4j.properties"/>
@@ -577,7 +586,7 @@ DISTRIBUTION
     </zip>
 </target>
 
-<target name="dist_client" depends="compile, voltdbclient.jar"
+<target name="dist_client" depends="compile, javadoc, voltdbclient.jar"
         description="Hacky Java client package target">
     <!-- prepare release directory for new content -->
     <delete includeemptydirs="true" failonerror='false'>
@@ -589,55 +598,12 @@ DISTRIBUTION
     <mkdir dir="${dist.dir}/tools" />
     <mkdir dir="${dist.dir}/voltdb" />
 
-    <!-- populate selected server/compiler javadoc documentation -->
-    <javadoc
-        destdir="${dist.dir}/doc/procedure-api"
-        Public="true"
-        version="true"
-        use="true"
-        nodeprecated="true"
-        Overview='${src.gpl.dir}/overview-public.html'
-        Windowtitle='VoltDB Server APIs'>
-        <link href="${j2se_api}"/>
-        <classpath refid='project.classpath' />
-        <fileset dir="." defaultexcludes="yes">
-            <include name="src/frontend/org/voltdb/VoltTable.java" />
-            <include name="src/frontend/org/voltdb/VoltTableRow.java" />
-            <include name="src/frontend/org/voltdb/VoltProcedure.java" />
-            <include name="src/frontend/org/voltdb/SQLStmt.java" />
-            <include name="src/frontend/org/voltdb/VoltType.java" />
-            <include name="src/frontend/org/voltdb/ProcInfo.java" />
+    <!-- populate the javadoc in the dist directory -->
+    <copy todir="${dist.dir}/doc/javadoc">
+        <fileset dir="doc/javadoc" defaultexcludes="yes">
+            <include name="**"/>
         </fileset>
-    </javadoc>
-
-    <!-- populate selected client javadoc documentation -->
-    <javadoc
-        destdir="${dist.dir}/doc/java-client-api"
-        access="protected"
-        version="true"
-        use="true"
-        nodeprecated="true"
-        Overview='${src.gpl.dir}/overview-public.html'
-        Windowtitle='VoltDB Client APIs'>
-        <link href="${j2se_api}"/>
-        <classpath refid='project.classpath' />
-        <fileset dir="." defaultexcludes="yes">
-            <include name="src/frontend/org/voltdb/VoltTable.java" />
-            <include name="src/frontend/org/voltdb/VoltTableRow.java" />
-            <include name="src/frontend/org/voltdb/VoltClient.java" />
-            <include name="src/frontend/org/voltdb/VoltType.java" />
-            <include name="src/frontend/org/voltdb/client/Client.java" />
-            <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
-            <include name="src/frontend/org/voltdb/client/ProcedureCallback.java" />
-            <include name="src/frontend/org/voltdb/client/ClientFactory.java" />
-            <include name="src/frontend/org/voltdb/client/SyncCallback.java" />
-            <include name="src/frontend/org/voltdb/client/NullCallback.java" />
-            <include name="src/frontend/org/voltdb/client/ProcCallException.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
-            <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
-            <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
-        </fileset>
-    </javadoc>
+    </copy>
 
     <!-- populate the logging configuration files -->
     <copy tofile="${dist.dir}/voltdb/log4j.properties" file="${src.gpl.dir}/log4j.properties"/>
@@ -758,6 +724,9 @@ CLEANING
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf 20index.jar bingo.jar dedupe.jar measureoverhead.jar tpcc.jar'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf doc/javadoc/procedure-api/* doc/javadoc/java-client-api/*'"/>
   </exec>
 </target>
 
