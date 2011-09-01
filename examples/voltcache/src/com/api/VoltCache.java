@@ -22,10 +22,12 @@
  */
 package com.api;
 
-import java.util.concurrent.Future;
+import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.Hashtable;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
@@ -36,9 +38,10 @@ import org.voltdb.client.exampleutils.PerfCounterMap;
 
 public class VoltCache implements IVoltCache
 {
+    private static final Lock lock = new ReentrantLock();
     // Pool of cleanup tasks: we need to ensure there is one background thread running to scrub out expired
     // items from the cache for a given cluster connection.
-    private static Hashtable<String,CleanupTask> CleanupTaskPool = new Hashtable<String,CleanupTask>();
+    private static HashMap<String,CleanupTask> CleanupTaskPool = new HashMap<String,CleanupTask>();
 
     /*
      * Timer task wrapper to scrub out expired items from the cache
@@ -102,13 +105,18 @@ public class VoltCache implements IVoltCache
         this.Port = port;
         this.Connection = ClientConnectionPool.get(servers, port);
         // Make sure there is at least one cleanup task for this cluster
-        synchronized(NullCallback)
+        lock.lock();
+        try
         {
             String key = this.Servers + ":" + this.Port;
             if (!CleanupTaskPool.containsKey(key))
                 CleanupTaskPool.put(key, new CleanupTask(this.Servers, this.Port));
             else
                 CleanupTaskPool.get(key).use();
+        }
+        finally
+        {
+            lock.unlock();
         }
     }
 
@@ -119,12 +127,17 @@ public class VoltCache implements IVoltCache
     {
         ClientConnectionPool.dispose(this.Connection);
         // Deal with cleanup task
-        synchronized(NullCallback)
+        lock.lock();
+        try
         {
             String key = this.Servers + ":" + this.Port;
             CleanupTaskPool.get(key).dispose();
             if (CleanupTaskPool.get(key).Users <= 0)
                 CleanupTaskPool.remove(key);
+        }
+        finally
+        {
+            lock.unlock();
         }
     }
 
