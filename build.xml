@@ -490,7 +490,8 @@ DISTRIBUTION
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
 
     <!-- populate the examples -->
-    <distribute-example exampledir="key_value"/>
+    <distribute-example exampledir="voltcache"/>
+    <distribute-example exampledir="voltkv"/>
     <distribute-example exampledir="voter"/>
 
     <!-- populate the tools -->
@@ -626,7 +627,8 @@ DISTRIBUTION
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
 
     <!-- populate the examples -->
-    <distribute-example exampledir="key_value"/>
+    <distribute-example exampledir="voltcache"/>
+    <distribute-example exampledir="voltkv"/>
     <distribute-example exampledir="voter"/>
 
     <!-- populate the tools -->
@@ -1579,7 +1581,8 @@ TEST CASES
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
 
-    <samplecheck app="key_value" />
+    <samplecheck app="voltcache" />
+    <samplecheck app="voltkv" />
     <samplecheck app="voter" />
 
     <!-- test the generator -->

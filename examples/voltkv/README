@@ -1,7 +1,7 @@
 Key-Value application
 ===========================
 
-This example application demonstrates how to create a "Key-Value" in VoltDB.
+This example application demonstrates how to create a "Key-Value" store in VoltDB.
 
 Many attributes of the application are customizable through arguments passed to the client, including:
 

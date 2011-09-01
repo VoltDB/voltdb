@@ -4,8 +4,8 @@ if [ "`ps aux | grep java | grep voter | grep -v grep | awk 'END {print NR}'`" !
     kill `ps aux | grep java | grep voter | grep -v grep | awk '{print $2}'`
 fi
 
-if [ "`ps aux | grep java | grep key_value | grep -v grep | awk 'END {print NR}'`" != "0" ]; then
-    kill `ps aux | grep java | grep key_value | grep -v grep | awk '{print $2}'`
+if [ "`ps aux | grep java | grep voltkv | grep -v grep | awk 'END {print NR}'`" != "0" ]; then
+    kill `ps aux | grep java | grep voltkv | grep -v grep | awk '{print $2}'`
 fi
 
 # if the system thinks it has an gnome-terminal in the path it's gnome linux
