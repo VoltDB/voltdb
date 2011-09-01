@@ -1,6 +1,7 @@
-CLASSPATH = ../../obj/release/prod:../../lib
+CLASSPATH = ../../voltdb/voltdb-2.0.jar:../../lib
 VOLTDB = ../../bin/voltdb
 VOLTCOMPILER = ../../bin/voltcompiler
+LICENSE = ../../voltdb/license.xml
 
 .PHONY: main clean srccompile compile server client
 
@@ -9,7 +10,7 @@ main: server
 clean:
 	rm -rf obj
 	rm -rf debugoutput
-	rm -rf voltcache.jar
+	rm -f voltcache.jar
 	rm -rf plannerlog.txt
 	rm -rf voltdbroot
 
@@ -24,7 +25,9 @@ compile: srccompile
 	$(VOLTCOMPILER) obj project.xml voltcache.jar
 
 server: compile
-	$(VOLTDB) create catalog voltcache.jar deployment deployment.xml
+	$(VOLTDB) create catalog voltcache.jar \
+	    deployment deployment.xml license $(LICENSE) \
+	    leader localhost
 
 client: benchmark
 
