@@ -13,7 +13,6 @@
             <procedure class='com.procedures.Initialize' />
             <procedure class='com.procedures.Results' />
             <procedure class='com.procedures.Vote' />
-            <procedure class='com.procedures.ContestantResultsByAreaCode' />
             <procedure class='com.procedures.ContestantWinningStates' />
             <procedure class='com.procedures.GetStateHeatmap' />
         </procedures>

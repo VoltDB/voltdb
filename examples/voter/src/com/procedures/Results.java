@@ -39,7 +39,7 @@ public class Results extends VoltProcedure
     public final SQLStmt resultStmt = new SQLStmt( "   SELECT a.contestant_name   AS contestant_name"
                                                  + "        , a.contestant_number AS contestant_number"
                                                  + "        , SUM(b.num_votes)    AS total_votes"
-                                                 + "     FROM v_votes_by_contestant_number AS b"
+                                                 + "     FROM v_votes_by_contestant_number_state AS b"
                                                  + "        , contestants AS a"
                                                  + "    WHERE a.contestant_number = b.contestant_number"
                                                  + " GROUP BY a.contestant_name"

@@ -3,7 +3,7 @@ CREATE TABLE contestants
 (
   contestant_number integer     NOT NULL
 , contestant_name   varchar(50) NOT NULL
-, CONSTRAINT PK_contestants_Hash_index PRIMARY KEY
+, CONSTRAINT PK_contestants PRIMARY KEY
   (
     contestant_number
   )
@@ -14,7 +14,6 @@ CREATE TABLE contestants
 CREATE TABLE votes
 (
   phone_number       bigint     NOT NULL
-, area_code          smallint   NOT NULL
 , state              varchar(2) NOT NULL
 , contestant_number  integer    NOT NULL
 -- PARTITION BY ( phone_number )
@@ -25,14 +24,14 @@ CREATE TABLE area_code_state
 (
   area_code smallint   NOT NULL
 , state     varchar(2) NOT NULL
-, CONSTRAINT PK_area_code_state_hash_index PRIMARY KEY
+, CONSTRAINT PK_area_code_state PRIMARY KEY
   (
     area_code
   )
 );
 
 -- Supporting index on the vote table for business rule validation ("no more than <x> votes per phone number")
-CREATE INDEX idx_votes_hash_index ON votes (phone_number);
+--CREATE INDEX idx_votes ON votes (phone_number);
 
 -- rollup of votes by phone number, used to reject excessive voting
 CREATE VIEW v_votes_by_phone_number
@@ -47,36 +46,7 @@ AS
  GROUP BY phone_number
 ;
 
--- rollup of votes by contestant, used to determine winner
-CREATE VIEW v_votes_by_contestant_number
-(
-  contestant_number
-, num_votes
-)
-AS
-   SELECT contestant_number
-        , COUNT(*)
-     FROM votes
- GROUP BY contestant_number
-;
-
--- rollup of votes by contestant and area-code
-CREATE VIEW v_votes_by_contestant_number_area_code
-(
-  contestant_number
-, area_code
-, num_votes
-)
-AS
-   SELECT contestant_number
-        , area_code
-        , COUNT(*)
-     FROM votes
- GROUP BY contestant_number
-        , area_code
-;
-
--- rollup of votes by contestant and state
+-- rollup of votes by contestant and state for the heat map and results
 CREATE VIEW v_votes_by_contestant_number_state
 (
   contestant_number
@@ -90,30 +60,5 @@ AS
      FROM votes
  GROUP BY contestant_number
         , state
-;
-
--- rollup of votes by area-code
-CREATE VIEW v_votes_by_area_code
-(
-  area_code
-, num_votes
-)
-AS
-   SELECT area_code
-        , COUNT(*)
-     FROM votes
- GROUP BY area_code
-;
--- rollup of votes by state
-CREATE VIEW v_votes_by_state
-(
-  state
-, num_votes
-)
-AS
-   SELECT state
-        , COUNT(*)
-     FROM votes
- GROUP BY state
 ;
 
