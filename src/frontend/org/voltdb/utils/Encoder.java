@@ -111,9 +111,13 @@ public class Encoder {
     public static boolean isHexEncodedString(String hexString) {
         if ((hexString.length() % 2) != 0)
             return false;
-        for (int i = 0; i < hexString.length(); i++) {
-            int value = Integer.parseInt(hexString.substring(i, i + 1), 16);
-            if ((value < 0) || (value > 15)) return false;
+        try {
+            for (int i = 0; i < hexString.length(); i++) {
+                int value = Integer.parseInt(hexString.substring(i, i + 1), 16);
+                if ((value < 0) || (value > 15)) return false;
+            }
+        } catch (NumberFormatException e) {
+            return false;
         }
         return true;
     }

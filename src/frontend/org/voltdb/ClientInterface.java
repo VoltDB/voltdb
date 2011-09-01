@@ -1062,8 +1062,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
 
                 byte[] catalogBytes = null;
-                if (params.m_params[0] instanceof String &&
-                    Encoder.isHexEncodedString((String) params.m_params[0])) {
+                boolean isHex = false;
+                if (params.m_params[0] instanceof String) {
+                    isHex = Encoder.isHexEncodedString((String) params.m_params[0]);
+                }
+                if (isHex) {
                     catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
                 } else if (params.m_params[0] instanceof byte[]) {
                     catalogBytes = (byte[]) params.m_params[0];
