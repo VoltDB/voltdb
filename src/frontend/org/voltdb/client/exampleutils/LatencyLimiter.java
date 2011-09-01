@@ -16,6 +16,10 @@
  */
 package org.voltdb.client.exampleutils;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+
 public class LatencyLimiter implements IRateLimiter
 {
     private final ClientConnection Connection;
@@ -26,6 +30,8 @@ public class LatencyLimiter implements IRateLimiter
     private long Rate;
     private final RateLimiter Limiter;
     private long LastCheck;
+    private final SimpleDateFormat DateFormat;
+    private final long StartTime;
     public LatencyLimiter(ClientConnection connection, String procedure, double targetLatency, long initialMaxProcessPerSecond)
     {
         this.Connection = connection;
@@ -36,6 +42,9 @@ public class LatencyLimiter implements IRateLimiter
         this.Rate = initialMaxProcessPerSecond;
         this.Limiter = new RateLimiter(this.Rate);
         this.LastCheck = System.currentTimeMillis();
+        this.DateFormat = new SimpleDateFormat("HH:mm:ss");
+        this.DateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        this.StartTime = System.currentTimeMillis();
     }
 
     public void throttle()
@@ -83,7 +92,13 @@ public class LatencyLimiter implements IRateLimiter
                     this.Rate = (long)(this.Rate*1.001);
 
                 if (showTuningMessages && oldRate != this.Rate)
-                    System.out.printf("Observed Latency (ms): %8.2f | Adjusting TPS %s to: %,d\n", tuningLatency, (oldRate < this.Rate ? "Up" : "Down"), this.Rate);
+                    System.out.printf(
+                      "%8s | Adjusting %s to:  %,11.1f TPS | Recent Latency :  %7.2f\n"
+                    , this.DateFormat.format(new Date(Math.round((System.currentTimeMillis()-this.StartTime)/1000d)*1000l))
+                    , (oldRate < this.Rate ? " UP " : "DOWN")
+                    , (double)this.Rate
+                    , tuningLatency
+                    );
             }
             this.Start = (PerfCounter)this.End.clone();
             this.End = ClientConnectionPool.getStatistics(this.Connection).get(this.Procedure);
