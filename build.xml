@@ -322,8 +322,8 @@ DISTRIBUTION
         <arg line="${build.dir}/voltbin"/>
     </exec>
     <!-- populate the logging configuration files -->
-    <copy tofile="${build.dir}/voltbin/log4j.properties" file="${src.gpl.dir}/log4j.properties"/>
-    <copy tofile="${build.dir}/voltbin/log4j.xml" file="${src.gpl.dir}/log4j.xml"/>
+    <copy tofile="${build.dir}/voltbin/log4j.properties" file="voltdb/log4j.properties"/>
+    <copy tofile="${build.dir}/voltbin/log4j.xml" file="voltdb/log4j.xml"/>
   </sequential>
 </macrodef>
 
@@ -446,8 +446,8 @@ DISTRIBUTION
     </copy>
 
     <!-- populate the logging configuration files -->
-    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="${src.gpl.dir}/log4j.properties"/>
-    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="${src.gpl.dir}/log4j.xml"/>
+    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="voltdb/log4j.properties"/>
+    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="voltdb/log4j.xml"/>
 
     <!-- populate java and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
@@ -607,8 +607,8 @@ DISTRIBUTION
     </copy>
 
     <!-- populate the logging configuration files -->
-    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="${src.gpl.dir}/log4j.properties"/>
-    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="${src.gpl.dir}/log4j.xml"/>
+    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="voltdb/log4j.properties"/>
+    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="voltdb/log4j.xml"/>
 
     <!-- populate java and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
