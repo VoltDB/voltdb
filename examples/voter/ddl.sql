@@ -30,9 +30,6 @@ CREATE TABLE area_code_state
   )
 );
 
--- Supporting index on the vote table for business rule validation ("no more than <x> votes per phone number")
---CREATE INDEX idx_votes ON votes (phone_number);
-
 -- rollup of votes by phone number, used to reject excessive voting
 CREATE VIEW v_votes_by_phone_number
 (
