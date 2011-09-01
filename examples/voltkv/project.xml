@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.procedures.Initialize' />
+            <procedure class='com.procedures.Get' />
+            <procedure class='com.procedures.Put' />
+            <procedure class='com.procedures.Remove' />
+        </procedures>
+        <partitions>
+            <partition table='store' column='key' />
+        </partitions>
+    </database>
+</project>
