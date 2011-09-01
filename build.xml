@@ -360,6 +360,11 @@ DISTRIBUTION
                 <include name="**/*"/>
             </fileset>
         </copy>
+        <chmod perm="ugo+rx">
+          <fileset dir="${dist.dir}/examples/@{exampledir}" defaultexcludes="yes">
+            <include name="run.sh"/>
+          </fileset>
+        </chmod>
     </sequential>
 </macrodef>
 
