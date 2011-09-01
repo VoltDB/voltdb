@@ -6,22 +6,22 @@ VOLTCOMPILER="../../../bin/voltcompiler"
 
 # remove build artifacts
 function clean() {
-	rm -rf obj
-	rm -rf debugoutput
-	rm helloworld.jar
-	rm -rf voltdbroot
+    rm -rf obj
+    rm -rf debugoutput
+    rm helloworld.jar
+    rm -rf voltdbroot
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
-	mkdir -p obj
-	javac -classpath $CLASSPATH -d obj *.java
+    mkdir -p obj
+    javac -classpath $CLASSPATH -d obj *.java
 }
 
 # build an application catalog
 function compile() {
     srccompile
-	$VOLTCOMPILER obj project.xml helloworld.jar
+    $VOLTCOMPILER obj project.xml helloworld.jar
 }
 
 # run the voltdb server locally
@@ -29,13 +29,13 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f helloworld.jar ]; then compile; fi
     # run the server
-	$VOLTDB create catalog helloworld.jar deployment deployment.xml
+    $VOLTDB create catalog helloworld.jar deployment deployment.xml
 }
 
 # run the client that drives the example
 function client() {
     srccompile
-	java -classpath obj:$CLASSPATH Client
+    java -classpath obj:$CLASSPATH Client
 }
 
 # Run the target passed as the first arg on the command line
