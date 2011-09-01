@@ -373,7 +373,7 @@ DISTRIBUTION
             </fileset>
         </copy>
         <chmod perm="ugo+rx">
-          <fileset dir="${dist.dir}/examples/@{exampledir}" defaultexcludes="yes">
+          <fileset dir="${dist.dir}/@{exampleparent}/@{exampledir}" defaultexcludes="yes">
             <include name="run.sh"/>
           </fileset>
         </chmod>
