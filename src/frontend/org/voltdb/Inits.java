@@ -381,7 +381,9 @@ public class Inits {
             m_rvdb.m_jsonEnabled = false;
             if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
                 httpPort = m_deployment.getHttpd().getPort();
-                m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
+                if (m_deployment.getHttpd().getJsonapi() != null) {
+                    m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
+                }
             }
 
             // if not set by the user, just find a free port
