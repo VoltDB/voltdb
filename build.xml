@@ -735,9 +735,13 @@ DISTRIBUTION
 
     <!-- populate java and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
+        <fileset dir="voltdb" defaultexcludes="yes">
+            <include name="voltdb-${dist.version}.jar" />
+            <include name="voltdbclient-${dist.version}.jar" />
+        </fileset>
+    </copy>
+    <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="${build.dir}" defaultexcludes="yes">
-            <include name="prod/voltdb-${dist.version}.jar" />
-            <include name="prod/voltdbclient-${dist.version}.jar" />
             <include name="nativelibs/libvoltdb*" />
         </fileset>
     </copy>
