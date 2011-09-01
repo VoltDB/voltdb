@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -653,18 +654,8 @@ SnapshotCompletionInterest {
         sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
 
         // Negotiate with other hosts about which snapshot to restore
-        SnapshotInfo last = null;
         Set<SnapshotInfo> lastSnapshot = getRestorePlan();
-        if (lastSnapshot != null) {
-            Iterator<SnapshotInfo> i = lastSnapshot.iterator();
-            while (i.hasNext()) {
-                last = i.next();
-                break;
-            }
-            assert(last != null);
-            assert(last.hostId != -1);
-            LOG.debug("Snapshot to restore: " + last.txnId);
-        }
+        SnapshotInfo infoWithMinHostId = pickSnapshotInfo(lastSnapshot);
 
         /*
          * Generate the replay plan here so that we don't have to wait until the
@@ -674,7 +665,33 @@ SnapshotCompletionInterest {
             m_replayAgent.generateReplayPlan();
         }
 
-        return last;
+        return infoWithMinHostId;
+    }
+
+    /**
+     * Picks a snapshot info for restore. A single snapshot might have different
+     * files scattered across multiple machines. All nodes must pick the same
+     * SnapshotInfo or different nodes will generate different plans.
+     *
+     * @param lastSnapshot The snapshot to restore from
+     * @return A single snapshot info
+     */
+    static SnapshotInfo pickSnapshotInfo(Collection<SnapshotInfo> lastSnapshot) {
+        SnapshotInfo infoWithMinHostId = null;
+        if (lastSnapshot != null) {
+            Iterator<SnapshotInfo> i = lastSnapshot.iterator();
+            while (i.hasNext()) {
+                SnapshotInfo next = i.next();
+                if (infoWithMinHostId == null ||
+                    next.hostId < infoWithMinHostId.hostId) {
+                    infoWithMinHostId = next;
+                }
+            }
+            assert(infoWithMinHostId != null);
+            assert(infoWithMinHostId.hostId != -1);
+            LOG.debug("Snapshot to restore: " + infoWithMinHostId.txnId);
+        }
+        return infoWithMinHostId;
     }
 
     /**

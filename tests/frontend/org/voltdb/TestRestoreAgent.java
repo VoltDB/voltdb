@@ -650,6 +650,27 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         }
     }
 
+    @Test
+    public void testConsistentRestorePlan() {
+        List<SnapshotInfo> infos = new ArrayList<SnapshotInfo>();
+        SnapshotInfo info1 = new SnapshotInfo(0, "blah", "nonce", 3, 0, 0);
+        SnapshotInfo info2 = new SnapshotInfo(0, "blah", "nonce", 3, 0, 1);
+
+        infos.add(info1);
+        infos.add(info2);
+        SnapshotInfo pickedInfo = RestoreAgent.pickSnapshotInfo(infos);
+        assertNotNull(pickedInfo);
+        assertEquals(0, pickedInfo.hostId);
+
+        // Inverse the order we add infos
+        infos.clear();
+        infos.add(info2);
+        infos.add(info1);
+        pickedInfo = RestoreAgent.pickSnapshotInfo(infos);
+        assertNotNull(pickedInfo);
+        assertEquals(0, pickedInfo.hostId);
+    }
+
     @Override
     public void onRestoreCompletion(long txnId) {
         if (snapshotTxnId != null) {

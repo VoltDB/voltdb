@@ -585,8 +585,10 @@ public class Inits {
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others
                 if (catalog != null) {
+                    hostLog.debug("Found catalog to load on host " + catalog.getFirst() +
+                                  ": " + catalog.getSecond());
                     m_rvdb.m_hostIdWithStartupCatalog = catalog.getFirst().intValue();
-                    assert(m_rvdb.m_hostIdWithStartupCatalog > 0);
+                    assert(m_rvdb.m_hostIdWithStartupCatalog >= 0);
                     m_rvdb.m_pathToStartupCatalog = catalog.getSecond();
                     assert(m_rvdb.m_pathToStartupCatalog != null);
                 }
