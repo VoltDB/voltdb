@@ -437,10 +437,11 @@ DISTRIBUTION
     <mkdir dir="${dist.dir}/voltdb" />
     <mkdir dir="${dist.dir}/bin" />
 
-    <!-- populate the javadoc in the dist directory -->
-    <copy todir="${dist.dir}/doc/javadoc">
-        <fileset dir="doc/javadoc" defaultexcludes="yes">
-            <include name="**"/>
+    <!-- populate the doc dir -->
+    <copy todir="${dist.dir}/doc/">
+        <fileset dir="doc" defaultexcludes="yes">
+            <include name="**/**"/>
+            <exclude name=".gitignore"/>
         </fileset>
     </copy>
 
@@ -489,8 +490,6 @@ DISTRIBUTION
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
 
     <!-- populate the examples -->
-    <distribute-example exampledir="tutorial/auction"/>
-    <distribute-example exampledir="tutorial/helloworld"/>
     <distribute-example exampledir="key_value"/>
     <distribute-example exampledir="voter"/>
 
@@ -598,10 +597,11 @@ DISTRIBUTION
     <mkdir dir="${dist.dir}/tools" />
     <mkdir dir="${dist.dir}/voltdb" />
 
-    <!-- populate the javadoc in the dist directory -->
-    <copy todir="${dist.dir}/doc/javadoc">
-        <fileset dir="doc/javadoc" defaultexcludes="yes">
-            <include name="**"/>
+    <!-- populate the doc dir -->
+    <copy todir="${dist.dir}/doc/">
+        <fileset dir="doc" defaultexcludes="yes">
+            <include name="**/**"/>
+            <exclude name=".gitignore"/>
         </fileset>
     </copy>
 
@@ -626,8 +626,6 @@ DISTRIBUTION
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
 
     <!-- populate the examples -->
-    <distribute-example exampledir="tutorial/auction"/>
-    <distribute-example exampledir="tutorial/helloworld"/>
     <distribute-example exampledir="key_value"/>
     <distribute-example exampledir="voter"/>
 
@@ -1581,7 +1579,6 @@ TEST CASES
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
 
-    <samplecheck app="tutorial/auction" />
     <samplecheck app="key_value" />
     <samplecheck app="voter" />
 
