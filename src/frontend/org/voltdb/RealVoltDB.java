@@ -777,9 +777,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
         String startAction = m_config.m_startAction.toString();
-        String startActionLog = (startAction.substring(0, 1).toUpperCase() +
-                                 startAction.substring(1).toLowerCase() +
-                                 " database.");
+        String startActionLog = "Database start action is " + (startAction.substring(0, 1).toUpperCase() +
+                                 startAction.substring(1).toLowerCase()) + ".";
         if (m_config.m_startAction == START_ACTION.START) {
             startActionLog += " Will create a new database if there is nothing to recover from.";
         }
@@ -844,9 +843,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public void writeNetworkCatalogToTmp(byte[] catalogBytes) {
-        hostLog.info("Got a catalog!");
+        hostLog.debug("Got a catalog!");
 
-        hostLog.info(String.format("Got %d catalog bytes", catalogBytes.length));
+        hostLog.debug(String.format("Got %d catalog bytes", catalogBytes.length));
 
         String prefix = String.format("catalog-host%d-", m_myHostId);
 

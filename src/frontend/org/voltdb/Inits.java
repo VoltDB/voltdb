@@ -236,7 +236,7 @@ public class Inits {
                         fin.close();
                     }
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
-                    hostLog.info(String.format("Sending %d catalog bytes", catalogBytes.length));
+                    hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
                     m_rvdb.m_messenger.sendCatalog(catalogBytes);
                 }
