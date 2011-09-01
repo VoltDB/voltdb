@@ -288,7 +288,7 @@ PRIMARY ENTRY POINTS
 </target>
 
 <target name="all"
-    depends="compile, ee, junit, eecheck, doc, eedoc, jars"
+    depends="compile, ee, junit, eecheck, javadoc, jars"
     description="Do all tasks."
 />
 <target name="jars"
@@ -963,35 +963,6 @@ JAVA COMPILATION
   <antcall target="voltpro.compile"/>
 </target>
 
-<!--
-***************************************
-DOCUMENTATION
-***************************************
--->
-
-<target name="doc" description="Create Java doc files.">
-    <javadoc
-        destdir="${doc.dir}/java-api"
-        version="true"
-        use="true"
-        Overview='${src.gpl.dir}/overview.html'>
-        <classpath refid='project.classpath' />
-        <link href="${j2se_api}"/>
-        <fileset dir="." defaultexcludes="yes">
-            <include name="src/frontend/org/voltdb/**/*.java"/>
-        </fileset>
-    </javadoc>
-</target>
-
-<taskdef
-    name="doxygen"
-    classname="org.doxygen.tools.DoxygenTask"
-    classpath="${vendor.lib.dir}/ant_doxygen.jar"
-/>
-<target name="eedoc"
-    description="Generate doxygen C++ execution engine documentation.">
-    <doxygen configfilename="${doc.dir}/Doxyfile" />
-</target>
 
 <!--
 ***************************************
