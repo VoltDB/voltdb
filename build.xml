@@ -296,9 +296,21 @@ PRIMARY ENTRY POINTS
     description="Create production JAR files."
 />
 <target name="dist"
-    depends="dist_client, dist_internal"
+    depends="dist_client, dist_internal, dist_voltcache, dist_voltkv"
     description="Create VoltDB release packages with examples and documentation."
 />
+<target name="dist_voltcache"
+        description="Create VoltDB release package with VoltCache reference app.">
+    <antcall target="dist_refapp">
+        <param name="appname" value="voltcache" />
+    </antcall>
+</target>
+<target name="dist_voltkv"
+        description="Create VoltDB release package with VoltKV reference app.">
+    <antcall target="dist_refapp">
+        <param name="appname" value="voltkv" />
+    </antcall>
+</target>
 
 <!--
 ***************************************
