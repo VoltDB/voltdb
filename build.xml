@@ -451,9 +451,13 @@ DISTRIBUTION
 
     <!-- populate java and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
+        <fileset dir="voltdb" defaultexcludes="yes">
+            <include name="voltdb-${dist.version}.jar" />
+            <include name="voltdbclient-${dist.version}.jar" />
+        </fileset>
+    </copy>
+    <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="${build.dir}" defaultexcludes="yes">
-            <include name="prod/voltdb-${dist.version}.jar" />
-            <include name="prod/voltdbclient-${dist.version}.jar" />
             <include name="nativelibs/libvoltdb*" />
         </fileset>
     </copy>
@@ -612,8 +616,8 @@ DISTRIBUTION
 
     <!-- populate java and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
-        <fileset dir="${build.dir}" defaultexcludes="yes">
-            <include name="prod/voltdbclient-${dist.version}.jar" />
+        <fileset dir="voltdb" defaultexcludes="yes">
+            <include name="voltdbclient-${dist.version}.jar" />
         </fileset>
     </copy>
 
@@ -752,7 +756,7 @@ JAR BUILDING
 </target>
 
 <target name="voltdb.jar" depends="compile, buildinfo">
-    <jar destfile="${build.prod.dir}/voltdb-${dist.version}.jar">
+    <jar destfile="voltdb/voltdb-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
             <include name="org/hsqldb_voltpatches/**" />
@@ -792,7 +796,7 @@ JAR BUILDING
 </target>
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">
-    <jar destfile="${build.prod.dir}/voltdbclient-${dist.version}.jar">
+    <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
