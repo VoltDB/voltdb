@@ -1,0 +1,158 @@
+<?xml version="1.0" ?>
+<project default="default" name="VoltCache">
+
+<!-- ***************************************
+     SHARED PATHS AND PROPERTIES
+     *************************************** -->
+<property name='catalog' value='voltcache.jar'/>
+
+<property name='voltdb.dir'            location='../../obj/release/dist/voltdb/'/>
+
+<property name='build.dir'             location='obj/'/>
+<property name='src.dir'               location='src/'/>
+<property name='debugoutput.dir'       location='debugoutput/'/>
+<property name='junit.haltonfailure'   value='true'/>
+<property name='log4j.configuration'   location='${voltdb.dir}/log4j.properties'/>
+
+<path id='project.classpath'>
+    <fileset dir='${voltdb.dir}' >
+        <include name='voltdb*.jar' />
+    </fileset>
+<!--
+    <fileset dir='./lib' >
+        <include name='*.jar' />
+    </fileset>
+-->
+    <pathelement location='${build.dir}' />
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<!-- ***************************************
+     MACROS
+     *************************************** -->
+
+<!-- Example client use this for default jvm arguments. -->
+<macrodef name="invoke-java">
+  <attribute name="classname"/>
+  <element name="javac" optional="true" implicit="true"/>
+  <sequential>
+    <java fork="yes" failonerror="true" classname="@{classname}">
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+        <jvmarg value="-XX:HeapDumpPath=/tmp" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <classpath refid='project.classpath'/>
+        <assertions><disable/></assertions>
+        <javac/>
+    </java>
+  </sequential>
+</macrodef>
+
+<!-- ***************************************
+     CONCRETE SHARED TARGETS
+     *************************************** -->
+
+<target name="default" depends="srccompile, proccompile, catalog, server"
+        description="Compile and start server."/>
+
+<target name="build" depends="srccompile, proccompile, catalog"
+        description="Compile all code files and catalog."/>
+
+<target name="clean" description="Remove compilation artifacts">
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${build.dir}" includes="**/*" />
+        <fileset dir="${debugoutput.dir}" includes="**/*" />
+        <fileset dir="." defaultexcludes="yes" >
+            <include name="${catalog}" />
+        </fileset>
+    </delete>
+</target>
+
+<!-- Some examples override srccompileImpl to add additional srcs or dependencies -->
+<target name="srccompile">
+    <mkdir dir='${build.dir}' />
+    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true' includeAntRuntime='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+<target name="proccompile" if="procedures.dir">
+    <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true' includeAntRuntime='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+<target name="catalog" depends="srccompile, proccompile" description="Compile the catalog using the schema and the DDL file" >
+    <java fork="yes" failonerror="true" classname="org.voltdb.compiler.VoltCompiler" >
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
+        <arg value="project.xml"/> <!-- project file -->
+        <arg value="${catalog}"/> <!-- output -->
+        <classpath refid='project.classpath' />
+        <assertions><disable/></assertions>
+    </java>
+</target>
+
+<target name="server" description="Start the server and load the catalog." >
+    <java fork="yes" classname="org.voltdb.VoltDB" >
+        <jvmarg value="-Djava.library.path=${voltdb.dir}" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+        <jvmarg value="-XX:HeapDumpPath=/tmp" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
+        <arg value="catalog" />
+        <arg value="${catalog}" />
+        <arg value="deployment" />
+        <arg value="deployment.xml" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<target name="client" description="Start the Memcache Interface Server (performs protocol translation between Memcache client and VoltCache server).">
+    <invoke-java  classname="com.BenchmarkClient">
+        <arg value="--servers=localhost"/>
+        <arg value="--port=21212"/>
+        <arg value="--pool=100000"/>
+        <arg value="--key-size=32"/>
+        <arg value="--value-size=1000"/>
+        <arg value="--get-put-ratio=50"/>
+        <arg value="--threads=200"/>
+        <arg value="--duration=25"/>
+    </invoke-java>
+</target>
+
+<target name="mic" description="Start the Memcache Interface Client (Basic testing for 'mis' during coding - to be replaced by true Memcache client later).">
+    <invoke-java  classname="com.MemcacheClient">
+        <arg value="--mservers=localhost"/>
+        <arg value="--mport=11212"/>
+    </invoke-java>
+</target>
+
+<target name="benchmark-direct" description="Run a benchmark directly against the server, no interface client needed.">
+    <invoke-java  classname="com.BenchmarkDirect">
+        <arg value="--servers=localhost"/>
+        <arg value="--port=21212"/>
+    </invoke-java>
+</target>
+
+<target name="jmemcached" description="Start the JavaMemcached Benchmark.">
+    <invoke-java  classname="net.rubyeye.memcached.benchmark.java_memcached.JavaMemCached">
+    </invoke-java>
+</target>
+<target name="smemcached" description="Start the Spymemcached Benchmark.">
+    <invoke-java  classname="net.rubyeye.memcached.benchmark.spymemcached.Spymemcached">
+    </invoke-java>
+</target>
+<target name="xmemcached" description="Start the Xmemcached Benchmark.">
+    <invoke-java  classname="net.rubyeye.memcached.benchmark.xmemcached.Xmemcached">
+    </invoke-java>
+</target>
+<target name="analyze" description="Generate Charts, etc.">
+    <invoke-java  classname="net.rubyeye.memcached.benchmark.result_analyse.ResultAnalyser">
+    </invoke-java>
+</target>
+
+</project>
