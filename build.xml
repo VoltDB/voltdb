@@ -352,9 +352,10 @@ DISTRIBUTION
 <!-- Copy an example and move the basebuild.xml into that example -->
 <macrodef name="distribute-example">
     <attribute name="exampledir"/>
+    <attribute name="exampleparent" default="examples"/>
     <sequential>
-        <mkdir dir="${dist.dir}/examples/@{exampledir}" />
-        <copy todir="${dist.dir}/examples/@{exampledir}">
+        <mkdir dir="${dist.dir}/@{exampleparent}/@{exampledir}" />
+        <copy todir="${dist.dir}/@{exampleparent}/@{exampledir}">
             <fileset dir="examples/@{exampledir}" defaultexcludes="yes">
                 <include name="**/*"/>
             </fileset>
@@ -695,6 +696,90 @@ DISTRIBUTION
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}"/>
+        <arg value="${raw.dist.dir}/dist"/>
+    </exec>
+</target>
+
+<target name="dist_refapp" depends="compile, ee, javadoc, voltdb.jar, voltdbclient.jar"
+        description="Build a kit that only includes a single reference app">
+    <fail unless="appname" message="must specify an app name with -Dappname=" />
+
+    <!-- prepare release directory for new content -->
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${dist.dir}" includes="**/*" />
+    </delete>
+    <mkdir dir="${dist.dir}" />
+
+    <mkdir dir="${dist.dir}/src" />
+    <mkdir dir="${dist.dir}/voltdb" />
+
+    <!-- populate the logging configuration files -->
+    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="voltdb/log4j.properties"/>
+    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="voltdb/log4j.xml"/>
+
+    <!-- populate java and native libraries -->
+    <copy todir="${dist.dir}/voltdb" flatten="true" >
+        <fileset dir="${build.dir}" defaultexcludes="yes">
+            <include name="prod/voltdb-${dist.version}.jar" />
+            <include name="prod/voltdbclient-${dist.version}.jar" />
+            <include name="nativelibs/libvoltdb*" />
+        </fileset>
+    </copy>
+
+    <!-- populate top level README by copying and renaming README -->
+    <copy tofile="${dist.dir}/README" file="README"/>
+
+    <!-- populate top level thirdparty readmy by copying it -->
+    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty"/>
+
+    <!-- populate the examples -->
+    <distribute-example exampleparent="src" exampledir="${appname}" />
+
+    <!-- populate the bin dir -->
+    <mkdir dir="${dist.dir}/bin" />
+    <copy todir="${dist.dir}/bin" >
+        <fileset dir="bin" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </copy>
+
+    <!-- make shell scripts executable -->
+    <chmod perm="ugo+rx">
+        <fileset dir="${dist.dir}/bin" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </chmod>
+
+    <!-- copy lib dir -->
+    <mkdir dir="${dist.dir}/lib" />
+    <copy todir="${dist.dir}/lib">
+        <fileset dir="${lib.dir}" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </copy>
+
+    <!-- copy licenses -->
+    <copy todir="${dist.dir}" file="LICENSE"/>
+    <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
+
+    <!-- create an archive for distribution -->
+    <exec executable="mv" failonerror="true">
+        <arg value="${raw.dist.dir}/dist"/>
+        <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}"/>
+    </exec>
+
+    <exec executable="tar" failonerror="true">
+        <arg value="-cz"/>
+        <arg value="-C"/>
+        <arg value="${raw.dist.dir}"/>
+        <arg value="-f"/>
+        <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}.tar.gz"/>
+        <arg value="voltdb-${appname}-${dist.version}"/>
+    </exec>
+
+    <!-- move it back to dist directory for downstream dependencies -->
+    <exec executable="mv" failonerror="true">
+        <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 </target>
