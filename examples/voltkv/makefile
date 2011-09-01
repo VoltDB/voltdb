@@ -10,7 +10,7 @@ main: server
 clean:
 	rm -rf obj
 	rm -rf debugoutput
-	rm -f key_value_catalog.jar
+	rm -f voltkv.jar
 	rm -rf plannerlog.txt
 	rm -rf voltdbroot
 
@@ -21,10 +21,10 @@ srccompile:
 		src/com/procedures/*.java
 
 compile: srccompile
-	$(VOLTCOMPILER) obj project.xml key_value_catalog.jar
+	$(VOLTCOMPILER) obj project.xml voltkv.jar
 
 server: compile
-	$(VOLTDB) create catalog key_value_catalog.jar \
+	$(VOLTDB) create catalog voltkv.jar \
 		deployment deployment.xml license $(LICENSE) \
 		leader localhost
 
