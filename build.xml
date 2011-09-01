@@ -463,8 +463,8 @@ DISTRIBUTION
         <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
     </exec>
 
-    <!-- populate top level README by copying and renaming README.dist -->
-    <copy tofile="${dist.dir}/README" file="doc/README.dist"/>
+    <!-- populate top level README by copying and renaming README -->
+    <copy tofile="${dist.dir}/README" file="README"/>
 
     <!-- populate top level thirdparty readme by copying it -->
     <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty.txt"/>
@@ -650,8 +650,8 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- populate top level README by copying and renaming README.dist -->
-    <copy tofile="${dist.dir}/README" file="doc/README.dist"/>
+    <!-- populate top level README by copying and renaming README -->
+    <copy tofile="${dist.dir}/README" file="README"/>
 
     <!-- populate top level thirdparty readmy by copying it -->
     <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty.txt"/>

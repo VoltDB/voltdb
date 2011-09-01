@@ -1,53 +1,44 @@
-% VoltDB
+Thank you for your interest in VoltDB!
 
-Thank you for your interest in VoltDB! The VoltDB project is managed at
-http://voltdb.com/.
+This program is free software distributed under the terms of the 
+GNU General Public License Version 3. See the accompanying LICENSE
+file for details on your rights and responsibilities with regards to
+the use and redistribution of VoltDB software.
 
 What is VoltDB?
 ====================
 VoltDB is an in-memory online transaction processing (OLTP) database
 designed from the ground up to be the fastest most scalable OLTP
-system in the world. VoltDB is distributed in a Community Edition
-(GPL3 license) and in an Enterprise Edition (commercial license).
-For difference between the two editions, see
-http://voltdb.com/content/voltdb-editions-and-pricing.
+system in the world.
 
 
-What VoltDB is not
-==================
-VoltDB is not a general purpose database like MySQL or PostgreSQL, for
-example.
-
-
-Binary Distributions
+Getting Started
 ===============
-Binary distributions of VoltDB Community Edition are available from the
-VoltDB community site at http://community.voltdb.com/downloads.
+If you have installed VoltDB from the distribution kit, you now have 
+a directory containing this README file and several subdirectories, 
+including:
+
+doc      - java-doc description of the VoltDB programming interfaces
+examples - sample programs demonstrating the use of VoltDB
+voltdb   - the VoltDB software itself
+
+The easiest way to get started using VoltDB is to try building and 
+running one or more of the sample programs. Read examples/README for 
+instructions. There is also a more complete tutorial describing the 
+Hello World program in _Getting Started with VoltDB_ which is 
+available online:
+
+    http://community.voltdb.com/docs/GettingStarted/index
+
+Additional documentation on using VoltDB to build OLTP applications 
+is available from the VoltDB community site:
+
+    http://community.voltdb.com/documentation/
 
 
-Getting Started Building VoltDB from Source
-============================================
-'ant check'      Compile VoltDB and run all tests.
+Feedback
+========
+If you have any questions or comments about VoltDB, we encourage you
+to post and discuss your feedback in the forums available online at:
 
-'ant doc'        Generate Javadoc in doc/java-api:
-
-'ant dist'       Create a .tar.gz distribution with example apps
-                 in obj/release/voltdb-version.tar.gz.
-
-There are several example projects which can be compiled and run.  See
-https://svnmirror.voltdb.com/eng/trunk/examples/README for details.
-
-
-Documentation
-=============
-Documentation on using VoltDB to build OLTP applications is available from
-the VoltDB community site at http://community.voltdb.com/documentation/
-
-
-Forums
-======
-For help using or building VoltDB, see the VoltDB forums at
-http://community.voltdb.com/forum.
-
-
-This content is available at https://svnmirror.voltdb.com/eng/trunk/README.
+    http://community.voltdb.com/forum/
