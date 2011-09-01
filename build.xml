@@ -211,7 +211,7 @@ PRIMARY ENTRY POINTS
 -->
 
 <target name="default"
-    depends="compile, ee"
+    depends="compile, ee, voltdb.jar"
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
@@ -372,11 +372,7 @@ DISTRIBUTION
                 <include name="**/*"/>
             </fileset>
         </copy>
-        <chmod perm="ugo+rx">
-          <fileset dir="${dist.dir}/@{exampleparent}/@{exampledir}" defaultexcludes="yes">
-            <include name="run.sh"/>
-          </fileset>
-        </chmod>
+        <chmod perm="ugo+rx" file="${dist.dir}/@{exampleparent}/@{exampledir}/run.sh" />
     </sequential>
 </macrodef>
 
@@ -451,6 +447,9 @@ DISTRIBUTION
             <exclude name=".gitignore"/>
         </fileset>
     </copy>
+    <!-- set permissions on tutorials -->
+    <chmod perm="ugo+rx" file="${dist.dir}/doc/tutorials/auction/run.sh" />
+    <chmod perm="ugo+rx" file="${dist.dir}/doc/tutorials/helloworld/run.sh" />
 
     <!-- populate the logging configuration files -->
     <copy tofile="${dist.dir}/voltdb/log4j.properties" file="voltdb/log4j.properties"/>
@@ -1147,11 +1146,16 @@ NATIVE EE STUFF
     </exec>
 </target>
 
-<target name='ee' depends="catalog, jnicompile"
+<target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <arg line="build.py ${build}" />
     </exec>
+    <copy todir='voltdb'>
+        <fileset dir="${build.dir}/nativelibs">
+            <include name="libvoltdb-${dist.version}.*"/>
+        </fileset>
+    </copy>
 </target>
 
 <target name='ee_profile' depends="catalog, jnicompile"
