@@ -82,8 +82,7 @@
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">4</td><td class="nbrtitle">Explore...</td></tr></table>
         <p>You can open a New Query in VoltDB Studio to run requests against the database even as the Voter application is running. Click the Execute Query button after typing in your query.</p>
         Follow live voting results:<br/>
-        <pre>declare procedure Results
-exec Results</pre>
+        <pre>exec Results</pre>
         Get the total number of votes:<br/>
         <pre>select count(*) from votes;</pre>
         <p>To close VoltDB Studio, <a href="intro.htm?s=1" target="content">click here</a></p>
@@ -108,7 +107,7 @@ exec Results</pre>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Running the sample</td></tr></table>
         <br/>
         Open Terminal, and run:<br/>
-        <pre><script>document.write(root)</script>launch key_value</pre>
+        <pre><script>document.write(root)</script>launch voltkv</pre>
         This will open two Terminal windows:
         <ul>
             <li>A VoltDB database process.</li>
@@ -131,14 +130,14 @@ exec Results</pre>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">4</td><td class="nbrtitle">Explore...</td></tr></table>
         <p>You can open a New Query in VoltDB Studio to run requests against the database even as the application is running. Click the Execute Query button after typing in your query.</p>
         Sample stored data:<br/>
-        <pre>select top 10 * from key_value;</pre>
+        <pre>select top 10 * from store;</pre>
         Get the total number of stored values:<br/>
-        <pre>select count(*) from key_value;</pre>
+        <pre>select count(*) from store;</pre>
         <p>To close VoltDB Studio, <a href="intro.htm?s=2" target="content">click here</a></p>
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">5</td><td class="nbrtitle">Get hands-on with K/V Store</td></tr></table>
         <p>You can customize the key-value store sample by editing:</p>
-        <pre><script>document.write(root.replace('/tools/demo/','/examples/key_value/makefile'));</script></pre>
+        <pre><script>document.write(root.replace('/tools/demo/','/examples/voltkv/makefile'));</script></pre>
         <ul>
             <li>Test payload sizes (up to 1MB)</li>
             <li>Test with GZIP compression.</li>
