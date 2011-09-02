@@ -504,8 +504,9 @@ this.AddConnection = function(connection, success)
               src += '<ul>'
                 for (var p = 0; p < procParams.length; ++p) {
                     connTypeParams[connTypeParams.length] = procParams[p].type;
-                    src += '<li>' + procParams[p].type + '</li>';
+                    src += '<li class="paramin"><span>Param' + (p+1) + ' (' + procParams[p].type + ')</span></li>';
                 }
+                src += '<li class="paramreturn"><span>Return Table[]</span></li>';
               src += '</ul>'
             src += '</li>'
           src += '</ul>'
@@ -587,25 +588,6 @@ this.AddConnection = function(connection, success)
 this.ActiveConnection = function()
 {
     return VoltDB.GetConnection($('.treeview li.database.selected').attr('id'));
-}
-this.DeclareProcedure = function(connection, procedureInfo)
-{
-    var procedureId = connection.Key + '_' + procedureInfo.name;
-    if (document.getElementById(procedureId) != null)
-        $('#' + connection.Key).treeview({remove: $('#' + procedureId)});
-    var src = '<li id="' + procedureId + '" class="procedure closed"><span>' + procedureInfo.name + '</span><ul><li class="folder closed"><span>Parameters</span><ul>'
-    if (procedureInfo.params != null)
-        for(var i = 0; i < procedureInfo.params.length; i++)
-            src += '<li class="paramin"><span>Param' + (i+1) + ' (' + procedureInfo.params[i] + ')</span></li>';
-    src += '<li class="paramreturn"><span>Return Table[]</span></li></ul></li></ul></li>';
-    var b = $(src).appendTo('#' + connection.Key + '_sp');
-    $('#' + connection.Key).treeview({add: b});
-}
-
-this.UndeclareProcedure = function(connection, procedureName)
-{
-    var procedureId = connection.Key + '_' + procedureName;
-    $('#' + connection.Key).treeview({remove: $('#' + procedureId)});
 }
 
 this.RemoveConnection = function(connection)

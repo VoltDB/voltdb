@@ -6,12 +6,12 @@ var QueryUI = (function(queryTab){
         {
 			var SingleLineComments = /^\s*(\/\/|--).*$/gm;
 			var Extract = new RegExp(/'[^']*'/gm);
-			var AutoSplit = /\s(select|insert|update|delete|exec|execute|declare|undeclare)\s/gim;
+			var AutoSplit = /\s(select|insert|update|delete|exec|execute)\s/gim;
 			var AutoSplitParameters = /[\s,]+/gm;
 			this.parse = function(src)
 			{
-                var command = ["exec", "execute", "undeclare proc", "undeclare procedure", "declare proc", "declare procedure"];
-                var keyword = ["select", "insert", "update", "delete", "undeclare", "declare"];
+                var command = ["exec", "execute"];
+                var keyword = ["select", "insert", "update", "delete"];
                 for(var i = 0;i<command.length;i++)
                 {
                     for(var j = 0;j<command.length;j++)
@@ -142,10 +142,6 @@ this.execute = function()
 		var callback = new executeCallback(format, target, id);
 		if (/^execute /i.test(statements[i]))
 			statements[i] = 'exec ' + statements[i].substr(8);
-		else if (/^declare procedure /i.test(statements[i]))
-			statements[i] = 'declare proc ' + statements[i].substr(18);
-		else if (/^undeclare procedure /i.test(statements[i]))
-			statements[i] = 'undeclare proc ' + statements[i].substr(20);
 		if (/^exec /i.test(statements[i]))
 		{
 			var params = SQLParser.parseProcedureCallParameters(statements[i].substr(5));
@@ -153,22 +149,6 @@ this.execute = function()
 			if ((procedure.charAt(0) == '@') && (!(procedure in connection.Metadata['sysprocs'])))
 				continue;
 			connectionQueue.BeginExecute(procedure, params, callback.Callback);
-		}
-		else if (/^declare proc /i.test(statements[i]))
-		{
-			var params = SQLParser.parseProcedureCallParameters(statements[i].substr(13));
-			var procedure = params.splice(0,1)[0];
-			if (procedure.charAt(0) == '@')
-				continue;
-			connectionQueue.DeclareProcedure({name: procedure, 'params': params});
-		}
-		else if (/^undeclare proc /i.test(statements[i]))
-		{
-			var params = SQLParser.parseProcedureCallParameters(statements[i].substr(15));
-			var procedure = params.splice(0,1)[0];
-			if (procedure.charAt(0) == '@')
-				continue;
-			connectionQueue.UndeclareProcedure(procedure);
 		}
 		else
 		{
@@ -267,13 +247,13 @@ function printFixed(target, id, table)
 	var src = '';
 	for(var j = 0; j < table.schema.length; j++)
 	{
-		if (j > 0) src += ' '; 
+		if (j > 0) src += ' ';
 		src += (table.schema[j].name + fmt[j]).substr(0,padding[j]);
 	}
 	src += '\r\n';
 	for(var j = 0; j < table.schema.length; j++)
 	{
-		if (j > 0) src += ' '; 
+		if (j > 0) src += ' ';
 		src += fmt[j].replace(/ /g,'-');
 	}
 	src += '\r\n';
@@ -281,7 +261,7 @@ function printFixed(target, id, table)
 	{
 		for(var k = 0; k < table.data[j].length; k++)
 		{
-			if (k > 0) src += ' '; 
+			if (k > 0) src += ' ';
 			if (table.schema[k].type == 9)
 				src += ('' + table.data[j][k] + fmt[k]).substr(0,padding[k]);
 			else
@@ -307,7 +287,7 @@ function printTab(target, id, table)
 	var colModeData = [];
 	for(var j = 0; j < table.schema.length; j++)
 	{
-		if (j > 0) src += '\t'; 
+		if (j > 0) src += '\t';
 		src += table.schema[j].name;
 	}
 	src += '\r\n';
@@ -315,7 +295,7 @@ function printTab(target, id, table)
 	{
 		for(var k = 0; k < table.data[j].length; k++)
 		{
-			if (k > 0) src += '\t'; 
+			if (k > 0) src += '\t';
 			src += table.data[j][k];
 		}
 		src += '\r\n';
@@ -334,7 +314,7 @@ function printCSV(target, id, table)
 	var colModeData = [];
 	for(var j = 0; j < table.schema.length; j++)
 	{
-		if (j > 0) src += ','; 
+		if (j > 0) src += ',';
 		src += table.schema[j].name;
 	}
 	src += '\r\n';
@@ -342,7 +322,7 @@ function printCSV(target, id, table)
 	{
 		for(var k = 0; k < table.data[j].length; k++)
 		{
-			if (k > 0) src += ','; 
+			if (k > 0) src += ',';
 			src += table.data[j][k];
 		}
 		src += '\r\n';

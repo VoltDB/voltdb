@@ -122,16 +122,6 @@ var IVoltDB = (function(){
                 Stack.push(null);
                 return this;
             }
-            this.DeclareProcedure = function(procedureInfo)
-            {
-                Stack.push(['@declare-proc', procedureInfo]);
-                return this;
-            }
-            this.UndeclareProcedure = function(procedureName)
-            {
-                Stack.push(['@undeclare-proc', procedureName]);
-                return this;
-            }
             this.BeginExecute = function(procedure, parameters, callback)
             {
                 Stack.push([procedure, parameters, callback]);
@@ -144,37 +134,24 @@ var IVoltDB = (function(){
                 if (Stack.length > 0 && (Success || ContinueOnFailure))
                 {
                     var item = Stack[0];
-                    if (item[0] == '@declare-proc')
-                    {
-                        Connection.DeclareProcedure(item[1]);
-                        return this.EndExecute();
-                    }
-                    else if (item[0] == '@undeclare-proc')
-                    {
-                        Connection.UndeclareProcedure(item[1]);
-                        return this.EndExecute();
-                    }
-                    else
-                    {
-                        Connection.CallExecute(item[0], item[1], (new CallbackWrapper(
-                                                                    (function(queue,item) {
-                                                                        return function(response) {
-                                                                            try
-                                                                            {
-                                                                                if (response.status != 1)
-                                                                                    Success = false;
-                                                                                if (item[2] != null)
-                                                                                    item[2](response);
-                                                                                queue.EndExecute();
-                                                                            }
-                                                                            catch(x)
-                                                                            {
+                    Connection.CallExecute(item[0], item[1], (new CallbackWrapper(
+                                                                (function(queue,item) {
+                                                                    return function(response) {
+                                                                        try
+                                                                        {
+                                                                            if (response.status != 1)
                                                                                 Success = false;
-                                                                                queue.EndExecute();
-                                                                            }
-                                                                        };
-                                                                    })(this,item))).Callback);
-                    }
+                                                                            if (item[2] != null)
+                                                                                item[2](response);
+                                                                            queue.EndExecute();
+                                                                        }
+                                                                        catch(x)
+                                                                        {
+                                                                            Success = false;
+                                                                            queue.EndExecute();
+                                                                        }
+                                                                    };
+                                                                })(this,item))).Callback);
                 }
                 else
                 {
@@ -244,41 +221,6 @@ var IVoltDB = (function(){
                           , '@UpdateApplicationCatalog': ['varchar', 'varchar']
                           , '@UpdateLogging': ['xml']
                         };
-        this.DeclareProcedure = function(procedureInfo)
-        {
-            if (procedureInfo.name.indexOf('@') == -1)
-            {
-                for(var i = 0;i < procedureInfo.params.length; i++)
-                {
-                    procedureInfo.params[i] = procedureInfo.params[i].toLowerCase();
-                    if (procedureInfo.params[i] == 'string')
-                        procedureInfo.params[i] = 'varchar';
-                }
-                if (procedureInfo.name in this.Procedures)
-                {
-                    if (this.Procedures[procedureInfo.name].length == procedureInfo.params.length)
-                    {
-                        var identical = true;
-                        for (var i = 0;i < procedureInfo.params.length; i++)
-                            if (procedureInfo.params[i] != this.Procedures[procedureInfo.name][i])
-                                identical = false;
-                        if (identical)
-                            return;
-                    }
-                }
-                delete this.Procedures[procedureInfo.name];
-                this.Procedures[procedureInfo.name] = procedureInfo.params;
-                try { MainUI.DeclareProcedure(this, procedureInfo); } catch(x) {}
-            }
-        }
-        this.UndeclareProcedure = function(procedureName)
-        {
-            if (procedureName.indexOf('@') == -1)
-            {
-                delete this.Procedures[procedureName];
-                try { MainUI.UndeclareProcedure(this, procedureName); } catch(x) {}
-            }
-        }
         return this;
     }
 
