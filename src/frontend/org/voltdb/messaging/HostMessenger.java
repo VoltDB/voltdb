@@ -463,9 +463,11 @@ public class HostMessenger implements Messenger {
      * Uses a special negative mailbox id to bypass the mailbox system.
      */
     public void sendPoisonPill(String msg) {
-        byte[] msgBytes = null;
+        byte[] msgBytes = new byte[0];
         try {
-            msgBytes = msg.getBytes("UTF-8");
+            if (msg != null) {
+                msgBytes = msg.getBytes("UTF-8");
+            }
         } catch (UnsupportedEncodingException e) {
             VoltDB.crashLocalVoltDB("Missing UTF-8 encoding. Broken JVM.", false, e);
         }
