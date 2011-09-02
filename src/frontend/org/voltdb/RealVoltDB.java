@@ -511,7 +511,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
+        long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
+                                                             true, true);
         assert(depCRC != -1);
         m_catalogContext = new CatalogContext(0, catalog, null, depCRC, 0, -1);
     }
