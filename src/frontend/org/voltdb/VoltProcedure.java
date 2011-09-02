@@ -81,12 +81,43 @@ public abstract class VoltProcedure {
     // And how much wood a woodchuck chucks.
     public static final String ANON_STMT_NAME = "sql";
 
+    /**
+     * Expect an empty result set (0 rows)
+     */
     public static final Expectation EXPECT_EMPTY = new Expectation(Type.EXPECT_EMPTY);
+
+    /**
+     * Expect a result set with exactly one row
+     */
     public static final Expectation EXPECT_ONE_ROW = new Expectation(Type.EXPECT_ONE_ROW);
+
+    /**
+     * Expect a result set with one or no rows
+     */
     public static final Expectation EXPECT_ZERO_OR_ONE_ROW = new Expectation(Type.EXPECT_ZERO_OR_ONE_ROW);
+
+    /**
+     * Expect a result set with one or more rows
+     */
     public static final Expectation EXPECT_NON_EMPTY = new Expectation(Type.EXPECT_NON_EMPTY);
+
+    /**
+     * Expect a result set with a single row and a single column (scalar value)
+     */
     public static final Expectation EXPECT_SCALAR = new Expectation(Type.EXPECT_SCALAR);
+
+    /**
+     * Expect a result with a single row and a single BIGINT column
+     */
     public static final Expectation EXPECT_SCALAR_LONG = new Expectation(Type.EXPECT_SCALAR_LONG);
+
+    /**
+     * Expect a result with a single row and a single BIGINT column containing
+     * the specified value. This factory method constructs an Expectation for the specified
+     * value.
+     * @param scalar The expected value the single row/column should contain
+     * @return An Expectation that will cause an exception to be thrown if the value or schema doesn't match
+     */
     public static final Expectation EXPECT_SCALAR_MATCH(long scalar) {
         return new Expectation(Type.EXPECT_SCALAR_MATCH, scalar);
     }
@@ -689,7 +720,8 @@ public abstract class VoltProcedure {
      * Get a Java RNG seeded with the current transaction id. This will ensure that
      * two procedures for the same transaction, but running on different replicas,
      * can generate an identical stream of random numbers. This is required to endure
-     * procedures have deterministic behavior.
+     * procedures have deterministic behavior. The RNG is memoized so you can invoke this
+     * multiple times within a single procedure.
      *
      * @return A deterministically-seeded java.util.Random instance.
      */
@@ -715,10 +747,24 @@ public abstract class VoltProcedure {
         return new Date(ts);
     }
 
-    public void checkExpectation(Expectation expectation, VoltTable table) {
-        Expectation.check(m_procedureName, "NO STMT", 0, expectation, table);
-    }
+    /*
+     * Commented this out and nothing broke? It's cluttering up the javadoc AW 9/2/11
+     */
+//    public void checkExpectation(Expectation expectation, VoltTable table) {
+//        Expectation.check(m_procedureName, "NO STMT", 0, expectation, table);
+//    }
 
+    /**
+     * Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list,
+     * and an Expectation describing the expected results. If the Expectation is not met then VoltAbortException
+     * will be thrown with a description of the expecation that was not met. This exception must not be
+     * caught from within the procedure.
+     *
+     * @param Expectation describing the expected result of executing this SQL statement.
+     * @param stmt {@link org.voltdb.SQLStmt Statement} to queue for execution.
+     * @param args List of arguments to be bound as parameters for the {@link org.voltdb.SQLStmt statement}
+     * @see <a href="#allowable_params">List of allowable parameter types</a>
+     */
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         voltQueueSQL(stmt, args);
 
@@ -1195,6 +1241,13 @@ public abstract class VoltProcedure {
         m_statusCode = statusCode;
     }
 
+    /**
+     * Set the string that will be turned to the client. This is not the same as teh status string
+     * returned by the server. If a procedure sets the status string and then rolls back or causes an error
+     * the status string will still be propagated back to the client so it is always necessary to check
+     * the server status code first.
+     * @param statusString
+     */
     public void setAppStatusString(String statusString) {
         m_statusString = statusString;
     }
