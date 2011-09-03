@@ -1144,7 +1144,8 @@ public class VoltCompiler {
     public static void main(final String[] args) {
         // Parse arguments
         if (args.length != 2) {
-            System.err.println("VoltCompiler [project file] [output JAR]");
+            System.err.println("USAGE (1): voltcompiler [classpath] [project file] [output JAR]");
+            System.err.println("USAGE (2): java -cp $CLASSPATH org.voltdb.compiler.VoltCompiler [project file] [output JAR]");
             System.exit(1);
         }
         final String projectPath = args[0];
