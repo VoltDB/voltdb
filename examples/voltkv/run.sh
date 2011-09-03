@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+APPNAME="voltkv"
 VOLTJAR=`ls ../../voltdb/voltdb-2.*.jar`
 CLASSPATH="$VOLTJAR:../../lib"
 VOLTDB="../../bin/voltdb"
@@ -8,7 +9,7 @@ LICENSE="../../voltdb/license.xml"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput voltkv.jar voltdbroot plannerlog.txt voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot plannerlog.txt voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -22,9 +23,9 @@ function srccompile() {
 }
 
 # build an application catalog
-function compile() {
+function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml voltkv.jar
+    $VOLTCOMPILER obj project.xml $APPNAME.jar
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -32,9 +33,9 @@ function compile() {
 # run the voltdb server locally
 function server() {
     # if a catalog doesn't exist, build one
-    if [ ! -f voltkv.jar ]; then compile; fi
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog voltkv.jar deployment deployment.xml \
+    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE leader localhost
 }
 
@@ -117,7 +118,12 @@ function jdbc-benchmark() {
         --use-compression=false
 }
 
+function help() {
+    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}
+    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+}
+
 # Run the target passed as the first arg on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then echo "Too many arguments to script"; exit; fi
+if [ $# -gt 1 ]; then help; exit; fi
 if [ $# = 1 ]; then $1; else server; fi

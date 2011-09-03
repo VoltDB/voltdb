@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
+APPNAME="auction"
 VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar`
-CLASSPATH="../../../voltdb/$VOLTJAR:../../../lib"
+CLASSPATH="$VOLTJAR:../../../lib"
 VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"
 LICENSE="../../../voltdb/license.xml"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput auction.jar voltdbroot plannerlog.txt voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot plannerlog.txt voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -26,7 +27,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml auction.jar
+    $VOLTCOMPILER obj project.xml $APPNAME.jar
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -34,9 +35,9 @@ function catalog() {
 # run the voltdb server locally
 function server() {
     # if a catalog doesn't exist, build one
-    if [ ! -f helloworld.jar ]; then catalog; fi
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog auction.jar deployment deployment.xml \
+    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE leader localhost
 }
 
@@ -52,7 +53,11 @@ function export() {
         --nonce EXPORTDEMO --user voltdb --password demo
 }
 
+function help() {
+    echo "Usage: ./run.sh {clean|catalog|client|server|export}"
+}
+
 # Run the target passed as the first arg on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then echo "Too many arguments to script"; exit; fi
+if [ $# -gt 1 ]; then help; exit; fi
 if [ $# = 1 ]; then $1; else server; fi
