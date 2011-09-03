@@ -1679,8 +1679,7 @@ TEST CASES
     <attribute name="app"/>
     <!-- make sure example application compiles -->
     <sequential>
-        <exec dir="${dist.examples.dir}/@{app}" executable="/usr/bin/env" failonerror='true'>
-            <arg value='make' />
+        <exec dir="${dist.examples.dir}/@{app}" executable="run.sh" failonerror='true'>
             <arg value="srccompile"/>
         </exec>
     </sequential>
