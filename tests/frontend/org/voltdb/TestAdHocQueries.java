@@ -46,7 +46,7 @@ public class TestAdHocQueries extends TestCase {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(org.voltdb.compiler.procedures.EmptyProcedure.class);
-        assertTrue(project.compile(config.m_pathToCatalog));
+        assertTrue(project.compile(config.m_pathToCatalog, 2, 0));
 
         config.m_pathToDeployment = project.getPathToDeployment();
 
@@ -63,21 +63,29 @@ public class TestAdHocQueries extends TestCase {
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
 
-
         VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM NEW_ORDER;").getResults()[0];
         assertTrue(result.getRowCount() == 1);
         System.out.println(result.toString());
 
-        boolean caught = false;
-        try
-        {
+        // test single-partition stuff
+        result = client.callProcedure("@AdHoc", "SELECT * FROM NEW_ORDER;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 0);
+        System.out.println(result.toString());
+        result = client.callProcedure("@AdHoc", "SELECT * FROM NEW_ORDER;", 1).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        try {
+            client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (0, 0, 0);", 1);
+            fail("Badly partitioned insert failed to throw expected exception");
+        }
+        catch (Exception e) {}
+
+        try {
             client.callProcedure("@AdHoc", "SLEECT * FROOM NEEEW_OOORDERERER;");
+            fail("Bad SQL failed to throw expected exception");
         }
-        catch (Exception e)
-        {
-            caught = true;
-        }
-        assertTrue("Bad SQL failed to throw expected exception", caught);
+        catch (Exception e) {}
 
         server.shutdown();
         server.join();

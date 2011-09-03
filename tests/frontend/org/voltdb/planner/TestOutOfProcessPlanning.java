@@ -82,7 +82,7 @@ public class TestOutOfProcessPlanning extends TestCase {
         ptKiller.start();
 
         PlannerTool.Result result = null;
-        result = m_pt.planSql("select * from warehouse;");
+        result = m_pt.planSql("select * from warehouse;", false);
         System.out.println(result);
 
         result = m_pt.planSql("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
@@ -94,10 +94,10 @@ public class TestOutOfProcessPlanning extends TestCase {
                 "WAREHOUSE.W_ID = ORDERS.O_W_ID and " +
                 "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
                 "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
-                "WAREHOUSE.W_ID = 0");
+                "WAREHOUSE.W_ID = 0", false);
         System.out.println(result);
 
-        result = m_pt.planSql("ryan likes the yankees");
+        result = m_pt.planSql("ryan likes the yankees", false);
         System.out.println(result);
 
         try {
@@ -107,10 +107,10 @@ public class TestOutOfProcessPlanning extends TestCase {
             e1.printStackTrace();
         }
 
-        result = m_pt.planSql("ryan likes the yankees");
+        result = m_pt.planSql("ryan likes the yankees", false);
         System.out.println(result);
 
-        result = m_pt.planSql("select * from warehouse;");
+        result = m_pt.planSql("select * from warehouse;", false);
         System.out.println(result);
 
         final File jar = new File("tpcc-oop.jar");
@@ -154,7 +154,7 @@ public class TestOutOfProcessPlanning extends TestCase {
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
         PlannerTool.Result result = null;
-        result = m_pt.planSql("select * from A;");
+        result = m_pt.planSql("select * from A;", false);
         System.out.println(result);
         assertNotSame("Stream closed", result.getErrors());
         assertNull(result.getErrors());

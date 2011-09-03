@@ -107,6 +107,8 @@ public class AsyncCompilerWorkThread extends Thread {
     /**
      *
      * @param sql
+     * @param partitionInfo Standard partition info string for single-partition procs.
+     *                      NULL if multi-partition
      * @param clientHandle Handle provided by the client application (not ClientInterface)
      * @param connectionId
      * @param hostname Hostname of the other end of the connection
@@ -115,6 +117,7 @@ public class AsyncCompilerWorkThread extends Thread {
      */
     public void planSQL(
             String sql,
+            Object partitionParam,
             long clientHandle,
             long connectionId,
             String hostname,
@@ -124,6 +127,7 @@ public class AsyncCompilerWorkThread extends Thread {
         AdHocPlannerWork work = new AdHocPlannerWork();
         work.clientHandle = clientHandle;
         work.sql = sql;
+        work.partitionParam = partitionParam;
         work.connectionId = connectionId;
         work.hostname = hostname;
         work.adminConnection = adminConnection;
@@ -216,13 +220,14 @@ public class AsyncCompilerWorkThread extends Thread {
         try {
             ensureLoadedPlanner();
 
-            PlannerTool.Result result = m_ptool.planSql(work.sql);
+            PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam != null);
 
             plannedStmt.aggregatorFragment = result.onePlan;
             plannedStmt.collectorFragment = result.allPlan;
 
             plannedStmt.isReplicatedTableDML = result.replicatedDML;
             plannedStmt.sql = work.sql;
+            plannedStmt.partitionParam = work.partitionParam;
             plannedStmt.errorMsg = result.errors;
         }
         catch (Exception e) {

@@ -21,10 +21,12 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     private static final long serialVersionUID = -6567283432846270119L;
 
     String sql = null;
+    Object partitionParam = null;
 
     @Override
     public String toString() {
         String retval = super.toString();
+        retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
         retval += "\n  sql: " + ((sql != null) ? sql : "null");
         return retval;
     }

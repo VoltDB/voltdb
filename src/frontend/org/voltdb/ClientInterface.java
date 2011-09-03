@@ -962,7 +962,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
         else {
-            if (task.procName.equals("@AdHoc")) {
+            if (task.procName.startsWith("@AdHoc")) {
                 // AdHoc requires unique permission. Then has to plan in a separate thread.
                 if (!user.hasAdhocPermission()) {
                     final ClientResponseImpl errorResponse =
@@ -990,18 +990,46 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
-                if (params.m_params.length != 1) {
+                // note the second secret param
+                if (params.m_params.length > 2) {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                                                new VoltTable[0],
-                                               "Adhoc system procedure requires exactly one parameter, the SQL statement to execute.",
+                                               "Adhoc system procedure requires exactly one or two parameters, " +
+                                               "the SQL statement to execute with an optional partitioning value.",
                                                task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
+                // check the types are both strings
+                if ((params.m_params[0] instanceof String) == false) {
+                    final ClientResponseImpl errorResponse =
+                            new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                                   new VoltTable[0],
+                                                   "Adhoc system procedure requires sql in the String type only.",
+                                                   task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
+
                 String sql = (String) params.m_params[0];
-                m_asyncCompilerWorkThread.planSQL(
-                                                  sql,
+
+                // get the partition param if it exists
+                // null means MP-txn
+                Object partitionParam = null;
+                if (params.m_params.length > 1) {
+                    if (params.m_params[1] == null) {
+                        // nulls map to zero
+                        partitionParam = new Long(0);
+                        // skip actual null value because it means MP txn
+                    }
+                    else {
+                        partitionParam = params.m_params[1];
+                    }
+                }
+
+                m_asyncCompilerWorkThread.planSQL(sql,
+                                                  partitionParam,
                                                   task.clientHandle,
                                                   handler.connectionId(),
                                                   handler.m_hostname,
@@ -1205,6 +1233,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             rest of the system. If the adhoc sql was planned against an
                             obsolete catalog, re-plan. */
                         m_asyncCompilerWorkThread.planSQL(plannedStmt.sql,
+                                                          plannedStmt.partitionParam,
                                                           plannedStmt.clientHandle,
                                                           plannedStmt.connectionId,
                                                           plannedStmt.hostname,
@@ -1214,7 +1243,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     else {
                         // create the execution site task
                         StoredProcedureInvocation task = new StoredProcedureInvocation();
-                        task.procName = "@AdHoc";
+                        // pick the sysproc based on the presence of partition info
+                        boolean isSinglePartition = (plannedStmt.partitionParam != null);
+                        int partitions[] = null;
+
+                        if (isSinglePartition) {
+                            task.procName = "@AdHocSP";
+                            partitions = new int[] { TheHashinator.hashToPartition(plannedStmt.partitionParam) };
+                        }
+                        else {
+                            task.procName = "@AdHoc";
+                            partitions = m_allPartitions;
+                        }
+
                         task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
                             @Override
                             public ParameterSet call() {
@@ -1248,8 +1289,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         // initiate the transaction
                         m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
                                                       plannedStmt.adminConnection,
-                                                      task, false, false, false, m_allPartitions,
-                                                      m_allPartitions.length, plannedStmt.clientData,
+                                                      task, false, isSinglePartition, false, partitions,
+                                                      partitions.length, plannedStmt.clientData,
                                                       0, EstTime.currentTimeMillis());
                     }
                 }

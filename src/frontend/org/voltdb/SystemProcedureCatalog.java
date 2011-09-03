@@ -94,6 +94,7 @@ public class SystemProcedureCatalog {
 
     static {
         listing.put("@AdHoc",                   new Config("org.voltdb.sysprocs.AdHoc",             false, false, false));
+        listing.put("@AdHocSP",                 new Config("org.voltdb.sysprocs.AdHocSP",           false, false, false));
         listing.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",             false, true,  false));
         listing.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",            false, true,  false));
         listing.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",           false, false, false));

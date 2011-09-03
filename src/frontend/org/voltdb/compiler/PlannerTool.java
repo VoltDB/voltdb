@@ -125,7 +125,7 @@ public class PlannerTool {
         return false;
     }
 
-    public synchronized Result planSql(String sql) {
+    public synchronized Result planSql(String sql, boolean singlePartition) {
         Result retval = new Result();
         retval.errors = "";
 
@@ -142,12 +142,12 @@ public class PlannerTool {
         }
         // remove any spaces or newlines
         sql = sql.trim();
-        synchronized (m_lastSql)
-        {
+        synchronized (m_lastSql) {
             m_lastSql = sql;
         }
         try {
-            m_in.write(sql + "\n");
+            // format is S#sql for single-partition and M#sql for multi
+            m_in.write((singlePartition ? "S" : "M") + "#" + sql + "\n");
             m_in.flush();
         } catch (IOException e) {
             m_timeOfLastPlannerCall.set(0);
@@ -368,15 +368,29 @@ public class PlannerTool {
             }
             // check the input
             if (inputLine.length() == 0) {
-                log("got a zero-length sql statement");
+                log("got a zero-length input to the sql planner");
                 continue;
             }
             inputLine = inputLine.trim();
 
             log("recieved sql stmt: " + inputLine);
 
+            String[] parts = inputLine.split("#");
+            log(String.format("Got %d parts", parts.length));
+            if (parts.length != 2) {
+                log("got a malformed input to the sql planner (bad hash splitting)");
+                continue;
+            }
+            if ((parts[0].charAt(0) != 'S') && (parts[0].charAt(0) != 'M')) {
+                log("got a malformed input to the sql planner (bad single/multi hinting)");
+                continue;
+            }
+
+            boolean isSinglePartition = parts[0].charAt(0) == 'S';
+            String sql = parts[1];
+
             // the poison sql causes the process to exit
-            if (inputLine.compareTo(POISON_SQL) == 0) {
+            if (sql.equalsIgnoreCase("POISON_SQL")) {
                 log("Dying a horrible death (on purpose).");
                 System.exit(-1);
             }
@@ -391,7 +405,7 @@ public class PlannerTool {
             CompiledPlan plan = null;
             try {
                 plan = planner.compilePlan(
-                        costModel, inputLine, null, "PlannerTool", "PlannerToolProc", false, null);
+                        costModel, sql, null, "PlannerTool", "PlannerToolProc", isSinglePartition, null);
             } catch (Exception e) {
                 log("Error creating planner: " + e.getMessage());
                 String plannerMsg = e.getMessage();

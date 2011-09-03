@@ -23,13 +23,15 @@ public class AdHocPlannedStmt extends AsyncCompilerResult {
     public String aggregatorFragment;
     public String collectorFragment;
     public String sql;
+    public Object partitionParam;
     public boolean isReplicatedTableDML;
     public int catalogVersion;
 
     @Override
     public String toString() {
         String retval = super.toString();
-        retval += "sql: " + ((sql != null) ? sql : "null");
+        retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
+        retval += "\n  sql: " + ((sql != null) ? sql : "null");
         return retval;
     }
 }
