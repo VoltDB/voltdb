@@ -361,21 +361,6 @@ DISTRIBUTION
   </exec>
 </target>
 
-<!-- Copy an example and move the basebuild.xml into that example -->
-<macrodef name="distribute-example">
-    <attribute name="exampledir"/>
-    <attribute name="exampleparent" default="examples"/>
-    <sequential>
-        <mkdir dir="${dist.dir}/@{exampleparent}/@{exampledir}" />
-        <copy todir="${dist.dir}/@{exampleparent}/@{exampledir}">
-            <fileset dir="examples/@{exampledir}" defaultexcludes="yes">
-                <include name="**/*"/>
-            </fileset>
-        </copy>
-        <chmod perm="ugo+rx" file="${dist.dir}/@{exampleparent}/@{exampledir}/run.sh" />
-    </sequential>
-</macrodef>
-
 <target name="javadoc">
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
@@ -435,25 +420,23 @@ DISTRIBUTION
     </delete>
     <mkdir dir="${dist.dir}" />
 
-    <mkdir dir="${dist.dir}/doc" />
-    <mkdir dir="${dist.dir}/tools" />
-    <mkdir dir="${dist.dir}/voltdb" />
-    <mkdir dir="${dist.dir}/bin" />
-
     <!-- populate the doc dir -->
-    <copy todir="${dist.dir}/doc/">
-        <fileset dir="doc" defaultexcludes="yes">
-            <include name="**/**"/>
+    <copy todir="${dist.dir}/">
+        <fileset dir="." defaultexcludes="yes">
+            <include name="Click Here to Start.html"/>
+            <include name="README"/>
+            <include name="README.thirdparty"/>
+            <include name="LICENSE"/>
+            <include name="bin/**"/>
+            <include name="doc/**"/>
+            <include name="examples/**"/>
+            <include name="lib/**"/>
+            <include name="tools/demo/**"/>
+            <include name="tools/sqlcmd/**"/>
+            <include name="voltdb/**"/>
             <exclude name=".gitignore"/>
         </fileset>
     </copy>
-    <!-- set permissions on tutorials -->
-    <chmod perm="ugo+rx" file="${dist.dir}/doc/tutorials/auction/run.sh" />
-    <chmod perm="ugo+rx" file="${dist.dir}/doc/tutorials/helloworld/run.sh" />
-
-    <!-- populate the logging configuration files -->
-    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="voltdb/log4j.properties"/>
-    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="voltdb/log4j.xml"/>
 
     <!-- populate java and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
@@ -483,35 +466,6 @@ DISTRIBUTION
         <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
     </exec>
 
-    <!-- populate top level README by copying and renaming README -->
-    <copy tofile="${dist.dir}/README" file="README"/>
-
-    <!-- populate top level thirdparty readme by copying it -->
-    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty"/>
-
-    <!-- populate the bin dir -->
-    <copy todir="${dist.dir}/bin" >
-        <fileset dir="bin" defaultexcludes="yes">
-            <include name="**"/>
-        </fileset>
-    </copy>
-
-    <!-- populate examples top level README -->
-    <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
-
-    <!-- populate the examples -->
-    <distribute-example exampledir="voltcache"/>
-    <distribute-example exampledir="voltkv"/>
-    <distribute-example exampledir="voter"/>
-
-    <!-- populate the tools -->
-    <copy todir="${dist.dir}/tools" >
-        <fileset dir="tools" defaultexcludes="yes">
-            <include name="demo/**"/>
-            <include name="sqlcmd/**"/>
-        </fileset>
-    </copy>
-
     <!-- copy studio.web -->
     <mkdir dir="${dist.dir}/tools/studio.web" />
     <copy todir="${dist.dir}/tools/studio.web">
@@ -520,59 +474,36 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- make shell scripts executable -->
-    <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}/bin" defaultexcludes="yes">
-            <include name="**"/>
-        </fileset>
-        <fileset dir="${dist.dir}/tools/demo" defaultexcludes="yes">
-            <include name="launch"/>
-        </fileset>
-    </chmod>
-
-    <!-- populate top level demo html -->
-    <copy todir="${dist.dir}/" file="Click Here to Start.html"/>
-
-    <!-- copy lib dir -->
-    <mkdir dir="${dist.dir}/lib" />
-    <copy todir="${dist.dir}/lib">
-        <fileset dir="${lib.dir}" defaultexcludes="yes">
-            <include name="**"/>
-        </fileset>
-    </copy>
-
-    <!-- make shell script executable -->
-    <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}/tools/sqlcmd" defaultexcludes="yes">
-            <include name="sqlcmd"/>
-        </fileset>
-    </chmod>
-
     <!-- populate project generator -->
     <exec dir="src/proj_gen/" executable="python">
         <arg line="generator_compiler.py"/>
     </exec>
     <move tofile="${dist.dir}/tools/generate" file="src/proj_gen/generate" />
-    <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}/tools" defaultexcludes="yes">
-            <include name="generate"/>
-        </fileset>
-    </chmod>
 
     <!-- add the Project and Deployment file schemas to the dist -->
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
 
-    <!-- copy licenses -->
-    <copy todir="${dist.dir}" file="LICENSE"/>
+    <!-- copy license to voltdb dir -->
     <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
+
+    <!-- make shell scripts executable -->
+    <chmod perm="ugo+rx">
+        <fileset dir="${dist.dir}" defaultexcludes="yes">
+            <include name="bin/*"/>
+            <include name="tools/demo/launch"/>
+            <include name="doc/tutorial/**/run.sh"/>
+            <include name="examples/**/run.sh"/>
+            <include name="tools/generate"/>
+            <include name="tools/sqlcmd/sqlcmd"/>
+        </fileset>
+    </chmod>
 
     <!-- create an archive for distribution -->
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
     </exec>
-
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
@@ -581,7 +512,6 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz"/>
         <arg value="voltdb-${dist.version}"/>
     </exec>
-
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
@@ -596,110 +526,44 @@ DISTRIBUTION
     </zip>
 </target>
 
-<target name="dist_client" depends="compile, javadoc, voltdbclient.jar"
+<target name="dist_client" depends="dist_internal"
         description="Hacky Java client package target">
     <!-- prepare release directory for new content -->
     <delete includeemptydirs="true" failonerror='false'>
-        <fileset dir="${dist.dir}" includes="**/*" />
+        <fileset dir="${dist.dir}-client-java" includes="**/*" />
     </delete>
-    <mkdir dir="${dist.dir}" />
+    <mkdir dir="${dist.dir}-client-java" />
 
-    <mkdir dir="${dist.dir}/doc" />
-    <mkdir dir="${dist.dir}/tools" />
-    <mkdir dir="${dist.dir}/voltdb" />
-
-    <!-- populate the doc dir -->
-    <copy todir="${dist.dir}/doc/">
-        <fileset dir="doc" defaultexcludes="yes">
-            <include name="**/**"/>
+    <!-- populate the dist-client-java dir from the superset dist -->
+    <copy todir="${dist.dir}-client-java/">
+        <fileset dir="${dist.dir}/" defaultexcludes="yes">
+            <include name="**/*"/>
             <exclude name=".gitignore"/>
+            <exclude name="bin/"/>
+            <exclude name="voltdb/libvoltdb*"/>
+            <exclude name="voltdb/voltdb-*.jar"/>
         </fileset>
     </copy>
 
-    <!-- populate the logging configuration files -->
-    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="voltdb/log4j.properties"/>
-    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="voltdb/log4j.xml"/>
-
-    <!-- populate java and native libraries -->
-    <copy todir="${dist.dir}/voltdb" flatten="true" >
-        <fileset dir="voltdb" defaultexcludes="yes">
-            <include name="voltdbclient-${dist.version}.jar" />
-        </fileset>
-    </copy>
-
-    <!-- populate top level README by copying and renaming README -->
-    <copy tofile="${dist.dir}/README" file="README"/>
-
-    <!-- populate top level thirdparty readmy by copying it -->
-    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty"/>
-
-    <!-- populate examples top level README -->
-    <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
-
-    <!-- populate the examples -->
-    <distribute-example exampledir="voltcache"/>
-    <distribute-example exampledir="voltkv"/>
-    <distribute-example exampledir="voter"/>
-
-    <!-- populate the tools -->
-    <copy todir="${dist.dir}/tools" >
-        <fileset dir="tools" defaultexcludes="yes">
-            <include name="studio.web/**"/>
-            <include name="demo/**"/>
-            <include name="sqlcmd/**"/>
-        </fileset>
-    </copy>
-
-    <!-- make shell script executable -->
+    <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}/tools/demo" defaultexcludes="yes">
-            <include name="launch"/>
+        <fileset dir="${dist.dir}-client-java/" defaultexcludes="yes">
+            <include name="tools/demo/launch"/>
+            <include name="doc/tutorial/auction/run.sh"/>
+            <include name="doc/tutorial/helloworld/run.sh"/>
+            <include name="examples/voltcache/run.sh"/>
+            <include name="examples/voltkv/run.sh"/>
+            <include name="examples/voter/run.sh"/>
+            <include name="tools/generate"/>
+            <include name="tools/sqlcmd/sqlcmd"/>
         </fileset>
     </chmod>
-
-    <!-- populate top level demo html -->
-    <copy todir="${dist.dir}/" file="Click Here to Start.html"/>
-
-    <!-- copy lib dir -->
-    <mkdir dir="${dist.dir}/lib" />
-    <copy todir="${dist.dir}/lib">
-        <fileset dir="${lib.dir}" defaultexcludes="yes">
-            <include name="**"/>
-        </fileset>
-    </copy>
-
-    <!-- make shell script executable -->
-    <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}/tools/sqlcmd" defaultexcludes="yes">
-            <include name="sqlcmd"/>
-        </fileset>
-    </chmod>
-
-    <!-- populate project generator -->
-    <exec dir="src/proj_gen/" executable="python">
-        <arg line="generator_compiler.py"/>
-    </exec>
-    <move tofile="${dist.dir}/tools/generate" file="src/proj_gen/generate" />
-    <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}/tools" defaultexcludes="yes">
-            <include name="generate"/>
-        </fileset>
-    </chmod>
-
-    <!-- add the Project and Deployment file schemas to the dist -->
-    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
-    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
-
-    <!-- copy licenses -->
-    <copy todir="${dist.dir}" file="LICENSE"/>
-    <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
 
     <!-- create an archive for distribution -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/dist"/>
+        <arg value="${raw.dist.dir}/dist-client-java"/>
         <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}"/>
     </exec>
-
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
@@ -708,86 +572,56 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}.tar.gz"/>
         <arg value="voltdb-client-java-${dist.version}"/>
     </exec>
-
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}"/>
-        <arg value="${raw.dist.dir}/dist"/>
+        <arg value="${raw.dist.dir}/dist-client-java"/>
     </exec>
 </target>
 
-<target name="dist_refapp" depends="compile, ee, javadoc, voltdb.jar, voltdbclient.jar"
+<target name="dist_refapp" depends="dist_internal"
         description="Build a kit that only includes a single reference app">
     <fail unless="appname" message="must specify an app name with -Dappname=" />
 
     <!-- prepare release directory for new content -->
     <delete includeemptydirs="true" failonerror='false'>
-        <fileset dir="${dist.dir}" includes="**/*" />
+        <fileset dir="${dist.dir}-${appname}" includes="**/*" />
     </delete>
-    <mkdir dir="${dist.dir}" />
-
-    <mkdir dir="${dist.dir}/src" />
-    <mkdir dir="${dist.dir}/voltdb" />
-
-    <!-- populate the logging configuration files -->
-    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="voltdb/log4j.properties"/>
-    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="voltdb/log4j.xml"/>
-
-    <!-- populate java and native libraries -->
-    <copy todir="${dist.dir}/voltdb" flatten="true" >
-        <fileset dir="voltdb" defaultexcludes="yes">
-            <include name="voltdb-${dist.version}.jar" />
-            <include name="voltdbclient-${dist.version}.jar" />
-        </fileset>
-    </copy>
-    <copy todir="${dist.dir}/voltdb" flatten="true" >
-        <fileset dir="${build.dir}" defaultexcludes="yes">
-            <include name="nativelibs/libvoltdb*" />
-        </fileset>
-    </copy>
-
-    <!-- populate top level README by copying and renaming README -->
-    <copy tofile="${dist.dir}/README" file="README"/>
-
-    <!-- populate top level thirdparty readmy by copying it -->
-    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty"/>
+    <mkdir dir="${dist.dir}-${appname}" />
+    <mkdir dir="${dist.dir}-${appname}/src" />
 
     <!-- populate the examples -->
-    <distribute-example exampleparent="src" exampledir="${appname}" />
+    <copy todir="${dist.dir}-${appname}/src">
+        <fileset dir="${dist.dir}/examples/${appname}" defaultexcludes="yes">
+            <include name="**/*"/>
+            <exclude name=".gitignore"/>
+        </fileset>
+    </copy>
 
-    <!-- populate the bin dir -->
-    <mkdir dir="${dist.dir}/bin" />
-    <copy todir="${dist.dir}/bin" >
-        <fileset dir="bin" defaultexcludes="yes">
-            <include name="**"/>
+    <!-- populate the bin/lib/voltdb/etc... dirs -->
+    <copy todir="${dist.dir}-${appname}" >
+        <fileset dir="${dist.dir}" defaultexcludes="yes">
+            <include name="README" />
+            <include name="LICENSE" />
+            <include name="README.thirdparty" />
+            <include name="voltdb/**" />
+            <include name="lib/**" />
         </fileset>
     </copy>
 
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}/bin" defaultexcludes="yes">
-            <include name="**"/>
+        <fileset dir="${dist.dir}-${appname}" defaultexcludes="yes">
+            <include name="bin/*"/>
+            <include name="src/run.sh"/>
         </fileset>
     </chmod>
 
-    <!-- copy lib dir -->
-    <mkdir dir="${dist.dir}/lib" />
-    <copy todir="${dist.dir}/lib">
-        <fileset dir="${lib.dir}" defaultexcludes="yes">
-            <include name="**"/>
-        </fileset>
-    </copy>
-
-    <!-- copy licenses -->
-    <copy todir="${dist.dir}" file="LICENSE"/>
-    <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
-
     <!-- create an archive for distribution -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/dist"/>
+        <arg value="${raw.dist.dir}/dist-${appname}"/>
         <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}"/>
     </exec>
-
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
@@ -796,11 +630,10 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}.tar.gz"/>
         <arg value="voltdb-${appname}-${dist.version}"/>
     </exec>
-
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}"/>
-        <arg value="${raw.dist.dir}/dist"/>
+        <arg value="${raw.dist.dir}/dist-${appname}"/>
     </exec>
 </target>
 
@@ -1679,8 +1512,10 @@ TEST CASES
     <attribute name="app"/>
     <!-- make sure example application compiles -->
     <sequential>
-        <exec dir="${dist.examples.dir}/@{app}" executable="run.sh" failonerror='true'>
-            <arg value="srccompile"/>
+        <exec dir="${dist.examples.dir}/@{app}" executable="/usr/bin/env" failonerror='true'>
+            <arg value="bash" />
+            <arg value="run.sh" />
+            <arg value="srccompile" />
         </exec>
     </sequential>
 </macrodef>
@@ -1688,8 +1523,11 @@ TEST CASES
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
 
+    <echo>checking voltcache</echo>
     <samplecheck app="voltcache" />
+    <echo>checking voltkv</echo>
     <samplecheck app="voltkv" />
+    <echo>checking voter</echo>
     <samplecheck app="voter" />
 
     <!-- test the generator -->
