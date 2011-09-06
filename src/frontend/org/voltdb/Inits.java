@@ -196,6 +196,29 @@ public class Inits {
     //
     ///////////////////////////////////////////////////////////////
 
+    /*
+        The Inits functions are run via reflection in an order
+        that satisfies all dependencies.
+
+        Per John, these all run after the socket joiner complete.
+
+        The dependency DAG (a depends on <- b) is:
+
+        SetupAdminMode
+        StartHTTPServer
+        InitHashinator
+        InitAgreementSite
+
+        CreateRestoreAgentAndPlan <- InitAgreementSite
+        DistributeCatalog <- InitAgreementSite, CreateRestoreAgentAndPlan
+        EnforceLicensing <- CreateRestoreAgentAndPlan
+        LoadCatalog <- DistributeCatalog
+        SetupCommandLogging <- LoadCatalog
+        InitExport <- LoadCatalog
+
+     */
+
+
     class CollectPlatformInfo extends InitWork {
         @Override
         public void run() {
@@ -317,12 +340,18 @@ public class Inits {
 
     class EnforceLicensing extends InitWork {
         EnforceLicensing() {
+            // Requires the network to be established in order to
+            // cleanly shutdown the cluster. The network is created
+            // in CreateRestoreAgentAndPlan ...
+            dependsOn(CreateRestoreAgentAndPlan.class);
         }
 
         @Override
         public void run() {
             // If running commercial code (of value) and not rejoining, enforce licensing.
-            if (m_config.m_isEnterprise && !m_isRejoin) {
+            // Make the leader the only license enforcer.
+            boolean isLeader = (m_rvdb.m_myHostId == 0);
+            if (m_config.m_isEnterprise && isLeader && !m_isRejoin) {
                 assert(m_config != null);
                 if (!MiscUtils.validateLicense(m_config.m_pathToLicense, m_deployment.getCluster().getHostcount())) {
                     // validateLicense logs as appropriate. Exit call is here for testability.
