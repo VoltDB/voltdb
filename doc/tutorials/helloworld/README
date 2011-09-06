@@ -1,8 +1,8 @@
 This directory contains the source files for the Hello, World! tutorial described in _Getting Started with VoltDB_.
 
-The tutorial is designed to familiarize you with the source code and the commands needed to write and compile VoltDB applications, so we suggest you try issuing the commands yourself. However, a makefile file is provided as well for those who just want to see the example in action.
+The tutorial is designed to familiarize you with the source code and the commands needed to write and compile VoltDB applications, so we suggest you try issuing the commands yourself. However, a run.sh script is provided as well for those who just want to see the example in action.
 
-The commands to process these files (not using Make) are the following:
+The commands to process these files (not using run.sh) are the following:
 
   $ export CLASSPATH=.:../../voltdb/*
 

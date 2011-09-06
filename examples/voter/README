@@ -12,7 +12,7 @@ Many attributes of the application are customizable through arguments passed to 
   - When to start recording performance statistics
   - How frequently to report those statistics
 
-These attributes can be adjusted by modifying the arguments to the "client" target in the makefile.
+These attributes can be adjusted by modifying the arguments to the "client" target in run.sh.
 
 Additional arguments allow the client to automatically "tune" itself for optimal performance
 
@@ -34,7 +34,7 @@ As delivered, the example runs both client and server on a single node (like the
 - The servers supports multiple clients at one time
 - Single node or multi-node clusters are supported as the server
 
-To test the example on a different configuration, simply edit the makefile, listing one server node as the lead node when building the catalog and using a comma-separated list of the server addresses as an argument to the client. See the comments in the build script for details.
+To test the example on a different configuration, simply edit run.sh, listing one server node as the lead node when building the catalog and using a comma-separated list of the server addresses as an argument to the client. See the comments in the build script for details.
 
 Interpreting the Results
 ------------------------
@@ -52,19 +52,23 @@ For more on benchmarking and tips on application tuning, make sure you visit the
  - http://voltdb.com/search/node/benchmark
  - http://voltdb.com/search/node/tuning
 
-make targets
+run.sh actions 
 -----------
 
-make                 : compile all Java clients and stored procedures, build the catalog, and
+run.sh               : compile all Java clients and stored procedures, build the catalog, and
                       start the server
 
-make server          : start the server
+run.sh srccompile    : compile all Java clients and stored procedures
 
-make client          : start the client, more than 1 client is permitted
+run.sh server        : start the server
 
-make sync-client     : start the synchronous client, more than 1 client is permitted.
+run.sh client        : start the client, more than 1 client is permitted
 
-make catalog         : build the catalog
+run.sh sync-benchmark: start the synchronous client, more than 1 client is permitted.
 
-make clean           : remove compiled files
+run.sh jdbc-benchmark: start the JDBC client, more than 1 client is permitted.
+
+run.sh compile       : build the catalog
+
+run.sh clean         : remove compiled files
 

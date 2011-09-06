@@ -4,15 +4,10 @@ Example Projects
 ================
 The following projects are included in the examples directory:
 
-auction
-  This example contains a set of schema, clients, and procedures
-  for running auction related transactions.
+voltcache
+  This example shows memcache-like cache implemented using VoltDB.
 
-helloworld
- This directory contains the sources for the "Hello World" tutorial
- from the book Getting Started With VoltDB.
-
-key_value
+voltkv
   This directory contains the sources for the "Key-Value" implementation
   in VoltDB.
 

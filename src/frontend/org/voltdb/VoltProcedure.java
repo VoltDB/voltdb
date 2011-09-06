@@ -760,8 +760,8 @@ public abstract class VoltProcedure {
      * will be thrown with a description of the expecation that was not met. This exception must not be
      * caught from within the procedure.
      *
-     * @param Expectation describing the expected result of executing this SQL statement.
      * @param stmt {@link org.voltdb.SQLStmt Statement} to queue for execution.
+     * @param expectation Expectation describing the expected result of executing this SQL statement.
      * @param args List of arguments to be bound as parameters for the {@link org.voltdb.SQLStmt statement}
      * @see <a href="#allowable_params">List of allowable parameter types</a>
      */
@@ -1137,6 +1137,7 @@ public abstract class VoltProcedure {
             long maxExecutionTime = m_maxExecutionTime;
             long abortCount = m_abortCount;
             long failureCount = m_failureCount;
+
 
             if (m_interval) {
                 invocations = m_invocations - m_lastInvocations;
