@@ -19,7 +19,6 @@
         var intervalId;
         function RefreshData()
         {
-            con.DeclareProcedure({ name:'GetStateHeatmap', params:[]});
             con.BeginExecute('GetStateHeatmap', [], function(response)
             {
                 try
@@ -103,7 +102,8 @@
 
             con = VoltDB.AddConnection('localhost', 8080, false, null, null, false, (function(connection, success)
             {
-                connection.DeclareProcedure({ name:'GetStateHeatmap', params:[]});
+                connection.Procedures['GetStateHeatmap'] = [];
+                //connection.DeclareProcedure({ name:'GetStateHeatmap', params:[]});
             }));
             SetRefreshInterval(1);
         });
