@@ -67,7 +67,7 @@ public class Expectation {
         case EXPECT_EMPTY:
             if (rowCount != 0) {
                 fail(procedureName, stmtName, batchIndex,
-                     String.format("Expected one row, but got %d", rowCount));
+                     String.format("Expected zero row, but got %d", rowCount));
             }
             return;
         case EXPECT_ONE_ROW:
@@ -85,7 +85,7 @@ public class Expectation {
         case EXPECT_NON_EMPTY:
             if (rowCount == 0) {
                 fail(procedureName, stmtName, batchIndex,
-                     String.format("Expected zero rows, but got %d", rowCount));
+                     String.format("Expected one or more rows, but got %d", rowCount));
             }
             return;
         case EXPECT_SCALAR:
