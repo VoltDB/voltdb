@@ -492,7 +492,7 @@ DISTRIBUTION
         <fileset dir="${dist.dir}" defaultexcludes="yes">
             <include name="bin/*"/>
             <include name="tools/demo/launch"/>
-            <include name="doc/tutorial/**/run.sh"/>
+            <include name="doc/tutorials/**/run.sh"/>
             <include name="examples/**/run.sh"/>
             <include name="tools/generate"/>
             <include name="tools/sqlcmd/sqlcmd"/>
@@ -549,8 +549,8 @@ DISTRIBUTION
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}-client-java/" defaultexcludes="yes">
             <include name="tools/demo/launch"/>
-            <include name="doc/tutorial/auction/run.sh"/>
-            <include name="doc/tutorial/helloworld/run.sh"/>
+            <include name="doc/tutorials/auction/run.sh"/>
+            <include name="doc/tutorials/helloworld/run.sh"/>
             <include name="examples/voltcache/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
