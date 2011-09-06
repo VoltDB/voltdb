@@ -6,6 +6,7 @@ CLASSPATH="$VOLTJAR:../../lib"
 VOLTDB="../../bin/voltdb"
 VOLTCOMPILER="../../bin/voltcompiler"
 LICENSE="../../voltdb/license.xml"
+LEADER="localhost"
 
 # remove build artifacts
 function clean() {
@@ -38,7 +39,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader localhost
+        license $LICENSE leader $LEADER
 }
 
 # run the client that drives the example
