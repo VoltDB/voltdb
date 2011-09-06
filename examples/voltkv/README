@@ -23,14 +23,6 @@ Additional arguments allow the client to automatically "tune" itself for optimal
   - Adjustment rate: the tuning process decreases the number of requested transactions per second to FACTOR*<observed-TPS> until the target latency is reached
   - Auto-tuning interval (in seconds)
 
-While this example application demonstrates how to implement a Key-Value system using VoltDB, it also implements the following:
-
-Measuring Performance - Client Network Bandwidth
-------------------------------------------------
-
-Key-Value also displays the amount of client network bandwidth (MB in and out).
-
-
 Logging
 ------------------------------------------------
 
