@@ -848,6 +848,13 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
+    <!-- README files we want to include in the jar -->
+    <copy flatten='false' todir='${build.prod.dir}'>
+        <fileset dir="${src.gpl.dir}">
+           <include name="**/*Readme.txt"/>
+        </fileset>
+    </copy>
+
     <!-- pick src//** schemas as package resources -->
     <copy flatten='false' todir="${build.prod.dir}">
         <fileset dir="${src.gpl.dir}">

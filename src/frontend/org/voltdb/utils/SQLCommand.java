@@ -32,6 +32,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.text.SimpleDateFormat;
 import java.math.BigDecimal;
+import java.net.URL;
+import java.nio.Buffer;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -268,7 +270,7 @@ public class SQLCommand
                             System.out.println("\n--- User Views ---------------------------------------------");
                         else
                             System.out.println("\n--- User Export Streams ------------------------------------");
-                        Iterator<String> list = (Iterator<String>)((TreeSet<String>)lists[i]).iterator();
+                        Iterator<String> list = ((TreeSet<String>)lists[i]).iterator();
                         while(list.hasNext())
                             System.out.println(list.next());
                         System.out.print("\n");
@@ -765,16 +767,12 @@ public class SQLCommand
     {
         try
         {
-            BufferedReader readme = new BufferedReader(new FileReader("README"));
-            String line;
-            while ((line = readme.readLine()) != null)
-                System.out.println(line);
-            readme.close();
-        }
-        catch(FileNotFoundException e)
-        {
-            System.err.println("The readme file containing the help information is no longer available.");
-            System.exit(-1);
+            byte[] bytes = new byte[1024 * 4];
+            InputStream is = SQLCommand.class.getResourceAsStream("SQLCommandReadme.txt");
+            while (is.available() > 0) {
+                is.read(bytes, 0, bytes.length);
+                System.out.write(bytes);
+            }
         }
         catch(Exception x)
         {
