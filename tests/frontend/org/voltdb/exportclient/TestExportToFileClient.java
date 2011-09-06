@@ -24,11 +24,21 @@
 package org.voltdb.exportclient;
 
 import java.io.File;
+import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.InetSocketAddress;
 
 import junit.framework.TestCase;
 
+import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportToFileClient.ExportToFileDecoder;
+import org.voltdb.regressionsuites.LocalCluster;
 
 public class TestExportToFileClient extends TestCase {
 
@@ -53,5 +63,114 @@ public class TestExportToFileClient extends TestCase {
         assertEquals(decoder0, decoder1);
         decoder0.sourceNoLongerAdvertised(source1);
         decoder0.sourceNoLongerAdvertised(source0);
+    }
+
+    public void testNoAutoDiscovery() throws Exception {
+        // clean up any files that exist
+        File tmpdir = new File("/tmp");
+        assertTrue(tmpdir.exists());
+        assertTrue(tmpdir.isDirectory());
+        FileFilter filter = new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.getPath().contains("nadclient") && pathname.getPath().contains(".csv");
+            }
+        };
+        File[] filesToDelete = tmpdir.listFiles(filter);
+        for (File f : filesToDelete) {
+            f.delete();
+        }
+
+        String simpleSchema =
+            "create table blah (" +
+            "ival bigint default 0 not null, " +
+            "PRIMARY KEY(ival));";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
+        builder.addPartitionInfo("blah", "ival");
+        builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        builder.setTableAsExportOnly("blah");
+
+        LocalCluster cluster = new LocalCluster("exportAuto.jar",
+                2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        cluster.setHasLocalServer(true);
+        boolean success = cluster.compile(builder);
+        assertTrue(success);
+        cluster.startUp(true);
+
+        final String listener = cluster.getListenerAddresses().get(0);
+        final Client client = ClientFactory.createClient();
+        client.createConnection(listener);
+        client.callProcedure("Insert", 5);
+        client.close();
+
+        final ExportToFileClient exportClient1 =
+                new ExportToFileClient(
+                    ',',
+                    "nadclient1",
+                    new File("/tmp/"),
+                    1,
+                    "yyyyMMddHHmmss",
+                    null,
+                    6,
+                    false,
+                    false,
+                    false,
+                    0,
+                    false);
+        final ExportToFileClient exportClient2 =
+                new ExportToFileClient(
+                    ',',
+                    "nadclient2",
+                    new File("/tmp/"),
+                    1,
+                    "yyyyMMddHHmmss",
+                    null,
+                    6,
+                    false,
+                    false,
+                    false,
+                    0,
+                    false);
+
+        InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT);
+        InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT + 1);
+
+        exportClient1.addServerInfo(inetaddr1);
+        exportClient2.addServerInfo(inetaddr2);
+
+        // run both export clients for 5s
+        Thread other = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    exportClient1.run(5000);
+                } catch (ExportClientException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        other.start();
+        exportClient2.run(5000);
+        other.join();
+
+        cluster.shutDown();
+
+        // compare the output files
+        File[] filesToCompare = tmpdir.listFiles(filter);
+        assertEquals(2, filesToCompare.length);
+        assertEquals(filesToCompare[0].length(), filesToCompare[1].length());
+        InputStream in1 = new FileInputStream(filesToCompare[0]);
+        InputStream in2 = new FileInputStream(filesToCompare[1]);
+        int b1 = 0, b2 = 0;
+        do {
+            b1 = in1.read();
+            b2 = in2.read();
+        } while ((b1 == b2) && (b1 != -1));
+        assertEquals(-1, b1);
+        in1.close();
+        in2.close();
     }
 }

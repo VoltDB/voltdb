@@ -578,6 +578,21 @@ public class ExportToFileClient extends ExportClientBase {
     }
 
     public ExportToFileClient(char delimiter,
+            String nonce,
+            File outdir,
+            int period,
+            String dateformatString,
+            String fullDelimiters,
+            int firstfield,
+            boolean useAdminPorts,
+            boolean batched,
+            boolean withSchema,
+            int throughputMonitorPeriod) {
+        this(delimiter, nonce, outdir, period, dateformatString, fullDelimiters,
+                firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod, true);
+    }
+
+    public ExportToFileClient(char delimiter,
                               String nonce,
                               File outdir,
                               int period,
@@ -587,8 +602,9 @@ public class ExportToFileClient extends ExportClientBase {
                               boolean useAdminPorts,
                               boolean batched,
                               boolean withSchema,
-                              int throughputMonitorPeriod) {
-        super(useAdminPorts, throughputMonitorPeriod);
+                              int throughputMonitorPeriod,
+                              boolean autodiscoverTopolgy) {
+        super(useAdminPorts, throughputMonitorPeriod, autodiscoverTopolgy);
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -756,6 +772,7 @@ public class ExportToFileClient extends ExportClientBase {
         boolean withSchema = false;
         String fullDelimiters = null;
         int throughputMonitorPeriod = 0;
+        boolean autodiscoverTopolgy = true;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -901,6 +918,9 @@ public class ExportToFileClient extends ExportClientBase {
                     printHelpAndQuit(-1);
                 }
             }
+            else if (arg.equals("--disable-topology-autodiscovery")) {
+                autodiscoverTopolgy = false;
+            }
             else if (arg.equals("--throughput-monitor-period")) {
                 if (args.length < ii + 1) {
                     System.err.println("Error: Not enough args following --throughput-monitor-period");
@@ -953,7 +973,8 @@ public class ExportToFileClient extends ExportClientBase {
                                                            connect == 'a',
                                                            batched,
                                                            withSchema,
-                                                           throughputMonitorPeriod);
+                                                           throughputMonitorPeriod,
+                                                           autodiscoverTopolgy);
 
         // add all of the servers specified
         for (String server : volt_servers) {
