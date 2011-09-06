@@ -23,7 +23,7 @@ function srccompile() {
 }
 
 # build an application catalog
-function compile() {
+function catalog() {
     srccompile
     $VOLTCOMPILER obj project.xml $APPNAME.jar
     # stop if compilation fails
@@ -33,7 +33,7 @@ function compile() {
 # run the voltdb server locally
 function server() {
     # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then compile; fi
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE leader localhost
