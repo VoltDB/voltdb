@@ -588,10 +588,10 @@ DISTRIBUTION
         <fileset dir="${dist.dir}-${appname}" includes="**/*" />
     </delete>
     <mkdir dir="${dist.dir}-${appname}" />
-    <mkdir dir="${dist.dir}-${appname}/src" />
+    <mkdir dir="${dist.dir}-${appname}/${appname}" />
 
     <!-- populate the examples -->
-    <copy todir="${dist.dir}-${appname}/src">
+    <copy todir="${dist.dir}-${appname}/${appname}">
         <fileset dir="${dist.dir}/examples/${appname}" defaultexcludes="yes">
             <include name="**/*"/>
             <exclude name=".gitignore"/>
@@ -606,16 +606,25 @@ DISTRIBUTION
             <include name="README.thirdparty" />
             <include name="voltdb/**" />
             <include name="lib/**" />
+            <include name="bin/**" />
         </fileset>
     </copy>
+
+    <!-- rewrite the run.sh script's relative directories -->
+    <replace
+        file="${dist.dir}-${appname}/${appname}/run.sh"
+        token="../../"
+        value="../"/>
 
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}-${appname}" defaultexcludes="yes">
             <include name="bin/*"/>
-            <include name="src/run.sh"/>
+            <include name="${appname}/run.sh"/>
         </fileset>
     </chmod>
+
+
 
     <!-- create an archive for distribution -->
     <exec executable="mv" failonerror="true">
