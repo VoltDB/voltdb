@@ -82,6 +82,52 @@ public class TestCRUDSuite extends RegressionSuite {
         assertTrue(resp.getResults()[0].asScalarLong() == 0);
     }
 
+    public void testMultiColPk() throws Exception
+    {
+        // P4(z INTEGER, x VARCHAR(10), y INTEGER,
+        // PRIMARY KEY(y, x, z));"
+
+        // z = i
+        // x = hex(i)
+        // y = i *100     (partition key)
+
+        final Client client = this.getClient();
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("P4.insert", i, Integer.toHexString(i), i * 100);  // z,x,y
+            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+        }
+
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("P4.select", i*100, Integer.toHexString(i), i); // y,x,z
+            VoltTable vt = resp.getResults()[0];
+            assertTrue(vt.advanceRow());
+            assertTrue(vt.getLong(0) == i);
+        }
+
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("P4.update",
+                    i*10, "STR" + Integer.toHexString(i), i*100, // z,x,y (update / table order)
+                    i*100, Integer.toHexString(i), i);           // y,x,z (search / index order)
+            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+        }
+
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("P4.select", i*100, "STR" + Integer.toHexString(i), i*10); // y,x,z
+            VoltTable vt = resp.getResults()[0];
+            assertTrue(vt.advanceRow());
+            assertTrue(vt.getLong(0) == i*10);
+        }
+
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("P4.delete", i*100, "STR" + Integer.toHexString(i), i*10); // y,x,z
+            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+        }
+
+    }
+
     public void testPartitionedPkWithoutPartitionCol() throws Exception
     {
         Client client = getClient();
@@ -130,10 +176,11 @@ public class TestCRUDSuite extends RegressionSuite {
 
         try {
             // a table that should generate procedures
+            // use column names such that lexical order != column order.
             project.addLiteralSchema(
-                    "CREATE TABLE p1(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (a1));"
+                    "CREATE TABLE p1(b1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
             );
-            project.addPartitionInfo("p1", "a1");
+            project.addPartitionInfo("p1", "b1");
 
             // a partitioned table that should not generate procedures (no pkey)
             project.addLiteralSchema(
@@ -153,6 +200,14 @@ public class TestCRUDSuite extends RegressionSuite {
             project.addLiteralSchema(
                     "CREATE TABLE r1(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (a1));"
             );
+
+            // table with a multi-column pkey. verify that pkey column ordering is
+            // in the index column order, not table order and not index column lex. order
+            project.addLiteralSchema(
+                    "CREATE TABLE p4(z INTEGER NOT NULL, x VARCHAR(10) NOT NULL, y INTEGER NOT NULL, PRIMARY KEY(y,x,z));"
+            );
+            project.addPartitionInfo("p4", "y");
+
         } catch (IOException error) {
             fail(error.getMessage());
         }

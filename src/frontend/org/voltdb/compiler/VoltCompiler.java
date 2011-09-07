@@ -27,13 +27,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
@@ -771,71 +765,101 @@ public class VoltCompiler {
         return crudprocs;
     }
 
+    /** Helper to sort table columns by table column order */
+    private static class TableColumnComparator implements Comparator<Column> {
+        @Override
+        public int compare(Column o1, Column o2) {
+            return o1.getIndex() - o2.getIndex();
+        }
+    }
+
+    /** Helper to sort index columnrefs by index column order */
+    private static class ColumnRefComparator implements Comparator<ColumnRef> {
+        @Override
+        public int compare(ColumnRef o1, ColumnRef o2) {
+            return o1.getIndex() - o2.getIndex();
+        }
+    }
+
     /**
      * Helper to generate a WHERE pkey_col1 = ?, pkey_col2 = ? ...; clause.
      * @param partitioncolumn partitioning column for the table
      * @param pkey constraint from the catalog
      * @param paramoffset 0-based counter of parameters in the full sql statement so far
      * @param sb string buffer accumulating the sql statement
-     * @return partition key offset (which must be in the primary key)
+     * @return offset in the index of the partition column
      */
     private int generateCrudPKeyWhereClause(Column partitioncolumn,
-            Constraint pkey, int paramoffset, StringBuilder sb)
+            Constraint pkey, StringBuilder sb)
     {
-        int partitionoffset = -1;
-        boolean first;
-        first = true;
+        // Sort the catalog index columns by index column order.
+        ArrayList<ColumnRef> indexColumns = new ArrayList<ColumnRef>(pkey.getIndex().getColumns().size());
+        for (ColumnRef c : pkey.getIndex().getColumns()) {
+            indexColumns.add(c);
+        }
+        Collections.sort(indexColumns, new ColumnRefComparator());
+
+        boolean first = true;
+        int partitionOffset = -1;
+
         sb.append(" WHERE ");
-        for (ColumnRef pkc : pkey.getIndex().getColumns()) {
-            paramoffset++;
+        for (ColumnRef pkc : indexColumns) {
             if (!first) sb.append(" AND ");
             first = false;
             sb.append("(" + pkc.getColumn().getName() + " = ?" + ")");
             if (pkc.getColumn() == partitioncolumn) {
-                partitionoffset = paramoffset;
+                partitionOffset = pkc.getIndex();
             }
         }
         sb.append(";");
-        return partitionoffset;
+        return partitionOffset;
+
     }
 
     /**
      * Helper to generate a full col1 = ?, col2 = ?... clause.
      * @param table
      * @param sb
-     * @return number of columns added (for partition key offset calculation).
      */
-    private int generateCrudExpressionColumns(Table table, StringBuilder sb) {
+    private void generateCrudExpressionColumns(Table table, StringBuilder sb) {
         boolean first = true;
-        int paramoffset = -1;
+
+        // Sort the catalog table columns by column order.
+        ArrayList<Column> tableColumns = new ArrayList<Column>(table.getColumns().size());
         for (Column c : table.getColumns()) {
-            paramoffset++;
+            tableColumns.add(c);
+        }
+        Collections.sort(tableColumns, new TableColumnComparator());
+
+        for (Column c : tableColumns) {
             if (!first) sb.append(", ");
             first = false;
             sb.append(c.getName() + " = ?");
         }
-        return paramoffset;
     }
 
     /**
      * Helper to generate a full col1, col2, col3 list.
      */
-    private int generateCrudColumnList(Column partitioncolumn, Table table, StringBuilder sb) {
-        int partitionoffset = -1;
+    private void generateCrudColumnList(Table table, StringBuilder sb) {
         boolean first = true;
-        int paramoffset = -1;
         sb.append("(");
+
+        // Sort the catalog table columns by column order.
+        ArrayList<Column> tableColumns = new ArrayList<Column>(table.getColumns().size());
         for (Column c : table.getColumns()) {
-            paramoffset++;
+            tableColumns.add(c);
+        }
+        Collections.sort(tableColumns, new TableColumnComparator());
+
+        // Output the SQL column list.
+        for (Column c : tableColumns) {
+            assert (c.getIndex() >= 0);  // mostly mask unused 'c'.
             if (!first) sb.append(", ");
             first = false;
             sb.append("?");
-            if (c == partitioncolumn) {
-                partitionoffset = paramoffset;
-            }
         }
         sb.append(")");
-        return partitionoffset;
     }
 
     /**
@@ -848,11 +872,11 @@ public class VoltCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("DELETE FROM " + table.getTypeName());
 
-        int partitionoffset =
-            generateCrudPKeyWhereClause(partitioncolumn, pkey, -1, sb);
+        int partitionOffset =
+            generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
 
         String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionOffset;
 
         ProcedureDescriptor pd =
             new ProcedureDescriptor(
@@ -863,7 +887,7 @@ public class VoltCompiler {
                     partitioninfo,            // table.column:offset
                     true);                    // builtin statement
 
-        compilerLog.debug("Synthesized built-in DELETE procedure: " +
+        compilerLog.info("Synthesized built-in DELETE procedure: " +
                 sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
                 partitioninfo);
 
@@ -880,14 +904,11 @@ public class VoltCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("UPDATE " + table.getTypeName() + " SET ");
 
-        int paramoffset =
-            generateCrudExpressionColumns(table, sb);
-
-        int partitionoffset =
-            generateCrudPKeyWhereClause(partitioncolumn, pkey, paramoffset, sb);
+        generateCrudExpressionColumns(table, sb);
+        generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
 
         String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitioncolumn.getIndex();
 
         ProcedureDescriptor pd =
             new ProcedureDescriptor(
@@ -915,12 +936,11 @@ public class VoltCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO " + table.getTypeName() + " VALUES ");
 
-        int partitionoffset =
-            generateCrudColumnList(partitioncolumn, table, sb);
+        generateCrudColumnList(table, sb);
         sb.append(";");
 
         String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitioncolumn.getIndex();
 
         ProcedureDescriptor pd =
             new ProcedureDescriptor(
@@ -948,11 +968,11 @@ public class VoltCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT * FROM " + table.getTypeName());
 
-        int partitionoffset =
-            generateCrudPKeyWhereClause(partitioncolumn, pkey, -1, sb);
+        int partitionOffset =
+            generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
 
         String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionoffset;
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionOffset;
 
         ProcedureDescriptor pd =
             new ProcedureDescriptor(
