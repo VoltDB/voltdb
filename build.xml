@@ -1194,6 +1194,8 @@ TEST CASES
                 <exclude name="**/TestMultiPartitionSuite.class"  />
                 <exclude name="**/TestReplicatedSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestAdminMode.class" />
+                <exclude name="**/TestPartitionDetection.class"  />
+                <exclude name="**/TestSystemProcedureSuite.class"  />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
             </fileset>
         </tests>
