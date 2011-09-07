@@ -166,6 +166,12 @@ public class VoltDB {
 
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
+                // Some LocalCluster ProcessBuilder instances can result in an empty string
+                // in the array args.  Ignore them.
+                if (arg.equals(""))
+                {
+                    continue;
+                }
                 if (arg.equals("noloadlib")) {
                     m_noLoadLibVOLTDB = true;
                 }
