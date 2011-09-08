@@ -61,10 +61,10 @@ def buildPro():
         run("VOLTCORE=../eng ant -f mmt.xml clean dist.pro")
 
 ################################################
-# COMPUTE CHECKSUMS
+# COPY FILES
 ################################################
 
-def copyFilesToReleaseDir(releaseDir, version, operatingsys):
+def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/eng/obj/release/voltdb-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-%s.tar.gz" % (releaseDir, operatingsys, version))
     get("%s/eng/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
@@ -82,6 +82,7 @@ def copyFilesToReleaseDir(releaseDir, version, operatingsys):
         get("%s/eng/obj/release/voltdb-%s.sym" % (builddir, version),
             "%s/other/%s-voltdb-voltkv-%s.sym" % (releaseDir, operatingsys, version))
 
+def copyEnterpriseFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/pro/obj/pro/voltdb-ent-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-ent-%s.tar.gz" % (releaseDir, operatingsys, version))
 
@@ -138,6 +139,7 @@ eng_svn_url = getSVNURL("https://svn.voltdb.com/eng/", argv[1])
 pro_svn_url = getSVNURL("https://svn.voltdb.com/pro/", argv[2])
 
 version = "unknown"
+releaseDir = "unknown"
 
 # get ssh config
 volt5f = getSSHInfoForHost("volt5f")
@@ -146,25 +148,22 @@ voltmini = getSSHInfoForHost("voltmini")
 # build kits on 5f
 with settings(host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
     version = checkoutCode(eng_svn_url, pro_svn_url)
+    releaseDir = os.getenv('HOME') + "/releases/" + version
+    makeReleaseDir(releaseDir)
     print "VERSION: " + version
     buildCommunity()
+    copyCommunityFilesToReleaseDir(releaseDir, version, "LINUX")
     buildPro()
+    copyEnterpriseFilesToReleaseDir(releaseDir, version, "LINUX")
 
 # build kits on the mini
 with settings(host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
     version2 = checkoutCode(eng_svn_url, pro_svn_url)
     assert version == version2
     buildCommunity()
+    copyCommunityFilesToReleaseDir(releaseDir, version, "MAC")
     buildPro()
-
-releaseDir = os.getenv('HOME') + "/releases/" + version
-makeReleaseDir(releaseDir)
-
-# copy kits to the release dir
-with settings(host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
-    copyFilesToReleaseDir(releaseDir, version, "LINUX")
-with settings(host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
-    copyFilesToReleaseDir(releaseDir, version, "MAC")
+    copyEnterpriseFilesToReleaseDir(releaseDir, version, "MAC")
 
 computeChecksums(releaseDir)
 createCandidateSysmlink(releaseDir)

@@ -1,6 +1,6 @@
 #!/usr/bin/expect -f
 
-# run this script from the examples/auction directory of the unpacked kit under test
+# run this script from the doc/tutorials/auction directory of the unpacked kit under test
 
 if { $argc != 1 } {
   puts "Please pass the build string as one single argument"
@@ -17,14 +17,15 @@ proc abort {} {
 
 exec rm -f EXPORTDEMO-BID.csv  EXPORTDEMO-ITEM.csv
 
-spawn ant clean build server
+exec ./run.sh clean
+spawn ./run.sh
 set server_id $spawn_id
-expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
+expect -i $server_id eof abort timeout abort "HOST: $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
 # wait for server to really be ready
 sleep 1
 
-spawn ant client
+spawn ./run.sh client
 set client_id $spawn_id
 expect -i $client_id eof abort timeout abort "Welcome to Bobbi's Awesome Auctions"
 expect -i $client_id eof abort timeout abort "Loading ITEM Table"
@@ -42,24 +43,24 @@ expect -i $client_id eof abort timeout abort "CLOSED"
 expect -i $client_id eof abort timeout abort "Complete..."
 expect -i $client_id eof abort timeout abort "Where do ghosts shop?"
 expect -i $client_id eof abort timeout abort "In Boo-tiques!"
-expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
 expect -i $client_id timeout abort eof
 close -i $server_id
 
 exec mv deployment.xml deployment.xml.bak
 exec sed s/false/true/g deployment.xml.bak > deployment.xml
 
-spawn ant clean build server
+exec ./run.sh clean
+spawn ./run.sh
 set server_id $spawn_id
-expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
+expect -i $server_id eof abort timeout abort "HOST: $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
 # wait for server to really be ready
 sleep 1
 
-spawn ant export
+spawn ./run.sh export
 set export_id $spawn_id
 
-spawn ant client
+spawn ./run.sh client
 set client_id $spawn_id
 
 expect -i $client_id eof abort timeout abort "Welcome to Bobbi's Awesome Auctions"
@@ -78,7 +79,6 @@ expect -i $client_id eof abort timeout abort "CLOSED"
 expect -i $client_id eof abort timeout abort "Complete..."
 expect -i $client_id eof abort timeout abort "Where do ghosts shop?"
 expect -i $client_id eof abort timeout abort "In Boo-tiques!"
-expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
 expect -i $client_id timeout abort eof
 close -i $export_id
 close -i $server_id

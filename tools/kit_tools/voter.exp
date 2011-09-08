@@ -14,20 +14,20 @@ proc abort {} {
   exit 1
 }
 
-spawn ant clean catalog server
+exec ./run.sh catalog
+spawn ./run.sh server
 set server_id $spawn_id
-expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
+expect -i $server_id eof abort timeout abort "HOST: $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
 # wait for server to really be ready
 sleep 1
 
-spawn ant client
+spawn ./run.sh client
 set client_id $spawn_id
 expect -i $client_id eof abort timeout abort "Running for 120 second(s)"
 expect -i $client_id eof abort timeout abort "Connecting to server: 'localhost'"
 expect -i $client_id eof abort timeout abort "Voting Results"
 expect -i $client_id eof abort timeout abort " - Contestant Edwina Burnam was the winner."
 expect -i $client_id eof abort timeout abort "System Statistics"
-expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
 expect -i $client_id timeout abort eof
 close -i $server_id

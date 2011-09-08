@@ -1,6 +1,6 @@
 #!/usr/bin/expect -f
 
-# run this script from the examples/key_value directory of the unpacked kit under test
+# run this script from the examples/voltkv directory of the unpacked kit under test
 
 if { $argc != 1 } {
   puts "Please pass the build string as one single argument"
@@ -12,15 +12,15 @@ puts "Build string is: $buildstring"
 set timeout 600
 proc abort {} { exit 1 }
 
-exec ant catalog
-spawn ant server
+exec ./run.sh catalog
+spawn ./run.sh server
 set server_id $spawn_id
-expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
+expect -i $server_id eof abort timeout abort "HOST: $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
 # wait for server to really be ready
 sleep 1
 
-spawn ant client
+spawn ./run.sh client
 set client_id $spawn_id
 expect -i $client_id eof abort timeout abort "com.ClientKV: Initial number of keys/values = "
 expect -i $client_id eof abort timeout abort "com.ClientKV: Populating Initial Data"
@@ -28,6 +28,5 @@ expect -i $client_id eof abort timeout abort "com.ClientKV: Checking Results - P
 expect -i $client_id eof abort timeout abort "com.ClientKV: Running Get/Put Benchmark"
 expect -i $client_id eof abort timeout abort "com.ClientKV: Checking Results - Get/Put Benchmark"
 expect -i $client_id eof abort timeout abort "com.ClientKV:  - System ran for     120"
-expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
 expect -i $client_id timeout abort eof
 close -i $server_id
