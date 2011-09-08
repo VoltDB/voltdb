@@ -17,15 +17,15 @@ voter
 
 
 Each example includes a DDL file and a project.xml that lists the DDL
-file and the stored procedures names, as well as a makefile 
+file and the stored procedures names, as well as a makefile
 to simplify the build process.
 
-Examining the makefile will show the available targets for each example. 
+Examining the run.sh will show the available targets for each example.
 The targets "client" and "server" let you run a client and server for each example.
 
 To run an example project, 'cd' to that example's directory and:
-- In a terminal window, run "make" (no target) to compile the Java and start the VoltDB server
-- In a separate terminal window, run "make client", where you will see the results
+- In a terminal window, run "./run.sh" (no target) to compile the Java and start the VoltDB server
+- In a separate terminal window, run "./run.sh client", where you will see the results
 - When complete, hit Ctrl C in the server terminal window to stop the VoltDB database
 
 See the README file in each example directory for more details.
