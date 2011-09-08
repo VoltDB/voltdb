@@ -37,15 +37,18 @@ public class Initialize extends VoltProcedure
     // Inserts a key/value pair
     public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
 
-    public long run(int poolSize, String keyFormat, byte[] defaultValue)
+    public long run(int startIndex, int stopIndex, String keyFormat, byte[] defaultValue)
     {
         // Wipe out the data store to re-initialize
-        voltQueueSQL(cleanStmt);
-        voltExecuteSQL();
+        if (startIndex == 0)
+        {
+            voltQueueSQL(cleanStmt);
+            voltExecuteSQL();
+        }
 
         // Initialize the data store with given parameters
         int batchSize = 0;
-        for(int i=0;i<poolSize;i++)
+        for(int i=startIndex;i<stopIndex;i++)
         {
             voltQueueSQL(insertStmt, String.format(keyFormat, i), defaultValue);
             batchSize++;
@@ -59,6 +62,6 @@ public class Initialize extends VoltProcedure
         if (batchSize > 0)
             voltExecuteSQL(true);
 
-        return poolSize;
+        return stopIndex;
     }
 }

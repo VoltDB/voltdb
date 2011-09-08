@@ -239,11 +239,15 @@ public class JDBCBenchmark
             if (preload)
             {
                 System.out.print("Initializing data store... ");
-                final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?,?)}");
-                initializeCS.setInt(1, poolSize);
-                initializeCS.setString(2, processor.KeyFormat);
-                initializeCS.setBytes(3, processor.generateForStore().getStoreValue());
-                initializeCS.executeUpdate();
+                final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?,?,?)}");
+                for(int i=0;i<poolSize;i+=1000)
+                {
+                    initializeCS.setInt(1, i);
+                    initializeCS.setInt(2, Math.min(i+1000,poolSize));
+                    initializeCS.setString(3, processor.KeyFormat);
+                    initializeCS.setBytes(4, processor.generateForStore().getStoreValue());
+                    initializeCS.executeUpdate();
+                }
                 System.out.println(" Done.");
             }
 

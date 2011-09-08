@@ -154,7 +154,8 @@ public class AsyncBenchmark
             if (preload)
             {
                 System.out.print("Initializing data store... ");
-                Con.execute("Initialize", poolSize, processor.KeyFormat, processor.generateForStore().getStoreValue());
+                for(int i=0;i<poolSize;i+=1000)
+                    Con.execute("Initialize", i, Math.min(i+1000,poolSize), processor.KeyFormat, processor.generateForStore().getStoreValue());
                 System.out.println(" Done.");
             }
 
