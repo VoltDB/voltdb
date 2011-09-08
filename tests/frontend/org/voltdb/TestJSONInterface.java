@@ -403,6 +403,14 @@ public class TestJSONInterface extends TestCase {
         System.out.println(responseJSON);
         assertTrue(responseJSON.startsWith("fooBar("));
 
+        // now try adhoc
+        pset.setParameters("select * from blah");
+        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        System.out.println(response.statusString);
+        assertEquals(ClientResponse.SUCCESS, response.status);
+
         server.shutdown();
         server.join();
     }

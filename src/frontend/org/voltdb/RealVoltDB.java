@@ -61,6 +61,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.AsyncCompilerWorkThread;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -388,6 +389,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Create the client interfaces and associated dtxn initiators
             int portOffset = 0;
+            AsyncCompilerWorkThread compilerThread = null;
             for (Site site : m_catalogContext.siteTracker.getUpSites()) {
                 int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
                 int currSiteId = Integer.parseInt(site.getTypeName());
@@ -406,6 +408,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                m_config.m_timestampTestingSalt);
                     portOffset++;
                     m_clientInterfaces.add(ci);
+                    compilerThread = ci.getCompilerThread();
                 }
             }
 
@@ -456,7 +459,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             fivems = new PeriodicWorkTimerThread(m_clientInterfaces,
-                                                 m_statsManager);
+                                                 m_statsManager, compilerThread);
             fivems.start();
 
             // print out a bunch of useful system info

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
+import org.voltdb.compiler.AsyncCompilerWorkThread;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.SystemStatsCollector;
 
@@ -34,16 +35,21 @@ public class PeriodicWorkTimerThread extends Thread {
 
     ArrayList<ClientInterface> m_clientInterfaces;
     StatsManager m_statsManager;
+    AsyncCompilerWorkThread m_compilerThread;
     private long m_lastStatsManagerTime;
     private long m_lastSysStatsSCollection = 0;
     private long m_lastSysStatsMCollection = 0;
     private long m_lastSysStatsLCollection = 0;
     private static final VoltLogger log = new VoltLogger("HOST");
+    private static final long m_classLoadTime = System.currentTimeMillis();
+    private boolean m_hasTriedLoadAdHocPlanner = false;
 
     public PeriodicWorkTimerThread(ArrayList<ClientInterface> clientInterfaces,
-                                   StatsManager statsManager) {
+                                   StatsManager statsManager,
+                                   AsyncCompilerWorkThread compilerThread) {
         m_clientInterfaces = clientInterfaces;
         m_statsManager = statsManager;
+        m_compilerThread = compilerThread;
         m_lastStatsManagerTime = System.currentTimeMillis();
     }
 
@@ -91,6 +97,12 @@ public class PeriodicWorkTimerThread extends Thread {
                     }
 
                     SystemStatsCollector.asyncSampleSystemNow(medium, large);
+                }
+
+                // if it's been 10 seconds, and we haven't loaded the ad-hoc planner process,
+                // do so now
+                if ((!m_hasTriedLoadAdHocPlanner) && (currentTime - m_classLoadTime > 10000)) {
+                    m_compilerThread.ensureLoadedPlanner();
                 }
 
                 //long duration = System.nanoTime() - beforeTime;

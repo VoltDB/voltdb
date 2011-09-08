@@ -848,6 +848,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
     }
 
+    AsyncCompilerWorkThread getCompilerThread() {
+        return m_asyncCompilerWorkThread;
+    }
+
     /**
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
