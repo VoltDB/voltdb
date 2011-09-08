@@ -7,6 +7,43 @@ builddir = "/tmp/" + os.getenv('USER') + "/buildtemp"
 version = "UNKNOWN"
 
 ################################################
+# USE SSH CONFIG IF POSSIBLE
+################################################
+
+def getSSHInfoForHost(host):
+    """ Inspired by:
+        http://markpasc.typepad.com/blog/2010/04/loading-ssh-config-settings-for-fabric.html """
+
+    from os.path import expanduser
+    from paramiko.config import SSHConfig
+
+    key = None
+    key_filename = None
+    host = host
+
+    def hostinfo(host, config):
+        hive = config.lookup(host)
+        if 'hostname' in hive:
+            host = hive['hostname']
+        if 'user' in hive:
+            host = '%s@%s' % (hive['user'], host)
+        if 'port' in hive:
+            host = '%s:%s' % (host, hive['port'])
+        return host
+
+    try:
+        config_file = file(expanduser('~/.ssh/config'))
+    except IOError:
+        pass
+    else:
+        config = SSHConfig()
+        config.parse(config_file)
+        key = config.lookup(host).get('identityfile', None)
+        if key != None: key_filename = expanduser(key)
+        host = hostinfo(host, config)
+    return key_filename, host
+
+################################################
 # CHECKOUT CODE INTO A TEMP DIR
 ################################################
 
@@ -138,14 +175,19 @@ pro_svn_url = getSVNURL("https://svn.voltdb.com/pro/", argv[2])
 
 version = "unknown"
 
-with settings(host_string="volt5f"):
-    global version
+# get ssh config
+volt5f = getSSHInfoForHost("volt5f")
+voltmini = getSSHInfoForHost("voltmini")
+
+# build kits on 5f
+with settings(host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
     version = checkoutCode(eng_svn_url, pro_svn_url)
     print "VERSION: " + version
     buildCommunity()
     buildPro()
 
-with settings(host_string="voltmini"):
+# build kits on the mini
+with settings(host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
     version2 = checkoutCode(eng_svn_url, pro_svn_url)
     assert version == version2
     buildCommunity()
@@ -154,10 +196,10 @@ with settings(host_string="voltmini"):
 releaseDir = os.getenv('HOME') + "/releases/" + version
 makeReleaseDir(releaseDir)
 
-with settings(host_string="volt5f"):
+# copy kits to the release dir
+with settings(host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
     copyFilesToReleaseDir(releaseDir, version, "LINUX")
-
-with settings(host_string="voltmini"):
+with settings(host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
     copyFilesToReleaseDir(releaseDir, version, "MAC")
 
 computeChecksums(releaseDir)
