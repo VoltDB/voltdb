@@ -4,6 +4,7 @@ APPNAME="auction"
 VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar`
 CLASSPATH="$VOLTJAR:../../../lib"
 VOLTDB="../../../bin/voltdb"
+EXPORTTOFILE="../../../bin/exporttofile"
 VOLTCOMPILER="../../../bin/voltcompiler"
 LICENSE="../../../voltdb/license.xml"
 
@@ -48,8 +49,8 @@ function client() {
 }
 
 function export() {
-    $EXPORTTOFILE -classpath $CLASSPATH \
-        --connect admin --servers localhost --type csv \
+    $EXPORTTOFILE \
+        --connect client --servers localhost --type csv \
         --nonce EXPORTDEMO --user voltdb --password demo
 }
 
