@@ -188,8 +188,8 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
-                deploymentURL);
+        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
+                                                                             new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         quiesce(client);

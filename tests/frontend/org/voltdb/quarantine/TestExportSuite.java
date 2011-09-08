@@ -649,8 +649,8 @@ public class TestExportSuite extends RegressionSuite {
         // add a new table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
-                deploymentURL);
+        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
+                                                                             new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // make a new tester and see if it gets the new advertisement!
@@ -686,8 +686,8 @@ public class TestExportSuite extends RegressionSuite {
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
-                deploymentURL);
+        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
+                                                                             new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         client = getClient();
