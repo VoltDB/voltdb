@@ -238,6 +238,12 @@ public class Inits {
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
                 final int MAX_CATALOG_SIZE = 40 * 1024 * 1024; // 40mb
 
+                if (m_rvdb.m_pathToStartupCatalog == null) {
+                    VoltDB.crashGlobalVoltDB("The catalog file location is missing, " +
+                                             " please see usage for more information",
+                                             false, null);
+                }
+
                 try {
                     InputStream fin = null;
                     try {

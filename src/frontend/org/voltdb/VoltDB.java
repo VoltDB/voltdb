@@ -303,15 +303,6 @@ public class VoltDB {
                 hostLog.fatal("The leader hostname is missing.");
             }
 
-            // require catalog file location
-            if (m_pathToCatalog == null) {
-                isValid = false;
-                hostLog.fatal("The catalog file location is missing.");
-            } else if (m_pathToCatalog.equals("")) {
-                isValid = false;
-                hostLog.fatal("The catalog file location is empty.");
-            }
-
             if (m_backend.isIPC) {
                 if (m_ipcPorts.isEmpty()) {
                     isValid = false;
@@ -339,7 +330,7 @@ public class VoltDB {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
-            hostLog.fatal("Usage: org.voltdb.VoltDB <action> leader <hostname> catalog <catalog.jar> deployment <deployment.xml> license <license.xml>");
+            hostLog.fatal("Usage: org.voltdb.VoltDB <action> leader <hostname> deployment <deployment.xml> license <license.xml> [catalog <catalog.jar>]");
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 
