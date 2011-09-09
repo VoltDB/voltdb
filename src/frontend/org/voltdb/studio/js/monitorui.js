@@ -224,21 +224,38 @@ this.RefreshMonitor = function(id, Success)
 	var TPS = 0;
 	var procStats = {};
 	table = monitor.procStatsResponse.results[0].data;
+	var cleanTable = {};
 	for(var j = 0; j < table.length; j++)
 	{
-		var data = null;
-		if (table[j][5] in procStats)
+		if ((table[j][4] + "." + table[j][5]) in cleanTable)
 		{
-			data = procStats[table[j][5]];
-			data[1] += table[j][6];
-			if (data[2] > table[j][8]) data[2] = table[j][8];
-			data[3] += table[j][10]*table[j][7];
-			if (data[4] < table[j][9]) data[4] = table[j][9];
-			data[5] += table[j][7];
+			var dat = cleanTable[table[j][4] + "." + table[j][5]];
+			if (table[j][6] > dat[6]) dat[6] = table[j][6];
+			if (table[j][7] > dat[7]) dat[7] = table[j][7];
+			if (table[j][8] < dat[8]) dat[8] = table[j][8];
+			if (table[j][9] > dat[9]) dat[9] = table[j][9];
+			if (table[j][10] > dat[10]) dat[10] = table[j][10];
+			cleanTable[table[j][4] + "." + table[j][5]] = dat;
 		}
 		else
-			data = [table[j][5], table[j][6], table[j][8], table[j][10]*table[j][7], table[j][9], table[j][7]];
-		procStats[table[j][5]] = data;
+			cleanTable[table[j][4] + "." + table[j][5]] = table[j];
+	}
+	for(var key in cleanTable)
+	{
+		var srcData = cleanTable[key];
+		var data = null;
+		if (srcData[5] in procStats)
+		{
+			data = procStats[srcData[5]];
+			data[1] += srcData[6];
+			if (data[2] > srcData[8]) data[2] = srcData[8];
+			data[3] += srcData[10]*srcData[7];
+			if (data[4] < srcData[9]) data[4] = srcData[9];
+			data[5] += srcData[7];
+		}
+		else
+			data = [srcData[5], srcData[6], srcData[8], srcData[10]*srcData[7], srcData[9], srcData[7]];
+		procStats[srcData[5]] = data;
 	}
 	table = monitor.starvStatsResponse.results[0].data;
 	var starvStats = {}
@@ -256,9 +273,9 @@ this.RefreshMonitor = function(id, Success)
 			starvStats
 		starvStats[table[j][3]] = data;
 	}
-	var currentTransactionCount = 0;
-	var currentTimedTransactionCount = 0;
-	var currentLatencyAverage = 0;
+	var currentTransactionCount = 0.0;
+	var currentTimedTransactionCount = 0.0;
+	var currentLatencyAverage = 0.0;
 	for(var proc in procStats)
 	{
 		currentTransactionCount += procStats[proc][1];
@@ -266,7 +283,7 @@ this.RefreshMonitor = function(id, Success)
 		currentLatencyAverage += procStats[proc][3];
 		procStats[proc][3] = procStats[proc][3]/procStats[proc][5];
 	}
-	currentLatencyAverage = currentLatencyAverage / currentTimedTransactionCount*1.0;
+	currentLatencyAverage = currentLatencyAverage / currentTimedTransactionCount;
 	
 	if (monitor.lastTransactionCount > 0 && monitor.lastTimerTick > 0)
 	{
@@ -279,10 +296,10 @@ this.RefreshMonitor = function(id, Success)
 			if (delta < 10)
 				dataLat.push([dataIdx,0]);
 			else
-				dataLat.push([dataIdx,currentLatencyAverage/1000.0/1000.0]);
+				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
 		}
 		else
-			dataLat.push([dataIdx,((currentLatencyAverage * currentTimedTransactionCount - monitor.lastLatencyAverage * monitor.lastTimedTransactionCount) / (currentTimedTransactionCount - monitor.lastTimedTransactionCount)) /1000.0/1000.0]);
+			dataLat.push([dataIdx,((currentLatencyAverage * currentTimedTransactionCount - monitor.lastLatencyAverage * monitor.lastTimedTransactionCount) / (currentTimedTransactionCount - monitor.lastTimedTransactionCount)) /1000000.0]);
 	}
 	
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
@@ -321,7 +338,7 @@ this.RefreshMonitor = function(id, Success)
 		src += '</tbody></table>';
 		$(monitor.tab.find('.tablebar')).html(src);
 	}
-    sorttable.makeSortable(document.getElementById('stats-' + id));
+	sorttable.makeSortable(document.getElementById('stats-' + id));
 	
 	monitor.lastTransactionCount = currentTransactionCount;
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
@@ -424,16 +441,15 @@ this.RefreshMonitor = function(id, Success)
 			break;
 	}
 
-    try
-    {
-//alert("plot: " + id + " | " + monitor.leftPlot.targetId);
-	    monitor.leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
-	    monitor.rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
-    } catch (x) {}
+	try
+	{
+		monitor.leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
+		monitor.rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
+	} catch (x) {}
 
 	MonitorUI.UpdateMonitorItem(id);
 	monitor.lastTimerTick = currentTimerTick;
-    MonitorUI.Monitors[id] = monitor;
+	MonitorUI.Monitors[id] = monitor;
 
 }
 

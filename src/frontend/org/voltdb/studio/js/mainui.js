@@ -539,6 +539,11 @@ this.AddConnection = function(connection, success)
             src += '<li class="type"><span>bit</span></li>';
         src += '</ul></li>';
         src += '<li class="folder closed"><span>Character String Enumerations</span><ul>';
+            src += '<li class="type closed"><span>CatalogComponent</span><ul>';
+                list = ['COLUMNS','INDEXINFO','PRIMARYKEYS','PROCEDURECOLUMNS','PROCEDURES','TABLES'];
+                for(var k in list)
+                    src += '<li class="empty"><span>' + list[k] + '</span></li>';
+            src += '</ul></li>';
             src += '<li class="type closed"><span>StatisticsComponent</span><ul>';
                 list = ['INDEX','INITIATOR','IOSTATS','MANAGEMENT','MEMORY','PROCEDURE','TABLE','PARTITIONCOUNT','STARVATION','LIVECLIENTS'];
                 for(var k in list)
