@@ -51,10 +51,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             columnCount = table.getColumnCount();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     protected final void checkClosed() throws SQLException
@@ -78,10 +78,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.advanceToRow(row);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
     // Moves the cursor to the end of this ResultSet object, just after the last row.
     public void afterLast() throws SQLException
@@ -91,10 +91,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             table.advanceToRow(table.getRowCount());
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
     // Moves the cursor to the front of this ResultSet object, just before the first row.
     public void beforeFirst() throws SQLException
@@ -104,10 +104,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             table.resetRowPosition();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Cancels the updates made to the current row in this ResultSet object.
@@ -146,10 +146,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             throw SQLError.get(iax, SQLError.COLUMN_NOT_FOUND, columnLabel);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Moves the cursor to the first row in this ResultSet object.
@@ -160,10 +160,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.advanceToRow(0);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as an Array object in the Java programming language.
@@ -187,10 +187,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return new ByteArrayInputStream(table.getStringAsBytes(columnIndex-1));
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a stream of ASCII characters.
@@ -207,10 +207,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getDecimalAsBigDecimal(columnIndex-1);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Deprecated.
@@ -242,10 +242,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return new ByteArrayInputStream(table.getStringAsBytes(columnIndex-1));
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a stream of uninterpreted bytes.
@@ -262,10 +262,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return new SerialBlob(table.getStringAsBytes(columnIndex-1));
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a Blob object in the Java programming language.
@@ -279,7 +279,14 @@ public class JDBC4ResultSet implements java.sql.ResultSet
     {
         checkColumnBounds(columnIndex);
         // TODO: Tempting to apply a != 0 operation on numbers and .equals("true") on strings, but... hacky
-        throw SQLError.noSupport();
+        try
+        {
+            return (new Long(table.getLong(columnIndex-1))).intValue() == 1;
+        }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a boolean in the Java programming language.
@@ -296,10 +303,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return (new Long(table.getLong(columnIndex-1))).byteValue();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a byte in the Java programming language.
@@ -321,14 +328,14 @@ public class JDBC4ResultSet implements java.sql.ResultSet
             else
                 throw SQLError.get(SQLError.CONVERSION_NOT_FOUND, table.getColumnType(columnIndex-1), "byte[]");
         }
-         catch(SQLException x)
-         {
-             throw x;
-         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(SQLException x)
+        {
+            throw x;
+        }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a byte array in the Java programming language.
@@ -348,10 +355,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
                 return new StringReader(value);
             return null;
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
     // Retrieves the value of the designated column in the current row of this ResultSet object as a java.io.Reader object.
     public Reader getCharacterStream(String columnLabel) throws SQLException
@@ -367,10 +374,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return new SerialClob(table.getString(columnIndex-1).toCharArray());
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a Clob object in the Java programming language.
@@ -402,10 +409,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
             long millis = (timestamp - micros) / 1000;
             return new Date(millis);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a java.sql.Date object in the Java programming language.
@@ -436,10 +443,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getDouble(columnIndex-1);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a double in the Java programming language.
@@ -468,10 +475,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return (new Double(table.getDouble(columnIndex-1))).floatValue();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a float in the Java programming language.
@@ -494,10 +501,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return (new Long(table.getLong(columnIndex-1))).intValue();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as an int in the Java programming language.
@@ -514,10 +521,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getLong(columnIndex-1);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a long in the Java programming language.
@@ -544,10 +551,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
                 return new StringReader(value);
             return null;
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a java.io.Reader object.
@@ -564,10 +571,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return new JDBC4NClob(table.getString(columnIndex-1).toCharArray());
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a NClob object in the Java programming language.
@@ -584,10 +591,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getString(columnIndex-1);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a String in the Java programming language.
@@ -608,10 +615,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
             else
                 return table.get(columnIndex-1, type);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as an Object in the Java programming language.
@@ -655,10 +662,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getActiveRowIndex();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a java.sql.RowId object in the Java programming language.
@@ -682,10 +689,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return (new Long(table.getLong(columnIndex-1))).shortValue();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a short in the Java programming language.
@@ -721,10 +728,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getString(columnIndex-1);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a String in the Java programming language.
@@ -744,10 +751,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
             long millis = (timestamp - micros) / 1000;
             return new Time(millis);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a java.sql.Time object in the Java programming language.
@@ -782,10 +789,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
             result.setNanos(micros*1000);
             return result;
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a java.sql.Timestamp object in the Java programming language.
@@ -836,10 +843,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return new URL(table.getString(columnIndex-1));
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves the value of the designated column in the current row of this ResultSet object as a java.net.URL object in the Java programming language.
@@ -869,10 +876,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getActiveRowIndex() >= table.getRowCount();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves whether the cursor is before the first row in this ResultSet object.
@@ -883,10 +890,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getActiveRowIndex() < 0;
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves whether this ResultSet object has been closed.
@@ -903,10 +910,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getActiveRowIndex() == 0;
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves whether the cursor is on the last row of this ResultSet object.
@@ -917,10 +924,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.getActiveRowIndex() == table.getRowCount()-1;
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Moves the cursor to the last row in this ResultSet object.
@@ -931,10 +938,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.advanceToRow(table.getRowCount()-1);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Moves the cursor to the remembered cursor position, usually the current row.
@@ -959,10 +966,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.advanceRow();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
     // Moves the cursor to the previous row in this ResultSet object.
     public boolean previous() throws SQLException
@@ -972,10 +979,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.advanceToRow(table.getActiveRowIndex()-1);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Refreshes the current row with its most recent value in the database.
@@ -993,10 +1000,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.advanceToRow(table.getActiveRowIndex()+rows);
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Retrieves whether a row has been deleted.
@@ -1541,10 +1548,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return table.wasNull();
         }
-         catch(Exception x)
-         {
-             throw SQLError.get(x);
-         }
+        catch(Exception x)
+        {
+            throw SQLError.get(x);
+        }
     }
 
     // Returns true if this either implements the interface argument or is directly or indirectly a wrapper for an object that does.
@@ -1560,10 +1567,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         {
             return iface.cast(this);
         }
-         catch (ClassCastException cce)
-         {
-            throw SQLError.get(SQLError.ILLEGAL_ARGUMENT, iface.toString());
-        }
+        catch (ClassCastException cce)
+        {
+           throw SQLError.get(SQLError.ILLEGAL_ARGUMENT, iface.toString());
+       }
     }
 }
 

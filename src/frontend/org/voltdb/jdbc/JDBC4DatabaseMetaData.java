@@ -23,10 +23,14 @@ import org.voltdb.client.*;
 
 public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 {
+    private final CallableStatement sysInfo;
+    private final CallableStatement sysCatalog;
     private final JDBC4Connection sourceConnection;
     JDBC4DatabaseMetaData(JDBC4Connection connection) throws SQLException
     {
         this.sourceConnection = connection;
+    this.sysInfo = connection.prepareCall("{call @SystemInformation}");
+    this.sysCatalog = connection.prepareCall("{call @SystemCatalog(?)}");
 
         // Initialize system information
         loadSystemInformation();
@@ -38,8 +42,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     private void loadSystemInformation() throws SQLException
     {
-        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemInformation}");
-        ResultSet res = sysinfo.executeQuery();
+        ResultSet res = this.sysInfo.executeQuery();
         while (res.next())
         {
             if (res.getString(2).equals("BUILDSTRING"))
@@ -169,9 +172,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
             throw new SQLException("getColumns() does not support pattern filtering");
         }
         checkClosed();
-        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
-        sysinfo.setString(1, "COLUMNS");
-        ResultSet res = sysinfo.executeQuery();
+        this.sysCatalog.setString(1, "COLUMNS");
+        ResultSet res = this.sysCatalog.executeQuery();
         return res;
     }
 
@@ -303,9 +305,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
             throw new SQLException("getIndexInfo() does not support pattern filtering");
         }
         checkClosed();
-        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
-        sysinfo.setString(1, "INDEXINFO");
-        ResultSet res = sysinfo.executeQuery();
+        this.sysCatalog.setString(1, "INDEXINFO");
+        ResultSet res = this.sysCatalog.executeQuery();
         return res;
     }
 
@@ -479,9 +480,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
             throw new SQLException("getPrimaryKeys() does not support pattern filtering");
         }
         checkClosed();
-        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
-        sysinfo.setString(1, "PRIMARYKEYS");
-        ResultSet res = sysinfo.executeQuery();
+        this.sysCatalog.setString(1, "PRIMARYKEYS");
+        ResultSet res = this.sysCatalog.executeQuery();
         return res;
     }
 
@@ -495,9 +495,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
             throw new SQLException("getProcedureColumns() does not support pattern filtering");
         }
         checkClosed();
-        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
-        sysinfo.setString(1, "PROCEDURECOLUMNS");
-        ResultSet res = sysinfo.executeQuery();
+        this.sysCatalog.setString(1, "PROCEDURECOLUMNS");
+        ResultSet res = this.sysCatalog.executeQuery();
         return res;
     }
 
@@ -505,15 +504,12 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern) throws SQLException
     {
-        if (catalog != null || schemaPattern != null ||
-            procedureNamePattern != null)
-        {
-            throw new SQLException("getProcedures() does not support pattern filtering");
-        }
+        if (procedureNamePattern != null && procedureNamePattern != "%")
+            throw new SQLException(String.format("getProcedures('%s','%s','%s') does not support pattern filtering", catalog, schemaPattern, procedureNamePattern));
+
         checkClosed();
-        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
-        sysinfo.setString(1, "PROCEDURES");
-        ResultSet res = sysinfo.executeQuery();
+        this.sysCatalog.setString(1, "PROCEDURES");
+        ResultSet res = this.sysCatalog.executeQuery();
         return res;
     }
 
@@ -619,15 +615,12 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types) throws SQLException
     {
-        if (catalog != null || schemaPattern != null ||
-            tableNamePattern != null || types != null)
-        {
-            throw new SQLException("getTables() does not support pattern filtering");
-        }
+        if ((tableNamePattern != null && !tableNamePattern.equals("%")) || types != null)
+            throw new SQLException(String.format("getTables('%s','%s','%s',%d) does not support pattern filtering", catalog, schemaPattern, tableNamePattern, types != null ? types.length : 0));
+
         checkClosed();
-        CallableStatement sysinfo = this.sourceConnection.prepareCall("{call @SystemCatalog(?)}");
-        sysinfo.setString(1, "TABLES");
-        ResultSet res = sysinfo.executeQuery();
+        this.sysCatalog.setString(1, "TABLES");
+        ResultSet res = this.sysCatalog.executeQuery();
         return res;
     }
 
