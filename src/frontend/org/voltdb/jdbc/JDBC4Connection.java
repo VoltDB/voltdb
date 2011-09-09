@@ -323,7 +323,8 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setAutoCommit(boolean autoCommit) throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport(); // Force to be always true?
+    if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
+            throw SQLError.noSupport();
     }
 
     // Sets the given catalog name in order to select a subspace of this Connection object's database in which to work.

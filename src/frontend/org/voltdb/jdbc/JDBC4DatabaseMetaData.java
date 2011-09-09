@@ -166,11 +166,9 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
-        if (catalog != null || schemaPattern != null ||
-            tableNamePattern != null || columnNamePattern != null)
-        {
+        if (tableNamePattern != null || columnNamePattern != null)
             throw new SQLException("getColumns() does not support pattern filtering");
-        }
+
         checkClosed();
         this.sysCatalog.setString(1, "COLUMNS");
         ResultSet res = this.sysCatalog.executeQuery();
@@ -300,10 +298,9 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) throws SQLException
     {
-        if (catalog != null || schema != null || table != null)
-        {
+        if (table != null)
             throw new SQLException("getIndexInfo() does not support pattern filtering");
-        }
+
         checkClosed();
         this.sysCatalog.setString(1, "INDEXINFO");
         ResultSet res = this.sysCatalog.executeQuery();
@@ -475,10 +472,9 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException
     {
-        if (catalog != null || schema != null || table != null)
-        {
+        if (table != null)
             throw new SQLException("getPrimaryKeys() does not support pattern filtering");
-        }
+
         checkClosed();
         this.sysCatalog.setString(1, "PRIMARYKEYS");
         ResultSet res = this.sysCatalog.executeQuery();
@@ -489,11 +485,9 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern, String columnNamePattern) throws SQLException
     {
-        if (catalog != null || schemaPattern != null ||
-            procedureNamePattern != null || columnNamePattern != null)
-        {
+        if (procedureNamePattern != null || columnNamePattern != null)
             throw new SQLException("getProcedureColumns() does not support pattern filtering");
-        }
+
         checkClosed();
         this.sysCatalog.setString(1, "PROCEDURECOLUMNS");
         ResultSet res = this.sysCatalog.executeQuery();
@@ -620,8 +614,26 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
         checkClosed();
         this.sysCatalog.setString(1, "TABLES");
+    return this.sysCatalog.executeQuery();
+/*
         ResultSet res = this.sysCatalog.executeQuery();
-        return res;
+    VoltTable jdbcData = new VoltTable(
+      new VoltTable.ColumnInfo("TABLE_CAT",VoltType.STRING)
+    , new VoltTable.ColumnInfo("TABLE_SCHEM",VoltType.STRING)
+    , new VoltTable.ColumnInfo("TABLE_NAME",VoltType.STRING)
+    , new VoltTable.ColumnInfo("TABLE_TYPE",VoltType.STRING)
+    , new VoltTable.ColumnInfo("TABLE_REMARKS",VoltType.STRING)
+    );
+    while(res.next())
+        jdbcData.addRow(new Object[] {
+          ""
+        , ""
+        , res.getString(3)
+        , res.getString(4)
+        , ""
+        });
+        return new JDBC4ResultSet(this.sysCatalog, jdbcData);
+*/
     }
 
     // Retrieves the table types available in this database.
