@@ -504,7 +504,15 @@ public class SQLCommand
                         throw new Exception("Unsupported Data Type: " + paramType);
                 }
             }
-            printResponse(VoltDB.callProcedure(procedure, objectParams));
+            if (procedure.equals("@UpdateApplicationCatalog"))
+            {
+                printResponse(VoltDB.updateApplicationCatalog(new File((String) objectParams[0]),
+                                                              new File((String) objectParams[1])));
+            }
+            else
+            {
+                printResponse(VoltDB.callProcedure(procedure, objectParams));
+            }
         }
         else
         {
