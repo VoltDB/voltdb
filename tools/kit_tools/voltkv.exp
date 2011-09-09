@@ -28,5 +28,4 @@ expect -i $client_id eof abort timeout abort "com.ClientKV: Checking Results - P
 expect -i $client_id eof abort timeout abort "com.ClientKV: Running Get/Put Benchmark"
 expect -i $client_id eof abort timeout abort "com.ClientKV: Checking Results - Get/Put Benchmark"
 expect -i $client_id eof abort timeout abort "com.ClientKV:  - System ran for     120"
-expect -i $client_id timeout abort eof
 close -i $server_id
