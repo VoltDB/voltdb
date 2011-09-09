@@ -77,10 +77,6 @@ public abstract class VoltProcedure {
 
     final static Double DOUBLE_NULL = new Double(-1.7976931348623157E+308);
 
-    // The name of the SQLStmt implied by a statement procedure's sql statement.
-    // And how much wood a woodchuck chucks.
-    public static final String ANON_STMT_NAME = "sql";
-
     /**
      * Expect an empty result set (0 rows)
      */
@@ -302,7 +298,7 @@ public abstract class VoltProcedure {
         }
         // has no java
         else {
-            Statement catStmt = catProc.getStatements().get(ANON_STMT_NAME);
+            Statement catStmt = catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
             SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
             stmt.catStmt = catStmt;
             initSQLStmt(stmt);
@@ -659,16 +655,19 @@ public abstract class VoltProcedure {
         private String message = "No message specified.";
 
         /**
-         * Constructs a new <code>AbortException</code>
+         * Constructs a new AbortException
          */
         public VoltAbortException() {}
 
+        /**
+         * Constructs a new AbortException from an existing <code>Throwable</code>.
+         */
         public VoltAbortException(Throwable t) {
             super(t);
         }
 
         /**
-         * Constructs a new <code>AbortException</code> with the specified detail message.
+         * Constructs a new AbortException with the specified detail message.
          */
         public VoltAbortException(String msg) {
             message = msg;

@@ -116,6 +116,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * This value is counted from byte 0 of the header size to the end of row data.
      */
     public static final int MAX_SERIALIZED_TABLE_LENGTH = 10 * 1024 * 1024;
+    /**
+     * String representation of <code>MAX_SERIALIZED_TABLE_LENGTH</code>.
+     */
     public static final String MAX_SERIALIZED_TABLE_LENGTH_STR =
         String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
 
@@ -1026,11 +1029,27 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         return js.toString();
     }
 
+    /**
+     * Construct a table from a JSON string. Only parses VoltDB VoltTable JSON format.
+     *
+     * @param json String containing JSON-formatted table data.
+     * @return Constructed <code>VoltTable</code> instance.
+     * @throws JSONException
+     * @throws IOException
+     */
     public static VoltTable fromJSONString(String json) throws JSONException, IOException {
         JSONObject jsonObj = new JSONObject(json);
         return fromJSONObject(jsonObj);
     }
 
+    /**
+     * Construct a table from a JSON object. Only parses VoltDB VoltTable JSON format.
+     *
+     * @param json String containing JSON-formatted table data.
+     * @return Constructed <code>VoltTable</code> instance.
+     * @throws JSONException
+     * @throws IOException
+     */
     public static VoltTable fromJSONObject(JSONObject json) throws JSONException, IOException {
         // extract the schema and creat an empty table
         JSONArray jsonCols = json.getJSONArray(JSON_SCHEMA_KEY);

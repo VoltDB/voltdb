@@ -28,6 +28,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -393,7 +394,7 @@ public abstract class ProcedureCompiler {
         // ADD THE STATEMENT
 
         // add the statement to the catalog
-        Statement catalogStmt = procedure.getStatements().add(VoltProcedure.ANON_STMT_NAME);
+        Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
 
         // compile the statement
         StatementCompiler.compile(compiler, hsql, catalog, db,

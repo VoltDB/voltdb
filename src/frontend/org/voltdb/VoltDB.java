@@ -54,6 +54,9 @@ public class VoltDB {
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
+    // The name of the SQLStmt implied by a statement procedure's sql statement.
+    public static final String ANON_STMT_NAME = "sql";
+
     public static enum START_ACTION {
         CREATE, RECOVER, START
     }

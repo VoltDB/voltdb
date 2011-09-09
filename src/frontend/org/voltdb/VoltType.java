@@ -123,16 +123,14 @@ public enum VoltType {
     VARBINARY    ((byte)25, -1, "varbinary", new Class[] { byte[].class, Byte[].class }, 'l');
 
     /**
-     * Size in bytes of the maximum length for a VoltDB field value, presumably a string or varbinary
+     * Size in bytes of the maximum length for a VoltDB field value, presumably a
+     * <code>STRING</code> or <code>VARBINARY</code>
      */
     public static final int MAX_VALUE_LENGTH = 1048576;
-    public static final String MAX_VALUE_LENGTH_STR = String.valueOf(MAX_VALUE_LENGTH / 1024) + "k";
-
     /**
-     * Fixed precision 8-byte value with 4 decimal places of precision.
-     * Stored as an 8-byte long value representing 10,000x the actual value.
+     * String representation of <code>MAX_VALUE_LENGTH</code>.
      */
-    //MONEY     ((byte)20, 8, "money", new Class[] {});
+    public static final String MAX_VALUE_LENGTH_STR = String.valueOf(MAX_VALUE_LENGTH / 1024) + "k";
 
     private final byte m_val;
     private final int m_lengthInBytes;
@@ -259,6 +257,11 @@ public enum VoltType {
         return "VoltType." + name();
     }
 
+    /**
+     * Get the number of bytes required to store the type for types
+     * with fixed length.
+     * @return An integer value represting a number of bytes.
+     */
     public int getLengthInBytesForFixedTypes() {
         if (m_lengthInBytes == -1) {
             Thread.dumpStack();
@@ -443,6 +446,11 @@ public enum VoltType {
         }
     }
 
+    /**
+     * Is this type an integer type? True for <code>TINYINT</code>, <code>SMALLINT</code>,
+     * <code>INTEGER</code>, <code>BIGINT</code> and <code>TIMESTAMP</code>.
+     * @return True if integer type. False if not.
+     */
     public boolean isInteger() {
         switch(this)  {
         case TINYINT:
@@ -456,6 +464,11 @@ public enum VoltType {
         }
     }
 
+    /**
+     * Get a char that uniquely identifies a type. Used to create
+     * concise schema signatures.
+     * @return A char representing the type.
+     */
     public char getSignatureChar() {
         assert(m_signatureChar != '0');
         return m_signatureChar;
@@ -491,21 +504,29 @@ public enum VoltType {
         return sb.toString();
     }
 
+    /** Length value for a null string. */
     public static final int NULL_STRING_LENGTH = -1;
+    /** Null value for <code>TINYINT</code>.  */
     public static final byte NULL_TINYINT = Byte.MIN_VALUE;
+    /** Null value for <code>SMALLINT</code>.  */
     public static final short NULL_SMALLINT = Short.MIN_VALUE;
+    /** Null value for <code>INTEGER</code>.  */
     public static final int NULL_INTEGER = Integer.MIN_VALUE;
+    /** Null value for <code>BIGINT</code>.  */
     public static final long NULL_BIGINT = Long.MIN_VALUE;
-    // TODO(evanj): make this a specific bit pattern?
+    /** Null value for <code>FLOAT</code>.  */
     public static final double NULL_FLOAT = -1.7E+308;
 
     // for consistency at the API level, provide symbolic nulls for these types, too
     private static final class NullTimestampSigil{}
+    /** Null value for <code>TIMESTAMP</code>.  */
     public static final NullTimestampSigil NULL_TIMESTAMP = new NullTimestampSigil();
 
     private static final class NullStringOrVarbinarySigil{}
+    /** Null value for <code>STRING</code> or <code>VARBINARY</code>.  */
     public static final NullStringOrVarbinarySigil NULL_STRING_OR_VARBINARY = new NullStringOrVarbinarySigil();
 
     private static final class NullDecimalSigil{}
+    /** Null value for <code>DECIMAL</code>.  */
     public static final NullDecimalSigil NULL_DECIMAL = new NullDecimalSigil();
 }

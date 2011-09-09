@@ -63,6 +63,11 @@ public class SQLStmt {
         return sqlText;
     }
 
+    /**
+     * Get the join order hint supplied in the constructor.
+     *
+     * @return String containing the join order hint.
+     */
     public String getJoinOrder() {
         return joinOrder;
     }

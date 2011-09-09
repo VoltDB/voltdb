@@ -17,7 +17,10 @@
 
 package org.voltdb;
 
-import java.lang.annotation.*;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * Annotates a stored procedure with information needed by the stored
@@ -38,8 +41,7 @@ public @interface ProcInfo {
     String partitionInfo() default "";
 
     /**
-     * Is the procedure single sited? This information is hard to determine if there
-     * is more than one SQL statement.
+     * Is the procedure meant for a single partition?
      * @return True if all statements run on the same partition always, false otherwise.
      */
     boolean singlePartition() default false;
