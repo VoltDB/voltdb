@@ -15,7 +15,7 @@ proc abort {} {
   exit 1
 }
 
-exec rm -f EXPORTDEMO-BID.csv  EXPORTDEMO-ITEM.csv
+exec rm -f *.csv
 
 exec ./run.sh clean
 spawn ./run.sh

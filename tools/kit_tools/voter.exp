@@ -24,9 +24,6 @@ sleep 1
 
 spawn ./run.sh client
 set client_id $spawn_id
-expect -i $client_id eof abort timeout abort "Running for 120 second(s)"
-expect -i $client_id eof abort timeout abort "Connecting to server: 'localhost'"
-expect -i $client_id eof abort timeout abort "Voting Results"
-expect -i $client_id eof abort timeout abort " - Contestant Edwina Burnam was the winner."
+expect -i $client_id eof abort timeout abort "The Winner is: Edwina Burnam"
 expect -i $client_id eof abort timeout abort "System Statistics"
 close -i $server_id

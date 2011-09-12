@@ -12,6 +12,9 @@ puts "Build string is: $buildstring"
 set timeout 600
 proc abort {} { exit 1 }
 
+exec rm -rf /tmp/snapshots
+exec rm -rf /tmp/export_overflow
+
 exec python generate tmc com tmc
 spawn ant -f tmc/build.xml server
 set server_id $spawn_id
