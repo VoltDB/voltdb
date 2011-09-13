@@ -1,0 +1,14 @@
+/.classpath
+/.depcache
+/.project
+/.settings
+*.pyc
+buildstring.txt
+/obj
+/src/catgen/out
+/src/ee/catalog/*
+/src/ee/org_voltdb_jni_ExecutionEngine.h
+/src/ee/org_voltdb_utils_DBBPool.h
+/src/frontend/org/voltdb/catalog/*.java
+/voltdb/libvoltdb*.so
+/voltdb/voltdb*.jar
