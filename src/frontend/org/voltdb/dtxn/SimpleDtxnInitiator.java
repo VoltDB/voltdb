@@ -65,8 +65,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     final TransactionIdManager m_idManager;
 
     private final ExecutorTxnIdSafetyState m_safetyState;
-
-    private static final VoltLogger transactionLog = new VoltLogger("TRANSACTION");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /**
@@ -432,7 +430,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_pendingTxnCount++;
         if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
             if (m_hadBackPressure.compareAndSet(false, true)) {
-                transactionLog.trace("DTXN back pressure began");
+                hostLog.trace("DTXN back pressure began");
                 m_onBackPressure.run();
             }
         }
@@ -448,7 +446,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         {
             if (m_hadBackPressure.compareAndSet(true, false))
             {
-                transactionLog.trace("DTXN backpressure ended");
+                hostLog.trace("DTXN backpressure ended");
                 m_offBackPressure.run();
             }
         }
