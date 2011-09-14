@@ -17,6 +17,7 @@
 package org.voltdb.client.exampleutils;
 
 import org.voltdb.client.*;
+
 import java.util.HashMap;
 import java.io.Closeable;
 import java.util.concurrent.Future;
@@ -158,6 +159,16 @@ public class ClientConnection implements Closeable
         for(String procedure : procedures)
             result.merge(map.get(procedure));
         return result;
+    }
+
+    public void drain() throws NoConnectionsException, InterruptedException
+    {
+        Client.drain();
+    }
+
+    public void backpressureBarrier() throws InterruptedException
+    {
+        Client.backpressureBarrier();
     }
 }
 

@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='tpcc-ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.procedures.LoadWarehouse' />
+            <procedure class='com.procedures.LoadWarehouseReplicated' />
+            <procedure class='com.procedures.ostatByCustomerName' />
+            <procedure class='com.procedures.ostatByCustomerId' />
+            <procedure class='com.procedures.delivery' />
+            <procedure class='com.procedures.paymentByCustomerName' />
+            <procedure class='com.procedures.paymentByCustomerNameC' />
+            <procedure class='com.procedures.paymentByCustomerNameW' />
+            <procedure class='com.procedures.paymentByCustomerId' />
+            <procedure class='com.procedures.paymentByCustomerIdC' />
+            <procedure class='com.procedures.paymentByCustomerIdW' />
+            <procedure class='com.procedures.neworder' />
+            <procedure class='com.procedures.slev' />
+            <procedure class='com.procedures.ResetWarehouse' />
+            <procedure class='com.procedures.LoadStatus' />
+        </procedures>
+        <classdependencies>
+          <classdependency class='com.Constants' />
+          <classdependency class='com.procedures.ByteBuilder' />
+        </classdependencies>
+        <partitions>
+            <partition table='WAREHOUSE' column='W_ID' />
+            <partition table='DISTRICT' column='D_W_ID' />
+            <partition table='CUSTOMER' column='C_W_ID' />
+            <partition table='HISTORY' column='H_W_ID' />
+            <partition table='STOCK' column='S_W_ID' />
+            <partition table='ORDERS' column='O_W_ID' />
+            <partition table='NEW_ORDER' column='NO_W_ID' />
+            <partition table='ORDER_LINE' column='OL_W_ID' />
+        </partitions>
+    </database>
+</project>
