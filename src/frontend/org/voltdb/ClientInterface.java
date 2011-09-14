@@ -269,7 +269,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
             m_running = true;
-            m_thread = new Thread( null, this, "Client connection accceptor", 262144);
+            String threadName = m_isAdmin ? "AdminPort connection acceptor" : "ClientPort connection acceptor";
+            m_thread = new Thread( null, this, threadName, 262144);
             m_thread.setDaemon(true);
             m_thread.start();
         }
