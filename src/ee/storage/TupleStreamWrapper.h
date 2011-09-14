@@ -26,7 +26,7 @@
 #include "common/FatalException.hpp"
 #include "common/Topend.h"
 #include <deque>
-
+#include <cassert>
 namespace voltdb {
 
 class Topend;

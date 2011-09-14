@@ -47,6 +47,8 @@
 #define COMPACTINGTREEUNIQUEINDEX_H_
 
 #include <iostream>
+#include <cassert>
+
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "indexes/tableindex.h"

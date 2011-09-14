@@ -47,6 +47,7 @@
 #define COMPACTINGHASHMULTIMAPINDEX_H_
 
 #include <iostream>
+#include <cassert>
 #include "indexes/tableindex.h"
 #include "common/tabletuple.h"
 #include "structures/CompactingHashTable.h"

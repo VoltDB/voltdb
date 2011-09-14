@@ -76,6 +76,7 @@
 #include <stdint.h>
 #include <utility>
 #include <vector>
+#include <cassert>
 
 namespace voltdb {
 

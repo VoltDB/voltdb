@@ -48,6 +48,7 @@
 
 #include <map>
 #include <iostream>
+#include <cassert>
 #include "indexes/tableindex.h"
 #include "common/tabletuple.h"
 #include "structures/CompactingMap.h"

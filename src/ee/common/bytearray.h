@@ -46,6 +46,7 @@
 #ifndef HSTOREBYTEARRAY_H
 #define HSTOREBYTEARRAY_H
 
+#include <cassert>
 #include <cstring>
 #include <boost/shared_array.hpp>
 

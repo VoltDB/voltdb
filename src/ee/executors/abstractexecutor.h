@@ -48,6 +48,7 @@
 
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
+#include <cassert>
 
 namespace voltdb {
 

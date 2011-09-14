@@ -50,6 +50,8 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <cassert>
+
 #include "boost/shared_ptr.hpp"
 #include "json_spirit/json_spirit.h"
 #include "catalog/database.h"

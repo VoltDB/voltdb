@@ -51,6 +51,8 @@
 #include <string>
 #include <exception>
 #include <arpa/inet.h>
+#include <cassert>
+
 #include "bytearray.h"
 #include "debuglog.h"
 #include "common/SQLException.h"

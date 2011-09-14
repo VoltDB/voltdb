@@ -48,6 +48,7 @@
 
 #include <string>
 #include <vector>
+#include <cassert>
 #include "boost/shared_ptr.hpp"
 #include "boost/scoped_ptr.hpp"
 #include "common/ids.h"

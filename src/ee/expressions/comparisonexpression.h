@@ -56,6 +56,7 @@
 #include "expressions/tuplevalueexpression.h"
 
 #include <string>
+#include <cassert>
 
 namespace voltdb {
 

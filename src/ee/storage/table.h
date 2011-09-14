@@ -52,6 +52,8 @@
 #include <vector>
 #include <set>
 #include <list>
+#include <cassert>
+
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"

@@ -20,6 +20,8 @@
 #include <vector>
 #include <stdint.h>
 #include <string.h>
+#include <cassert>
+
 #include "boost/scoped_array.hpp"
 #include "boost/shared_ptr.hpp"
 #include "boost/unordered_set.hpp"

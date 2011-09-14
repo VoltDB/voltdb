@@ -52,8 +52,9 @@
 #include "common/ValuePeeker.hpp"
 #include "common/FatalException.hpp"
 #include "common/ExportSerializeIo.h"
-#include <ostream>
 
+#include <cassert>
+#include <ostream>
 #include <iostream>
 
 class CopyOnWriteTest_TestTableTupleFlags;

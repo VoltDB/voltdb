@@ -20,7 +20,7 @@
 #include "LogDefs.h"
 #include "LogProxy.h"
 #include <string>
-#include <assert.h>
+#include <cassert>
 
 namespace voltdb {
 

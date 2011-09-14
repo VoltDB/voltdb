@@ -17,13 +17,16 @@
 
 #ifndef UNDOLOG_H_
 #define UNDOLOG_H_
-#include <vector>
-#include <deque>
-#include <stdint.h>
 #include "common/Pool.hpp"
 #include "common/UndoQuantum.h"
 #include "boost/pool/object_pool.hpp"
+
+#include <vector>
+#include <deque>
+#include <stdint.h>
 #include <iostream>
+#include <cassert>
+
 
 namespace voltdb
 {

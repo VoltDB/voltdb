@@ -53,6 +53,7 @@
 #include "expressions/abstractexpression.h"
 
 #include <string>
+#include <cassert>
 
 namespace voltdb {
 
