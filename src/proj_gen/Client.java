@@ -108,7 +108,7 @@ public class Client {
             e.printStackTrace();
         }
         catch (org.voltdb.client.ProcCallException e) {
-            System.out.println("Invalid Insert(" + id + ") failed: " + e.getMessage());
+            System.out.println("Demonstrate a response with an error string: " + e.getMessage());
         }
     }
 
