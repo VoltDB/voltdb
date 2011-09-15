@@ -2,10 +2,9 @@
 
 import os, sys, re
 
-# Path to eng checkout root directory. To use this as a git pre-commit
-# hook, copy this script to .git/hooks/pre-commit, set basepath as the
-# absolute path to your volt checkout and set ascommithook to true.
-basepath = "../"
+# Path to eng checkout root directory. To use this as a git pre-commit hook,
+# create a symlink to this file in .git/hooks with the name pre-commit
+basepath = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + os.sep
 ascommithook = False
 
 prunelist = ('hsqldb19b3',
