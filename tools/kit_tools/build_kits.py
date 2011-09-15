@@ -20,9 +20,9 @@ def checkoutCode(engSvnUrl, proSvnUrl):
     # change to it
     with cd(builddir):
         # do the checkouts
-        run("svn co " + engSvnUrl + " eng")
-        run("svn co " + proSvnUrl + " pro")
-        return run("cat eng/version.txt").strip()
+        run("git clone git@github.com:VoltDB/voltdb.git")
+        run("git clone git@github.com:VoltDB/pro.git")
+        return run("cat voltdb/version.txt").strip()
 
 ################################################
 # MAKE A RELEASE DIR
@@ -45,7 +45,7 @@ def makeReleaseDir(releaseDir):
 ################################################
 
 def buildCommunity():
-    with cd(builddir + "/eng"):
+    with cd(builddir + "/voltdb"):
         run("pwd")
         run("svn status")
         run("ant clean default dist")
@@ -58,28 +58,28 @@ def buildPro():
     with cd(builddir + "/pro"):
         run("pwd")
         run("svn status")
-        run("VOLTCORE=../eng ant -f mmt.xml clean dist.pro")
+        run("VOLTCORE=../voltdb ant -f mmt.xml clean dist.pro")
 
 ################################################
 # COPY FILES
 ################################################
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
-    get("%s/eng/obj/release/voltdb-%s.tar.gz" % (builddir, version),
+    get("%s/voltdb/obj/release/voltdb-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-%s.tar.gz" % (releaseDir, operatingsys, version))
-    get("%s/eng/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
+    get("%s/voltdb/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
         "%s/voltdb-client-java-%s.tar.gz" % (releaseDir, version))
-    get("%s/eng/obj/release/voltdb-studio.web-%s.zip" % (builddir, version),
+    get("%s/voltdb/obj/release/voltdb-studio.web-%s.zip" % (builddir, version),
         "%s/voltdb-studio.web-%s.zip" % (releaseDir, version))
-    get("%s/eng/obj/release/voltdb-voltcache-%s.tar.gz" % (builddir, version),
+    get("%s/voltdb/obj/release/voltdb-voltcache-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-voltcache-%s.tar.gz" % (releaseDir, operatingsys, version))
-    get("%s/eng/obj/release/voltdb-voltkv-%s.tar.gz" % (builddir, version),
+    get("%s/voltdb/obj/release/voltdb-voltkv-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-voltkv-%s.tar.gz" % (releaseDir, operatingsys, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
         os.makedirs(releaseDir + "/other")
-        get("%s/eng/obj/release/voltdb-%s.sym" % (builddir, version),
+        get("%s/voltdb/obj/release/voltdb-%s.sym" % (builddir, version),
             "%s/other/%s-voltdb-voltkv-%s.sym" % (releaseDir, operatingsys, version))
 
 def copyEnterpriseFilesToReleaseDir(releaseDir, version, operatingsys):
