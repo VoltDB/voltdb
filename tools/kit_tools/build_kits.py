@@ -146,7 +146,7 @@ volt5f = getSSHInfoForHost("volt5f")
 voltmini = getSSHInfoForHost("voltmini")
 
 # build kits on 5f
-with settings(host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
+with settings(user='test',host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
     version = checkoutCode(eng_svn_url, pro_svn_url)
     releaseDir = os.getenv('HOME') + "/releases/" + version
     makeReleaseDir(releaseDir)
@@ -157,7 +157,7 @@ with settings(host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f
     copyEnterpriseFilesToReleaseDir(releaseDir, version, "LINUX")
 
 # build kits on the mini
-with settings(host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
+with settings(user='test',host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
     version2 = checkoutCode(eng_svn_url, pro_svn_url)
     assert version == version2
     buildCommunity()
