@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2010 VoltDB L.L.C.
+ * Copyright (C) 2008-2011 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,7 +25,7 @@ package com;
 
 import org.voltdb.types.TimestampType;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.benchmark.Clock;
+import com.Clock;
 import com.procedures.LoadStatus;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.Client;
