@@ -2,6 +2,7 @@
 /.depcache
 /.project
 /.settings
+/last_junit_suite.log
 *.pyc
 buildstring.txt
 /obj
