@@ -32,9 +32,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.text.SimpleDateFormat;
 import java.math.BigDecimal;
-import java.net.URL;
-import java.nio.Buffer;
-
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -844,7 +841,12 @@ public class SQLCommand
         }
         while (procs.advanceRow())
         {
-            procedures.put(procs.getString("PROCEDURE_NAME"), new ArrayList<String>());
+            ArrayList<String> this_params = new ArrayList<String>();
+            // prepopulate it to make sure the size is right
+            for (int i = 0; i < params.getRowCount(); i++) {
+                this_params.add(null);
+            }
+            procedures.put(procs.getString("PROCEDURE_NAME"), this_params);
         }
         while (params.advanceRow())
         {
