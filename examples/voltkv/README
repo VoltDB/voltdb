@@ -16,7 +16,7 @@ Many attributes of the application are customizable through arguments passed to 
 
 These attributes can be adjusted by modifying the arguments to the "async-benchmark" and "sync-benchmark" targets in run.sh.
 
-Additional arguments allow the client to automatically "tune" itself for optimal performance ("client" target only).
+Additional arguments allow the client to automatically tune itself for optimal performance ("client" target only).
 
   - Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
   - Target average transaction call latency (in milliseconds)
@@ -36,11 +36,11 @@ The default client configuration will allow the system to automatically tune its
 
 The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion transactions per second, or 1B TPS).  Within 5 seconds, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency within 10 ms.
 
-You can also turn Auto-Tuning off to experiment with different loads and better understand why proper tuning is key to getting the most of your specific VoltDB deployment.
+You can also turn auto-tuning off to experiment with different loads or to better understand why proper tuning is key to getting the most of your specific VoltDB deployment.
 
 Rate-limiting your clients (or adding cluster nodes) is essential to preventing "fire-hosing" your server (cluster) and will ensure you get proper application responsiveness (latency) while maximizing througput (TPS) for your hardware configuration.
 
-While the "Key-Value" application is designed with benchmarking in mind, it is essentially a network-bound application: you will generally find that you max-out your network bandwidth long before you reach "impressive" pure database throughput (TPS) numbers.
+While the "Key-Value" application is designed with benchmarking in mind, it is essentially a network-bound application: you will generally find that you max-out your network bandwidth long before you exhaust VoltDB's throughput processing capability.
 
 For a better feel for the type of performance VoltDB is capable of on your hardware, check out the "Voter" application sample.
 
