@@ -5,10 +5,10 @@
             <schema path='ddl.sql' />
         </schemas>
         <procedures>
-            <procedure class='com.procedures.Initialize' />
-            <procedure class='com.procedures.Get' />
-            <procedure class='com.procedures.Put' />
-            <procedure class='com.procedures.Remove' />
+            <procedure class='voltkv.procedures.Initialize' />
+            <procedure class='voltkv.procedures.Get' />
+            <procedure class='voltkv.procedures.Put' />
+            <procedure class='voltkv.procedures.Remove' />
         </procedures>
         <partitions>
             <partition table='store' column='key' />

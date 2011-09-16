@@ -10,11 +10,11 @@
             <schema path='ddl.sql' />
         </schemas>
         <procedures>
-            <procedure class='com.procedures.Initialize' />
-            <procedure class='com.procedures.Results' />
-            <procedure class='com.procedures.Vote' />
-            <procedure class='com.procedures.ContestantWinningStates' />
-            <procedure class='com.procedures.GetStateHeatmap' />
+            <procedure class='voter.procedures.Initialize' />
+            <procedure class='voter.procedures.Results' />
+            <procedure class='voter.procedures.Vote' />
+            <procedure class='voter.procedures.ContestantWinningStates' />
+            <procedure class='voter.procedures.GetStateHeatmap' />
         </procedures>
         <partitions>
             <partition table='votes' column='phone_number' />

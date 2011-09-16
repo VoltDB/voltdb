@@ -17,8 +17,8 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -classpath $CLASSPATH -d obj \
-        src/com/*.java \
-        src/com/procedures/*.java
+        src/voltkv/*.java \
+        src/voltkv/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -49,12 +49,12 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj com.AsyncBenchmark --help
+    java -classpath obj:$CLASSPATH:obj voltkv.AsyncBenchmark --help
 }
 
 function async-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj com.AsyncBenchmark \
+    java -classpath obj:$CLASSPATH:obj voltkv.AsyncBenchmark \
         --display-interval=5 \
         --duration=120 \
         --servers=localhost \
@@ -75,12 +75,12 @@ function async-benchmark() {
 # Use this target for argument help
 function sync-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj com.SyncBenchmark --help
+    java -classpath obj:$CLASSPATH:obj voltkv.SyncBenchmark --help
 }
 
 function sync-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj com.SyncBenchmark \
+    java -classpath obj:$CLASSPATH:obj voltkv.SyncBenchmark \
         --threads=40 \
         --display-interval=5 \
         --duration=120 \
@@ -99,12 +99,12 @@ function sync-benchmark() {
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj com.JDBCBenchmark --help
+    java -classpath obj:$CLASSPATH:obj voltkv.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj com.JDBCBenchmark \
+    java -classpath obj:$CLASSPATH:obj voltkv.JDBCBenchmark \
         --threads=40 \
         --display-interval=5 \
         --duration=120 \

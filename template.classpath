@@ -24,7 +24,7 @@
             <!-- Update the directory value to reflect
             your top-level project directory name, then
             copy it to .classpath -->
-            <attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="eng/obj/release/nativelibs"/>
+            <attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/obj/release/nativelibs"/>
           </attributes>
         </classpathentry>
         <classpathentry kind="lib" path="third_party/java/obj"/>

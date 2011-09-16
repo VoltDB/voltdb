@@ -10,22 +10,22 @@
             <schema path='ddl.sql' />
         </schemas>
         <procedures>
-            <procedure class='com.procedures.Add' />
-            <procedure class='com.procedures.Append' />
-            <procedure class='com.procedures.CheckAndSet' />
-            <procedure class='com.procedures.Cleanup' />
-            <procedure class='com.procedures.Delete' />
-            <procedure class='com.procedures.IncrDecr' />
-            <procedure class='com.procedures.Prepend' />
-            <procedure class='com.procedures.Replace' />
-            <procedure class='com.procedures.Set' />
-            <procedure class='com.procedures.Get' />
-            <procedure class='com.procedures.Gets' />
-            <procedure class='com.procedures.FlushAll' />
+            <procedure class='voltcache.procedures.Add' />
+            <procedure class='voltcache.procedures.Append' />
+            <procedure class='voltcache.procedures.CheckAndSet' />
+            <procedure class='voltcache.procedures.Cleanup' />
+            <procedure class='voltcache.procedures.Delete' />
+            <procedure class='voltcache.procedures.IncrDecr' />
+            <procedure class='voltcache.procedures.Prepend' />
+            <procedure class='voltcache.procedures.Replace' />
+            <procedure class='voltcache.procedures.Set' />
+            <procedure class='voltcache.procedures.Get' />
+            <procedure class='voltcache.procedures.Gets' />
+            <procedure class='voltcache.procedures.FlushAll' />
         </procedures>
         <classdependencies>
-            <classdependency class="com.api.VoltCacheResult" />
-            <classdependency class="com.procedures.Shared" />
+            <classdependency class="voltcache.api.VoltCacheResult" />
+            <classdependency class="voltcache.procedures.Shared" />
         </classdependencies>
         <partitions>
             <partition table='cache' column='Key' />

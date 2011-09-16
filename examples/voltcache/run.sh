@@ -18,9 +18,9 @@ function srccompile() {
     mkdir -p obj
     echo $CLASSPATH
     javac -classpath $CLASSPATH -d obj \
-        src/com/*.java \
-        src/com/api/*.java \
-        src/com/procedures/*.java
+        src/voltcache/*.java \
+        src/voltcache/api/*.java \
+        src/voltcache/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -51,12 +51,12 @@ function client() {
 # Use this target for argument help
 function benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj com.Benchmark --help
+    java -classpath obj:$CLASSPATH:obj voltcache.Benchmark --help
 }
 
 function benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj com.Benchmark \
+    java -classpath obj:$CLASSPATH:obj voltcache.Benchmark \
         --threads=40 \
         --display-interval=5 \
         --duration=120 \
