@@ -52,12 +52,10 @@ public class CSVTableSaveFile {
             .getRuntime().availableProcessors());
     private final TableSaveFile m_saveFile;
     private final char m_delimiter;
-    private final SimpleDateFormat m_sdf;
 
-    public CSVTableSaveFile(File saveFile, char delimiter,
-            Integer partitions[]) throws IOException {
+    public CSVTableSaveFile(File saveFile, char delimiter, Integer partitions[])
+            throws IOException {
         m_delimiter = delimiter;
-        m_sdf = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss:SSS:");
         final FileInputStream fis = new FileInputStream(saveFile);
         m_saveFile = new TableSaveFile(fis.getChannel(), 10, partitions);
         for (int ii = 0; ii < m_converterThreads.length; ii++) {
@@ -72,6 +70,7 @@ public class CSVTableSaveFile {
      *
      * @return null if there is no more data or a byte array contain some number
      *         of complete CSV lines
+     *
      * @throws IOException
      */
     public byte[] read() throws IOException {
@@ -104,8 +103,11 @@ public class CSVTableSaveFile {
     }
 
     private class ConverterThread implements Runnable {
-
         private void convertChunks() throws IOException, InterruptedException {
+
+            final SimpleDateFormat m_sdf = new SimpleDateFormat(
+                    "yyyy.MM.dd HH:mm:ss:SSS:");
+
             while (!Thread.interrupted() && m_saveFile.hasMoreChunks()) {
                 if (m_availableBytes.get() > m_maxAvailableBytes) {
                     Thread.sleep(5);
@@ -119,7 +121,8 @@ public class CSVTableSaveFile {
 
                 try {
                     final int size = c.b.remaining();
-                    final VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, true);
+                    final VoltTable vt = PrivateVoltTableFactory
+                            .createVoltTableFromBuffer(c.b, true);
                     StringWriter sw = new StringWriter(size * 2);
                     CSVWriter csv;
                     if (m_delimiter == '\t')
@@ -149,7 +152,8 @@ public class CSVTableSaveFile {
                                     fields[ii] = Double.toString(value);
                                 }
                             } else if (type == VoltType.DECIMAL) {
-                                final BigDecimal bd = vt.getDecimalAsBigDecimal(ii);
+                                final BigDecimal bd = vt
+                                        .getDecimalAsBigDecimal(ii);
                                 if (vt.wasNull()) {
                                     fields[ii] = "NULL";
                                 } else {
@@ -163,12 +167,15 @@ public class CSVTableSaveFile {
                                     fields[ii] = str;
                                 }
                             } else if (type == VoltType.TIMESTAMP) {
-                                final TimestampType timestamp = vt.getTimestampAsTimestamp(ii);
+                                final TimestampType timestamp = vt
+                                        .getTimestampAsTimestamp(ii);
                                 if (vt.wasNull()) {
                                     fields[ii] = "NULL";
                                 } else {
-                                    fields[ii] = m_sdf.format(timestamp.asApproximateJavaDate());
-                                    fields[ii] += String.valueOf(timestamp.getUSec());
+                                    fields[ii] = m_sdf.format(timestamp
+                                            .asApproximateJavaDate());
+                                    fields[ii] += String.valueOf(timestamp
+                                            .getUSec());
                                 }
                             }
                         }
