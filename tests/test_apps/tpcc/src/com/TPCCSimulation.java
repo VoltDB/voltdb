@@ -52,7 +52,6 @@ package com;
 
 import java.io.IOException;
 
-import org.voltdb.benchmark.Clock;
 import org.voltdb.types.TimestampType;
 
 public class TPCCSimulation
