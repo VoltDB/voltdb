@@ -274,7 +274,28 @@ public abstract class SubPlanAssembler {
 
                 if (ltColumns.containsKey(col) && (ltColumns.get(col).size() >= 0)) {
                     AbstractExpression expr = ltColumns.get(col).remove(0);
-                    retval.endExprs.add(expr);
+                    if (retval.sortDirection == SortDirectionType.ASC ||
+                        retval.lookupType == IndexLookupType.GT ||
+                        retval.lookupType == IndexLookupType.GTE) {
+                        /*
+                         * If we are already doing an index lookup of type GT or
+                         * GTE, don't insert the expression into search keys and
+                         * change the lookup type to LT or LTE here. Insert the
+                         * expression as end expression should be just as good.
+                         */
+                        retval.endExprs.add(expr);
+                    } else {
+                        retval.indexExprs.add(expr);
+
+                        if (expr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN)
+                            retval.lookupType = IndexLookupType.LT;
+                        else if (expr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO)
+                            retval.lookupType = IndexLookupType.LTE;
+                        else
+                            assert false;
+
+                        retval.use = IndexUseType.INDEX_SCAN;
+                    }
                 }
 
                 // if we didn't find an equality match, we can stop looking

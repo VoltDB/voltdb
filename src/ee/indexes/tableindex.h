@@ -255,6 +255,23 @@ public:
     }
 
     /**
+     * This method reverses the direction of traversal, so nextValue() will walk
+     * the index in the opposite direction.
+     */
+    virtual void reverse()
+    {
+        throwFatalException("Invoked TableIndex virtual method reverse which has no implementation");
+    }
+
+    /**
+     * @return true if the iterator is pointing at the beginning of the index
+     */
+    virtual bool isBegin()
+    {
+        throwFatalException("Invoked TableIndex virtual method isBegin which has no implementation");
+    }
+
+    /**
      * sets the tuple to point the entry found by
      * moveToKeyOrGreater().  calls this repeatedly to get all entries
      * with or following to the search key.

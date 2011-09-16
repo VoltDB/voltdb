@@ -182,6 +182,16 @@ public:
             m_seqIter = m_entries.rbegin();
     }
 
+    void reverse()
+    {
+        m_begin = !m_begin;
+    }
+
+    bool isBegin()
+    {
+        return m_seqIter.equals(m_entries.begin());
+    }
+
     TableTuple nextValue()
     {
         TableTuple retval(m_tupleSchema);

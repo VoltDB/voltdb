@@ -101,7 +101,7 @@ public:
         void moveNext() { m_node = m_map->successor(m_node); }
         void movePrev() { m_node = m_map->predecessor(m_node); }
         bool isEnd() const { return ((!m_map) || (m_node == &(m_map->NIL))); }
-        bool equals(iterator &iter) {
+        bool equals(const iterator &iter) const {
             if (isEnd()) return iter.isEnd();
             return m_node == iter.m_node;
         }

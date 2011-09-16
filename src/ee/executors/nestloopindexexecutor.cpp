@@ -383,6 +383,30 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             {
                 index->moveToKeyOrGreater(&index_values);
             }
+            else if (m_lookupType == INDEX_LOOKUP_TYPE_LT)
+            {
+                // find the lower bound of the key range, then move one value to
+                // the left because lower bound is equal to the key
+                index->moveToKeyOrGreater(&index_values);
+                index->reverse();
+                TableTuple tmpTuple = index->nextValue();
+
+                if (tmpTuple.isNullTuple()) {
+                    index->moveToEnd(false);
+                }
+            }
+            else if (m_lookupType == INDEX_LOOKUP_TYPE_LTE)
+            {
+                // find the upper bound of the key range, then move one value to
+                // the left because upper bound is bigger than the key
+                index->moveToGreaterThanKey(&index_values);
+                index->reverse();
+                TableTuple tmpTuple = index->nextValue();
+
+                if (tmpTuple.isNullTuple()) {
+                    index->moveToEnd(false);
+                }
+            }
             else
             {
                 return false;

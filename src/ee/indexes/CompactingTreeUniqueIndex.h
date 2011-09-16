@@ -189,6 +189,16 @@ public:
             m_keyIter = m_entries.rbegin();
     }
 
+    void reverse()
+    {
+        m_begin = !m_begin;
+    }
+
+    bool isBegin()
+    {
+        return m_keyIter.equals(m_entries.begin());
+    }
+
     TableTuple nextValue()
     {
         TableTuple retval(m_tupleSchema);
