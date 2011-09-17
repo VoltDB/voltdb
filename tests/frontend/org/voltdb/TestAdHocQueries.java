@@ -23,60 +23,61 @@
 
 package org.voltdb;
 
-import java.io.IOException;
-
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestAdHocQueries extends TestCase {
 
-    public void testSimple() throws InterruptedException, IOException, ProcCallException {
-        Configuration config = new Configuration();
-        config.m_backend = BackendTarget.NATIVE_EE_JNI;
-        config.m_noLoadLibVOLTDB = false;
-        config.setPathToCatalogForTest("tpcc.jar");
+    public void testSimple() throws Exception {
+        String simpleSchema =
+            "create table BLAH (" +
+            "IVAL bigint default 0 not null, " +
+            "TVAL timestamp default null," +
+            "PRIMARY KEY(IVAL));";
 
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(org.voltdb.compiler.procedures.EmptyProcedure.class);
-        assertTrue(project.compile(config.m_pathToCatalog, 2, 0));
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addPartitionInfo("BLAH", "IVAL");
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
+        builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002');");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("adhoc.jar"), 2, 1, 0);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("adhoc.xml"));
 
-        config.m_pathToDeployment = project.getPathToDeployment();
-
-        ServerThread server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("adhoc.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
+        ServerThread localServer = new ServerThread(config);
+        localServer.start();
+        localServer.waitForInitialization();
 
         // do the test
-        ClientConfig clientConfig = new ClientConfig("program", "password");
-        Client client = ClientFactory.createClient(clientConfig);
+        Client client = ClientFactory.createClient();
         client.createConnection("localhost");
 
-        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (1, 1, 1);").getResults()[0];
+        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1, 1);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
 
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM NEW_ORDER;").getResults()[0];
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
         assertTrue(result.getRowCount() == 1);
         System.out.println(result.toString());
 
         // test single-partition stuff
-        result = client.callProcedure("@AdHoc", "SELECT * FROM NEW_ORDER;", 0).getResults()[0];
+        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 0).getResults()[0];
         assertTrue(result.getRowCount() == 0);
         System.out.println(result.toString());
-        result = client.callProcedure("@AdHoc", "SELECT * FROM NEW_ORDER;", 1).getResults()[0];
+        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 1).getResults()[0];
         assertTrue(result.getRowCount() == 1);
         System.out.println(result.toString());
 
         try {
-            client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (0, 0, 0);", 1);
+            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0);", 1);
             fail("Badly partitioned insert failed to throw expected exception");
         }
         catch (Exception e) {}
@@ -87,9 +88,16 @@ public class TestAdHocQueries extends TestCase {
         }
         catch (Exception e) {}
 
-        server.shutdown();
-        server.join();
-        assertTrue(true);
+        // try a huge bigint literal
+        modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26');").getResults()[0];
+        assertTrue(modCount.getRowCount() == 1);
+        assertTrue(modCount.asScalarLong() == 1);
+        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        localServer.shutdown();
+        localServer.join();
     }
 
 }

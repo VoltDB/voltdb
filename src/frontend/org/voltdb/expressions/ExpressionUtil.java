@@ -579,6 +579,23 @@ public abstract class ExpressionUtil {
                 }
             }
 
+            if (neededType == VoltType.TIMESTAMP) {
+                if (cve.getValueType() == VoltType.STRING) {
+                    try {
+                        java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(cve.m_value);
+                        long timeInMicroSecs = sqlTS.getTime() * 1000;
+                        timeInMicroSecs += sqlTS.getNanos() / 1000;
+                        cve.m_value = String.valueOf(timeInMicroSecs);
+                        cve.setValueType(neededType);
+                        cve.setValueSize(neededSize);
+                        checkConstantValueTypeSafety(cve);
+                    }
+                    // ignore errors if it's not the right format
+                    catch (IllegalArgumentException e) {}
+                    return;
+                }
+            }
+
             throw new Exception("Constant value cannot be converted to column type.");
         }
         else {

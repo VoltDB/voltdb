@@ -411,6 +411,23 @@ public class TestJSONInterface extends TestCase {
         System.out.println(response.statusString);
         assertEquals(ClientResponse.SUCCESS, response.status);
 
+        // now try adhoc insert with a huge bigint
+        pset.setParameters("insert into blah values (974599638818488300, NULL, NULL, NULL, NULL);");
+        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        System.out.println(response.statusString);
+        assertEquals(ClientResponse.SUCCESS, response.status);
+
+        pset.setParameters("select * from blah where ival = 974599638818488300;");
+        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        System.out.println(response.statusString);
+        assertEquals(ClientResponse.SUCCESS, response.status);
+        assertEquals(1, response.results.length);
+        assertEquals(1, response.results[0].getRowCount());
+
         server.shutdown();
         server.join();
     }

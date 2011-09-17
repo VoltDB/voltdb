@@ -13,3 +13,4 @@ buildstring.txt
 /src/frontend/org/voltdb/catalog/*.java
 /voltdb/libvoltdb*.so
 /voltdb/voltdb*.jar
+/.DS_Store
