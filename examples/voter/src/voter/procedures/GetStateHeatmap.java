@@ -24,16 +24,20 @@
 //
 // Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
 //
+
 package voter.procedures;
 
-import org.voltdb.*;
 import java.util.ArrayList;
 
-@ProcInfo
-(
-  singlePartition = false
-)
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 
+@ProcInfo (
+    singlePartition = false
+)
 public class GetStateHeatmap extends VoltProcedure
 {
     public final SQLStmt resultStmt = new SQLStmt( "SELECT contestant_number, state, SUM(num_votes) AS num_votes FROM v_votes_by_contestant_number_state GROUP BY contestant_number, state ORDER BY 2 ASC, 3 DESC;");
@@ -53,26 +57,27 @@ public class GetStateHeatmap extends VoltProcedure
         }
     }
 
-    public VoltTable[] run()
+    public VoltTable run()
     {
         ArrayList<Result> results = new ArrayList<Result>();
         voltQueueSQL(resultStmt);
         VoltTable summary = voltExecuteSQL()[0];
         String state = "";
-        while(summary.advanceRow())
-        {
-            if (!summary.getString(1).equals(state))
-            {
+
+        while(summary.advanceRow()) {
+            if (!summary.getString(1).equals(state)) {
                 state = summary.getString(1);
                 results.add(new Result(state, (int)summary.getLong(0), summary.getLong(2), (byte)1));
             }
-            else
+            else {
                 results.add(new Result(state, (int)summary.getLong(0), summary.getLong(2), (byte)0));
+            }
         }
+
         Object[] resultArray = results.toArray();
         VoltTable result = new VoltTable(new VoltTable.ColumnInfo("state",VoltType.STRING), new VoltTable.ColumnInfo("contestant_number",VoltType.INTEGER), new VoltTable.ColumnInfo("num_votes",VoltType.BIGINT), new VoltTable.ColumnInfo("is_winning",VoltType.TINYINT));
         for(int i=0;i<resultArray.length;i++)
             result.addRow(new Object[] { ((Result)resultArray[i]).State, ((Result)resultArray[i]).ContestantNumber, ((Result)resultArray[i]).Votes, ((Result)resultArray[i]).IsWinning });
-        return new VoltTable[] { result };
+        return result;
     }
 }

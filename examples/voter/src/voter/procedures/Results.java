@@ -24,15 +24,17 @@
 //
 // Returns the results of the votes.
 //
+
 package voter.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo
-(
+@ProcInfo (
     singlePartition = false
 )
-
 public class Results extends VoltProcedure
 {
     // Gets the results
@@ -44,10 +46,8 @@ public class Results extends VoltProcedure
                                                  + "    WHERE a.contestant_number = b.contestant_number"
                                                  + " GROUP BY a.contestant_name"
                                                  + "        , a.contestant_number"
-                                                 + " ORDER BY total_votes DESC;"
-                                                 );
-    public VoltTable[] run()
-    {
+                                                 + " ORDER BY total_votes DESC;" );
+    public VoltTable[] run() {
         voltQueueSQL(resultStmt);
         return voltExecuteSQL(true);
     }

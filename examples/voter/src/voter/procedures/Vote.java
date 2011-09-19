@@ -27,85 +27,70 @@
 // contestant and that the voter (phone number of the caller) is not above the
 // number of allowed votes.
 //
+
 package voter.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 
-@ProcInfo
-(
-  partitionInfo = "votes.phone_number:0"
-, singlePartition = true
+@ProcInfo (
+    partitionInfo = "votes.phone_number:0",
+    singlePartition = true
 )
+public class Vote extends VoltProcedure {
 
-public class Vote extends VoltProcedure
-{
+    // potential return codes
+    public static final long VOTE_SUCCESSFUL = 0;
+    public static final long ERR_INVALID_CONTESTANT = 1;
+    public static final long ERR_VOTER_OVER_VOTE_LIMIT = 2;
+
     // Checks if the vote is for a valid contestant
-    public final SQLStmt checkContestantStmt = new SQLStmt("SELECT contestant_number FROM contestants WHERE contestant_number = ?;");
+    public final SQLStmt checkContestantStmt = new SQLStmt(
+            "SELECT contestant_number FROM contestants WHERE contestant_number = ?;");
 
     // Checks if the voter has exceeded their allowed number of votes
-    public final SQLStmt checkVoterStmt = new SQLStmt("SELECT num_votes FROM v_votes_by_phone_number WHERE phone_number = ?;");
+    public final SQLStmt checkVoterStmt = new SQLStmt(
+            "SELECT num_votes FROM v_votes_by_phone_number WHERE phone_number = ?;");
 
     // Checks an area code to retrieve the corresponding state
-    public final SQLStmt checkStateStmt = new SQLStmt("SELECT state FROM area_code_state WHERE area_code = ?;");
+    public final SQLStmt checkStateStmt = new SQLStmt(
+            "SELECT state FROM area_code_state WHERE area_code = ?;");
 
     // Records a vote
-    public final SQLStmt insertVoteStmt = new SQLStmt("INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);");
+    public final SQLStmt insertVoteStmt = new SQLStmt(
+            "INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);");
 
-    public VoltTable[] run(long phoneNumber, int contestantNumber, long maxVotesPerPhoneNumber)
-    {
-        boolean validVoter = false;
-        boolean validContestant = false;
-        long returnValue = 0;
+    public long run(long phoneNumber, int contestantNumber, long maxVotesPerPhoneNumber) {
 
         // Queue up validation statements
-        voltQueueSQL(checkContestantStmt, contestantNumber);
-        voltQueueSQL(checkVoterStmt, phoneNumber);
-        voltQueueSQL(checkStateStmt, (short)(phoneNumber / 10000000l));
+        voltQueueSQL(checkContestantStmt, EXPECT_ZERO_OR_ONE_ROW, contestantNumber);
+        voltQueueSQL(checkVoterStmt, EXPECT_ZERO_OR_ONE_ROW, phoneNumber);
+        voltQueueSQL(checkStateStmt, EXPECT_ONE_ROW, (short)(phoneNumber / 10000000l));
         VoltTable validation[] = voltExecuteSQL();
 
-        if (validation[0].getRowCount() > 0)
-        {
-            // valid contestant
-            validContestant = true;
-            // phone number has not yet voted
-            if (validation[1].getRowCount() == 0)
-                validVoter = true;
-            // phone number still has votes
-            else if (validation[1].fetchRow(0).getLong(0) < maxVotesPerPhoneNumber)
-                validVoter = true;
+        if (validation[0].getRowCount() == 0) {
+            return ERR_INVALID_CONTESTANT;
         }
 
-        if (validContestant && validVoter)
-        {
-            // Some sample client libraries use the legacy random phone generation that mostly
-            // created invalid phone numbers. Until refactoring, re-assign all such votes to
-            // the "XX" fake state (those votes will not appear on the Live Statistics dashboard,
-            // but are tracked as legitimate instead of invalid, as old clients would mostly get
-            // it wrong and see all their transactions rejected).
-            final String state = (validation[2].getRowCount() > 0) ? validation[2].fetchRow(0).getString(0) : "XX";
-
-            // Post the vote
-            voltQueueSQL(insertVoteStmt, phoneNumber, state, contestantNumber);
-            voltExecuteSQL(true);
-
-            // Set the return value to 0: successful vote
-            returnValue = 0;
+        if ((validation[1].getRowCount() == 1) &&
+                (validation[1].asScalarLong() >= maxVotesPerPhoneNumber)) {
+            return ERR_VOTER_OVER_VOTE_LIMIT;
         }
-        else if (!validContestant)
-            returnValue = 1;
-        else
-            returnValue = 2;
 
-        // return a 1 row 2 column VoltTable
-        //   column return_value : 0 = successful vote
-        //                         1 = invalid contestant number
-        //                         2 = voter over vote limit
-        VoltTable result = new VoltTable(new VoltTable.ColumnInfo("return_value",VoltType.INTEGER));
-        result.addRow(new Object[] {returnValue});
-        return new VoltTable[] { result };
+        // Some sample client libraries use the legacy random phone generation that mostly
+        // created invalid phone numbers. Until refactoring, re-assign all such votes to
+        // the "XX" fake state (those votes will not appear on the Live Statistics dashboard,
+        // but are tracked as legitimate instead of invalid, as old clients would mostly get
+        // it wrong and see all their transactions rejected).
+        final String state = (validation[2].getRowCount() > 0) ? validation[2].fetchRow(0).getString(0) : "XX";
+
+        // Post the vote
+        voltQueueSQL(insertVoteStmt, EXPECT_SCALAR_MATCH(1), phoneNumber, state, contestantNumber);
+        voltExecuteSQL(true);
+
+        // Set the return value to 0: successful vote
+        return VOTE_SUCCESSFUL;
     }
 }

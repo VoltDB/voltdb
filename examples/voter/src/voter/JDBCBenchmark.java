@@ -31,26 +31,20 @@
  * transaction), the VoltDB cluster at large is still able to perform at
  * blazing speeds when many clients are connected to it.
  */
+
 package voter;
 
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
-
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 
-// The VoltDB JDBC driver exposes extended methoed through the IVoltDBConnection interface.
-// Specifically for this example, we will use the embedded performance statistics.
-import org.voltdb.jdbc.IVoltDBConnection;
-
-// This sample also use a simple utility class for command-line applications, however, note
-// that there is otherwise no VoltDB-specific imports.  The sample is only using standard
-// Java and JDBC statements.
 import org.voltdb.client.exampleutils.AppHelper;
+import org.voltdb.jdbc.IVoltDBConnection;
 
 public class JDBCBenchmark
 {
@@ -89,8 +83,8 @@ public class JDBCBenchmark
                 while (endTime > System.currentTimeMillis())
                 {
                     PhoneCallGenerator.PhoneCall call = this.switchboard.receive();
-                    voteCS.setLong(1, call.PhoneNumber);
-                    voteCS.setInt(2, call.ContestantNumber);
+                    voteCS.setLong(1, call.phoneNumber);
+                    voteCS.setInt(2, call.contestantNumber);
                     voteCS.setLong(3, this.maxVoteCount);
                     try
                     {

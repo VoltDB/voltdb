@@ -37,6 +37,7 @@
  * part of your pre-launch evalution so you can adequately provision your
  * VoltDB cluster with the number of servers required for your needs.
  */
+
 package voter;
 
 import java.util.Timer;
@@ -46,7 +47,6 @@ import java.util.concurrent.atomic.AtomicLongArray;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.client.exampleutils.ClientConnection;
 import org.voltdb.client.exampleutils.ClientConnectionPool;
@@ -158,9 +158,9 @@ public class AsyncBenchmark
             // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
             IRateLimiter limiter = null;
             if (autoTune)
-                limiter = (IRateLimiter)new LatencyLimiter(Con, "Vote", latencyTarget, rateLimit);
+                limiter = new LatencyLimiter(Con, "Vote", latencyTarget, rateLimit);
             else
-                limiter = (IRateLimiter)new RateLimiter(rateLimit);
+                limiter = new RateLimiter(rateLimit);
 
             // Run the benchmark loop for the requested duration
             long endTime = System.currentTimeMillis() + (1000l * duration);
@@ -183,8 +183,8 @@ public class AsyncBenchmark
                     }
                 }
                 , "Vote"
-                , call.PhoneNumber
-                , call.ContestantNumber
+                , call.phoneNumber
+                , call.contestantNumber
                 , maxVoteCount
                 );
 

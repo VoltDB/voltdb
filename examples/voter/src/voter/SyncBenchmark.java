@@ -31,6 +31,7 @@
  * transaction), the VoltDB cluster at large is still able to perform at
  * blazing speeds when many clients are connected to it.
  */
+
 package voter;
 
 import java.util.ArrayList;
@@ -39,8 +40,6 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
-
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.client.exampleutils.ClientConnection;
 import org.voltdb.client.exampleutils.ClientConnectionPool;
@@ -85,7 +84,7 @@ public class SyncBenchmark
                     PhoneCallGenerator.PhoneCall call = this.switchboard.receive();
                     try
                     {
-                        VotingBoardResults.incrementAndGet((int)con.execute("Vote", call.PhoneNumber, call.ContestantNumber, this.maxVoteCount).getResults()[0].fetchRow(0).getLong(0));
+                        VotingBoardResults.incrementAndGet((int)con.execute("Vote", call.phoneNumber, call.contestantNumber, this.maxVoteCount).getResults()[0].fetchRow(0).getLong(0));
                     }
                     catch(Exception x)
                     {
