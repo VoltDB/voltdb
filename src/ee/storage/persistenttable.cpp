@@ -271,7 +271,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
 
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
-        m_nonInlinedMemorySize += m_tmpTarget1.getNonInlinedMemorySize();
+        increaseStringMemCount(m_tmpTarget1.getNonInlinedMemorySize());
     }
     /*
      * Create and register an undo action.
@@ -340,8 +340,8 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
 
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
-        m_nonInlinedMemorySize -= target.getNonInlinedMemorySize();
-        m_nonInlinedMemorySize += source.getNonInlinedMemorySize();
+        decreaseStringMemCount(target.getNonInlinedMemorySize());
+        increaseStringMemCount(source.getNonInlinedMemorySize());
     }
 
      source.setActiveTrue();
@@ -413,8 +413,8 @@ void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
                                          bool revertIndexes) {
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
-        m_nonInlinedMemorySize -= target.getNonInlinedMemorySize();
-        m_nonInlinedMemorySize += source.getNonInlinedMemorySize();
+        decreaseStringMemCount(target.getNonInlinedMemorySize());
+        increaseStringMemCount(source.getNonInlinedMemorySize());
     }
 
     //Need to back up the updated version of the tuple to provide to
@@ -511,7 +511,7 @@ void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
 
         if (m_schema->getUninlinedObjectColumnCount() != 0)
         {
-            m_nonInlinedMemorySize -= tupleCopy.getNonInlinedMemorySize();
+            decreaseStringMemCount(tupleCopy.getNonInlinedMemorySize());
         }
 
         // Delete the strings/objects
@@ -732,7 +732,7 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple) {
     // Account for non-inlined memory allocated via bulk load or recovery
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
-        m_nonInlinedMemorySize += tuple.getNonInlinedMemorySize();
+        increaseStringMemCount(tuple.getNonInlinedMemorySize());
     }
 }
 

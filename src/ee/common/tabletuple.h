@@ -195,9 +195,10 @@ public:
                 {
                     if (!getNValue(i).isNull())
                     {
-                        bytes += (sizeof(int32_t) +
-                                  ValuePeeker::
-                                  peekObjectLength(getNValue(i)));
+                        bytes +=
+                            StringRef::
+                            computeStringMemoryUsed((ValuePeeker::
+                                                     peekObjectLength(getNValue(i))));
                     }
                 }
             }

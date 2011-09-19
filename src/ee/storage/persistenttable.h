@@ -251,6 +251,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     void doIdleCompaction();
     void printBucketInfo();
 
+    void increaseStringMemCount(size_t bytes)
+    {
+        m_nonInlinedMemorySize += bytes;
+    }
+    void decreaseStringMemCount(size_t bytes)
+    {
+        m_nonInlinedMemorySize -= bytes;
+    }
+
 protected:
 
     size_t allocatedBlockCount() const {

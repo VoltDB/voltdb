@@ -80,7 +80,7 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     string strval = "123456";
     NValue non_inline_string = ValueFactory::getStringValue(strval);
     non_inline_tuple.setNValue(1, non_inline_string);
-    EXPECT_EQ(strval.length() + sizeof(int32_t),
+    EXPECT_EQ(StringRef::computeStringMemoryUsed(strval.length()),
               non_inline_tuple.getNonInlinedMemorySize());
 
     delete[] non_inline_tuple.address();

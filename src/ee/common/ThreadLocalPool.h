@@ -46,6 +46,12 @@ public:
     ~ThreadLocalPool();
 
     /**
+     * Return the nearest power-of-two-plus-or-minus buffer size that
+     * will be allocated for an object of the given length
+     */
+    static std::size_t getAllocationSizeForObject(std::size_t length);
+
+    /**
      * Retrieve a pool that allocates approximately sized chunks of memory. Provides pools that
      * are powers of two and powers of two + the previous power of two.
      */

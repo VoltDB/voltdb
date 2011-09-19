@@ -32,6 +32,13 @@ namespace voltdb
     class StringRef
     {
     public:
+        /// Utility method to compute the amount of memory that will
+        /// be used by non-inline storage of a string/varbinary of the
+        /// given length.  Includes the size of pooled StringRef object,
+        /// backpointer, and excess memory allocated in the compacting
+        /// string pool.
+        static std::size_t computeStringMemoryUsed(std::size_t length);
+
         friend class CompactingStringPool;
         /// Create and return a new StringRef object which points to an
         /// allocated memory block of the requested size.  The caller

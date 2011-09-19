@@ -48,7 +48,7 @@ void PersistentTableUndoDeleteAction::release() {
         //No snapshot in progress, just whack it
         if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
         {
-            m_table->m_nonInlinedMemorySize -= tuple.getNonInlinedMemorySize();
+            m_table->decreaseStringMemCount(tuple.getNonInlinedMemorySize());
         }
         tuple.freeObjectColumns();
         m_table->deleteTupleStorage(tuple);
@@ -57,7 +57,7 @@ void PersistentTableUndoDeleteAction::release() {
             //Safe to free the tuple and do memory accounting
             if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
             {
-                m_table->m_nonInlinedMemorySize -= tuple.getNonInlinedMemorySize();
+                m_table->decreaseStringMemCount(tuple.getNonInlinedMemorySize());
             }
             tuple.freeObjectColumns();
             m_table->deleteTupleStorage(tuple);

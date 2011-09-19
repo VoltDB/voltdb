@@ -91,7 +91,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
             assert(!tuple.isPendingDeleteOnUndoRelease());
             if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
             {
-                m_table->m_nonInlinedMemorySize -= tuple.getNonInlinedMemorySize();
+                m_table->decreaseStringMemCount(tuple.getNonInlinedMemorySize());
             }
             tuple.setPendingDeleteFalse();
             tuple.freeObjectColumns();

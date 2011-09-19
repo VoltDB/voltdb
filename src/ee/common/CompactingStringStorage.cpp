@@ -17,101 +17,13 @@
 #include "common/CompactingStringStorage.h"
 
 #include "common/FatalException.hpp"
+#include "common/ThreadLocalPool.h"
 #include <boost/unordered_map.hpp>
 #include <iostream>
 
 using namespace voltdb;
 using namespace std;
 using boost::shared_ptr;
-
-namespace
-{
-    size_t getAllocationSizeForObject(size_t length)
-    {
-        if (length <= 2) {
-            return 2;
-        } else if (length <= 4) {
-            return 4;
-        } else if (length <= 4 + 2) {
-            return 4 + 2;
-        } else if (length <= 8) {
-            return 8;
-        } else if (length <= 8 + 4) {
-            return 8 + 4;
-        } else if (length <= 16) {
-            return 16;
-        } else if (length <= 16 + 8) {
-            return 16 + 8;
-        } else if (length <= 32) {
-            return 32;
-        } else if (length <= 32 + 16) {
-            return 32 + 16;
-        } else if (length <= 64) {
-            return 64;
-        } else if (length <= 64 + 32) {
-            return 64 + 32;
-        } else if (length <= 128) {
-            return 128;
-        } else if (length < 128 + 64) {
-            return 128 + 64;
-        } else if (length <= 256) {
-            return 256;
-        } else if (length <= 256 + 128) {
-            return 256 + 128;
-        } else if (length <= 512) {
-            return 512;
-        } else if (length <= 512 + 256) {
-            return 512 + 256;
-        } else if (length <= 1024) {
-            return 1024;
-        } else if (length <= 1024 + 512) {
-            return 1024 + 512;
-        } else if (length <= 2048) {
-            return 2048;
-        } else if (length <= 2048 + 1024) {
-            return 2048 + 1024;
-        } else if (length <= 4096) {
-            return 4096;
-        } else if (length < 4096 + 2048) {
-            return 4096 + 2048;
-        } else if (length <= 8192) {
-            return 8192;
-        } else if (length < 8192 + 4096) {
-            return 8192 + 4096;
-        } else if (length <= 16384) {
-            return 16384;
-        } else if (length <= 16384 + 8192) {
-            return 16384 + 8192;
-        } else if (length <= 32768) {
-            return 32768;
-        } else if (length <= 32768 + 16384) {
-            return 32768 + 16384;
-        } else if (length <= 65536) {
-            return 65536;
-        } else if (length <= 65536 + 32768) {
-            return 65536 + 32768;
-        } else if (length <= 131072) {
-            return 131072;
-        } else if (length <= 131072 + 65536) {
-            return 131072 + 65536;
-        } else if (length <= 262144) {
-            return 262144;
-        } else if (length <= 262144 + 131072) {
-            return 262144 + 131072;
-        } else if (length <= 524288) {
-            return 524288;
-        } else if (length <= 524288 + 262144) {
-            return 524288 + 262144;
-            //Need space for a length prefix and a backpointer
-        } else if (length <= 1048576 + sizeof(int32_t) + sizeof(void*)) {
-            return 1048576 + sizeof(int32_t) + sizeof(void*);
-        } else {
-            throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %Zu", length);
-        }
-        // NOT REACHED
-        return length + 4;
-    }
-}
 
 typedef boost::shared_ptr<CompactingStringPool> PoolPtrType;
 typedef boost::unordered_map<size_t, PoolPtrType> MapType;
@@ -127,8 +39,12 @@ CompactingStringStorage::~CompactingStringStorage()
 PoolPtrType
 CompactingStringStorage::get(size_t size)
 {
-    size = getAllocationSizeForObject(size);
-    return getExact(size);
+    size_t alloc_size = ThreadLocalPool::getAllocationSizeForObject(size);
+    if (alloc_size == 0)
+    {
+        throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %Zu", size);
+    }
+    return getExact(alloc_size);
 }
 
 PoolPtrType

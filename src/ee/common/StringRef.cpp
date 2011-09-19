@@ -24,6 +24,26 @@
 using namespace voltdb;
 using namespace std;
 
+size_t
+StringRef::computeStringMemoryUsed(size_t length)
+{
+    // CompactingStringPool will allocate a chunk of this size for storage.
+    // This size is the actual length plus the 4-byte length storage
+    // plus the backpointer to the StringRef
+    size_t alloc_size =
+        ThreadLocalPool::getAllocationSizeForObject(length +
+                                                    sizeof(int32_t) +
+                                                    sizeof(StringRef*));
+    //cout << "Object length: " << length << endl;
+    //cout << "StringRef* size: " << sizeof(StringRef*) << endl;
+    //cout << "Pool allocation size: " << alloc_size << endl;
+    // One of these will be allocated in the thread local pool for the string
+    alloc_size += sizeof(StringRef);
+    //cout << "StringRef size: " << sizeof(StringRef) << endl;
+    //cout << "Total allocation size: " << alloc_size << endl;
+    return alloc_size;
+}
+
 StringRef*
 StringRef::create(size_t size, Pool* dataPool)
 {

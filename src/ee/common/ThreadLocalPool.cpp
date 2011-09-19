@@ -78,7 +78,8 @@ ThreadLocalPool::~ThreadLocalPool() {
     }
 }
 
-static std::size_t getAllocationSizeForObject(std::size_t length) {
+std::size_t
+ThreadLocalPool::getAllocationSizeForObject(std::size_t length) {
     if (length <= 2) {
         return 2;
     } else if (length <= 4) {
@@ -157,10 +158,11 @@ static std::size_t getAllocationSizeForObject(std::size_t length) {
     } else if (length <= 1048576 + sizeof(int32_t) + sizeof(void*)) {
         return 1048576 + sizeof(int32_t) + sizeof(void*);
     } else {
-        throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %Zu", length);
+        // Do this so that we can use this method to compute allocation sizes.
+        // Expect callers to check for 0 and throw a FatalException for
+        // illegal size.
+        return 0;
     }
-    // NOT REACHED
-    return length + 4;
 }
 
 CompactingStringStorage*
@@ -170,8 +172,12 @@ ThreadLocalPool::getStringPool()
 }
 
 boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPool::get(std::size_t size) {
-    size = getAllocationSizeForObject(size);
-    return getExact(size);
+    size_t alloc_size = getAllocationSizeForObject(size);
+    if (alloc_size == 0)
+    {
+        throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %Zu", size);
+    }
+    return getExact(alloc_size);
 }
 
 boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPool::getExact(std::size_t size) {
