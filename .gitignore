@@ -4,6 +4,7 @@
 /.settings
 /last_junit_suite.log
 *.pyc
+*.swp
 buildstring.txt
 /obj
 /src/catgen/out
