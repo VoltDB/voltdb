@@ -6,6 +6,7 @@
 *.pyc
 *.swp
 buildstring.txt
+/plannerlog.txt
 /obj
 /src/catgen/out
 /src/ee/catalog/*
@@ -16,3 +17,4 @@ buildstring.txt
 /voltdb/libvoltdb*.so
 /voltdb/voltdb*.jar
 /.DS_Store
+/debugoutput/
