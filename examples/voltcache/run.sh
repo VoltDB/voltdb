@@ -10,7 +10,7 @@ LEADER="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot plannerlog.txt voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME.api.jar voltdbroot plannerlog.txt voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -23,6 +23,8 @@ function srccompile() {
         src/voltcache/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
+
+    jar -cf $APPNAME.api.jar -C obj/ com/api/
 }
 
 # build an application catalog
