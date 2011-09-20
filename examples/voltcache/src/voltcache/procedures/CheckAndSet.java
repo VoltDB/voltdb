@@ -40,13 +40,13 @@ public class CheckAndSet extends VoltProcedure
         voltQueueSQL(check, key, now);
         VoltTable checkResult = voltExecuteSQL()[0];
         if (checkResult.getRowCount() == 0)
-            return VoltCacheResult.NOT_FOUND.Code;
+            return VoltCacheResult.NOT_FOUND;
 
         if (checkResult.fetchRow(0).getLong(0) != casVersion)
-            return VoltCacheResult.EXISTS.Code;
+            return VoltCacheResult.EXISTS;
 
         voltQueueSQL(update, Shared.expires(this, expires), flags, value, key, casVersion);
         voltExecuteSQL(true);
-        return VoltCacheResult.STORED.Code;
+        return VoltCacheResult.STORED;
     }
 }

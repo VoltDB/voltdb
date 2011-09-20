@@ -41,11 +41,11 @@ public class Add extends VoltProcedure
         voltQueueSQL(check, key, now);
         VoltTable[] checkResult = voltExecuteSQL();
         if (checkResult[0].getRowCount() > 0)
-            return VoltCacheResult.NOT_STORED.Code;
+            return VoltCacheResult.NOT_STORED;
 
         // Insert new item
         voltQueueSQL(insert, key, Shared.expires(this, expires), flags, value);
         voltExecuteSQL(true);
-        return VoltCacheResult.STORED.Code;
+        return VoltCacheResult.STORED;
     }
 }

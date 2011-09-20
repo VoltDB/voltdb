@@ -63,14 +63,14 @@ public class VoltCacheFuture implements Future<VoltCacheResult>
     public VoltCacheResult get() throws InterruptedException, ExecutionException
     {
         if (this.source == null)
-            return VoltCacheResult.ERROR;
+            return VoltCacheResult.ERROR();
         return VoltCacheResult.get(this.type, source.get());
     }
     @Override
     public VoltCacheResult get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
     {
         if (this.source == null)
-            return VoltCacheResult.ERROR;
+            return VoltCacheResult.ERROR();
         return VoltCacheResult.get(this.type, source.get(timeout, unit));
     }
     @Override

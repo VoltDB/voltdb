@@ -41,7 +41,7 @@ public class Prepend extends VoltProcedure
         voltQueueSQL(check, key, now);
         VoltTable checkResult = voltExecuteSQL()[0];
         if (checkResult.getRowCount() == 0)
-            return VoltCacheResult.NOT_STORED.Code;
+            return VoltCacheResult.NOT_STORED;
 
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         try
@@ -51,7 +51,7 @@ public class Prepend extends VoltProcedure
             stream.write(old, 0, old.length);
             voltQueueSQL(update, stream.toByteArray(), key);
             voltExecuteSQL(true);
-            return VoltCacheResult.STORED.Code;
+            return VoltCacheResult.STORED;
         }
         catch(Exception x)
         {

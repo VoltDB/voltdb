@@ -44,7 +44,7 @@ public class Set extends VoltProcedure
         {
             // If invalidated return success immediately (without doing anything though: invalidated item cannot be retrieved)
             if (checkResult.fetchRow(0).getLong(0) == -1)
-                return VoltCacheResult.STORED.Code;
+                return VoltCacheResult.STORED;
             else
                 voltQueueSQL(update, Shared.expires(this, expires), flags, value, key);
         }
@@ -52,6 +52,6 @@ public class Set extends VoltProcedure
             voltQueueSQL(insert, key, Shared.expires(this, expires), flags, value);
 
         voltExecuteSQL(true);
-        return VoltCacheResult.STORED.Code;
+        return VoltCacheResult.STORED;
     }
 }

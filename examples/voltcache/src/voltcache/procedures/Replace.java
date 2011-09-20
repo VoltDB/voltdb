@@ -40,10 +40,10 @@ public class Replace extends VoltProcedure
         voltQueueSQL(check, key, now);
         VoltTable checkResult = voltExecuteSQL()[0];
         if (checkResult.getRowCount() == 0)
-            return VoltCacheResult.NOT_FOUND.Code;
+            return VoltCacheResult.NOT_FOUND;
 
         voltQueueSQL(update, Shared.expires(this, expires), flags, value, key);
         voltExecuteSQL(true);
-        return VoltCacheResult.STORED.Code;
+        return VoltCacheResult.STORED;
     }
 }

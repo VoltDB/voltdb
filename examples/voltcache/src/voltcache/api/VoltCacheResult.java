@@ -27,28 +27,36 @@ import java.util.HashMap;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 
-public enum VoltCacheResult
+public class VoltCacheResult
 {
-      STORED       (0l, "STORED")
-    , NOT_STORED   (1l, "NOT_STORED")
-    , EXISTS       (2l, "EXISTS")
-    , NOT_FOUND    (3l, "NOT_FOUND")
-    , DELETED      (4l, "DELETED")
-    , ERROR        (5l, "ERROR")
-    , CLIENT_ERROR (6l, "CLIENT_ERROR")
-    , SERVER_ERROR (7l, "SERVER_ERROR")
-    , OK           (8l, "OK")
-    , SUBMITTED    (9l, "SUBMITTED")
-    ;
+    public static final long STORED       = 0l;
+    public static final long NOT_STORED   = 1l;
+    public static final long EXISTS       = 2l;
+    public static final long NOT_FOUND    = 3l;
+    public static final long DELETED      = 4l;
+    public static final long ERROR        = 5l;
+    public static final long CLIENT_ERROR = 6l;
+    public static final long SERVER_ERROR = 7l;
+    public static final long OK           = 8l;
+    public static final long SUBMITTED    = 9l;
+
+    public static VoltCacheResult STORED()       { return new VoltCacheResult(0l); }
+    public static VoltCacheResult NOT_STORED()   { return new VoltCacheResult(1l); }
+    public static VoltCacheResult EXISTS()       { return new VoltCacheResult(2l); }
+    public static VoltCacheResult NOT_FOUND()    { return new VoltCacheResult(3l); }
+    public static VoltCacheResult DELETED()      { return new VoltCacheResult(4l); }
+    public static VoltCacheResult ERROR()        { return new VoltCacheResult(5l); }
+    public static VoltCacheResult CLIENT_ERROR() { return new VoltCacheResult(6l); }
+    public static VoltCacheResult SERVER_ERROR() { return new VoltCacheResult(7l); }
+    public static VoltCacheResult OK()           { return new VoltCacheResult(8l); }
+    public static VoltCacheResult SUBMITTED()    { return new VoltCacheResult(9l); }
 
     public final long Code;
-    public final String Name;
     public long IncrDecrValue = Long.MAX_VALUE;
     public Map<String,VoltCacheItem> Data = null;
-    VoltCacheResult(long code, String name)
+    VoltCacheResult(long code)
     {
         this.Code = code;
-        this.Name = name;
     }
 
     public enum Type
@@ -65,16 +73,12 @@ public enum VoltCacheResult
     {
         if (type == Type.CODE)
         {
-            final long code = response.getResults()[0].fetchRow(0).getLong(0);
-            for (VoltCacheResult result : VoltCacheResult.values())
-                if (result.Code == code)
-                    return result;
-            throw new AssertionError("Unknown type: " + String.valueOf(code));
+            return new VoltCacheResult(response.getResults()[0].fetchRow(0).getLong(0));
         }
         else if (type == Type.DATA)
         {
             final VoltTable data = response.getResults()[0];
-            final VoltCacheResult result = VoltCacheResult.OK;
+            final VoltCacheResult result = VoltCacheResult.OK();
             result.Data = new HashMap<String,VoltCacheItem>();
             while(data.advanceRow())
                 result.Data.put(
@@ -90,7 +94,7 @@ public enum VoltCacheResult
         }
         else if (type == Type.IDOP)
         {
-            final VoltCacheResult result = VoltCacheResult.OK;
+            final VoltCacheResult result = VoltCacheResult.OK();
             result.IncrDecrValue = response.getResults()[0].fetchRow(0).getLong(0);
             return result;
         }

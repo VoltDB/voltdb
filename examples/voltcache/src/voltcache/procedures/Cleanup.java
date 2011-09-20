@@ -34,6 +34,6 @@ public class Cleanup extends VoltProcedure
     {
         voltQueueSQL(cleanup, Shared.now(this));
         voltExecuteSQL(true);
-        return VoltCacheResult.OK.Code;
+        return VoltCacheResult.OK;
     }
 }

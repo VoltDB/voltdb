@@ -158,7 +158,7 @@ public class VoltCache implements IVoltCache
                                                      VoltCache.NullCallback
                                                    , procedure
                                                    , parameters
-                                                   ) ? VoltCacheResult.SUBMITTED : VoltCacheResult.ERROR;
+                                                   ) ? VoltCacheResult.SUBMITTED() : VoltCacheResult.ERROR();
             else
                 return VoltCacheResult.get(
                                             type
@@ -170,7 +170,7 @@ public class VoltCache implements IVoltCache
         }
         catch(Exception x)
         {
-            return VoltCacheResult.ERROR;
+            return VoltCacheResult.ERROR();
         }
     }
 

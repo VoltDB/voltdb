@@ -44,6 +44,6 @@ public class FlushAll extends VoltProcedure
             voltQueueSQL(update, Shared.expires(this, expires));
         }
         voltExecuteSQL(true);
-        return VoltCacheResult.OK.Code;
+        return VoltCacheResult.OK;
     }
 }
