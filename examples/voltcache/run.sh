@@ -24,7 +24,7 @@ function srccompile() {
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 
-    jar -cf $APPNAME.api.jar -C obj/ com/api/
+    jar -cf $APPNAME.api.jar -C obj/ voltcache/api/
 }
 
 # build an application catalog
