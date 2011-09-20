@@ -7,7 +7,7 @@
 *.swp
 buildstring.txt
 /plannerlog.txt
-/obj
+obj/
 /src/catgen/out
 /src/ee/catalog/*
 /src/ee/tags
@@ -17,4 +17,4 @@ buildstring.txt
 /voltdb/libvoltdb*.so
 /voltdb/voltdb*.jar
 /.DS_Store
-/debugoutput/
+debugoutput/
