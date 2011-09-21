@@ -126,6 +126,7 @@ public class SnapshotSiteProcessor {
 
     private long m_lastSnapshotTxnId;
     private int m_lastSnapshotNumHosts;
+    private final int m_snapshotPriority;
 
     private boolean m_lastSnapshotSucceded = true;
 
@@ -208,8 +209,9 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    SnapshotSiteProcessor(Runnable onPotentialSnapshotWork) {
+    SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority) {
         m_onPotentialSnapshotWork = onPotentialSnapshotWork;
+        m_snapshotPriority = snapshotPriority;
         initializeBufferPool();
     }
 
@@ -341,8 +343,8 @@ public class SnapshotSiteProcessor {
             if (retval != null) {
                 m_writeFutures.add(retval);
             }
-            if (!ignoreQuietPeriod) {
-                m_quietUntil = System.currentTimeMillis() + 5 + ((long)(Math.random() * 5));
+            if (!ignoreQuietPeriod && m_snapshotPriority > 0) {
+                m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(Math.random() * 15));
             }
             break;
         }
@@ -520,7 +522,7 @@ public class SnapshotSiteProcessor {
     public HashSet<Exception> completeSnapshotWork(ExecutionEngine ee) throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(ee, false);
+            Future<?> result = doSnapshotWork(ee, true);
             if (result != null) {
                 try {
                     result.get();

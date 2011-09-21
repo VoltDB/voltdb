@@ -89,6 +89,14 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
     private long m_nextCallbackHandle;
     private String m_truncationSnapshotPath;
 
+    /*
+     * Before doing truncation snapshot operations, wait a few seconds
+     * to give a few nodes a chance to get into the same state WRT to truncation
+     * so that a truncation snapshot will can service multiple truncation requests
+     * that arrive at the same time.
+     */
+    int m_truncationGatheringPeriod = 10;
+
     private final TreeMap<Long, TruncationSnapshotAttempt> m_truncationSnapshotAttempts =
         new TreeMap<Long, TruncationSnapshotAttempt>();
     private Future<?> m_truncationSnapshotScanTask;
@@ -382,125 +390,161 @@ class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private void processTruncationRequestEvent(final WatchedEvent event) {
         if (event.getType() == EventType.NodeCreated) {
-            loggingLog.info("Snapshot truncation leader received snapshot truncation request");
-            String snapshotPathTemp;
-            try {
-                snapshotPathTemp = new String(m_zk.getData("/truncation_snapshot_path", false, null), "UTF-8");
-            } catch (Exception e) {
-                loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
-                return;
-            }
-            m_truncationSnapshotPath = snapshotPathTemp;
-            final String snapshotPath = snapshotPathTemp;
-            final long now = System.currentTimeMillis();
-            final String nonce = Long.toString(now);
-            //Allow nodes to check and see if the nonce incoming for a snapshot is
-            //for a truncation snapshot. In that case they will mark the completion node
-            //to be for a truncation snapshot. SnapshotCompletionMonitor notices the mark.
-            try {
-                ByteBuffer payload = ByteBuffer.allocate(8);
-                payload.putLong(0, now);
-                m_zk.setData("/request_truncation_snapshot", payload.array(), -1);
-            } catch (Exception e) {
-                loggingLog.error("Setting data on the truncation snapshot request in ZK should never fail", e);
-                //Cause a cascading failure?
-                VoltDB.crashVoltDB();
-            }
-            final Object params[] = new Object[3];
-            params[0] = snapshotPath;
-            params[1] = nonce;
-            params[2] = 0;//don't block
-            long handle = m_nextCallbackHandle++;
-
-            m_procedureCallbacks.put(handle, new ProcedureCallback() {
-
+            /*
+             * Do it five seconds later because these requests tend to come in bunches
+             * and we want one truncation snapshot to do truncation for all nodes
+             * so we don't get them back to back
+             */
+            m_es.schedule(new Runnable() {
                 @Override
-                public void clientCallback(ClientResponse clientResponse)
-                        throws Exception {
-                    if (clientResponse.getStatus() != ClientResponse.SUCCESS){
-                        loggingLog.warn(
-                                "Attempt to initiate a truncation snapshot was not successful: " +
-                                clientResponse.getStatusString());
-                        loggingLog.warn("Retrying log truncation snapshot in 5 minutes");
-                        /*
-                         * Try again in a few minute
-                         */
-                        m_es.schedule(new Runnable() {
-                            @Override
-                            public void run() {
-                                processTruncationRequestEvent(event);
-                            }
-                        }, 5, TimeUnit.MINUTES);
-                        return;
-                    }
+                public void run() {
+                    processSnapshotTruncationRequestCreated(event);
+                }
+            }, m_truncationGatheringPeriod, TimeUnit.SECONDS);
+            return;
+        }
+    }
 
-                    final VoltTable results[] = clientResponse.getResults();
-                    final VoltTable result = results[0];
-                    boolean success = true;
-                    if (result.getColumnCount() == 1) {
-                        boolean advanced = result.advanceRow();
-                        assert(advanced);
-                        assert(result.getColumnCount() == 1);
-                        assert(result.getColumnType(0) == VoltType.STRING);
-                        loggingLog.error("Snapshot failed with failure response: " + result.getString(0));
-                        success = false;
-                    }
+    private void processSnapshotTruncationRequestCreated(
+            final WatchedEvent event) {
+        loggingLog.info("Snapshot truncation leader received snapshot truncation request");
+        String snapshotPathTemp;
+        try {
+            snapshotPathTemp = new String(m_zk.getData("/truncation_snapshot_path", false, null), "UTF-8");
+        } catch (Exception e) {
+            loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
+            return;
+        }
+        m_truncationSnapshotPath = snapshotPathTemp;
+        final String snapshotPath = snapshotPathTemp;
+        final long now = System.currentTimeMillis();
+        final String nonce = Long.toString(now);
+        //Allow nodes to check and see if the nonce incoming for a snapshot is
+        //for a truncation snapshot. In that case they will mark the completion node
+        //to be for a truncation snapshot. SnapshotCompletionMonitor notices the mark.
+        try {
+            ByteBuffer payload = ByteBuffer.allocate(8);
+            payload.putLong(0, now);
+            m_zk.setData("/request_truncation_snapshot", payload.array(), -1);
+        } catch (Exception e) {
+            loggingLog.error("Setting data on the truncation snapshot request in ZK should never fail", e);
+            //Cause a cascading failure?
+            VoltDB.crashVoltDB();
+        }
+        final Object params[] = new Object[3];
+        params[0] = snapshotPath;
+        params[1] = nonce;
+        params[2] = 0;//don't block
+        long handle = m_nextCallbackHandle++;
 
-                    //assert(result.getColumnName(1).equals("TABLE"));
-                    if (success) {
-                        while (result.advanceRow()) {
-                            if (!result.getString("RESULT").equals("SUCCESS")) {
-                                success = false;
-                                loggingLog.warn("Snapshot save feasibility test failed for host "
-                                        + result.getLong("HOST_ID") + " table " + result.getString("TABLE") +
-                                        " with error message " + result.getString("ERR_MSG"));
-                            }
+        m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS){
+                    loggingLog.warn(
+                            "Attempt to initiate a truncation snapshot was not successful: " +
+                            clientResponse.getStatusString());
+                    loggingLog.warn("Retrying log truncation snapshot in 5 minutes");
+                    /*
+                     * Try again in a few minute
+                     */
+                    m_es.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            processTruncationRequestEvent(event);
                         }
-                    }
+                    }, 5, TimeUnit.MINUTES);
+                    return;
+                }
 
-                    if (success) {
-                        /*
-                         * Race to create the completion node before deleting
-                         * the request node so that we can guarantee that the
-                         * completion node will have the correct information
-                         */
-                        JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
-                        long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
-                        int hosts = VoltDB.instance().getCatalogContext().siteTracker
-                                          .getAllLiveHosts().size();
-                        SnapshotSaveAPI.createSnapshotCompletionNode(snapshotTxnId,
-                                                                     true, hosts);
+                final VoltTable results[] = clientResponse.getResults();
+                final VoltTable result = results[0];
+                boolean success = true;
+                if (result.getColumnCount() == 1) {
+                    boolean advanced = result.advanceRow();
+                    assert(advanced);
+                    assert(result.getColumnCount() == 1);
+                    assert(result.getColumnType(0) == VoltType.STRING);
+                    loggingLog.error("Snapshot failed with failure response: " + result.getString(0));
+                    success = false;
+                }
 
-                        m_zk.delete("/request_truncation_snapshot", -1);
-                        try {
-                            TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(snapshotTxnId);
-                            if (snapshotAttempt == null) {
-                                snapshotAttempt = new TruncationSnapshotAttempt();
-                                m_truncationSnapshotAttempts.put(snapshotTxnId, snapshotAttempt);
-                            }
-                            snapshotAttempt.nonce = nonce;
-                            snapshotAttempt.path = snapshotPath;
-                        } finally {
-                            truncationRequestExistenceCheck();
+                //assert(result.getColumnName(1).equals("TABLE"));
+                if (success) {
+                    while (result.advanceRow()) {
+                        if (!result.getString("RESULT").equals("SUCCESS")) {
+                            success = false;
+                            loggingLog.warn("Snapshot save feasibility test failed for host "
+                                    + result.getLong("HOST_ID") + " table " + result.getString("TABLE") +
+                                    " with error message " + result.getString("ERR_MSG"));
                         }
-                    } else {
-                        loggingLog.info("Retrying log truncation snapshot in 60 seconds");
-                        /*
-                         * Try again in a few minutes
-                         */
-                        m_es.schedule(new Runnable() {
-                            @Override
-                            public void run() {
-                                processTruncationRequestEvent(event);
-                            }
-                        }, 1, TimeUnit.MINUTES);
                     }
                 }
 
-            });
-            m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
-            return;
-        }
+                if (success) {
+                    /*
+                     * Race to create the completion node before deleting
+                     * the request node so that we can guarantee that the
+                     * completion node will have the correct information
+                     */
+                    JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
+                    final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
+                    int hosts = VoltDB.instance().getCatalogContext().siteTracker
+                                      .getAllLiveHosts().size();
+                    SnapshotSaveAPI.createSnapshotCompletionNode(snapshotTxnId,
+                                                                 true, hosts);
+                    /*
+                     * Truncation requests tend to come in clusters, wait 5 seconds before
+                     * deleting the request so that they don't always happen back to back
+                     */
+                    m_es.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                try {
+                                    m_zk.delete("/request_truncation_snapshot", -1);
+                                } catch (Exception e) {
+                                    VoltDB.crashLocalVoltDB(
+                                            "Unexpected error deleting truncation snapshot request", true, e);
+                                }
+                                TruncationSnapshotAttempt snapshotAttempt =
+                                    m_truncationSnapshotAttempts.get(snapshotTxnId);
+                                if (snapshotAttempt == null) {
+                                    snapshotAttempt = new TruncationSnapshotAttempt();
+                                    m_truncationSnapshotAttempts.put(snapshotTxnId, snapshotAttempt);
+                                }
+                                snapshotAttempt.nonce = nonce;
+                                snapshotAttempt.path = snapshotPath;
+                            } finally {
+                                try {
+                                    truncationRequestExistenceCheck();
+                                } catch (Exception e) {
+                                    VoltDB.crashLocalVoltDB(
+                                            "Unexpected error checking for existence of truncation snapshot request"
+                                            , true, e);
+                                }
+                            }
+                        }
+                    }, m_truncationGatheringPeriod, TimeUnit.SECONDS);
+                } else {
+                    loggingLog.info("Retrying log truncation snapshot in 60 seconds");
+                    /*
+                     * Try again in a few minutes
+                     */
+                    m_es.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            processTruncationRequestEvent(event);
+                        }
+                    }, 1, TimeUnit.MINUTES);
+                }
+            }
+
+        });
+        m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
+        return;
     }
 
     private final Watcher m_truncationRequestExistenceWatcher = new Watcher() {

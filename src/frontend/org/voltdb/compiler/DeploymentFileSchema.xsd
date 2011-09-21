@@ -91,6 +91,11 @@
                 <xs:attribute name="maxsize" type="memorySizeType" default="100"/>
             </xs:complexType>
         </xs:element>
+         <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="snapshotpriority" type="snapshotPriorityType" default="6"/>
+            </xs:complexType>
+        </xs:element>
     </xs:all>
   </xs:complexType>
 
@@ -112,6 +117,7 @@
     </xs:all>
     <xs:attribute name="synchronous" type="xs:boolean" default="false"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="logsize" type="logSizeType" default="1024" />
   </xs:complexType>
 
   <!-- <partition-detection>/<snapshot> -->
@@ -137,6 +143,22 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- restriction on command log size in megabytes -->
+  <xs:simpleType name="snapshotPriorityType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="10"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <!-- restriction on command log size in megabytes -->
+  <xs:simpleType name="logSizeType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="3"/>
+      <xs:maxInclusive value="102400"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
   <!-- restriction on command log fsync frequency -->
   <xs:simpleType name="logFrequencyTimeType">
     <xs:restriction base="xs:int">

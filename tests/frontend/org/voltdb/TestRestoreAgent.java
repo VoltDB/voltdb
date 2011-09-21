@@ -295,7 +295,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             builder.addStmtProcedure("Dedupe", "select * from A where l = ? and sh = ?");
             builder.addStmtProcedure("Cill", "select * from A where l = ? and s = ?");
         }
-        builder.configureLogging(voltroot, voltroot, false, commandLog, 200, 20000);
+        builder.configureLogging(voltroot, voltroot, false, commandLog, 200, 20000, 300);
 
 
         File cat = File.createTempFile("temp-restore", "catalog");

@@ -736,6 +736,7 @@ public class TestSnapshotDaemon {
         m_mockVoltDB = new MockVoltDB();
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         m_daemon = new SnapshotDaemon();
+        m_daemon.m_truncationGatheringPeriod = 1;
         m_initiator = new Initiator(m_daemon);
         m_daemon.init(m_initiator, m_mockVoltDB.getZK());
         m_daemon.makeActive(schedule);
@@ -754,7 +755,8 @@ public class TestSnapshotDaemon {
                  e.getMessage());
         }
 
-        m_daemon.truncationRequestExistenceCheck();
+          //Has a dedicated thread now so this shouldn't be necessary
+//        m_daemon.truncationRequestExistenceCheck();
 
         // Wait until the request node is gone
         while (true) {

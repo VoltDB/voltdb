@@ -100,9 +100,9 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
             m_table->deleteTupleStorage(tuple, iter->m_currentBlock);
         }
 
-        // If we have serialized more than 256Kb of tuple data, stop for a while
+        // If we have serialized more than 512Kb of tuple data, stop for a while
         bytesSerialized += tupleEndPosition - tupleStartPosition;
-        if (bytesSerialized >= 1024 * 256) {
+        if (bytesSerialized >= 1024 * 512) {
             break;
         }
     }

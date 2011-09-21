@@ -31,6 +31,7 @@ end
 
 begin Systemsettings  "Container for deployment systemsettings element"
   int maxtemptablesize   "The maximum allocation size for temp tables in the EE"
+  int snapshotpriority "The priority of snapshot work"
 end
 
 begin Host      "A single host participating in the cluster"
@@ -64,6 +65,7 @@ begin CommandLog "Configuration for a command log"
   bool synchronous "Should commands be executed only once durable"
   int fsyncInterval "How often commands should be written to disk"
   int maxTxns "How many txns waiting to go to disk should trigger a flush"
+  int logSize "Size of the command log in megabytes"
   string logPath "Directory to store log files"
   string internalSnapshotPath "Directory to store internal snapshots for the command log"
 end

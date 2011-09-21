@@ -150,6 +150,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     // The time in ms since epoch of the last call to tick()
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
+    long lastCommittedTxnTime = 0;
 
     /*
      * Due to failures we may find out about commited multi-part txns
@@ -714,12 +715,18 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         loadProcedures(voltdb.getBackendTargetType());
 
+        int snapshotPriority = 6;
+        if (m_context.cluster.getDeployment().get("deployment") != null) {
+            snapshotPriority = m_context.cluster.getDeployment().get("deployment").
+                getSystemsettings().get("systemsettings").getSnapshotpriority();
+        }
         m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
             @Override
             public void run() {
                 m_mailbox.deliver(new PotentialSnapshotWorkMessage());
             }
-        });
+        },
+         snapshotPriority);
 
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         m_starvationTracker = new StarvationTracker(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
@@ -1020,7 +1027,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     // Before blocking record the starvation
                     VoltMessage message = m_mailbox.recv();
                     if (message == null) {
-                        if (m_snapshotter.doSnapshotWork(ee, true) != null) {
+                        //Will return null if there is no work, safe to block on the mailbox if there is no work
+                        Object hadWork =
+                            m_snapshotter.doSnapshotWork(
+                                    ee,
+                                    EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        if ( hadWork != null) {
                             continue;
                         } else {
                             m_starvationTracker.beginStarvation();
@@ -1035,7 +1047,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(ee, true);
+                        m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
                     }
                 }
                 if (currentTxnState != null) {
@@ -1125,6 +1137,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         {
             if (txnState.txnId > lastCommittedTxnId) {
                 lastCommittedTxnId = txnState.txnId;
+                lastCommittedTxnTime = EstTime.currentTimeMillis();
                 if (!txnState.isSinglePartition() && !txnState.isReadOnly())
                 {
                     lastKnownGloballyCommitedMultiPartTxnId =
@@ -2055,7 +2068,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     handleMailboxMessage(message);
                 } else {
                     //idle, do snapshot work
-                    m_snapshotter.doSnapshotWork(ee, true);
+                    m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
                 }
 
                 /**

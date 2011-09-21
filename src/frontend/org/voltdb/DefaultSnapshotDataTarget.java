@@ -66,7 +66,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     private volatile long m_bytesWritten = 0;
 
-    private static final Semaphore m_bytesAllowedBeforeSync = new Semaphore((1024 * 1024) * 25 + (1024 * 768));
+    private static final Semaphore m_bytesAllowedBeforeSync = new Semaphore((1024 * 1024) * 256);
     private final AtomicInteger m_bytesWrittenSinceLastSync = new AtomicInteger(0);
 
     private final ScheduledFuture<?> m_syncTask;
@@ -246,7 +246,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }
             }
-        }, 100, 100, TimeUnit.MILLISECONDS);
+        }, 1, 1, TimeUnit.SECONDS);
         m_syncTask = syncTask;
     }
 

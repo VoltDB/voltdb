@@ -516,8 +516,10 @@ public abstract class CatalogUtil {
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
         boolean enabled = false;
         boolean sync = false;
+        int logSizeMb = 1024;
         org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
         if (commandlog != null) {
+            logSizeMb = commandlog.getLogsize();
             sync = commandlog.isSynchronous();
             enabled = commandlog.isEnabled();
             Frequency freq = commandlog.getFrequency();
@@ -539,6 +541,7 @@ public abstract class CatalogUtil {
         config.setSynchronous(sync);
         config.setFsyncinterval(fsyncInterval);
         config.setMaxtxns(maxTxnsBeforeFsync);
+        config.setLogsize(logSizeMb);
     }
 
     public static long getDeploymentCRC(String deploymentURL) {
@@ -860,6 +863,7 @@ public abstract class CatalogUtil {
         Systemsettings syssettings =
             catDeployment.getSystemsettings().add("systemsettings");
         int maxtemptablesize = 100;
+        int snapshotpriority = 6;
         if (deployment.getSystemsettings() != null)
         {
             Temptables temptables = deployment.getSystemsettings().getTemptables();
@@ -867,8 +871,13 @@ public abstract class CatalogUtil {
             {
                 maxtemptablesize = temptables.getMaxsize();
             }
+            SystemSettingsType.Snapshot snapshot = deployment.getSystemsettings().getSnapshot();
+            if (snapshot != null) {
+                snapshotpriority = snapshot.getSnapshotpriority();
+            }
         }
         syssettings.setMaxtemptablesize(maxtemptablesize);
+        syssettings.setSnapshotpriority(snapshotpriority);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {

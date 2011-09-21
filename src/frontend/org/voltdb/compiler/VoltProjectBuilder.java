@@ -216,19 +216,23 @@ public class VoltProjectBuilder {
     private String m_commandLogPath;
     private Boolean m_commandLogSync;
     private Boolean m_commandLogEnabled;
+    private Integer m_commandLogSize;
     private Integer m_commandLogFsyncInterval;
     private Integer m_commandLogMaxTxnsBeforeFsync;
+
+    private Integer m_snapshotPriority;
 
     private Integer m_maxTempTableMemory = 100;
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
-            Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync) {
+            Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
         m_internalSnapshotPath = internalSnapshotPath;
         m_commandLogPath = commandLogPath;
         m_commandLogSync = commandLogSync;
         m_commandLogEnabled = commandLogEnabled;
         m_commandLogFsyncInterval = fsyncInterval;
         m_commandLogMaxTxnsBeforeFsync = maxTxnsBeforeFsync;
+        m_commandLogSize = logSize;
     }
 
     /**
@@ -250,6 +254,10 @@ public class VoltProjectBuilder {
         throw new NotImplementedException("This project builder does not support compileAllCatalogs");
     }
 
+
+    public void setSnapshotPriority(int priority) {
+        m_snapshotPriority = priority;
+    }
 
     public void addAllDefaults() {
         // does nothing in the base class
@@ -869,7 +877,8 @@ public class VoltProjectBuilder {
         }
 
         if (m_commandLogSync != null || m_commandLogEnabled != null ||
-                m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
+                m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null ||
+                m_commandLogSize != null) {
             CommandLogType commandLogType = factory.createCommandLogType();
             if (m_commandLogSync != null) {
                 commandLogType.setSynchronous(m_commandLogSync.booleanValue());
@@ -877,7 +886,9 @@ public class VoltProjectBuilder {
             if (m_commandLogEnabled != null) {
                 commandLogType.setEnabled(m_commandLogEnabled);
             }
-
+            if (m_commandLogSize != null) {
+                commandLogType.setLogsize(m_commandLogSize);
+            }
             if (m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
                 CommandLogType.Frequency frequency = factory.createCommandLogTypeFrequency();
                 if (m_commandLogFsyncInterval != null) {
@@ -915,6 +926,11 @@ public class VoltProjectBuilder {
         Temptables temptables = factory.createSystemSettingsTypeTemptables();
         temptables.setMaxsize(m_maxTempTableMemory);
         systemSettingType.setTemptables(temptables);
+        if (m_snapshotPriority != null) {
+            SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
+            snapshot.setSnapshotpriority(m_snapshotPriority);
+            systemSettingType.setSnapshot(snapshot);
+        }
         deployment.setSystemsettings(systemSettingType);
 
         // <users>
