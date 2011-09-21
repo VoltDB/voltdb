@@ -839,11 +839,26 @@ public class SQLCommand
             e.printStackTrace();
             return;
         }
+        Hashtable<String, Integer> proc_param_counts =
+            new Hashtable<String, Integer>();
+        while (params.advanceRow())
+        {
+            String this_proc = params.getString("PROCEDURE_NAME");
+            if (!proc_param_counts.containsKey(this_proc))
+            {
+                proc_param_counts.put(this_proc, 0);
+            }
+            int curr_val = proc_param_counts.get(this_proc);
+            proc_param_counts.put(this_proc, ++curr_val);
+        }
+        params.resetRowPosition();
         while (procs.advanceRow())
         {
+            String proc_name = procs.getString("PROCEDURE_NAME");
+            Integer param_count = proc_param_counts.get(proc_name);
             ArrayList<String> this_params = new ArrayList<String>();
             // prepopulate it to make sure the size is right
-            for (int i = 0; i < params.getRowCount(); i++) {
+            for (int i = 0; i < proc_param_counts.get(procs.getString("PROCEDURE_NAME")); i++) {
                 this_params.add(null);
             }
             procedures.put(procs.getString("PROCEDURE_NAME"), this_params);
@@ -851,7 +866,7 @@ public class SQLCommand
         while (params.advanceRow())
         {
             List<String> this_params = procedures.get(params.getString("PROCEDURE_NAME"));
-            this_params.add((int)params.getLong("ORDINAL_POSITION") - 1,
+            this_params.set((int)params.getLong("ORDINAL_POSITION") - 1,
                             params.getString("TYPE_NAME").toLowerCase());
         }
     }
