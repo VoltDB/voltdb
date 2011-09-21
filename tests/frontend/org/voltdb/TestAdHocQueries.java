@@ -38,13 +38,14 @@ public class TestAdHocQueries extends TestCase {
             "create table BLAH (" +
             "IVAL bigint default 0 not null, " +
             "TVAL timestamp default null," +
+            "DVAL decimal default null," +
             "PRIMARY KEY(IVAL));";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("BLAH", "IVAL");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
-        builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002');");
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
+        builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);");
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("adhoc.jar"), 2, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("adhoc.xml"));
@@ -60,7 +61,7 @@ public class TestAdHocQueries extends TestCase {
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
 
-        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1, 1);").getResults()[0];
+        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1, 1, 1);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
 
@@ -77,7 +78,7 @@ public class TestAdHocQueries extends TestCase {
         System.out.println(result.toString());
 
         try {
-            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0);", 1);
+            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 1);
             fail("Badly partitioned insert failed to throw expected exception");
         }
         catch (Exception e) {}
@@ -89,15 +90,61 @@ public class TestAdHocQueries extends TestCase {
         catch (Exception e) {}
 
         // try a huge bigint literal
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26');").getResults()[0];
+        modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26', 5);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
         result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
         assertTrue(result.getRowCount() == 1);
         System.out.println(result.toString());
 
+        // try a decimal calculation (ENG-1093)
+        modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (2, '2011-06-24 10:30:26', 1.12345*1);").getResults()[0];
+        assertTrue(modCount.getRowCount() == 1);
+        assertTrue(modCount.asScalarLong() == 1);
+        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
         localServer.shutdown();
         localServer.join();
     }
+
+    /*public void testDecimalLiteral() throws Exception {
+        String simpleSchema =
+            "create table BLAH (" +
+            "IVAL bigint default 0 not null, " +
+            "DVAL decimal default null," +
+            "PRIMARY KEY(IVAL));";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addPartitionInfo("BLAH", "IVAL");
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
+        builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, 1.12345*1);");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("adhoc.jar"), 2, 1, 0);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("adhoc.xml"));
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("adhoc.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
+        ServerThread localServer = new ServerThread(config);
+        localServer.start();
+        localServer.waitForInitialization();
+
+        // do the test
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1, 1.12345*1);").getResults()[0];
+        assertTrue(modCount.getRowCount() == 1);
+        assertTrue(modCount.asScalarLong() == 1);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 1;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        localServer.shutdown();
+        localServer.join();
+    }*/
 
 }
