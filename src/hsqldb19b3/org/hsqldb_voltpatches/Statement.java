@@ -122,7 +122,7 @@ public abstract class Statement {
 
     public abstract String describe(Session session);
 
-    public HsqlName getSchemalName() {
+    public HsqlName getSchemaName() {
         return schemaName;
     }
 

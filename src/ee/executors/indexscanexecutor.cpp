@@ -262,12 +262,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     if (m_limitNode != NULL)
     {
         m_limitNode->getLimitAndOffsetByReference(params, m_limitSize, m_limitOffset);
-        if (m_limitOffset > 0)
-        {
-            VOLT_ERROR("The limit offset operation is not supported for"
-                       " IndexScans yet");
-            return false;
-        }
     }
 
 
@@ -325,6 +319,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
     int tuples_written = 0;
+    int tuples_skipped = 0;     // for offset
 
     //
     // An index scan has three parts:
@@ -439,6 +434,15 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         if (post_expression == NULL ||
             post_expression->eval(&m_tuple, NULL).isTrue())
         {
+            //
+            // INLINE OFFSET
+            //
+            if (m_limitNode != NULL && tuples_skipped < m_limitOffset)
+            {
+                tuples_skipped++;
+                continue;
+            }
+
             if (m_projectionNode != NULL)
             {
                 TableTuple &temp_tuple = m_outputTable->tempTuple();

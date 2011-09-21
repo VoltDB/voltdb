@@ -223,7 +223,7 @@ public class StatementQuery extends StatementDMQL {
                 if (limitCondition.nodes[0].isParam() == false) {
                     Integer offset = (Integer)limitCondition.nodes[0].getValue(session);
                     if (offset > 0) {
-                        sb.append(" offset=\"" + offset + " \"");
+                        sb.append(" offset=\"" + offset + "\"");
                     }
                 }
                 else {

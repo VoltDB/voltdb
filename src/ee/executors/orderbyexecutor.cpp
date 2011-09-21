@@ -152,12 +152,6 @@ OrderByExecutor::p_execute(const NValueArray &params)
     if (limit_node != NULL)
     {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
-        if (offset > 0)
-        {
-            VOLT_ERROR("Nested Limit Offset is not yet supported for PlanNode"
-                       " '%s'", node->debug().c_str());
-            return false;
-        }
     }
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
@@ -176,8 +170,17 @@ OrderByExecutor::p_execute(const NValueArray &params)
                                              node->getSortDirections()));
 
     int tuple_ctr = 0;
+    int tuple_skipped = 0;
     for (vector<TableTuple>::iterator it = xs.begin(); it != xs.end(); it++)
     {
+        //
+        // Check if has gone past the offset
+        //
+        if (tuple_skipped < offset) {
+            tuple_skipped++;
+            continue;
+        }
+
         VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
                    input_table->debug().c_str());
         if (!output_table->insertTuple(*it))

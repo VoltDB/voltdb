@@ -192,6 +192,21 @@ public class TestPushDownAggregates extends TestCase {
                         null);
     }
 
+    public void testSinglePartOffset() {
+        List<AbstractPlanNode> pn =
+                compile("select PKEY from T1 order by PKEY limit 5 offset 1", 0, true);
+        assertEquals(1, pn.size());
+        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+    }
+
+    public void testMultiPartOffset() {
+        List<AbstractPlanNode> pn =
+                compile("select PKEY from T1 order by PKEY limit 5 offset 1", 0, false);
+        assertEquals(2, pn.size());
+        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
+    }
+
     public void testLimit() {
         List<AbstractPlanNode> pn = compile("select PKEY from T1 order by PKEY limit 5", 0, false);
         PlanNodeList pnl = new PlanNodeList(pn.get(0));

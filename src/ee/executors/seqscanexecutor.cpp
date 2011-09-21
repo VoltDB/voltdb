@@ -156,11 +156,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     if (limit_node != NULL) {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
-        if (offset > 0) {
-            VOLT_ERROR("Nested Limit Offset is not yet supported for PlanNode"
-                       " '%s'", node->debug().c_str());
-            return false;
-        }
     }
 
     //
@@ -193,6 +188,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         }
 
         int tuple_ctr = 0;
+        int tuple_skipped = 0;
         while (iterator.next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
@@ -203,6 +199,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             //
             if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue())
             {
+                // Check if we have to skip this tuple because of offset
+                if (tuple_skipped < offset) {
+                    tuple_skipped++;
+                    continue;
+                }
+
                 //
                 // Nested Projection
                 // Project (or replace) values from input tuple
