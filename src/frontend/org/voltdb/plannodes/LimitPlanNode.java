@@ -18,9 +18,8 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
@@ -30,7 +29,8 @@ public class LimitPlanNode extends AbstractPlanNode {
         OFFSET,
         LIMIT,
         OFFSET_PARAM_IDX,
-        LIMIT_PARAM_IDX;
+        LIMIT_PARAM_IDX,
+        LIMIT_EXPRESSION;
     }
 
     protected int m_offset = 0;
@@ -39,6 +39,8 @@ public class LimitPlanNode extends AbstractPlanNode {
     // -1 also interpreted by EE as uninitialized
     private long m_limitParameterId = -1;
     private long m_offsetParameterId = -1;
+
+    private AbstractExpression m_limitExpression = null;
 
     public LimitPlanNode() {
         super();
@@ -58,6 +60,10 @@ public class LimitPlanNode extends AbstractPlanNode {
             throw new Exception("ERROR: The limit size is negative [" + m_limit + "]");
         } else if (m_offset < 0) {
             throw new Exception("ERROR: The offset amount  is negative [" + m_offset + "]");
+        }
+
+        if (m_limitExpression != null) {
+            m_limitExpression.validate();
         }
     }
 
@@ -86,6 +92,14 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_offset = offset;
     }
 
+    public AbstractExpression getLimitExpression() {
+        return m_limitExpression;
+    }
+
+    public void setLimitExpression(AbstractExpression expr) {
+        m_limitExpression = expr;
+    }
+
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
@@ -93,11 +107,7 @@ public class LimitPlanNode extends AbstractPlanNode {
         stringer.key(Members.LIMIT.name()).value(m_limit);
         stringer.key(Members.OFFSET_PARAM_IDX.name()).value(m_offsetParameterId);
         stringer.key(Members.LIMIT_PARAM_IDX.name()).value(m_limitParameterId);
-    }
-
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
-        m_offset = obj.getInt(Members.OFFSET.name());
-        m_limit = obj.getInt(Members.LIMIT.name());
+        stringer.key(Members.LIMIT_EXPRESSION.name()).value(m_limitExpression);
     }
 
     public void setLimitParameterIndex(long limitParameterId) {

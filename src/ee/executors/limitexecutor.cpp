@@ -102,9 +102,9 @@ LimitExecutor::p_execute(const NValueArray &params)
     int tuple_ctr = 0;
 
     int limit = 0, offset = 0;
-    bool start = (node->getOffset() == 0);
     node->getLimitAndOffsetByReference(params, limit, offset);
 
+    bool start = (offset == 0);
     while (iterator.next(tuple) && (tuple_ctr < limit))
     {
         // TODO: need a way to skip / iterate N items.

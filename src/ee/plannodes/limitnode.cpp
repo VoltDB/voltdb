@@ -74,6 +74,19 @@ int LimitPlanNode::getOffset() const {
     return (this->offset);
 }
 
+AbstractExpression* LimitPlanNode::getLimitExpression() const {
+    return this->limitExpression;
+}
+
+void LimitPlanNode::setLimitExpression(AbstractExpression* expression) {
+    if (limitExpression && limitExpression != expression)
+    {
+        throwFatalException("limitExpression initialized twice in LimitPlanNode");
+        delete limitExpression;
+    }
+    this->limitExpression = expression;
+}
+
 /*
  * This code is needed in the limit executor as well as anywhere limit
  * is inlined. Centralize it here.
@@ -102,6 +115,16 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
             throw SQLException(SQLException::data_exception_invalid_parameter,
                                "Negative parameter to LIMIT OFFSET");
         }
+    }
+
+    // If the limit expression is not null, we need to evaluate it and assign
+    // the result to limit, offset must be 0
+    if (limitExpression != NULL) {
+        // The expression should be an operator expression with either constant
+        // value expression or parameter value expression as children
+        limitExpression->substitute(params);
+        limit = ValuePeeker::peekInteger(limitExpression->eval(NULL, NULL));
+        assert(offset == 0);
     }
 }
 
@@ -136,6 +159,13 @@ void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     paramIdx = json_spirit::find_value(obj, "OFFSET_PARAM_IDX");
     if (!(paramIdx == json_spirit::Value::null)) {
         setOffsetParamIdx(paramIdx.get_int());
+    }
+
+    json_spirit::Value expr = json_spirit::find_value(obj, "LIMIT_EXPRESSION");
+    if (expr == json_spirit::Value::null) {
+        limitExpression = NULL;
+    } else {
+        limitExpression = AbstractExpression::buildExpressionTree(expr.get_obj());
     }
 }
 

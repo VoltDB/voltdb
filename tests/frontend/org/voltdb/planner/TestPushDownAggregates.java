@@ -204,7 +204,7 @@ public class TestPushDownAggregates extends TestCase {
                 compile("select PKEY from T1 order by PKEY limit 5 offset 1", 0, false);
         assertEquals(2, pn.size());
         assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
-        assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
+        assertTrue(pn.get(1).toExplainPlanString().contains("LIMIT"));
     }
 
     public void testLimit() {

@@ -65,6 +65,7 @@ class LimitPlanNode : public AbstractPlanNode {
             this->offset = 0;
             this->limitParamIdx = -1;
             this->offsetParamIdx = -1;
+            this->limitExpression = NULL;
         }
         LimitPlanNode() : AbstractPlanNode() {
             this->limit = -1;
@@ -100,6 +101,9 @@ class LimitPlanNode : public AbstractPlanNode {
             return offsetParamIdx;
         }
 
+        AbstractExpression* getLimitExpression() const;
+        void setLimitExpression(AbstractExpression* expression);
+
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
@@ -108,6 +112,13 @@ class LimitPlanNode : public AbstractPlanNode {
         int offset;
         int limitParamIdx;
         int offsetParamIdx;
+
+        /*
+         * If the query has limit and offset, the pushed-down limit node will
+         * have a limit expression of the sum of the limit parameter and the
+         * offset parameter, and offset will be 0
+         */
+        AbstractExpression* limitExpression;
 };
 
 }
