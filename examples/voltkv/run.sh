@@ -81,17 +81,17 @@ function sync-benchmark-help() {
 function sync-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj voltkv.SyncBenchmark \
-        --threads=40 \
+        --threads=500 \
         --display-interval=5 \
         --duration=120 \
-        --servers=localhost \
+        --servers=volt3d,volt3f,volt3g,volt3h,volt3i,volt3j,volt3k,volt3l \
         --port=21212 \
         --pool-size=100000 \
         --preload=true \
-        --get-put-ratio=0.90 \
-        --key-size=32 \
-        --min-value-size=1024 \
-        --max-value-size=1024 \
+        --get-put-ratio=0.50 \
+        --key-size=64 \
+        --min-value-size=1000 \
+        --max-value-size=1000 \
         --use-compression=false
 }
 
