@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="voltkv"
-VOLTJAR=`ls ../../voltdb/voltdb-2.*.jar`
-CLASSPATH="$VOLTJAR:../../lib"
+CLASSPATH="`ls -x ../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../lib/*.jar | tr '[:space:]' ':'`"
 VOLTDB="../../bin/voltdb"
 VOLTCOMPILER="../../bin/voltcompiler"
 LICENSE="../../voltdb/license.xml"
