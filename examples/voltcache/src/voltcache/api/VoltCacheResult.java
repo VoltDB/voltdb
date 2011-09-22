@@ -51,12 +51,23 @@ public class VoltCacheResult
     public static VoltCacheResult OK()           { return new VoltCacheResult(8l); }
     public static VoltCacheResult SUBMITTED()    { return new VoltCacheResult(9l); }
 
+    private static final String[] Name = new String[] {"STORED","NOT_STORED","EXISTS","NOT_FOUND","DELETED","ERROR","CLIENT_ERROR","SERVER_ERROR","OK","SUBMITTED"};
+
     public final long Code;
     public long IncrDecrValue = Long.MAX_VALUE;
     public Map<String,VoltCacheItem> Data = null;
     VoltCacheResult(long code)
     {
         this.Code = code;
+    }
+
+    public static String getName(long code)
+    {
+        return Name[(int)code];
+    }
+    public String getName()
+    {
+        return Name[(int)this.Code];
     }
 
     public enum Type
