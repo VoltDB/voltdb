@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="voltcache"
-VOLTJAR=`ls ../../voltdb/voltdb-2.*.jar`
-CLASSPATH="$VOLTJAR:../../lib"
+CLASSPATH="`ls -x ../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../lib/*.jar | tr '[:space:]' ':'`"
 VOLTDB="../../bin/voltdb"
 VOLTCOMPILER="../../bin/voltcompiler"
 LICENSE="../../voltdb/license.xml"
@@ -16,7 +15,6 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    echo $CLASSPATH
     javac -classpath $CLASSPATH -d obj \
         src/voltcache/*.java \
         src/voltcache/api/*.java \
@@ -49,7 +47,7 @@ function client() {
     benchmark
 }
 
-# Asynchronous benchmark sample
+# Benchmark sample
 # Use this target for argument help
 function benchmark-help() {
     srccompile
@@ -71,6 +69,23 @@ function benchmark() {
         --min-value-size=1024 \
         --max-value-size=1024 \
         --use-compression=false
+}
+
+# Help on the Memcached Interface Server
+function memcached-interface-help() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj voltcache.api.MemcachedInterfaceServer --help
+}
+
+# Provides a sample protocol transalation between VoltCache and Memcached, allowing
+# client applications using a Memcached client to run on VoltCache without any code
+# change (Text Protocol only)
+function memcached-interface() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj voltcache.api.MemcachedInterfaceServer \
+        --vservers=localhost \
+        --vport=21212 \
+        --mport=11211
 }
 
 function help() {
