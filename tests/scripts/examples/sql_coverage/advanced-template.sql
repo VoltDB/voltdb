@@ -22,6 +22,8 @@ SELECT _variable[@order] FROM @from_tables ORDER BY _variable[@order] LIMIT _val
 
 -- combine where and limit
 SELECT _variable[@order] FROM @from_tables WHERE _variable _cmp _variable ORDER BY _variable[@order] LIMIT _value[int:1,100]
+-- combine where and offset
+SELECT _variable[@order] FROM @from_tables WHERE _variable _cmp _variable ORDER BY _variable[@order] LIMIT _value[int:1,100] OFFSET _value[int:1,100]
 -- compare more columns
 SELECT _variable FROM @from_tables WHERE (_variable _cmp _variable) _logic (_variable _cmp _variable)
 
