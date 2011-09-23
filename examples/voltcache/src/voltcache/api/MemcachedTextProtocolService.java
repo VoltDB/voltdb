@@ -140,26 +140,26 @@ public class MemcachedTextProtocolService implements Runnable
         int b;
         while(true)
         {
-		    b = this.in.read();
+                    b = this.in.read();
 
             if (b == -1)
                 throw new IOException("Stream terminated");
 
-		    if (b == 13)
-		    {
-			    gotR = true;
-			    continue;
-		    }
+                    if (b == 13)
+                    {
+                            gotR = true;
+                            continue;
+                    }
 
-		    if (gotR)
-		    {
-			    if (b == 10)
-				    break;
+                    if (gotR)
+                    {
+                            if (b == 10)
+                                    break;
 
                 lineData.write(13);
 
-			    gotR = false;
-		    }
+                            gotR = false;
+                    }
 
             lineData.write(b);
         }
@@ -540,17 +540,17 @@ public class MemcachedTextProtocolService implements Runnable
             this.out.write(value, 0, value.length);
 
             this.out.write(OneSpace, 0, OneSpace_Length);
-            
+
             value = Integer.toString(item.Value.length).getBytes("UTF-8");
             this.out.write(value, 0, value.length);
 
             this.out.write(OneSpace, 0, OneSpace_Length);
-            
+
             value = Long.toString(item.CASVersion).getBytes("UTF-8");
             this.out.write(value, 0, value.length);
 
             this.out.write(NewLine, 0, NewLine_Length);
-            
+
             this.out.write(item.Value, 0, item.Value.length);
             this.out.write(NewLine, 0, NewLine_Length);
         }
@@ -578,4 +578,3 @@ public class MemcachedTextProtocolService implements Runnable
         this.reply(RESPONSES[(int)response.Code]);
     }
 }
-
