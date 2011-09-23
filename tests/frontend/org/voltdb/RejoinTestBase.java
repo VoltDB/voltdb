@@ -33,8 +33,12 @@ import java.util.HashSet;
 
 import junit.framework.TestCase;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.agreement.AgreementSite;
+import org.voltdb.agreement.ZKUtil;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
@@ -193,7 +197,17 @@ public class RejoinTestBase extends TestCase {
 
         host2.sendReadyMessage();
 
+        ZooKeeper zk = ZKUtil.getClient("localhost", 60000);
+        try {
+            zk.create(
+                    "/cluster_metadata", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (Exception e) {}
+        System.out.println(zk.getChildren("/cluster_metadata", false));
+        zk.create(
+                "/cluster_metadata/" + host2.getHostId(), new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+
         retval.localServer.waitForInitialization();
+        zk.close();
         HostMessenger host1 = VoltDB.instance().getHostMessenger();
 
         site.shutdown();

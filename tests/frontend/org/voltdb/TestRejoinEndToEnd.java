@@ -34,6 +34,8 @@ import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.voltdb.BackendTarget;
 import org.voltdb.ExecutionSite;
 import org.voltdb.OperationMode;

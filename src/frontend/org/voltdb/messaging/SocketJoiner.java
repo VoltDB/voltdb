@@ -310,8 +310,6 @@ public class SocketJoiner extends Thread {
                 difftimes[hostId - 1] = System.currentTimeMillis() - timestamp;
                 othercrcs[hostId - 1] = in.readLong();
                 otherdepcrcs[hostId - 1] = in.readLong();
-                // read in host metadata
-                readHostMetadata(in, hostId);
             }
 
             // figure out how bad the skew is and if it's acceptable
@@ -349,7 +347,6 @@ public class SocketJoiner extends Thread {
             for (int hostId = 1; hostId < m_expectedHosts; hostId++) {
                 out = getOutputForHost(hostId);
                 out.writeLong(maxDiffMS);
-                writeClusterPublicMetadata(out);
                 if (errors == 0) {
                     out.writeInt(COMMAND_COMPLETE);
                 }
@@ -503,15 +500,13 @@ public class SocketJoiner extends Thread {
             out.writeLong(m_catalogCRC);
             // write the local deployment crc
             out.writeLong(m_deploymentCRC);
-            // write the public interface info for this node
-            writeHostMetadata(out);
+
             // write whether this node has done a restore
             out.writeByte(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore ? 1 : 0);
             out.flush();
             long maxDiffMS = in.readLong();
             if (m_hostLog != null)
                 m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to leader)");
-            readClusterPublicMetadata(in);
             command = in.readInt();
             if (command == COMMAND_JOINFAIL) {
                 int errors = in.readInt();
@@ -590,8 +585,6 @@ public class SocketJoiner extends Thread {
                 in.readFully(catalogBytes);
                 VoltDB.instance().writeNetworkCatalogToTmp(catalogBytes);
 
-                // read the metadata (topology) of the cluster
-                readClusterPublicMetadata(in);
                 m_sockets.put(hostId, socket);
                 recoveryLog.info("Have " + m_sockets.size() + " of " + (m_expectedHosts - 1) + " with hostId " + hostId);
             }
@@ -609,7 +602,6 @@ public class SocketJoiner extends Thread {
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
                 out.writeInt(COMMAND_SENDTIME_AND_CRC);
-                writeHostMetadata(out);
                 out.flush();
             }
             int i = 0;
@@ -821,15 +813,12 @@ public class SocketJoiner extends Thread {
             // write the catalog contents
             out.writeInt(catalogBytes.length);
             out.write(catalogBytes);
-            writeClusterPublicMetadata(out);
             out.flush();
 
             // read in the command to acknowledge connection and to request the time
             int command = in.readInt();
             if (command != COMMAND_SENDTIME_AND_CRC)
                 throw new Exception(String.format("Unexpected command (%d) from joining node.", command));
-
-            readHostMetadata(in, rejoiningHostId);
 
             // write the id of the new host
             out.writeInt(rejoiningHostId);
@@ -920,46 +909,5 @@ public class SocketJoiner extends Thread {
 
     Map<Integer, DataInputStream> getHostsAndInputs() {
         return m_inputs;
-    }
-
-    private static void readClusterPublicMetadata(DataInputStream in) throws IOException {
-        int clusterSize = in.readInt();
-        for (int i = 0; i < clusterSize; i++) {
-            int hostId = in.readInt();
-            int byteCount = in.readInt();
-            byte[] stringAsBytes = new byte[byteCount];
-            int read = in.read(stringAsBytes);
-            assert(read == byteCount);
-            String metadataForHost = new String(stringAsBytes, "UTF-8");
-            VoltDB.instance().getClusterMetadataMap().put(hostId, metadataForHost);
-        }
-    }
-
-    private static void writeClusterPublicMetadata(DataOutputStream out) throws IOException {
-        Map<Integer, String> metadataMap = VoltDB.instance().getClusterMetadataMap();
-        out.writeInt(metadataMap.size());
-        for (Entry<Integer, String> e : metadataMap.entrySet()) {
-            out.writeInt(e.getKey());
-            byte[] stringAsBytes = e.getValue().getBytes("UTF-8");
-            out.writeInt(stringAsBytes.length);
-            out.write(stringAsBytes);
-        }
-    }
-
-    private static void writeHostMetadata(DataOutputStream out) throws IOException {
-        String metadata = VoltDB.instance().getLocalMetadata();
-        assert(metadata != null);
-        byte[] stringAsBytes = metadata.getBytes("UTF-8");
-        out.writeInt(stringAsBytes.length);
-        out.write(stringAsBytes);
-    }
-
-    private static void readHostMetadata(DataInputStream in, int hostId) throws IOException {
-        int byteCount = in.readInt();
-        byte[] stringAsBytes = new byte[byteCount];
-        int read = in.read(stringAsBytes);
-        assert(read == byteCount);
-        Map<Integer, String> metadataMap = VoltDB.instance().getClusterMetadataMap();
-        metadataMap.put(hostId, new String(stringAsBytes, "UTF-8"));
     }
 }

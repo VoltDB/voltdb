@@ -46,12 +46,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
+import org.voltdb.agreement.ZKUtil;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -577,9 +579,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         // Prepare the network socket manager for work
         m_network = new VoltNetwork();
 
-        // get local host info
-        collectLocalNetworkMetadata();
-
         String leaderAddress = m_config.m_leader;
         int numberOfNodes = m_deployment.getCluster().getHostcount();
         long depCRC = CatalogUtil.getDeploymentCRC(m_config.m_pathToDeployment);
@@ -615,10 +614,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
-
-        // make sure the local entry for metadata is current
-        // it's possible it could get overwritten in a rejoin scenario
-        m_clusterMetadata.put(m_myHostId, m_localMetadata);
 
         if (isRejoin) {
             /**
@@ -830,6 +825,59 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         String[] lines = pp.toLogLines().split("\n");
         for (String line : lines) {
             hostLog.info(line.trim());
+        }
+
+        collectLocalNetworkMetadata();
+        m_clusterMetadata.put(m_messenger.getHostId(), getLocalMetadata());
+
+        /*
+         * Publish our cluster metadata, and then retrieve the metadata
+         * for the rest of the cluster
+         */
+        try {
+            m_zk.create(
+                    "/cluster_metadata",
+                    null,
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT,
+                    new ZKUtil.StringCallback(),
+                    null);
+            m_zk.create(
+                    "/cluster_metadata/" + m_messenger.getHostId(),
+                    getLocalMetadata().getBytes("UTF-8"),
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.EPHEMERAL,
+                    new ZKUtil.StringCallback(),
+                    null);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error creating \"/cluster_metadata\" node in ZK", true, e);
+        }
+
+        /*
+         * Spin and attempt to retrieve cluster metadata for all nodes in the cluster.
+         */
+        HashSet<Integer> metadataToRetrieve = new HashSet<Integer>(m_catalogContext.siteTracker.getAllLiveHosts());
+        metadataToRetrieve.remove(m_messenger.getHostId());
+        while (!metadataToRetrieve.isEmpty()) {
+            Map<Integer, ZKUtil.ByteArrayCallback> callbacks = new HashMap<Integer, ZKUtil.ByteArrayCallback>();
+            for (Integer hostId : metadataToRetrieve) {
+                ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+                m_zk.getData("/cluster_metadata/" + hostId, false, cb, null);
+                callbacks.put(hostId, cb);
+            }
+
+            for (Map.Entry<Integer, ZKUtil.ByteArrayCallback> entry : callbacks.entrySet()) {
+                try {
+                    ZKUtil.ByteArrayCallback cb = entry.getValue();
+                    Integer hostId = entry.getKey();
+                    m_clusterMetadata.put(hostId, new String(cb.getData(), "UTF-8"));
+                    metadataToRetrieve.remove(hostId);
+                } catch (KeeperException.NoNodeException e) {}
+                  catch (Exception e) {
+                      VoltDB.crashLocalVoltDB("Error retrieving cluster metadata", true, e);
+                }
+            }
+
         }
 
         // print out cluster membership
