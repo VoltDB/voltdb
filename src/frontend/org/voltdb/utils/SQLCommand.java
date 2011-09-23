@@ -858,8 +858,11 @@ public class SQLCommand
             Integer param_count = proc_param_counts.get(proc_name);
             ArrayList<String> this_params = new ArrayList<String>();
             // prepopulate it to make sure the size is right
-            for (int i = 0; i < proc_param_counts.get(procs.getString("PROCEDURE_NAME")); i++) {
-                this_params.add(null);
+            if (proc_param_counts.get(proc_name) != null)
+            {
+                for (int i = 0; i < proc_param_counts.get(procs.getString("PROCEDURE_NAME")); i++) {
+                    this_params.add(null);
+                }
             }
             procedures.put(procs.getString("PROCEDURE_NAME"), this_params);
         }
