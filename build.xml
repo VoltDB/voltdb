@@ -299,17 +299,20 @@ PRIMARY ENTRY POINTS
     depends="dist_client, dist_internal, dist_voltcache, dist_voltkv"
     description="Create VoltDB release packages with examples and documentation."
 />
-<target name="dist_voltcache"
+<target name="dist_voltcache"  depends="dist_internal"
         description="Create VoltDB release package with VoltCache reference app.">
-    <antcall target="dist_refapp">
-        <param name="appname" value="voltcache" />
-    </antcall>
+  <refapp_macro appname="voltcache" />
 </target>
-<target name="dist_voltkv"
+
+<target name="dist_voltkv" depends="dist_internal"
         description="Create VoltDB release package with VoltKV reference app.">
-    <antcall target="dist_refapp">
-        <param name="appname" value="voltkv" />
-    </antcall>
+  <refapp_macro appname="voltkv" />
+</target>
+
+<target name="dist_refapp" depends="dist_internal"
+        description="Create reference application release package with app supplied in ant invocation.">
+  <fail unless="appname" message="must specify an app name with -Dappname=" />
+  <refapp_macro appname="${appname}" />
 </target>
 
 <!--
@@ -579,27 +582,28 @@ DISTRIBUTION
     </exec>
 </target>
 
-<target name="dist_refapp" depends="dist_internal"
+<macrodef name="refapp_macro"
         description="Build a kit that only includes a single reference app">
-    <fail unless="appname" message="must specify an app name with -Dappname=" />
-
+  <attribute name="appname"/>
+  <sequential>
+    
     <!-- prepare release directory for new content -->
     <delete includeemptydirs="true" failonerror='false'>
-        <fileset dir="${dist.dir}-${appname}" includes="**/*" />
+        <fileset dir="${dist.dir}-@{appname}" includes="**/*" />
     </delete>
-    <mkdir dir="${dist.dir}-${appname}" />
-    <mkdir dir="${dist.dir}-${appname}/${appname}" />
+    <mkdir dir="${dist.dir}-@{appname}" />
+    <mkdir dir="${dist.dir}-@{appname}/@{appname}" />
 
     <!-- populate the examples -->
-    <copy todir="${dist.dir}-${appname}/${appname}">
-        <fileset dir="${dist.dir}/examples/${appname}" defaultexcludes="yes">
+    <copy todir="${dist.dir}-@{appname}/@{appname}">
+        <fileset dir="${dist.dir}/examples/@{appname}" defaultexcludes="yes">
             <include name="**/*"/>
             <exclude name=".gitignore"/>
         </fileset>
     </copy>
 
     <!-- populate the bin/lib/voltdb/etc... dirs -->
-    <copy todir="${dist.dir}-${appname}" >
+    <copy todir="${dist.dir}-@{appname}" >
         <fileset dir="${dist.dir}" defaultexcludes="yes">
             <include name="README" />
             <include name="LICENSE" />
@@ -612,15 +616,15 @@ DISTRIBUTION
 
     <!-- rewrite the run.sh script's relative directories -->
     <replace
-        file="${dist.dir}-${appname}/${appname}/run.sh"
+        file="${dist.dir}-@{appname}/@{appname}/run.sh"
         token="../../"
         value="../"/>
 
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}-${appname}" defaultexcludes="yes">
+        <fileset dir="${dist.dir}-@{appname}" defaultexcludes="yes">
             <include name="bin/*"/>
-            <include name="${appname}/run.sh"/>
+            <include name="@{appname}/run.sh"/>
         </fileset>
     </chmod>
 
@@ -628,23 +632,24 @@ DISTRIBUTION
 
     <!-- create an archive for distribution -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/dist-${appname}"/>
-        <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}"/>
+        <arg value="${raw.dist.dir}/dist-@{appname}"/>
+        <arg value="${raw.dist.dir}/voltdb-@{appname}-${dist.version}"/>
     </exec>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
         <arg value="${raw.dist.dir}"/>
         <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}.tar.gz"/>
-        <arg value="voltdb-${appname}-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-@{appname}-${dist.version}.tar.gz"/>
+        <arg value="voltdb-@{appname}-${dist.version}"/>
     </exec>
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/voltdb-${appname}-${dist.version}"/>
-        <arg value="${raw.dist.dir}/dist-${appname}"/>
+        <arg value="${raw.dist.dir}/voltdb-@{appname}-${dist.version}"/>
+        <arg value="${raw.dist.dir}/dist-@{appname}"/>
     </exec>
-</target>
+  </sequential> 
+</macrodef>
 
 <!--
 ***************************************
