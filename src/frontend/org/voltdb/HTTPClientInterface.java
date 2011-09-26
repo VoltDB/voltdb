@@ -24,11 +24,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.servlet_voltpatches.http.HttpServletResponse;
+import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty_voltpatches.continuation.Continuation;
-import org.eclipse.jetty_voltpatches.continuation.ContinuationSupport;
-import org.eclipse.jetty_voltpatches.server.Request;
+import org.eclipse.jetty.continuation.Continuation;
+import org.eclipse.jetty.continuation.ContinuationSupport;
+import org.eclipse.jetty.server.Request;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;

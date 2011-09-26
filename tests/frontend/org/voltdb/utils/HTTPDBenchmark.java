@@ -32,15 +32,15 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.servlet_voltpatches.ServletException;
-import javax.servlet_voltpatches.http.HttpServletRequest;
-import javax.servlet_voltpatches.http.HttpServletResponse;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import junit.framework.TestCase;
 
-import org.eclipse.jetty_voltpatches.server.Server;
-import org.eclipse.jetty_voltpatches.server.handler.AbstractHandler;
-import org.eclipse.jetty_voltpatches.server.nio.SelectChannelConnector;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.nio.SelectChannelConnector;
 import org.voltdb.ParameterSet;
 import org.voltdb.ServerThread;
 import org.voltdb.TestJSONInterface;
@@ -70,7 +70,7 @@ public class HTTPDBenchmark extends TestCase {
 
         @Override
         public void handle(String target,
-                org.eclipse.jetty_voltpatches.server.Request baseRequest,
+                org.eclipse.jetty.server.Request baseRequest,
                 HttpServletRequest request,
                 HttpServletResponse response)
                 throws IOException, ServletException {

@@ -30,23 +30,25 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import javax.servlet_voltpatches.ServletException;
-import javax.servlet_voltpatches.http.HttpServletRequest;
-import javax.servlet_voltpatches.http.HttpServletResponse;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty_voltpatches.server.AsyncContinuation;
-import org.eclipse.jetty_voltpatches.server.Handler;
-import org.eclipse.jetty_voltpatches.server.Request;
-import org.eclipse.jetty_voltpatches.server.Server;
-import org.eclipse.jetty_voltpatches.server.bio.SocketConnector;
-import org.eclipse.jetty_voltpatches.server.handler.AbstractHandler;
-import org.eclipse.jetty_voltpatches.server.handler.ContextHandler;
-import org.eclipse.jetty_voltpatches.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.server.AsyncContinuation;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.bio.SocketConnector;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.HTTPAdminListener.RequestHandler;
+import org.voltdb.utils.HTTPAdminListener.StudioHander;
 
 public class HTTPAdminListener {
 
