@@ -43,10 +43,13 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -83,6 +86,7 @@ import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.ResponseSampler;
+import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
@@ -158,6 +162,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
     CountDownLatch m_hasCatalog;
+    AsyncCompilerWorkThread m_compilerThread = null;
 
     DeploymentType m_deployment;
 
@@ -224,7 +229,69 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
     }
 
-    PeriodicWorkTimerThread fivems;
+    HeartbeatThread heartbeatThread;
+    private ScheduledExecutorService m_periodicWorkThread;
+
+    /*
+     * Periodic work that will be executed every 5ms. This doesn't include
+     * heartbeats. Heartbeats are dealt with in a different thread.
+     */
+    private Runnable periodicWork = new Runnable() {
+        StatsManager m_statsManager;
+        private long m_lastStatsManagerTime = System.currentTimeMillis();
+        private long m_lastSysStatsSCollection = 0;
+        private long m_lastSysStatsMCollection = 0;
+        private long m_lastSysStatsLCollection = 0;
+        private final long m_classLoadTime = System.currentTimeMillis();
+        private boolean m_hasTriedLoadAdHocPlanner = false;
+
+        @Override
+        public void run() {
+            try {
+                // Ask the statistics manager to send out change notifications if
+                // enough time has passed
+                final long currentTime = System.currentTimeMillis();
+                if (m_statsManager != null
+                    && (currentTime - m_lastStatsManagerTime) >= StatsManager.POLL_INTERVAL) {
+                    m_lastStatsManagerTime = currentTime;
+                    m_statsManager.sendNotification();
+                }
+
+                // deal with system stats collection every 5 seconds
+                if ((currentTime - m_lastSysStatsSCollection) >= 5000) {
+
+                    m_lastSysStatsSCollection = currentTime;
+                    boolean medium = false, large = false;
+
+                    // collect medium and large samples less frequently
+                    if ((currentTime - m_lastSysStatsMCollection) >= 60000) {
+                        m_lastSysStatsMCollection = currentTime;
+                        medium = true;
+                    }
+                    if ((currentTime - m_lastSysStatsLCollection) >= 360000) {
+                        m_lastSysStatsLCollection = currentTime;
+                        large = true;
+                    }
+
+                    SystemStatsCollector.asyncSampleSystemNow(medium, large);
+                }
+
+                // if it's been 10 seconds, and we haven't loaded the ad-hoc planner process,
+                // do so now
+                if ((!m_hasTriedLoadAdHocPlanner) && (currentTime - m_classLoadTime > 10000)) {
+                    m_compilerThread.ensureLoadedPlanner();
+                }
+
+                //long duration = System.nanoTime() - beforeTime;
+                //double millis = duration / 1000000.0;
+                //System.out.printf("TICK %.2f\n", millis);
+                //System.out.flush();
+            }
+            catch (Exception ex) {
+                log.warn(ex.getMessage(), ex);
+            }
+        }
+    };
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
@@ -391,7 +458,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Create the client interfaces and associated dtxn initiators
             int portOffset = 0;
-            AsyncCompilerWorkThread compilerThread = null;
             for (Site site : m_catalogContext.siteTracker.getUpSites()) {
                 int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
                 int currSiteId = Integer.parseInt(site.getTypeName());
@@ -410,7 +476,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                m_config.m_timestampTestingSalt);
                     portOffset++;
                     m_clientInterfaces.add(ci);
-                    compilerThread = ci.getCompilerThread();
+                    m_compilerThread = ci.getCompilerThread();
                 }
             }
 
@@ -460,9 +526,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger.waitForAllHostsToBeReady();
             }
 
-            fivems = new PeriodicWorkTimerThread(m_clientInterfaces,
-                                                 m_statsManager, compilerThread);
-            fivems.start();
+            heartbeatThread = new HeartbeatThread(m_clientInterfaces);
+            heartbeatThread.start();
+
+            m_periodicWorkThread =
+                    new ScheduledThreadPoolExecutor(1, new ThreadFactory() {
+                        @Override
+                        public Thread newThread(Runnable r) {
+                            return new Thread(r, "Periodic Work");
+                        }
+                    });
+            m_periodicWorkThread.scheduleWithFixedDelay(periodicWork,
+                                                        0, 5,
+                                                        TimeUnit.MILLISECONDS);
 
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
@@ -1012,8 +1088,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_executionSitesRecovered = false;
             m_agreementSiteRecovered = false;
             m_snapshotCompletionMonitor.shutdown();
-            fivems.interrupt();
-            fivems.join();
+            m_periodicWorkThread.shutdown();
+            heartbeatThread.interrupt();
+            heartbeatThread.join();
             // Things are going pear-shaped, tell the fault distributor to
             // shut its fat mouth
             m_faultManager.shutDown();
