@@ -73,7 +73,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.voltdb.logging.VoltLogger;
@@ -101,6 +103,12 @@ public class VoltNetwork implements Runnable
     private final ArrayList<DBBPool> m_poolsToClearOnShutdown = new ArrayList<DBBPool>();
     public final int threadPoolSize;
 
+    /*
+     * Thread pool used for the reverse DNS lookup triggers. If not provided, it
+     * will trigger the lookup immediately. Otherwise, it delays for 5 seconds.
+     */
+    private final ScheduledExecutorService m_es;
+
     /**
      * Synchronizes registration and unregistration of channels
      */
@@ -120,10 +128,21 @@ public class VoltNetwork implements Runnable
         m_useBlockingSelect = true;
         m_useExecutorService = false;
         threadPoolSize = 1;
+        m_es = null;
     }
 
     public VoltNetwork() {
-        this( true, true, null);
+        this(true, true, null, null);
+    }
+
+    /**
+     * RealVoltDB calls this to pass the thread pool in so that VoltNetwork can
+     * use the same thread pool for the reverse DNS lookup triggers.
+     *
+     * @param es Thread pool
+     */
+    public VoltNetwork(ScheduledExecutorService es) {
+        this(true, true, null, es);
     }
 
     /**
@@ -131,10 +150,12 @@ public class VoltNetwork implements Runnable
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    public VoltNetwork(boolean useExecutorService, boolean blockingSelect, Integer threads) {
+    public VoltNetwork(boolean useExecutorService, boolean blockingSelect, Integer threads,
+                       ScheduledExecutorService es) {
         m_thread = new Thread(this, "Volt Network");
         m_thread.setDaemon(true);
         m_useBlockingSelect = blockingSelect;
+        m_es = es;
 
         try {
             m_selector = Selector.open();
@@ -318,13 +339,36 @@ public class VoltNetwork implements Runnable
         channel.configureBlocking (false);
         channel.socket().setKeepAlive(true);
 
-        VoltPort port =
+        final VoltPort port =
             new VoltPort(
                     this,
                     handler,
                     handler.getExpectedOutgoingMessageSize(),
-                    channel.socket().getInetAddress().getHostName());
+                    channel.socket().getInetAddress().getHostAddress());
         port.registering();
+
+        /*
+         * If no thread pool was given, VoltNetwork is probably used by client.
+         * So trigger the reverse DNS lookup immediately. Otherwise, check if
+         * the port is still alive 5 seconds later. If it is alive,start a
+         * background thread to do reverse DNS lookup.
+         */
+        if (m_es != null) {
+            synchronized (m_es) {
+                m_es.schedule(new Runnable() {
+                    @Override
+                    public void run() {
+                        port.resolveHostname();
+                    }
+                }, 5, TimeUnit.SECONDS);
+            }
+        } else {
+            /*
+             * This means we are used by a client. No need to wait then, trigger
+             * the reverse DNS lookup now.
+             */
+            port.resolveHostname();
+        }
 
         acquireRegistrationLock();
         try {

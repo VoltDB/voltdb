@@ -1556,7 +1556,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public String getHostname() {
+        public String getHostnameOrIP() {
             return "";
         }
 
@@ -1597,7 +1597,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             {
                 client_stats.put(
                     c.connectionId(),
-                    new Pair<String, long[]>(c.getHostname(),
+                    new Pair<String, long[]>(c.getHostnameOrIP(),
                             new long[]{0,
                                        c.readStream().dataAvailable(),
                                        c.writeStream().getOutstandingMessageCount(),

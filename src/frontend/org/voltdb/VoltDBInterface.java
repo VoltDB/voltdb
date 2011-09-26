@@ -19,7 +19,6 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.fault.FaultDistributorInterface;

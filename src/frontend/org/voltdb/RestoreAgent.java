@@ -312,7 +312,7 @@ SnapshotCompletionInterest {
         }
 
         @Override
-        public String getHostname() {
+        public String getHostnameOrIP() {
             return "";
         }
 

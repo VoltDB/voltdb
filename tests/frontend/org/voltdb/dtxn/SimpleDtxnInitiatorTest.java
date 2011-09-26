@@ -151,7 +151,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
         }
 
         @Override
-        public String getHostname()
+        public String getHostnameOrIP()
         {
             // TODO Auto-generated method stub
             return null;

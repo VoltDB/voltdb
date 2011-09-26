@@ -18,12 +18,18 @@
 package org.voltdb.network;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.concurrent.Callable;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.logging.VoltLogger;
@@ -36,6 +42,21 @@ public class VoltPort implements Callable<VoltPort>, Connection
     private final VoltNetwork m_network;
 
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+
+    /*
+     * Thread pool for doing reverse DNS lookups. It will create new threads on
+     * demand, until the maximum of 16 threads is reached, in which case it will
+     * queue new works.
+     */
+    private static final ThreadPoolExecutor m_es =
+            new ThreadPoolExecutor(0, 16, 1, TimeUnit.SECONDS,
+                                   new LinkedBlockingQueue<Runnable>(),
+                                   new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    return new Thread(r, "VoltPort DNS Reverse Lookup");
+                }
+            });
 
     /** The currently selected operations on this port. */
     private int m_readyOps = 0;
@@ -73,7 +94,15 @@ public class VoltPort implements Callable<VoltPort>, Connection
     private final AtomicLong m_messagesRead = new AtomicLong(0);
     private long m_lastMessagesRead = 0;
     final int m_expectedOutgoingMessageSize;
-    final String m_remoteHost;
+
+    /*
+     * This variable will be changed to the actual hostname some time later. It
+     * is not guaranteed on how long it will take to do the reverse DNS lookup.
+     * It is not recommended to use the value of this variable as a key. Use
+     * m_remoteIP if you need to identify a host.
+     */
+    volatile String m_remoteHost = null;
+    final String m_remoteIP;
     private String m_toString = null;
 
     /**
@@ -92,11 +121,39 @@ public class VoltPort implements Callable<VoltPort>, Connection
             VoltNetwork network,
             InputHandler handler,
             final int expectedOutgoingMessageSize,
-            String remoteHost) {
+            String remoteIP) {
         m_network = network;
         m_handler = handler;
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
-        m_remoteHost = remoteHost;
+        m_remoteIP = remoteIP;
+    }
+
+    /**
+     * If the port is still alive, start a thread in background to do a reverse
+     * DNS lookup of the remote hostname.
+     */
+    void resolveHostname() {
+        synchronized (m_lock) {
+            if (!m_running) {
+                return;
+            }
+
+            /*
+             * Start the reverse DNS lookup in background because it might be
+             * very slow if the hostname is not specified in local /etc/hosts.
+             */
+            m_es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        m_remoteHost = InetAddress.getByName(m_remoteIP).getHostName();
+                    } catch (UnknownHostException e) {
+                        networkLog.warn("Unable to resolve hostname of host "
+                                        + m_remoteIP);
+                    }
+                }
+            });
+        }
     }
 
     void setKey (SelectionKey key) {
@@ -391,8 +448,12 @@ public class VoltPort implements Callable<VoltPort>, Connection
     }
 
     @Override
-    public String getHostname() {
-        return m_remoteHost;
+    public String getHostnameOrIP() {
+        if (m_remoteHost != null) {
+            return m_remoteHost;
+        } else {
+            return m_remoteIP;
+        }
     }
 
     @Override

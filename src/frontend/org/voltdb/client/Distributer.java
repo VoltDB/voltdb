@@ -442,7 +442,7 @@ class Distributer {
             m_statsLoader = null;
         }
         m_useMultipleThreads = useMultipleThreads;
-        m_network = new VoltNetwork( useMultipleThreads, true, 3);
+        m_network = new VoltNetwork( useMultipleThreads, true, 3, null);
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_network.start();
         m_pool = new DBBPool(false, arenaSizes, false);
@@ -520,7 +520,7 @@ class Distributer {
         NodeConnection cxn = new NodeConnection(numbers);
         m_connections.add(cxn);
         Connection c = m_network.registerChannel( aChannel, cxn);
-        cxn.m_hostname = c.getHostname();
+        cxn.m_hostname = c.getHostnameOrIP();
         cxn.m_connection = c;
     }
 

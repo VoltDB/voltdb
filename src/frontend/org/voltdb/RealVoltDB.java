@@ -358,6 +358,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             readDeploymentAndCreateStarterCatalogContext();
 
+            // Create the thread pool here. It's needed by buildClusterMesh()
+            final int availableProcessors = Runtime.getRuntime().availableProcessors();
+            int poolSize = 1;
+            if (availableProcessors > 4) {
+                poolSize = 2;
+            }
+            m_periodicWorkThread =
+                    new ScheduledThreadPoolExecutor(poolSize, new ThreadFactory() {
+                        @Override
+                        public Thread newThread(Runnable r) {
+                            return new Thread(r, "Periodic Work");
+                        }
+                    });
+
             buildClusterMesh(isRejoin);
 
             // do the many init tasks in the Inits class
@@ -528,14 +542,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             heartbeatThread = new HeartbeatThread(m_clientInterfaces);
             heartbeatThread.start();
-
-            m_periodicWorkThread =
-                    new ScheduledThreadPoolExecutor(1, new ThreadFactory() {
-                        @Override
-                        public Thread newThread(Runnable r) {
-                            return new Thread(r, "Periodic Work");
-                        }
-                    });
             m_periodicWorkThread.scheduleWithFixedDelay(periodicWork,
                                                         0, 5,
                                                         TimeUnit.MILLISECONDS);
@@ -653,7 +659,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         // Prepare the network socket manager for work
-        m_network = new VoltNetwork();
+        m_network = new VoltNetwork(m_periodicWorkThread);
 
         String leaderAddress = m_config.m_leader;
         int numberOfNodes = m_deployment.getCluster().getHostcount();
