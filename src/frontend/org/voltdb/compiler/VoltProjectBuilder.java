@@ -928,7 +928,7 @@ public class VoltProjectBuilder {
         systemSettingType.setTemptables(temptables);
         if (m_snapshotPriority != null) {
             SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
-            snapshot.setSnapshotpriority(m_snapshotPriority);
+            snapshot.setPriority(m_snapshotPriority);
             systemSettingType.setSnapshot(snapshot);
         }
         deployment.setSystemsettings(systemSettingType);

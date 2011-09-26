@@ -873,7 +873,7 @@ public abstract class CatalogUtil {
             }
             SystemSettingsType.Snapshot snapshot = deployment.getSystemsettings().getSnapshot();
             if (snapshot != null) {
-                snapshotpriority = snapshot.getSnapshotpriority();
+                snapshotpriority = snapshot.getPriority();
             }
         }
         syssettings.setMaxtemptablesize(maxtemptablesize);

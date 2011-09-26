@@ -93,7 +93,7 @@
         </xs:element>
          <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="snapshotpriority" type="snapshotPriorityType" default="6"/>
+                <xs:attribute name="priority" type="snapshotPriorityType" default="6"/>
             </xs:complexType>
         </xs:element>
     </xs:all>
