@@ -205,7 +205,12 @@ import org.voltdb.types.VoltDecimalHelper;
                     out.writeLong((Long) obj);
                     break;
                 case FLOAT:
-                    out.writeDouble((Double) obj);
+                    if (cls == Float.class)
+                        out.writeDouble(((Float) obj).doubleValue());
+                    else if (cls == Double.class)
+                        out.writeDouble(((Double) obj).doubleValue());
+                    else
+                        throw new RuntimeException("Can't cast paramter type to Double");
                     break;
                 case STRING:
                     out.writeString((String) obj);

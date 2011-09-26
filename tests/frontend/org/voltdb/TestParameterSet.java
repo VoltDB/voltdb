@@ -91,6 +91,15 @@ public class TestParameterSet extends TestCase {
         assertEquals(bin[0], 'f'); assertEquals(bin[1], 'o'); assertEquals(bin[2], 'o');
     }
 
+    public void testFloatsInsteadOfDouble() {
+        params = new ParameterSet(true);
+        params.setParameters(5.5f);
+        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
+        Object value = out.toArray()[0];
+        assertTrue(value instanceof Double);
+        assertTrue((5.5f - ((Double) value).doubleValue()) < 0.01);
+    }
+
     public void testJSONEncodesBinary() throws JSONException, IOException {
         params = new ParameterSet(true);
         params.setParameters(new Object[]{ 123,
