@@ -423,6 +423,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int64_t logLevels;
         int16_t hostnameLength;
         char hostname[0];
+        int64_t exportWindowSize;
         int64_t tempTableMemory;
     };
     struct initialize * cs = (struct initialize*) cmd;
@@ -434,6 +435,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
     cs->hostnameLength = ntohs(cs->hostnameLength);
+    cs->exportWindowSize = ntohll(cs->exportWindowSize);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
     std::string hostname(cs->hostname, cs->hostnameLength);
     try {
@@ -447,6 +449,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
+                                 cs->exportWindowSize,
                                  cs->tempTableMemory) == true) {
             return kErrorCode_Success;
         }
@@ -1149,8 +1152,13 @@ void VoltDBIPC::pushExportBuffer(
     index += static_cast<int32_t>(signature.size());
     if (block != NULL) {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->uso());
+        index += 8;
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->txnId());
     } else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;
+        index += 8;
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) =
+            std::numeric_limits<int64_t>::min();
     }
     index += 8;
     *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =

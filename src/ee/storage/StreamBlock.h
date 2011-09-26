@@ -21,6 +21,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <limits>
 #include <stdint.h>
 
 namespace voltdb
@@ -28,17 +29,19 @@ namespace voltdb
     /**
      * A single data block with some buffer semantics.
      */
-    class StreamBlock {
+    class StreamBlock
+    {
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
             : m_data(data), m_capacity(capacity), m_offset(0),
-              m_uso(uso)
+              m_uso(uso), m_txnId(std::numeric_limits<int64_t>::min())
         {
         }
 
         StreamBlock(StreamBlock *other)
-            : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
-              m_uso(other->m_uso)
+            : m_data(other->m_data), m_capacity(other->m_capacity),
+              m_offset(other->m_offset), m_uso(other->m_uso),
+              m_txnId(other->m_txnId)
         {
         }
 
@@ -82,6 +85,19 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
+        /**
+         * Transaction ID of the first tuple in the buffer
+         */
+        const int64_t txnId() const
+        {
+            return m_txnId;
+        }
+
+        void setTxnId(int64_t txnId)
+        {
+            m_txnId = txnId;
+        }
+
     private:
         char* mutableDataPtr() {
             return m_data + m_offset;
@@ -108,6 +124,8 @@ namespace voltdb
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
+        int64_t m_txnId;         // The transaction ID of the first
+                                 // tuple in this block
 
         friend class TupleStreamWrapper;
     };

@@ -21,8 +21,8 @@
 #include "Topend.h"
 #include "common/UndoQuantum.h"
 
-namespace voltdb {
-
+namespace voltdb
+{
 /*
  * EE site global data required by executors at runtime.
  *
@@ -35,7 +35,7 @@ namespace voltdb {
  * you see a preferable refactoring.
  */
 class ExecutorContext {
-  public:
+public:
     ~ExecutorContext() {
         // currently does not own any of its pointers
     }
@@ -46,6 +46,7 @@ class ExecutorContext {
                     Topend* topend,
                     bool exportEnabled,
                     int64_t epoch,
+                    int64_t exportWindowSize,
                     std::string hostname,
                     CatalogId hostId);
 
@@ -108,6 +109,11 @@ class ExecutorContext {
         return m_lastCommittedTxnId;
     }
 
+    int64_t currentExportWindow()
+    {
+        return (m_txnId >> 23) / m_exportWindowSize;
+    }
+
     static ExecutorContext* getExecutorContext();
 
   private:
@@ -125,6 +131,7 @@ class ExecutorContext {
 
     /** local epoch for voltdb, somtime around 2008, pulled from catalog */
     int64_t m_epoch;
+    int64_t m_exportWindowSize;
 };
 
 }

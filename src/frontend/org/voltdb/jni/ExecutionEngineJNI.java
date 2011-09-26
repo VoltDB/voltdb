@@ -92,6 +92,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int partitionId,
             final int hostId,
             final String hostname,
+            final long exportWindowSize,
             final int tempTableMemory)
     {
         // base class loads the volt shared library
@@ -115,6 +116,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     partitionId,
                     hostId,
                     hostname,
+                    exportWindowSize,
                     tempTableMemory * 1024 * 1024);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {

@@ -15,8 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "JNITopend.h"
+
 #include <cassert>
 #include <iostream>
+#include <limits>
 
 #include "common/debuglog.h"
 #include "storage/table.h"
@@ -125,7 +127,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(JILjava/lang/String;JJLjava/nio/ByteBuffer;ZZ)V");
+            "(JILjava/lang/String;JJJLjava/nio/ByteBuffer;ZZ)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
@@ -287,6 +289,7 @@ void JNITopend::pushExportBuffer(
                 partitionId,
                 signatureString,
                 block->uso(),
+                block->txnId(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
                 sync ? JNI_TRUE : JNI_FALSE,
@@ -301,6 +304,7 @@ void JNITopend::pushExportBuffer(
                         partitionId,
                         signatureString,
                         static_cast<int64_t>(0),
+                        std::numeric_limits<int64_t>::min(),
                         NULL,
                         NULL,
                         sync ? JNI_TRUE : JNI_FALSE,

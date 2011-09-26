@@ -157,7 +157,7 @@ class ExecutionEngineTest : public Test {
              * Initialize the engine
              */
             engine = new VoltDBEngine();
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY));
+            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", 60000, DEFAULT_TEMP_TABLE_MEMORY));
             ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
 
             /*

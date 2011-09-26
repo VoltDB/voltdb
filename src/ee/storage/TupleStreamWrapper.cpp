@@ -45,7 +45,7 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
       m_uso(0), m_currBlock(NULL),
       m_openTransactionId(0), m_openTransactionUso(0),
       m_committedTransactionId(0), m_committedUso(0),
-      m_signature(""), m_generation(0)
+      m_signature(""), m_generation(0), m_exportWindow(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -350,6 +350,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
                                        int64_t txnId,
                                        int64_t seqNo,
                                        int64_t timestamp,
+                                       int64_t exportWindow,
                                        TableTuple &tuple,
                                        TupleStreamWrapper::Type type)
 {
@@ -368,12 +369,25 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
-    if (!m_currBlock) {
+    if (!m_currBlock || exportWindow != m_exportWindow)
+    {
         extendBufferChain(m_defaultCapacity);
+        m_exportWindow = exportWindow;
     }
 
+    // If the current block doesn't have enough capacity to hold the
+    // maximum tuple size, then this pushes it onto the pending list
+    // and allocates a new block of m_defaultCapacity (the argument is
+    // a lie)
     if ((m_currBlock->rawLength() + tupleMaxLength) > m_defaultCapacity) {
         extendBufferChain(tupleMaxLength);
+    }
+
+    // if this is the first tuple being appended to this block, set
+    // the transaction ID appropriately.
+    if (m_currBlock->offset() == 0)
+    {
+        m_currBlock->setTxnId(txnId);
     }
 
     // initialize the full row header to 0. This also

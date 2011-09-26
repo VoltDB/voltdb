@@ -161,6 +161,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
+                         int64_t exportWindowSize,
                          int64_t tempTableMemoryLimit)
 {
     // Be explicit about running in the standard C locale for now.
@@ -208,6 +209,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             getTopend(),
                                             m_isELEnabled,
                                             0, /* epoch not yet known */
+                                            exportWindowSize,
                                             hostname,
                                             hostId);
     return true;
