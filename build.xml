@@ -61,7 +61,6 @@
 <property name='doc.dir'                     location='doc' />
 <property name='src.gpl.dir'                 location='src/frontend' />
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
-<property name='src.jetty.dir'               location='src/jetty716' />
 <property name='src.test.dir'                location='tests/frontend' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
@@ -70,7 +69,6 @@
 <property name='lib.dir'                     location='lib' />
 <property name='vendor.lib.dir'              location='third_party/java/jars' />
 <property name='vendor.src.dir'              location='third_party/java/src'  />
-<property name='vendor.obj.dir'              location='third_party/java/obj'  />
 <property name='src.ee.parent.dir'           location='src/ee' />
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
@@ -98,7 +96,6 @@
     <pathelement location='${build.instr.dir}' />
     <pathelement location='${build.prod.dir}' />
     <pathelement location='${build.test.dir}' />
-    <pathelement location='${vendor.obj.dir}' />
     <fileset dir='${lib.dir}'>
         <include name='*.jar' />
     </fileset>
@@ -586,7 +583,7 @@ DISTRIBUTION
         description="Build a kit that only includes a single reference app">
   <attribute name="appname"/>
   <sequential>
-    
+
     <!-- prepare release directory for new content -->
     <delete includeemptydirs="true" failonerror='false'>
         <fileset dir="${dist.dir}-@{appname}" includes="**/*" />
@@ -648,7 +645,7 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/voltdb-@{appname}-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist-@{appname}"/>
     </exec>
-  </sequential> 
+  </sequential>
 </macrodef>
 
 <!--
@@ -722,9 +719,6 @@ JAR BUILDING
             <include name="org/voltdb/regressionsuites/RegressionSuite.class" />
             <include name="org/voltdb/regressionsuites/VoltServerConfig.class" />
         </fileset>
-        <fileset dir="${vendor.obj.dir}" defaultexcludes="yes" >
-            <include name="**" />
-        </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
             <section name="Credits">
@@ -793,9 +787,6 @@ JAR BUILDING
         <fileset dir="${src.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
         </fileset>
-        <fileset dir="${vendor.obj.dir}" defaultexcludes="yes" >
-            <include name="**" />
-        </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
             <section name="Credits">
@@ -829,7 +820,7 @@ JAVA COMPILATION
         executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
         failonerror='true' />
     <depend
-        srcdir="${src.jetty.dir}:${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${vendor.src.dir}"
+        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${vendor.src.dir}"
         destdir="${build.prod.dir}:${build.test.dir}"
         cache="${depcache}">
         <classpath refid="project.classpath" />
@@ -838,7 +829,6 @@ JAVA COMPILATION
     <!-- copy resources needed for logging messages -->
     <copy todir="${build.prod.dir}">
         <fileset dir="${src.hsqldb.dir}" includes="**/*.properties" />
-        <fileset dir="${src.jetty.dir}" includes="**/*.properties" />
         <fileset dir="${src.gpl.dir}" includes="**/*.properties"/>
         <fileset dir="${src.gpl.dir}" includes="**/*.xml" />
         <fileset dir="${src.gpl.dir}" includes="**/admintemplate.html" />
@@ -846,12 +836,6 @@ JAVA COMPILATION
 
     <copy todir='${build.prod.dir}/org/hsqldb_voltpatches/resources'>
         <fileset dir="${src.hsqldb.dir}/org/hsqldb_voltpatches/resources">
-            <include name="*"/>
-        </fileset>
-    </copy>
-
-    <copy todir='${build.prod.dir}/javax/servlet_voltpatches/resources'>
-        <fileset dir="${src.jetty.dir}/javax/servlet_voltpatches/resources">
             <include name="*"/>
         </fileset>
     </copy>
@@ -906,7 +890,6 @@ JAVA COMPILATION
 
     <!-- compile the individual source directories -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
-    <invoke-javac srcdir="${src.jetty.dir}"/>
     <invoke-javac srcdir="${src.gpl.dir}:${vendor.src.dir}"/>
 
     <!-- compile the individual test directories -->
