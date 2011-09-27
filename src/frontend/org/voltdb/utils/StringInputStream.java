@@ -17,7 +17,10 @@
 
 package org.voltdb.utils;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+
+import org.voltdb.VoltDB;
 
 /**
  * Create an <code>InputStream</code> from a Java string so it can
@@ -25,16 +28,24 @@ import java.io.*;
  *
  */
 public class StringInputStream extends InputStream {
-    StringReader sr;
+    final byte[] m_strBytes;
+    int m_position = 0;
 
     /**
      * Create the stream from a string.
      * @param value The string value to turn into an InputStream.
      */
-    public StringInputStream(String value) { sr = new StringReader(value); }
+    public StringInputStream(String value) {
+        m_strBytes = value.getBytes(VoltDB.UTF8ENCODING);
+    }
 
     /**
      * Read a single byte from the stream (string).
      */
-    public int read() throws IOException { return sr.read(); }
+    @Override
+    public int read() throws IOException {
+        if (m_position == m_strBytes.length)
+            return -1;
+        return m_strBytes[m_position++];
+    }
 }

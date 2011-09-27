@@ -34,7 +34,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import javax.xml.bind.*;
+
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -49,11 +53,22 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
-import org.voltdb.compiler.deploymentfile.*;
+import org.voltdb.compiler.deploymentfile.AdminModeType;
+import org.voltdb.compiler.deploymentfile.ClusterType;
+import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
+import org.voltdb.compiler.deploymentfile.PathEntry;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
+import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
+import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
@@ -590,8 +605,8 @@ public class VoltProjectBuilder {
             return false;
         }
 
-        String xml = result.getWriter().toString();
-        System.out.println(xml);
+        /*String xml = result.getWriter().toString();
+        System.out.println(xml);*/
 
         final File projectFile =
             writeStringToTempFile(result.getWriter().toString());

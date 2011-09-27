@@ -35,6 +35,7 @@ import java.util.Map;
 import junit.framework.TestCase;
 
 import org.voltdb.ProcInfoData;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCClient;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Connector;
@@ -105,6 +106,17 @@ public class TestVoltCompiler extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
 
         final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
+        assertTrue(success);
+    }
+
+    public void testUTF8XMLFromHSQL() throws IOException {
+        final String simpleSchema =
+                "create table blah  (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(simpleSchema);
+        pb.addStmtProcedure("utf8insert", "insert into blah values(1, 'něco za nic')");
+        pb.addPartitionInfo("blah", "pkey");
+        boolean success = pb.compile(Configuration.getPathToCatalogForTest("utf8xml.jar"));
         assertTrue(success);
     }
 

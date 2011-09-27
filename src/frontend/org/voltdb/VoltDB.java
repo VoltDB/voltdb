@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -60,6 +61,8 @@ public class VoltDB {
     public static enum START_ACTION {
         CREATE, RECOVER, START
     }
+
+    public static Charset UTF8ENCODING = Charset.forName("UTF-8");
 
     // if VoltDB is running in your process, prepare to us GMT timezone
     public synchronized static void setDefaultTimezone() {
