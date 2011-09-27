@@ -693,7 +693,7 @@ JAR BUILDING
   <loadfile property='dist.version' srcFile='version.txt'>
       <filterchain><striplinebreaks/></filterchain>
   </loadfile>
-  <exec dir="." executable="tools/getsvninfo.sh">
+  <exec dir="." executable="tools/getgitinfo.py">
       <arg line='${dist.version}' />
   </exec>
 </target>
