@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.CatalogContext;
@@ -34,7 +33,6 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -56,8 +54,7 @@ public class ExportManager
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    private final AtomicReference<TreeMap< Long, ExportGeneration>> m_generations =
-        new AtomicReference<TreeMap<Long, ExportGeneration>>(new TreeMap<Long, ExportGeneration>());
+    public final ExportWindowDirectory m_windowDirectory;
 
     /**
      * Thrown if the initial setup of the loader fails
@@ -87,7 +84,7 @@ public class ExportManager
 
     private String m_loaderClass;
 
-    private final Runnable m_onGenerationDrained = new Runnable() {
+    final Runnable m_onGenerationDrained = new Runnable() {
         @Override
         public void run() {
             /*
@@ -101,12 +98,7 @@ public class ExportManager
             proc.queueWork(new Runnable() {
                 @Override
                 public void run() {
-                    TreeMap<Long, ExportGeneration> generations =
-                        new TreeMap<Long, ExportGeneration>(m_generations.get());
-                    ExportGeneration generation = generations.firstEntry().getValue();
-                    generations.remove(generations.firstEntry().getKey());
-                    exportLog.info("Finished draining generation " + generation.m_timestamp);
-                    m_generations.set(generations);
+                    ExportGeneration head = m_windowDirectory.popWindow();
 
                     exportLog.info("Creating connector " + m_loaderClass);
                     ExportDataProcessor newProcessor = null;
@@ -114,7 +106,7 @@ public class ExportManager
                         final Class<?> loaderClass = Class.forName(m_loaderClass);
                         newProcessor = (ExportDataProcessor)loaderClass.newInstance();
                         newProcessor.addLogger(exportLog);
-                        newProcessor.setExportGeneration(generations.firstEntry().getValue());
+                        newProcessor.setExportGeneration(m_windowDirectory.peekWindow());
                         newProcessor.readyForData();
                     } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
                         exportLog.error(e);
@@ -124,9 +116,9 @@ public class ExportManager
 
                     m_processor.getAndSet(newProcessor).shutdown();
                     try {
-                        generation.closeAndDelete();
+                        exportLog.info("Finished draining generation " + head.m_timestamp);
+                        head.closeAndDelete();
                     } catch (IOException e) {
-                        e.printStackTrace();
                         exportLog.error(e);
                     }
                 }
@@ -143,35 +135,17 @@ public class ExportManager
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, boolean isRejoin)
     throws ExportManager.SetupException
     {
-        /*
-         * If a node is rejoining it is because it crashed. Export overflow isn't crash safe so it isn't possible
-         * to recover the data. Delete it instead.
-         */
-        if (isRejoin) {
-            deleteExportOverflowData(catalogContext);
+        ExportWindowDirectory exportWindowDirectory;
+        try {
+            exportWindowDirectory = new ExportWindowDirectory(isRejoin, catalogContext);
+        } catch (IOException e) {
+            throw new ExportManager.SetupException(e.getMessage());
         }
-        ExportManager tmp = new ExportManager(myHostId, catalogContext);
+
+        ExportManager tmp = new ExportManager(myHostId, catalogContext, exportWindowDirectory);
         m_self = tmp;
     }
 
-    private static void deleteExportOverflowData(CatalogContext context) {
-        File exportOverflowDirectory = new File(context.cluster.getExportoverflow());
-        exportLog.info("Deleting export overflow data from " + exportOverflowDirectory);
-        if (!exportOverflowDirectory.exists()) {
-            return;
-        }
-        File files[] = exportOverflowDirectory.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                try {
-                    VoltFile.recursivelyDelete(f);
-                } catch (IOException e) {
-                    exportLog.fatal(e);
-                    VoltDB.crashVoltDB();
-                }
-            }
-        }
-    }
     /**
      * Get the global instance of the ExportManager.
      * @return The global single instance of the ExportManager.
@@ -185,18 +159,16 @@ public class ExportManager
         m_self = self;
     }
 
-    protected ExportManager() {
-        m_hostId = 0;
-    }
 
     /**
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
      */
-    private ExportManager(int myHostId, CatalogContext catalogContext)
+    private ExportManager(int myHostId, CatalogContext catalogContext, ExportWindowDirectory windowDirectory)
     throws ExportManager.SetupException
     {
         m_hostId = myHostId;
+        m_windowDirectory = windowDirectory;
 
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -223,16 +195,20 @@ public class ExportManager
             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
             m_processor.set(newProcessor);
             newProcessor.addLogger(exportLog);
+
+            // add the disk generation(s) to the directory
+            m_windowDirectory.initializePersistedWindows(m_onGenerationDrained);
+
+            // add the current in-memory generation to the directory
             File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
-            initializePersistedGenerations(
-                    exportOverflowDirectory,
-                    catalogContext, conn);
             ExportGeneration currentGeneration =
                 new ExportGeneration( catalogContext.m_transactionId, m_onGenerationDrained, exportOverflowDirectory);
             currentGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
-            m_generations.get().put( catalogContext.m_transactionId, currentGeneration);
-            newProcessor.setExportGeneration(m_generations.get().firstEntry().getValue());
-            newProcessor.readyForData();
+            m_windowDirectory.pushWindow(catalogContext.m_transactionId, currentGeneration);
+
+            // once windows are loaded, the processor can be started
+            m_processor.get().setExportGeneration(m_windowDirectory.peekWindow());
+            m_processor.get().readyForData();
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
@@ -244,31 +220,6 @@ public class ExportManager
     }
 
 
-
-    private void initializePersistedGenerations(
-            File exportOverflowDirectory, CatalogContext catalogContext,
-            Connector conn) throws IOException {
-        TreeSet<File> generationDirectories = new TreeSet<File>();
-        for (File f : exportOverflowDirectory.listFiles()) {
-            if (f.isDirectory()) {
-                if (!f.canRead() || !f.canWrite() || !f.canExecute()) {
-                    throw new RuntimeException("Can't one of read/write/execute directory " + f);
-                }
-                generationDirectories.add(f);
-            }
-        }
-
-        //Only give the processor to the oldest generation
-        for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation =
-                new ExportGeneration(
-                        m_onGenerationDrained,
-                        generationDirectory,
-                        Long.valueOf(generationDirectory.getName()));
-            generation.initializeGenerationFromDisk(conn);
-            m_generations.get().put( Long.valueOf(generationDirectory.getName()), generation);
-        }
-    }
 
     public void notifyOfClusterTopologyChange() {
         exportLog.info("Attempting to boot export client due to rejoin or other cluster topology change");
@@ -308,41 +259,7 @@ public class ExportManager
             VoltDB.crashVoltDB();
         }
         newGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
-
-        while (true) {
-            TreeMap<Long, ExportGeneration> oldGenerations = m_generations.get();
-            TreeMap<Long, ExportGeneration> generations = new TreeMap<Long, ExportGeneration>(oldGenerations);
-            generations.put(catalogContext.m_transactionId, newGeneration);
-            if (m_generations.compareAndSet( oldGenerations, generations)) {
-                break;
-            }
-        }
-        //
-        //        Runnable switchToNextGeneration = new Runnable() {
-        //            @Override
-        //            public void run() {
-        //                ExportDataProcessor processor = m_processors.peek();
-        //                processor.shutdown();
-        //
-        //                ExportGeneration currentGeneration = m_generations.lastEntry().getValue();
-        //                try {
-        //                    currentGeneration.closeAndDelete();
-        //                } catch (IOException e) {
-        //                    exportLog.error(e);
-        //                }
-        //                m_generations.remove(m_generations.lastEntry().getKey());
-        //
-        //                ExportGeneration newGeneration = m_generations.firstEntry().getValue();
-        //                newGeneration.registerWithProcessor(processor);
-        //                processor.readyForData();
-        //
-        //                if (m_generations.size() > 1) {
-        //                    processor.setOnAllSourcesDrained(this);
-        //                }
-        //            }
-        //        };
-        //
-        //        m_processors.peek().setOnAllSourcesDrained(switchToNextGeneration);
+        m_windowDirectory.pushWindow(catalogContext.m_transactionId, newGeneration);
     }
 
     public void shutdown() {
@@ -350,9 +267,8 @@ public class ExportManager
         if (proc != null) {
             proc.shutdown();
         }
-        for (ExportGeneration generation : m_generations.get().values()) {
-            generation.close();
-        }
+
+        m_windowDirectory.closeAllWindows();
     }
 
     /**
@@ -385,17 +301,7 @@ public class ExportManager
     public static long getQueuedExportBytes(int partitionId, String signature) {
         ExportManager instance = instance();
         try {
-            TreeMap<Long, ExportGeneration> generations = instance.m_generations.get();
-            if (generations.isEmpty()) {
-                assert(false);
-                return -1;
-            }
-
-            long exportBytes = 0;
-            for (ExportGeneration generation : generations.values()) {
-                exportBytes += generation.getQueuedExportBytes( partitionId, signature);
-            }
-
+            long exportBytes = instance.m_windowDirectory.estimateQueuedBytes(partitionId, signature);
             return exportBytes;
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
@@ -421,8 +327,11 @@ public class ExportManager
             boolean sync,
             boolean endOfStream) {
         ExportManager instance = instance();
+
         try {
-            ExportGeneration generation = instance.m_generations.get().get(exportGeneration);
+
+            ExportGeneration generation = instance.m_windowDirectory.getWindow(exportGeneration);
+
             if (generation == null) {
                 assert(false);
                 DBBPool.deleteCharArrayMemory(bufferPtr);
@@ -440,8 +349,6 @@ public class ExportManager
 
     public void truncateExportToTxnId(long snapshotTxnId) {
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
-        for (ExportGeneration generation : m_generations.get().values()) {
-            generation.truncateExportToTxnId( snapshotTxnId);
-        }
+        m_windowDirectory.truncateExportToTxnId(snapshotTxnId);
     }
 }
