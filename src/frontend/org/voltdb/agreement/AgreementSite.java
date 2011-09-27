@@ -74,7 +74,7 @@ import org.voltdb.utils.MiscUtils;
  * A wrapper around a single node ZK server. The server is a modified version of ZK that speaks the ZK
  * wire protocol and data model, but has no durability. Agreement is provided
  * by the AgreementSite wrapper which contains a restricted priority queue like an execution site,
- * but also has a transaciton id manager and a unique initiator id. The intiator ID and site id are the same
+ * but also has a transaction id manager and a unique initiator id. The intiator ID and site id are the same
  * as the id of the regular txn initiator on this node. The mailbox used has a different ID so messages
  * for agreement are routed here.
  *
