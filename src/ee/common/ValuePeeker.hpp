@@ -54,8 +54,9 @@ public:
         return value.getInteger();
     }
 
-    // cast as int and peek at value. this is used by
-    // index code that need a real number from a tuple.
+    // cast as int and peek at value. this is used by index code that need a
+    // real number from a tuple and the limit node code used to get the limit
+    // from an expression.
     static inline int32_t peekAsInteger(const NValue value) {
         return value.castAsInteger().getInteger();
     }
