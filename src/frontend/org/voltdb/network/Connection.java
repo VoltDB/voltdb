@@ -32,7 +32,14 @@ public interface Connection {
 
     void disableReadSelection();
     void enableReadSelection();
-    String getHostname();
+
+    /**
+     * Get the hostname of a host if it's available, otherwise return the IP
+     * address.
+     *
+     * @return hostname or IP as a string
+     */
+    String getHostnameOrIP();
     long connectionId();
 
     /**

@@ -157,7 +157,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public String getHostname()
+        public String getHostnameOrIP()
         {
             return null;
         }
