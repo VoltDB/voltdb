@@ -298,7 +298,7 @@ void NValue::createDecimalFromString(const std::string &txt) {
     TTInt whole(wholeString);
     std::string fractionalString = txt.substr( separatorPos + 1, txt.size() - (separatorPos + 1));
     // remove trailing zeros
-    while (fractionalString[fractionalString.size() - 1] == '0')
+    while (fractionalString.size() > 0 && fractionalString[fractionalString.size() - 1] == '0')
         fractionalString.erase(fractionalString.size() - 1, 1);
     // check if too many decimal places
     if (fractionalString.size() > 12) {

@@ -53,6 +53,14 @@ TEST_F(NValueTest, DeserializeDecimal)
     TTInt value;
     NValue nv;
 
+
+    nv = ValueFactory::getDecimalValueFromString("6.0000000");
+    deserDecHelper(nv, vt, value, str);
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(value, TTInt("6000000000000"));
+    ASSERT_EQ(str, "6.000000000000");
+
     nv = ValueFactory::getDecimalValueFromString("-0");
     deserDecHelper(nv, vt, value, str);
     ASSERT_FALSE(nv.isNull());
@@ -202,7 +210,6 @@ TEST_F(NValueTest, DeserializeDecimal)
     }
 
     ASSERT_EQ(1,1);
-
 }
 
 TEST_F(NValueTest, TestCastToBigInt) {
