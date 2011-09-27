@@ -46,7 +46,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
     @Override
     public void setUp()
     {
-        m_state = new PartitionedTableSaveFileState(TABLE_NAME);
+        m_state = new PartitionedTableSaveFileState(TABLE_NAME, 0);
         m_siteInput =
             ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
         m_voltDB = new MockVoltDB();
@@ -367,13 +367,13 @@ public class TestPartitionedTableSaveFileState extends TestCase
                                    int totalPartitions)
     {
         m_siteInput.addRow(hostId, "host", originalHostId, "ohost", "cluster", DATABASE_NAME,
-                           TABLE_NAME, "FALSE", partitionId, totalPartitions);
+                           TABLE_NAME, 0, "FALSE", partitionId, totalPartitions);
     }
 
     private void addBadSiteToTestData(int siteId)
     {
         m_siteInput.addRow(10, "host", siteId, "ohost", "cluster", DATABASE_NAME,
-                           TABLE_NAME, "TRUE", 0, 1);
+                           TABLE_NAME, 0, "TRUE", 0, 1);
     }
 
     private void addSiteInfoToCatalog(int siteId, int hostId, int partitionId,

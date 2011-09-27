@@ -36,9 +36,10 @@ public abstract class TableSaveFileState
         return NEXT_DEPENDENCY_ID++;
     }
 
-    TableSaveFileState(String tableName)
+    TableSaveFileState(String tableName, long txnId)
     {
         m_tableName = tableName;
+        m_txnId = txnId;
         m_consistencyResult = "Table: " + m_tableName + " not yet processed";
         m_planDependencyIds = new HashSet<Integer>();
     }
@@ -49,6 +50,11 @@ public abstract class TableSaveFileState
     String getTableName()
     {
         return m_tableName;
+    }
+
+    long getTxnId()
+    {
+        return m_txnId;
     }
 
     public String getConsistencyResult()
@@ -90,5 +96,6 @@ public abstract class TableSaveFileState
     int m_rootDependencyId;
     protected String m_consistencyResult;
     private final String m_tableName;
+    private final long m_txnId;
     private final Set<Integer> m_planDependencyIds;
 }

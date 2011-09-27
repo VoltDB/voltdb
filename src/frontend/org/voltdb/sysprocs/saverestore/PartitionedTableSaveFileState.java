@@ -42,9 +42,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 {
     private static final VoltLogger LOG = new VoltLogger(PartitionedTableSaveFileState.class.getName());
 
-    public PartitionedTableSaveFileState(String tableName)
+    public PartitionedTableSaveFileState(String tableName, long txnId)
     {
-        super(tableName);
+        super(tableName, txnId);
     }
 
     @Override

@@ -141,6 +141,24 @@ public class TestClusterSaveFileState extends TestCase
         assertTrue(false);
     }
 
+    public void testReplicatedTableWithDifferentTxnId()
+    {
+        addReplicatedTableToTestData(0, REPL_TABLE_NAME_1);
+        addReplicatedTableWithTxnId(0, REPL_TABLE_NAME_1, 1);
+        try
+        {
+            @SuppressWarnings("unused")
+            ClusterSaveFileState state =
+                new ClusterSaveFileState(m_siteInput);
+        }
+        catch (IOException e)
+        {
+            assertTrue(true);
+            return;
+        }
+        assertTrue(false);
+    }
+
     public void testMissingPartitionTable()
     {
         addPartitionToTestData(0, PART_TABLE_NAME_1, 0, 0, 3);
@@ -212,19 +230,25 @@ public class TestClusterSaveFileState extends TestCase
                                         int originalPartitionId, int totalPartitions)
     {
         m_siteInput.addRow(hostId, "host", originalHostId, "ohost", CLUSTER_NAME, DATABASE_NAME,
-                           tableName, "FALSE", originalPartitionId, totalPartitions);
+                           tableName, 0, "FALSE", originalPartitionId, totalPartitions);
     }
 
     private void addReplicatedTableToTestData(int currentHostId, String tableName)
     {
         m_siteInput.addRow(currentHostId, "host", currentHostId, "ohost", CLUSTER_NAME, DATABASE_NAME,
-                           tableName, "TRUE", 0, 1);
+                           tableName, 0, "TRUE", 0, 1);
+    }
+
+    private void addReplicatedTableWithTxnId(int currentHostId, String tableName, long txnId)
+    {
+        m_siteInput.addRow(currentHostId, "host", currentHostId, "ohost", CLUSTER_NAME, DATABASE_NAME,
+                           tableName, txnId, "TRUE", 0, 1);
     }
 
     private void addBadSiteToTestData(String clusterName, String databaseName)
     {
         m_siteInput.addRow(10, "host", 10, "ohost", clusterName, databaseName, "dontcare",
-                           "FALSE", 1, 2);
+                           0, "FALSE", 1, 2);
     }
 
     private VoltTable m_siteInput;

@@ -44,7 +44,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
     @Override
     public void setUp()
     {
-        m_state = new ReplicatedTableSaveFileState(TABLE_NAME);
+        m_state = new ReplicatedTableSaveFileState(TABLE_NAME, 0);
         m_siteInput =
             ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
     }
@@ -243,13 +243,13 @@ public class TestReplicatedTableSaveFileState extends TestCase
     private void addHostToTestData(int hostId)
     {
         m_siteInput.addRow(hostId, "host", hostId, "ohost", "cluster", DATABASE_NAME,
-                           TABLE_NAME, "TRUE", 0, 1);
+                           TABLE_NAME, 0, "TRUE", 0, 1);
     }
 
     private void addBadHostToTestData(int hostId)
     {
         m_siteInput.addRow(hostId, "host", hostId, "ohost", "cluster", DATABASE_NAME,
-                           TABLE_NAME, "FALSE", 0, 2);
+                           TABLE_NAME, 0, "FALSE", 0, 2);
     }
 
     private void checkPlanDependencies(SynthesizedPlanFragment[] plan)

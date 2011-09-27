@@ -458,6 +458,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                               savefile.getClusterName(),
                                               savefile.getDatabaseName(),
                                               savefile.getTableName(),
+                                              savefile.getTxnId(),
                                               is_replicated,
                                               pid,
                                               savefile.getTotalPartitions());

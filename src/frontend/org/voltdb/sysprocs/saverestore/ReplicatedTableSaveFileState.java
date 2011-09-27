@@ -30,9 +30,9 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
-    ReplicatedTableSaveFileState(String tableName)
+    ReplicatedTableSaveFileState(String tableName, long txnId)
     {
-        super(tableName);
+        super(tableName, txnId);
     }
 
     @Override

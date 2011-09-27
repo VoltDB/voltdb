@@ -31,7 +31,7 @@ public class ClusterSaveFileState
 {
     public static VoltTable constructEmptySaveFileStateVoltTable()
     {
-        ColumnInfo[] result_columns = new ColumnInfo[10];
+        ColumnInfo[] result_columns = new ColumnInfo[11];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo("CURRENT_HOST_ID", VoltType.INTEGER);
         result_columns[ii++] = new ColumnInfo("CURRENT_HOSTNAME", VoltType.STRING);
@@ -42,6 +42,7 @@ public class ClusterSaveFileState
         result_columns[ii++] = new ColumnInfo("CLUSTER", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("DATABASE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("TXNID", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("IS_REPLICATED", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PARTITION", VoltType.INTEGER);
         result_columns[ii++] = new ColumnInfo("TOTAL_PARTITIONS",
@@ -55,13 +56,14 @@ public class ClusterSaveFileState
     {
         TableSaveFileState table_state = null;
         String table_name = row.getString("TABLE");
+        long txnId = row.getLong("TXNID");
         if (row.getString("IS_REPLICATED").equals("TRUE"))
         {
-            table_state = new ReplicatedTableSaveFileState(table_name);
+            table_state = new ReplicatedTableSaveFileState(table_name, txnId);
         }
         else if (row.getString("IS_REPLICATED").equals("FALSE"))
         {
-            table_state = new PartitionedTableSaveFileState(table_name);
+            table_state = new PartitionedTableSaveFileState(table_name, txnId);
         }
         else
         {
@@ -85,10 +87,24 @@ public class ClusterSaveFileState
 
 
         m_tableStateMap = new HashMap<String, TableSaveFileState>();
+        long txnId = -1;
         while (saveFileState.advanceRow())
         {
             checkConsistency(saveFileState); // throws if inconsistent
             String table_name = saveFileState.getString("TABLE");
+
+            // Check if the transaction IDs match
+            if (txnId == -1)
+            {
+                txnId = saveFileState.getLong("TXNID");
+            }
+            else if (txnId != saveFileState.getLong("TXNID"))
+            {
+                String error = "Table: " + table_name + " has inconsistent" +
+                        " transaction ID ";
+                throw new IOException(error);
+            }
+
             TableSaveFileState table_state = null;
             if (!(getSavedTableNames().contains(table_name)))
             {
