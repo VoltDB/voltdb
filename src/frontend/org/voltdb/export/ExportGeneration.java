@@ -103,7 +103,7 @@ public class ExportGeneration {
         exportLog.info("Restoring export generation " + generationTimestamp);
     }
 
-    void initializeGenerationFromDisk(final Connector conn) {
+    void initializeGenerationFromDisk() {
         /*
          * Find all the advertisements. Once one is found, extract the nonce
          * and check for any data files related to the advertisement. If no data files

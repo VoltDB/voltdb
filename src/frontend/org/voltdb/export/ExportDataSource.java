@@ -415,6 +415,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushExportBuffer(long uso, final long bufferPtr, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         synchronized (m_committedBuffers) {
+
             if (endOfStream) {
                 assert(!m_endOfStream);
                 assert(bufferPtr == 0);
