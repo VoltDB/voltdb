@@ -93,6 +93,7 @@ public:
                        int64_t txnId,
                        int64_t seqNo,
                        int64_t timestamp,
+                       int64_t exportWindow,
                        TableTuple &tuple,
                        TupleStreamWrapper::Type type);
 
@@ -136,6 +137,8 @@ public:
 
     std::string m_signature;
     int64_t m_generation;
+
+    size_t m_exportWindow;
 };
 
 }

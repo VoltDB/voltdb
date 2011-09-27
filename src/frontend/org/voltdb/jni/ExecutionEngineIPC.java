@@ -329,6 +329,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     header.get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
                     long uso = header.getLong();
+                    long txn_id = header.getLong();
                     boolean sync = header.get() == 1 ? true : false;
                     boolean isEndOfGeneration = header.get() == 1 ? true : false;
                     int length = header.getInt();
@@ -345,6 +346,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             partitionId,
                             signature,
                             uso,
+                            txn_id,
                             0,
                             length == 0 ? null : exportBuffer,
                             sync,

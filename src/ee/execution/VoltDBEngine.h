@@ -136,6 +136,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t partitionId,
                         int32_t hostId,
                         std::string hostname,
+                        int64_t exportWindowSize,
                         int64_t tempTableMemoryLimit);
         virtual ~VoltDBEngine();
 

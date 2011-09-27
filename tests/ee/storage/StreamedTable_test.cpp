@@ -99,7 +99,7 @@ public:
           new (m_pool->allocate(sizeof(UndoQuantum)))
           UndoQuantum(0, m_pool);
 
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, true, 0, "", 0);
+        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, true, 0, 60000, "", 0);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;

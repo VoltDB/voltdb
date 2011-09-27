@@ -254,6 +254,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint partitionId,
     jint hostId,
     jstring hostname,
+    jlong exportWindowSize,
     jlong tempTableMemory)
 {
     VOLT_DEBUG("nativeInitialize() start");
@@ -278,6 +279,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    partitionId,
                                    hostId,
                                    hostString,
+                                   exportWindowSize,
                                    tempTableMemory);
 
         if (success) {

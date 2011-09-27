@@ -428,6 +428,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             String hostname,
+            long exportWindowSize,
             long tempTableMemory);
 
     /**
