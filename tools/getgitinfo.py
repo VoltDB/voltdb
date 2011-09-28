@@ -39,8 +39,8 @@ def getGitInfo():
 
     (gitLocalVersion, local) = ("","")
 
-    # git update index - we need this because describe --dirty can get confused by timestamps
-    (gitLocalVersion,stderr) = Popen("git update-index", shell=True, stdout=PIPE, stderr=PIPE).communicate()
+    # need to do a 'git diff' because 'describe --dirty' can get confused by timestamps
+    (gitLocalVersion,stderr) = Popen("git diff --shortstat", shell=True, stdout=PIPE, stderr=PIPE).communicate()
     if stderr:
         print "This is not a git working tree\n"
         return
