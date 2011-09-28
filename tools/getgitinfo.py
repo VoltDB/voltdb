@@ -1,5 +1,4 @@
 #!/usr/bin/python
-import os
 from subprocess import Popen, PIPE
 import sys
 import re
@@ -38,17 +37,28 @@ def getGitInfo():
     
     Returns a string or None if not in a git repository"""
 
-    (urlbase, gitLocalVersion, local) = ("","","")    
+    (gitLocalVersion, local) = ("","")
     
     # git describe --dirty adds '-dirty' to the version string if uncommitted code is found
     (gitLocalVersion,stderr) = Popen("git describe --dirty", shell=True, stdout=PIPE, stderr=PIPE).communicate()
     if stderr:
         print "This is not a git working tree\n"
         return
+
+    # jenkins puts in local tags - look backwards until a non-jenkins tag is found
+    while gitLocalVersion[:7] == "jenkins":
+        gitLocalVersion = gitLocalVersion.strip()
+        if gitLocalVersion[len(gitLocalVersion)-6:] == "-dirty":
+            gitLocalVersion = gitLocalVersion[:len(gitLocalVersion)-6]
+        (gitLocalVersion,stderr) = Popen("git describe %s^1" % gitLocalVersion, 
+                                         shell=True, stdout=PIPE, stderr=PIPE).communicate()
+        if stderr:
+            print stderr
+            break
+
     gitLocalVersion = gitLocalVersion.strip()
 
     #check if local repository == remote repository
-        
     (gitLocalBranch, stderr) = Popen("git name-rev --name-only HEAD", 
                                          shell=True, stdout=PIPE, stderr=PIPE).communicate()
     gitLocalBranch = gitLocalBranch.strip()
@@ -70,13 +80,6 @@ def getGitInfo():
     return "%s%s" % (gitLocalVersion, local)
 
 
-def saveBuildInfo(version, build):
-    """ Save the information to a buildstring.txt file
-
-    """
-
-
-
 if __name__ == "__main__":
     buildstring = None
     version = "0.0.0"
@@ -89,10 +92,6 @@ if __name__ == "__main__":
         buildstring = getSvnInfo()
         if not buildstring:
             buildstring = "This is not from a known repository"
-
-    vfile = open("version.txt", "r")
-    version = vfile.readline().strip()
-    vfile.close()
 
     bfile = open("buildstring.txt", "w")
     bfile.write ("%s %s\n"% (version,buildstring))

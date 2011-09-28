@@ -47,7 +47,8 @@ def makeReleaseDir(releaseDir):
 def buildCommunity():
     with cd(builddir + "/voltdb"):
         run("pwd")
-        run("svn status")
+        run("git status")
+        run("git describe --dirty")
         run("ant clean default dist")
 
 ################################################
@@ -57,7 +58,8 @@ def buildCommunity():
 def buildPro():
     with cd(builddir + "/pro"):
         run("pwd")
-        run("svn status")
+        run("git status")
+        run("git describe --dirty")
         run("VOLTCORE=../voltdb ant -f mmt.xml clean dist.pro")
 
 ################################################
