@@ -31,6 +31,7 @@
 #include <ctime>
 #include <utility>
 #include <math.h>
+#include <limits>
 
 using namespace std;
 using namespace voltdb;
@@ -45,7 +46,8 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
       m_uso(0), m_currBlock(NULL),
       m_openTransactionId(0), m_openTransactionUso(0),
       m_committedTransactionId(0), m_committedUso(0),
-      m_signature(""), m_generation(0), m_exportWindow(0)
+      m_signature(""), m_generation(numeric_limits<int64_t>::min()),
+      m_prevBlockGeneration(numeric_limits<int64_t>::min())
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -89,30 +91,14 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
     assert(generation > m_generation);
     assert(signature == m_signature || m_signature == string(""));
 
-    //The first time through this is catalog load and m_generation will be 0
-    //Don't send the end of stream notice.
-    if (generation != m_generation && m_generation > 0) {
-        //Notify that no more data is coming from this generation.
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                m_generation,
-                m_partitionId,
-                m_signature,
-                NULL,
-                false,
-                true);
-        /*
-         * With the new generational code the USO is reset to 0 for each
-         * generation. The sequence number stored on the table outside the wrapper
-         * is not reset and remains constant. USO is really just for transport purposes.
-         */
-        m_uso = 0;
-        m_openTransactionId = 0;
-        m_openTransactionUso = 0;
-        m_committedTransactionId = 0;
-        m_committedUso = 0;
-        //Reconstruct the next block so it has a USO of 0.
-        assert(m_currBlock->offset() == 0);
-        extendBufferChain(m_defaultCapacity);
+    //The first time through this is catalog load and m_generation
+    //will be Long.MIN.  Don't send the end of stream notice.
+    if (generation != m_generation &&
+        m_generation != numeric_limits<int64_t>::min())
+    {
+        commit(generation, generation);
+        extendBufferChain(0);
+        drainPendingBlocks();
     }
     m_signature = signature;
     m_generation = generation;
@@ -135,18 +121,6 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     if ((currentTxnId == m_openTransactionId) &&
         (lastCommittedTxnId == m_committedTransactionId))
     {
-        //std::cout << "Current txnid(" << currentTxnId << ") == m_openTransactionId(" << m_openTransactionId <<
-        //") && lastCommittedTxnId(" << lastCommittedTxnId << ") m_committedTransactionId(" <<
-        //m_committedTransactionId << ")" << std::endl;
-        if (sync) {
-            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
-                    m_partitionId,
-                    m_signature,
-                    NULL,
-                    true,
-                    false);
-        }
         return;
     }
 
@@ -155,8 +129,6 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     // - The current transaction is now our open transaction
     if (m_openTransactionId < currentTxnId)
     {
-        //std::cout << "m_openTransactionId(" << m_openTransactionId << ") < currentTxnId("
-        //<< currentTxnId << ")" << std::endl;
         m_committedUso = m_uso;
         // Advance the tip to the new transaction.
         m_committedTransactionId = m_openTransactionId;
@@ -168,47 +140,41 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     // committed state.
     if (m_openTransactionId <= lastCommittedTxnId)
     {
-        //std::cout << "m_openTransactionId(" << m_openTransactionId << ") <= lastCommittedTxnId(" <<
-        //lastCommittedTxnId << ")" << std::endl;
         m_committedUso = m_uso;
         m_committedTransactionId = m_openTransactionId;
     }
+}
 
+void
+TupleStreamWrapper::drainPendingBlocks()
+{
     while (!m_pendingBlocks.empty())
     {
         StreamBlock* block = m_pendingBlocks.front();
-        //std::cout << "m_committedUso(" << m_committedUso << "), block->uso() + block->offset() == "
-        //<< (block->uso() + block->offset()) << std::endl;
+
+        // Check to see if we need to inject an end of stream
+        // indication to Java
+        if (block->generationId() > m_prevBlockGeneration &&
+            m_prevBlockGeneration != numeric_limits<int64_t>::min())
+        {
+            StreamBlock* eos_block = new StreamBlock(NULL, 0, block->uso());
+            eos_block->setGenerationId(m_prevBlockGeneration);
+            eos_block->setSignature(m_signature);
+            eos_block->setEndOfStream(true);
+            pushExportBlock(eos_block);
+        }
+        m_prevBlockGeneration = block->generationId();
 
         // check that the entire remainder is committed
         if (m_committedUso >= (block->uso() + block->offset()))
         {
-            //The block is handed off to the topend which is responsible for releasing the
-            //memory associated with the block data. The metadata is deleted here.
-            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
-                    m_partitionId,
-                    m_signature,
-                    block,
-                    false,
-                    false);
-            delete block;
+            pushExportBlock(block);
             m_pendingBlocks.pop_front();
         }
         else
         {
             break;
         }
-    }
-
-    if (sync) {
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                m_generation,
-                m_partitionId,
-                m_signature,
-                NULL,
-                true,
-                false);
     }
 }
 
@@ -271,18 +237,10 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
     }
 
     if (m_currBlock) {
-        if (m_currBlock->offset() > 0) {
-            if (m_committedUso >= (m_currBlock->uso() + m_currBlock->offset()))
-            {
-                //The block is handed off to the topend which is responsible for releasing the
-                //memory associated with the block data. The metadata is deleted here.
-                ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                        m_generation, m_partitionId, m_signature, m_currBlock, false, false);
-                delete m_currBlock;
-            } else {
-                m_pendingBlocks.push_back(m_currBlock);
-                m_currBlock = NULL;
-            }
+        if (m_currBlock->offset() > 0)
+        {
+            m_pendingBlocks.push_back(m_currBlock);
+            m_currBlock = NULL;
         }
         // fully discard empty blocks. makes valgrind/testcase
         // conclusion easier.
@@ -298,6 +256,8 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+    m_currBlock->setGenerationId(m_generation);
+    m_currBlock->setSignature(m_signature);
 }
 
 /*
@@ -336,6 +296,7 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
 
         extendBufferChain(0);
         commit(lastCommittedTxnId, txnId, timeInMillis < 0 ? true : false);
+        drainPendingBlocks();
     }
 }
 
@@ -350,7 +311,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
                                        int64_t txnId,
                                        int64_t seqNo,
                                        int64_t timestamp,
-                                       int64_t exportWindow,
+                                       int64_t generationId,
                                        TableTuple &tuple,
                                        TupleStreamWrapper::Type type)
 {
@@ -369,10 +330,16 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
-    if (!m_currBlock || exportWindow != m_exportWindow)
+    if (generationId > m_generation)
+    {
+        // Advance the generation ID and then create a new buffer
+        // with it
+        m_generation = generationId;
+        extendBufferChain(m_defaultCapacity);
+    }
+    if (!m_currBlock)
     {
         extendBufferChain(m_defaultCapacity);
-        m_exportWindow = exportWindow;
     }
 
     // If the current block doesn't have enough capacity to hold the
@@ -383,11 +350,14 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
         extendBufferChain(tupleMaxLength);
     }
 
+    drainPendingBlocks();
+
     // if this is the first tuple being appended to this block, set
-    // the transaction ID appropriately.
+    // the generation ID appropriately.
     if (m_currBlock->offset() == 0)
     {
-        m_currBlock->setTxnId(txnId);
+        m_currBlock->setGenerationId(m_generation);
+        m_currBlock->setSignature(m_signature);
     }
 
     // initialize the full row header to 0. This also
@@ -451,4 +421,35 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
     }
 
     return *rowHeaderSz + metadataSz + dataSz;
+}
+
+void
+TupleStreamWrapper::pushExportBlock(StreamBlock* sb)
+{
+    cout << endl << "Pushing block, generation: " << sb->generationId() << ", uso: " << sb->uso() << ", offset: " << sb->offset() << ", EOS: " << sb->endOfStream() << endl;
+    if (sb->offset() > 0)
+    {
+        //The block is handed off to the topend which is
+        //responsible for releasing the memory associated with the
+        //block data. The metadata is deleted here.
+        ExecutorContext::getExecutorContext()->getTopend()->
+            pushExportBuffer(sb->generationId(),
+                             m_partitionId,
+                             sb->signature(),
+                             sb,
+                             false,
+                             sb->endOfStream());
+        delete sb;
+    }
+    else
+    {
+        ExecutorContext::getExecutorContext()->getTopend()->
+            pushExportBuffer(sb->generationId(),
+                             m_partitionId,
+                             sb->signature(),
+                             NULL,
+                             false,
+                             sb->endOfStream());
+        discardBlock(sb);
+    }
 }

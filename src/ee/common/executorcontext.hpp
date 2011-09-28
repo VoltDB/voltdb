@@ -109,9 +109,9 @@ public:
         return m_lastCommittedTxnId;
     }
 
-    int64_t currentExportWindow()
+    int64_t currentGenerationId()
     {
-        return (m_txnId >> 23) / m_exportWindowSize;
+        return (currentTxnTimestamp() / m_exportWindowSize) * m_exportWindowSize;
     }
 
     static ExecutorContext* getExecutorContext();

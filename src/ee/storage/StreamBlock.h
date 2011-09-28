@@ -34,14 +34,17 @@ namespace voltdb
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
             : m_data(data), m_capacity(capacity), m_offset(0),
-              m_uso(uso), m_txnId(std::numeric_limits<int64_t>::min())
+            m_uso(uso), m_generationId(std::numeric_limits<int64_t>::min()),
+            m_signature(""), m_endOfStream(false)
         {
         }
 
         StreamBlock(StreamBlock *other)
             : m_data(other->m_data), m_capacity(other->m_capacity),
               m_offset(other->m_offset), m_uso(other->m_uso),
-              m_txnId(other->m_txnId)
+            m_generationId(other->m_generationId),
+            m_signature(other->m_signature),
+            m_endOfStream(other->m_endOfStream)
         {
         }
 
@@ -86,16 +89,36 @@ namespace voltdb
         }
 
         /**
-         * Transaction ID of the first tuple in the buffer
+         * Generation ID of the buffer
          */
-        const int64_t txnId() const
+        const int64_t generationId() const
         {
-            return m_txnId;
+            return m_generationId;
         }
 
-        void setTxnId(int64_t txnId)
+        void setGenerationId(int64_t generationId)
         {
-            m_txnId = txnId;
+            m_generationId = generationId;
+        }
+
+        const std::string signature() const
+        {
+            return m_signature;
+        }
+
+        void setSignature(std::string signature)
+        {
+            m_signature = signature;
+        }
+
+        const bool endOfStream() const
+        {
+            return m_endOfStream;
+        }
+
+        void setEndOfStream(bool endOfStream)
+        {
+            m_endOfStream = endOfStream;
         }
 
     private:
@@ -124,8 +147,12 @@ namespace voltdb
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
-        int64_t m_txnId;         // The transaction ID of the first
-                                 // tuple in this block
+        int64_t m_generationId;  // The generation ID to which this
+                                 // block belongs
+        std::string m_signature; // the signature of the export stream
+                                 // when this block was created
+        bool m_endOfStream;      // Does this block mark the end of a
+                                 // generation?
 
         friend class TupleStreamWrapper;
     };

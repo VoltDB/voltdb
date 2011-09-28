@@ -289,7 +289,7 @@ void JNITopend::pushExportBuffer(
                 partitionId,
                 signatureString,
                 block->uso(),
-                block->txnId(),
+                block->generationId(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
                 sync ? JNI_TRUE : JNI_FALSE,

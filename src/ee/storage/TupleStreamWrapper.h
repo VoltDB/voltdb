@@ -100,9 +100,11 @@ public:
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
     void extendBufferChain(size_t minLength);
     void discardBlock(StreamBlock *sb);
+    void pushExportBlock(StreamBlock* sb);
 
     /** Send committed data to the top end */
     void commit(int64_t lastCommittedTxnId, int64_t txnId, bool sync = false);
+    void drainPendingBlocks();
 
     // cached catalog values
     const CatalogId m_partitionId;
@@ -138,7 +140,9 @@ public:
     std::string m_signature;
     int64_t m_generation;
 
-    size_t m_exportWindow;
+    /** previously sent block generation to detect the need for
+        end of stream insertion */
+    int64_t m_prevBlockGeneration;
 };
 
 }
