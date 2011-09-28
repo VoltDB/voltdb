@@ -203,6 +203,7 @@ public class SiteTracker {
         }
         m_localHeartbeatTargets = tempLocalHeartbeatTargets;
         m_firstNonExecSiteForHost = new int[m_hostsToSites.size()];
+        java.util.Arrays.fill(m_firstNonExecSiteForHost, -1);
         for (ii = 0; ii < m_firstNonExecSiteForHost.length; ii++) {
             HashSet<Integer> set = getNonExecSitesForHost(ii);
             if (set != null) {
@@ -210,6 +211,10 @@ public class SiteTracker {
                     m_firstNonExecSiteForHost[ii] = set.iterator().next();
                 }
             }
+        }
+        System.out.println("First non exec site for hosts ");
+        for (Integer i : m_firstNonExecSiteForHost) {
+            System.out.println(i);
         }
     }
 

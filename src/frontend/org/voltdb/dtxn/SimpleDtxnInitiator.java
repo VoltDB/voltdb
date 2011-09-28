@@ -258,6 +258,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
              */
             for (int hostTargets[] : remoteHeartbeatTargets) {
                 final int initiatorSiteId = st.getFirstNonExecSiteForHost(st.getHostForSite(hostTargets[0]));
+                assert(initiatorSiteId != 1);//uninitialized value
                 long safeTxnIds[] = new long[hostTargets.length];
                 for (int ii = 0; ii < safeTxnIds.length; ii++) {
                     safeTxnIds[ii] = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(hostTargets[ii]);
