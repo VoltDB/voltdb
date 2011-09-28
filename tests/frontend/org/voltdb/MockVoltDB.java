@@ -67,7 +67,7 @@ public class MockVoltDB implements VoltDBInterface
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata = "0.0.0.0:0:0:0";
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
-    private final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
+    final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
     final AgreementSite m_agreementSite;
     private final ZooKeeper m_zk;
     boolean m_noLoadLib = false;

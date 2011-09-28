@@ -425,6 +425,7 @@ public class TestExecutionSite extends TestCase {
             m_mboxes[i] = null;
         }
         m_voltdb.getFaultDistributor().shutDown();
+        m_voltdb.m_snapshotCompletionMonitor.shutdown();
         m_voltdb.getZK().close();
         m_voltdb.m_agreementSite.shutdown();
         m_voltdb = null;

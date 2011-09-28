@@ -183,6 +183,8 @@ public class RejoinTestBase extends TestCase {
 
         int myHostId = host2.getHostId() * 100;
         host2.createLocalSite(myHostId);
+        //Need to create the initiator mailbox to receive heartbeats
+        Mailbox initiatorMailbox = host2.createMailbox(myHostId, VoltDB.DTXN_MAILBOX_ID, false);
         Mailbox mailbox = host2.createMailbox(myHostId, VoltDB.AGREEMENT_MAILBOX_ID, false);
         AgreementSite site = new AgreementSite(
                 myHostId,

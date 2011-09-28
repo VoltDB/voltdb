@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Site;
 
@@ -75,6 +76,12 @@ public class SiteTracker {
     Set<Integer> m_downHostIds = new TreeSet<Integer>();
 
     private final Site m_allSites[];
+
+    private final int[] m_firstNonExecSiteForHost;
+
+    private final int[] m_localHeartbeatTargets;
+
+    private final int[][] m_remoteHeartbeatTargets;
 
     // scratch value used to compute the out of date sites
     // note: this makes
@@ -158,6 +165,60 @@ public class SiteTracker {
                 m_lastHeartbeatTime.put(siteId, -1L);
             }
         }
+
+        /*
+         *  Calculate exec sites for each up host, these will be the heartbeat targets
+         */
+        HashMap<Integer, ArrayList<Integer>> upHostsToExecSites = new HashMap<Integer, ArrayList<Integer>>();
+        for (Integer host : m_liveHostIds) {
+            ArrayList<Integer> sites = new ArrayList<Integer>(m_hostsToSites.get(host));
+            sites.removeAll(m_nonExecSitesForHost.get(host));
+            upHostsToExecSites.put( host, sites);
+        }
+
+        /*
+         * Local heartbeat targets go in a separate array, get individual messages delivery locally
+         */
+        int myHostId = 0;
+        if (VoltDB.instance() != null) {
+            if (VoltDB.instance().getMessenger() != null) {
+                myHostId = VoltDB.instance().getHostMessenger().getHostId();
+            }
+        }
+
+        int ii = 0;
+        int numHosts = upHostsToExecSites.size();
+        if (numHosts < 2) {
+            m_remoteHeartbeatTargets = new int[0][];
+        } else {
+            m_remoteHeartbeatTargets = new int[upHostsToExecSites.size() - 1][];
+        }
+        int tempLocalHeartbeatTargets[] = new int[0];
+        for (Map.Entry<Integer, ArrayList<Integer>> entry : upHostsToExecSites.entrySet()) {
+            if (entry.getKey() == myHostId) {
+                tempLocalHeartbeatTargets = intArrayListToArray(entry.getValue());
+            } else {
+                m_remoteHeartbeatTargets[ii++] = intArrayListToArray(entry.getValue());
+            }
+        }
+        m_localHeartbeatTargets = tempLocalHeartbeatTargets;
+        m_firstNonExecSiteForHost = new int[m_hostsToSites.size()];
+        for (ii = 0; ii < m_firstNonExecSiteForHost.length; ii++) {
+            HashSet<Integer> set = getNonExecSitesForHost(ii);
+            if (set != null) {
+                if (set.iterator().hasNext()) {
+                    m_firstNonExecSiteForHost[ii] = set.iterator().next();
+                }
+            }
+        }
+    }
+
+    private int[] intArrayListToArray(ArrayList<Integer> ints) {
+        int retval[] = new int[ints.size()];
+        for (int ii = 0; ii < retval.length; ii++) {
+            retval[ii] = ints.get(ii);
+        }
+        return retval;
     }
 
     public Set<Integer> getAllLiveSites() {
@@ -533,4 +594,21 @@ public class SiteTracker {
         return retval;
     }
 
+    /*
+     * Get an array of local sites that need heartbeats. This will get individually generated heartbeats.
+     */
+    public int[] getLocalHeartbeatTargets() {
+        return m_localHeartbeatTargets;
+    }
+
+    /*
+     * An array per up host, there will be no entry for this host
+     */
+    public int[][] getRemoteHeartbeatTargets() {
+        return m_remoteHeartbeatTargets;
+    }
+
+    public int getFirstNonExecSiteForHost(int hostId) {
+        return m_firstNonExecSiteForHost[hostId];
+    }
 }

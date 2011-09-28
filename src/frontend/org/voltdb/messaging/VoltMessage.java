@@ -46,6 +46,7 @@ public abstract class VoltMessage {
     final public static byte COMPLETE_TRANSACTION_RESPONSE_ID = 12;
     final public static byte AGREEMENT_TASK_ID = 13;
     final public static byte BINARY_PAYLOAD_ID = 14;
+    final public static byte COALESCED_HEARTBEAT_ID = 15;
 
     // place holder for destination site ids when using multi-cast
     final public static int SEND_TO_MANY = -2;
@@ -127,6 +128,9 @@ public abstract class VoltMessage {
             break;
         case HEARTBEAT_ID:
             message = new HeartbeatMessage();
+            break;
+        case COALESCED_HEARTBEAT_ID:
+            message = new CoalescedHeartbeatMessage();
             break;
         case HEARTBEAT_RESPONSE_ID:
             message = new HeartbeatResponseMessage();

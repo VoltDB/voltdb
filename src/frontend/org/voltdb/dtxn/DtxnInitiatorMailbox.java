@@ -29,6 +29,8 @@ import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.messaging.CoalescedHeartbeatMessage;
+import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -206,6 +208,10 @@ public class DtxnInitiatorMailbox implements Mailbox
 
     @Override
     public void deliver(VoltMessage message) {
+        if (message instanceof CoalescedHeartbeatMessage) {
+            demuxCoalescedHeartbeatMessage((CoalescedHeartbeatMessage)message);
+            return;
+        }
         ClientResponseImpl toSend = null;
         InFlightTxnState state = null;
         synchronized (m_initiator) {
@@ -251,6 +257,21 @@ public class DtxnInitiatorMailbox implements Mailbox
                 ResponseSampler.offerResponse(this.getSiteId(), state.txnId, state.invocation, toSend);
             // queue the response to be sent to the client
             enqueueResponse(toSend, state);
+        }
+    }
+
+    private void demuxCoalescedHeartbeatMessage(
+            CoalescedHeartbeatMessage message) {
+        final int destinations[] = message.getHeartbeatDestinations();
+        final HeartbeatMessage heartbeats[] = message.getHeartbeatsToDeliver();
+        assert(destinations.length == heartbeats.length);
+
+        try {
+            for (int ii = 0; ii < destinations.length; ii++) {
+                m_hostMessenger.send(destinations[ii], VoltDB.DTXN_MAILBOX_ID, heartbeats[ii]);
+            }
+        } catch (MessagingException e) {
+            VoltDB.crashLocalVoltDB("Error attempting to demux and deliver coalesced heartbeat messages", true, e);
         }
     }
 

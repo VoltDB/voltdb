@@ -54,6 +54,7 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MessagingException;
@@ -245,22 +246,31 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     @Override
     public void sendHeartbeat(final long txnId) {
-        // SEMI-HACK: this list can become incorrect if there's a node
-        // failure in between here and the Heartbeat transmission loop below.
-        // Rather than add another synchronization point, we'll just make
-        // that a survivable case, see ExecutorTxnIdSafetyState for more info.
-        int[] outOfDateSites =
-            VoltDB.instance().getCatalogContext().
-            //siteTracker.getSitesWhichNeedAHeartbeat(time, interval);
-            siteTracker.getUpExecutionSites();
-
-        //long duration = now - m_lastTickTime;
-        //System.out.printf("Sending tick after %d ms pause.\n", duration);
-        //System.out.flush();
+        final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
+        int remoteHeartbeatTargets[][] = st.getRemoteHeartbeatTargets();
+        int localHeartbeatTargets[] = st.getLocalHeartbeatTargets();
 
         try {
-            // loop over all the sites that need a heartbeat and send one
-            for (int siteId : outOfDateSites) {
+            /*
+             * For each host, create an array containing the safe txn ids for each
+             * site. Then coalesce them into a single heartbeat message to send to the
+             * initiator on that host who will then demux the heartbeats
+             */
+            for (int hostTargets[] : remoteHeartbeatTargets) {
+                final int initiatorSiteId = st.getFirstNonExecSiteForHost(st.getHostForSite(hostTargets[0]));
+                long safeTxnIds[] = new long[hostTargets.length];
+                for (int ii = 0; ii < safeTxnIds.length; ii++) {
+                    safeTxnIds[ii] = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(hostTargets[ii]);
+                }
+
+                CoalescedHeartbeatMessage heartbeat =
+                    new CoalescedHeartbeatMessage(m_siteId, txnId, hostTargets,safeTxnIds);
+                m_mailbox.send(initiatorSiteId, VoltDB.DTXN_MAILBOX_ID, heartbeat);
+            }
+
+            // loop over all the local sites that need a heartbeat and send each a message
+            // no coalescing here
+            for (int siteId : localHeartbeatTargets) {
                 // tack on the last confirmed seen txn id for all sites with a particular partition
                 long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(siteId);
                 HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, newestSafeTxnId);
