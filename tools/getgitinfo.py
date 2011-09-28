@@ -38,6 +38,12 @@ def getGitInfo():
     Returns a string or None if not in a git repository"""
 
     (gitLocalVersion, local) = ("","")
+
+    # git update index - we need this because describe --dirty can get confused by timestamps
+    (gitLocalVersion,stderr) = Popen("git update-index", shell=True, stdout=PIPE, stderr=PIPE).communicate()
+    if stderr:
+        print "This is not a git working tree\n"
+        return
     
     # git describe --dirty adds '-dirty' to the version string if uncommitted code is found
     (gitLocalVersion,stderr) = Popen("git describe --dirty", shell=True, stdout=PIPE, stderr=PIPE).communicate()
