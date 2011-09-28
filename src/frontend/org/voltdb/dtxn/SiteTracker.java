@@ -212,10 +212,6 @@ public class SiteTracker {
                 }
             }
         }
-        System.out.println("First non exec site for hosts ");
-        for (Integer i : m_firstNonExecSiteForHost) {
-            System.out.println(i);
-        }
     }
 
     private int[] intArrayListToArray(ArrayList<Integer> ints) {
