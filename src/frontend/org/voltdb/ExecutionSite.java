@@ -118,6 +118,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
 
+    // Start with a default value of 5 minutes.  This should turn into
+    // a configuration value at some point
+    static final long DEFAULT_EXPORT_WINDOWSIZE_MS = 60 * 5 * 1000;
+
     /*
      * Recover a site at a time to make the interval in which other sites
      * are blocked as small as possible. The permit will be generated once.
@@ -808,6 +812,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         Integer.valueOf(site.getPartition().getTypeName()),
                         Integer.valueOf(site.getHost().getTypeName()),
                         hostname,
+                        DEFAULT_EXPORT_WINDOWSIZE_MS,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize());
                 eeTemp.loadCatalog( txnId, serializedCatalog);

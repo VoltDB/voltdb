@@ -322,6 +322,7 @@ public class ExportManager
             int partitionId,
             String signature,
             long uso,
+            long txnId,
             long bufferPtr,
             ByteBuffer buffer,
             boolean sync,

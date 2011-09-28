@@ -96,10 +96,14 @@ public class TestTwoSitePlans extends TestCase {
 
         // create two EEs
         site1 = new ExecutionSite(0); // site 0
-        ee1 = new ExecutionEngineJNI(site1, cluster.getRelativeIndex(), 1, 0, 0, "", 100);
+        ee1 = new ExecutionEngineJNI(site1,
+                                     cluster.getRelativeIndex(),
+                                     1, 0, 0, "", 60000, 100);
         ee1.loadCatalog( 0, catalog.serialize());
         site2 = new ExecutionSite(1); // site 1
-        ee2 = new ExecutionEngineJNI(site2, cluster.getRelativeIndex(), 2, 0, 0, "", 100);
+        ee2 = new ExecutionEngineJNI(site2,
+                                     cluster.getRelativeIndex(),
+                                     2, 0, 0, "", 60000, 100);
         ee2.loadCatalog( 0, catalog.serialize());
 
         // cache some plan fragments

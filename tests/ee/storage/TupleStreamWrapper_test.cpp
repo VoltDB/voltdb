@@ -51,7 +51,7 @@ const int COLUMN_COUNT = 5;
 // 2 bytes for null mask (10 columns rounds to 16, /8 = 2) = 2
 // sizeof(int32_t) for row header = 4
 // 5 * sizeof(int64_t) for tuple data = 40
-// total: 87
+// total: 94
 const int MAGIC_TUPLE_SIZE = 94;
 // 1k buffer
 const int BUFFER_SIZE = 1024;
@@ -101,7 +101,8 @@ public:
 class TupleStreamWrapperTest : public Test {
 public:
     TupleStreamWrapperTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, true, 0, "localhost", 2)) {
+                               m_context(new ExecutorContext( 1, 1, NULL, &m_topend, true, 0, 60000, "localhost", 2))
+    {
         srand(0);
 
         // set up the schema used to fill the new buffer
@@ -136,7 +137,8 @@ public:
         m_tuple->move(m_tupleMemory);
     }
 
-    void appendTuple(int64_t lastCommittedTxnId, int64_t currentTxnId)
+    void appendTuple(int64_t lastCommittedTxnId, int64_t currentTxnId,
+                     int64_t exportWindow)
     {
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
@@ -145,7 +147,8 @@ public:
         }
         // append into the buffer
         m_wrapper->appendTuple(lastCommittedTxnId,
-                               currentTxnId, 1, 1, *m_tuple,
+                               currentTxnId, 1, 1, exportWindow,
+                               *m_tuple,
                                TupleStreamWrapper::INSERT);
     }
 
@@ -217,6 +220,11 @@ protected:
 //     currently available.  Then, if that buffer gets filled and
 //     finished, that the next poll returns the correct remainder of
 //     that buffer.
+// ---
+// New test for export refactoring 9/27/11
+//
+// Test that advancing the exportWindow value results in a new
+// StreamBlock boundary.
 
 /**
  * Get one tuple
@@ -225,13 +233,14 @@ TEST_F(TupleStreamWrapperTest, DoOneTuple)
 {
 
     // write a new tuple and then flush the buffer
-    appendTuple(1, 2);
+    appendTuple(1, 2, 0);
     m_wrapper->periodicFlush(-1, 2, 2);
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 2);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
 }
 
@@ -247,13 +256,13 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
 
     for (int i = 1; i < 10; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i-1, i, 0);
     }
     m_wrapper->periodicFlush(-1, 9, 10);
 
     for (int i = 10; i < 20; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i-1, i, 0);
     }
     m_wrapper->periodicFlush(-1, 19, 19);
 
@@ -264,6 +273,7 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
 
     // now get the second
@@ -271,6 +281,7 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->txnId(), 10);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
 
     // ack all of the data and re-verify block count
@@ -285,13 +296,13 @@ TEST_F(TupleStreamWrapperTest, FarFutureFlush)
 {
     for (int i = 1; i < 10; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i-1, i, 0);
     }
     m_wrapper->periodicFlush(-1, 99, 100);
 
     for (int i = 100; i < 110; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i-1, i, 0);
     }
     m_wrapper->periodicFlush(-1, 130, 131);
 
@@ -300,6 +311,7 @@ TEST_F(TupleStreamWrapperTest, FarFutureFlush)
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
 
     // now get the second
@@ -307,6 +319,7 @@ TEST_F(TupleStreamWrapperTest, FarFutureFlush)
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->txnId(), 100);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
 }
 
@@ -319,19 +332,20 @@ TEST_F(TupleStreamWrapperTest, Fill) {
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= tuples_to_fill; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i-1, i, 0);
     }
     // We shouldn't yet get a buffer because we haven't forced the
     // generation of a new one by exceeding the current one.
     ASSERT_FALSE(m_topend.receivedExportBuffer);
 
     // now, drop in one more
-    appendTuple(tuples_to_fill, tuples_to_fill + 1);
+    appendTuple(tuples_to_fill, tuples_to_fill + 1, 0);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
 
@@ -345,26 +359,27 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndAppend) {
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= tuples_to_fill; i++)
     {
-        appendTuple(0, 1);
+        appendTuple(0, 1, 0);
     }
     // We shouldn't yet get a buffer because we haven't forced the
     // generation of a new one by exceeding the current one.
     ASSERT_FALSE(m_topend.receivedExportBuffer);
 
     // now, drop in one more on the same TXN ID
-    appendTuple(0, 1);
+    appendTuple(0, 1, 0);
 
     // We shouldn't yet get a buffer because we haven't closed the current
     // transaction
     ASSERT_FALSE(m_topend.receivedExportBuffer);
 
     // now, finally drop in a tuple that closes the first TXN
-    appendTuple(1, 2);
+    appendTuple(1, 2, 0);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
 
@@ -378,14 +393,14 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndFlush) {
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= tuples_to_fill; i++)
     {
-        appendTuple(0, 1);
+        appendTuple(0, 1, 0);
     }
     // We shouldn't yet get a buffer because we haven't forced the
     // generation of a new one by exceeding the current one.
     ASSERT_FALSE(m_topend.receivedExportBuffer);
 
     // now, drop in one more on the same TXN ID
-    appendTuple(0, 1);
+    appendTuple(0, 1, 0);
 
     // We shouldn't yet get a buffer because we haven't closed the current
     // transaction
@@ -399,11 +414,13 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndFlush) {
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
 }
 
@@ -418,7 +435,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= tuples_to_fill; i++)
     {
-        appendTuple(0, 1);
+        appendTuple(0, 1, 0);
     }
     // We shouldn't yet get a buffer because we haven't forced the
     // generation of a new one by exceeding the current one.
@@ -428,7 +445,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
     // the whole first buffer.  Roll back the new tuple and make sure
     // we have a good buffer
     size_t mark = m_wrapper->bytesUsed();
-    appendTuple(1, 2);
+    appendTuple(1, 2, 0);
     m_wrapper->rollbackTo(mark);
 
     // so flush and make sure we got something sane
@@ -437,6 +454,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
 
@@ -450,7 +468,7 @@ TEST_F(TupleStreamWrapperTest, FillWithOneTxn) {
     // fill several buffers
     for (int i = 0; i <= (tuples_to_fill + 10) * 3; i++)
     {
-        appendTuple(1, 2);
+        appendTuple(1, 2, 0);
     }
     // We shouldn't yet get a buffer even though we've filled a bunch because
     // the transaction is still open.
@@ -464,19 +482,22 @@ TEST_F(TupleStreamWrapperTest, FillWithOneTxn) {
 TEST_F(TupleStreamWrapperTest, RollbackFirstTuple)
 {
 
-    appendTuple(1, 2);
+    appendTuple(1, 2, 0);
     // rollback the first tuple
     m_wrapper->rollbackTo(0);
 
     // write a new tuple and then flush the buffer
-    appendTuple(1, 2);
-    m_wrapper->periodicFlush(-1, 2, 2);
+    appendTuple(1, 3, 0);
+    m_wrapper->periodicFlush(-1, 3, 3);
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    // We wiped out the original tuple, so the txn ID of the first tuple
+    // should be the tuple we replaced it with
+    EXPECT_EQ(results->txnId(), 3);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
 }
 
@@ -491,12 +512,12 @@ TEST_F(TupleStreamWrapperTest, RollbackMiddleTuple)
     // append a bunch of tuples
     for (int i = 1; i <= 10; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i-1, i, 0);
     }
 
     // add another and roll it back and flush
     size_t mark = m_wrapper->bytesUsed();
-    appendTuple(10, 11);
+    appendTuple(10, 11, 0);
     m_wrapper->rollbackTo(mark);
     m_wrapper->periodicFlush(-1, 10, 11);
 
@@ -504,6 +525,7 @@ TEST_F(TupleStreamWrapperTest, RollbackMiddleTuple)
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
 }
 
@@ -516,7 +538,7 @@ TEST_F(TupleStreamWrapperTest, RollbackWholeBuffer)
     // append a bunch of tuples
     for (int i = 1; i <= 10; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i-1, i, 0);
     }
 
     // now, fill a couple of buffers with tuples from a single transaction
@@ -524,7 +546,7 @@ TEST_F(TupleStreamWrapperTest, RollbackWholeBuffer)
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     for (int i = 0; i < (tuples_to_fill + 10) * 2; i++)
     {
-        appendTuple(10, 11);
+        appendTuple(10, 11, 0);
     }
     m_wrapper->rollbackTo(mark);
     m_wrapper->periodicFlush(-1, 10, 11);
@@ -533,7 +555,37 @@ TEST_F(TupleStreamWrapperTest, RollbackWholeBuffer)
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
+}
+
+/**
+ * Verify that advancing the exportWindow generates a new buffer
+ */
+TEST_F(TupleStreamWrapperTest, AdvanceExportWindow)
+{
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i, 0);
+    }
+    appendTuple(10, 11, 1);
+    m_wrapper->periodicFlush(-1, 11, 11);
+
+    // get the first buffer flushed
+    ASSERT_TRUE(m_topend.receivedExportBuffer);
+    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->txnId(), 1);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
+
+    // now get the second
+    ASSERT_FALSE(m_topend.blocks.empty());
+    results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->txnId(), 11);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
 }
 
 int main() {
