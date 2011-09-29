@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import java.io.File;
-
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -477,7 +475,7 @@ public class JdbcDatabaseMetaDataGenerator
                     results.addRow(null,
                                    null, // table_schema
                                    table.getTypeName(), // table name
-                                   index.getUnique() ? 0 : 1, // non-unique, 1 is unique, 0 is not
+                                   index.getUnique() ? 0 : 1, // non-unique, 0 is unique, 1 is not
                                    null, // index qualifier (always null for us)
                                    index.getTypeName(), // index name
                                    getIndexType(index), // type

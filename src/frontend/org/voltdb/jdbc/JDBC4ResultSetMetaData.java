@@ -19,7 +19,6 @@ package org.voltdb.jdbc;
 
 import java.sql.*;
 import org.voltdb.*;
-import org.voltdb.client.*;
 
 public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
 {
@@ -41,7 +40,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     public String getColumnClassName(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        VoltType type = sourceResultSet.table.getColumnType(column);
+        VoltType type = sourceResultSet.table.getColumnType(column - 1);
         switch(type)
         {
             case TINYINT:
@@ -75,7 +74,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     public int getColumnDisplaySize(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        VoltType type = sourceResultSet.table.getColumnType(column);
+        VoltType type = sourceResultSet.table.getColumnType(column - 1);
         switch(type)
         {
             case TINYINT:
@@ -109,14 +108,14 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     public String getColumnName(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        return sourceResultSet.table.getColumnName(column);
+        return sourceResultSet.table.getColumnName(column - 1);
     }
 
     // Retrieves the designated column's SQL type.
     public int getColumnType(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        VoltType type = sourceResultSet.table.getColumnType(column);
+        VoltType type = sourceResultSet.table.getColumnType(column - 1);
         switch(type)
         {
             case TINYINT:
@@ -144,7 +143,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     public String getColumnTypeName(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        VoltType type = sourceResultSet.table.getColumnType(column);
+        VoltType type = sourceResultSet.table.getColumnType(column - 1);
         switch(type)
         {
             case TINYINT:
@@ -172,7 +171,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     public int getPrecision(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        VoltType type = sourceResultSet.table.getColumnType(column);
+        VoltType type = sourceResultSet.table.getColumnType(column - 1);
         switch(type)
         {
             case TINYINT:
@@ -200,7 +199,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     public int getScale(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        VoltType type = sourceResultSet.table.getColumnType(column);
+        VoltType type = sourceResultSet.table.getColumnType(column - 1);
         switch(type)
         {
             case DECIMAL:
@@ -237,7 +236,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     public boolean isCaseSensitive(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        VoltType type = sourceResultSet.table.getColumnType(column);
+        VoltType type = sourceResultSet.table.getColumnType(column - 1);
         switch(type)
         {
             case TINYINT:
@@ -293,7 +292,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     public boolean isSigned(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
-        VoltType type = sourceResultSet.table.getColumnType(column);
+        VoltType type = sourceResultSet.table.getColumnType(column - 1);
         switch(type)
         {
             case TINYINT:

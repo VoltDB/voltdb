@@ -18,19 +18,29 @@
 package org.voltdb.jdbc;
 
 import java.sql.*;
+import java.util.Arrays;
+import java.util.List;
+
 import org.voltdb.*;
-import org.voltdb.client.*;
+import org.voltdb.VoltTable.ColumnInfo;
 
 public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 {
+    /*
+     * Two types of tables the metadata generator generates. It has to match the
+     * table types generated in JdbcDatabaseMetaDataGenerator.
+     */
+    private static final String tableTypes[] = new String[] {"TABLE",
+                                                             "VIEW"};
+
     private final CallableStatement sysInfo;
     private final CallableStatement sysCatalog;
     private final JDBC4Connection sourceConnection;
     JDBC4DatabaseMetaData(JDBC4Connection connection) throws SQLException
     {
         this.sourceConnection = connection;
-    this.sysInfo = connection.prepareCall("{call @SystemInformation}");
-    this.sysCatalog = connection.prepareCall("{call @SystemCatalog(?)}");
+        this.sysInfo = connection.prepareCall("{call @SystemInformation}");
+        this.sysCatalog = connection.prepareCall("{call @SystemCatalog(?)}");
 
         // Initialize system information
         loadSystemInformation();
@@ -166,13 +176,21 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
-        if (tableNamePattern != null || columnNamePattern != null)
-            throw new SQLException("getColumns() does not support pattern filtering");
-
         checkClosed();
         this.sysCatalog.setString(1, "COLUMNS");
-        ResultSet res = this.sysCatalog.executeQuery();
-        return res;
+        JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
+        VoltTable vtable = res.getVoltTable().clone(0);
+
+        // Filter columns based on table name and column name
+        while (res.next()) {
+            if (res.getString("TABLE_NAME").equals(tableNamePattern)) {
+                if (columnNamePattern == null || res.getString("COLUMN_NAME").equals(columnNamePattern)) {
+                    vtable.addRow(res.getRowData());
+                }
+            }
+        }
+
+        return new JDBC4ResultSet(this.sysCatalog, vtable);
     }
 
     // Retrieves the connection that produced this metadata object.
@@ -298,13 +316,21 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) throws SQLException
     {
-        if (table != null)
-            throw new SQLException("getIndexInfo() does not support pattern filtering");
-
         checkClosed();
         this.sysCatalog.setString(1, "INDEXINFO");
-        ResultSet res = this.sysCatalog.executeQuery();
-        return res;
+        JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
+        VoltTable vtable = res.getVoltTable().clone(0);
+
+        // Filter the indexes by table name
+        while (res.next()) {
+            if (res.getString("TABLE_NAME").equals(table)) {
+                if (!unique || res.getShort("NON_UNIQUE") == 0) {
+                    vtable.addRow(res.getRowData());
+                }
+            }
+        }
+
+        return new JDBC4ResultSet(sysCatalog, vtable);
     }
 
     // Retrieves the major JDBC version number for this driver.
@@ -472,33 +498,46 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException
     {
-        if (table != null)
-            throw new SQLException("getPrimaryKeys() does not support pattern filtering");
-
         checkClosed();
         this.sysCatalog.setString(1, "PRIMARYKEYS");
-        ResultSet res = this.sysCatalog.executeQuery();
-        return res;
+        JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
+        VoltTable vtable = res.getVoltTable().clone(0);
+
+        // Filter the primary keys based on table name
+        while (res.next()) {
+            if (res.getString("TABLE_NAME").equals(table)) {
+                vtable.addRow(res.getRowData());
+            }
+        }
+        return new JDBC4ResultSet(sysCatalog, vtable);
     }
 
     // Retrieves a description of the given catalog's stored procedure parameter and result columns.
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern, String columnNamePattern) throws SQLException
     {
-        if (procedureNamePattern != null || columnNamePattern != null)
-            throw new SQLException("getProcedureColumns() does not support pattern filtering");
-
         checkClosed();
         this.sysCatalog.setString(1, "PROCEDURECOLUMNS");
-        ResultSet res = this.sysCatalog.executeQuery();
-        return res;
+        JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
+        VoltTable vtable = res.getVoltTable().clone(0);
+
+        // Filter the results based on procedure name and column name
+        while (res.next()) {
+            if (res.getString("PROCEDURE_NAME").equals(procedureNamePattern)) {
+                if (columnNamePattern == null || res.getString("COLUMN_NAME").equals(columnNamePattern)) {
+                    vtable.addRow(res.getRowData());
+                }
+            }
+        }
+
+        return new JDBC4ResultSet(sysCatalog, vtable);
     }
 
     // Retrieves a description of the stored procedures available in the given catalog.
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern) throws SQLException
     {
-        if (procedureNamePattern != null && procedureNamePattern != "%")
+        if (procedureNamePattern != null && !procedureNamePattern.equals("%"))
             throw new SQLException(String.format("getProcedures('%s','%s','%s') does not support pattern filtering", catalog, schemaPattern, procedureNamePattern));
 
         checkClosed();
@@ -609,12 +648,27 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types) throws SQLException
     {
-        if ((tableNamePattern != null && !tableNamePattern.equals("%")) || types != null)
+        if ((tableNamePattern != null && !tableNamePattern.equals("%")) ||
+            (types != null && types.length > tableTypes.length))
             throw new SQLException(String.format("getTables('%s','%s','%s',%d) does not support pattern filtering", catalog, schemaPattern, tableNamePattern, types != null ? types.length : 0));
 
         checkClosed();
         this.sysCatalog.setString(1, "TABLES");
-    return this.sysCatalog.executeQuery();
+        JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
+        VoltTable vtable = res.getVoltTable().clone(0);
+        List<String> typeStrings = null;
+        if (types != null) {
+            typeStrings = Arrays.asList(types);
+        }
+
+        // Filter tables based on type
+        while (res.next()) {
+            if (typeStrings == null || typeStrings.contains(res.getString("TABLE_TYPE"))) {
+                vtable.addRow(res.getRowData());
+            }
+        }
+
+        return new JDBC4ResultSet(this.sysCatalog, vtable);
 /*
         ResultSet res = this.sysCatalog.executeQuery();
     VoltTable jdbcData = new VoltTable(
@@ -640,7 +694,12 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public ResultSet getTableTypes() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        VoltTable vtable = new VoltTable(new ColumnInfo("TABLE_TYPE", VoltType.STRING));
+        for (String type : tableTypes) {
+            vtable.addRow(type);
+        }
+        JDBC4ResultSet res = new JDBC4ResultSet(this.sysCatalog, vtable);
+        return res;
     }
 
     // Retrieves a comma-separated list of the time and date functions available with this database.
