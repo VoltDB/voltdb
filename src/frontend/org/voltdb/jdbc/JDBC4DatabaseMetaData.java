@@ -30,8 +30,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
      * Two types of tables the metadata generator generates. It has to match the
      * table types generated in JdbcDatabaseMetaDataGenerator.
      */
-    private static final String tableTypes[] = new String[] {"TABLE",
-                                                             "VIEW"};
+    static final String tableTypes[] = new String[] {"TABLE",
+                                                     "VIEW"};
 
     private final CallableStatement sysInfo;
     private final CallableStatement sysCatalog;
@@ -176,6 +176,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
+        assert(tableNamePattern != null && !tableNamePattern.isEmpty());
         checkClosed();
         this.sysCatalog.setString(1, "COLUMNS");
         JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
