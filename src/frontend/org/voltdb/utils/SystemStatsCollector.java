@@ -274,6 +274,9 @@ public class SystemStatsCollector {
      * @return The most recently generated Datum.
      */
     public static synchronized Datum getRecentSample() {
+        if (historyS.isEmpty()) {
+            return null;
+        }
         return historyS.getLast();
     }
 

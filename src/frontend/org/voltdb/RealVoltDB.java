@@ -237,7 +237,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      * heartbeats. Heartbeats are dealt with in a different thread.
      */
     private Runnable periodicWork = new Runnable() {
-        StatsManager m_statsManager;
         private long m_lastStatsManagerTime = System.currentTimeMillis();
         private long m_lastSysStatsSCollection = 0;
         private long m_lastSysStatsMCollection = 0;
@@ -280,6 +279,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 // do so now
                 if ((!m_hasTriedLoadAdHocPlanner) && (currentTime - m_classLoadTime > 10000)) {
                     m_compilerThread.ensureLoadedPlanner();
+                    m_hasTriedLoadAdHocPlanner = true;
                 }
 
                 //long duration = System.nanoTime() - beforeTime;
