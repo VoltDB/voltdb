@@ -185,7 +185,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         // Filter columns based on table name and column name
         while (res.next()) {
             if (res.getString("TABLE_NAME").equals(tableNamePattern)) {
-                if (columnNamePattern == null || res.getString("COLUMN_NAME").equals(columnNamePattern)) {
+                if (columnNamePattern == null ||
+                    res.getString("COLUMN_NAME").equals(columnNamePattern)) {
                     vtable.addRow(res.getRowData());
                 }
             }
@@ -317,6 +318,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) throws SQLException
     {
+        assert(table != null && !table.isEmpty());
         checkClosed();
         this.sysCatalog.setString(1, "INDEXINFO");
         JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
@@ -499,6 +501,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException
     {
+        assert(table != null && !table.isEmpty());
         checkClosed();
         this.sysCatalog.setString(1, "PRIMARYKEYS");
         JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
@@ -517,6 +520,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // TODO: implement pattern filtering somewhere (preferably server-side)
     public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern, String columnNamePattern) throws SQLException
     {
+        assert(procedureNamePattern != null && !procedureNamePattern.isEmpty());
         checkClosed();
         this.sysCatalog.setString(1, "PROCEDURECOLUMNS");
         JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
@@ -670,25 +674,6 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         }
 
         return new JDBC4ResultSet(this.sysCatalog, vtable);
-/*
-        ResultSet res = this.sysCatalog.executeQuery();
-    VoltTable jdbcData = new VoltTable(
-      new VoltTable.ColumnInfo("TABLE_CAT",VoltType.STRING)
-    , new VoltTable.ColumnInfo("TABLE_SCHEM",VoltType.STRING)
-    , new VoltTable.ColumnInfo("TABLE_NAME",VoltType.STRING)
-    , new VoltTable.ColumnInfo("TABLE_TYPE",VoltType.STRING)
-    , new VoltTable.ColumnInfo("TABLE_REMARKS",VoltType.STRING)
-    );
-    while(res.next())
-        jdbcData.addRow(new Object[] {
-          ""
-        , ""
-        , res.getString(3)
-        , res.getString(4)
-        , ""
-        });
-        return new JDBC4ResultSet(this.sysCatalog, jdbcData);
-*/
     }
 
     // Retrieves the table types available in this database.
