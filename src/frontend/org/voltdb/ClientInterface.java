@@ -548,6 +548,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             socket.socket().getInetAddress().getHostName(),
                             m_isAdmin);
             }
+            else if (service.startsWith("exportstream:")) {
+                String streamname = service.substring("exportstream:".length());
+                handler = ExportManager.instance().createExportClientStream(streamname);
+            }
             else {
                 String strUser = "ANONYMOUS";
                 if ((username != null) && (username.length() > 0)) strUser = username;

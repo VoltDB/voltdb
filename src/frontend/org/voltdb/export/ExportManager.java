@@ -287,6 +287,65 @@ public class ExportManager
         return null;
     }
 
+    // extract generation id from a stream name.
+    private long getGenerationIdFromStreamName(String streamname) {
+        try {
+            String[] parts = streamname.split("-", 3);
+            if (parts.length != 3) {
+                return -1L;
+            }
+            return Long.parseLong(parts[0]);
+        } catch (NumberFormatException e) {
+            return -1L;
+        }
+    }
+
+    // extract partition id from a stream name
+    private int getPartitionIdFromStreamName(String streamname) {
+        try {
+            String[] parts = streamname.split("-", 3);
+            if (parts.length != 3) {
+                return -1;
+            }
+            return Integer.parseInt(parts[1]);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    // extract signature from a stream name
+    private String getSignatureFromStreamName(String streamname) {
+        String[] parts = streamname.split("-", 3);
+        if (parts.length != 3) {
+            return "";
+        }
+        return parts[2];
+    }
+
+    /**
+     * Create ExportDataStreams for the specified stream name.
+     * streamname: generationid-partitionid-signature
+     */
+    public InputHandler createExportClientStream(String streamname)
+    {
+        long generationId = getGenerationIdFromStreamName(streamname);
+        int partitionId = getPartitionIdFromStreamName(streamname);
+        String signature = getSignatureFromStreamName(streamname);
+
+        ExportGeneration gen = m_windowDirectory.getWindow(generationId);
+        if (gen == null) {
+            return null;
+        }
+
+        StreamBlockQueue sbq = null;
+           // gen.checkoutExportStreamBlockQueue(partitionId, signature);
+        if (sbq == null) {
+            return null;
+        }
+        return null;
+        // return new ExportClientStream(streamname, sbq);
+    }
+
 
     /**
      * Map service strings to connector class names
