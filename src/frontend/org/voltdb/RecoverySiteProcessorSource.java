@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
@@ -773,9 +774,14 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     messageHandler,
                     sc);
         } catch (IOException e) {
+            String ip = "invalid";
+            try {
+                InetAddress addr = InetAddress.getByAddress(rm.address());
+                ip = addr.getHostAddress();
+            } catch (UnknownHostException ignore) {}
             recoveryLog.error("Unable to create recovery connection, aborting. " +
                               "The recovery message is: txnId -> " + rm.txnId() +
-                              ", address -> " + rm.address() +
+                              ", address -> " + ip +
                               ", port -> " + rm.port() +
                               ", source site -> " + rm.sourceSite(), e);
             return null;
