@@ -20,10 +20,21 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.voltdb.client.ClientResponse;
 
+/**
+ * A thread-safe map of performance counters used to track procedure/statement execution statistics.
+ *
+ * @author Seb Coursol
+ * @since 2.0
+ */
 public class PerfCounterMap
 {
     private final ConcurrentHashMap<String,PerfCounter> Counters = new ConcurrentHashMap<String,PerfCounter>();
 
+    /**
+     * Gets a performance counter.
+     *
+     * @param counter the name of the counter to retrieve (typically the procedure name).  A new counter is created on the fly if none previously existed in the map.
+     */
     public PerfCounter get(String counter)
     {
         // Admited: could get a little race condition at the very beginning, but all that'll happen is that we'll lose a handful of tracking event, a loss far outweighed by overall reduced contention.
@@ -32,24 +43,59 @@ public class PerfCounterMap
         return this.Counters.get(counter);
     }
 
+    /**
+     * Tracks a call execution by processing the ClientResponse sent back by the VoltDB server.
+     *
+     * @param counter the name of the counter to update.
+     * @param response the response sent by the VoltDB server, containing details about the procedure/statement execution.
+     */
     public void update(String counter, ClientResponse response)
     {
         this.get(counter).update(response);
     }
+
+    /**
+     * Tracks a generic call execution by reporting the execution duration.  This method should be used for successful calls only.
+     *
+     * @param counter the name of the counter to update.
+     * @param executionDuration the duration of the execution call to track in this counter.
+     * @see #update(String counter, long executionDuration, boolean success)
+     */
     public void update(String counter, long executionDuration)
     {
         this.get(counter).update(executionDuration);
     }
+
+    /**
+     * Tracks a generic call execution by reporting the execution duration.  This method should be used for successful calls only.
+     *
+     * @param counter the name of the counter to update.
+     * @param executionDuration the duration of the execution call to track in this counter.
+     * @param success the flag indicating whether the execution call was successful.
+     */
     public void update(String counter, long executionDuration, boolean success)
     {
         this.get(counter).update(executionDuration, success);
     }
 
+    /**
+     * Gets a representation of this counter map as a list of single-line short-format strings detailing the statistics tracked by each counter available in this map.
+     *
+     * @return the string representation of this counter map.
+     * @see #toString(boolean useSimpleFormat)
+     */
     @Override
     public String toString()
     {
         return toString(true);
     }
+
+    /**
+     * Gets a representation of this counter map as a list of strings detailing the statistics tracked by each counter available in this map.
+     *
+     * @param useSimpleFormat the flag indicating whether to use a short one-line format, or detailed statistics including latency bucketing.
+     * @return the string representation of this counter map.
+     */
     public String toString(boolean useSimpleFormat)
     {
         StringBuilder result = new StringBuilder();

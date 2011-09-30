@@ -16,14 +16,35 @@
  */
 package org.voltdb.client.exampleutils;
 
+/**
+ * A simple utility class providing support for Greater Common Divisor calculation.
+ *
+ * @author Seb Coursol
+ * @since 2.0
+ */
 public class MathEx
 {
+    /**
+     * Recursively calculates the GCD of two integers.
+     *
+     * @param p the first integer of the pair to evaluate.
+     * @param q the second integer of the pair to evaluate.
+     * @return the GCD of the integer pair.
+     */
     public static int gcd(int p, int q)
     {
         if (q == 0)
             return p;
         return gcd(q, p % q);
     }
+
+    /**
+     * Recursively calculates the GCD of two longs.
+     *
+     * @param p the first long of the pair to evaluate.
+     * @param q the second long of the pair to evaluate.
+     * @return the GCD of the long pair.
+     */
     public static long gcd(long p, long q)
     {
         if (q == 0)

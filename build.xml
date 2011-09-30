@@ -409,6 +409,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
             <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
             <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
+            <include name="src/frontend/org/voltdb/client/exampleutils/*.java" />
         </fileset>
     </javadoc>
 </target>

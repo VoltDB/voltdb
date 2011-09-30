@@ -18,6 +18,12 @@ package org.voltdb.client.exampleutils;
 
 import java.util.ArrayList;
 
+/**
+ * A simple rate limiter that can be used to bind an asynchronous application/benchmark to a maximum transactional rate, preventing firehosing or providing a fixed expected throughput for performance validation (latency review at specific rates).
+ *
+ * @author Seb Coursol
+ * @since 2.0
+ */
 public class RateLimiter implements IRateLimiter
 {
     private long SleepTime;
@@ -29,57 +35,30 @@ public class RateLimiter implements IRateLimiter
     private long MaxProcessPerSecond = 0l;
     private long CycleAdjustment = Long.MIN_VALUE;
     private long LastCycleCount = Long.MAX_VALUE;
+
+    /**
+     * Creates a new rate limiter.
+     *
+     * @param maxProcessPerSecond the maximum number of requests the limiter should allow per second.
+     */
     public RateLimiter(long maxProcessPerSecond)
     {
         this.set(maxProcessPerSecond, 0l, false);
     }
-    private void set(long maxProcessPerSecond, long adjustment, boolean forceSet)
-    {
-        if ((this.MaxProcessPerSecond != maxProcessPerSecond) || (adjustment != 0l) || forceSet)
-        {
-            this.MaxProcessPerSecond = maxProcessPerSecond;
-            maxProcessPerSecond += adjustment;
 
-            // For rates below 1/ms we can sleep a while between each execution, which is the most efficient approach.
-            this.SleepTime = (1000l/maxProcessPerSecond)-1l;
-
-            // Calculate the largest cycle duration based on requested rate
-            long gcd = MathEx.gcd(maxProcessPerSecond,1000l);
-
-            // Calculate incremental sub-cycles that will be used to approach the desired rate (1s, 100ms, 10ms, 1ms (or a
-            // similar variation if the largest cycle duration is less than 1s))
-            double cycleDuration = (1000l/gcd);
-            double cycleMaxCount = (maxProcessPerSecond/gcd);
-            ArrayList<Long> cycleStepDuration = new ArrayList<Long>();
-            ArrayList<Long> cycleStepMaxCount = new ArrayList<Long>();
-            ArrayList<Long> cycleStepCount    = new ArrayList<Long>();
-            while((cycleDuration >= 1d) && (cycleMaxCount > 0d))
-            {
-                cycleStepDuration.add((long)cycleDuration);
-                cycleStepMaxCount.add((long)cycleMaxCount);
-                cycleStepCount.add(0l);
-                cycleDuration = cycleDuration/10d;
-                cycleMaxCount = Math.ceil(cycleMaxCount/10d);
-            }
-
-            // Convert ArrayLists to arrays (easier/faster to work with)
-            this.StepCount = cycleStepCount.size();
-            this.CycleStepDuration = cycleStepDuration.toArray(new Long[this.StepCount]);
-            this.CycleStepMaxCount = cycleStepMaxCount.toArray(new Long[this.StepCount]);
-            this.CycleStepCount = cycleStepCount.toArray(new Long[this.StepCount]);
-            this.CycleStepEndTime = cycleStepCount.toArray(new Long[this.StepCount]);
-
-            // Initialize cycle end times
-            for(int i=0;i<this.StepCount;i++)
-                this.CycleStepEndTime[i] = System.currentTimeMillis() + this.CycleStepDuration[i];
-
-        }
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     public void throttle()
     {
         this.throttle(this.MaxProcessPerSecond);
     }
+
+    /**
+     * Throttle the execution process and re-adjust the rate requirement on the fly.  This call allows the calling application to dynamically adjust the rate over time, for instance as a result of some external changes or analysis.  For an example of such an application, see {@link LatencyLimiter}.
+     *
+     * @param maxProcessPerSecond the maximum number of requests the limiter should allow per second.
+     */
     public void throttle(long maxProcessPerSecond)
     {
         long adjustment = 0l;
@@ -134,5 +113,56 @@ public class RateLimiter implements IRateLimiter
         }
         catch(Exception tie) {}
     }
+
+    /**
+     * Adjusts the rate limit, whether through automatic adjustment based on monitoring of executed versus requested rates, or as a consequence of an external request to modify the expected rate.
+     *
+     * @param maxProcessPerSecond the requested maximum number of requests per second.
+     * @param adjustment the adjustment calculated internally by the limiter by comparing actual executions versus the requested rate.
+     * @param forceSet the flag indicating this call is a conseuqnce to an external rate-change request and the distribution of executions over time should be recalculated.
+     */
+    private void set(long maxProcessPerSecond, long adjustment, boolean forceSet)
+    {
+        if ((this.MaxProcessPerSecond != maxProcessPerSecond) || (adjustment != 0l) || forceSet)
+        {
+            this.MaxProcessPerSecond = maxProcessPerSecond;
+            maxProcessPerSecond += adjustment;
+
+            // For rates below 1/ms we can sleep a while between each execution, which is the most efficient approach.
+            this.SleepTime = (1000l/maxProcessPerSecond)-1l;
+
+            // Calculate the largest cycle duration based on requested rate
+            long gcd = MathEx.gcd(maxProcessPerSecond,1000l);
+
+            // Calculate incremental sub-cycles that will be used to approach the desired rate (1s, 100ms, 10ms, 1ms (or a
+            // similar variation if the largest cycle duration is less than 1s))
+            double cycleDuration = (1000l/gcd);
+            double cycleMaxCount = (maxProcessPerSecond/gcd);
+            ArrayList<Long> cycleStepDuration = new ArrayList<Long>();
+            ArrayList<Long> cycleStepMaxCount = new ArrayList<Long>();
+            ArrayList<Long> cycleStepCount    = new ArrayList<Long>();
+            while((cycleDuration >= 1d) && (cycleMaxCount > 0d))
+            {
+                cycleStepDuration.add((long)cycleDuration);
+                cycleStepMaxCount.add((long)cycleMaxCount);
+                cycleStepCount.add(0l);
+                cycleDuration = cycleDuration/10d;
+                cycleMaxCount = Math.ceil(cycleMaxCount/10d);
+            }
+
+            // Convert ArrayLists to arrays (easier/faster to work with)
+            this.StepCount = cycleStepCount.size();
+            this.CycleStepDuration = cycleStepDuration.toArray(new Long[this.StepCount]);
+            this.CycleStepMaxCount = cycleStepMaxCount.toArray(new Long[this.StepCount]);
+            this.CycleStepCount = cycleStepCount.toArray(new Long[this.StepCount]);
+            this.CycleStepEndTime = cycleStepCount.toArray(new Long[this.StepCount]);
+
+            // Initialize cycle end times
+            for(int i=0;i<this.StepCount;i++)
+                this.CycleStepEndTime[i] = System.currentTimeMillis() + this.CycleStepDuration[i];
+
+        }
+    }
+
 }
 

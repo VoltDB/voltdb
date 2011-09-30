@@ -25,6 +25,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+/**
+ * Provides a Future wrapper around an execution task's ClientResponse response object.
+ *
+ * @author Seb Coursol
+ * @since 2.0
+ */
 public class ExecutionFuture implements Future<ClientResponse>
 {
     private final CountDownLatch latch = new CountDownLatch(1);
@@ -36,10 +42,22 @@ public class ExecutionFuture implements Future<ClientResponse>
     private static final int STATUS_FAILURE = 3;
     private static final int STATUS_ABORTED = 4;
     private ClientResponse response = null;
+
+    /**
+     * Create a {@link Future} wrapper with the specified default timeout.
+     *
+     * @param timeout the default timeout for the execution call.
+     */
     protected ExecutionFuture(long timeout)
     {
         this.timeout = timeout;
     }
+
+    /**
+     * Sets the result of the operation and flag the execution call as completed.
+     *
+     * @param response the execution call's response sent back by the database.
+     */
     protected void set(ClientResponse response)
     {
         if (!status.compareAndSet(STATUS_RUNNING, STATUS_SUCCESS))
@@ -47,16 +65,27 @@ public class ExecutionFuture implements Future<ClientResponse>
         this.response = response;
         this.latch.countDown();
     }
+
+    /**
+     * Attempts to cancel execution of this task (not supported - will always return <code>false</code>).
+     *
+     * @param mayInterruptIfRunning true if the thread executing this task should be interrupted; otherwise, in-progress tasks are allowed to complete.  This flag is ignored since VoltDB does not support cancellation of posted transaction requests.
+     * @return <code>false</code> always: VoltDB does not support cancellation of posted transaction requests.
+     */
     @Override
     public boolean cancel(boolean mayInterruptIfRunning)
     {
-        if (status.compareAndSet(STATUS_RUNNING, STATUS_ABORTED))
-        {
-            latch.countDown();
-            return true;
-        }
         return false;
     }
+
+    /**
+     * Waits if necessary for the computation to complete, and then retrieves its result.
+     *
+     * @return the computed result.
+     * @throws CancellationException if the computation was cancelled.
+     * @throws ExecutionException if the computation threw an exception.
+     * @throws InterruptedException if the current thread was interrupted while waiting.
+     */
     @Override
     public ClientResponse get() throws InterruptedException, ExecutionException
     {
@@ -70,6 +99,18 @@ public class ExecutionFuture implements Future<ClientResponse>
             throw new ExecutionException(to);
         }
     }
+
+    /**
+     * Waits if necessary for at most the given time for the computation to complete, and then retrieves its result, if available.
+     *
+     * @param timeout the maximum time to wait.
+     * @param unit the time unit of the timeout argument .
+     * @return the computed result.
+     * @throws CancellationException if the computation was cancelled.
+     * @throws ExecutionException if the computation threw an exception.
+     * @throws InterruptedException if the current thread was interrupted while waiting.
+     * @throws TimeoutException if the wait timed out
+     */
     @Override
     public ClientResponse get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
     {
@@ -93,11 +134,23 @@ public class ExecutionFuture implements Future<ClientResponse>
             return this.response;
         }
     }
+
+    /**
+     * Returns <code>true</code> if this task was cancelled before it completed normally.
+     *
+     * @return <code>true</code> if this task was cancelled before it completed.
+     */
     @Override
     public boolean isCancelled()
     {
         return status.get() == STATUS_ABORTED;
     }
+
+    /**
+     * Returns <code>true</code> if this task completed. Completion may be due to normal termination, an exception, or cancellation -- in all of these cases, this method will return true.
+     *
+     * @return <code>true</code> if this task completed.
+     */
     @Override
     public boolean isDone()
     {
