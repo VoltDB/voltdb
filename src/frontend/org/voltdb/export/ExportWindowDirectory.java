@@ -19,6 +19,11 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -61,6 +66,27 @@ public class ExportWindowDirectory {
         }
     }
 
+    /**
+     * Produce a description of the available data sources.
+     * For each generation, for each data partition, for each datasource...
+     */
+    List<ExportAdvertisement> createListing()
+    {
+        TreeMap<Long,ExportGeneration> gens = m_windows.get();
+        LinkedList<ExportAdvertisement> list = new LinkedList<ExportAdvertisement>();
+        for (Entry<Long, ExportGeneration> e : gens.entrySet()) {
+            for(Entry<Integer, HashMap<String, ExportDataSource>> ds :
+                e.getValue().m_dataSourcesByPartition.entrySet()) {
+                for(Entry<String, ExportDataSource> d : ds.getValue().entrySet()) {
+                    String signature = d.getKey();
+                    int partition = d.getValue().getPartitionId();
+                    long generation = d.getValue().getGeneration();
+                    list.add(new ExportAdvertisement(generation, partition, signature));
+                }
+            }
+        }
+        return list;
+    }
 
     /**
      * Remove all on-disk ExportWindows or die trying.
@@ -189,6 +215,5 @@ public class ExportWindowDirectory {
             }
         }
     }
-
 
 }

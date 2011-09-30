@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.CatalogContext;
@@ -244,6 +245,10 @@ public class ExportGeneration {
                 exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
                         " signature " + table.getSignature() + " partition id " + partition);
                 dataSourcesForPartition.put(table.getSignature(), exportDataSource);
+
+                // update the sbq / signature map.
+                addExportStreamBlockQueue(partition, table.getSignature(), exportDataSource.m_committedBuffers);
+
             } catch (IOException e) {
                 exportLog.fatal(e);
                 VoltDB.crashVoltDB();
@@ -304,4 +309,19 @@ public class ExportGeneration {
             }
         }
     }
+
+
+    private ConcurrentHashMap<String, StreamBlockQueue> m_blockMap = new
+        ConcurrentHashMap<String, StreamBlockQueue>();
+
+    public StreamBlockQueue checkoutExportStreamBlockQueue(int partitionId, String signature)
+    {
+        return m_blockMap.get(partitionId + "-" + signature);
+    }
+
+    public void addExportStreamBlockQueue(int partitionId, String signature, StreamBlockQueue sbq)
+    {
+        m_blockMap.put(partitionId + "-" + signature, sbq);
+    }
+
 }

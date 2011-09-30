@@ -60,7 +60,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
     private long m_firstUnpolledUso = 0;
-    private final StreamBlockQueue m_committedBuffers;
+    final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
 

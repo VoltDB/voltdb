@@ -337,13 +337,18 @@ public class ExportManager
             return null;
         }
 
-        StreamBlockQueue sbq = null;
-           // gen.checkoutExportStreamBlockQueue(partitionId, signature);
+        StreamBlockQueue sbq =
+            gen.checkoutExportStreamBlockQueue(partitionId, signature);
+
         if (sbq == null) {
             return null;
         }
-        return null;
-        // return new ExportClientStream(streamname, sbq);
+
+        return new ExportClientStream(streamname, sbq);
+    }
+
+    public InputHandler createExportListingService() {
+        return new ExportListingService();
     }
 
 
@@ -423,4 +428,5 @@ public class ExportManager
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
         m_windowDirectory.truncateExportToTxnId(snapshotTxnId);
     }
+
 }

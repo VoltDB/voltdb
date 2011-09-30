@@ -552,6 +552,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 String streamname = service.substring("exportstream:".length());
                 handler = ExportManager.instance().createExportClientStream(streamname);
             }
+            else if (service.startsWith("exportlisting")) {
+                handler = ExportManager.instance().createExportListingService();
+            }
             else {
                 String strUser = "ANONYMOUS";
                 if ((username != null) && (username.length() > 0)) strUser = username;
