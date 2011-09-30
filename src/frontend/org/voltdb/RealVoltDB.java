@@ -27,8 +27,11 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -36,8 +39,10 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -605,16 +610,48 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     void collectLocalNetworkMetadata() {
-        // create the string that describes the public interface
-        // format "XXX.XXX.XXX.XXX:clientport:adminport:httpport"
-        InetAddress addr = null;
-        try {
-            addr = InetAddress.getLocalHost();
-        } catch (UnknownHostException e1) {
-            hostLog.fatal("Unable to discover local IP address by invoking Java's InetAddress.getLocalHost() method. Usually this is because the hostname of this node fails to resolve (for example \"ping `hostname`\" would fail). VoltDB requires that the hostname of every node resolves correctly at that node as well as every other node.");
-            VoltDB.crashVoltDB();
+        String localMetadata = "";
+
+        /*
+         * If no interface was specified, do a ton of work
+         * to identify all ipv4 interfaces and turn them into a
+         * , separated list since the server will accept on
+         * any of them.
+         */
+        if (m_config.m_externalInterface.equals("")) {
+            LinkedList<NetworkInterface> interfaces = new LinkedList<NetworkInterface>();
+            try {
+                Enumeration<NetworkInterface> intfEnum = NetworkInterface.getNetworkInterfaces();
+                while (intfEnum.hasMoreElements()) {
+                    NetworkInterface intf = intfEnum.nextElement();
+                    if (intf.isLoopback() || !intf.isUp()) {
+                        continue;
+                    }
+                    interfaces.offer(intf);
+                }
+            } catch (SocketException e) {
+                throw new RuntimeException(e);
+            }
+
+            while (!interfaces.isEmpty()) {
+                NetworkInterface intf = interfaces.poll();
+                Enumeration<InetAddress> inetAddrs = intf.getInetAddresses();
+                Inet4Address addr = null;
+                while (inetAddrs.hasMoreElements()) {
+                    InetAddress inetAddr = inetAddrs.nextElement();
+                    if (inetAddr instanceof Inet4Address) {
+                        addr = (Inet4Address)inetAddr;
+                        break;
+                    }
+                }
+                localMetadata += addr.getHostAddress();
+                if (interfaces.peek() != null) {
+                    localMetadata += ",";
+                }
+            }
+        } else {
+            localMetadata = m_config.m_externalInterface;
         }
-        String localMetadata = addr.getHostAddress();
         localMetadata += ":" + Integer.valueOf(m_config.m_port);
         localMetadata += ":" + Integer.valueOf(m_config.m_adminPort);
         localMetadata += ":" + Integer.valueOf(m_config.m_httpPort); // json

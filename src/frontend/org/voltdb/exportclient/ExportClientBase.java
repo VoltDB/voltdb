@@ -292,7 +292,7 @@ public abstract class ExportClientBase {
                         assert(hostname.contains(":"));
                         String[] parts = hostname.split(":");
                         int port = m_useAdminPorts ? Integer.valueOf(parts[2]) : Integer.valueOf(parts[1]);
-                        InetSocketAddress addr = new InetSocketAddress(parts[0], port);
+                        InetSocketAddress addr = new InetSocketAddress(parts[0].split(",")[0], port);
                         m_servers.add(addr);
                     }
                 }
