@@ -28,8 +28,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashMap;
-
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
@@ -37,9 +35,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.jdbc.Driver;
 
 public class TestSystemCatalogSuite extends RegressionSuite {
 
@@ -120,7 +115,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         // Not really a correctness test, just want to make sure we can
         // get real result sets back through the JDBC driver.
         // Just get a bunch of easy stupid stuff to verify for now
-        ResultSet blah = huh.getMetaData().getColumns(null, null, null, null);
+        ResultSet blah = huh.getMetaData().getColumns(null, null, "T", null);
         while (blah.next())
         {
             assertEquals("T", blah.getString("TABLE_NAME"));
@@ -133,13 +128,13 @@ public class TestSystemCatalogSuite extends RegressionSuite {
             assertEquals("TABLE", blah.getString("TABLE_TYPE"));
         }
         blah.close();
-        blah = huh.getMetaData().getIndexInfo(null, null, null, false, false);
+        blah = huh.getMetaData().getIndexInfo(null, null, "T", false, false);
         while (blah.next())
         {
             assertEquals("T", blah.getString("TABLE_NAME"));
         }
         blah.close();
-        blah = huh.getMetaData().getPrimaryKeys(null, null, null);
+        blah = huh.getMetaData().getPrimaryKeys(null, null, "T");
         while (blah.next())
         {
             assertEquals("T", blah.getString("TABLE_NAME"));
@@ -152,7 +147,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
             System.out.println(blah.getString(4));
         }
         blah.close();
-        blah = huh.getMetaData().getProcedureColumns(null, null, null, null);
+        blah = huh.getMetaData().getProcedureColumns(null, null, "InsertA", null);
         while (blah.next())
         {
             System.out.println(blah.getString(3));

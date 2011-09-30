@@ -1327,6 +1327,19 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
+    public void testUniqueIndexAllowed()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index idx_t_unique on t(id,num);\n" +
+                "create index idx_t on t(num);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_unique").getUnique());
+        assertFalse(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t").getUnique());
+    }
+
     public void testDDLCompilerVarcharTreeIndexAllowed()
     {
         for (int i = 0; i < column_types.length; i++)

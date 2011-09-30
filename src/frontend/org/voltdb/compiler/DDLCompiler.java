@@ -579,6 +579,8 @@ public class DDLCompiler {
         NamedNodeMap attrs = node.getAttributes();
 
         String name = attrs.getNamedItem("name").getNodeValue();
+        boolean unique = Boolean.parseBoolean(attrs.getNamedItem("unique").getNodeValue());
+
         // this won't work for multi-column indices
         // XXX not sure what 'this' is above, perhaps stale comment --izzy
         String colList = attrs.getNamedItem("columns").getNodeValue();
@@ -652,6 +654,8 @@ public class DDLCompiler {
             cref.setColumn(columns[i]);
             cref.setIndex(i);
         }
+
+        index.setUnique(unique);
 
         String msg = "Created index: " + name + " on table: " +
                      table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
