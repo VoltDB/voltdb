@@ -773,7 +773,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     messageHandler,
                     sc);
         } catch (IOException e) {
-            recoveryLog.error("Unable to create recovery connection, aborting", e);
+            recoveryLog.error("Unable to create recovery connection, aborting. " +
+                              "The recovery message is: txnId -> " + rm.txnId() +
+                              ", address -> " + rm.address() +
+                              ", port -> " + rm.port() +
+                              ", source site -> " + rm.sourceSite(), e);
             return null;
         }
         return source;
