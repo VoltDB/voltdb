@@ -43,9 +43,13 @@ public class ExportListingService extends VoltProtocolHandler {
         FastSerializer fs = new FastSerializer();
         ExportWindowDirectory lib = ExportManager.instance().m_windowDirectory;
 
+        // serialize the advertisment list as:
+        // <count of advertisements>
+        // <fast serialized strings>*
         if (m.isPoll()) {
             List<ExportAdvertisement> listing = lib.createListing();
             try {
+                fs.writeInt(listing.size());
                 for (ExportAdvertisement ad : listing) {
                     ad.serialize(fs);
                 }

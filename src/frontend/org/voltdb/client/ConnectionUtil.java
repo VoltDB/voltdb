@@ -145,6 +145,19 @@ public class ConnectionUtil {
         return getAuthenticatedConnection("export", host, username, hashedPassword, port);
     }
 
+    public static Object[] getAuthenticatedExportListingConnection(
+        String host, String username, byte[] hashedPassword, int port) throws IOException
+    {
+        return getAuthenticatedConnection("exportlist", host, username, hashedPassword, port);
+    }
+
+    public static Object[] getAuthenticatedExportDataConnection(
+        String advertisement, String host, String username,
+        byte[] hashedPassword, int port) throws IOException
+    {
+        return getAuthenticatedConnection("exportstream:" + advertisement, host, username, hashedPassword, port);
+    }
+
     public static String getHostnameOrAddress() {
         try {
             final InetAddress addr = InetAddress.getLocalHost();
