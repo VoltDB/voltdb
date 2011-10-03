@@ -31,6 +31,8 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.agreement.AgreementSite;
@@ -505,4 +507,10 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void writeNetworkCatalogToTmp(byte[] catalogBytes) {}
+
+    @Override
+    public void scheduleWork(Runnable work, long initialDelay, long delay, TimeUnit unit) {
+        // TODO Auto-generated method stub
+
+    }
 }

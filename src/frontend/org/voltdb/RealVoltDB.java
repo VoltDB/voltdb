@@ -237,67 +237,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     HeartbeatThread heartbeatThread;
     private ScheduledExecutorService m_periodicWorkThread;
 
-    /*
-     * Periodic work that will be executed every 5ms. This doesn't include
-     * heartbeats. Heartbeats are dealt with in a different thread.
-     */
-    private Runnable periodicWork = new Runnable() {
-        private long m_lastStatsManagerTime = System.currentTimeMillis();
-        private long m_lastSysStatsSCollection = 0;
-        private long m_lastSysStatsMCollection = 0;
-        private long m_lastSysStatsLCollection = 0;
-        private final long m_classLoadTime = System.currentTimeMillis();
-        private boolean m_hasTriedLoadAdHocPlanner = false;
-
-        @Override
-        public void run() {
-            try {
-                // Ask the statistics manager to send out change notifications if
-                // enough time has passed
-                final long currentTime = System.currentTimeMillis();
-                if (m_statsManager != null
-                    && (currentTime - m_lastStatsManagerTime) >= StatsManager.POLL_INTERVAL) {
-                    m_lastStatsManagerTime = currentTime;
-                    m_statsManager.sendNotification();
-                }
-
-                // deal with system stats collection every 5 seconds
-                if ((currentTime - m_lastSysStatsSCollection) >= 5000) {
-
-                    m_lastSysStatsSCollection = currentTime;
-                    boolean medium = false, large = false;
-
-                    // collect medium and large samples less frequently
-                    if ((currentTime - m_lastSysStatsMCollection) >= 60000) {
-                        m_lastSysStatsMCollection = currentTime;
-                        medium = true;
-                    }
-                    if ((currentTime - m_lastSysStatsLCollection) >= 360000) {
-                        m_lastSysStatsLCollection = currentTime;
-                        large = true;
-                    }
-
-                    SystemStatsCollector.asyncSampleSystemNow(medium, large);
-                }
-
-                // if it's been 10 seconds, and we haven't loaded the ad-hoc planner process,
-                // do so now
-                if ((!m_hasTriedLoadAdHocPlanner) && (currentTime - m_classLoadTime > 10000)) {
-                    m_compilerThread.ensureLoadedPlanner();
-                    m_hasTriedLoadAdHocPlanner = true;
-                }
-
-                //long duration = System.nanoTime() - beforeTime;
-                //double millis = duration / 1000000.0;
-                //System.out.printf("TICK %.2f\n", millis);
-                //System.out.flush();
-            }
-            catch (Exception ex) {
-                log.warn(ex.getMessage(), ex);
-            }
-        }
-    };
-
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
@@ -547,9 +486,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             heartbeatThread = new HeartbeatThread(m_clientInterfaces);
             heartbeatThread.start();
-            m_periodicWorkThread.scheduleWithFixedDelay(periodicWork,
-                                                        0, 5,
-                                                        TimeUnit.MILLISECONDS);
+            schedulePeriodicWorks();
 
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
@@ -570,6 +507,56 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_restoreAgent.setInitiator(initiator);
             }
         }
+    }
+
+    /**
+     * Schedule all the periodic works
+     */
+    private void schedulePeriodicWorks() {
+        // JMX stats broadcast
+        scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                m_statsManager.sendNotification();
+            }
+        }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS);
+
+        // small stats samples
+        scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                SystemStatsCollector.asyncSampleSystemNow(false, false);
+            }
+        }, 0, 5, TimeUnit.SECONDS);
+
+        // medium stats samples
+        scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                SystemStatsCollector.asyncSampleSystemNow(true, false);
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+
+        // large stats samples
+        scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                SystemStatsCollector.asyncSampleSystemNow(true, true);
+            }
+        }, 0, 6, TimeUnit.MINUTES);
+
+        // try to start the adhoc planner once
+        scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    m_compilerThread.ensureLoadedPlanner();
+                }
+                catch (Exception ex) {
+                    log.warn(ex.getMessage(), ex);
+                }
+            }
+        }, 10, -1, TimeUnit.SECONDS);
     }
 
     void readDeploymentAndCreateStarterCatalogContext() {
@@ -1766,5 +1753,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public synchronized void recoveryComplete() {
         m_recovering = false;
         hostLog.info("Node recovery completed");
+    }
+
+    @Override
+    public void scheduleWork(Runnable work,
+                             long initialDelay,
+                             long delay,
+                             TimeUnit unit) {
+        synchronized (m_periodicWorkThread) {
+            if (delay > 0) {
+                m_periodicWorkThread.scheduleWithFixedDelay(work,
+                                                            initialDelay, delay,
+                                                            unit);
+            } else {
+                m_periodicWorkThread.schedule(work, initialDelay, unit);
+            }
+        }
     }
 }

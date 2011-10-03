@@ -19,6 +19,8 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.fault.FaultDistributorInterface;
@@ -187,4 +189,21 @@ public interface VoltDBInterface
      * @param catalogBytes The raw bytes of the catalog.
      */
     public void writeNetworkCatalogToTmp(byte[] catalogBytes);
+
+    /**
+     * Schedule a work to be performed once or periodically.
+     *
+     * @param work
+     *            The work to be scheduled
+     * @param initialDelay
+     *            The initial delay before the first execution of the work
+     * @param delay
+     *            The delay between each subsequent execution of the work. If
+     *            this is negative, the work will only be executed once after
+     *            the initial delay.
+     * @param unit
+     *            Time unit
+     */
+    public void scheduleWork(Runnable work, long initialDelay, long delay,
+                             TimeUnit unit);
 }
