@@ -54,6 +54,7 @@
 namespace voltdb {
 
 LimitPlanNode::~LimitPlanNode() {
+    delete limitExpression;
     if (!isInline()) {
         delete getOutputTable();
         setOutputTable(NULL);
