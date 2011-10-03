@@ -49,30 +49,30 @@ public class ClusterMonitor {
     private static final String proceduresTable = tablePrefix + "procedures";
     private static final String tablestatsTable = tablePrefix + "tablestats";
 
-    private static final String retrieveInstanceId = new String(" select instanceId from " + instancesTable +
-            " where startTime = ? and leaderAddress = ?;");
+    private static final String retrieveInstanceId = " select instanceId from " + instancesTable +
+                                                     " where startTime = ? and leaderAddress = ?;";
 
-    private static final String createInstanceStatement = new String("insert into " + instancesTable +
-            " ( startTime, leaderAddress, applicationName, subApplicationName, username, " +
-            " versionString, tag, numHosts, " +
-            "numPartitionsPerHost, numTotalPartitions, numKSafety) " +
-            "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    private static final String createInstanceStatement = "insert into " + instancesTable +
+                                                          " ( startTime, leaderAddress, applicationName, subApplicationName, username, " +
+                                                          "   versionString, tag, numHosts, " +
+                                                             "numPartitionsPerHost, numTotalPartitions, numKSafety) " +
+                                                             "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
-    private static final String insertInitiatorStatement = new String("insert into " + initiatorsTable +
+    private static final String insertInitiatorStatement = "insert into " + initiatorsTable +
             " ( instanceId, tsEvent, hostId, hostName, siteId, connectionId, connectionHostname, " +
             " procedureName, numInvocations, avgExecutionTime, minExecutionTime, maxExecutionTime, " +
             " numAborts, numFailures )" +
-            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
-    private static final String insertIOStatsStatement = new String("insert into " + iostatsTable +
+    private static final String insertIOStatsStatement = "insert into " + iostatsTable +
             " ( instanceId, tsEvent, hostId, hostName, connectionId, connectionHostname, " +
             " numBytesRead, numMessagesRead, numBytesWritten, numMessagesWritten )" +
-            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
-    private static final String insertProceduresStatement = new String("insert into " + proceduresTable +
+    private static final String insertProceduresStatement = "insert into " + proceduresTable +
             " (instanceId, tsEvent, hostId, hostName, siteId, procedureName, numInvocations, " +
             " numTimedInvocations, avgExecutionTime, minExecutionTime, maxExecutionTime, numAborts, numFailures )" +
-            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
     private static final String insertTableStatsStatement = "insert into " + tablestatsTable +
             " (instanceId, tsEvent, hostId, hostName, siteId, partitionId, " +

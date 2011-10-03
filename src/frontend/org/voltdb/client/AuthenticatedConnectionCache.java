@@ -144,7 +144,7 @@ public class AuthenticatedConnectionCache {
         }
 
         // UN-AUTHENTICATED
-        if ((userName == null) || (userName == "")) {
+        if ((userName == null) || userName.equals("")) {
             if ((hashedPassword != null) && (hashedPassword.length > 0)) {
                 throw new IOException("Username was null but password was not.");
             }

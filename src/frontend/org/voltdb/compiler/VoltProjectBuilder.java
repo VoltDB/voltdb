@@ -574,7 +574,7 @@ public class VoltProjectBuilder {
 
         // <security>
         final Element security = doc.createElement("security");
-        security.setAttribute("enabled", new Boolean(m_securityEnabled).toString());
+        security.setAttribute("enabled", Boolean.valueOf(m_securityEnabled).toString());
         project.appendChild(security);
 
         // <database>

@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.util.Map;
-import java.util.Hashtable;
+import java.util.HashMap;
 import java.util.TreeSet;
 import java.util.Arrays;
 import java.util.Collections;
@@ -695,7 +695,7 @@ public class SQLCommand
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
                       "PROCEDURES", "PROCEDURECOLUMNS");
-    private static Map<String,List<String>> Procedures = new Hashtable<String,List<String>>();
+    private static Map<String,List<String>> Procedures = Collections.synchronizedMap(new HashMap<String,List<String>>());
     private static void loadSystemProcedures()
     {
         Procedures.put("@Pause", new ArrayList<String>());
@@ -839,8 +839,8 @@ public class SQLCommand
             e.printStackTrace();
             return;
         }
-        Hashtable<String, Integer> proc_param_counts =
-            new Hashtable<String, Integer>();
+        Map<String, Integer> proc_param_counts =
+            Collections.synchronizedMap(new HashMap<String, Integer>());
         while (params.advanceRow())
         {
             String this_proc = params.getString("PROCEDURE_NAME");
