@@ -35,14 +35,14 @@ import org.voltdb.utils.VoltFile;
 public class ExportWindowDirectory {
 
     // Map generation id to generation.
-    public final AtomicReference<TreeMap<Long, ExportGeneration>> m_windows =
+    private final AtomicReference<TreeMap<Long, ExportGeneration>> m_windows =
             new AtomicReference<TreeMap<Long, ExportGeneration>>(new TreeMap<Long, ExportGeneration>());
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     // user-configured export overflow directory
-    private final String m_overflowPath;
-    private final File m_exportOverflowDirectory;
+    final String m_overflowPath;
+    final File m_exportOverflowDirectory;
 
     /**
      * Configure a new ExportWindowDirectory
