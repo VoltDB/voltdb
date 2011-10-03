@@ -131,4 +131,31 @@ public class TestTransactionIdManager extends TestCase {
         System.out.printf("%d > %d\n", txnId1, txnId2);
     }
 
+
+    public void testMakeTransactionIdFromComponents() {
+        long txnId = TransactionIdManager.makeIdFromComponents(1000L + TransactionIdManager.VOLT_EPOCH, 0L, 0L);
+        long ts = TransactionIdManager.getTimestampFromTransactionId(txnId);
+        assertEquals(ts, 1000L + TransactionIdManager.VOLT_EPOCH);
+    }
+
+    public void testExportGenerationIdFromTransactionId() {
+        long txnId1 = TransactionIdManager.makeIdFromComponents(1009L + TransactionIdManager.VOLT_EPOCH, 1L, 2L);
+        long win1 = TransactionIdManager.getExportGenerationIdFromTransactionId(txnId1, 100);
+
+        long txnId2 = TransactionIdManager.makeIdFromComponents(1000L + TransactionIdManager.VOLT_EPOCH, 1L, 2L);
+        long win2 = TransactionIdManager.getExportGenerationIdFromTransactionId(txnId2, 100);
+
+        // both transactions fall in to the window marked by (initId 0, seqNo 0, timestamp 1000)
+        long ans = TransactionIdManager.makeIdFromComponents(1000L + TransactionIdManager.VOLT_EPOCH, 0L, 0L);
+        assertEquals(win1, ans);
+        assertEquals(win2, ans);
+    }
+
+    public void testWindowIdFromTransactionId() {
+        long txnId1 = TransactionIdManager.makeIdFromComponents(1000L + TransactionIdManager.VOLT_EPOCH, 1L, 2L);
+        long winid = TransactionIdManager.getExportWindowNumberFromTransactionId(txnId1, 100);
+        assertEquals(winid, (long)(Math.floor(1000L + TransactionIdManager.VOLT_EPOCH)/100));
+        System.out.println(winid);
+    }
+
 }

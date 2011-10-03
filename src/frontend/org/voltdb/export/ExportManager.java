@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.CatalogContext;
+import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
@@ -48,6 +49,8 @@ import org.voltdb.utils.LogKeys;
  */
 public class ExportManager
 {
+    public static final int DEFAULT_WINDOW_MS = 60 * 5 * 1000; // 5 minutes
+
 
     /**
      * Processors also log using this facility.
@@ -314,11 +317,11 @@ public class ExportManager
      * This method pulls double duty as a means of pushing export buffers
      * and "syncing" export data to disk. Syncing doesn't imply fsync, it just means
      * writing the data to a file instead of keeping it all in memory.
-     * End of stream indicates that no more data is coming from this source
+     * End of stream indicates that no more data is coming from this source (signature)
      * for this generation.
      */
     public static void pushExportBuffer(
-            long exportGeneration,
+            long generationId,
             int partitionId,
             String signature,
             long uso,
@@ -326,19 +329,28 @@ public class ExportManager
             long bufferPtr,
             ByteBuffer buffer,
             boolean sync,
-            boolean endOfStream) {
+            boolean endOfStream)
+    {
+        // The EE sends the right export generation id. If this is the
+        // first time the generation has been seen, make a new one.
+
         ExportManager instance = instance();
-
+        ExportGeneration generation = null;
         try {
+            if ((generation = instance.m_windowDirectory.getWindow(generationId)) == null) {
+                generation = new ExportGeneration(
+                    generationId,
+                    instance.m_onGenerationDrained,
+                    instance.m_windowDirectory.m_exportOverflowDirectory);
 
-            ExportGeneration generation = instance.m_windowDirectory.getWindow(exportGeneration);
-
-            if (generation == null) {
-                assert(false);
-                DBBPool.deleteCharArrayMemory(bufferPtr);
-                exportLog.error("Could not a find an export generation " + exportGeneration +
-                ". Should be impossible. Discarding export data");
-                return;
+                // BUG: Guess that the current catalog context is the right one.
+                // this is a false assumption - will have to fix this.
+                CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+                Connector conn = catalogContext.catalog.getClusters().get("cluster").
+                    getDatabases().get("database").
+                    getConnectors().get("0");
+                generation.initializeGenerationFromCatalog(catalogContext, conn, instance.m_hostId);
+                instance.m_windowDirectory.pushWindow(generationId, generation);
             }
 
             generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);

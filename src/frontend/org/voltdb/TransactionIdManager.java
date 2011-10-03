@@ -231,6 +231,26 @@ public class TransactionIdManager {
     }
 
     /**
+     * Given a transaction id and an export window-width,
+     * return the generation identifier.
+     */
+    public static long getExportGenerationIdFromTransactionId(long txnId, int genWidthMillis) {
+        long ts = getTimestampFromTransactionId(txnId);
+        long windowId = (long)(Math.floor(ts / genWidthMillis));
+        return makeIdFromComponents((windowId * genWidthMillis), 0L, 0L);
+    }
+
+    /**
+     * Given a transaction id and an export window-width,
+     * return the containing window number
+     */
+    public static long getExportWindowNumberFromTransactionId(long txnId, int genWidthMillis) {
+        long ts = getTimestampFromTransactionId(txnId);
+        long windowId = (long)(Math.floor(ts / genWidthMillis));
+        return windowId;
+    }
+
+    /**
      * Given a transaction id, return the embedded site id.
      * @param txnId The transaction id value to examine.
      * @return The site id embedded within the transaction id.
