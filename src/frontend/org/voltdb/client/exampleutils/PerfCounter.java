@@ -111,7 +111,7 @@ public class PerfCounter implements Cloneable
      */
     public long getErrorCount()
     {
-        return cnt;
+        return err;
     }
 
     /**
@@ -250,6 +250,35 @@ public class PerfCounter implements Cloneable
                                 , 100*(double)this.lat[7]/this.cnt
                                 , 100*(double)this.lat[8]/this.cnt
                                 );
+    }
+
+    /**
+     * Format the statistics into a delimiter separated string.
+     *
+     * Currently, the format is
+     * "start (ms), end (ms), total proc calls, min lat., max lat., lat. buckets..."
+     *
+     * @param delimiter Delimiter to separate values, e.g. ',' or '\t'
+     * @return
+     */
+    public String toRawString(char delimiter)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append(getStartTime())
+          .append(delimiter)
+          .append(getEndTime())
+          .append(delimiter)
+          .append(getExecutionCount())
+          .append(delimiter)
+          .append(getMinLatency())
+          .append(delimiter)
+          .append(getMaxLatency());
+        // There are 9 buckets
+        for (long latency : getLatencyBuckets()) {
+            sb.append(delimiter).append(latency);
+        }
+
+        return sb.toString();
     }
 
     /**

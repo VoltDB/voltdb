@@ -18,8 +18,9 @@ package org.voltdb.client.exampleutils;
 
 import org.voltdb.client.*;
 
-import java.util.HashMap;
 import java.io.Closeable;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.concurrent.Future;
 
 /**
@@ -275,6 +276,23 @@ public class ClientConnection implements Closeable
         for(String procedure : procedures)
             result.merge(map.get(procedure));
         return result;
+    }
+
+    /**
+     * Save statistics to a CSV file.
+     *
+     * @param file
+     *            File path
+     * @throws IOException
+     */
+    public void saveStatistics(String file) throws IOException
+    {
+        if (file != null) {
+            FileWriter fw = new FileWriter(file);
+            fw.write(getStatistics().toRawString(','));
+            fw.flush();
+            fw.close();
+        }
     }
 
     /**
