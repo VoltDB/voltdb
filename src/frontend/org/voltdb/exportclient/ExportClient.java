@@ -36,7 +36,7 @@ public class ExportClient {
     public void start() {
         while (true) {
             try {
-                Object[] pair = m_advertisements.poll(1000, TimeUnit.SECONDS);
+                Object[] pair = m_advertisements.poll(5, TimeUnit.SECONDS);
 
                 if (pair == null) {
                     for (InetSocketAddress s : m_servers) {
@@ -72,6 +72,7 @@ public class ExportClient {
 
     /** Read command line configuration and fire up an export client */
     public static void main(String[] args) {
+        LOG.info("Starting export client with arguments: " + args.toString());
         ExportClient that = new ExportClient();
         String clusterip = args[0];
         that.addServerInfo(clusterip, false);

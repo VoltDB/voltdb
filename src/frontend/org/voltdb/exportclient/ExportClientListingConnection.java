@@ -31,7 +31,7 @@ class ExportClientListingConnection implements Runnable {
             // connect
             Object[] cxndata = ConnectionUtil.getAuthenticatedExportListingConnection(
                 m_server.getHostName(),
-                "username",
+                null,
                 null,
                 m_server.getPort());
             socket = (SocketChannel) cxndata[0];
@@ -43,8 +43,8 @@ class ExportClientListingConnection implements Runnable {
             socket.write(m.toBuffer());
 
             // read the advertisement count
-            ByteBuffer stringLength = ByteBuffer.allocate(4);
-            int read = socket.read(stringLength);
+            ByteBuffer adCount = ByteBuffer.allocate(4);
+            int read = socket.read(adCount);
             if (read < 0) {
                 LOG.error("Failed to read advertisement count from: " + m_server);
                 return;
@@ -53,12 +53,13 @@ class ExportClientListingConnection implements Runnable {
                 LOG.error("Invalid read reading advertisements from: " + m_server);
                 return;
             }
-            stringLength.flip();
-            int count = stringLength.getInt();
+            adCount.flip();
+            int count = adCount.getInt();
 
             for (int i=0; i < count; i++) {
                 // string length
-                read = socket.read(stringLength);
+                ByteBuffer adLen = ByteBuffer.allocate(4);
+                read = socket.read(adLen);
                 if (read < 0) {
                     LOG.info("Retrieved " + advertisements.size() + " advertisements");
                     break;
@@ -68,8 +69,8 @@ class ExportClientListingConnection implements Runnable {
                     break;
                 }
                 // actual string
-                stringLength.flip();
-                int length = stringLength.getInt();
+                adLen.flip();
+                int length = adLen.getInt();
                 ByteBuffer ad = ByteBuffer.allocate(length);
                 read = socket.read(ad);
                 if (read < 0) {

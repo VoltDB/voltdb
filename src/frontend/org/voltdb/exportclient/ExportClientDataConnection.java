@@ -28,7 +28,7 @@ class ExportClientDataConnection implements Runnable {
             Object[] cxndata = ConnectionUtil.getAuthenticatedExportDataConnection(
                 m_advertisement,
                 m_server.getHostName(),
-                "username",
+                null,
                 null,
                 m_server.getPort());
             socket = (SocketChannel) cxndata[0];

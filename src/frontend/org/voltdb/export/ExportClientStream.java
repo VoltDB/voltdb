@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.Connection;
 import org.voltdb.network.InputHandler;
 import org.voltdb.network.QueueMonitor;
@@ -31,6 +32,8 @@ import org.voltdb.network.QueueMonitor;
  * from the client. This is a one way street.
  */
 public class ExportClientStream implements InputHandler {
+
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     /** the network read/write streams */
     private Connection m_cxn = null;
@@ -48,7 +51,8 @@ public class ExportClientStream implements InputHandler {
         @Override
         public void run() {
             StreamBlock sb = m_sbq.poll();
-            while (sb != null) {
+            if (sb != null) {
+                exportLog.info("Enqueing " + sb.block().b.remaining() + " bytes to stream.");
                 m_cxn.writeStream().enqueue(sb.block());
             }
         }

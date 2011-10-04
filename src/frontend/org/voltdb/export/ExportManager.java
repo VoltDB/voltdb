@@ -328,12 +328,14 @@ public class ExportManager
      */
     public InputHandler createExportClientStream(String streamname)
     {
+        exportLog.info("Creating export data stream for " + streamname);
         long generationId = getGenerationIdFromStreamName(streamname);
         int partitionId = getPartitionIdFromStreamName(streamname);
         String signature = getSignatureFromStreamName(streamname);
 
         ExportGeneration gen = m_windowDirectory.getWindow(generationId);
         if (gen == null) {
+            exportLog.error("Rejecting export data stream. Generation " + generationId + " does not exist.");
             return null;
         }
 
@@ -341,6 +343,8 @@ public class ExportManager
             gen.checkoutExportStreamBlockQueue(partitionId, signature);
 
         if (sbq == null) {
+            exportLog.error("Rejecting export data stream. Stream " +  signature +
+                " busy or not present in generation " + generationId);
             return null;
         }
 

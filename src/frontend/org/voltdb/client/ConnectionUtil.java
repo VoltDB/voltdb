@@ -148,7 +148,7 @@ public class ConnectionUtil {
     public static Object[] getAuthenticatedExportListingConnection(
         String host, String username, byte[] hashedPassword, int port) throws IOException
     {
-        return getAuthenticatedConnection("exportlist", host, username, hashedPassword, port);
+        return getAuthenticatedConnection("exportlisting", host, username, hashedPassword, port);
     }
 
     public static Object[] getAuthenticatedExportDataConnection(
@@ -230,6 +230,14 @@ public class ConnectionUtil {
         if (!aChannel.isConnected()) {
             // TODO Can open() be asynchronous if configureBlocking(true)?
             throw new IOException("Failed to open host " + host);
+        }
+        if (hashedPassword == null) {
+            // set a dummy password
+            hashedPassword = ConnectionUtil.getHashedPassword("");
+        }
+        if (username == null) {
+            // set a dummy username
+            username = "";
         }
         final long retvals[] = new long[4];
         returnArray[1] = retvals;
