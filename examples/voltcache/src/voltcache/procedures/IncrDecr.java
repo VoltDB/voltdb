@@ -37,20 +37,21 @@ public class IncrDecr extends VoltProcedure
         final int now = Shared.init(this, key);
 
         voltQueueSQL(check, key, now);
-        VoltTable checkResult = voltExecuteSQL()[0];
+        VoltTable checkResult = voltExecuteSQL()[1];
         if (checkResult.getRowCount() == 0)
             return VoltType.NULL_BIGINT;
 
         try
         {
-            byte[] oldRawData = checkResult.fetchRow(0).getVarbinary(1);
-            long value = Long.parseLong(new String(oldRawData,"UTF-8")) + (increment == 1 ? by : -by);
+            final byte[] oldRawData = checkResult.fetchRow(0).getVarbinary(1);
+            final long old_value = Long.parseLong(new String(oldRawData,"UTF-8"));
+            long value = old_value + (increment == 1 ? by : -by);
             if (value < 0l) // Underflow protection: per protocol, this should be an unsigned long...
                 value = 0l;
-            byte[] newRawData = Long.toString(value).getBytes("UTF-8");
+            final byte[] newRawData = Long.toString(value).getBytes("UTF-8");
             voltQueueSQL(update, newRawData, key);
             voltExecuteSQL(true);
-            return value;
+            return old_value;
         }
         catch(Exception x)
         {

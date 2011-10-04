@@ -41,7 +41,7 @@ public class VoltCache implements IVoltCache
     private static final Lock lock = new ReentrantLock();
     // Pool of cleanup tasks: we need to ensure there is one background thread running to scrub out expired
     // items from the cache for a given cluster connection.
-    private static HashMap<String,CleanupTask> CleanupTaskPool = new HashMap<String,CleanupTask>();
+    private static final HashMap<String,CleanupTask> CleanupTaskPool = new HashMap<String,CleanupTask>();
 
     /*
      * Timer task wrapper to scrub out expired items from the cache
@@ -53,7 +53,7 @@ public class VoltCache implements IVoltCache
         protected long Users = 1;
         private CleanupTask(String servers, int port) throws Exception
         {
-            this.connection = ClientConnectionPool.get(servers, port);;
+            this.connection = ClientConnectionPool.get(servers, port);
             this.timer = new Timer();
             this.timer.scheduleAtFixedRate(new TimerTask()
             {

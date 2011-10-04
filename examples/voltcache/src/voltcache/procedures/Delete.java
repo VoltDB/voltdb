@@ -42,7 +42,7 @@ public class Delete extends VoltProcedure
         if (expires <= 0)
         {
             voltQueueSQL(delete, key);
-            if (voltExecuteSQL()[0].fetchRow(0).getLong(0) == 0)
+            if (voltExecuteSQL()[1].fetchRow(0).getLong(0) == 0)
                 return VoltCacheResult.NOT_FOUND;
             return VoltCacheResult.DELETED;
         }
@@ -50,8 +50,7 @@ public class Delete extends VoltProcedure
         else
         {
             voltQueueSQL(check, key, now);
-            VoltTable[] checkResult = voltExecuteSQL();
-            if (checkResult[0].getRowCount() == 0)
+            if (voltExecuteSQL()[1].getRowCount() == 0)
                 return VoltCacheResult.NOT_FOUND;
 
             voltQueueSQL(update, Shared.expires(this, expires), key);

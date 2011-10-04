@@ -28,11 +28,13 @@ public class VoltCacheItem
     public final int Flags;
     public final byte[] Value;
     public final long CASVersion;
-    VoltCacheItem(String key, int flags, byte[] value, long casVersion)
+    public final int Expires;
+    VoltCacheItem(String key, int flags, byte[] value, long casVersion, int expires)
     {
         this.Key = key;
         this.Flags = flags;
         this.Value = value;
         this.CASVersion = casVersion;
+        this.Expires = expires;
     }
 }

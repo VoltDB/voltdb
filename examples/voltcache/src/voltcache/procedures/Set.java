@@ -39,7 +39,7 @@ public class Set extends VoltProcedure
         final int now = Shared.init(this, key);
 
         voltQueueSQL(check, key, now);
-        VoltTable checkResult = voltExecuteSQL()[0];
+        VoltTable checkResult = voltExecuteSQL()[1];
         if (checkResult.getRowCount() > 0)
         {
             // If invalidated return success immediately (without doing anything though: invalidated item cannot be retrieved)

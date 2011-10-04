@@ -38,7 +38,7 @@ public class CheckAndSet extends VoltProcedure
         final int now = Shared.init(this, key);
 
         voltQueueSQL(check, key, now);
-        VoltTable checkResult = voltExecuteSQL()[0];
+        VoltTable checkResult = voltExecuteSQL()[1];
         if (checkResult.getRowCount() == 0)
             return VoltCacheResult.NOT_FOUND;
 

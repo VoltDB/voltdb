@@ -23,14 +23,15 @@
 package voltcache.api;
 
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.BufferedInputStream;
+import java.io.InputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import org.voltdb.VoltType;
+import java.util.regex.Pattern;
+import java.nio.charset.Charset;
 
 public class MemcachedTextProtocolService implements Runnable
 {
@@ -59,11 +60,11 @@ public class MemcachedTextProtocolService implements Runnable
 
     private static byte[] RESPONSE_VALUE = getResponseBytes("VALUE ");
     private static int RESPONSE_VALUE_Length = RESPONSE_VALUE.length;
-    private static final byte[] OneSpace = " ".getBytes();
+    private static final byte[] OneSpace = getResponseBytes(" ");
     private static final int OneSpace_Length = OneSpace.length;
-    private static final byte[] NewLine = "\r\n".getBytes();
+    private static final byte[] NewLine = getResponseBytes("\r\n");
     private static final int NewLine_Length = NewLine.length;
-    private static final byte[] EndLine = "END\r\n".getBytes();
+    private static final byte[] EndLine = getResponseBytes("END\r\n");
     private static final int EndLine_Length = EndLine.length;
 
     // Commands
@@ -84,11 +85,14 @@ public class MemcachedTextProtocolService implements Runnable
 
     // Parsing helpers
     private static final String NOREPLY = "noreply";
+    private static final Pattern splitter = Pattern.compile(" ");
+    public static final Charset USASCII = Charset.forName("US-ASCII");
 
     // Instance members
     private final long Id;
     private final Socket Socket;
-    private final BufferedInputStream in;
+    private final InputStream in;
+//    private final BufferedInputStream in;
     private final BufferedOutputStream out;
     private final VoltCache Cache;
     private boolean Active = false;
@@ -98,8 +102,9 @@ public class MemcachedTextProtocolService implements Runnable
     {
         this.Id     = IdGenerator++;
         this.Socket = socket;
-        this.in     = new BufferedInputStream(socket.getInputStream());
-        this.out    = new BufferedOutputStream(socket.getOutputStream());
+        this.in     = socket.getInputStream();
+//        this.in     = new BufferedInputStream(socket.getInputStream(), 65535);
+        this.out    = new BufferedOutputStream(socket.getOutputStream(), 65535);
         this.Cache  = new VoltCache(voltcacheServerList, voltcachePort);
         System.out.println("Opening Client Connection[" + this.Id + "] :: " + this.Socket.getInetAddress());
     }
@@ -132,40 +137,42 @@ public class MemcachedTextProtocolService implements Runnable
         return false;
     }
 
+    private final byte[] msg = new byte[2048];
     protected void answer() throws Exception
     {
-        // Read a line of data
-        final ByteArrayOutputStream lineData = new ByteArrayOutputStream();
         boolean gotR = false;
         int b;
+        int xi = 0;
+
+        int tr = this.in.read(msg);
+        if (tr == -1)
+            throw new IOException("Stream terminated");
+
         while(true)
         {
-                    b = this.in.read();
-
-            if (b == -1)
+            b = msg[xi];
+            if (xi >= tr)
                 throw new IOException("Stream terminated");
-
-                    if (b == 13)
-                    {
-                            gotR = true;
-                            continue;
-                    }
-
-                    if (gotR)
-                    {
-                            if (b == 10)
-                                    break;
-
-                lineData.write(13);
-
-                            gotR = false;
-                    }
-
-            lineData.write(b);
+            if (b == 13)
+            {
+                gotR = true;
+                xi++;
+                continue;
+            }
+            if (gotR)
+            {
+                if (b == 10)
+                {
+                    xi++;
+                    break;
+                }
+                msg[xi++] = 13;
+                gotR = false;
+            }
+            xi++;
         }
-
         // Parse first line arguments to figure out command
-        final String[] args  = lineData.toString("UTF-8").trim().split(" ");
+        final String[] args  = splitter.split(new String(msg, 0, xi, USASCII).trim());
         final String command = args[0].toLowerCase();
         final int argCount   = args.length-1;
 
@@ -217,8 +224,19 @@ public class MemcachedTextProtocolService implements Runnable
                     final int exptime = Integer.valueOf(args[3]);
                     final int byteCount = Integer.valueOf(args[4]);
                     final byte[] data = new byte[byteCount];
-                    this.in.read(data);
-                    this.in.skip(2); // Skip \r\n terminator
+                    int avail = tr-xi;
+                    if (avail < byteCount)
+                    {
+                        System.arraycopy(msg, xi, data, 0, avail);
+                        this.in.read(data, avail, byteCount-avail);
+                        this.in.skip(2);
+                    }
+                    else
+                    {
+                        System.arraycopy(msg, xi, data, 0, byteCount);
+                        if (byteCount+2 > avail)
+                            this.in.skip(byteCount+2-avail);
+                    }
                     boolean noreply = false;
                     if (argCount == 5)
                     {
@@ -269,8 +287,19 @@ public class MemcachedTextProtocolService implements Runnable
                     final int exptime = Integer.valueOf(args[3]);
                     final int byteCount = Integer.valueOf(args[4]);
                     final byte[] data = new byte[byteCount];
-                    this.in.read(data, 0, byteCount);
-                    this.in.skip(2); // Skip \r\n terminator
+                    int avail = tr-xi;
+                    if (avail < byteCount)
+                    {
+                        System.arraycopy(msg, xi, data, 0, avail);
+                        this.in.read(data, avail, byteCount-avail);
+                        this.in.skip(2);
+                    }
+                    else
+                    {
+                        System.arraycopy(msg, xi, data, 0, byteCount);
+                        if (byteCount+2 > avail)
+                            this.in.skip(byteCount+2-avail);
+                    }
                     final long casVersion = Long.valueOf(args[5]);
                     boolean noreply = false;
                     if (argCount == 6)
@@ -450,7 +479,7 @@ public class MemcachedTextProtocolService implements Runnable
     {
         try
         {
-            return responseString.getBytes("UTF-8");
+            return USASCII.encode(responseString).array(); //responseString.getBytes(USASCII);
         }
         catch(Exception x)
         {
@@ -486,36 +515,39 @@ public class MemcachedTextProtocolService implements Runnable
 
     private void replyData(VoltCacheResult response) throws Exception
     {
-        Iterator<VoltCacheItem> itr = (Iterator<VoltCacheItem>)((Collection<VoltCacheItem>)response.Data.values()).iterator();
-        while (itr.hasNext())
+        if (response.Data != null)
         {
-            final VoltCacheItem item = itr.next();
-            byte[] value;
+            Iterator<VoltCacheItem> itr = (Iterator<VoltCacheItem>)((Collection<VoltCacheItem>)response.Data.values()).iterator();
+            while (itr.hasNext())
+            {
+                final VoltCacheItem item = itr.next();
+                byte[] value;
 
-            this.out.write(RESPONSE_VALUE, 0, RESPONSE_VALUE_Length);
+                this.out.write(RESPONSE_VALUE, 0, RESPONSE_VALUE_Length);
 
-            value = item.Key.getBytes("UTF-8");
-            this.out.write(value, 0, value.length);
+                value = getResponseBytes(item.Key);
+                this.out.write(value, 0, value.length);
 
-            this.out.write(OneSpace, 0, OneSpace_Length);
+                this.out.write(OneSpace, 0, OneSpace_Length);
 
-            value = Integer.toString(item.Flags).getBytes("UTF-8");
-            this.out.write(value, 0, value.length);
+                value = getResponseBytes(Integer.toString(item.Flags));
+                this.out.write(value, 0, value.length);
 
-            this.out.write(OneSpace, 0, OneSpace_Length);
+                this.out.write(OneSpace, 0, OneSpace_Length);
 
-            value = Integer.toString(item.Value.length).getBytes("UTF-8");
-            this.out.write(value, 0, value.length);
+                value = getResponseBytes(Integer.toString(item.Value.length));
+                this.out.write(value, 0, value.length);
 
-            this.out.write(OneSpace, 0, OneSpace_Length);
+                this.out.write(OneSpace, 0, OneSpace_Length);
 
-            value = Long.toString(item.CASVersion).getBytes("UTF-8");
-            this.out.write(value, 0, value.length);
+                value = getResponseBytes(Long.toString(item.CASVersion));
+                this.out.write(value, 0, value.length);
 
-            this.out.write(NewLine, 0, NewLine_Length);
+                this.out.write(NewLine, 0, NewLine_Length);
 
-            this.out.write(item.Value, 0, item.Value.length);
-            this.out.write(NewLine, 0, NewLine_Length);
+                this.out.write(item.Value, 0, item.Value.length);
+                this.out.write(NewLine, 0, NewLine_Length);
+            }
         }
         this.out.write(EndLine, 0, EndLine.length);
         this.out.flush();
@@ -523,36 +555,39 @@ public class MemcachedTextProtocolService implements Runnable
 
     private void replyData(String key, VoltCacheResult response) throws Exception
     {
-        if (response.Data.containsKey(key))
+        if (response.Data != null)
         {
-            final VoltCacheItem item = response.Data.get(key);
+            if (response.Data.containsKey(key))
+            {
+                final VoltCacheItem item = response.Data.get(key);
 
-            byte[] value;
+                byte[] value;
 
-            this.out.write(RESPONSE_VALUE, 0, RESPONSE_VALUE_Length);
+                this.out.write(RESPONSE_VALUE, 0, RESPONSE_VALUE_Length);
 
-            value = item.Key.getBytes("UTF-8");
-            this.out.write(value, 0, value.length);
+                value = getResponseBytes(key);
+                this.out.write(value, 0, value.length);
 
-            this.out.write(OneSpace, 0, OneSpace_Length);
+                this.out.write(OneSpace, 0, OneSpace_Length);
 
-            value = Integer.toString(item.Flags).getBytes("UTF-8");
-            this.out.write(value, 0, value.length);
+                value = getResponseBytes(Integer.toString(item.Flags));
+                this.out.write(value, 0, value.length);
 
-            this.out.write(OneSpace, 0, OneSpace_Length);
+                this.out.write(OneSpace, 0, OneSpace_Length);
 
-            value = Integer.toString(item.Value.length).getBytes("UTF-8");
-            this.out.write(value, 0, value.length);
+                value = getResponseBytes(Integer.toString(item.Value.length));
+                this.out.write(value, 0, value.length);
 
-            this.out.write(OneSpace, 0, OneSpace_Length);
+                this.out.write(OneSpace, 0, OneSpace_Length);
 
-            value = Long.toString(item.CASVersion).getBytes("UTF-8");
-            this.out.write(value, 0, value.length);
+                value = getResponseBytes(Long.toString(item.CASVersion));
+                this.out.write(value, 0, value.length);
 
-            this.out.write(NewLine, 0, NewLine_Length);
+                this.out.write(NewLine, 0, NewLine_Length);
 
-            this.out.write(item.Value, 0, item.Value.length);
-            this.out.write(NewLine, 0, NewLine_Length);
+                this.out.write(item.Value, 0, item.Value.length);
+                this.out.write(NewLine, 0, NewLine_Length);
+            }
         }
         this.out.write(EndLine, 0, EndLine_Length);
         this.out.flush();
@@ -565,11 +600,10 @@ public class MemcachedTextProtocolService implements Runnable
             this.replyStatus(response);
         else
         {
-            long value = response.IncrDecrValue;
-            if (value == VoltType.NULL_BIGINT)
+            if (response.Code == VoltCacheResult.NOT_FOUND)
                 this.reply(RESPONSE_NOT_FOUND);
             else
-                this.reply(Long.toString(value) + "\r\n");
+                this.reply(Long.toString(response.IncrDecrValue) + "\r\n");
         }
     }
 

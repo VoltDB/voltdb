@@ -39,8 +39,7 @@ public class Add extends VoltProcedure
 
         // Pre-check for item existence => Fail w/ NOT_STORED status if the record exists (whether active or queued for deletion)
         voltQueueSQL(check, key, now);
-        VoltTable[] checkResult = voltExecuteSQL();
-        if (checkResult[0].getRowCount() > 0)
+        if (voltExecuteSQL()[1].getRowCount() > 0)
             return VoltCacheResult.NOT_STORED;
 
         // Insert new item

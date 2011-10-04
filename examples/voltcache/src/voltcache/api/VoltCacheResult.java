@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.HashMap;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.VoltType;
 
 public class VoltCacheResult
 {
@@ -40,21 +41,35 @@ public class VoltCacheResult
     public static final long OK           = 8l;
     public static final long SUBMITTED    = 9l;
 
-    public static VoltCacheResult STORED()       { return new VoltCacheResult(0l); }
-    public static VoltCacheResult NOT_STORED()   { return new VoltCacheResult(1l); }
-    public static VoltCacheResult EXISTS()       { return new VoltCacheResult(2l); }
-    public static VoltCacheResult NOT_FOUND()    { return new VoltCacheResult(3l); }
-    public static VoltCacheResult DELETED()      { return new VoltCacheResult(4l); }
-    public static VoltCacheResult ERROR()        { return new VoltCacheResult(5l); }
-    public static VoltCacheResult CLIENT_ERROR() { return new VoltCacheResult(6l); }
-    public static VoltCacheResult SERVER_ERROR() { return new VoltCacheResult(7l); }
+    public static VoltCacheResult STORED()       { return _CODES[0]; }
+    public static VoltCacheResult NOT_STORED()   { return _CODES[1]; }
+    public static VoltCacheResult EXISTS()       { return _CODES[2]; }
+    public static VoltCacheResult NOT_FOUND()    { return _CODES[3]; }
+    public static VoltCacheResult DELETED()      { return _CODES[4]; }
+    public static VoltCacheResult ERROR()        { return _CODES[5]; }
+    public static VoltCacheResult CLIENT_ERROR() { return _CODES[6]; }
+    public static VoltCacheResult SERVER_ERROR() { return _CODES[7]; }
     public static VoltCacheResult OK()           { return new VoltCacheResult(8l); }
-    public static VoltCacheResult SUBMITTED()    { return new VoltCacheResult(9l); }
+    public static VoltCacheResult SUBMITTED()    { return _CODES[9]; }
+
+    private static final VoltCacheResult[] _CODES = new VoltCacheResult[]
+    {
+      new VoltCacheResult(0l)
+    , new VoltCacheResult(1l)
+    , new VoltCacheResult(2l)
+    , new VoltCacheResult(3l)
+    , new VoltCacheResult(4l)
+    , new VoltCacheResult(5l)
+    , new VoltCacheResult(6l)
+    , new VoltCacheResult(7l)
+    , new VoltCacheResult(8l)
+    , new VoltCacheResult(9l)
+    };
 
     private static final String[] Name = new String[] {"STORED","NOT_STORED","EXISTS","NOT_FOUND","DELETED","ERROR","CLIENT_ERROR","SERVER_ERROR","OK","SUBMITTED"};
 
     public final long Code;
-    public long IncrDecrValue = Long.MAX_VALUE;
+    public long IncrDecrValue = VoltType.NULL_BIGINT;
     public Map<String,VoltCacheItem> Data = null;
     VoltCacheResult(long code)
     {
@@ -84,30 +99,42 @@ public class VoltCacheResult
     {
         if (type == Type.CODE)
         {
-            return new VoltCacheResult(response.getResults()[0].fetchRow(0).getLong(0));
+            return _CODES[(int)response.getResults()[0].asScalarLong()];
         }
         else if (type == Type.DATA)
         {
             final VoltTable data = response.getResults()[0];
-            final VoltCacheResult result = VoltCacheResult.OK();
-            result.Data = new HashMap<String,VoltCacheItem>();
-            while(data.advanceRow())
-                result.Data.put(
-                                 data.getString(0)
-                               , new VoltCacheItem(
-                                                    data.getString(0)
-                                                  , (int)data.getLong(1)
-                                                  , data.getVarbinary(2)
-                                                  , data.getLong(3)
-                                                  )
-                               );
-            return result;
+            if (data.getRowCount() > 0)
+            {
+                final VoltCacheResult result = VoltCacheResult.OK();
+                result.Data = new HashMap<String,VoltCacheItem>();
+                while(data.advanceRow())
+                    result.Data.put(
+                                     data.getString(0)
+                                   , new VoltCacheItem(
+                                                        data.getString(0)
+                                                      , (int)data.getLong(1)
+                                                      , data.getVarbinary(2)
+                                                      , data.getLong(3)
+                                                      , (int)data.getLong(4)
+                                                      )
+                                   );
+                return result;
+            }
+            else
+                return VoltCacheResult.NOT_FOUND();
         }
         else if (type == Type.IDOP)
         {
-            final VoltCacheResult result = VoltCacheResult.OK();
-            result.IncrDecrValue = response.getResults()[0].fetchRow(0).getLong(0);
-            return result;
+            final long value = response.getResults()[0].asScalarLong();
+            if (value == VoltType.NULL_BIGINT)
+                return VoltCacheResult.NOT_FOUND();
+            else
+            {
+                final VoltCacheResult result = VoltCacheResult.OK();
+                result.IncrDecrValue = value;
+                return result;
+            }
         }
         else
             throw new RuntimeException("Invalid Result Type: " + type);

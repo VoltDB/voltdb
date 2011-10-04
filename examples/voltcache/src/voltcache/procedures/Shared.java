@@ -44,7 +44,6 @@ public class Shared
     {
         final int now = now(procedure);
         procedure.voltQueueSQL(CleanSQLStmt, key, now);
-        procedure.voltExecuteSQL();
         return now;
     }
     public static int init(VoltProcedure procedure, String[] keys)
