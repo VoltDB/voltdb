@@ -24,6 +24,7 @@ class ExportClientDataConnection implements Runnable {
     public void run() {
         LOG.info("Retrieving data for advertisement: " + m_advertisement);
         SocketChannel socket = null;
+        long totalBytes = 0;
         try {
             Object[] cxndata = ConnectionUtil.getAuthenticatedExportDataConnection(
                 m_advertisement,
@@ -39,7 +40,9 @@ class ExportClientDataConnection implements Runnable {
             do {
                 bytesRead = socket.read(buf);
                 buf.flip();
-                LOG.info("Export client read " + bytesRead + " bytes.");
+                totalBytes += bytesRead;
+                LOG.info("Advertisement drained " + m_advertisement +
+                    " read  " + totalBytes/(1024*1024) + " MB");
             } while(bytesRead > 0);
 
         } catch (IOException e) {

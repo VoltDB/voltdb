@@ -316,7 +316,7 @@ public class ExportGeneration {
 
     public StreamBlockQueue checkoutExportStreamBlockQueue(int partitionId, String signature)
     {
-        return m_blockMap.get(partitionId + "-" + signature);
+        return m_blockMap.remove(partitionId + "-" + signature);
     }
 
     public void addExportStreamBlockQueue(int partitionId, String signature, StreamBlockQueue sbq)
