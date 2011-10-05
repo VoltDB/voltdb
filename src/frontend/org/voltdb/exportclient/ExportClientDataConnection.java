@@ -1,5 +1,6 @@
 package org.voltdb.exportclient;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -24,9 +25,11 @@ class ExportClientDataConnection implements Runnable {
     @Override
     public void run()
     {
+        BufferedInputStream reader;
         SocketChannel socket = null;
         long totalBytes = 0;
         int bytesRead = 0;
+        long lastLogged = 0;
 
         LOG.info("Retrieving data for advertisement: " + m_advertisement);
 
@@ -39,14 +42,22 @@ class ExportClientDataConnection implements Runnable {
                 m_server.getPort());
             socket = (SocketChannel) cxndata[0];
             socket.configureBlocking(true);
-
-            ByteBuffer buf = ByteBuffer.allocate(4096);
+            reader = new BufferedInputStream(socket.socket().getInputStream());
+            ByteBuffer buf = ByteBuffer.allocate(1024 * 1024 * 2);
             do {
-                bytesRead = socket.read(buf);
+                bytesRead = reader.read(buf.array());
                 buf.flip();
                 totalBytes += bytesRead;
-                LOG.info("Advertisement " + m_advertisement +
-                    " read " + bytesRead + " bytes. Total read:"+ totalBytes/(1024*1024) + " MB");
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Advertisement " + m_advertisement +
+                        " read " + bytesRead +
+                        " bytes. Total read:"+ totalBytes/(1024*1024) + " MB");
+                }
+                else if (totalBytes > lastLogged + (1024*1024*5)) {
+                    lastLogged = totalBytes;
+                    LOG.info("Advertisement " + m_advertisement +
+                        " read " + totalBytes + ". Last read: " + bytesRead);
+                }
             } while(bytesRead > 0);
         }
         catch (IOException e) {
