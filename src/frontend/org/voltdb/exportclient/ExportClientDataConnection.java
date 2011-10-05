@@ -15,16 +15,21 @@ class ExportClientDataConnection implements Runnable {
     private final String m_advertisement;
     private final InetSocketAddress m_server;
 
-    public ExportClientDataConnection(InetSocketAddress server, String nextAdvertisement) {
+    public ExportClientDataConnection(InetSocketAddress server, String nextAdvertisement)
+    {
         m_advertisement = nextAdvertisement;
         m_server = server;
     }
 
     @Override
-    public void run() {
-        LOG.info("Retrieving data for advertisement: " + m_advertisement);
+    public void run()
+    {
         SocketChannel socket = null;
         long totalBytes = 0;
+        int bytesRead = 0;
+
+        LOG.info("Retrieving data for advertisement: " + m_advertisement);
+
         try {
             Object[] cxndata = ConnectionUtil.getAuthenticatedExportDataConnection(
                 m_advertisement,
@@ -35,19 +40,27 @@ class ExportClientDataConnection implements Runnable {
             socket = (SocketChannel) cxndata[0];
             socket.configureBlocking(true);
 
-            int bytesRead = 0;
             ByteBuffer buf = ByteBuffer.allocate(4096);
             do {
                 bytesRead = socket.read(buf);
                 buf.flip();
                 totalBytes += bytesRead;
-                LOG.info("Advertisement drained " + m_advertisement +
-                    " read  " + totalBytes/(1024*1024) + " MB");
+                LOG.info("Advertisement " + m_advertisement +
+                    " read " + bytesRead + " bytes. Total read:"+ totalBytes/(1024*1024) + " MB");
             } while(bytesRead > 0);
-
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             LOG.error(e);
         }
-
+        finally {
+            try {
+                if (socket != null) {
+                    socket.close();
+                }
+            }
+            catch (IOException e) {
+                LOG.error(e);
+            }
+        }
     }
 }

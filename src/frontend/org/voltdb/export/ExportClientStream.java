@@ -52,13 +52,16 @@ public class ExportClientStream implements InputHandler {
         public void run() {
             StreamBlock sb = m_sbq.poll();
             if (sb != null) {
-                exportLog.info("Enqueing " + sb.block().b.remaining() + " bytes to stream.");
+                exportLog.info("Advertisement: " + m_streamName +
+                    " enqueuing: " + sb.block().b.remaining() +
+                    " bytes to stream from uso: " + sb.uso() +
+                    " container: " + sb.block());
                 m_cxn.writeStream().enqueue(sb.block());
             }
         }
     }
 
-    /** Write monitor that pushes a writer runnable when necessary */
+    /** Write monitor that pushes a writer runnable when stream is empty */
     class WriteMonitor implements QueueMonitor {
         private AtomicInteger counter = new AtomicInteger(0);
         @Override
@@ -68,7 +71,7 @@ public class ExportClientStream implements InputHandler {
                 // network drained the connection. push more data.
                 m_cxn.scheduleRunnable(ExportClientStream.this.m_writer);
             }
-            // never request artificial backpressure
+            // never request artificial back-pressure
             return false;
         }
     }

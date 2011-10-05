@@ -34,10 +34,14 @@ public class ExportClient {
 
     /** Loop forever reading advertisements and processing data channels */
     public void start() {
-        while (true) {
-            try {
-                Object[] pair = m_advertisements.poll(5, TimeUnit.SECONDS);
+        try {
+            // seed the advertisement pool
+            for (InetSocketAddress s : m_servers) {
+                m_workerPool.execute(new ExportClientListingConnection(s, m_advertisements));
+            }
 
+            while (true) {
+                Object[] pair = m_advertisements.poll(30, TimeUnit.SECONDS);
                 if (pair == null) {
                     for (InetSocketAddress s : m_servers) {
                         m_workerPool.execute(new ExportClientListingConnection(s, m_advertisements));
@@ -48,9 +52,9 @@ public class ExportClient {
                     String advertisement =  (String) pair[1];
                     m_workerPool.execute(new ExportClientDataConnection(socket, advertisement));
                 }
-            } catch (Exception e) {
-                LOG.error(e);
             }
+        } catch (Exception e) {
+            LOG.error(e);
         }
     }
 

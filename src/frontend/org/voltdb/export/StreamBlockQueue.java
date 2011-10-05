@@ -92,16 +92,7 @@ public class StreamBlockQueue {
             final BBContainer fcont = cont;
             long uso = cont.b.getLong();
             ByteBuffer buf = cont.b.slice();
-            //Pass the stream block a subset of the bytes, provide
-            //a container that discards the original returned by the persistent deque
-            StreamBlock block = new StreamBlock( new BBContainer(buf, 0L) {
-                    @Override
-                    public void discard() {
-                        fcont.discard();
-                    }
-                },
-                uso,
-                true);
+            StreamBlock block = new StreamBlock(fcont, uso, true);
 
             //Optionally store a reference to the block in the in memory deque
             if (!actuallyPoll) {
