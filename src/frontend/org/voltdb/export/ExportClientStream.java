@@ -44,31 +44,46 @@ public class ExportClientStream implements InputHandler {
     /** the export data */
     private final StreamBlockQueue m_sbq;
 
-    /** Runnable that flushes sbq to the write stream */
-    private final ExportClientStream.Writer m_writer;
+    /** Current (approximate) write queue bytes */
+    private final AtomicInteger counter = new AtomicInteger(0);
 
+    /** Try to keep at least this many bytes in the NIO write stream */
+    private final int kLowWaterMark = 1024 * 1024 * 2;
+
+    /** Max bytes (approximately) allowed in the NIO write stream */
+    private final int kHighWaterMark = 1024 * 1024 * 20;
+
+    /** Controls the transfer of bytes from m_sbq to m_cxn */
     class Writer implements Runnable {
         @Override
         public void run() {
-            StreamBlock sb = m_sbq.poll();
-            if (sb != null) {
-                exportLog.info("Advertisement: " + m_streamName +
-                    " enqueuing: " + sb.block().b.remaining() +
-                    " bytes to stream from uso: " + sb.uso() +
-                    " container: " + sb.block());
+            StreamBlock sb = null;
+            int goalBytes = kHighWaterMark - counter.get();
+            int queuedBytes = 0;
+            while ((goalBytes > queuedBytes) && (sb = m_sbq.poll()) != null) {
+                if (exportLog.isTraceEnabled()) {
+                    exportLog.trace("Advertisement: " + m_streamName +
+                        " enqueuing: " + sb.block().b.remaining() +
+                        " bytes to stream from uso: " + sb.uso() +
+                        " container: " + sb.block() +
+                        " goal bytes: " + goalBytes +
+                        " queued bytes: " + queuedBytes);
+                }
+                queuedBytes += sb.block().b.remaining();
                 m_cxn.writeStream().enqueue(sb.block());
             }
         }
     }
 
-    /** Write monitor that pushes a writer runnable when stream is empty */
+    /** The writer instance */
+    private final ExportClientStream.Writer m_writer;
+
+    /** Schedules m_writer when the queue falls below kLowWaterMark bytes */
     class WriteMonitor implements QueueMonitor {
-        private AtomicInteger counter = new AtomicInteger(0);
         @Override
         public boolean queue(int bytes) {
             int queued = counter.addAndGet(bytes);
-            if (queued == 0) {
-                // network drained the connection. push more data.
+            if (queued < kLowWaterMark) {
                 m_cxn.scheduleRunnable(ExportClientStream.this.m_writer);
             }
             // never request artificial back-pressure
@@ -96,6 +111,12 @@ public class ExportClientStream implements InputHandler {
         return 2 * 1024 * 1024;
     }
 
+    /** Create and return an instance of WriteMonitor */
+    @Override
+    public QueueMonitor writestreamMonitor() {
+        return this.new WriteMonitor();
+    }
+
     /**
      * Never reads. We take the word "export" to heart here.
      */
@@ -115,6 +136,7 @@ public class ExportClientStream implements InputHandler {
         assert(false);
     }
 
+    /** VoltNetwork passes in the Connection here. */
     @Override
     public void starting(Connection c) {
         assert(m_cxn == null);
@@ -143,11 +165,6 @@ public class ExportClientStream implements InputHandler {
     @Override
     public Runnable offBackPressure() {
         return null;
-    }
-
-    @Override
-    public QueueMonitor writestreamMonitor() {
-        return this.new WriteMonitor();
     }
 
     @Override
