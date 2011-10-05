@@ -141,6 +141,7 @@ public class NIOWriteStream implements WriteStream {
         return m_queuedWrites.size() + m_queuedBuffers.size();
     }
 
+    @Override
     synchronized public boolean isEmpty()
     {
         return m_queuedBuffers.isEmpty() && m_queuedWrites.isEmpty();
@@ -248,22 +249,34 @@ public class NIOWriteStream implements WriteStream {
             final int queuedForWrite = 0;
             final BBContainer peekedBuffer = m_queuedBuffers.peek();
             if (peekedBuffer.b.remaining() > MAX_GATHERING_WRITE) {
-                /*
-                 * If the buffer is not direct and it is this large it should be split up in separate writes
-                 */
+
                 if (!peekedBuffer.b.isDirect()) {
-                    /**
-                     * Split a big heap byte buffer into many smaller slices
-                     * so Java doesn't allocate a bunch of direct ByteBuffers
+                    /*
+                     * Slice the large buffer in to smaller buffers. Replace the big
+                     * buffer in the write queue with these smaller slices. Delegate
+                     * the big buffer's discard action to the last slice.
+                     *
+                     * This prevents Java from allocating a large direct buffer,
+                     * which can lead to OOM or fragmentation.
                      */
-                    //The source buffer for the slices that holds the memory goes in first
-                    //so it will be discarded once all the slices have been read.
-                    m_queuedBuffers.push(peekedBuffer);
+                    m_queuedBuffers.poll();
                     final int originalPosition = peekedBuffer.b.position();
+                    boolean firstSlice = true;
                     do {
                         final int amountToSplit = Math.min(peekedBuffer.b.remaining(), MAX_GATHERING_WRITE);
                         peekedBuffer.b.position(peekedBuffer.b.limit() - amountToSplit);
-                        final BBContainer splice = DBBPool.wrapBB(peekedBuffer.b.slice());
+                        final BBContainer splice;
+                        if (firstSlice) {
+                            firstSlice = false;
+                            splice = new BBContainer(peekedBuffer.b.slice(), 0L) {
+                                @Override
+                                public void discard() {
+                                    peekedBuffer.discard();
+                                }
+                            };
+                        } else {
+                            splice = DBBPool.wrapBB(peekedBuffer.b.slice());
+                        }
                         m_queuedBuffers.push(splice);
                         m_messagesWritten--;//corrects message count
                         peekedBuffer.b.limit(peekedBuffer.b.position());
@@ -271,6 +284,7 @@ public class NIOWriteStream implements WriteStream {
                     }
                     while(peekedBuffer.b.hasRemaining());
                     buffer = m_queuedBuffers.peek().b;
+
                 } else {
                     //Elect to do a single regular write instead of all the gathering write work
                     //It is okay not to split it into many smaller buffers because it is direct
