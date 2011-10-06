@@ -11,12 +11,12 @@ import org.voltdb.logging.VoltLogger;
 
 
 /** Connect to a server data feed */
-class ExportClientDataConnection implements Runnable {
+class ExportClientStreamConnection implements Runnable {
     static final VoltLogger LOG = new VoltLogger("ExportClient");
     private final String m_advertisement;
     private final InetSocketAddress m_server;
 
-    public ExportClientDataConnection(InetSocketAddress server, String nextAdvertisement)
+    public ExportClientStreamConnection(InetSocketAddress server, String nextAdvertisement)
     {
         m_advertisement = nextAdvertisement;
         m_server = server;
@@ -34,7 +34,7 @@ class ExportClientDataConnection implements Runnable {
         LOG.info("Retrieving data for advertisement: " + m_advertisement);
 
         try {
-            Object[] cxndata = ConnectionUtil.getAuthenticatedExportDataConnection(
+            Object[] cxndata = ConnectionUtil.getAuthenticatedExportStreamConnection(
                 m_advertisement,
                 m_server.getHostName(),
                 null,

@@ -151,7 +151,7 @@ public class ConnectionUtil {
         return getAuthenticatedConnection("exportlisting", host, username, hashedPassword, port);
     }
 
-    public static Object[] getAuthenticatedExportDataConnection(
+    public static Object[] getAuthenticatedExportStreamConnection(
         String advertisement, String host, String username,
         byte[] hashedPassword, int port) throws IOException
     {

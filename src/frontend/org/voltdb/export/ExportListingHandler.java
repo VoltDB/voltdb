@@ -34,7 +34,7 @@ import org.voltdb.network.VoltProtocolHandler;
  *
  *
  */
-public class ExportListingService extends VoltProtocolHandler {
+public class ExportListingHandler extends VoltProtocolHandler {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     private Connection m_cxn = null;

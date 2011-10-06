@@ -50,7 +50,7 @@ public class ExportClient {
                 else {
                     InetSocketAddress socket = (InetSocketAddress) pair[0];
                     String advertisement =  (String) pair[1];
-                    m_workerPool.execute(new ExportClientDataConnection(socket, advertisement));
+                    m_workerPool.execute(new ExportClientStreamConnection(socket, advertisement));
                 }
             }
         } catch (Exception e) {

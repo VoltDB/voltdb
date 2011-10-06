@@ -31,7 +31,7 @@ import org.voltdb.network.QueueMonitor;
  * to the connected socket. No communication is required, or read,
  * from the client. This is a one way street.
  */
-public class ExportClientStream implements InputHandler {
+public class ExportStreamHandler implements InputHandler {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
@@ -76,7 +76,7 @@ public class ExportClientStream implements InputHandler {
     }
 
     /** The writer instance */
-    private final ExportClientStream.Writer m_writer;
+    private final ExportStreamHandler.Writer m_writer;
 
     /** Schedules m_writer when the queue falls below kLowWaterMark bytes */
     class WriteMonitor implements QueueMonitor {
@@ -84,7 +84,7 @@ public class ExportClientStream implements InputHandler {
         public boolean queue(int bytes) {
             int queued = counter.addAndGet(bytes);
             if (queued < kLowWaterMark) {
-                m_cxn.scheduleRunnable(ExportClientStream.this.m_writer);
+                m_cxn.scheduleRunnable(ExportStreamHandler.this.m_writer);
             }
             // never request artificial back-pressure
             return false;
@@ -92,7 +92,7 @@ public class ExportClientStream implements InputHandler {
     }
 
     /** Create an input handler for a given StreamBlockQueue */
-    public ExportClientStream(String streamname, StreamBlockQueue sbq) {
+    public ExportStreamHandler(String streamname, StreamBlockQueue sbq) {
         m_streamName = streamname;
         m_sbq = sbq;
         m_writer = this.new Writer();

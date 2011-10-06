@@ -20,11 +20,9 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.CatalogContext;
-import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
@@ -32,7 +30,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
-import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -318,7 +315,7 @@ public class ExportManager
      * Create ExportDataStreams for the specified stream name.
      * streamname: generationid-partitionid-signature
      */
-    public InputHandler createExportClientStream(String streamname)
+    public InputHandler createExportStreamHandler(String streamname)
     {
         exportLog.info("Creating export data stream for " + streamname);
         long generationId = getGenerationIdFromStreamName(streamname);
@@ -340,11 +337,11 @@ public class ExportManager
             return null;
         }
 
-        return new ExportClientStream(streamname, sbq);
+        return new ExportStreamHandler(streamname, sbq);
     }
 
-    public InputHandler createExportListingService() {
-        return new ExportListingService();
+    public InputHandler createExportListingHandler() {
+        return new ExportListingHandler();
     }
 
 
