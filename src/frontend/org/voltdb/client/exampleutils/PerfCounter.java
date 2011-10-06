@@ -40,7 +40,14 @@ public class PerfCounter implements Cloneable
     private long tot   = 0l;
     private long cnt   = 0l;
     private long err   = 0l;
-    private long[] lat = new long[9];
+
+    /*
+     * The buckets cover 0 - 500ms+.
+     *
+     * The first 100 buckets cover 0 - 100ms, 1ms each (e.g. (0, 1ms]). The next
+     * 8 buckets cover 100 - 500ms, 50ms each. The last one covers 500ms+.
+     */
+    private long[] lat = new long[109];
 
     /**
      * Creates a new performance counter and immediately starts tracking time (for rate/second calculations).
@@ -187,7 +194,10 @@ public class PerfCounter implements Cloneable
                 min = executionDuration;
             if (max < executionDuration)
                 max = executionDuration;
-            lat[Math.min((int)(executionDuration/25l),8)]++;
+            int bucket = (int) executionDuration;
+            if (executionDuration > 100)
+                bucket = Math.min((int)((executionDuration-100l)/50l),8) + 100;
+            lat[bucket]++;
             if (!success)
                 err++;
         }
@@ -231,25 +241,46 @@ public class PerfCounter implements Cloneable
                                 , (double)this.tot/(double)this.cnt
                                 , this.max == -1l ? 0l : this.max
                                 );
-        else
+        else {
+            long[] coarseLat = new long[9];
+            // Roll up the latencies below 100ms
+            for (int i = 0; i < 4; i++) {
+                for (int j = 0; j < 25; j++) {
+                    coarseLat[i] += this.lat[i * 25 + j];
+                }
+            }
+            // Roll up the rest
+            for (int i = 4; i < 8; i++) {
+                coarseLat[i] = this.lat[100 + i - 4];
+            }
+            for (int j = 104; j < this.lat.length; j++) {
+                coarseLat[8] += this.lat[j];
+            }
+
             return String.format(
-                                   "-------------------------------------------------------------------------------------\nFinal:   | Txn.: %,11d%s @ %,11.1f TPS | Lat. = %7d <  %7.2f < %7d\n-------------------------------------------------------------------------------------\nLat.:     25 <     50 <     75 <    100 <    125 <    150 <    175 <    200 <    200+\n-------------------------------------------------------------------------------------\n%%     %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f\n"
+                                 "-------------------------------------------------------------------------------------\n" +
+                                 "Final:   | Txn.: %,11d%s @ %,11.1f TPS | Lat. = %7d <  %7.2f < %7d\n" +
+                                 "-------------------------------------------------------------------------------------\n" +
+                                 "Lat.:     25 <     50 <     75 <    100 <    150 <    200 <    250 <    300 <    300+\n" +
+                                 "-------------------------------------------------------------------------------------\n" +
+                                 "%%     %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f | %6.2f\n"
                                 , this.cnt
                                 , this.err > 0 ? String.format(" [!%,11d]", this.err) : ""
                                 , (this.cnt*1000d / elapsedDuration)
                                 , this.min == 999999999l ? 0l : this.min
                                 , (double)this.tot/(double)this.cnt
                                 , this.max == -1l ? 0l : this.max
-                                , 100*(double)this.lat[0]/this.cnt
-                                , 100*(double)this.lat[1]/this.cnt
-                                , 100*(double)this.lat[2]/this.cnt
-                                , 100*(double)this.lat[3]/this.cnt
-                                , 100*(double)this.lat[4]/this.cnt
-                                , 100*(double)this.lat[5]/this.cnt
-                                , 100*(double)this.lat[6]/this.cnt
-                                , 100*(double)this.lat[7]/this.cnt
-                                , 100*(double)this.lat[8]/this.cnt
+                                , 100*(double)coarseLat[0]/this.cnt
+                                , 100*(double)coarseLat[1]/this.cnt
+                                , 100*(double)coarseLat[2]/this.cnt
+                                , 100*(double)coarseLat[3]/this.cnt
+                                , 100*(double)coarseLat[4]/this.cnt
+                                , 100*(double)coarseLat[5]/this.cnt
+                                , 100*(double)coarseLat[6]/this.cnt
+                                , 100*(double)coarseLat[7]/this.cnt
+                                , 100*(double)coarseLat[8]/this.cnt
                                 );
+        }
     }
 
     /**
@@ -273,7 +304,7 @@ public class PerfCounter implements Cloneable
           .append(getMinLatency())
           .append(delimiter)
           .append(getMaxLatency());
-        // There are 9 buckets
+        // There are 109 buckets
         for (long latency : getLatencyBuckets()) {
             sb.append(delimiter).append(latency);
         }
@@ -320,7 +351,7 @@ public class PerfCounter implements Cloneable
             this.tot = this.tot+other.tot;
             this.cnt = this.cnt+other.cnt;
             this.err = this.err+other.err;
-            for(int i=0;i<9;i++)
+            for(int i=0;i<109;i++)
                 this.lat[i] = this.lat[i]+other.lat[i];
         }
         finally
@@ -359,7 +390,7 @@ public class PerfCounter implements Cloneable
             diff.tot = this.tot-previous.tot;
             diff.cnt = this.cnt-previous.cnt;
             diff.err = this.err-previous.err;
-            for(int i=0;i<9;i++)
+            for(int i=0;i<109;i++)
                 diff.lat[i] = this.lat[i]-previous.lat[i];
         }
         return diff;

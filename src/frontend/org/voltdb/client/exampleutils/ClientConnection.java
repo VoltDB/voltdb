@@ -287,7 +287,7 @@ public class ClientConnection implements Closeable
      */
     public void saveStatistics(String file) throws IOException
     {
-        if (file != null) {
+        if (file != null && !file.trim().isEmpty()) {
             FileWriter fw = new FileWriter(file);
             fw.write(getStatistics().toRawString(','));
             fw.flush();
@@ -305,6 +305,16 @@ public class ClientConnection implements Closeable
     public void drain() throws NoConnectionsException, InterruptedException
     {
         Client.drain();
+    }
+
+    /**
+     * Blocks the current thread until there is no more backpressure or there are no more connections
+     * to the database
+     * @throws InterruptedException
+     */
+    public void backpressureBarrier() throws InterruptedException
+    {
+        Client.backpressureBarrier();
     }
 }
 

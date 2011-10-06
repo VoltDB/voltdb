@@ -127,7 +127,7 @@ public class AppHelper
         this.Name = name;
 
         // Default command-line argument: file to save the statistics
-        add("stats", "stats", "File to save statistics to", null);
+        add("stats", "stats", "File to save statistics to", "");
     }
 
     /**

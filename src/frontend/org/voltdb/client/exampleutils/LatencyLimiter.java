@@ -88,15 +88,29 @@ public class LatencyLimiter implements IRateLimiter
                 long[] sl = this.Start.getLatencyBuckets();
                 long ec = this.End.getExecutionCount()-this.Start.getExecutionCount();
 
-                // If most (97%) requests are in the fastest latency bucket, fudge out observed latency to remove accidental outliers that would cause too much oscillation in latency targetting
-                if (((double)(el[0]-sl[0])/(double)ec) > 0.97)
+                long elsum = 0;
+                for (int i = 0; i < 25; i++) {
+                    elsum += el[i];
+                }
+
+                long slsum = 0;
+                for (int i = 0; i < 25; i++) {
+                    slsum += sl[i];
+                }
+
+                // If most (97%) requests are below 25ms, fudge out observed latency to remove accidental outliers that would cause too much oscillation in latency targetting
+                if (((double)(elsum-slsum)/(double)ec) > 0.97)
                 {
                     long outlierExecutionDuration = 0;
                     long outlierExecutionCount = 0;
-                    for(int i=1;i<9;i++)
+                    for(int i=25;i<109;i++)
                     {
                         outlierExecutionCount += (el[i]-sl[i]);
-                        outlierExecutionDuration += (el[i]-sl[i])*25l;
+                        // buckets over 99 cover 50ms each
+                        if (i >= 100)
+                            outlierExecutionDuration += (el[i]-sl[i])*50l;
+                        else
+                            outlierExecutionDuration += (el[i]-sl[i]);
                     }
                     tuningLatency = (double)(this.End.getTotalExecutionDuration()-this.Start.getTotalExecutionDuration()-outlierExecutionDuration)/(double)(this.End.getExecutionCount()-this.Start.getExecutionCount()-outlierExecutionCount);
                 }
