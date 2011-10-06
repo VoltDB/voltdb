@@ -37,7 +37,7 @@ import org.voltdb.utils.VoltFile;
  *  Provides an interface to list, claim, unclaim, create and delete
  *  ExportWindows.
  */
-public class ExportWindowDirectory {
+public class ExportGenerationDirectory {
 
     // Map generation id to generation.
     private final AtomicReference<TreeMap<Long, ExportGeneration>> m_windows =
@@ -54,7 +54,7 @@ public class ExportWindowDirectory {
      * @param context
      * @throws IOException
      */
-    public ExportWindowDirectory(boolean isRejoin, CatalogContext context) throws IOException
+    public ExportGenerationDirectory(boolean isRejoin, CatalogContext context) throws IOException
     {
         m_overflowPath = context.cluster.getExportoverflow();
         m_exportOverflowDirectory = new File(m_overflowPath);

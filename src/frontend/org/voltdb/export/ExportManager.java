@@ -57,7 +57,7 @@ public class ExportManager
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    public final ExportWindowDirectory m_windowDirectory;
+    public final ExportGenerationDirectory m_windowDirectory;
 
     /**
      * Thrown if the initial setup of the loader fails
@@ -138,9 +138,9 @@ public class ExportManager
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, boolean isRejoin)
     throws ExportManager.SetupException
     {
-        ExportWindowDirectory exportWindowDirectory;
+        ExportGenerationDirectory exportWindowDirectory;
         try {
-            exportWindowDirectory = new ExportWindowDirectory(isRejoin, catalogContext);
+            exportWindowDirectory = new ExportGenerationDirectory(isRejoin, catalogContext);
         } catch (IOException e) {
             throw new ExportManager.SetupException(e.getMessage());
         }
@@ -167,7 +167,7 @@ public class ExportManager
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
      */
-    private ExportManager(int myHostId, CatalogContext catalogContext, ExportWindowDirectory windowDirectory)
+    private ExportManager(int myHostId, CatalogContext catalogContext, ExportGenerationDirectory windowDirectory)
     throws ExportManager.SetupException
     {
         m_hostId = myHostId;
