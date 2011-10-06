@@ -55,7 +55,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import junit.framework.*;
 import java.nio.channels.SelectionKey;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.EstTimeUpdater;
 
@@ -148,6 +151,7 @@ public class TestNIOWriteStream extends TestCase {
             return -1;
         }
 
+        @Override
         public long write(ByteBuffer src[]) throws IOException {
             if (!m_open) throw new IOException();
 
@@ -319,14 +323,21 @@ public class TestNIOWriteStream extends TestCase {
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
 
-        ByteBuffer tmp = ByteBuffer.allocate(NIOWriteStream.MAX_GATHERING_WRITE * 2);
+        ByteBuffer tmp = ByteBuffer.allocate(NIOWriteStream.MAX_GATHERING_WRITE * 3);
+        final AtomicInteger discardCount = new AtomicInteger(0);
+        BBContainer bbc = new BBContainer(tmp, 0L) {
+            @Override
+            public void discard() {
+                discardCount.addAndGet(1);
+            }
+        };
 
-        assertTrue(wstream.enqueue(tmp));
+        assertTrue(wstream.enqueue(bbc));
         assertTrue(port.checkWriteSet());
         int written = wstream.drainTo( channel, wstream.swapAndSerializeQueuedWrites(pool));
-        assertEquals( NIOWriteStream.MAX_GATHERING_WRITE * 2, written);
+        assertEquals( NIOWriteStream.MAX_GATHERING_WRITE * 3, written);
         assertFalse(channel.didOversizeWrite);
-        assertTrue(channel.wroteSizeZero);
+        assertTrue(discardCount.get() == 1);
         wstream.shutdown();
     }
 
