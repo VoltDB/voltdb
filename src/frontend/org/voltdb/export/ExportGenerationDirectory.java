@@ -19,7 +19,6 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,26 +33,24 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.VoltFile;
 
 /**
- *  Provides an interface to list, claim, unclaim, create and delete
- *  ExportWindows.
+ *  An interface to list, claim and unclaim, create and delete
+ *  export generations.
  */
 public class ExportGenerationDirectory {
 
-    // Map generation id to generation.
-    private final AtomicReference<TreeMap<Long, ExportGeneration>> m_windows =
-            new AtomicReference<TreeMap<Long, ExportGeneration>>(new TreeMap<Long, ExportGeneration>());
-
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    // user-configured export overflow directory
+    // Map generation id to generation.
+    private final AtomicReference<TreeMap<Long, ExportGeneration>> m_library =
+            new AtomicReference<TreeMap<Long, ExportGeneration>>(new TreeMap<Long, ExportGeneration>());
+
+    // user-configured export overflow path
     final String m_overflowPath;
+
+    // File representation of m_overflowPath
     final File m_exportOverflowDirectory;
 
-    /**
-     * Configure a new ExportWindowDirectory
-     * @param context
-     * @throws IOException
-     */
+    /** Create a new directory and correctly initialize on-disk content */
     public ExportGenerationDirectory(boolean isRejoin, CatalogContext context) throws IOException
     {
         m_overflowPath = context.cluster.getExportoverflow();
@@ -62,17 +59,15 @@ public class ExportGenerationDirectory {
         // If a node is rejoining it is because it crashed. Export overflow isn't crash
         // safe. It isn't possible to recover valid/consistent data. Delete it instead.
         if (isRejoin) {
-            deletePersistedWindows();
+            deletePersistedGenerations();
         }
     }
 
-    /**
-     * Produce a description of the available data sources.
-     * For each generation, for each data partition, for each datasource...
-     */
+    /** Produce a description of the available data sources. */
     List<ExportAdvertisement> createListing()
     {
-        TreeMap<Long,ExportGeneration> gens = m_windows.get();
+        // for each generation, for each partition, for each table...
+        TreeMap<Long,ExportGeneration> gens = m_library.get();
         LinkedList<ExportAdvertisement> list = new LinkedList<ExportAdvertisement>();
         for (Entry<Long, ExportGeneration> e : gens.entrySet()) {
             for(Entry<Integer, HashMap<String, ExportDataSource>> ds :
@@ -88,10 +83,8 @@ public class ExportGenerationDirectory {
         return list;
     }
 
-    /**
-     * Remove all on-disk ExportWindows or die trying.
-     */
-    public void deletePersistedWindows()
+    /** Remove all on-disk generations or die trying. */
+    public void deletePersistedGenerations()
     {
         File exportOverflowDirectory = new File(m_overflowPath);
         exportLog.info("Deleting export overflow data from " + exportOverflowDirectory);
@@ -113,12 +106,9 @@ public class ExportGenerationDirectory {
         }
     }
 
-    /**
-     * Initialize the directory from the on-disk contents
-     * @param m_onGenerationDrained
-     * @throws IOException
-     */
-    void initializePersistedWindows(Runnable onDrained) throws IOException {
+    /** Initialize the directory from the on-disk contents */
+    void initializePersistedWindows(Runnable onDrained) throws IOException
+    {
         TreeSet<File> generationDirectories = new TreeSet<File>();
         for (File f : m_exportOverflowDirectory.listFiles()) {
             if (f.isDirectory()) {
@@ -136,24 +126,22 @@ public class ExportGenerationDirectory {
                         generationDirectory,
                         Long.valueOf(generationDirectory.getName()));
             generation.initializeGenerationFromDisk();
-            pushWindow(Long.valueOf(generationDirectory.getName()), generation);
+            offer(Long.valueOf(generationDirectory.getName()), generation);
         }
     }
 
-    /**
-     * Close all the windows.
-     */
-    public void closeAllWindows() {
-        for (ExportGeneration generation : m_windows.get().values()) {
+    /** Close all generations. */
+    public void closeAllGenerations()
+    {
+        for (ExportGeneration generation : m_library.get().values()) {
             generation.close();
         }
     }
 
-    /**
-     * How many bytes are queued? Estimate.
-     */
-    public long estimateQueuedBytes(int partitionId, String signature) {
-        TreeMap<Long, ExportGeneration> generations = m_windows.get();
+    /** Estimate total queued bytes in all generations. */
+    public long estimateQueuedBytes(int partitionId, String signature)
+    {
+        TreeMap<Long, ExportGeneration> generations = m_library.get();
         if (generations.isEmpty()) {
             assert(false);
             return -1L;
@@ -166,51 +154,53 @@ public class ExportGenerationDirectory {
         return exportBytes;
     }
 
-    /**
-     * Drop data that follows snapshotTxnId
-     * @param snapshotTxnId
-     */
-    public void truncateExportToTxnId(long snapshotTxnId) {
-        for (ExportGeneration generation : m_windows.get().values()) {
+    /** Forget data that follows snapshotTxnId */
+    public void truncateExportToTxnId(long snapshotTxnId)
+    {
+        for (ExportGeneration generation : m_library.get().values()) {
             generation.truncateExportToTxnId( snapshotTxnId);
         }
     }
 
 
-    /** Get reference to a specific generation. */
-    public ExportGeneration getWindow(long id) {
-        return m_windows.get().get(id);
+    /** Get reference to a specific generation in the directory. */
+    public ExportGeneration get(long id)
+    {
+        return m_library.get().get(id);
     }
 
-    /** Get reference to first generation */
-    public ExportGeneration peekWindow() {
-        return m_windows.get().firstEntry().getValue();
+    /** Get reference to first generation in the directory */
+    public ExportGeneration peek()
+    {
+        return m_library.get().firstEntry().getValue();
     }
 
-    /** Pop and return the oldest generation. */
-    public ExportGeneration popWindow() {
+    /** Pop and return the oldest generation from the directory */
+    public ExportGeneration pop()
+    {
         ExportGeneration head = null;
         while (true) {
-            TreeMap<Long, ExportGeneration> current = m_windows.get();
+            TreeMap<Long, ExportGeneration> current = m_library.get();
             TreeMap<Long, ExportGeneration> copy = new TreeMap<Long, ExportGeneration>(current);
             head = copy.firstEntry().getValue();
             copy.remove(copy.firstEntry().getKey());
 
-            if (m_windows.compareAndSet(current, copy)) {
+            if (m_library.compareAndSet(current, copy)) {
                 break;
             }
         }
         return head;
     }
 
-    /** Push a new generation */
-    public void pushWindow(long txnId, ExportGeneration exportGeneration) {
+    /** Add a new generation to the directory */
+    public void offer(long txnId, ExportGeneration exportGeneration)
+    {
         while(true) {
-            TreeMap<Long, ExportGeneration> current = m_windows.get();
+            TreeMap<Long, ExportGeneration> current = m_library.get();
             TreeMap<Long, ExportGeneration> copy = new TreeMap<Long, ExportGeneration>(current);
             copy.put(txnId, exportGeneration);
 
-            if (m_windows.compareAndSet(current, copy)) {
+            if (m_library.compareAndSet(current, copy)) {
                 break;
             }
         }
