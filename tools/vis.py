@@ -10,88 +10,62 @@
 import sys
 import os
 import time
-import datetime
-import MySQLdb
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from voltdbclient import *
+
+STATS_SERVER = 'volt3j'
 
 def COLORS(k):
     return (((k ** 3) % 255) / 255.0,
             ((k * 100) % 255) / 255.0,
             ((k * k) % 255) / 255.0)
 
-class Stat:
-    def __init__(self, hostname, username, password, database):
-        self.conn = MySQLdb.connect(host = hostname,
-                                    user = username,
-                                    passwd = password,
-                                    db = database)
-        self.cursor = self.conn.cursor(MySQLdb.cursors.DictCursor)
+MARKERS = ['+', '*', '<', '>', '^', '_',
+           'D', 'H', 'd', 'h', 'o', 'p']
 
-    def close(self):
-        self.cursor.close()
-        self.conn.close()
+def get_stats(hostname, port, days):
+    """Get statistics of all runs
 
-class LatencyStat(Stat):
-    LATENCIES = """
-SELECT startTime AS time, numHosts AS hosts, AVG(latencies) AS latency
-FROM ma_instances AS runs
-    JOIN ma_clientInstances AS clients ON clusterStartTime = startTime
-    JOIN (SELECT instanceId, AVG(clusterRoundtripAvg) AS latencies
-          FROM ma_clientProcedureStats
-          GROUP BY instanceId) AS stats ON stats.instanceId = clientInstanceId
-WHERE runs.startTime >= '%s'
-    AND runs.numKSafety = 0
-    AND runs.numPartitionsPerHost = 12
-    AND clients.applicationName = "TPC-C"
-    AND clients.subApplicationName = "Client"
-GROUP BY startTime
-"""
+    Example return value:
+    { u'VoltKV': [ { 'lat95': 21,
+                 'lat99': 35,
+                 'nodes': 1,
+                 'throughput': 104805,
+                 'date': datetime object}],
+      u'Voter': [ { 'lat95': 20,
+                    'lat99': 47,
+                    'nodes': 1,
+                    'throughput': 66287,
+                    'date': datetime object}]}
+    """
 
-    def get_latencies(self, start_time):
-        res = []
-        latencies = {}
+    conn = FastSerializer(hostname, port)
+    proc = VoltProcedure(conn, 'BestOfPeriod',
+                         [FastSerializer.VOLTTYPE_SMALLINT])
+    resp = proc.call([days])
+    conn.close()
 
-        self.cursor.execute(self.LATENCIES % (start_time))
-        res = list(self.cursor.fetchall())
+    # keyed on app name, value is a list of runs sorted chronologically
+    stats = dict()
+    run_stat_keys = ['nodes', 'date', 'tps', 'lat95', 'lat99']
+    for row in resp.tables[0].tuples:
+        app_stats = []
+        if row[0] not in stats:
+            stats[row[0]] = app_stats
+        else:
+            app_stats = stats[row[0]]
+        run_stats = dict(zip(run_stat_keys, row[1:]))
+        app_stats.append(run_stats)
 
-        for i in res:
-            i["time"] = datetime.date.fromtimestamp(i["time"] / 1000.0)
+    # sort each one
+    for app_stats in stats.itervalues():
+        app_stats.sort(key=lambda x: x['date'])
 
-            key = (i["time"], i["hosts"])
-            if i["latency"] == None:
-                continue
-            if float(i["latency"]) > 40:
-                continue
-            if key not in latencies \
-                    or i["latency"] < latencies[key]["latency"]:
-                latencies[key] = i
-
-        return latencies.values()
-
-class ThroughputStat(Stat):
-    THROUGHPUT = """
-SELECT resultid as id,
-       hostcount as hosts,
-       DATE(time) as time,
-       MAX(txnpersecond) as tps
-FROM results
-WHERE time >= '%s'
-      AND benchmarkname = 'org.voltdb.benchmark.tpcc.TPCCClient'
-      AND txnpersecond >= hostcount * 35100
-      AND txnpersecond <= hostcount * 78000
-GROUP BY hostcount, DATE(time)
-ORDER BY time DESC
-"""
-
-    def get_throughputs(self, time):
-        throughput_map = {}
-
-        self.cursor.execute(self.THROUGHPUT % (time))
-        return list(self.cursor.fetchall())
+    return stats
 
 class Plot:
     DPI = 100.0
@@ -105,142 +79,102 @@ class Plot:
                          dpi=self.DPI)
         self.ax = fig.add_subplot(111)
         self.ax.set_title(title)
-        plt.ylabel(ylabel)
-        plt.xlabel(xlabel)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        plt.ylabel(ylabel, fontsize=8)
+        plt.xlabel(xlabel, fontsize=8)
         fig.autofmt_xdate()
 
-    def plot(self, x, y, color, legend):
-        self.ax.plot(x, y, linestyle="-", label=str(legend), marker="^",
-                     markerfacecolor=color, markersize=10)
+    def plot(self, x, y, color, marker_shape, legend):
+        self.ax.plot(x, y, linestyle="-", label=str(legend),
+                     marker=marker_shape, markerfacecolor=color, markersize=4)
 
     def close(self):
         formatter = matplotlib.dates.DateFormatter("%b %d")
         self.ax.xaxis.set_major_formatter(formatter)
-        plt.legend(loc=0)
+        plt.legend(prop={'size': 10}, loc=0)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
 
-def parse_credentials(filename):
-    credentials = {}
-    fd = open(filename, "r")
-    for i in fd:
-        line = i.strip().split("?")
-        credentials["hostname"] = line[0].split("/")[-2]
-        db = line[0].split("/")[-1]
-        pair = line[1].split("&")
-        user = pair[0].strip("\\").split("=")
-        password = pair[1].strip("\\").split("=")
-        if user[1].startswith("monitor"):
-            credentials["latency"] = {user[0]: user[1],
-                                      password[0]: password[1],
-                                      "database": db}
-        else:
-            credentials["throughput"] = {user[0]: user[1],
-                                         password[0]: password[1],
-                                         "database": db}
-    fd.close()
 
-    return credentials
+def plot(title, xlabel, ylabel, filename, nodes, width, height, data,
+         data_type):
+    plot_data = dict()
+    for app, runs in data.iteritems():
+        for v in runs:
+            if v['nodes'] != nodes:
+                continue
 
-def starttime(daysago):
-    timedelta = datetime.timedelta(days=daysago)
-    starttime = datetime.datetime.now() - timedelta
-    return starttime
+            if app not in plot_data:
+                plot_data[app] = {'time': [], data_type: []}
+
+            datenum = matplotlib.dates.date2num(v['date'])
+            plot_data[app]['time'].append(datenum)
+
+            if data_type == 'tps':
+                value = v['tps']/v['nodes']
+            else:
+                value = v[data_type]
+            plot_data[app][data_type].append(value)
+
+    if len(plot_data) == 0:
+        return
+
+    i = 0
+    pl = Plot(title, xlabel, ylabel, filename, width, height)
+    for k, v in plot_data.iteritems():
+        pl.plot(v['time'], v[data_type], COLORS(i), MARKERS[i], k)
+        i += 3
+
+    pl.close()
 
 def usage():
     print "Usage:"
-    print "\t", sys.argv[0], "credential_file output_dir filename_base" \
+    print "\t", sys.argv[0], "output_dir filename_base" \
         " [width] [height]"
     print
     print "\t", "width in pixels"
     print "\t", "height in pixels"
 
 def main():
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 3:
         usage()
         exit(-1)
 
-    if not os.path.exists(sys.argv[2]):
+    if not os.path.exists(sys.argv[1]):
         print sys.argv[2], "does not exist"
         exit(-1)
 
-    credentials = parse_credentials(sys.argv[1])
-    path = os.path.join(sys.argv[2], sys.argv[3])
+    path = os.path.join(sys.argv[1], sys.argv[2])
     width = None
     height = None
+    if len(sys.argv) >= 4:
+        width = int(sys.argv[3])
     if len(sys.argv) >= 5:
-        width = int(sys.argv[4])
-    if len(sys.argv) >= 6:
-        height = int(sys.argv[5])
+        height = int(sys.argv[4])
 
-    latency_stat = LatencyStat(credentials["hostname"],
-                               credentials["latency"]["user"],
-                               credentials["latency"]["password"],
-                               credentials["latency"]["database"])
-    volt_stat = ThroughputStat(credentials["hostname"],
-                               credentials["throughput"]["user"],
-                               credentials["throughput"]["password"],
-                               credentials["throughput"]["database"])
+    stats = get_stats(STATS_SERVER, 21212, 30)
 
-    timestamp = time.mktime(starttime(30).timetuple()) * 1000.0
-    latencies = latency_stat.get_latencies(timestamp)
-    throughput = volt_stat.get_throughputs(starttime(90))
+    # Plot single node stats for all apps
+    plot("Average Latency on Single Node", "Time", "Latency (ms)",
+         path + "-latency-single.png", 1, width, height, stats, 'lat99')
 
-    latency_stat.close()
-    volt_stat.close()
+    plot("Single Node Performance", "Time", "Throughput (txns/sec)",
+         path + "-throughput-single.png", 1, width, height, stats, 'tps')
 
-    latency_map = {}
-    latencies.sort(key=lambda x: x["time"])
-    for v in latencies:
-        if v["time"] == None or v["latency"] == None:
-            continue
-        if v["hosts"] not in latency_map:
-            latency_map[v["hosts"]] = {"time": [], "latency": []}
-        datenum = matplotlib.dates.date2num(v["time"])
-        latency_map[v["hosts"]]["time"].append(datenum)
-        latency_map[v["hosts"]]["latency"].append(v["latency"])
+    # Plot 3 node stats for all apps
+    plot("Average Latency on 3 Nodes", "Time", "Latency (ms)",
+         path + "-latency-3.png", 3, width, height, stats, 'lat99')
 
-    if 1 in latency_map:
-        pl = Plot("Average Latency on Single Node", "Time", "Latency (ms)",
-                  path + "-latency-single.png",
-                  width, height)
-        v = latency_map.pop(1)
-        pl.plot(v["time"], v["latency"], COLORS(1), 1)
-        pl.close()
+    plot("3 Node Performance", "Time", "Throughput (txns/sec)",
+         path + "-throughput-3.png", 3, width, height, stats, 'tps')
 
-    if len(latency_map) > 0:
-        pl = Plot("Average Latency", "Time", "Latency (ms)",
-                  path + "-latency.png", width, height)
-        for k in latency_map.iterkeys():
-            v = latency_map[k]
-            pl.plot(v["time"], v["latency"], COLORS(k), k)
-        pl.close()
+    # Plot 6 node stats for all apps
+    plot("Average Latency on 6 Node", "Time", "Latency (ms)",
+         path + "-latency-6.png", 6, width, height, stats, 'lat99')
 
-    throughput_map = {}
-    throughput.sort(key=lambda x: x["id"])
-    for v in throughput:
-        if v["hosts"] not in throughput_map:
-            throughput_map[v["hosts"]] = {"time": [], "tps": []}
-        datenum = matplotlib.dates.date2num(v["time"])
-        print "hosts", v["hosts"], "time", v["time"], "tps", v["tps"]
-        throughput_map[v["hosts"]]["time"].append(datenum)
-        throughput_map[v["hosts"]]["tps"].append(v["tps"]/v["hosts"])
-
-    if 1 in throughput_map:
-        pl = Plot("Single Node Performance", "Time", "Throughput (txns/sec)",
-                  path + "-throughput-single.png",
-                  width, height)
-        v = throughput_map[1]
-        pl.plot(v["time"], v["tps"], COLORS(1), 1)
-        pl.close()
-
-    if len(throughput_map) > 0:
-        pl = Plot("Per Node Performance", "Time", "Throughput (txns/sec/node)",
-                  path + "-throughput.png", width, height)
-        for k in throughput_map.iterkeys():
-            v = throughput_map[k]
-            pl.plot(v["time"], v["tps"], COLORS(k), k)
-        pl.close()
+    plot("6 Node Performance", "Time", "Throughput (txns/sec)",
+         path + "-throughput-6.png", 6, width, height, stats, 'tps')
 
 if __name__ == "__main__":
     main()
