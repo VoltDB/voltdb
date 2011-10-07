@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.exportclient.ExportClient.CompletionEvent;
 import org.voltdb.logging.VoltLogger;
 
 
@@ -15,11 +16,15 @@ class ExportClientStreamConnection implements Runnable {
     static final VoltLogger LOG = new VoltLogger("ExportClient");
     private final String m_advertisement;
     private final InetSocketAddress m_server;
+    private final CompletionEvent m_onCompletion;
 
-    public ExportClientStreamConnection(InetSocketAddress server, String nextAdvertisement)
+    public ExportClientStreamConnection(InetSocketAddress server,
+        String nextAdvertisement,
+        CompletionEvent onCompletion)
     {
         m_advertisement = nextAdvertisement;
         m_server = server;
+        m_onCompletion = onCompletion;
     }
 
     @Override
@@ -59,6 +64,9 @@ class ExportClientStreamConnection implements Runnable {
                         " read " + totalBytes + ". Last read: " + bytesRead);
                 }
             } while(bytesRead > 0);
+
+            // trigger the ack for this advertisement
+            m_onCompletion.run(totalBytes);
         }
         catch (IOException e) {
             LOG.error(e);

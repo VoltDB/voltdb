@@ -32,6 +32,30 @@ public class ExportClient {
     private final ExecutorService m_workerPool =
         Executors.newFixedThreadPool(4);
 
+    /** Schedule an ack for a client stream connection */
+    class CompletionEvent {
+        private final String m_advertisement;
+        private final InetSocketAddress m_server;
+        private long m_ackedByteCount;
+
+        CompletionEvent(String advertisement, InetSocketAddress server) {
+            m_advertisement = advertisement;
+            m_server = server;
+        }
+
+        public void run(long byteCount) {
+            m_ackedByteCount = byteCount;
+            run();
+        }
+
+        private void run() {
+            ExportClient.this.m_workerPool.execute(
+                new ExportClientListingConnection(m_server,
+                    ExportClient.this.m_advertisements,
+                    m_advertisement, m_ackedByteCount));
+        }
+    }
+
     /** Loop forever reading advertisements and processing data channels */
     public void start() {
         try {
@@ -50,7 +74,10 @@ public class ExportClient {
                 else {
                     InetSocketAddress socket = (InetSocketAddress) pair[0];
                     String advertisement =  (String) pair[1];
-                    m_workerPool.execute(new ExportClientStreamConnection(socket, advertisement));
+                    m_workerPool.execute(
+                        new ExportClientStreamConnection(socket,
+                            advertisement,
+                            new CompletionEvent(advertisement, socket)));
                 }
             }
         } catch (Exception e) {

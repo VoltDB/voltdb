@@ -277,7 +277,7 @@ public class ExportManager
     }
 
     // extract generation id from a stream name.
-    private long getGenerationIdFromStreamName(String streamname) {
+    public static long getGenerationFromAdvertisement(String streamname) {
         try {
             String[] parts = streamname.split("-", 3);
             if (parts.length != 3) {
@@ -290,7 +290,7 @@ public class ExportManager
     }
 
     // extract partition id from a stream name
-    private int getPartitionIdFromStreamName(String streamname) {
+    public static int getPartitionIdFromAdvertisement(String streamname) {
         try {
             String[] parts = streamname.split("-", 3);
             if (parts.length != 3) {
@@ -303,7 +303,7 @@ public class ExportManager
     }
 
     // extract signature from a stream name
-    private String getSignatureFromStreamName(String streamname) {
+    public static String getSignatureFromStreamName(String streamname) {
         String[] parts = streamname.split("-", 3);
         if (parts.length != 3) {
             return "";
@@ -318,8 +318,8 @@ public class ExportManager
     public InputHandler createExportStreamHandler(String streamname)
     {
         exportLog.info("Creating export data stream for " + streamname);
-        long generationId = getGenerationIdFromStreamName(streamname);
-        int partitionId = getPartitionIdFromStreamName(streamname);
+        long generationId = getGenerationFromAdvertisement(streamname);
+        int partitionId = getPartitionIdFromAdvertisement(streamname);
         String signature = getSignatureFromStreamName(streamname);
 
         ExportGeneration gen = m_generationDirectory.get(generationId);
@@ -342,6 +342,19 @@ public class ExportManager
 
     public InputHandler createExportListingHandler() {
         return new ExportListingHandler();
+    }
+
+    public boolean ackStream(String streamname, long byteCount) {
+        long generationId = getGenerationFromAdvertisement(streamname);
+        int partitionId = getPartitionIdFromAdvertisement(streamname);
+        String signature = getSignatureFromStreamName(streamname);
+
+        ExportGeneration gen = m_generationDirectory.get(generationId);
+        if (gen == null) {
+            return false;
+        } else {
+            return gen.acknowledgeExportStreamBlockQueue(partitionId, signature);
+        }
     }
 
 

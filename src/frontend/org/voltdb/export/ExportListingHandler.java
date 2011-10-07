@@ -43,7 +43,7 @@ public class ExportListingHandler extends VoltProtocolHandler {
         FastSerializer fs = new FastSerializer();
         ExportGenerationDirectory lib = ExportManager.instance().m_generationDirectory;
 
-        // serialize the advertisment list as:
+        // serialize the advertisement list as:
         // <count of advertisements>
         // <fast serialized strings>*
         if (m.isPoll()) {
@@ -57,6 +57,11 @@ public class ExportListingHandler extends VoltProtocolHandler {
             } catch (IOException e) {
                 exportLog.error("Failed to create export advertisement listing.");
             }
+        }
+        if (m.isAck()) {
+            String advertisement = m.getSignature();
+            long byteCount = m.getAckOffset();
+            ExportManager.instance().ackStream(advertisement, byteCount);
         }
 
     }
