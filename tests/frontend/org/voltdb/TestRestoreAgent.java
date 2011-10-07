@@ -262,7 +262,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
                       boolean excludeProcs, boolean rebuildAll)
     throws IOException {
-        buildCatalog(hostCount, sitesPerHost, kfactor, voltroot, false,
+        buildCatalog(hostCount, sitesPerHost, kfactor, voltroot, true,
                      excludeProcs, rebuildAll);
     }
 
