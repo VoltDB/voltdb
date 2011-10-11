@@ -327,6 +327,15 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 null, null, null, null, null, null);
     }
 
+    // ENG-1276
+    public void testPassingFloatToDoubleArg() throws Exception {
+        final Client client = this.getClient();
+
+        client.callProcedure("Insert", "ALLOW_NULLS", 0, 0, 0, 0, 0,
+                             new Float(0.0), null, null,
+                             null, null, null, null, null, null);
+    }
+
     //
     // Insert strings that violate the VARCHAR size limit.
     //
