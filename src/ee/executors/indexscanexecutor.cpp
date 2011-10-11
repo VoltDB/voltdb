@@ -347,40 +347,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         {
             m_index->moveToKeyOrGreater(&m_searchKey);
         }
-        else if (m_lookupType == INDEX_LOOKUP_TYPE_LT)
-        {
-            // find the lower bound of the key range, then move one value to the
-            // left because lower bound is equal to the key
-            m_index->moveToKeyOrGreater(&m_searchKey);
-            m_index->reverse();
-            TableTuple tmpTuple = m_index->nextValue();
-
-            // How to handle edge cases:
-            // search key > largest key: move iterator to end of index
-            // search key < smallest key: no-op, already at rend
-            // search key == largest key: no-op
-            // search key == smallest key: no-op, already at rend
-            if (tmpTuple.isNullTuple()) {
-                m_index->moveToEnd(false);
-            }
-        }
-        else if (m_lookupType == INDEX_LOOKUP_TYPE_LTE)
-        {
-            // find the upper bound of the key range, then move one value to the
-            // left because upper bound is bigger than the key
-            m_index->moveToGreaterThanKey(&m_searchKey);
-            m_index->reverse();
-            TableTuple tmpTuple = m_index->nextValue();
-
-            // How to handle edge cases:
-            // search key > largest key: move iterator to end of index
-            // search key < smallest key: no-op, already at rend
-            // search key == largest key: move iterator to end of index
-            // search key == smallest key: no-op, already at begin
-            if (tmpTuple.isNullTuple()) {
-                m_index->moveToEnd(false);
-            }
-        }
         else
         {
             return false;
@@ -398,14 +364,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
         if (m_numOfSearchkeys == 0)
             m_index->moveToEnd(order_by_asc);
-
-        // If the lookup type is <= or <, and the sort direction is desc, we
-        // don't need to do anything here because it should already been taken
-        // care of above.
-        //
-        // If the lookup type is <= or <, and the sort direction is asc, the
-        // planner should have generated a plan with no search key but an end
-        // expression.
     } else if (m_sortDirection == SORT_DIRECTION_TYPE_INVALID &&
                m_numOfSearchkeys == 0) {
         return false;

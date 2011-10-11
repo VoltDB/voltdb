@@ -6,7 +6,7 @@ create table t (
   e bigint not null
 );
 
-create index idx_1_HASH on t (a, b, c, d);
+create index idx_1 on t (a, b, c, d);
 create index idx_2_TREE on t (e, a, b, c, d);
 
 create index cover2_TREE on t (a, b);

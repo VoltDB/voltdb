@@ -87,7 +87,7 @@ public class TestIndexVSHashChoice extends TestCase {
 
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
-        assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1_HASH\""));
+        assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
 
         if (pn != null) {
             System.out.println(pn.toJSONString());
