@@ -1082,6 +1082,17 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 2);
     }
 
+    public void testDDLCompilerSplitLines() throws IOException {
+        final String s =
+            "create\n" +
+            "table\n" +
+            "t(id\n" +
+            "integer);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
     public void testDDLCompilerTrailingComment1() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
