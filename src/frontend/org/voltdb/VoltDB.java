@@ -465,7 +465,11 @@ public class VoltDB {
         if (instance().ignoreCrash()) {
             return;
         }
-        ((HostMessenger) instance().getMessenger()).sendPoisonPill(errMsg);
+        try {
+            ((HostMessenger) instance().getMessenger()).sendPoisonPill(errMsg);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         try { Thread.sleep(500); } catch (InterruptedException e) {}
         crashLocalVoltDB(errMsg, stackTrace, t);
     }
