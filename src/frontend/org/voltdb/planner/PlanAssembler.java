@@ -848,6 +848,8 @@ public class PlanAssembler {
      * @return new plan's root node
      */
     AbstractPlanNode handleLimitOperator(AbstractPlanNode root) {
+        // Whether or not we can push the limit node down
+        boolean canPushDown = true;
 
         // The nodes that need to be applied at the coordinator
         Stack<AbstractPlanNode> coordGraph = new Stack<AbstractPlanNode>();
@@ -874,12 +876,18 @@ public class PlanAssembler {
 
         coordGraph.push(coordLimit);
 
-        // TODO: allow push down with distinct (select distinct C from T limit 5) .
+        /*
+         * TODO: allow push down limit with distinct (select distinct C from T limit 5)
+         * or distinct in aggregates.
+         */
+        if (m_parsedSelect.distinct) {
+            canPushDown = false;
+        }
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
             AbstractExpression rootExpr = col.expression;
             if (rootExpr instanceof AggregateExpression) {
                 if (((AggregateExpression)rootExpr).m_distinct) {
-                    coordGraph.clear();
+                    canPushDown = false;
                     break;
                 }
             }
@@ -907,60 +915,58 @@ public class PlanAssembler {
          * there is no need to do the push down work, the limit plan node will
          * be run in the partition.
          */
-        if ((int)m_parsedSelect.offset != 0 || m_parsedSelect.offsetParameterId != -1) {
-            if (root.findAllNodesOfType(PlanNodeType.RECEIVE).isEmpty()) {
-                // not for partitioned table
-                coordGraph.clear();
-            } else {
-                /*
-                 * For partitioned table, the pushed-down limit plan node
-                 * contains an expression for the limit, and the offset is
-                 * always 0. The expression for the limit is the original
-                 * (limit * + offset). The top level limit plan node remains the
-                 * same, with the original limit and offset values.
-                 */
-                distGraph.clear();
+        if (root.findAllNodesOfType(PlanNodeType.RECEIVE).isEmpty() || !canPushDown) {
+            // not for partitioned table or cannot push down
+            coordGraph.clear();
+        } else {
+            /*
+             * For partitioned table, the pushed-down limit plan node contains
+             * an expression for the limit, and the offset is always 0. The
+             * expression for the limit is the original (limit + offset). The
+             * top level limit plan node remains the same, with the original
+             * limit and offset values.
+             */
+            distGraph.clear();
 
-                distLimit = new LimitPlanNode();
-                distLimit.setLimit((int) (m_parsedSelect.limit + m_parsedSelect.offset));
-                distLimit.setOffset(0);
+            distLimit = new LimitPlanNode();
+            distLimit.setLimit((int) (m_parsedSelect.limit + m_parsedSelect.offset));
+            distLimit.setOffset(0);
 
-                AbstractExpression left = new ConstantValueExpression();
-                ((ConstantValueExpression) left).setValue(Long.toString(m_parsedSelect.offset));
-                left.setValueType(VoltType.INTEGER);
+            AbstractExpression left = new ConstantValueExpression();
+            ((ConstantValueExpression) left).setValue(Long.toString(m_parsedSelect.offset));
+            left.setValueType(VoltType.INTEGER);
 
-                AbstractExpression right = new ConstantValueExpression();
-                ((ConstantValueExpression) right).setValue(Long.toString(m_parsedSelect.limit));
-                right.setValueType(VoltType.INTEGER);
+            AbstractExpression right = new ConstantValueExpression();
+            ((ConstantValueExpression) right).setValue(Long.toString(m_parsedSelect.limit));
+            right.setValueType(VoltType.INTEGER);
 
-                if (m_parsedSelect.offsetParameterId != -1 ||
+            if (m_parsedSelect.offsetParameterId != -1 ||
                     m_parsedSelect.limitParameterId != -1) {
-                    if (m_parsedSelect.offsetParameterId != -1) {
-                        left = new ParameterValueExpression();
-                        ParameterInfo paramInfo =
-                                m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
-                        ((ParameterValueExpression) left).setParameterId(paramInfo.index);
-                        left.setValueType(paramInfo.type);
-                        left.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
-                    }
-
-                    if (m_parsedSelect.limitParameterId != -1) {
-                        right = new ParameterValueExpression();
-                        ParameterInfo paramInfo =
-                                m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
-                        ((ParameterValueExpression) right).setParameterId(paramInfo.index);
-                        right.setValueType(paramInfo.type);
-                        right.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
-                    }
+                if (m_parsedSelect.offsetParameterId != -1) {
+                    left = new ParameterValueExpression();
+                    ParameterInfo paramInfo =
+                        m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
+                    ((ParameterValueExpression) left).setParameterId(paramInfo.index);
+                    left.setValueType(paramInfo.type);
+                    left.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
                 }
 
-                OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_PLUS,
-                                                                 left, right);
-                expr.setValueType(VoltType.INTEGER);
-                expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
-                distLimit.setLimitExpression(expr);
-                distGraph.push(distLimit);
+                if (m_parsedSelect.limitParameterId != -1) {
+                    right = new ParameterValueExpression();
+                    ParameterInfo paramInfo =
+                        m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
+                    ((ParameterValueExpression) right).setParameterId(paramInfo.index);
+                    right.setValueType(paramInfo.type);
+                    right.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
+                }
             }
+
+            OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_PLUS,
+                                                             left, right);
+            expr.setValueType(VoltType.INTEGER);
+            expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
+            distLimit.setLimitExpression(expr);
+            distGraph.push(distLimit);
         }
 
         return pushDownLimit(root, distGraph, coordGraph);
