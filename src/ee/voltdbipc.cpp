@@ -1153,7 +1153,7 @@ void VoltDBIPC::pushExportBuffer(
     if (block != NULL) {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->uso());
         index += 8;
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->txnId());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->generationId());
     } else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;
         index += 8;

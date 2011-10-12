@@ -90,7 +90,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       m_executorContext->currentTxnId(),
                                       m_sequenceNo++,
                                       m_executorContext->currentTxnTimestamp(),
-                                      m_executorContext->currentExportWindow(),
+                                      m_executorContext->currentGenerationId(),
                                       source,
                                       TupleStreamWrapper::INSERT);
         m_tupleCount++;
@@ -119,7 +119,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
                                       m_executorContext->currentTxnId(),
                                       m_sequenceNo++,
                                       m_executorContext->currentTxnTimestamp(),
-                                      m_executorContext->currentExportWindow(),
+                                      m_executorContext->currentGenerationId(),
                                       tuple,
                                       TupleStreamWrapper::DELETE);
         m_tupleCount++;
