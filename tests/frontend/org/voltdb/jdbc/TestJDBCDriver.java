@@ -168,6 +168,7 @@ public class TestJDBCDriver {
     @Test
     public void testAllColumns() throws SQLException {
         tableColumnTest("WAREHOUSE", null, 9);
+        tableColumnTest("WAREHOUSE", "%", 9);
     }
 
     @Test
@@ -280,6 +281,7 @@ public class TestJDBCDriver {
     @Test
     public void testAllProcedureColumns() throws SQLException {
         procedureColumnTest("InsertNewOrder", null, 3);
+        procedureColumnTest("InsertNewOrder", "%", 3);
     }
 
     @Test

@@ -185,7 +185,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         // Filter columns based on table name and column name
         while (res.next()) {
             if (res.getString("TABLE_NAME").equals(tableNamePattern)) {
-                if (columnNamePattern == null ||
+                if (columnNamePattern == null || columnNamePattern.equals("%") ||
                     res.getString("COLUMN_NAME").equals(columnNamePattern)) {
                     vtable.addRow(res.getRowData());
                 }
@@ -529,7 +529,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         // Filter the results based on procedure name and column name
         while (res.next()) {
             if (res.getString("PROCEDURE_NAME").equals(procedureNamePattern)) {
-                if (columnNamePattern == null || res.getString("COLUMN_NAME").equals(columnNamePattern)) {
+                if (columnNamePattern == null || columnNamePattern.equals("%") ||
+                    res.getString("COLUMN_NAME").equals(columnNamePattern)) {
                     vtable.addRow(res.getRowData());
                 }
             }
