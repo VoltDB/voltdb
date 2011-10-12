@@ -110,6 +110,14 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
     }
 
+    public void testJoinAndLimitOffset() throws IOException, ProcCallException, InterruptedException {
+        Client client = this.getClient();
+        load(client);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM A, B WHERE A.PKEY < B.PKEY LIMIT 1 OFFSET 1;")
+                                 .getResults()[0];
+        assertEquals(1, result.getRowCount());
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(

@@ -880,7 +880,7 @@ public class PlanAssembler {
          * TODO: allow push down limit with distinct (select distinct C from T limit 5)
          * or distinct in aggregates.
          */
-        if (m_parsedSelect.distinct) {
+        if (m_parsedSelect.distinct || checkPushDownViability(root) == null) {
             canPushDown = false;
         }
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
@@ -1310,6 +1310,62 @@ public class PlanAssembler {
                                   Stack<AbstractPlanNode> distNodes,
                                   Stack<AbstractPlanNode> coordNodes) {
 
+        AbstractPlanNode receiveNode = checkPushDownViability(root);
+
+        // If there is work to distribute and a receive node was found,
+        // disconnect the coordinator and distributed parts of the plan
+        // below the SEND node
+        AbstractPlanNode distributedPlan = root;
+        if (!coordNodes.isEmpty() && receiveNode != null) {
+            distributedPlan = receiveNode.getChild(0).getChild(0);
+            distributedPlan.clearParents();
+            receiveNode.getChild(0).clearChildren();
+        }
+
+        // If there is work to distribute, determine if the distributed
+        // limit must be performed on ordered input. If so, produce that
+        // order if an explicit sort is necessary
+        if (!coordNodes.isEmpty() && receiveNode != null) {
+            if ((distributedPlan.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
+                ((IndexScanPlanNode) distributedPlan).getSortDirection() == SortDirectionType.INVALID) &&
+                m_parsedSelect.orderColumns.size() > 0) {
+                distNodes.push(createOrderBy());
+            }
+        }
+
+        // Add the distributed work to the plan
+        while (!distNodes.isEmpty()) {
+            AbstractPlanNode distributedNode = distNodes.pop();
+            distributedNode.addAndLinkChild(distributedPlan);
+            distributedPlan = distributedNode;
+        }
+
+        // Reconnect the plans and add the coordinator's work
+        if (!coordNodes.isEmpty() && receiveNode != null) {
+            receiveNode.getChild(0).addAndLinkChild(distributedPlan);
+
+            while (!coordNodes.isEmpty()) {
+                AbstractPlanNode coordNode = coordNodes.pop();
+                coordNode.addAndLinkChild(root);
+                root = coordNode;
+            }
+        }
+        else {
+            root = distributedPlan;
+        }
+
+        root.generateOutputSchema(m_catalogDb);
+        return root;
+    }
+
+    /**
+     * Check if we can push the limit node down.
+     *
+     * @param root
+     * @return If we can push it down, the receive node is returned. Otherwise,
+     *         it returns null.
+     */
+    protected AbstractPlanNode checkPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
 
         // Find a receive node, if one exists. There is guaranteed to be at
@@ -1361,51 +1417,7 @@ public class PlanAssembler {
             assert(receiveNode.getChildCount() == 1);
             receiveNode = receiveNode.getChild(0);
         }
-
-        // If there is work to distribute and a receive node was found,
-        // disconnect the coordinator and distributed parts of the plan
-        // below the SEND node
-        AbstractPlanNode distributedPlan = root;
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            distributedPlan = receiveNode.getChild(0).getChild(0);
-            distributedPlan.clearParents();
-            receiveNode.getChild(0).clearChildren();
-        }
-
-        // If there is work to distribute, determine if the distributed
-        // limit must be performed on ordered input. If so, produce that
-        // order if an explicit sort is necessary
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            if ((distributedPlan.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                ((IndexScanPlanNode) distributedPlan).getSortDirection() == SortDirectionType.INVALID) &&
-                m_parsedSelect.orderColumns.size() > 0) {
-                distNodes.push(createOrderBy());
-            }
-        }
-
-        // Add the distributed work to the plan
-        while (!distNodes.isEmpty()) {
-            AbstractPlanNode distributedNode = distNodes.pop();
-            distributedNode.addAndLinkChild(distributedPlan);
-            distributedPlan = distributedNode;
-        }
-
-        // Reconnect the plans and add the coordinator's work
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            receiveNode.getChild(0).addAndLinkChild(distributedPlan);
-
-            while (!coordNodes.isEmpty()) {
-                AbstractPlanNode coordNode = coordNodes.pop();
-                coordNode.addAndLinkChild(root);
-                root = coordNode;
-            }
-        }
-        else {
-            root = distributedPlan;
-        }
-
-        root.generateOutputSchema(m_catalogDb);
-        return root;
+        return receiveNode;
     }
 
     /**
