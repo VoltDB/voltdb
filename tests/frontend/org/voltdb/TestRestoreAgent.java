@@ -262,7 +262,15 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
                       boolean excludeProcs, boolean rebuildAll)
     throws IOException {
-        buildCatalog(hostCount, sitesPerHost, kfactor, voltroot, true,
+        /*
+         * This suite is intended only to test RestoreAgentWithout command logging.
+         * They fail with the pro build and command logging enabled because they are
+         * testing for community before. TestRestoreAgentWithReplay tests with CL enabled.
+         * We do want to check that the community edition doesn't barf if command logging is
+         * accidentally request, and we want to run these tests with the pro build as well
+         * so we switch CL enabled on whether this is a pro build.
+         */
+        buildCatalog(hostCount, sitesPerHost, kfactor, voltroot, isEnterprise() ? false : true,
                      excludeProcs, rebuildAll);
     }
 
@@ -407,6 +415,11 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                 assertEquals(0, count);
             }
         }
+    }
+
+
+    private boolean isEnterprise() {
+        return VoltDB.instance().getConfig().m_isEnterprise;
     }
 
     protected RestoreAgent getRestoreAgent(MockInitiator initiator, int hostId) throws Exception {
