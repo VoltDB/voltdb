@@ -62,6 +62,22 @@ public class ClientConnectionPool
 
     /**
      * Gets a client connection to the given VoltDB server(s).  No credentials or options are passed when connecting to the server.  For custom credentials and options, see method overloads.
+     * Retries connecting until the connection is successful.
+     *
+     * @param servers the VoltDB server (or CSV list of servers) to connect to.
+     * @param port the VoltDB native protocol port to connect to (usually 21212).
+     * @return the client connection object the caller should use to post requests.
+     * @see #getWithRetry(String[] servers, int port)
+     * @see #getWithRetry(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+     * @see #getWithRetry(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+     */
+    public static ClientConnection getWithRetry(String servers, int port) throws Exception
+    {
+        return getWithRetry(servers.split(","), port, "", "", false, 0);
+    }
+
+    /**
+     * Gets a client connection to the given VoltDB server(s).  No credentials or options are passed when connecting to the server.  For custom credentials and options, see method overloads.
      *
      * @param servers the list of VoltDB servers to connect to.
      * @param port the VoltDB native protocol port to connect to (usually 21212).
@@ -73,6 +89,22 @@ public class ClientConnectionPool
     public static ClientConnection get(String[] servers, int port) throws Exception
     {
         return get(servers, port, "", "", false, 0);
+    }
+
+    /**
+     * Gets a client connection to the given VoltDB server(s).  No credentials or options are passed when connecting to the server.  For custom credentials and options, see method overloads.
+     * Retries connecting until the connection is successful.
+     *
+     * @param servers the list of VoltDB servers to connect to.
+     * @param port the VoltDB native protocol port to connect to (usually 21212).
+     * @return the client connection object the caller should use to post requests.
+     * @see #getWithRetry(String servers, int port)
+     * @see #getWithRetry(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+     * @see #getWithRetry(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+     */
+    public static ClientConnection getWithRetry(String[] servers, int port) throws Exception
+    {
+        return getWithRetry(servers, port, "", "", false, 0);
     }
 
     /**
@@ -101,6 +133,35 @@ public class ClientConnectionPool
     public static ClientConnection get(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
     {
         return get(servers.split(","), port, user, password, isHeavyWeight, maxOutstandingTxns);
+    }
+
+    /**
+     * Gets a client connection to the given VoltDB server(s).
+     * Retries connecting until the connection is successful.
+     *
+     * @param servers the VoltDB server (or CSV list of servers) to connect to.
+     * @param port the VoltDB native protocol port to connect to (usually 21212).
+     * @param user the user name to use when connecting to the server(s).
+     * @param password the password to use when connecting to the server(s).
+     * @param isHeavyWeight the flag indicating callback processes on this connection will be heavy (long running callbacks).
+     *        By default the connection only allocates one background processing thread to process callbacks.  If those
+     *        callbacks run for a long time, the network stack can get clogged with pending responses that have yet to be
+     *        processed, at which point the server will disconnect the application, thinking it died and is not reading
+     *        responses as fast as it is pushing requests.  When the flag is set to 'true', an additional 2 processing
+     *        thread will deal with processing callbacks, thus mitigating the issue.
+     * @param maxOutstandingTxns the number of transactions the client application may push against a specific connection
+     *        before getting blocked on back-pressure.
+     *        By default the connection allows 3,000 open transactions before preventing the client from posting more work,
+     *        thus preventing server fire-hosing.  In some cases however, with very fast, small transactions, this limit
+     *        can be raised.
+     * @return the client connection object the caller should use to post requests.
+     * @see #getWithRetry(String servers, int port)
+     * @see #getWithRetry(String[] servers, int port)
+     * @see #getWithRetry(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+     */
+    public static ClientConnection getWithRetry(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    {
+        return getWithRetry(servers.split(","), port, user, password, isHeavyWeight, maxOutstandingTxns);
     }
 
     /**
@@ -149,6 +210,61 @@ public class ClientConnectionPool
             lock.unlock();
         }
         return ClientConnections.get(clientConnectionKey).use();
+    }
+
+    /**
+     * Gets a client connection to the given VoltDB server(s).
+     * Retries connecting until the connection is successful.
+     *
+     * @param servers the list of VoltDB servers to connect to.
+     * @param port the VoltDB native protocol port to connect to (usually 21212).
+     * @param user the user name to use when connecting to the server(s).
+     * @param password the password to use when connecting to the server(s).
+     * @param isHeavyWeight the flag indicating callback processes on this connection will be heavy (long running callbacks).
+     *        By default the connection only allocates one background processing thread to process callbacks.  If those
+     *        callbacks run for a long time, the network stack can get clogged with pending responses that have yet to be
+     *        processed, at which point the server will disconnect the application, thinking it died and is not reading
+     *        responses as fast as it is pushing requests.  When the flag is set to 'true', an additional 2 processing
+     *        thread will deal with processing callbacks, thus mitigating the issue.
+     * @param maxOutstandingTxns the number of transactions the client application may push against a specific connection
+     *        before getting blocked on back-pressure.
+     *        By default the connection allows 3,000 open transactions before preventing the client from posting more work,
+     *        thus preventing server fire-hosing.  In some cases however, with very fast, small transactions, this limit
+     *        can be raised.
+     * @return the client connection object the caller should use to post requests.
+     * @see #getWithRetry(String servers, int port)
+     * @see #getWithRetry(String[] servers, int port)
+     * @see #getWithRetry(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
+     */
+    public static ClientConnection getWithRetry(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    {
+        ClientConnection con = null;
+        System.out.println("Connecting to servers: ");
+        for(String server : servers)
+            System.out.printf(" - %s:%d\n", server, port);
+        System.out.printf( "Credentials:\n%s\nOptions:\n - Heavyweight: %s\n - MaxTxnQueue: %s\n"
+                         , user == "" ? " - None" : " - User: " + user + "\n - Password: ********"
+                         , isHeavyWeight ? "yes" : "no"
+                         , maxOutstandingTxns == 0 ? "(default)" : String.format("%,d", maxOutstandingTxns)
+                         );
+        int sleep = 1000;
+        while(true)
+        {
+            try
+            {
+                con = ClientConnectionPool.get(servers, port);
+                break;
+            }
+            catch (Exception e)
+            {
+                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep/1000);
+                try {Thread.sleep(sleep);} catch(Exception tie){}
+                if (sleep < 8000)
+                    sleep += sleep;
+            }
+        }
+        System.out.println("Connected.");
+        return con;
     }
 
     /**
