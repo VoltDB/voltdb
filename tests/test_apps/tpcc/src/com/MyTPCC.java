@@ -76,6 +76,7 @@ public class MyTPCC
         long lag_latency_millis = lag_latency_seconds * 1000l;
         long thisOutstanding = 0;
         long lastOutstanding = 0;
+        final String statsFile = m_helpah.stringValue("stats");
 
         long transactions_this_second = 0;
         long last_millisecond = System.currentTimeMillis();
@@ -214,6 +215,13 @@ public class MyTPCC
         + " System Statistics\n"
         + "-------------------------------------------------------------------------------------\n\n");
         System.out.print(m_clientCon.getStatistics(Constants.TRANS_PROCS).toString(false));
+
+        // Dump stats to file
+        try {
+            m_clientCon.saveStatistics(statsFile);
+        } catch (IOException e) {
+            System.err.println("Unable to save statistics file: " + e.getMessage());
+        }
 
         m_clientCon.close();
     }

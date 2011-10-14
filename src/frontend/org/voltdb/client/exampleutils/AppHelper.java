@@ -111,13 +111,23 @@ public class AppHelper
     private final String Name;
 
     /**
-     * Create a new helper for the application with the given name.  The name is used in the usage printout to document the generic command line call.
+     * Create a new helper for the application with the given name. The name is
+     * used in the usage printout to document the generic command line call.
      *
-     * @param name the name of the application used for display in the usage print-out.
+     * A default command-line argument with the name "stats" will be added. It
+     * is the file to save statistics to at the end of run. If it is not set by
+     * the user, no file will be created.
+     *
+     * @param name
+     *            the name of the application used for display in the usage
+     *            print-out.
      */
     public AppHelper(String name)
     {
         this.Name = name;
+
+        // Default command-line argument: file to save the statistics
+        add("stats", "stats", "File to save statistics to", "");
     }
 
     /**

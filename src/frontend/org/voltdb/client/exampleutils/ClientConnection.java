@@ -18,8 +18,9 @@ package org.voltdb.client.exampleutils;
 
 import org.voltdb.client.*;
 
-import java.util.HashMap;
 import java.io.Closeable;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.concurrent.Future;
 
 /**
@@ -278,6 +279,23 @@ public class ClientConnection implements Closeable
     }
 
     /**
+     * Save statistics to a CSV file.
+     *
+     * @param file
+     *            File path
+     * @throws IOException
+     */
+    public void saveStatistics(String file) throws IOException
+    {
+        if (file != null && !file.trim().isEmpty()) {
+            FileWriter fw = new FileWriter(file);
+            fw.write(getStatistics().toRawString(','));
+            fw.flush();
+            fw.close();
+        }
+    }
+
+    /**
      * Block the current thread until all queued stored procedure invocations have received responses
      * or there are no more connections to the cluster
      * @throws NoConnectionsException
@@ -287,6 +305,16 @@ public class ClientConnection implements Closeable
     public void drain() throws NoConnectionsException, InterruptedException
     {
         Client.drain();
+    }
+
+    /**
+     * Blocks the current thread until there is no more backpressure or there are no more connections
+     * to the database
+     * @throws InterruptedException
+     */
+    public void backpressureBarrier() throws InterruptedException
+    {
+        Client.backpressureBarrier();
     }
 }
 

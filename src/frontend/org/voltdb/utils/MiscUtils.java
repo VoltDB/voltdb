@@ -14,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.voltdb.utils;
 
 import java.io.File;
@@ -24,6 +23,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.VoltLogger;
@@ -178,5 +179,37 @@ public class MiscUtils {
         hostLog.info(msg);
 
         return true;
+    }
+
+    /**
+     * Check that RevisionStrings are properly formatted.
+     * @param fullBuildString
+     * @return build revision # (SVN), build hash (git) or null
+     */
+    public static String parseRevisionString(String fullBuildString) {
+        String build = "";
+
+        // Test for SVN revision string - example: https://svn.voltdb.com/eng/trunk?revision=2352
+        String[] splitted = fullBuildString.split("=", 2);
+        if (splitted.length == 2) {
+            build = splitted[1].trim();
+                if (build.length() == 0) {
+                        return null;
+                        }
+                return build;
+
+                }
+
+        // Test for git build string - example: 2.0 voltdb-2.0-70-gb39f43e-dirty
+        Pattern p = Pattern.compile("-(\\d*-\\w{8}(?:-.*)?)");
+        Matcher m = p.matcher(fullBuildString);
+        if (! m.find())
+                return null;
+        build = m.group(1).trim();
+        if (build.length() == 0) {
+            return null;
+        }
+        return build;
+
     }
 }

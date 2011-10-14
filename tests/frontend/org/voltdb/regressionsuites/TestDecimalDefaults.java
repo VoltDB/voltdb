@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.MathContext;
 
 import junit.framework.Test;
 
@@ -49,6 +50,7 @@ public class TestDecimalDefaults extends RegressionSuite
                                  "A3 DECIMAL DEFAULT 0, " +
                                  "A4 DECIMAL DEFAULT 999, " +
                                  "A5 DECIMAL DEFAULT 9.99E2, " +
+                                 "A6 DECIMAL DEFAULT 1.012345678901, " +
                                  "PRIMARY KEY(A1));"
                                  );
         builder.addPartitionInfo("T", "A1");
@@ -71,6 +73,9 @@ public class TestDecimalDefaults extends RegressionSuite
             assertEquals(0, answer.compareTo(new BigDecimal(999)));
             answer = (BigDecimal)results.get("A5", VoltType.DECIMAL);
             assertEquals(0, answer.compareTo(new BigDecimal(999)));
+            // ENG-1098
+            answer = (BigDecimal)results.get("A6", VoltType.DECIMAL);
+            assertEquals(0, answer.compareTo(new BigDecimal("1.012345678901")));
         }
         finally
         {

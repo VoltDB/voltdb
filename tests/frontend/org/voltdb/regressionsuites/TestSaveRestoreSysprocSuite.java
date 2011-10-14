@@ -800,9 +800,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         /*
          * Increased timeout from .7 to 1.2 seconds for the mini. It might not
-         * finished the non-blocking snapshot in time.
+         * finished the non-blocking snapshot in time.  Later increased to 2.0
+         * to get memcheck to stop timing out ENG-1800
          */
-        Thread.sleep(1200);
+        Thread.sleep(2000);
 
         /*
          * Check that snapshot status returns a reasonable result

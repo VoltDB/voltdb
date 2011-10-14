@@ -16,6 +16,7 @@
  */
 package org.voltdb.client.exampleutils;
 
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.voltdb.client.ClientResponse;
@@ -107,6 +108,25 @@ public class PerfCounterMap
                 result.append(String.format("---- %1$-24s -------------------------------------------------------\n", counter));
             result.append(this.Counters.get(counter).toString(useSimpleFormat));
             result.append("\n\n");
+        }
+        return result.toString();
+    }
+
+    /**
+     * Gets the statistics as delimiter separated strings. Each line contains
+     * statistics for a single procedure. There might be multiple lines.
+     *
+     * @param delimiter Delimiter, e.g. ',' or '\t'
+     * @return
+     */
+    public String toRawString(char delimiter)
+    {
+        StringBuilder result = new StringBuilder();
+        for (Entry<String, PerfCounter> e : Counters.entrySet()) {
+            result.append(e.getKey())
+                  .append(delimiter)
+                  .append(e.getValue().toRawString(delimiter))
+                  .append('\n');
         }
         return result.toString();
     }

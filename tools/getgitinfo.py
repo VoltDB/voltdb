@@ -46,7 +46,7 @@ def getGitInfo():
         return
     
     # git describe --dirty adds '-dirty' to the version string if uncommitted code is found
-    (gitLocalVersion,stderr) = Popen("git describe --dirty", shell=True, stdout=PIPE, stderr=PIPE).communicate()
+    (gitLocalVersion,stderr) = Popen("git describe --long --dirty", shell=True, stdout=PIPE, stderr=PIPE).communicate()
     if stderr:
         print "This is not a git working tree\n"
         return

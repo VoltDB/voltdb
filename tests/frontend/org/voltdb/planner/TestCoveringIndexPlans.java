@@ -98,8 +98,8 @@ public class TestCoveringIndexPlans extends TestCase {
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER2_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.LT, ispn.getLookupType());
-        assertEquals(2, ispn.getSearchKeyExpressions().size());
+        assertEquals(IndexLookupType.GT, ispn.getLookupType());
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
     }
 
     public void testCover2ColumnsWithEquality()
@@ -134,8 +134,8 @@ public class TestCoveringIndexPlans extends TestCase {
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.LT, ispn.getLookupType());
-        assertEquals(3, ispn.getSearchKeyExpressions().size());
+        assertEquals(IndexLookupType.GT, ispn.getLookupType());
+        assertEquals(2, ispn.getSearchKeyExpressions().size());
     }
 
     public void testCover3ColumnsInOrderWithLessThanAndOrderBy()
@@ -152,8 +152,8 @@ public class TestCoveringIndexPlans extends TestCase {
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.LT, ispn.getLookupType());
-        assertEquals(3, ispn.getSearchKeyExpressions().size());
+        assertEquals(IndexLookupType.GT, ispn.getLookupType());
+        assertEquals(2, ispn.getSearchKeyExpressions().size());
     }
 
     public void testCover3ColumnsOutOfOrderWithLessThan()
@@ -179,20 +179,6 @@ public class TestCoveringIndexPlans extends TestCase {
         AbstractPlanNode pn = null;
         pn =
             compile("select a from t where a < ?;", 1, true);
-        assertTrue(pn != null);
-
-        pn = pn.getChild(0);
-        if (pn != null) {
-            System.out.println(pn.toJSONString());
-        }
-        assertTrue(pn instanceof IndexScanPlanNode);
-    }
-
-    public void testSingleColumnLessThanNoCover()
-    {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a from t where b < ?;", 1, true);
         assertTrue(pn != null);
 
         pn = pn.getChild(0);

@@ -409,7 +409,7 @@ SnapshotCompletionInterest {
         m_action = action;
         m_zk = zk;
         m_partitionCount = partitionCount;
-        m_clEnabled = clEnabled;
+        m_clEnabled = VoltDB.instance().getConfig().m_isEnterprise ? clEnabled : false;
         m_clPath = clPath;
         m_clSnapshotPath = clSnapshotPath;
         m_snapshotPath = snapshotPath;

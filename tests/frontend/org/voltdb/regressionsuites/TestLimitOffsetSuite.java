@@ -100,6 +100,24 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         doLimitOffsetAndCheck("LimitBI");
     }
 
+    public void testDistinctLimitOffset() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertA", 0, 1);
+        client.callProcedure("InsertA", 1, 1);
+        client.callProcedure("InsertA", 2, 2);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;")
+                                 .getResults()[0];
+        assertEquals(1, result.getRowCount());
+    }
+
+    public void testJoinAndLimitOffset() throws IOException, ProcCallException, InterruptedException {
+        Client client = this.getClient();
+        load(client);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM A, B WHERE A.PKEY < B.PKEY LIMIT 1 OFFSET 1;")
+                                 .getResults()[0];
+        assertEquals(1, result.getRowCount());
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(

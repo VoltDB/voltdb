@@ -97,7 +97,12 @@ public class SocketJoiner extends Thread {
     private DataInputStream addToInputs(Integer hostId, InputStream s) {
         // if not buffered, in.writeInt() will write 1 byte at time
         // to the network when PSH is set and host order != network order.
-        DataInputStream in = new DataInputStream(new BufferedInputStream(s));
+        //**update So we used to buffer on both sides, but on the read side
+        // this could eagerly pull in bytes to the BIS that were meant to be
+        // picked up by VoltNetwork. This only showed up on volt5a for ENG-1066
+        // We can afford the read syscall overhead, so we will only buffer on the write side
+        // to get around the writeInt issue.
+        DataInputStream in = new DataInputStream(s);
         assert (in != null);
         m_inputs.put(hostId, in);
         return in;
@@ -500,9 +505,6 @@ public class SocketJoiner extends Thread {
             out.writeLong(m_catalogCRC);
             // write the local deployment crc
             out.writeLong(m_deploymentCRC);
-
-            // write whether this node has done a restore
-            out.writeByte(org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore ? 1 : 0);
             out.flush();
             long maxDiffMS = in.readLong();
             if (m_hostLog != null)

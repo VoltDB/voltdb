@@ -97,6 +97,7 @@ public class AsyncBenchmark
             long rateLimit       = apph.longValue("rate-limit");
             boolean autoTune     = apph.booleanValue("auto-tune");
             double latencyTarget = apph.doubleValue("latency-target");
+            final String csv     = apph.stringValue("stats");
 
 
             // Validate parameters
@@ -163,7 +164,7 @@ public class AsyncBenchmark
                 limiter = new RateLimiter(rateLimit);
 
             // Run the benchmark loop for the requested duration
-            long endTime = System.currentTimeMillis() + (1000l * duration);
+            final long endTime = System.currentTimeMillis() + (1000l * duration);
             while (endTime > System.currentTimeMillis())
             {
                 // Get the next phone call
@@ -242,6 +243,9 @@ public class AsyncBenchmark
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
             System.out.print(Con.getStatistics("Vote").toString(false));
+
+            // Dump statistics to a CSV file
+            Con.saveStatistics(csv);
 
             Con.close();
 

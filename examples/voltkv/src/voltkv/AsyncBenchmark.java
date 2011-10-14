@@ -110,6 +110,7 @@ public class AsyncBenchmark
             long rateLimit         = apph.longValue("rate-limit");
             boolean autoTune       = apph.booleanValue("auto-tune");
             double latencyTarget   = apph.doubleValue("latency-target");
+            final String csv       = apph.stringValue("stats");
 
 
             // Validate parameters
@@ -310,6 +311,9 @@ public class AsyncBenchmark
             + " Detailed Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
             System.out.print(Con.getStatistics().toString(false));
+
+            // Dump statistics to a CSV file
+            Con.saveStatistics(csv);
 
             Con.close();
 

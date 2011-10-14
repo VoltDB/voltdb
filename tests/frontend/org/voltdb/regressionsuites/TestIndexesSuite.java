@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.TreeSet;
 
 import org.voltdb.*;
 import org.voltdb.client.*;
@@ -224,6 +225,44 @@ public class TestIndexesSuite extends RegressionSuite {
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(2, results[0].getRowCount());
         }
+    }
+
+    /**
+     * Multimap one column less than.
+     */
+    public void testOrderedMultiOneColumnIndexLessThan()
+    throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        client.callProcedure("Insert", "P3", 0, "a", 1, 2, 1.0);
+        client.callProcedure("Insert", "P3", 1, "b", 1, 2, 2.0);
+        client.callProcedure("Insert", "P3", 2, "c", 2, 3, 3.0);
+        client.callProcedure("Insert", "P3", 3, "d", 3, 4, 4.0);
+        client.callProcedure("Insert", "P3", 4, "e", 4, 5, 5.0);
+        client.callProcedure("Insert", "P3", 5, "f", 5, 6, 6.0);
+        client.callProcedure("Insert", "P3", 6, "g", 5, 6, 7.0);
+
+        VoltTable result = client.callProcedure("@AdHoc", "select * from P3 where NUM < 5 order by num desc")
+                                 .getResults()[0];
+        assertEquals(5, result.getRowCount());
+        TreeSet<Integer> ids = new TreeSet<Integer>();
+        while (result.advanceRow()) {
+            assertFalse(ids.contains((int) result.getLong("ID")));
+            ids.add((int) result.getLong("ID"));
+        }
+
+        int i = 0;
+        for (int id : ids) {
+            assertEquals(i++, id);
+        }
+
+        result = client.callProcedure("@AdHoc", "select * from P3 where NUM < 1 order by num desc")
+                       .getResults()[0];
+        assertEquals(0, result.getRowCount());
+
+        result = client.callProcedure("@AdHoc", "select * from P3 where NUM < 4 order by num desc")
+                       .getResults()[0];
+        assertEquals(4, result.getRowCount());
     }
 
     public void testTicket195()

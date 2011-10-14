@@ -853,7 +853,7 @@ public abstract class Type implements SchemaObject, Cloneable {
                     precision = NumberType.defaultNumericPrecision;
                 }
 
-                return NumberType.getNumberType(type, precision, 7);
+                return NumberType.getNumberType(type, precision, 12);
 
             case Types.SQL_BOOLEAN :
                 return SQL_BOOLEAN;
