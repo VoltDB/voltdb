@@ -139,7 +139,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.0";
+    private static final String m_defaultVersionString = "2.1";
     private String m_versionString = m_defaultVersionString;
     // fields accessed via the singleton
     HostMessenger m_messenger = null;
