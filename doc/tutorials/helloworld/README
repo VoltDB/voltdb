@@ -4,7 +4,7 @@ The tutorial is designed to familiarize you with the source code and the command
 
 The commands to process these files (not using run.sh) are the following:
 
-  $ export CLASSPATH=.:../../../voltdb/*
+  $ export CLASSPATH=.:../../../lib/*:../../../voltdb/*
 
   $ javac Client.java
   $ javac Insert.java
