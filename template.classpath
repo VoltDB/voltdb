@@ -20,15 +20,20 @@
 	<classpathentry kind="lib" path="third_party/java/jars/junit-4.8.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
-	  <attributes>
-            <!-- Update the directory value to reflect
-            your top-level project directory name, then
-            copy it to .classpath -->
-            <attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/obj/release/nativelibs"/>
-          </attributes>
-        </classpathentry>
-        <classpathentry kind="lib" path="third_party/java/obj"/>
-        <classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
-        <classpathentry kind="lib" path="lib/jline-1.0.jar"/>
-        <classpathentry kind="output" path="obj/eclipse"/>
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/obj/release/nativelibs"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
+	<classpathentry kind="lib" path="lib/jline-1.0.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-continuation-7.5.1.v20110908.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-http-7.5.1.v20110908.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-io-7.5.1.v20110908.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-server-7.5.1.v20110908.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-util-7.5.1.v20110908.jar"/>
+	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>
+	<classpathentry kind="lib" path="lib/servlet-api-2.5.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
+	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
