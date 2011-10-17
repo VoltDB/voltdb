@@ -124,7 +124,8 @@ def plot(title, xlabel, ylabel, filename, nodes, width, height, data,
 
     i = 0
     pl = Plot(title, xlabel, ylabel, filename, width, height)
-    for k, v in plot_data.iteritems():
+    sorted_data = sorted(plot_data.items(), key=lambda x: x[0])
+    for k, v in sorted_data:
         pl.plot(v['time'], v[data_type], COLORS(i), MARKERS[i], k)
         i += 3
 
