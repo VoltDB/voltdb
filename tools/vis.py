@@ -13,7 +13,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))) +
                 os.sep + 'tests/scripts/')
 
 import time
-import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
