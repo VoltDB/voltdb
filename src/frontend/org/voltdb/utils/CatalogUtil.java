@@ -959,11 +959,12 @@ public abstract class CatalogUtil {
             if (!frequency.endsWith("s") &&
                     !frequency.endsWith("m") &&
                     !frequency.endsWith("h")) {
-                hostLog.fatal(
+                hostLog.error(
                         "Snapshot frequency " + frequency +
                         " needs to end with time unit specified" +
-                        " that is one of [s, m, h] (seconds, minutes, hours)");
-                VoltDB.crashVoltDB();
+                        " that is one of [s, m, h] (seconds, minutes, hours)" +
+                        " Defaulting snapshot frequency to 10m.");
+                frequency = "10m";
             }
 
             int frequencyInt = 0;
@@ -971,29 +972,33 @@ public abstract class CatalogUtil {
             try {
                 frequencyInt = Integer.parseInt(frequencySubstring);
             } catch (Exception e) {
-                hostLog.fatal("Frequency " + frequencySubstring +
-                        " is not an integer ");
-                VoltDB.crashVoltDB();
+                hostLog.error("Frequency " + frequencySubstring +
+                        " is not an integer. Defaulting frequency to 10m.");
+                frequency = "10m";
+                frequencyInt = 10;
             }
 
             String prefix = snapshotSettings.getPrefix();
             if (prefix == null || prefix.isEmpty()) {
-                hostLog.fatal("Snapshot prefix " + prefix +
-                " is not a valid prefix ");
-                VoltDB.crashVoltDB();
+                hostLog.error("Snapshot prefix " + prefix +
+                " is not a valid prefix. Using prefix of 'SNAPSHOTNONCE' ");
+                prefix = "SNAPSHOTNONCE";
             }
 
             if (prefix.contains("-") || prefix.contains(",")) {
-                hostLog.fatal("Snapshot prefix " + prefix +
-                " cannot include , or - ");
-                VoltDB.crashVoltDB();
+                String oldprefix = prefix;
+                prefix = prefix.replaceAll("-", "_");
+                prefix = prefix.replaceAll(",", "_");
+                hostLog.error("Snapshot prefix " + oldprefix + " cannot include , or -." +
+                        " Using the prefix: " + prefix + " instead.");
             }
 
             int retain = snapshotSettings.getRetain();
             if (retain < 1) {
-                hostLog.fatal("Snapshot retain value " + retain +
-                        " is not a valid value. Must be 1 or greater.");
-                VoltDB.crashVoltDB();
+                hostLog.error("Snapshot retain value " + retain +
+                        " is not a valid value. Must be 1 or greater." +
+                        " Defaulting snapshot retain to 1.");
+                retain = 1;
             }
 
             schedule.setFrequencyunit(
