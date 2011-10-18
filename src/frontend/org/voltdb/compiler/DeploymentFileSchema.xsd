@@ -177,6 +177,14 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- restriction on snapshot retention knob -->
+  <xs:simpleType name="snapshotRetainType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+      <xs:maxInclusive value="5000"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- <httpd> -->
   <xs:complexType name="httpdType">
     <xs:sequence>
@@ -193,7 +201,7 @@
   <!-- <snapshot> -->
   <xs:complexType name="snapshotType">
     <xs:attribute name="frequency" type="xs:string" use="required"/>
-    <xs:attribute name="retain" type="xs:int" use="required"/>
+    <xs:attribute name="retain" type="snapshotRetainType" use="required"/>
     <xs:attribute name="prefix" type="xs:string" use="required"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
