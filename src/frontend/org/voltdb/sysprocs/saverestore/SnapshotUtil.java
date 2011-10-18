@@ -154,6 +154,9 @@ public class SnapshotUtil {
             String nonce) throws Exception {
         VoltFile directoryWithDigest = new VoltFile(path);
         ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
+        if (directoryWithDigest.listFiles() == null) {
+            return digests;
+        }
         for (File f : directoryWithDigest.listFiles()) {
             if ( f.getName().equals(nonce + ".digest") || //old style digest name
                     (f.getName().startsWith(nonce + "-host_") && f.getName().endsWith(".digest"))) {//new style

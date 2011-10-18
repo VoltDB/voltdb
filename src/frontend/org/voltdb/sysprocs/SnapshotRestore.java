@@ -432,6 +432,9 @@ public class SnapshotRestore extends VoltSystemProcedure
                 TRACE_LOG.trace("Checking saved table state for restore of: "
                                 + m_filePath + ", " + m_fileNonce);
                 File[] savefiles = retrieveRelevantFiles(m_filePath, m_fileNonce);
+                if (savefiles == null) {
+                    return new DependencyPair(DEP_restoreScan, result);
+                }
                 for (File file : savefiles)
                 {
                     TableSaveFile savefile = null;
