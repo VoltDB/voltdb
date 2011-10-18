@@ -145,7 +145,7 @@ def main():
         exit(-1)
 
     if not os.path.exists(sys.argv[1]):
-        print sys.argv[2], "does not exist"
+        print sys.argv[1], "does not exist"
         exit(-1)
 
     path = os.path.join(sys.argv[1], sys.argv[2])
@@ -159,21 +159,21 @@ def main():
     stats = get_stats(STATS_SERVER, 21212, 30)
 
     # Plot single node stats for all apps
-    plot("Average Latency on Single Node", "Time", "Latency (ms)",
+    plot("99th Percentile Latency on Single Node", "Time", "Latency (ms)",
          path + "-latency-single.png", 1, width, height, stats, 'lat99')
 
     plot("Single Node Performance", "Time", "Throughput (txns/sec)",
          path + "-throughput-single.png", 1, width, height, stats, 'tps')
 
     # Plot 3 node stats for all apps
-    plot("Average Latency on 3 Nodes", "Time", "Latency (ms)",
+    plot("99th Percentile Latency on 3 Nodes", "Time", "Latency (ms)",
          path + "-latency-3.png", 3, width, height, stats, 'lat99')
 
     plot("3 Node Performance", "Time", "Throughput (txns/sec)",
          path + "-throughput-3.png", 3, width, height, stats, 'tps')
 
     # Plot 6 node stats for all apps
-    plot("Average Latency on 6 Node", "Time", "Latency (ms)",
+    plot("99th Percentile Latency on 6 Node", "Time", "Latency (ms)",
          path + "-latency-6.png", 6, width, height, stats, 'lat99')
 
     plot("6 Node Performance", "Time", "Throughput (txns/sec)",
