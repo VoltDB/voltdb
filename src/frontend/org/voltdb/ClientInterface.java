@@ -1387,8 +1387,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
             m_catalogContext.set(VoltDB.instance().getCatalogContext());
             m_asyncCompilerWorkThread.notifyShouldUpdateCatalog();
-            //Update snapshot daemon settings
-            mayActivateSnapshotDaemon();
+            /*
+             * Update snapshot daemon settings.
+             *
+             * Don't do it if the system is still initializing (CL replay),
+             * because snapshot daemon may call @SnapshotScan on activation and
+             * it will mess replaying txns up.
+             */
+            if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
+                mayActivateSnapshotDaemon();
+            }
         }
 
         // poll planner queue
