@@ -51,12 +51,12 @@ def getGitInfo():
         print "This is not a git working tree\n"
         return
 
-    # jenkins puts in local tags - look backwards until a non-jenkins tag is found
+    # jenkins puts in local tags - look backwards until a non-jenkins tag is foundfg
     while gitLocalVersion[:7] == "jenkins":
         gitLocalVersion = gitLocalVersion.strip()
         if gitLocalVersion[len(gitLocalVersion)-6:] == "-dirty":
             gitLocalVersion = gitLocalVersion[:len(gitLocalVersion)-6]
-        (gitLocalVersion,stderr) = Popen("git describe %s^1" % gitLocalVersion, 
+        (gitLocalVersion,stderr) = Popen("git describe --long %s^1" % gitLocalVersion, 
                                          shell=True, stdout=PIPE, stderr=PIPE).communicate()
         if stderr:
             print stderr
