@@ -94,30 +94,27 @@ class Plot:
     def close(self):
         formatter = matplotlib.dates.DateFormatter("%b %d")
         self.ax.xaxis.set_major_formatter(formatter)
+        ymin, ymax = plt.ylim()
+        plt.ylim((0, ymax * 1.1))
         plt.legend(prop={'size': 10}, loc=0)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
 
 
-def plot(title, xlabel, ylabel, filename, nodes, width, height, data,
-         data_type):
+def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
     plot_data = dict()
-    for app, runs in data.iteritems():
-        for v in runs:
-            if v['nodes'] != nodes:
-                continue
+    for run in data:
+        if run['nodes'] not in plot_data:
+            plot_data[run['nodes']] = {'time': [], data_type: []}
 
-            if app not in plot_data:
-                plot_data[app] = {'time': [], data_type: []}
+        datenum = matplotlib.dates.date2num(run['date'])
+        plot_data[run['nodes']]['time'].append(datenum)
 
-            datenum = matplotlib.dates.date2num(v['date'])
-            plot_data[app]['time'].append(datenum)
-
-            if data_type == 'tps':
-                value = v['tps']/v['nodes']
-            else:
-                value = v[data_type]
-            plot_data[app][data_type].append(value)
+        if data_type == 'tps':
+            value = run['tps']/run['nodes']
+        else:
+            value = run[data_type]
+        plot_data[run['nodes']][data_type].append(value)
 
     if len(plot_data) == 0:
         return
@@ -159,25 +156,15 @@ def main():
     stats = get_stats(STATS_SERVER, 21212, 30)
 
     # Plot single node stats for all apps
-    plot("99th Percentile Latency on Single Node", "Time", "Latency (ms)",
-         path + "-latency-single.png", 1, width, height, stats, 'lat99')
+    for app, data in stats.iteritems():
+        app_filename = app.replace(' ', '_')
+        plot(app + " latency", "Time", "Latency (ms)",
+             path + "-latency-" + app_filename + ".png", width, height, app,
+             data, 'lat99')
 
-    plot("Single Node Performance", "Time", "Throughput (txns/sec)",
-         path + "-throughput-single.png", 1, width, height, stats, 'tps')
-
-    # Plot 3 node stats for all apps
-    plot("99th Percentile Latency on 3 Nodes", "Time", "Latency (ms)",
-         path + "-latency-3.png", 3, width, height, stats, 'lat99')
-
-    plot("3 Node Performance", "Time", "Throughput (txns/sec)",
-         path + "-throughput-3.png", 3, width, height, stats, 'tps')
-
-    # Plot 6 node stats for all apps
-    plot("99th Percentile Latency on 6 Node", "Time", "Latency (ms)",
-         path + "-latency-6.png", 6, width, height, stats, 'lat99')
-
-    plot("6 Node Performance", "Time", "Throughput (txns/sec)",
-         path + "-throughput-6.png", 6, width, height, stats, 'tps')
+        plot(app + " throughput", "Time", "Throughput (txns/sec)",
+             path + "-throughput-" + app_filename + ".png", width, height, app,
+             data, 'tps')
 
 if __name__ == "__main__":
     main()
