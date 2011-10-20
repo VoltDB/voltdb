@@ -7,11 +7,9 @@
     <!-- Not sure why, but env.HOSTANME will not be assigned despite loading the environment (Ubuntu 10.10, Ant 1.8) -->
     <exec executable="hostname" outputproperty="env.HOSTNAME"/>
 
-    <!-- Select the engine: eng/pro: eng by default;, override with -Dpro=(anything) -->
-    <condition property="voltdb.dir" value="../../../obj/release/dist/voltdb" else="../../../../pro/obj/pro/dist/voltdb">
-        <not>
-            <isset property="pro"/>
-        </not>
+    <!-- Select the engine. Default to relative project checkout -->
+    <condition property="voltdb.dir" value="${env.VOLTDB}" else="../../..">
+      <isset property="env.VOLTDB"/>
     </condition>
 
     <!-- Define all launch defaults as overridable properties -->
@@ -37,8 +35,11 @@
     <property name="junit.haltonfailure" value="true"/>
     <property name="catalog" value="genqa.jar"/>
     <path id="project.classpath">
-        <fileset dir="${voltdb.dir}">
+        <fileset dir="${voltdb.dir}/voltdb">
             <include name="voltdb*.jar"/>
+        </fileset>
+        <fileset dir="${voltdb.dir}/lib">
+	    <include name="*.jar"/>
         </fileset>
         <pathelement location="${build.dir}"/>
         <pathelement path="${java.class.path}"/>
@@ -67,7 +68,7 @@
         <element name="javac" optional="true" implicit="true"/>
         <sequential>
             <java classname="org.voltdb.VoltDB" fork="yes" failonerror="true">
-                <jvmarg value="-Djava.library.path=${voltdb.dir}"/>
+                <jvmarg value="-Djava.library.path=${voltdb.dir}/voltdb"/>
                 <jvmarg value="-server"/>
                 <jvmarg value="-Xmx512m"/>
                 <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
