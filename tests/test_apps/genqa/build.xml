@@ -221,7 +221,7 @@
             <arg value="--type"/>
             <arg value="csv"/>
             <arg value="--outdir"/>
-            <arg value="/tmp"/>
+            <arg value="."/>
             <arg value="--nonce"/>
             <arg value="export"/>
             <arg value="--period"/>

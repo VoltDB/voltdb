@@ -45,7 +45,8 @@ AS
 -- Export Table for Partitioned Data Table deletions
 CREATE TABLE export_partitioned_table
 (
-  rowid                     BIGINT        NOT NULL
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
 , type_null_tinyint         TINYINT
 , type_not_null_tinyint     TINYINT       NOT NULL
@@ -117,7 +118,8 @@ AS
 -- Export Table for Replicated Data Table deletions
 CREATE TABLE export_replicated_table
 (
-  rowid                     BIGINT        NOT NULL
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
 , type_null_tinyint         TINYINT
 , type_not_null_tinyint     TINYINT       NOT NULL
