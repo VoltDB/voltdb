@@ -128,6 +128,29 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
 
     pl.close()
 
+def generate_index_file(filenames):
+    row = """
+      <tr>
+        <td>%s</td>
+        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
+        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
+      </tr>
+"""
+
+    full_content = """
+<html>
+  <head>
+    <title>Performance Graphs</title>
+  </head>
+  <body>
+    <table>
+%s
+    </table>
+  </body>
+</html>
+""" % (''.join([row % (i[0], i[1], i[1], i[2], i[2]) for i in filenames]))
+    return full_content
+
 def usage():
     print "Usage:"
     print "\t", sys.argv[0], "output_dir filename_base" \
@@ -145,6 +168,7 @@ def main():
         print sys.argv[1], "does not exist"
         exit(-1)
 
+    prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
     width = None
     height = None
@@ -156,8 +180,13 @@ def main():
     stats = get_stats(STATS_SERVER, 21212, 30)
 
     # Plot single node stats for all apps
+    filenames = []              # (appname, latency, throughput)
     for app, data in stats.iteritems():
         app_filename = app.replace(' ', '_')
+        latency_filename = '%s-latency-%s.png' % (prefix, app_filename)
+        throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
+        filenames.append((app, latency_filename, throughput_filename))
+
         plot(app + " latency", "Time", "Latency (ms)",
              path + "-latency-" + app_filename + ".png", width, height, app,
              data, 'lat99')
@@ -165,6 +194,11 @@ def main():
         plot(app + " throughput", "Time", "Throughput (txns/sec)",
              path + "-throughput-" + app_filename + ".png", width, height, app,
              data, 'tps')
+
+    # generate index file
+    index_file = open(path + '-index.html', 'w')
+    index_file.write(generate_index_file(filenames))
+    index_file.close()
 
 if __name__ == "__main__":
     main()
