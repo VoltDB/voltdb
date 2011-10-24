@@ -660,6 +660,12 @@ CLEANING
     <arg line="-c 'rm -rf obj/*'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf voltdb/*.jar'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf voltdb/*.so'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/ee/catalog/*'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
