@@ -470,7 +470,6 @@ public class ExportToFileClient extends ExportClientBase {
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType) row[i];
                         fields[i - m_firstfield] = m_ODBCDateformat.get().format(timestamp.asApproximateJavaDate());
-                        fields[i - m_firstfield] += String.valueOf(timestamp.getUSec());
                     } else {
                         fields[i - m_firstfield] = row[i].toString();
                     }
