@@ -36,6 +36,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.zip.GZIPInputStream;
 
 import org.voltdb.BackendTarget;
@@ -51,6 +52,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
@@ -345,13 +347,17 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     }
 
     private void validateSnapshot(boolean expectSuccess) {
+        validateSnapshot(expectSuccess, TESTNONCE);
+    }
+
+    private void validateSnapshot(boolean expectSuccess, String nonce) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
         PrintStream original = System.out;
         try {
             System.setOut(ps);
             String args[] = new String[] {
-                    TESTNONCE,
+                    nonce,
                     "--dir",
                     TMPDIR
             };
@@ -371,6 +377,143 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
           finally {
             System.setOut(original);
         }
+    }
+
+    public void testQueueUserSnapshot() throws Exception
+    {
+        System.out.println("Staring testQueueUserSnapshot.");
+        Client client = getClient();
+
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        Set<?>[] expectedText = new Set<?>[4];
+        for (int i = 0; i < 4; i++)
+            expectedText[i] = new HashSet<String>();
+
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks,
+                                 false,
+                                 expectedText);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+
+        /*
+         * Take a snapshot that will block snapshots in the system
+         */
+        DefaultSnapshotDataTarget.m_simulateBlockedWrite = new CountDownLatch(1);
+        client.callProcedure("@SnapshotSave", TMPDIR,
+                                       TESTNONCE, (byte)0);
+
+        org.voltdb.SnapshotDaemon.m_userSnapshotRetryInterval = 1;
+
+        /*
+         * Make sure we can queue a snapshot
+         */
+        ClientResponse r =
+            client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2",  (byte)0);
+        VoltTable result = r.getResults()[0];
+        assertTrue(result.advanceRow());
+        assertTrue(
+                result.getString("ERR_MSG").startsWith("SNAPSHOT REQUEST QUEUED"));
+
+        //Let it reattempt and fail a few times
+        Thread.sleep(2000);
+
+        /*
+         * Now make sure it is reattempted and works
+         */
+        DefaultSnapshotDataTarget.m_simulateBlockedWrite.countDown();
+        DefaultSnapshotDataTarget.m_simulateBlockedWrite = null;
+
+        Thread.sleep(2000);
+        validateSnapshot(true, TESTNONCE + "2");
+
+        /*
+         * Make sure errors are properly forwarded, this is one code path to handle errors,
+         * there is another for errors that don't occur right off the bat
+         */
+        r =
+            client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2",  (byte)1);
+        result = r.getResults()[0];
+        assertTrue(result.advanceRow());
+        assertTrue(result.getString("ERR_MSG").startsWith("SAVE FILE ALREADY EXISTS"));
+    }
+
+    /*
+     * Test specific case where a user snapshot is queued
+     * and then fails while queued. It shouldn't block future snapshots
+     */
+    public void testQueueFailedUserSnapshot() throws Exception
+    {
+        System.out.println("Staring testQueueFailedUserSnapshot.");
+        Client client = getClient();
+
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        Set<?>[] expectedText = new Set<?>[4];
+        for (int i = 0; i < 4; i++)
+            expectedText[i] = new HashSet<String>();
+
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks,
+                                 false,
+                                 expectedText);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+
+        /*
+         * Take a snapshot that will block snapshots in the system
+         */
+        DefaultSnapshotDataTarget.m_simulateBlockedWrite = new CountDownLatch(1);
+        client.callProcedure("@SnapshotSave", TMPDIR,
+                                       TESTNONCE, (byte)0);
+
+        org.voltdb.SnapshotDaemon.m_userSnapshotRetryInterval = 1;
+
+        /*
+         * Make sure we can queue a snapshot
+         */
+        ClientResponse r =
+            client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte)0);
+        VoltTable result = r.getResults()[0];
+        assertTrue(result.advanceRow());
+        assertTrue(
+                result.getString("ERR_MSG").startsWith("SNAPSHOT REQUEST QUEUED"));
+
+        //Let it reattempt a few times
+        Thread.sleep(2000);
+
+        /*
+         * Now make sure it is reattempted, it will fail,
+         * because it has the name of an existing snapshot.
+         * No way to tell other then that new snapshots continue to work
+         */
+        DefaultSnapshotDataTarget.m_simulateBlockedWrite.countDown();
+        DefaultSnapshotDataTarget.m_simulateBlockedWrite = null;
+
+        Thread.sleep(2000);
+
+        /*
+         * Make sure errors are properly forwarded, this is one code path to handle errors,
+         * there is another for errors that don't occur right off the bat
+         */
+        r =
+            client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2",  (byte)1);
+        result = r.getResults()[0];
+        while (result.advanceRow()) {
+            assertTrue(result.getString("RESULT").equals("SUCCESS"));
+        }
+        validateSnapshot(true, TESTNONCE + "2");
     }
 
     public void testRestore12Snapshot()
