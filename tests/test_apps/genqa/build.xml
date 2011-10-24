@@ -229,6 +229,12 @@
         </invoke-java-client>
     </target>
 
+    <target name="export-verify" description="Start the export client.">
+        <invoke-java-client classname="com.ExportVerifier">
+            <arg value="${file}"/>
+        </invoke-java-client>
+    </target>
+
     <!-- Displays the call configuration -->
     <target name="config">
         <antcall target="timestamp" />

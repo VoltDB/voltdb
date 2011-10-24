@@ -26,6 +26,7 @@
         <partitions>
             <partition table='partitioned_table' column='rowid' />
             <partition table='export_partitioned_table' column='rowid' />
+            <partition table='export_mirror_partitioned_table' column='rowid' />
         </partitions>
         <export>
             <tables>

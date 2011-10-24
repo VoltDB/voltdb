@@ -27,7 +27,6 @@ import java.util.Random;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
 @ProcInfo(
     partitionInfo = "export_partitioned_table.rowid:0",
@@ -35,17 +34,50 @@ import org.voltdb.VoltTable;
 )
 
 public class JiggleExportSinglePartition extends VoltProcedure {
-    public final SQLStmt insert = new SQLStmt("INSERT INTO export_partitioned_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    public final SQLStmt export = new SQLStmt("INSERT INTO export_partitioned_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    public final SQLStmt insert = new SQLStmt("INSERT INTO export_mirror_partitioned_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    public VoltTable[] run(long rowid)
+    public long run(long rowid)
     {
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = getSeededRandomNumberGenerator();
 
         // Insert a new record
         SampleRecord record = new SampleRecord(rowid, rand);
+        /*
+          Uncomment this to duplicate the export data in memory.
+          Useful for debugging export data correctness, but not useful
+          for not running out of memory....
+
         voltQueueSQL(
                       insert
+                    , getTransactionId()
+                    , rowid
+                    , record.rowid_group
+                    , record.type_null_tinyint
+                    , record.type_not_null_tinyint
+                    , record.type_null_smallint
+                    , record.type_not_null_smallint
+                    , record.type_null_integer
+                    , record.type_not_null_integer
+                    , record.type_null_bigint
+                    , record.type_not_null_bigint
+                    , record.type_null_timestamp
+                    , record.type_not_null_timestamp
+                    , record.type_null_float
+                    , record.type_not_null_float
+                    , record.type_null_decimal
+                    , record.type_not_null_decimal
+                    , record.type_null_varchar25
+                    , record.type_not_null_varchar25
+                    , record.type_null_varchar128
+                    , record.type_not_null_varchar128
+                    , record.type_null_varchar1024
+                    , record.type_not_null_varchar1024
+                    );
+        */
+        voltQueueSQL(
+                      export
                     , getTransactionId()
                     , rowid
                     , record.rowid_group
@@ -75,6 +107,6 @@ public class JiggleExportSinglePartition extends VoltProcedure {
         voltExecuteSQL(true);
 
         // Retun to caller
-        return null;
+        return getTransactionId();
     }
 }
