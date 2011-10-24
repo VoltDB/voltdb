@@ -25,6 +25,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
@@ -612,7 +613,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private void processUserSnapshotRequestEvent(final WatchedEvent event) throws Exception {
         if (event.getType() == EventType.NodeCreated) {
             byte data[] = m_zk.getData(event.getPath(), false, null);
-            m_zk.delete(event.getPath(), -1, null, null);
             String jsonString = new String(data, "UTF-8");
             JSONObject jsObj = new JSONObject(jsonString);
             final String path = jsObj.getString("path");
@@ -848,6 +848,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * request for a snapshot
      */
     void userSnapshotRequestExistenceCheck() throws Exception {
+        m_zk.delete("/user_snapshot_request", -1, null, null);
         if (m_zk.exists("/user_snapshot_request", m_userSnapshotRequestExistenceWatcher) != null) {
             processUserSnapshotRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,

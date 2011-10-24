@@ -425,6 +425,17 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         Thread.sleep(2000);
 
         /*
+         * Make sure that attempting to queue a second snapshot save request results
+         * in a snapshot in progress message
+         */
+        r =
+            client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2",  (byte)0);
+        result = r.getResults()[0];
+        assertTrue(result.advanceRow());
+        assertTrue(
+                result.getString("ERR_MSG").startsWith("SNAPSHOT IN PROGRESS"));
+
+        /*
          * Now make sure it is reattempted and works
          */
         DefaultSnapshotDataTarget.m_simulateBlockedWrite.countDown();
