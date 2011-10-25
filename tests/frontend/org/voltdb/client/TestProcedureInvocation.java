@@ -211,6 +211,21 @@ public class TestProcedureInvocation extends TestCase{
         verifySpi(spi);
     }
 
+    /**
+     * Test de/ser a replicated procedure invocation.
+     * @throws IOException
+     */
+    public void testWriteReplicated() throws IOException {
+        ProcedureInvocation invocation = new ProcedureInvocation(1, 0, 0, "test", 1);
+        FastSerializer fs = new FastSerializer();
+        fs.writeObject(invocation);
+
+        FastDeserializer fds = new FastDeserializer(fs.getBytes());
+        StoredProcedureInvocation spi = fds.readObject(StoredProcedureInvocation.class);
+        assertEquals(1, spi.getTxnId());
+        assertEquals(0, spi.getOriginalTxnId());
+    }
+
     public void testGetAsBytes() throws Exception {
         StoredProcedureInvocation spi = null;
         try {

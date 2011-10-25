@@ -34,12 +34,28 @@ class ProcedureInvocation implements FastSerializable {
     private final String m_procName;
     private final ParameterSet m_parameters;
 
+    // used for replicated procedure invocations
+    private final long m_txnId;
+    private final long m_originalTxnId;
+    private final ProcedureInvocationType m_type;
+
     ProcedureInvocation(long handle, String procName, Object... parameters) {
+        this(-1, -1, handle, procName, parameters);
+    }
+
+    ProcedureInvocation(long txnId, long originalTxnId, long handle,
+                        String procName, Object... parameters) {
         super();
+        m_txnId = txnId;
+        m_originalTxnId = originalTxnId;
         m_clientHandle = handle;
         m_procName = procName;
         m_parameters = new ParameterSet();
         m_parameters.setParameters(parameters);
+
+        // auto-set the type if both txn IDs are set
+        m_type = m_txnId == -1 && m_originalTxnId == -1 ? ProcedureInvocationType.ORIGINAL
+                                                        : ProcedureInvocationType.REPLICATED;
     }
 
     /** return the clientHandle value */
@@ -58,7 +74,13 @@ class ProcedureInvocation implements FastSerializable {
 
     /** Produce a serialization matching ExecutionSiteTask.createFromWireProtocol(). */
     public void writeExternal(FastSerializer out) throws IOException {
-        out.writeByte(0);//Version
+        assert((m_txnId == -1 && m_originalTxnId == -1) ||
+               (m_txnId != -1 && m_originalTxnId != -1));
+        out.writeByte(m_type.getValue());//Version
+        if (m_type == ProcedureInvocationType.REPLICATED) {
+            out.writeLong(m_txnId);
+            out.writeLong(m_originalTxnId);
+        }
         out.writeString(m_procName);
         out.writeLong(m_clientHandle);
         out.writeObject(m_parameters);
