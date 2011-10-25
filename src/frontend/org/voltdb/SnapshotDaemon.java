@@ -210,17 +210,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         } catch (Exception e) {}
 
         // Really shouldn't leak this from a constructor, and twice to boot
-        //
-        // If enterprise version, do leader election for snapshot truncation
-        // Eventually, we may want to do this for the community edition as well
-        if (VoltDB.instance().getConfig().m_isEnterprise) {
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    leaderElection();
-                }
-            });
-        }
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                leaderElection();
+            }
+        });
     }
 
     /*
