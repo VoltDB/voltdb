@@ -50,9 +50,11 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
         long timeInMillis = sqlTS.getTime();
         timeInMillis = timeInMillis - (timeInMillis % 1000);
 
+        final long timeInMicros = timeInMillis * 1000;
+
         // add back the fractional seconds and return nanos since epoch
-        long fractionalSeconds = sqlTS.getNanos();
-        return (timeInMillis + fractionalSeconds/(1000*1000)) * 1000;
+        final long fractionalSeconds = sqlTS.getNanos();
+        return (timeInMicros + fractionalSeconds/1000);
     }
 
     public TimestampType(String param) {
