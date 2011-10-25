@@ -17,6 +17,7 @@
 
 package org.voltdb.jdbc;
 
+import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 import java.util.regex.*;
@@ -427,5 +428,12 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     {
         return this.NativeConnection.getStatistics(procedures);
     }
+
+    // Save statistics to a file
+    public void saveStatistics(String file) throws IOException
+    {
+        this.NativeConnection.saveStatistics(file);
+    }
+
 }
 
