@@ -101,7 +101,9 @@ public class AsyncBenchmark
 
 
             // Validate parameters
-            apph.validate("contestants", (contestantCount > 0))
+            apph.validate("duration", (duration > 0))
+                .validate("display-interval", (displayInterval > 0))
+                .validate("contestants", (contestantCount > 0))
                 .validate("max-votes", (maxVoteCount > 0))
                 .validate("rate-limit", (rateLimit > 0))
                 .validate("latency-target", (latencyTarget > 0))
@@ -113,24 +115,7 @@ public class AsyncBenchmark
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Get a client connection - we retry for a while in case the server hasn't started yet
-            System.out.printf("Connecting to servers: %s at port: %d\n", servers, port);
-            int sleep = 1000;
-            while(true)
-            {
-                try
-                {
-                    Con = ClientConnectionPool.get(servers, port);
-                    break;
-                }
-                catch (Exception e)
-                {
-                    System.err.printf("Connection failed - retrying in %d second(s).\n", sleep/1000);
-                    try {Thread.sleep(sleep);} catch(Exception tie){}
-                    if (sleep < 8000)
-                        sleep += sleep;
-                }
-            }
-            System.out.println("Connected.  Starting benchmark.");
+            Con = ClientConnectionPool.getWithRetry(servers, port);
 
             // Initialize the application
             final int maxContestants = (int)Con.execute("Initialize", contestantCount, ContestantNamesCSV).getResults()[0].fetchRow(0).getLong(0);

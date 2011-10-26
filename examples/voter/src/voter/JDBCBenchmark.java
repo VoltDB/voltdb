@@ -138,9 +138,12 @@ public class JDBCBenchmark
             int port             = apph.intValue("port");
             int contestantCount  = apph.intValue("contestants");
             int maxVoteCount     = apph.intValue("max-votes");
+            final String csv     = apph.stringValue("stats");
 
             // Validate parameters
-            apph.validate("threads", (threadCount > 0))
+            apph.validate("duration", (duration > 0))
+                .validate("display-interval", (displayInterval > 0))
+                .validate("threads", (threadCount > 0))
                 .validate("contestants", (contestantCount > 0))
                 .validate("max-votes", (maxVoteCount > 0))
             ;
@@ -267,6 +270,9 @@ public class JDBCBenchmark
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
             System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Vote").toString(false));
+
+            // Dump statistics to a CSV file
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(csv);
 
             Con.close();
 

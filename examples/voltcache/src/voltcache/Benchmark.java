@@ -184,10 +184,13 @@ public class Benchmark
             int minValueSize       = apph.intValue("min-value-size");
             int maxValueSize       = apph.intValue("max-value-size");
             boolean useCompression = apph.booleanValue("use-compression");
+            final String csv       = apph.stringValue("stats");
 
 
             // Validate parameters
-            apph.validate("threads", (threadCount > 0))
+            apph.validate("duration", (duration > 0))
+                .validate("display-interval", (displayInterval > 0))
+                .validate("threads", (threadCount > 0))
                 .validate("pool-size", (poolSize > 0))
                 .validate("get-put-ratio", (getPutRatio >= 0) && (getPutRatio <= 1))
                 .validate("key-size", (keySize > 0) && (keySize < 251))
@@ -321,6 +324,9 @@ public class Benchmark
             + " Detailed Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
             System.out.print(Con.getStatistics().toString(false));
+
+            // Dump statistics to a CSV file
+            Con.saveStatistics(csv);
 
             Con.close();
 
