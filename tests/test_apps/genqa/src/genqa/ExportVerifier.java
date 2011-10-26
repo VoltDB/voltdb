@@ -20,21 +20,28 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com;
+package genqa;
 
+import genqa.procedures.SampleRecord;
+
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.TreeSet;
 
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
-
-import com.procedures.SampleRecord;
 
 public class ExportVerifier {
 
@@ -56,41 +63,220 @@ public class ExportVerifier {
         }
     }
 
-    public static void main(String[] args) {
+    ExportVerifier()
+    {
+    }
+
+    void verify(String[] args) throws IOException, ValidationErr
+    {
+        m_partitions = Integer.parseInt(args[0]);
+
+        for (int i = 0; i < m_partitions; i++)
+        {
+            m_rowTxnIds.put(i, new HashSet<Long>());
+        }
+
         String[] row;
         long ttlVerified = 0;
+        long buffered_rows = 0;
+        File dataPath = new File(args[1]);
+        if (!dataPath.exists() || !dataPath.isDirectory())
+        {
+            throw new IOException("Issue with export data path");
+        }
 
-        try {
-            File data = new File(args[0]);
-            FileInputStream dataIs = new FileInputStream(data);
-            Reader reader = new InputStreamReader(dataIs);
-            CSVReader csv = new CSVReader(reader);
+        m_exportFiles = dataPath.listFiles();
+        Arrays.sort(m_exportFiles, new Comparator<File>(){
+            public int compare(File f1, File f2)
+            {
+                return Long.valueOf(f1.lastModified()).compareTo(f2.lastModified());
+            } });
 
-            while ((row = csv.readNext()) != null) {
+        CSVReader csv = openNextExportFile();
+
+        File txnidPath = new File(args[2]);
+        if (!txnidPath.exists() || !txnidPath.isDirectory())
+        {
+            throw new IOException("Issue with transaction ID path");
+        }
+
+        m_clientFiles = txnidPath.listFiles();
+        Arrays.sort(m_clientFiles, new Comparator<File>(){
+            public int compare(File f1, File f2)
+            {
+                long first = Long.parseLong(f1.getName().split("-")[0]);
+                long second = Long.parseLong(f2.getName().split("-")[0]);
+                return (int)(first - second);
+            } });
+
+        BufferedReader txnIdReader = openNextClientFile();
+
+        boolean quit = false;
+        boolean more_rows = true;
+        boolean more_txnids = true;
+        while (!quit)
+        {
+            more_rows = true;
+            while (!canCheckClient() && more_rows)
+            {
+                row = csv.readNext();
+                if (row == null)
+                {
+                    csv = openNextExportFile();
+                    if (csv == null)
+                    {
+                        System.out.println("No more export rows");
+                        more_rows = false;
+                        break;
+                    }
+                    else
+                    {
+                        row = csv.readNext();
+                    }
+                }
+
                 verifyRow(row);
                 if (++ttlVerified % 1000 == 0) {
                     System.out.println("Verified " + ttlVerified + " rows.");
                 }
+                Integer partition = Integer.parseInt(row[3]);
+                Long rowTxnId = Long.parseLong(row[6]);
+                boolean goodness = m_rowTxnIds.get(partition).add(rowTxnId);
+                if (!goodness)
+                {
+                    System.out.println("Duplicate TXN ID in export stream: " + rowTxnId);
+                    System.exit(-1);
+                }
+                else
+                {
+                    //System.out.println("Added txnId: " + rowTxnId + " to outstanding export");
+                }
+            }
+
+            // If we've pulled in rows for every partition, or there are
+            // no more export rows, and there are still unchecked client txnids,
+            // attempt to validate as many client txnids as possible
+            more_txnids = true;
+            while ((canCheckClient() || !more_rows) && more_txnids)
+            {
+                String txnId = txnIdReader.readLine();
+                if (txnId == null)
+                {
+                    txnIdReader = openNextClientFile();
+                    if (txnIdReader == null)
+                    {
+                        System.out.println("No more client txn IDs");
+                        more_txnids = false;
+                    }
+                    else
+                    {
+                        txnId = txnIdReader.readLine();
+                    }
+                }
+                if (txnId != null)
+                {
+                    //System.out.println("Added txnId: " + txnId + " to outstanding client");
+                    m_clientTxnIds.add(Long.parseLong(txnId));
+                }
+                boolean progress = true;
+                while (!m_clientTxnIds.isEmpty() && progress)
+                {
+                    Long txnid = m_clientTxnIds.first();
+                    if (foundTxnId(txnid))
+                    {
+                        m_clientTxnIds.pollFirst();
+                    }
+                    else
+                    {
+                        progress = false;
+                    }
+                }
+            }
+
+            if (!more_rows || !more_txnids)
+            {
+                quit = true;
             }
         }
-        catch(IOException e) {
-            e.printStackTrace(System.err);
-            System.exit(-1);
+        if (more_rows || more_txnids)
+        {
+            System.out.println("Something wasn't drained");
+            System.out.println("client txns remaining: " + m_clientTxnIds.size());
+            System.out.println("Export rows remaining: ");
+            int total = 0;
+            for (int i = 0; i < m_partitions; i++)
+            {
+                total += m_rowTxnIds.get(i).size();
+                System.out.println("\tpartition: " + i + ", size: " + m_rowTxnIds.get(i).size());
+            }
+            if (total != 0 && m_clientTxnIds.size() != 0)
+            {
+                System.out.println("THIS IS A REAL ERROR?!");
+            }
         }
-        catch (ValidationErr e ) {
-            System.err.println("On row: " + ttlVerified + ": " + e.toString());
-            System.exit(-1);
-        }
-        System.out.println("Verified " + ttlVerified  + " rows.");
-        System.exit(0);
     }
 
-    private static void error(String msg, Object val, Object exp) throws ValidationErr {
-        System.err.println("ERROR: " + msg + " " + val + " " + exp);
-        throw new ValidationErr(msg, val, exp);
+    private CSVReader openNextExportFile() throws FileNotFoundException
+    {
+        CSVReader exportreader = null;
+        if (m_exportIndex < m_exportFiles.length)
+        {
+            File data = m_exportFiles[m_exportIndex];
+            System.out.println("Opening export file: " + data.getName());
+            FileInputStream dataIs = new FileInputStream(data);
+            Reader reader = new InputStreamReader(dataIs);
+            exportreader = new CSVReader(reader);
+            m_exportIndex++;
+        }
+        return exportreader;
     }
 
-    private static void verifyRow(String[] row) throws ValidationErr {
+    private BufferedReader openNextClientFile() throws FileNotFoundException
+    {
+        BufferedReader clientreader = null;
+        if (m_clientIndex < m_clientFiles.length)
+        {
+            File data = m_clientFiles[m_clientIndex];
+            System.out.println("Opening client file: " + data.getName());
+            FileInputStream dataIs = new FileInputStream(data);
+            Reader reader = new InputStreamReader(dataIs);
+            clientreader = new BufferedReader(reader);
+            m_clientIndex++;
+        }
+        return clientreader;
+    }
+
+    private boolean canCheckClient()
+    {
+        boolean can_check = true;
+        for (int i = 0; i < m_partitions; i++)
+        {
+            if (m_rowTxnIds.get(i).isEmpty())
+            {
+                can_check = false;
+                break;
+            }
+        }
+        return can_check;
+    }
+
+    private boolean foundTxnId(Long txnId)
+    {
+        boolean found = false;
+        for (int i = 0; i < m_partitions; i++)
+        {
+            if (m_rowTxnIds.get(i).contains(txnId))
+            {
+                //System.out.println("Found txnId: " + txnId + " in partition: " + i);
+                m_rowTxnIds.get(i).remove(txnId);
+                found = true;
+                break;
+            }
+        }
+        return found;
+    }
+
+    private void verifyRow(String[] row) throws ValidationErr {
         int col = 5; // col offset is always pre-incremented.
         Long txnid = Long.parseLong(row[++col]);
         Long rowid = Long.parseLong(row[++col]);
@@ -214,5 +400,38 @@ public class ExportVerifier {
         if (!type_not_null_varchar1024.equals(valid.type_not_null_varchar1024))
             error("type_not_null_varchar1024", type_not_null_varchar1024, valid.type_not_null_varchar1024);
     }
+
+    private void error(String msg, Object val, Object exp) throws ValidationErr {
+        System.err.println("ERROR: " + msg + " " + val + " " + exp);
+        throw new ValidationErr(msg, val, exp);
+    }
+
+    int m_partitions = 0;
+    HashMap<Integer, HashSet<Long>> m_rowTxnIds =
+        new HashMap<Integer, HashSet<Long>>();
+
+    TreeSet<Long> m_clientTxnIds = new TreeSet<Long>();
+    File[] m_exportFiles = null;
+    int m_exportIndex = 0;
+    File[] m_clientFiles = null;
+    int m_clientIndex = 0;
+
+    public static void main(String[] args) {
+        ExportVerifier verifier = new ExportVerifier();
+        try
+        {
+            verifier.verify(args);
+        }
+        catch(IOException e) {
+            e.printStackTrace(System.err);
+            System.exit(-1);
+        }
+        catch (ValidationErr e ) {
+            System.err.println("Validation error: " + e.toString());
+            System.exit(-1);
+        }
+        System.exit(0);
+    }
+
 
 }

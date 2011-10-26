@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 
 APPNAME="genqa"
-CLASSPATH="`ls -x ../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../lib/*.jar | tr '[:space:]' ':'`"
-VOLTDB="../../bin/voltdb"
-VOLTCOMPILER="../../bin/voltcompiler"
-LICENSE="../../voltdb/license.xml"
+CLASSPATH="`ls -x ../../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../../lib/*.jar | tr '[:space:]' ':'`"
+VOLTDB="../../../bin/voltdb"
+VOLTCOMPILER="../../../bin/voltcompiler"
+LICENSE="../../../voltdb/license.xml"
 LEADER="localhost"
+EXPORTDATA="exportdata"
+CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
@@ -66,6 +68,23 @@ function async-benchmark() {
         --latency-target=10.0
 }
 
+function async-export() {
+    srccompile
+    rm -rf $CLIENTLOG/*
+    mkdir $CLIENTLOG
+    java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
+        --display-interval=5 \
+        --duration=60 \
+        --servers=localhost \
+        --port=21212 \
+        --procedure=JiggleExportSinglePartition \
+        --pool-size=100000 \
+        --wait=0 \
+        --rate-limit=100000 \
+        --auto-tune=true \
+        --latency-target=10.0
+}
+
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
@@ -104,6 +123,25 @@ function jdbc-benchmark() {
         --procedure=JiggleSinglePartition \
         --pool-size=100000 \
         --wait=0
+}
+
+function export() {
+    rm -rf $EXPORTDATA/*
+    mkdir $EXPORTDATA
+    java -classpath obj:$CLASSPATH:obj org.voltdb.exportclient.ExportToFileClient \
+        --connect client \
+        --servers localhost \
+        --type csv \
+        --outdir ./$EXPORTDATA \
+        --nonce export \
+        --period 1
+}
+
+function exportverify() {
+    java -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
+        4 \
+        $EXPORTDATA \
+        $CLIENTLOG
 }
 
 function help() {
