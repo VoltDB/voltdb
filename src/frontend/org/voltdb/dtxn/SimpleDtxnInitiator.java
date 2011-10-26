@@ -53,6 +53,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.HeartbeatMessage;
@@ -143,7 +144,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final int messageSize,
                                   final long now)
     {
-        long txnId = m_idManager.getNextUniqueTransactionId();
+        long txnId;
+        if (invocation.getType() == ProcedureInvocationType.REPLICATED) {
+            txnId = invocation.getTxnId();
+        } else {
+            txnId = m_idManager.getNextUniqueTransactionId();
+        }
         createTransaction(connectionId, connectionHostname, adminConnection, txnId,
                           invocation, isReadOnly, isSinglePartition, isEveryPartition,
                           partitions, numPartitions, clientData, messageSize, now);

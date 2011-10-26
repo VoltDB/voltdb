@@ -119,6 +119,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         unserializedParams = null;
     }
 
+    public ProcedureInvocationType getType() {
+        return type;
+    }
+
     public String getProcName() {
         return procName;
     }

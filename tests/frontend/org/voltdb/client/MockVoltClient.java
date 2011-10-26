@@ -275,4 +275,26 @@ public class MockVoltClient implements Client {
         // TODO Auto-generated method stub
         return false;
     }
+
+    @Override
+    public ClientResponse callProcedure(long txnId,
+                                        long originalTxnId,
+                                        String procName,
+                                        Object... parameters) throws IOException,
+                                                             NoConnectionsException,
+                                                             ProcCallException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean callProcedure(long txnId,
+                                 long originalTxnId,
+                                 ProcedureCallback callback,
+                                 String procName,
+                                 Object... parameters) throws IOException,
+                                                      NoConnectionsException {
+        // TODO Auto-generated method stub
+        return false;
+    }
 }

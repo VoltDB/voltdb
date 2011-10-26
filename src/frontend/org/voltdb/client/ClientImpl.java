@@ -194,14 +194,39 @@ final class ClientImpl implements Client {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
-        if (m_isShutdown) {
-            throw new NoConnectionsException("Client instance is shutdown");
-        }
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation =
               new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
+        return callProcedure(cb, invocation);
+    }
 
+    /**
+     * Synchronously invoke a procedure call blocking until a result is available.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return array of VoltTable results.
+     * @throws org.voltdb.client.ProcCallException
+     * @throws NoConnectionsException
+     */
+    @Override
+    public final ClientResponse callProcedure(long txnId, long originalTxnId,
+                                              String procName, Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException
+    {
+        final SyncCallback cb = new SyncCallback();
+        cb.setArgs(parameters);
+        final ProcedureInvocation invocation =
+              new ProcedureInvocation(txnId, originalTxnId, m_handle.getAndIncrement(), procName, parameters);
+        return callProcedure(cb, invocation);
+    }
+
+    private final ClientResponse callProcedure(SyncCallback cb, ProcedureInvocation invocation)
+        throws IOException, NoConnectionsException, ProcCallException
+    {
+        if (m_isShutdown) {
+            throw new NoConnectionsException("Client instance is shutdown");
+        }
 
         m_distributer.queue(
                 invocation,
@@ -238,6 +263,22 @@ final class ClientImpl implements Client {
     }
 
     @Override
+    public final boolean callProcedure(
+            long txnId,
+            long originalTxnId,
+            ProcedureCallback callback,
+            String procName,
+            Object... parameters)
+            throws IOException, NoConnectionsException {
+        if (callback instanceof ProcedureArgumentCacher) {
+            ((ProcedureArgumentCacher)callback).setArgs(parameters);
+        }
+        ProcedureInvocation invocation =
+            new ProcedureInvocation(txnId, originalTxnId, m_handle.getAndIncrement(), procName, parameters);
+        return callProcedure(callback, procName, invocation);
+    }
+
+    @Override
     public int calculateInvocationSerializedSize(String procName,
             Object... parameters) {
         final ProcedureInvocation invocation =
@@ -256,10 +297,23 @@ final class ClientImpl implements Client {
 
     @Override
     public final boolean callProcedure(
+           ProcedureCallback callback,
+           int expectedSerializedSize,
+           String procName,
+           Object... parameters)
+           throws NoConnectionsException, IOException {
+        if (callback instanceof ProcedureArgumentCacher) {
+            ((ProcedureArgumentCacher)callback).setArgs(parameters);
+        }
+        ProcedureInvocation invocation =
+            new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
+        return callProcedure(callback, expectedSerializedSize, invocation);
+    }
+
+    private final boolean callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
-            String procName,
-            Object... parameters)
+            ProcedureInvocation invocation)
             throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
@@ -267,11 +321,8 @@ final class ClientImpl implements Client {
 
         if (callback == null) {
             callback = new NullCallback();
-        } else if (callback instanceof ProcedureArgumentCacher) {
-            ((ProcedureArgumentCacher)callback).setArgs(parameters);
         }
-        ProcedureInvocation invocation =
-            new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
+
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
         if (!isBlessed) {
