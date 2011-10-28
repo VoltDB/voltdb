@@ -32,6 +32,8 @@ import org.voltdb.VoltTable.ColumnInfo;
  * procedure-visible txn ID is the one that the client sent.
  */
 public class ReplicatedProcedure extends VoltProcedure {
+    private final SQLStmt insert = new SQLStmt("INSERT INTO A VALUES (1)");
+
     public VoltTable run(long id, String desc) {
         if (id != 1 || !desc.equals("haha")) {
             throw new VoltAbortException();

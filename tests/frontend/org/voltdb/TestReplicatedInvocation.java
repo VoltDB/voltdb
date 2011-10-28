@@ -25,7 +25,6 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
-
 import static org.junit.Assert.*;
 import org.junit.After;
 import org.junit.Before;
@@ -33,6 +32,7 @@ import org.junit.Test;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.VoltFile;
 
@@ -83,5 +83,18 @@ public class TestReplicatedInvocation {
         result.advanceRow();
         assertEquals(3, result.getLong("txnId"));
         client.close();
+    }
+
+    @Test
+    public void testAcceptanceOnPrimary() throws Exception {
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+        try {
+            client.callProcedure("A.insert", 1);
+        } catch (ProcCallException e) {
+            client.close();
+            fail();
+        }
+        return;
     }
 }

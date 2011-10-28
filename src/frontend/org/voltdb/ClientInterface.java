@@ -28,6 +28,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
@@ -114,6 +115,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
      */
     private final AtomicInteger m_numConnections = new AtomicInteger(0);
+
+    /**
+     * Policies used to determine if we can accept an invocation.
+     */
+    private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
+            new HashMap<String, List<InvocationAcceptancePolicy>>();
 
     // clock time of last call to the initiator's tick()
     static final int POKE_INTERVAL = 1000;
@@ -847,6 +854,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
+
+        registerPolicies();
+    }
+
+    private void registerPolicies() {
+        registerPolicy(new SecondaryInvocationAcceptancePolicy(false));
+    }
+
+    private void registerPolicy(InvocationAcceptancePolicy policy) {
+        List<InvocationAcceptancePolicy> policies = m_policies.get(null);
+        if (policies == null) {
+            policies = new ArrayList<InvocationAcceptancePolicy>();
+            m_policies.put(null, policies);
+        }
+        policies.add(policy);
+    }
+
+    private void registerPolicy(String procName, InvocationAcceptancePolicy policy) {
+        List<InvocationAcceptancePolicy> policies = m_policies.get(procName);
+        if (policies == null) {
+            policies = new ArrayList<InvocationAcceptancePolicy>();
+            m_policies.put(procName, policies);
+        }
+        policies.add(policy);
     }
 
     AsyncCompilerWorkThread getCompilerThread() {
@@ -946,6 +977,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         new VoltTable[0], errorMessage, task.clientHandle);
             c.writeStream().enqueue(errorResponse);
             return;
+        }
+
+        // Check against policies
+        List<InvocationAcceptancePolicy> policies = m_policies.get(null);
+        for (InvocationAcceptancePolicy policy : policies) {
+            if (catProc != null) {
+                if (!policy.shouldAccept(task, catProc, c.writeStream())) {
+                    return;
+                }
+            } else {
+                if (!policy.shouldAccept(task, sysProc, c.writeStream())) {
+                    return;
+                }
+            }
         }
 
         //
