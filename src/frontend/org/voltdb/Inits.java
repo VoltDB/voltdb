@@ -479,6 +479,17 @@ public class Inits {
         }
     }
 
+    class SetupStartMode extends InitWork {
+        SetupStartMode() {
+        }
+
+        @Override
+        public void run() {
+            // See if we should bring the server up in WAN replication mode
+            m_rvdb.setStartMode(m_config.m_startMode);
+        }
+    }
+
     class InitExport extends InitWork {
         InitExport() {
             dependsOn(LoadCatalog.class);

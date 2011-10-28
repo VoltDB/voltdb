@@ -135,6 +135,9 @@ public class VoltDB {
         /** start up action */
         public START_ACTION m_startAction = START_ACTION.START;
 
+        /** start mode: normal, primary, secondary */
+        public OperationMode m_startMode = OperationMode.RUNNING;
+
         /**
          * At rejoin time an interface will be selected. It will be the
          * internal interface specified on the command line. If none is specified
@@ -259,6 +262,12 @@ public class VoltDB {
                     m_startAction = START_ACTION.RECOVER;
                 } else if (arg.equals("start")) {
                     m_startAction = START_ACTION.START;
+                }
+
+                else if (arg.equals("primary")) {
+                    m_startMode = OperationMode.PRIMARY;
+                } else if (arg.equals("secondary")) {
+                    m_startMode = OperationMode.SECONDARY;
                 }
 
                 // handle timestampsalt

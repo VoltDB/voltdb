@@ -579,8 +579,7 @@ public class SocketJoiner extends Thread {
                     VoltDB.crashVoltDB();
                 }
                 // set the admin mode here, not in the local deployment file for rejoining nodes
-                VoltDB.instance().setStartMode(in.readBoolean() ? OperationMode.PAUSED
-                                                                : OperationMode.RUNNING);
+                VoltDB.instance().setStartMode(OperationMode.get((byte) in.read()));
                 // read the current catalog
                 int catalogLength = in.readInt();
                 byte[] catalogBytes = new byte[catalogLength];
@@ -811,7 +810,7 @@ public class SocketJoiner extends Thread {
                 out.writeInt(site);
             }
             // send the admin mode here, don't use local deployment file for rejoining nodes
-            out.writeBoolean(VoltDB.instance().getMode() == OperationMode.PAUSED);
+            out.write(VoltDB.instance().getMode().ordinal());
             // write the catalog contents
             out.writeInt(catalogBytes.length);
             out.write(catalogBytes);

@@ -781,6 +781,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltNetwork network,
             Messenger messenger,
             CatalogContext context,
+            boolean isSecondary,
             int hostCount,
             int siteId,
             int initiatorId,
@@ -829,7 +830,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(context, siteId);
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
-                port, adminPort, context, network, siteId, initiator,
+                port, adminPort, context, network, isSecondary, siteId, initiator,
                 plannerThread, allPartitions);
         onBackPressure.m_ci = ci;
         offBackPressure.m_ci = ci;
@@ -837,9 +838,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return ci;
     }
 
-    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network, int siteId,
-                    TransactionInitiator initiator, AsyncCompilerWorkThread plannerThread,
-                    int[] allPartitions)
+    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network,
+                    boolean isSecondary, int siteId, TransactionInitiator initiator,
+                    AsyncCompilerWorkThread plannerThread, int[] allPartitions)
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
@@ -855,11 +856,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
 
-        registerPolicies();
+        registerPolicies(isSecondary);
     }
 
-    private void registerPolicies() {
-        registerPolicy(new SecondaryInvocationAcceptancePolicy(false));
+    private void registerPolicies(boolean isSecondary) {
+        registerPolicy(new SecondaryInvocationAcceptancePolicy(isSecondary));
     }
 
     private void registerPolicy(InvocationAcceptancePolicy policy) {
@@ -941,7 +942,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // Check for admin mode restrictions before proceeding any further
         VoltDBInterface instance = VoltDB.instance();
-        if (instance.getMode() != OperationMode.RUNNING && !handler.isAdmin())
+        if (instance.getMode() == OperationMode.PAUSED && !handler.isAdmin())
         {
             final ClientResponseImpl errorResponse =
                 new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,

@@ -59,6 +59,7 @@ public class TestReplicatedInvocation {
         // start server
         server = new ServerThread(cat.getAbsolutePath(), deployment,
                                   BackendTarget.NATIVE_EE_JNI);
+        server.m_config.m_startMode = OperationMode.SECONDARY;
         server.start();
         server.waitForInitialization();
     }
@@ -93,8 +94,8 @@ public class TestReplicatedInvocation {
             client.callProcedure("A.insert", 1);
         } catch (ProcCallException e) {
             client.close();
-            fail();
+            return;
         }
-        return;
+        fail("Should not succeed");
     }
 }
