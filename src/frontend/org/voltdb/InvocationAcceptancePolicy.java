@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.network.WriteStream;
@@ -53,12 +54,13 @@ public abstract class InvocationAcceptancePolicy {
      * Inheriting class should override this method if it's targeting a user
      * procedure invocation.
      *
+     * @param user Current user
      * @param invocation The invocation
      * @param proc The procedure catalog object
      * @param s Write stream to queue error responses
      * @return true to accept, false to reject
      */
-    public boolean shouldAccept(StoredProcedureInvocation invocation,
+    public boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
                                 Procedure proc, WriteStream s) {
         return true;
     }
@@ -69,12 +71,13 @@ public abstract class InvocationAcceptancePolicy {
      * Inheriting class should override this method if it's targeting a system
      * procedure invocation.
      *
+     * @param Current user
      * @param invocation The invocation
      * @param proc The system procedure catalog object
      * @param s Write stream to queue error responses
      * @return true to accept, false to reject
      */
-    public boolean shouldAccept(StoredProcedureInvocation invocation,
+    public boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
                                 Config sysProc, WriteStream s) {
         return true;
     }

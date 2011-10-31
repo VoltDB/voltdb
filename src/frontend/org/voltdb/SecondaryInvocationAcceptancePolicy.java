@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ProcedureInvocationType;
@@ -31,13 +32,19 @@ public class SecondaryInvocationAcceptancePolicy extends InvocationAcceptancePol
         super(isOn);
     }
 
-    private boolean shouldAccept(StoredProcedureInvocation invocation,
+    private boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
                                  boolean isReadOnly, WriteStream s) {
         if (!isOn) {
             return true;
         }
 
         if (invocation.getType() == ProcedureInvocationType.ORIGINAL) {
+            // hackish way to check if an adhoc query is read-only
+            if (invocation.procName.equals("@AdHoc")) {
+                String sql = (String) invocation.getParams().toArray()[0];
+                isReadOnly = sql.trim().toLowerCase().startsWith("select");
+            }
+
             if (isReadOnly) {
                 return true;
             } else {
@@ -67,20 +74,20 @@ public class SecondaryInvocationAcceptancePolicy extends InvocationAcceptancePol
     }
 
     @Override
-    public boolean shouldAccept(StoredProcedureInvocation invocation,
+    public boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
                                 Procedure proc, WriteStream s) {
         if (invocation == null || proc == null) {
             return false;
         }
-        return shouldAccept(invocation, proc.getReadonly(), s);
+        return shouldAccept(user, invocation, proc.getReadonly(), s);
     }
 
     @Override
-    public boolean shouldAccept(StoredProcedureInvocation invocation,
+    public boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
                                 Config sysProc, WriteStream s) {
         if (invocation == null || sysProc == null) {
             return false;
         }
-        return shouldAccept(invocation, sysProc.readOnly, s);
+        return shouldAccept(user, invocation, sysProc.readOnly, s);
     }
 }
