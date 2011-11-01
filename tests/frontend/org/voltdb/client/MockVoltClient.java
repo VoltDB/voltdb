@@ -294,7 +294,10 @@ public class MockVoltClient implements Client {
                                  String procName,
                                  Object... parameters) throws IOException,
                                                       NoConnectionsException {
-        // TODO Auto-generated method stub
-        return false;
+        numCalls += 1;
+        calledName = procName;
+        calledParameters = parameters;
+
+        return true;
     }
 }
