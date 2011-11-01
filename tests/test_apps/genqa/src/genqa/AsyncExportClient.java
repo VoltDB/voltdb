@@ -60,6 +60,11 @@ import org.voltdb.client.exampleutils.RateLimiter;
 
 public class AsyncExportClient
 {
+    // Transactions between catalog swaps.
+    public static long CATALOG_SWAP_INTERVAL = 500000;
+    // Number of txn ids per client log file.
+    public static long CLIENT_TXNID_FILE_SIZE = 250000;
+
     static class TxnIdWriter
     {
         String m_nonce;
@@ -89,7 +94,7 @@ public class AsyncExportClient
 
         public void write(String txnId) throws IOException
         {
-            if ((m_count % 50000) == 0)
+            if ((m_count % CLIENT_TXNID_FILE_SIZE) == 0)
             {
                 createNewFile();
             }
@@ -135,6 +140,9 @@ public class AsyncExportClient
     // Reference to the database connection we will use
     private static ClientConnection Con;
 
+    private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
+    private static File deployment = new File("deployment.xml");
+
     // Application entry point
     public static void main(String[] args)
     {
@@ -152,8 +160,7 @@ public class AsyncExportClient
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
                 .add("pool-size", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
-                .add("procedure", "procedure_name", "Procedure to call.", "JiggleSinglePartition")
-                .add("wait", "wait_duration", "Wait duration (only when calling one of the Wait procedures), in milliseconds.", 0)
+                .add("procedure", "procedure_name", "Procedure to call.", "JiggleExportSinglePartition")
                 .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
@@ -167,7 +174,6 @@ public class AsyncExportClient
             final int port             = apph.intValue("port");
             final int poolSize         = apph.intValue("pool-size");
             final String procedure     = apph.stringValue("procedure");
-            final long wait            = apph.intValue("wait");
             final long rateLimit       = apph.longValue("rate-limit");
             final boolean autoTune     = apph.booleanValue("auto-tune");
             final double latencyTarget = apph.doubleValue("latency-target");
@@ -178,7 +184,6 @@ public class AsyncExportClient
             // Validate parameters
             apph.validate("duration", (duration > 0))
                 .validate("pool-size", (duration > 0))
-                .validate("wait", (wait >= 0))
                 .validate("rate-limit", (rateLimit > 0))
                 .validate("latency-target", (latencyTarget > 0))
             ;
@@ -219,14 +224,22 @@ public class AsyncExportClient
             // Run the benchmark loop for the requested duration
             final long endTime = System.currentTimeMillis() + (1000l * duration);
             Random rand = new Random();
+            int swap_count = 0;
+            boolean first_cat = false;
             while (endTime > System.currentTimeMillis())
             {
                 // Post the request, asynchronously
                 Con.executeAsync(new AsyncCallback(writer),
                                  procedure,
                                  (long)rand.nextInt(poolSize),
-                                 wait);
-
+                                 0);
+                swap_count++;
+                if ((swap_count % CATALOG_SWAP_INTERVAL) == 0)
+                {
+                    System.out.println("Changing catalogs...");
+                    Con.updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
+                    first_cat = !first_cat;
+                }
                 // Use the limiter to throttle client activity
                 limiter.throttle();
             }

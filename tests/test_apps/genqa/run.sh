@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="genqa"
+APPNAME2="genqa2"
 CLASSPATH="`ls -x ../../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../../lib/*.jar | tr '[:space:]' ':'`"
 VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"
@@ -11,7 +12,7 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot plannerlog.txt voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar voltdbroot plannerlog.txt voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -20,6 +21,8 @@ function srccompile() {
     javac -classpath $CLASSPATH -d obj \
         src/$APPNAME/*.java \
         src/$APPNAME/procedures/*.java
+    javac -classpath $CLASSPATH -d obj \
+        src/$APPNAME2/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -28,6 +31,7 @@ function srccompile() {
 function catalog() {
     srccompile
     $VOLTCOMPILER obj project.xml $APPNAME.jar
+    $VOLTCOMPILER obj project2.xml $APPNAME2.jar
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -74,14 +78,12 @@ function async-export() {
     mkdir $CLIENTLOG
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --display-interval=5 \
-        --duration=60 \
+        --duration=6000 \
         --servers=localhost \
         --port=21212 \
-        --procedure=JiggleExportSinglePartition \
         --pool-size=100000 \
-        --wait=0 \
-        --rate-limit=100000 \
-        --auto-tune=true \
+        --rate-limit=10000 \
+        --auto-tune=false \
         --latency-target=10.0
 }
 

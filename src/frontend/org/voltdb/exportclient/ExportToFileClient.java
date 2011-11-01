@@ -24,6 +24,9 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -280,9 +283,33 @@ public class ExportToFileClient extends ExportClientBase {
             File[] notifySet = new File[m_writers.size()];
 
             int i = 0;
-            for (Entry<FileHandle, CSVWriter> e : m_writers.entrySet()) {
-                FileHandle handle = e.getKey();
+            // Sort the open files by TXN ID so that we can close and rename
+            // them in the order in which they were created.  This allows
+            // apps interested in the files to know that whenever a new file
+            // is closed, it will be the next file temporally in the export stream
+            FileHandle[] keys = m_writers.keySet().toArray(new FileHandle[] {});
+            Arrays.sort(keys, new Comparator<FileHandle>(){
+                public int compare(FileHandle f1, FileHandle f2)
+                {
+                    long first_txnid = Long.parseLong(f1.getPath("").split("-")[1]);
+                    long second_txnid = Long.parseLong(f2.getPath("").split("-")[1]);
+                    if (first_txnid < second_txnid)
+                    {
+                        return -1;
+                    }
+                    else if (first_txnid > second_txnid)
+                    {
+                        return 1;
+                    }
+                    else
+                    {
+                        return 0;
+                    }
+                }
+            });
 
+            for (FileHandle handle : keys)
+            {
                 String oldPath = handle.getPath(ACTIVE_PREFIX);
                 String newPath = handle.getPath("");
 

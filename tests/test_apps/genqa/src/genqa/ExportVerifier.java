@@ -26,6 +26,7 @@ import genqa.procedures.SampleRecord;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -44,6 +45,10 @@ import org.voltdb.types.TimestampType;
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 public class ExportVerifier {
+
+    public static long FILE_TIMEOUT_MS = 5 * 60 * 1000; // 5 mins
+
+    public static long VALIDATION_REPORT_INTERVAL = 100000;
 
     public static class ValidationErr extends Exception {
         private static final long serialVersionUID = 1L;
@@ -78,37 +83,22 @@ public class ExportVerifier {
 
         String[] row;
         long ttlVerified = 0;
-        long buffered_rows = 0;
-        File dataPath = new File(args[1]);
-        if (!dataPath.exists() || !dataPath.isDirectory())
+        m_dataPath = new File(args[1]);
+        if (!m_dataPath.exists() || !m_dataPath.isDirectory())
         {
             throw new IOException("Issue with export data path");
         }
 
-        m_exportFiles = dataPath.listFiles();
-        Arrays.sort(m_exportFiles, new Comparator<File>(){
-            public int compare(File f1, File f2)
-            {
-                return Long.valueOf(f1.lastModified()).compareTo(f2.lastModified());
-            } });
-
+        //checkForMoreExportFiles();
         CSVReader csv = openNextExportFile();
 
-        File txnidPath = new File(args[2]);
-        if (!txnidPath.exists() || !txnidPath.isDirectory())
+        m_clientPath = new File(args[2]);
+        if (!m_clientPath.exists() || !m_clientPath.isDirectory())
         {
             throw new IOException("Issue with transaction ID path");
         }
 
-        m_clientFiles = txnidPath.listFiles();
-        Arrays.sort(m_clientFiles, new Comparator<File>(){
-            public int compare(File f1, File f2)
-            {
-                long first = Long.parseLong(f1.getName().split("-")[0]);
-                long second = Long.parseLong(f2.getName().split("-")[0]);
-                return (int)(first - second);
-            } });
-
+        //checkForMoreClientFiles();
         BufferedReader txnIdReader = openNextClientFile();
 
         boolean quit = false;
@@ -136,7 +126,7 @@ public class ExportVerifier {
                 }
 
                 verifyRow(row);
-                if (++ttlVerified % 1000 == 0) {
+                if (++ttlVerified % VALIDATION_REPORT_INTERVAL == 0) {
                     System.out.println("Verified " + ttlVerified + " rows.");
                 }
                 Integer partition = Integer.parseInt(row[3]);
@@ -216,33 +206,133 @@ public class ExportVerifier {
         }
     }
 
-    private CSVReader openNextExportFile() throws FileNotFoundException
+    private File[] checkForMoreFiles(File path, File[] files, FileFilter acceptor,
+                                   Comparator<File> comparator) throws ValidationErr
+    {
+        int old_length = files.length;
+        long start_time = System.currentTimeMillis();
+        while (files.length == old_length || files.length == 0)
+        {
+            files = path.listFiles(acceptor);
+            long now = System.currentTimeMillis();
+            if ((now - start_time) > FILE_TIMEOUT_MS)
+            {
+                throw new ValidationErr("Timed out waiting on new files in " + path.getName()+ ".\n" +
+                                        "This indicates a mismatch in the transaction streams between the client logs and the export data or the death of something important.",
+                                        null, null);
+            }
+        }
+        Arrays.sort(files, comparator);
+        return files;
+    }
+
+    private void checkForMoreExportFiles() throws ValidationErr
+    {
+        FileFilter acceptor = new FileFilter()
+        {
+            public boolean accept(File pathname) {
+                return !pathname.getName().contains("active");
+            }
+        };
+
+        Comparator<File> comparator = new Comparator<File>()
+        {
+            public int compare(File f1, File f2)
+            {
+                long first_ts = Long.parseLong((f1.getName().split("-")[3]).split("\\.")[0]);
+                long second_ts = Long.parseLong((f2.getName().split("-")[3]).split("\\.")[0]);
+                if (first_ts != second_ts)
+                {
+                    return (int)(first_ts - second_ts);
+                }
+                else
+                {
+                    long first_txnid = Long.parseLong(f1.getName().split("-")[1]);
+                    long second_txnid = Long.parseLong(f2.getName().split("-")[1]);
+                    if (first_txnid < second_txnid)
+                    {
+                        return -1;
+                    }
+                    else if (first_txnid > second_txnid)
+                    {
+                        return 1;
+                    }
+                    else
+                    {
+                        return 0;
+                    }
+                }
+            }
+        };
+
+        m_exportFiles = checkForMoreFiles(m_dataPath, m_exportFiles, acceptor, comparator);
+        for (int i = 0; i < m_exportFiles.length; i++)
+        {
+            System.out.println("" + i + ": " + m_exportFiles[i].getName());
+        }
+    }
+
+    private void checkForMoreClientFiles() throws ValidationErr
+    {
+        FileFilter acceptor = new FileFilter()
+        {
+            public boolean accept(File pathname) {
+                return pathname.getName().contains("dude");
+            }
+        };
+
+        Comparator<File> comparator = new Comparator<File>()
+        {
+            public int compare(File f1, File f2)
+            {
+                long first = Long.parseLong(f1.getName().split("-")[0]);
+                long second = Long.parseLong(f2.getName().split("-")[0]);
+                return (int)(first - second);
+            }
+        };
+
+        m_clientFiles = checkForMoreFiles(m_clientPath, m_clientFiles, acceptor, comparator);
+    }
+
+    private CSVReader openNextExportFile() throws FileNotFoundException, ValidationErr
     {
         CSVReader exportreader = null;
-        if (m_exportIndex < m_exportFiles.length)
+        if (m_exportIndex == m_exportFiles.length)
         {
-            File data = m_exportFiles[m_exportIndex];
-            System.out.println("Opening export file: " + data.getName());
-            FileInputStream dataIs = new FileInputStream(data);
-            Reader reader = new InputStreamReader(dataIs);
-            exportreader = new CSVReader(reader);
-            m_exportIndex++;
+            for (int i = 0; i < m_exportIndex; i++)
+            {
+                m_exportFiles[i].delete();
+            }
+            checkForMoreExportFiles();
+            m_exportIndex = 0;
         }
+        File data = m_exportFiles[m_exportIndex];
+        System.out.println("Opening export file: " + data.getName());
+        FileInputStream dataIs = new FileInputStream(data);
+        Reader reader = new InputStreamReader(dataIs);
+        exportreader = new CSVReader(reader);
+        m_exportIndex++;
         return exportreader;
     }
 
-    private BufferedReader openNextClientFile() throws FileNotFoundException
+    private BufferedReader openNextClientFile() throws FileNotFoundException, ValidationErr
     {
         BufferedReader clientreader = null;
-        if (m_clientIndex < m_clientFiles.length)
+        if (m_clientIndex == m_clientFiles.length)
         {
-            File data = m_clientFiles[m_clientIndex];
-            System.out.println("Opening client file: " + data.getName());
-            FileInputStream dataIs = new FileInputStream(data);
-            Reader reader = new InputStreamReader(dataIs);
-            clientreader = new BufferedReader(reader);
-            m_clientIndex++;
+            for (int i = 0; i < m_clientIndex; i++)
+            {
+                m_clientFiles[i].delete();
+            }
+            checkForMoreClientFiles();
+            m_clientIndex = 0;
         }
+        File data = m_clientFiles[m_clientIndex];
+        System.out.println("Opening client file: " + data.getName());
+        FileInputStream dataIs = new FileInputStream(data);
+        Reader reader = new InputStreamReader(dataIs);
+        clientreader = new BufferedReader(reader);
+        m_clientIndex++;
         return clientreader;
     }
 
@@ -411,9 +501,11 @@ public class ExportVerifier {
         new HashMap<Integer, HashSet<Long>>();
 
     TreeSet<Long> m_clientTxnIds = new TreeSet<Long>();
-    File[] m_exportFiles = null;
+    File m_dataPath = null;
+    File[] m_exportFiles = {};
     int m_exportIndex = 0;
-    File[] m_clientFiles = null;
+    File m_clientPath = null;
+    File[] m_clientFiles = {};
     int m_clientIndex = 0;
 
     public static void main(String[] args) {

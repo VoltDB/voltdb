@@ -170,5 +170,3 @@ CREATE TABLE export_replicated_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 , PRIMARY KEY (rowid)
 );
-
-
