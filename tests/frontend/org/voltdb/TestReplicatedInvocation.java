@@ -39,6 +39,7 @@ import org.voltdb.utils.VoltFile;
 public class TestReplicatedInvocation {
     ServerThread server;
     File root;
+    OperationMode mode = OperationMode.SECONDARY;
 
     @Before
     public void setUp() throws IOException {
@@ -59,7 +60,7 @@ public class TestReplicatedInvocation {
         // start server
         server = new ServerThread(cat.getAbsolutePath(), deployment,
                                   BackendTarget.NATIVE_EE_JNI);
-        server.m_config.m_startMode = OperationMode.SECONDARY;
+        server.m_config.m_startMode = mode;
         server.start();
         server.waitForInitialization();
     }
@@ -93,9 +94,15 @@ public class TestReplicatedInvocation {
         try {
             client.callProcedure("A.insert", 1);
         } catch (ProcCallException e) {
-            client.close();
-            return;
+            if (mode == OperationMode.SECONDARY) {
+                client.close();
+                return;
+            } else {
+                throw e;
+            }
         }
-        fail("Should not succeed");
+        if (mode == OperationMode.SECONDARY) {
+            fail("Should not succeed on secondary cluster");
+        }
     }
 }

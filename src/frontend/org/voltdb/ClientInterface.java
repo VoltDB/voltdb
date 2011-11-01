@@ -898,9 +898,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (policies != null) {
             for (InvocationAcceptancePolicy policy : policies) {
                 if (catProc != null) {
-                    return policy.shouldAccept(user, task, catProc, s);
+                    if (!policy.shouldAccept(user, task, catProc, s)) {
+                        return false;
+                    }
                 } else {
-                    return policy.shouldAccept(user, task, sysProc, s);
+                    if (!policy.shouldAccept(user, task, sysProc, s)) {
+                        return false;
+                    }
                 }
             }
         }
