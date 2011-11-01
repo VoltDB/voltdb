@@ -118,6 +118,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
 
+    private PartitionDRGateway m_partitionDRGateway = null;
+
     /*
      * Recover a site at a time to make the interval in which other sites
      * are blocked as small as possible. The permit will be generated once.
@@ -659,6 +661,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         m_starvationTracker = null;
         m_tableStats = null;
         m_indexStats = null;
+
+        // initialize the DR gateway
+        int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
+        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -686,6 +692,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         registerFaultHandler(NodeFailureFault.NODE_FAILURE_EXECUTION_SITE,
                              m_faultHandler,
                              FaultType.NODE_FAILURE);
+
+        // initialize the DR gateway
+        int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
+        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -2259,17 +2269,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                    result.toString()));
                 }
                 if (callerParams != null) {
+                    ClientResponseImpl cr = null;
                     if (wrapper instanceof VoltSystemProcedure) {
                         final Object[] combinedParams = new Object[callerParams.length + 1];
                         combinedParams[0] = m_systemProcedureContext;
                         for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                        final ClientResponseImpl cr = wrapper.call(txnState, combinedParams);
+                        cr = wrapper.call(txnState, combinedParams);
                         response.setResults(cr, itask);
                     }
                     else {
-                        final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
+                        cr = wrapper.call(txnState, itask.getParameters());
                         response.setResults(cr, itask);
                     }
+                    // if enabled, send a record of this invocation to the secondary/dr cluster
+                    // if not enabled, should be a noop
+                    m_partitionDRGateway.onSuccessfulProcedureCall(itask.getTxnId(), itask.getStoredProcedureInvocation(), cr);
                 }
             }
             catch (final ExpectedProcedureException e) {
