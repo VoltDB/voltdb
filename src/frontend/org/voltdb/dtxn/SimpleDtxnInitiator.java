@@ -147,6 +147,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         long txnId;
         if (invocation.getType() == ProcedureInvocationType.REPLICATED) {
             txnId = invocation.getTxnId();
+            m_idManager.updateState(txnId);
         } else {
             txnId = m_idManager.getNextUniqueTransactionId();
         }

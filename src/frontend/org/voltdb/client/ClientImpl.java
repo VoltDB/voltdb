@@ -275,7 +275,7 @@ final class ClientImpl implements Client {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(txnId, originalTxnId, m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(callback, procName, invocation);
+        return callProcedure(callback, m_expectedOutgoingMessageSize, invocation);
     }
 
     @Override
