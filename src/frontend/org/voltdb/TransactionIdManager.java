@@ -117,6 +117,17 @@ public class TransactionIdManager {
     }
 
     /**
+     * Updates the state of the ID manager from the given txn ID.
+     *
+     * @param txnId
+     */
+    public void updateState(long txnId) {
+        lastUsedTime = getTimestampFromTransactionId(txnId);
+        counterValue = getSequenceNumberFromTransactionId(txnId);
+        lastTxnId = txnId;
+    }
+
+    /**
      * Generate a unique id that contains a timestamp, a counter
      * and a siteid packed into a 64-bit long value. Subsequent calls
      * to this method will return strictly larger long values.
