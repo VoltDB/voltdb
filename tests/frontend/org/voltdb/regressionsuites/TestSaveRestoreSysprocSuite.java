@@ -866,9 +866,16 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         //No rows returned right now, because the delete is done in a separate thread
         assertEquals( 0, deleteResults[0].getRowCount());
         //Give the async thread time to delete the files
-        Thread.sleep(100);
-        tmp_files = tmp_dir.listFiles(cleaner);
-        assertEquals( 0, tmp_files.length);
+        boolean hadZeroFiles = false;
+        for (int ii = 0; ii < 20; ii++) {
+            Thread.sleep(100);
+            tmp_files = tmp_dir.listFiles(cleaner);
+            if (tmp_files.length == 0) {
+                hadZeroFiles = true;
+                break;
+            }
+        }
+        assertTrue( hadZeroFiles);
 
         validateSnapshot(false);
     }
