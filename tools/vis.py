@@ -197,7 +197,8 @@ def main():
 
     # generate index file
     index_file = open(path + '-index.html', 'w')
-    index_file.write(generate_index_file(filenames))
+    sorted_filenames = sorted(filenames, key=lambda f: f[0].lower())
+    index_file.write(generate_index_file(sorted_filenames))
     index_file.close()
 
 if __name__ == "__main__":
