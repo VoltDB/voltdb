@@ -551,4 +551,12 @@ public class FastSerializer implements DataOutput {
     public int getPosition() {
         return buffer.b.position();
     }
+
+    /**
+     * Set current position of underlying buffer. Useful only in concert with getPosition()
+     * @param pos The position to set to.
+     */
+    public void setPosition(int pos) {
+        buffer.b.position(pos);
+    }
 }

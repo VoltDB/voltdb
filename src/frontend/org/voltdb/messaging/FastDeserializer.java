@@ -453,4 +453,12 @@ public class FastDeserializer implements DataInput {
     public int getPosition() {
         return buffer.position();
     }
+
+    /**
+     * Set current position of underlying buffer. Useful only in concert with getPosition()
+     * @param pos The position to set to.
+     */
+    public void setPosition(int pos) {
+        buffer.position(pos);
+    }
 }

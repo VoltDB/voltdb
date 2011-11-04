@@ -64,5 +64,6 @@ public class PartitionDRGateway {
     // empty methods for community edition
     protected void init(int partitionId) {}
     public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
+    public void tick(long txnId) {}
 
 }

@@ -199,8 +199,8 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      */
     public long noteTransactionRecievedAndReturnLastSeen(int initiatorSiteId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
-//        System.out.printf("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d\n",
-//               m_siteId, initiatorSiteId, txnId, lastSafeTxnIdFromInitiator);
+        // System.out.printf("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d\n",
+        //                   m_siteId, initiatorSiteId, txnId, lastSafeTxnIdFromInitiator);
 
         // this doesn't exclude dummy txnid but is also a sanity check
         assert(txnId != 0);
@@ -238,6 +238,22 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         // return the last seen id for the originating initiator
         return lid.m_lastSeenTxnId;
+    }
+
+    /**
+     * Used to poke the PartitionDRGateway with a number that should increase with
+     * time as a lower bound on the txnid of the next real work the EE is going to see.
+     * @return 0 if queue is non-empty, a valid txnid otherwise
+     */
+    public long getEarliestSeenTxnIdAcrossInitiatorsWhenEmpty() {
+        if (m_state != QueueState.BLOCKED_EMPTY)
+            return 0;
+        long txnId = Long.MAX_VALUE;
+        for (LastInitiatorData lid : m_initiatorData.values()) {
+            if (txnId < lid.m_lastSeenTxnId)
+                txnId = lid.m_lastSeenTxnId;
+        }
+        return txnId;
     }
 
     /**
