@@ -1,0 +1,35 @@
+package pmsg;
+option java_package = "org.voltdb.pmsg";
+option java_outer_classname = "DRAgent";
+
+message Ack {
+    optional int32 partitionId = 1;
+    optional fixed64 timestamp = 2;
+}
+
+message Reset {
+    optional int32 partitionId = 1;
+    optional fixed64 timestamp = 2;
+}
+
+message Pause {
+    optional int32 partitionId = 1;
+}
+
+message Response {
+}
+
+message CtrlEnvelope {
+    enum Type {
+        ACK = 1;
+        RESET = 2;
+        PAUSE = 3;
+        QUERY = 4;
+        RESPONSE = 5;
+    }
+    required Type type = 1;
+    optional Ack ack = 2;
+    optional Reset reset = 3;
+    optional Pause pause = 4;
+    optional Response response = 5;
+}
