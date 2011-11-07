@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys, shutil
+import os, sys, shutil, datetime
 from fabric.api import run, cd, local, get, settings, lcd
 from fabric_ssh_config import getSSHInfoForHost
 
@@ -31,11 +31,6 @@ def checkoutCode(engSvnUrl, proSvnUrl):
 def makeReleaseDir(releaseDir):
     # handle the case where a release dir exists for this version
     if os.path.exists(releaseDir):
-        if (len(os.listdir(releaseDir)) > 0):
-            # make a backup before we clear an existing release dir
-            if os.path.exists(releaseDir + ".tgz"):
-                os.remove(releaseDir + ".tgz")
-            local("tar -czf " +  releaseDir + ".tgz " + releaseDir)
         shutil.rmtree(releaseDir)
     # create a release dir
     os.makedirs(releaseDir)
@@ -120,6 +115,15 @@ def createCandidateSysmlink(releaseDir):
     local("ln -s %s %s" % (releaseDir, candidateDir))
 
 ################################################
+# BACKUP RELEASE DIR
+################################################
+
+def backupReleaseDir(releaseDir):
+    # make a backup with the timstamp of the build
+    timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
+    local("tar -czf " +  releaseDir + "-" + timestamp + ".tgz " + releaseDir)
+
+################################################
 # GET THE SVN URLS TO BUILD THE KIT FROM
 ################################################
 
@@ -169,3 +173,4 @@ with settings(user='test',host_string=voltmini[1],disable_known_hosts=True,key_f
 
 computeChecksums(releaseDir)
 createCandidateSysmlink(releaseDir)
+backupReleaseDir(releaseDir)
