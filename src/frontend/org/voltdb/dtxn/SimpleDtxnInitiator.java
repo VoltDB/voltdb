@@ -187,8 +187,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         {
             SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
             ArrayList<Integer> sitesOnThisHost =
-                tracker.m_hostsToSites.get(m_hostId);
-            int coordinatorId = sitesOnThisHost.get(1);
+                    tracker.getLiveExecutionSitesForHost(m_hostId);
+            int coordinatorId = sitesOnThisHost.get(0);
             ArrayList<Integer> replicaIds = new ArrayList<Integer>();
             for (Integer replica : tracker.getAllSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
                 if (replica != coordinatorId && tracker.getAllLiveSites().contains(replica)) {
