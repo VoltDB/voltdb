@@ -283,6 +283,11 @@ public class AppHelper
                         a.Value = args[i].split("=")[1];
                         isValid = true;
                     }
+                    else if (args[i].equals("--" + a.Name))
+                    {
+                        a.Value = args[++i];
+                        isValid = true;
+                    }
                 }
                 if (!isValid)
                     printErrorAndQuit("Invalid Parameter: " + args[i]);

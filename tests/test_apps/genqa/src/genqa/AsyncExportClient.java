@@ -164,6 +164,7 @@ public class AsyncExportClient
                 .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
+                .add("catalog-swap", "Swap catalogs from the client", "true")
                 .setArguments(args)
             ;
 
@@ -177,6 +178,7 @@ public class AsyncExportClient
             final long rateLimit       = apph.longValue("rate-limit");
             final boolean autoTune     = apph.booleanValue("auto-tune");
             final double latencyTarget = apph.doubleValue("latency-target");
+            final boolean catalogSwap  = apph.booleanValue("catalog-swap");
             final String csv           = apph.stringValue("stats");
 
             TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
@@ -234,7 +236,7 @@ public class AsyncExportClient
                                  (long)rand.nextInt(poolSize),
                                  0);
                 swap_count++;
-                if ((swap_count % CATALOG_SWAP_INTERVAL) == 0)
+                if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
                 {
                     System.out.println("Changing catalogs...");
                     Con.updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);

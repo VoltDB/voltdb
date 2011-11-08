@@ -33,6 +33,10 @@ function catalog() {
     $VOLTCOMPILER obj project.xml $APPNAME.jar
     $VOLTCOMPILER obj project2.xml $APPNAME2.jar
     # stop if compilation fails
+    rm -rf $EXPORTDATA
+    mkdir $EXPORTDATA
+    rm -rf $CLIENTLOG
+    mkdir $CLIENTLOG
     if [ $? != 0 ]; then exit; fi
 }
 
