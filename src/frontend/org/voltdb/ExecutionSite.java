@@ -1032,11 +1032,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
                 m_currentTransactionState = currentTxnState;
                 if (currentTxnState == null) {
-                    // check if we got no response because the queue is empty and, if so...
-                    // get a txnid with which to poke the PartitionDRGateway
+                    /*
+                     * check if we got no response because the queue is empty
+                     * and, if so... get a txnid with which to poke the
+                     * PartitionDRGateway.
+                     *
+                     * If the txnId is from a long time ago, caused by command
+                     * log replay, then ignore it.
+                     */
                     long seenTxnId = m_transactionQueue.getEarliestSeenTxnIdAcrossInitiatorsWhenEmpty();
-                    if (seenTxnId != 0)
+                    long ts = TransactionIdManager.getTimestampFromTransactionId(seenTxnId);
+                    if (seenTxnId > 0 && ts > (System.currentTimeMillis() - 500)) {
                         m_partitionDRGateway.tick(seenTxnId);
+                    }
 
                     // poll the messaging layer for a while as this site has nothing to do
                     // this will likely have a message/several messages immediately in a heavy workload

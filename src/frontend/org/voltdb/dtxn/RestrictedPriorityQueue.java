@@ -250,9 +250,10 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
             return 0;
         long txnId = Long.MAX_VALUE;
         for (LastInitiatorData lid : m_initiatorData.values()) {
-            if (txnId < lid.m_lastSeenTxnId)
+            if (txnId > lid.m_lastSeenTxnId)
                 txnId = lid.m_lastSeenTxnId;
         }
+        txnId = Math.max(0, txnId);
         return txnId;
     }
 
