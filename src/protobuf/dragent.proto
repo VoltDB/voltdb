@@ -17,6 +17,24 @@ message Pause {
 }
 
 message Response {
+    // all known nodes globally
+    //  first entry is self
+    repeated NodeInfo nodeInfo = 1;
+    // local partitions
+    repeated PartitionInfo partitionInfo = 2;
+}
+
+message NodeInfo {
+    optional string hostname = 1;
+}
+
+message PartitionInfo {
+    optional int32 partitionId = 1;
+    optional fixed64 oldestTimestamp = 2;
+    optional fixed64 lastSentTimestamp = 3;
+    optional int64 outstandingBufferCount = 4;
+    optional int64 outstandingByteCount = 5;
+    optional bool isPaused = 6;
 }
 
 message CtrlEnvelope {
