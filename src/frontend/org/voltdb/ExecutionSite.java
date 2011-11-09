@@ -2289,9 +2289,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     }
                     // if enabled, send a record of this invocation to the secondary/dr cluster
                     // if not enabled, should be a noop
-                    if (!itask.isReadOnly()) {
-                        m_partitionDRGateway.onSuccessfulProcedureCall(itask.getTxnId(), itask.getStoredProcedureInvocation(), cr);
-                    }
+                    m_partitionDRGateway.onSuccessfulProcedureCall(itask.getTxnId(), itask.getStoredProcedureInvocation(), cr);
                 }
             }
             catch (final ExpectedProcedureException e) {
