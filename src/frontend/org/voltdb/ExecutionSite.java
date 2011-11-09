@@ -118,6 +118,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
 
+    private long m_startupTime = System.currentTimeMillis();
     private PartitionDRGateway m_partitionDRGateway = null;
 
     /*
@@ -1032,11 +1033,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
                 m_currentTransactionState = currentTxnState;
                 if (currentTxnState == null) {
-                    // check if we got no response because the queue is empty and, if so...
-                    // get a txnid with which to poke the PartitionDRGateway
+                    /*
+                     * check if we got no response because the queue is empty
+                     * and, if so... get a txnid with which to poke the
+                     * PartitionDRGateway.
+                     *
+                     * If the txnId is from before the process started, caused by command
+                     * log replay, then ignore it.
+                     */
                     long seenTxnId = m_transactionQueue.getEarliestSeenTxnIdAcrossInitiatorsWhenEmpty();
-                    if (seenTxnId != 0)
+                    long seenTxnTime = TransactionIdManager.getTimestampFromTransactionId(seenTxnId);
+                    if (seenTxnTime > m_startupTime) {
                         m_partitionDRGateway.tick(seenTxnId);
+                    }
 
                     // poll the messaging layer for a while as this site has nothing to do
                     // this will likely have a message/several messages immediately in a heavy workload
@@ -2290,8 +2299,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     // if enabled, send a record of this invocation to the secondary/dr cluster
                     // if not enabled, should be a noop
                     // also only send write txns
-                    if (itask.isReadOnly() == false)
+                    if (!itask.isReadOnly()) {
                         m_partitionDRGateway.onSuccessfulProcedureCall(itask.getTxnId(), itask.getStoredProcedureInvocation(), cr);
+                    }
                 }
             }
             catch (final ExpectedProcedureException e) {
