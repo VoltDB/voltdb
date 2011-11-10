@@ -207,6 +207,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         delete [] m_projectionExpressions;
         return false;
     }
+    VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
+
     m_tuple = TableTuple(m_targetTable->schema());
 
     if (m_node->getEndExpression() != NULL)
@@ -271,6 +273,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // assert (m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
     //         m_lookupType == INDEX_LOOKUP_TYPE_GT);
     m_searchKey.setAllNulls();
+    VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
     if (m_searchKeyAllParamArray != NULL)
     {
         VOLT_TRACE("sweet, all params");
@@ -291,6 +294,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
     assert(m_searchKey.getSchema()->columnCount() > 0);
+    VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
+
 
     //
     // END EXPRESSION
@@ -337,7 +342,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     {
         if (m_lookupType == INDEX_LOOKUP_TYPE_EQ)
         {
-            m_index->moveToKey(&m_searchKey);
+            VOLT_TRACE("INDEX_LOOKUP_TYPE_EQ nsks: %d moveToKeyOrGreater '%s'",
+		       m_numOfSearchkeys, m_searchKey.debugNoHeader().c_str());
+            // need to move to or greater to find (x,_) when doing a partial covering search.
+            m_index->moveToKeyOrGreater(&m_searchKey);
         }
         else if (m_lookupType == INDEX_LOOKUP_TYPE_GT)
         {
@@ -373,10 +381,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // We have to different nextValue() methods for different lookup types
     //
     while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
-            !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
+            !(m_tuple = m_index->nextValue()).isNullTuple()) ||
            ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || m_numOfSearchkeys == 0) &&
             !(m_tuple = m_index->nextValue()).isNullTuple()))
+
     {
+        VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
         //
         // First check whether the end_expression is now false
         //
