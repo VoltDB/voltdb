@@ -134,11 +134,6 @@ comparisonFactory(ExpressionType c,
     //printf("%s\n", right_optimized->debug().c_str());
     //fflush(stdout);
 
-    VOLT_TRACE("comparisonFactoryHelper request:%s left:%s(%p) right:%s(%p)",
-               expressionutil::getTypeName(c).c_str(),
-               typeid(*(lc)).name(), lc,
-               typeid(*(rc)).name(), rc);
-
     // more specialization available?
     ConstantValueExpression *l_const =
       dynamic_cast<ConstantValueExpression*>(lc);
@@ -400,12 +395,6 @@ expressionFactory(json_spirit::Object &obj,
                   AbstractExpression* lc,
                   AbstractExpression* rc)
 {
-    VOLT_TRACE("expressionFactory request: %s(%d), %s(%d), %d, left: %p"
-               " right: %p",
-               expressionutil::getTypeName(et).c_str(), et,
-               getTypeName(vt).c_str(), vt, vs,
-               lc, rc);
-
     AbstractExpression *ret = NULL;
 
     switch (et) {
