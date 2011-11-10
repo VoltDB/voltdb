@@ -32,6 +32,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.AsyncCompilerWorkThread;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -70,6 +71,52 @@ public class TestFailuresSuite extends RegressionSuite {
      */
     public TestFailuresSuite(String name) {
         super(name);
+    }
+
+    public void testTicketEng1850_WhereOrderBy() throws Exception
+    {
+        System.out.println("STARTING testTicketENG1850_WhereOrderBy");
+
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+
+        Client client = getClient();
+        int cid=0;
+        do {
+            for (int aid = 0; aid < 5; aid++) {
+                int pid = cid % 10;
+                client.callProcedure(callback, "ENG1850.insert", cid++, aid, pid, (pid+aid));
+            }
+        } while (cid < 1000);
+        client.drain();
+
+        VoltTable r1 = client.callProcedure("@AdHoc", "select count(*) from ENG1850;").getResults()[0];
+        assertEquals(1000, r1.asScalarLong());
+
+        VoltTable r2 = client.callProcedure("@AdHoc", "select count(*) from ENG1850 where pid =2;").getResults()[0];
+        assertEquals(100, r2.asScalarLong());
+
+        VoltTable r3 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 limit 1;").getResults()[0];
+        System.out.println("r3\n" + r3);
+        assertEquals(1, r3.getRowCount());
+
+        // this failed, returning 0 rows.
+        VoltTable r4 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid").getResults()[0];
+        System.out.println("r4\n:" + r4);
+        assertEquals(100, r4.getRowCount());
+
+        // this is the failing condition reported in the defect report (as above but with the limit)
+        VoltTable r5 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid limit 1").getResults()[0];
+        System.out.println("r5\n" + r5);
+        assertEquals(1, r5.getRowCount());
+
     }
 
     // Subcase of ENG-800
@@ -543,6 +590,7 @@ public class TestFailuresSuite extends RegressionSuite {
         project.addPartitionInfo("FIVEK_STRING", "P");
         project.addPartitionInfo("FIVEK_STRING_WITH_INDEX", "ID");
         project.addPartitionInfo("WIDE", "P");
+        project.addPartitionInfo("ENG1850", "cid");
         //project.addPartitionInfo("BAD_COMPARES", "ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
