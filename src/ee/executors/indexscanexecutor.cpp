@@ -343,7 +343,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         if (m_lookupType == INDEX_LOOKUP_TYPE_EQ)
         {
             VOLT_TRACE("INDEX_LOOKUP_TYPE_EQ nsks: %d moveToKeyOrGreater '%s'",
-		       m_numOfSearchkeys, m_searchKey.debugNoHeader().c_str());
+                       m_numOfSearchkeys, m_searchKey.debugNoHeader().c_str());
             // need to move to or greater to find (x,_) when doing a partial covering search.
             m_index->moveToKeyOrGreater(&m_searchKey);
         }
