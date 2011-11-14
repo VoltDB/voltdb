@@ -544,7 +544,7 @@ public class Inits {
                     m_rvdb.m_messenger.createLocalSite(currSiteId);
                 }
                 // Create an agreement site for every initiator
-                if (myAgreementSiteId == -1 && site.getIsexec() == false) {
+                if (site.getIsexec() == false) {
                     agreementSiteIds.add(currSiteId);
                     if (sitesHostId == m_rvdb.m_myHostId) {
                         myAgreementSiteId = currSiteId;

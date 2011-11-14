@@ -16,7 +16,6 @@
  */
 package org.voltdb.compiler;
 
-import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -54,10 +53,6 @@ public class ClusterCompiler
 
         // add all the sites
         int initiatorsPerHost = 1;
-        if (VoltDB.instance().getConfig().m_startMode == OperationMode.SECONDARY) {
-            // add a second set of CI/Initiator to the node if running as secondary
-            initiatorsPerHost++;
-        }
         int partitionCounter = -1;
         int nextInitiatorId = 1;
         for (int i = 0; i < (sitesPerHost + initiatorsPerHost) * hostCount; i++) {
