@@ -47,6 +47,7 @@ begin Site             "A physical execution context for the system"
   Partition? partition "Which logical data partition does this host process?"
   int initiatorid      "If the site is an initiator, this is its tightly packed id"
   bool isUp            "Is the site up?"
+  bool shareAgreement  "If the site is an initiator, associate the agreement site with it"
 end
 
 begin Database          "A set of schema, procedures and other metadata that together comprise an application"

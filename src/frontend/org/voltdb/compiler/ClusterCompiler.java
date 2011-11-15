@@ -16,6 +16,7 @@
  */
 package org.voltdb.compiler;
 
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -55,6 +56,11 @@ public class ClusterCompiler
         int initiatorsPerHost = 1;
         int partitionCounter = -1;
         int nextInitiatorId = 1;
+        if (VoltDB.instance().getConfig().m_startMode == OperationMode.SECONDARY)
+        {
+            // add a second set of CI/Initiator to the node if running as secondary
+            initiatorsPerHost++;
+        }
         for (int i = 0; i < (sitesPerHost + initiatorsPerHost) * hostCount; i++) {
 
             int hostForSite = i / (sitesPerHost + initiatorsPerHost);
@@ -66,6 +72,7 @@ public class ClusterCompiler
             int siteId = hostId * VoltDB.SITES_TO_HOST_DIVISOR + withinHostId;
 
             Site site = cluster.getSites().add(String.valueOf(siteId));
+            site.setShareagreement(false);
 
             if (withinHostId >= initiatorsPerHost) {
                 site.setIsexec(true);
@@ -74,8 +81,10 @@ public class ClusterCompiler
                         String.valueOf((++partitionCounter) % partitionCount)));
             }
             else {
-                site.setInitiatorid(nextInitiatorId++);
+                site.setInitiatorid(nextInitiatorId);
                 site.setIsexec(false);
+                site.setShareagreement(((nextInitiatorId - 1) % initiatorsPerHost) == 0);
+                nextInitiatorId++;
             }
             site.setHost(host);
             site.setIsup(true);
