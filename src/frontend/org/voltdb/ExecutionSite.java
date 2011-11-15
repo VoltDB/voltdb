@@ -1151,6 +1151,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 ee.releaseUndoToken(latestUndoToken);
             }
 
+            // send to DR Agent if conditions are right
+            StoredProcedureInvocation invocation = txnState.getInvocation();
+            if ((invocation != null) && (m_recovering == false)) {
+                m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+            }
+
             // reset for error checking purposes
             txnState.setBeginUndoToken(kInvalidUndoToken);
         }
@@ -2296,11 +2302,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         cr = wrapper.call(txnState, itask.getParameters());
                         response.setResults(cr, itask);
                     }
-                    // if enabled, send a record of this invocation to the secondary/dr cluster
-                    // if not enabled, should be a noop
-                    // also only send write txns
-                    if (!itask.isReadOnly()) {
-                        m_partitionDRGateway.onSuccessfulProcedureCall(itask.getTxnId(), itask.getStoredProcedureInvocation(), cr);
+                    // record the results of write transactions to the transaction state
+                    // this may be used to verify the WAN slave cluster gets the same value
+                    // skip for multi-partition txns because only 1 of k+1 partitions will
+                    //  have the real results
+                    if ((!itask.isReadOnly()) && itask.isSinglePartition()) {
+                        m_currentTransactionState.storeResults(cr);
                     }
                 }
             }

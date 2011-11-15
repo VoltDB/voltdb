@@ -21,6 +21,7 @@ import java.util.HashSet;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
@@ -137,5 +138,10 @@ public class SinglePartitionTxnState extends TransactionState {
 
     public InitiateTaskMessage getInitiateTaskMessage() {
         return m_task;
+    }
+
+    @Override
+    public StoredProcedureInvocation getInvocation() {
+        return m_task.getStoredProcedureInvocation();
     }
 }
