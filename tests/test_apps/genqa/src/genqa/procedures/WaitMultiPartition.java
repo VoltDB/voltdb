@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.procedures;
+package genqa.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
@@ -32,7 +32,7 @@ import org.voltdb.VoltTable;
 
 public class WaitMultiPartition extends VoltProcedure
 {
-    public VoltTable[] run(long wait)
+    public VoltTable[] run(long partitioner, long wait)
     {
         try {Thread.sleep(wait);} catch(Exception x) {}
         return null;

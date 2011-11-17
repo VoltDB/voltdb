@@ -662,8 +662,18 @@ CLEANING
 -->
 
 <target name='clean' description="Remove all compiled files." depends="cleantmp">
-  <exec dir='.' executable='/bin/sh'>
+  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf voltdb/*.jar'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf voltdb/*.so'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/ee/catalog/*'"/>
@@ -677,11 +687,7 @@ CLEANING
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf doc/javadoc/procedure-api/* doc/javadoc/java-client-api/*'"/>
   </exec>
-  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+
 </target>
 
 <target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
@@ -1041,6 +1047,8 @@ TEST CASES
 ***************************************
 -->
 
+
+
 <!-- tests of build.xml itself -->
 <target name="ant_unit_tests" depends="testnexthostprop" />
 
@@ -1130,6 +1138,24 @@ TEST CASES
     </sequential>
 </macrodef>
 
+ <macrodef name="junitreport-macro">
+   <attribute name="testoutput" />
+   <sequential>
+     <mkdir dir='@{testoutput}/report' />
+     <junitreport todir="@{testoutput}">
+       <fileset dir="@{testoutput}">
+            <include name="TEST-*.xml" />
+        </fileset>
+        <report format="noframes" todir="@{testoutput}/report"/>
+        <report
+            styledir="tools"
+            format="noframes"
+            todir="@{testoutput}"
+        />
+     </junitreport>
+   </sequential>
+</macrodef>
+
 <!-- A set of junit tests that only run on hudson and have an extended timeout -->
 <!-- Run this before junit to pick up these tests in the reporting -->
 <target name="junit-hudson">
@@ -1143,6 +1169,30 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
+</target>
+
+<target name="timeoutbakeoff" description = "Reporting for junit tests">
+    <run_junit timeout="600000" printsummary="no">
+        <formatters>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
+        </formatters>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <include name='org/voltdb/**/TestExecutionSite.class'/>
+                <include name='org/voltdb/**/TestRejoinEndToEnd.class'/>
+                <include name='org/voltdb/**/TestPartitionDetection.class'/>
+                <include name='org/voltdb/**/TestRestoreAgent.class'/>
+            </fileset>
+        </tests>
+    </run_junit>
+    <junitreport-macro testoutput="${build.testoutput.dir}"/>
 </target>
 
 <!-- Junit tests that run quickly -->
@@ -1196,19 +1246,7 @@ TEST CASES
         </tests>
     </run_junit>
 
-    <!-- Generate unit test reports. -->
-    <mkdir dir='${build.testoutput.dir}/report' />
-    <junitreport todir="${build.testoutput.dir}">
-        <fileset dir='${build.testoutput.dir}'>
-            <include name="TEST-*.xml" />
-        </fileset>
-        <report format="noframes" todir="${build.testoutput.dir}/report"/>
-        <report
-            styledir="tools"
-            format="noframes"
-            todir="${build.testoutput.dir}"
-        />
-    </junitreport>
+    <junitreport-macro testoutput="${build.testoutput.dir}"/>
 
     <!-- Fail the build if there were any problems.
         This runs all the tests before failing. -->
@@ -1251,19 +1289,7 @@ TEST CASES
         </tests>
     </run_junit>
 
-    <!-- Generate unit test reports. -->
-    <mkdir dir='${build.testoutput.dir}/report' />
-    <junitreport todir="${build.testoutput.dir}">
-        <fileset dir='${build.testoutput.dir}'>
-            <include name="TEST-*.xml" />
-        </fileset>
-        <report format="noframes" todir="${build.testoutput.dir}/report"/>
-        <report
-            styledir="tools"
-            format="noframes"
-            todir="${build.testoutput.dir}"
-        />
-    </junitreport>
+    <junitreport-macro testoutput="${build.testoutput.dir}"/>
 
     <exec dir="${build.testoutput.dir}" executable='cat'>
         <arg line="junit-noframes.html"/>
@@ -1315,18 +1341,7 @@ TEST CASES
     </run_junit>
 
     <!-- Generate unit test reports. -->
-    <mkdir dir='${build.testoutput.dir}/report' />
-    <junitreport todir="${build.testoutput.dir}">
-        <fileset dir='${build.testoutput.dir}'>
-            <include name="TEST-*.xml" />
-        </fileset>
-        <report format="noframes" todir="${build.testoutput.dir}/report"/>
-        <report
-            styledir="tools"
-            format="noframes"
-            todir="${build.testoutput.dir}"
-        />
-    </junitreport>
+    <junitreport-macro testoutput="${build.testoutput.dir}"/>
 
     <!-- Fail the build if there were any problems.
         This runs all the tests before failing. -->

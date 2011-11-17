@@ -43,6 +43,24 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
         m_date = (Date) date.clone();
     }
 
+    private static long defeatJava(String param) {
+        java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(param);
+
+        // get millis and then truncate to integral seconds.
+        long timeInMillis = sqlTS.getTime();
+        timeInMillis = timeInMillis - (timeInMillis % 1000);
+
+        final long timeInMicros = timeInMillis * 1000;
+
+        // add back the fractional seconds and return nanos since epoch
+        final long fractionalSeconds = sqlTS.getNanos();
+        return (timeInMicros + fractionalSeconds/1000);
+    }
+
+    public TimestampType(String param) {
+        this(defeatJava(param));
+    }
+
     /**
      * Create a TimestampType instance for the current time.
      */
@@ -110,6 +128,7 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
      * CompareTo - to mimic Java Date
      */
+    @Override
     public int compareTo(TimestampType dateval) {
         int comp = m_date.compareTo(dateval.m_date);
         if (comp == 0) {

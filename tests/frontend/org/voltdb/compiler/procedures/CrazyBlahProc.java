@@ -38,7 +38,7 @@ import org.voltdb.types.TimestampType;
 public class CrazyBlahProc extends VoltProcedure {
 
     public VoltTable[] run(long ival, short ival2, double[] dvals, VoltTable tval, BigDecimal bd, BigDecimal[] decvals, TimestampType timeval) {
-        VoltTable[] retval = new VoltTable[3];
+        VoltTable[] retval = new VoltTable[4];
 
         retval[0] = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
         retval[0].addRow(1);
@@ -48,7 +48,8 @@ public class CrazyBlahProc extends VoltProcedure {
         retval[1].addRow("你好");
 
         retval[2] = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
-
+        retval[3] = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.TIMESTAMP));
+        retval[3].addRow(timeval);
         return retval;
     }
 }

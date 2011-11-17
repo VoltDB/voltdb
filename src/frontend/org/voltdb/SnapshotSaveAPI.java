@@ -194,9 +194,15 @@ public class SnapshotSaveAPI
         String nextTruncationNonce = null;
         boolean isTruncation = false;
         try {
-            ByteBuffer payload =
-                ByteBuffer.wrap(VoltDB.instance().getZK().getData("/request_truncation_snapshot", false, null));
-            nextTruncationNonce = Long.toString(payload.getLong());
+            final byte payloadBytes[] =
+                VoltDB.instance().getZK().getData("/request_truncation_snapshot", false, null);
+            //request_truncation_snapshot data may be null when initially created. If that is the case
+            //then this snapshot is definitely not a truncation snapshot because
+            //the snapshot daemon hasn't gotten around to asking for a truncation snapshot
+            if (payloadBytes != null) {
+                ByteBuffer payload = ByteBuffer.wrap(payloadBytes);
+                nextTruncationNonce = Long.toString(payload.getLong());
+            }
         } catch (KeeperException.NoNodeException e) {}
         catch (Exception e) {
             HOST_LOG.error("Getting the nonce should never fail with anything other than no node", e);

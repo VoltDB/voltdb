@@ -7,9 +7,9 @@ the use and redistribution of VoltDB software.
 
 What is VoltDB?
 ====================
-VoltDB is an in-memory online transaction processing (OLTP) database
-designed from the ground up to be the fastest most scalable OLTP
-system in the world.
+VoltDB is a horizontally-scalable, in-memory SQL RDBMS designed for 
+applications that have extremely high read and write throughput 
+requirements.
 
 
 Getting Started
@@ -34,8 +34,8 @@ available online:
 
     http://community.voltdb.com/docs/GettingStarted/index
 
-Additional documentation on using VoltDB to build OLTP applications 
-is available from the VoltDB community site:
+Additional documentation on using VoltDB to build high performance
+applications is available from the VoltDB community site:
 
     http://community.voltdb.com/documentation/
 

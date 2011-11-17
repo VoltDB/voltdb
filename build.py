@@ -324,6 +324,9 @@ CTX.THIRD_PARTY_INPUT['json_spirit'] = """
 ###############################################################################
 
 whichtests = os.getenv("EETESTSUITE")
+if whichtests == None:
+    whichtests = "${eetestsuite}"
+
 # input format similar to source, but the executable name is listed
 if whichtests ==  "${eetestsuite}":
     CTX.TESTS['.'] = """

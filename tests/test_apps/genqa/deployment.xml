@@ -1,14 +1,8 @@
 <?xml version="1.0"?>
 <deployment>
     <cluster hostcount="1" sitesperhost="4" kfactor="0" />
-    <heartbeat timeout="10"/>
-    <admin-mode port="6667" adminstartup="false" />
-    <snapshot prefix="genqa" retain="3" frequency="600s"/>
-    <paths>
-        <voltdbroot path="/tmp/genqa" />
-    </paths>
-    <export enabled="true"/>
-    <httpd port="8080">
-        <jsonapi enabled="true"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
     </httpd>
+    <export enabled="true"/>
 </deployment>

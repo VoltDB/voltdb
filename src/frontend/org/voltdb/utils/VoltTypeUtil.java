@@ -249,6 +249,14 @@ public abstract class VoltTypeUtil {
             case STRING:
                 ret = value;
                 break;
+
+            case DECIMAL:
+            case VARBINARY:
+                if (value != null) {
+                    throw new RuntimeException("Only NULL default values for DECIMAL " +
+                            "and VARBINARY columns are supported right now");
+                }
+                break;
             // --------------------------------
             // TIMESTAMP
             // --------------------------------

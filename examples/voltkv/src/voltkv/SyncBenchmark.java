@@ -180,10 +180,13 @@ public class SyncBenchmark
             int minValueSize       = apph.intValue("min-value-size");
             int maxValueSize       = apph.intValue("max-value-size");
             boolean useCompression = apph.booleanValue("use-compression");
+            final String csv       = apph.stringValue("stats");
 
 
             // Validate parameters
-            apph.validate("threads", (threadCount > 0))
+            apph.validate("duration", (duration > 0))
+                .validate("display-interval", (displayInterval > 0))
+                .validate("threads", (threadCount > 0))
                 .validate("pool-size", (poolSize > 0))
                 .validate("get-put-ratio", (getPutRatio >= 0) && (getPutRatio <= 1))
                 .validate("key-size", (keySize > 0) && (keySize < 251))
@@ -197,24 +200,7 @@ public class SyncBenchmark
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Get a client connection - we retry for a while in case the server hasn't started yet
-            System.out.printf("Connecting to servers: %s at port: %d\n", servers, port);
-            int sleep = 1000;
-            while(true)
-            {
-                try
-                {
-                    Con = ClientConnectionPool.get(servers, port);
-                    break;
-                }
-                catch (Exception e)
-                {
-                    System.err.printf("Connection failed - retrying in %d second(s).\n", sleep/1000);
-                    try {Thread.sleep(sleep);} catch(Exception tie){}
-                    if (sleep < 8000)
-                        sleep += sleep;
-                }
-            }
-            System.out.println("Connected.  Starting benchmark.");
+            Con = ClientConnectionPool.getWithRetry(servers, port);
 
             // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
             final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, poolSize, useCompression);
@@ -314,6 +300,9 @@ public class SyncBenchmark
             + " Detailed Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
             System.out.print(Con.getStatistics().toString(false));
+
+            // Dump statistics to a CSV file
+            Con.saveStatistics(csv);
 
             Con.close();
 

@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.procedures;
+package genqa.procedures;
 
 import java.util.Random;
 
@@ -32,17 +32,18 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 
 @ProcInfo(
-    singlePartition = false
+    partitionInfo = "partitioned_table.rowid:0",
+    singlePartition = true
 )
 
-public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
-    public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM replicated_table WHERE rowid = ?");
-    public final SQLStmt insert = new SQLStmt("INSERT INTO replicated_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    public final SQLStmt update = new SQLStmt("UPDATE replicated_table SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_not_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
-    public final SQLStmt delete = new SQLStmt("DELETE FROM replicated_table WHERE rowid = ?");
-    public final SQLStmt export = new SQLStmt("INSERT INTO export_replicated_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
+    public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM partitioned_table WHERE rowid = ?");
+    public final SQLStmt insert = new SQLStmt("INSERT INTO partitioned_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    public final SQLStmt update = new SQLStmt("UPDATE partitioned_table SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_not_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
+    public final SQLStmt delete = new SQLStmt("DELETE FROM partitioned_table WHERE rowid = ?");
+    public final SQLStmt export = new SQLStmt("INSERT INTO export_partitioned_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    public VoltTable[] run(long rowid)
+    public VoltTable[] run(long rowid, long ignore)
     {
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = getSeededRandomNumberGenerator();
@@ -64,6 +65,7 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
                 VoltTableRow row = item.fetchRow(0);
                 voltQueueSQL(
                               export
+                            , getTransactionId()
                             , rowid
                             , row.get( 1, VoltType.TINYINT)
                             , row.get( 2, VoltType.TINYINT)
@@ -148,7 +150,7 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
                             );
         }
 
-        // Execute last SQL batch
+        // Execute last statement batch
         voltExecuteSQL(true);
 
         // Retun to caller

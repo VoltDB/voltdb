@@ -22,6 +22,7 @@
  */
 package voltcache.api;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -517,6 +518,15 @@ public class VoltCache implements IVoltCache
     public PerfCounter getStatistics(String... procedures)
     {
         return this.Connection.getStatistics(procedures);
+    }
+
+    /**
+     * Saves performance statistics to a file
+     * @param file The path to the file where statistics will be saved
+     */
+    public void saveStatistics(String file) throws IOException
+    {
+        this.Connection.saveStatistics(file);
     }
 
 }

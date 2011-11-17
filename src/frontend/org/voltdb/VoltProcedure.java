@@ -174,7 +174,7 @@ public abstract class VoltProcedure {
     private final SQLStmt m_batchQueryStmts[] = new SQLStmt[MAX_BATCH_SIZE];
     private int m_batchQueryStmtIndex = 0;
     private Object[] m_batchQueryArgs[];
-    private Expectation[] m_batchQueryExpectations = new Expectation[MAX_BATCH_SIZE];
+    private final Expectation[] m_batchQueryExpectations = new Expectation[MAX_BATCH_SIZE];
     private final long m_fragmentIds[] = new long[MAX_BATCH_SIZE];
     private final int m_expectedDeps[] = new int[MAX_BATCH_SIZE];
     private ParameterSet m_parameterSets[];
@@ -596,13 +596,11 @@ public abstract class VoltProcedure {
             // if a string is given for a date, use java's JDBC parsing
             if (pclass == String.class) {
                 try {
-                    java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf((String) param);
-                    long timeInMicroSecs = sqlTS.getTime() * 1000;
-                    timeInMicroSecs += sqlTS.getNanos() / 1000;
-                    return new TimestampType(timeInMicroSecs);
+                    return new TimestampType((String)param);
                 }
-                // ignore errors if it's not the right format
-                catch (IllegalArgumentException e) {}
+                catch (IllegalArgumentException e) {
+                    // ignore errors if it's not the right format
+                }
             }
         }
         if (slot == BigDecimal.class) {

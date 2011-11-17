@@ -38,11 +38,12 @@
  * VoltDB cluster with the number of servers required for your needs.
  */
 
-package voter;
+package genqa;
 
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.Random;
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
@@ -57,8 +58,7 @@ import org.voltdb.client.exampleutils.RateLimiter;
 public class AsyncBenchmark
 {
     // Initialize some common constants and variables
-    private static final String ContestantNamesCSV = "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway,Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster,Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
-    private static final AtomicLongArray VotingBoardResults = new AtomicLongArray(4);
+    private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
 
     // Reference to the database connection we will use
     private static ClientConnection Con;
@@ -79,8 +79,9 @@ public class AsyncBenchmark
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("contestants", "contestant_count", "Number of contestants in the voting contest (from 1 to 10).", 6)
-                .add("max-votes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
+                .add("pool-size", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
+                .add("procedure", "procedure_name", "Procedure to call.", "JiggleSinglePartition")
+                .add("wait", "wait_duration", "Wait duration (only when calling one of the Wait procedures), in milliseconds.", 0)
                 .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
@@ -88,23 +89,23 @@ public class AsyncBenchmark
             ;
 
             // Retrieve parameters
-            long displayInterval = apph.longValue("display-interval");
-            long duration        = apph.longValue("duration");
-            String servers       = apph.stringValue("servers");
-            int port             = apph.intValue("port");
-            int contestantCount  = apph.intValue("contestants");
-            int maxVoteCount     = apph.intValue("max-votes");
-            long rateLimit       = apph.longValue("rate-limit");
-            boolean autoTune     = apph.booleanValue("auto-tune");
-            double latencyTarget = apph.doubleValue("latency-target");
-            final String csv     = apph.stringValue("stats");
+            final long displayInterval = apph.longValue("display-interval");
+            final long duration        = apph.longValue("duration");
+            final String servers       = apph.stringValue("servers");
+            final int port             = apph.intValue("port");
+            final int poolSize         = apph.intValue("pool-size");
+            final String procedure     = apph.stringValue("procedure");
+            final long wait            = apph.intValue("wait");
+            final long rateLimit       = apph.longValue("rate-limit");
+            final boolean autoTune     = apph.booleanValue("auto-tune");
+            final double latencyTarget = apph.doubleValue("latency-target");
+            final String csv           = apph.stringValue("stats");
 
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("contestants", (contestantCount > 0))
-                .validate("max-votes", (maxVoteCount > 0))
+                .validate("pool-size", (duration > 0))
+                .validate("wait", (wait >= 0))
                 .validate("rate-limit", (rateLimit > 0))
                 .validate("latency-target", (latencyTarget > 0))
             ;
@@ -117,22 +118,16 @@ public class AsyncBenchmark
             // Get a client connection - we retry for a while in case the server hasn't started yet
             Con = ClientConnectionPool.getWithRetry(servers, port);
 
-            // Initialize the application
-            final int maxContestants = (int)Con.execute("Initialize", contestantCount, ContestantNamesCSV).getResults()[0].fetchRow(0).getLong(0);
-
-            // Get a Phone Call Generator that will simulate voter entries from the call center
-            PhoneCallGenerator switchboard = new PhoneCallGenerator(maxContestants);
-
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // Create a Timer task to display performance data on the Vote procedure
+            // Create a Timer task to display performance data on the procedure
             Timer timer = new Timer();
             timer.scheduleAtFixedRate(new TimerTask()
             {
                 @Override
                 public void run()
                 {
-                    System.out.print(Con.getStatistics("Vote"));
+                    System.out.print(Con.getStatistics(procedure));
                 }
             }
             , displayInterval*1000l
@@ -144,34 +139,31 @@ public class AsyncBenchmark
             // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
             IRateLimiter limiter = null;
             if (autoTune)
-                limiter = new LatencyLimiter(Con, "Vote", latencyTarget, rateLimit);
+                limiter = new LatencyLimiter(Con, procedure, latencyTarget, rateLimit);
             else
                 limiter = new RateLimiter(rateLimit);
 
             // Run the benchmark loop for the requested duration
             final long endTime = System.currentTimeMillis() + (1000l * duration);
+            Random rand = new Random();
             while (endTime > System.currentTimeMillis())
             {
-                // Get the next phone call
-                PhoneCallGenerator.PhoneCall call = switchboard.receive();
-
-                // Post the vote, asynchronously
+                // Post the request, asynchronously
                 Con.executeAsync(new ProcedureCallback()
                 {
                     @Override
                     public void clientCallback(ClientResponse response) throws Exception
                     {
-                        // Track the result of the vote (Accepted, Rejected, Failure...)
+                        // Track the result of the request (Success, Failure)
                         if (response.getStatus() == ClientResponse.SUCCESS)
-                            VotingBoardResults.incrementAndGet((int)response.getResults()[0].fetchRow(0).getLong(0));
+                            TrackingResults.incrementAndGet(0);
                         else
-                            VotingBoardResults.incrementAndGet(3);
+                            TrackingResults.incrementAndGet(1);
                     }
                 }
-                , "Vote"
-                , call.phoneNumber
-                , call.contestantNumber
-                , maxVoteCount
+                , procedure
+                , (long)rand.nextInt(poolSize)
+                , wait
                 );
 
                 // Use the limiter to throttle client activity
@@ -187,47 +179,27 @@ public class AsyncBenchmark
 
             // Now print application results:
 
-            // 1. Voting Board statistics, Voting results and performance statistics
+            // 1. Tracking statistics
             System.out.printf(
               "-------------------------------------------------------------------------------------\n"
-            + " Voting Results\n"
+            + " Benchmark Results\n"
             + "-------------------------------------------------------------------------------------\n\n"
-            + "A total of %d votes was received...\n"
-            + " - %,9d Accepted\n"
-            + " - %,9d Rejected (Invalid Contestant)\n"
-            + " - %,9d Rejected (Maximum Vote Count Reached)\n"
+            + "A total of %d calls was received...\n"
+            + " - %,9d Succeeded\n"
             + " - %,9d Failed (Transaction Error)\n"
             + "\n\n"
             + "-------------------------------------------------------------------------------------\n"
-            + "Contestant Name\t\tVotes Received\n"
-            , Con.getStatistics("Vote").getExecutionCount()
-            , VotingBoardResults.get(0)
-            , VotingBoardResults.get(1)
-            , VotingBoardResults.get(2)
-            , VotingBoardResults.get(3)
+            , TrackingResults.get(0)+TrackingResults.get(1)
+            , TrackingResults.get(0)
+            , TrackingResults.get(1)
             );
 
-            // 2. Voting results
-            VoltTable result = Con.execute("Results").getResults()[0];
-            String winner = "";
-            long winnerVoteCount = 0;
-            while(result.advanceRow())
-            {
-                if (result.getLong(2) > winnerVoteCount)
-                {
-                    winnerVoteCount = result.getLong(2);
-                    winner = result.getString(0);
-                }
-                System.out.printf("%s\t\t%,14d\n", result.getString(0), result.getLong(2));
-            }
-            System.out.printf("\n\nThe Winner is: %s\n-------------------------------------------------------------------------------------\n", winner);
-
-            // 3. Performance statistics (we only care about the Vote procedure that we're benchmarking)
+            // 3. Performance statistics (we only care about the procedure that we're benchmarking)
             System.out.println(
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics("Vote").toString(false));
+            System.out.print(Con.getStatistics(procedure).toString(false));
 
             // Dump statistics to a CSV file
             Con.saveStatistics(csv);
