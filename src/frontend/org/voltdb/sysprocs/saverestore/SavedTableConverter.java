@@ -35,6 +35,10 @@ public abstract class SavedTableConverter
 
     public static Boolean needsConversion(VoltTable inputTable,
                                           Table outputTableSchema) {
+        if (inputTable.getColumnCount() != outputTableSchema.getColumns().size()) {
+            System.out.println(outputTableSchema.getColumns().size());
+            return true;
+        }
         for (int ii = 0; ii < inputTable.getColumnCount(); ii++) {
             final String name = inputTable.getColumnName(ii);
             final VoltType type = inputTable.getColumnType(ii);
