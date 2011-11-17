@@ -41,6 +41,7 @@ import org.voltdb.utils.Pair;
 public class PartitionedTableSaveFileState extends TableSaveFileState
 {
     private static final VoltLogger LOG = new VoltLogger(PartitionedTableSaveFileState.class.getName());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public PartitionedTableSaveFileState(String tableName, long txnId)
     {
@@ -144,66 +145,112 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
     }
 
-    private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan()
-    {
+    private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan() {
         LOG.info("Partition set: " + m_partitionsSeen);
-        ArrayList<SynthesizedPlanFragment> restorePlan =
-            new ArrayList<SynthesizedPlanFragment>();
+        ArrayList<SynthesizedPlanFragment> restorePlan = new ArrayList<SynthesizedPlanFragment>();
         HashSet<Integer> coveredPartitions = new HashSet<Integer>();
-        Iterator<Integer> hosts = m_partitionsAtHost.keySet().iterator();
+
+        HashMap<Integer, ArrayList<Integer>> hostsToUncoveredPartitions = new HashMap<Integer, ArrayList<Integer>>();
+        HashMap<Integer, ArrayList<Integer>> hostsToOriginalHosts = new HashMap<Integer, ArrayList<Integer>>();
+
+        for (Integer host : m_partitionsAtHost.keySet()) {
+            hostsToUncoveredPartitions.put(host, new ArrayList<Integer>());
+            hostsToOriginalHosts.put(host, new ArrayList<Integer>());
+        }
+
+        /*
+         * Loop through the list of hosts repeatedly. Each time pick only one
+         * partition to distribute from each host. This ensures some load
+         * balancing.
+         */
         while (!coveredPartitions.containsAll(m_partitionsSeen)) {
-            if (!hosts.hasNext()) {
-                LOG.error("Ran out of hosts before covering all partitions with distributors");
-                return null;
-            }
+            Iterator<Integer> hosts = m_partitionsAtHost.keySet().iterator();
+            // Track if progress was made, if nothing to distribute
+            // was found and we aren't covering then it is missing partitions
+            int numPartitionsUsed = 0;
+            while (hosts.hasNext()) {
+                /**
+                 * Get the list of partitions on this host and remove all that
+                 * were covered already
+                 */
+                Integer nextHost = hosts.next();
+                Set<Pair<Integer, Integer>> partitionsAndOrigHosts = new HashSet<Pair<Integer, Integer>>(
+                        m_partitionsAtHost.get(nextHost));
+                Iterator<Pair<Integer, Integer>> removeCoveredIterator = partitionsAndOrigHosts
+                        .iterator();
 
-            /**
-             * Get the list of partitions on this host and remove all that were covered
-             */
-            Integer nextHost = hosts.next();
-            Set<Pair<Integer, Integer>> partitionsAndOrigHosts =
-                new HashSet<Pair<Integer, Integer>>(m_partitionsAtHost.get(nextHost));
-            Iterator<Pair<Integer, Integer>> removeCoveredIterator = partitionsAndOrigHosts.iterator();
+                List<Integer> uncoveredPartitionsAtHostList = hostsToUncoveredPartitions
+                        .get(nextHost);
+                ArrayList<Integer> originalHosts = hostsToOriginalHosts
+                        .get(nextHost);
+                while (removeCoveredIterator.hasNext()) {
+                    Pair<Integer, Integer> p = removeCoveredIterator.next();
+                    if (coveredPartitions.contains(p.getFirst())) {
+                        removeCoveredIterator.remove();
+                    }
+                }
 
-            List<Integer> uncoveredPartitionsAtHostList = new ArrayList<Integer>();
-            HashSet<Integer> originalHosts = new HashSet<Integer>();
-            while (removeCoveredIterator.hasNext()) {
-                Pair<Integer, Integer> p = removeCoveredIterator.next();
-                if (coveredPartitions.contains(p.getFirst())) {
-                    removeCoveredIterator.remove();
-                } else {
+                /*
+                 * If there is a partition left that isn't covered select it for
+                 * distribution
+                 */
+                Iterator<Pair<Integer, Integer>> candidatePartitions = partitionsAndOrigHosts
+                        .iterator();
+                if (candidatePartitions.hasNext()) {
+                    Pair<Integer, Integer> p = candidatePartitions.next();
                     coveredPartitions.add(p.getFirst());
                     uncoveredPartitionsAtHostList.add(p.getFirst());
                     originalHosts.add(p.getSecond());
+                    numPartitionsUsed++;
                 }
             }
+            if (numPartitionsUsed == 0
+                    && !coveredPartitions.containsAll(m_partitionsSeen)) {
+                LOG.error("Could not find a host to distribute some partitions");
+                return null;
+            }
+        }
 
-            List<Integer> sitesAtHost =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLiveExecutionSitesForHost(nextHost);
+        hostLog.info("Distribution plan for table " + getTableName());
+        for (Integer host : m_partitionsAtHost.keySet()) {
+            List<Integer> uncoveredPartitionsAtHostList = hostsToUncoveredPartitions
+                    .get(host);
+            ArrayList<Integer> originalHosts = hostsToOriginalHosts.get(host);
+
+            List<Integer> sitesAtHost = VoltDB.instance().getCatalogContext().siteTracker
+                    .getLiveExecutionSitesForHost(host);
 
             int originalHostsArray[] = new int[originalHosts.size()];
             int qq = 0;
-            for (int originalHostId : originalHosts) originalHostsArray[qq++] = originalHostId;
-            int uncoveredPartitionsAtHost[] = new int[uncoveredPartitionsAtHostList.size()];
+            for (int originalHostId : originalHosts)
+                originalHostsArray[qq++] = originalHostId;
+            int uncoveredPartitionsAtHost[] = new int[uncoveredPartitionsAtHostList
+                    .size()];
             for (int ii = 0; ii < uncoveredPartitionsAtHostList.size(); ii++) {
-                uncoveredPartitionsAtHost[ii] = uncoveredPartitionsAtHostList.get(ii);
+                uncoveredPartitionsAtHost[ii] = uncoveredPartitionsAtHostList
+                        .get(ii);
             }
 
+            StringBuilder sb = new StringBuilder();
+            sb.append("\tHost ").append(host)
+                    .append(" will distribute partitions ");
+            for (Integer partition : uncoveredPartitionsAtHostList) {
+                sb.append(partition).append(' ');
+            }
+            hostLog.info(sb.toString());
+
             /*
-             * Assigning the FULL
-             * workload to each site. At the actual host
+             * Assigning the FULL workload to each site. At the actual host
              * static synchronization in the procedure will ensure the work is
              * distributed across every ES in a meaningful way.
              */
             for (Integer site : sitesAtHost) {
                 restorePlan.add(constructDistributePartitionedTableFragment(
-                        site,
-                        uncoveredPartitionsAtHost,
-                        originalHostsArray));
+                        site, uncoveredPartitionsAtHost, originalHostsArray));
             }
         }
-        restorePlan.add(constructDistributePartitionedTableAggregatorFragment());
+        restorePlan
+                .add(constructDistributePartitionedTableAggregatorFragment());
         return restorePlan.toArray(new SynthesizedPlanFragment[0]);
     }
 
