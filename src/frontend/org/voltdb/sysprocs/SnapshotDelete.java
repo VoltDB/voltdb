@@ -70,7 +70,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, final ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        //String hostname = ConnectionUtil.getHostnameOrAddress();
         errorString = null;
         VoltTable result = constructFragmentResultsTable();
         if (fragmentId == SysProcFragmentId.PF_snapshotDelete)
