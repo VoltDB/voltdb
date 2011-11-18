@@ -981,7 +981,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertNotNull(statusResults);
         assertEquals( 1, statusResults.length);
         assertEquals( 14, statusResults[0].getColumnCount());
-        assertEquals( 7, statusResults[0].getRowCount());
+        assertEquals( 8, statusResults[0].getRowCount());
         assertTrue(statusResults[0].advanceRow());
         assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
         assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
@@ -1165,7 +1165,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             results = client.callProcedure("@SnapshotStatus").getResults();
             assertTrue(results[0].advanceRow());
             assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
-            assertEquals( 7, results[0].getRowCount());
+            assertEquals( 8, results[0].getRowCount());
         }
         catch (Exception ex)
         {
@@ -1597,14 +1597,18 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable change_table =
             new VoltTable(new ColumnInfo("ID", VoltType.INTEGER),
                           new ColumnInfo("BYEBYE", VoltType.INTEGER));
-
+        VoltTable eng_2025_table =
+            new VoltTable(new ColumnInfo("key", VoltType.STRING),
+                    new ColumnInfo("value", VoltType.VARBINARY));
         for (int i = 0; i < 10; i++)
         {
             Object[] row = new Object[] {i, i};
             change_table.addRow(row);
+            eng_2025_table.addRow(new Object[] {Integer.toString(i), new byte[64]});
         }
 
         loadTable(client, "CHANGE_COLUMNS", change_table);
+        loadTable(client, "ENG_2025", eng_2025_table);
 
         VoltTable[] results = null;
         results = saveTables(client);
