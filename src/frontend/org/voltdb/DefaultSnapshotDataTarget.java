@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.CountDownLatch;
 import java.util.zip.CRC32;
 
 import org.voltdb.client.ConnectionUtil;
@@ -42,8 +43,13 @@ import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.json_voltpatches.JSONStringer;
 
+
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
+    /*
+     * Make it possible for test code to block a write and thus snapshot completion
+     */
+    public static volatile CountDownLatch m_simulateBlockedWrite = null;
     public static volatile boolean m_simulateFullDiskWritingHeader = false;
     public static volatile boolean m_simulateFullDiskWritingChunk = false;
 
@@ -302,6 +308,9 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     if (m_acceptOneWrite) {
                         m_acceptOneWrite = false;
                     } else {
+                        if (m_simulateBlockedWrite != null) {
+                            m_simulateBlockedWrite.await();
+                        }
                         if (m_simulateFullDiskWritingChunk) {
                             throw new IOException("Disk full");
                         }

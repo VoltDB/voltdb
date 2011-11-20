@@ -1,0 +1,14 @@
+Quick hacky description on running the long-running export test.
+
+- Build everything:
+./run.sh catalog
+
+- You'll need 4(four) terminals:
+-- In 1, run the server:
+./run.sh server
+-- In 2, run the export client:
+./run.sh export
+-- In 3, start the app client:
+./run.sh async-export
+-- In 4, start the verifier:
+./run.sh export-verify

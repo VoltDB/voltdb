@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.procedures;
+package genqa2.procedures;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

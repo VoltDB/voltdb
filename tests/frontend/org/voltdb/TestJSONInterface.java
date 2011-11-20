@@ -232,7 +232,7 @@ public class TestJSONInterface extends TestCase {
         JSONArray resultsJson = jsonObj.getJSONArray("results");
         response.results = new VoltTable[resultsJson.length()];
         for (int i = 0; i < response.results.length; i++) {
-            JSONObject tableJson = resultsJson.getJSONObject(0);
+            JSONObject tableJson = resultsJson.getJSONObject(i);
             response.results[i] =  VoltTable.fromJSONObject(tableJson);
         }
         if (jsonObj.isNull("status") == false)
@@ -316,7 +316,7 @@ public class TestJSONInterface extends TestCase {
         // check the JSON itself makes sense
         JSONObject jsonObj = new JSONObject(responseJSON);
         JSONArray results = jsonObj.getJSONArray("results");
-        assertEquals(3, response.results.length);
+        assertEquals(4, response.results.length);
         JSONObject table = results.getJSONObject(0);
         JSONArray data = table.getJSONArray("data");
         assertEquals(1, data.length());
@@ -327,6 +327,7 @@ public class TestJSONInterface extends TestCase {
 
         // try to pass a string as a date
         java.sql.Timestamp ts = new java.sql.Timestamp(System.currentTimeMillis());
+        ts.setNanos(123456789);
         pset.setParameters(1,
                 5,
                 new double[] { 1.5, 6.0, 4 },
@@ -339,6 +340,9 @@ public class TestJSONInterface extends TestCase {
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
+        response.results[3].advanceRow();
+        System.out.println(response.results[3].getTimestampAsTimestamp(0).getTime());
+        assertEquals(123456, response.results[3].getTimestampAsTimestamp(0).getTime() % 1000000);
 
         // now try a null short value sent as a int  (param expects short)
         pset.setParameters(1,

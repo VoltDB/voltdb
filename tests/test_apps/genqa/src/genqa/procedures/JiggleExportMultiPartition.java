@@ -20,24 +20,22 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.procedures;
+package genqa.procedures;
 
 import java.util.Random;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
 @ProcInfo(
-    partitionInfo = "export_partitioned_table.rowid:0",
-    singlePartition = true
+    singlePartition = false
 )
 
-public class JiggleExportSinglePartition extends VoltProcedure {
-    public final SQLStmt insert = new SQLStmt("INSERT INTO export_partitioned_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+public class JiggleExportMultiPartition extends VoltProcedure {
+    public final SQLStmt insert = new SQLStmt("INSERT INTO export_replicated_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    public VoltTable[] run(long rowid)
+    public long run(long rowid, long ignore)
     {
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = getSeededRandomNumberGenerator();
@@ -46,6 +44,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
         SampleRecord record = new SampleRecord(rowid, rand);
         voltQueueSQL(
                       insert
+                    , getTransactionId()
                     , rowid
                     , record.rowid_group
                     , record.type_null_tinyint
@@ -74,6 +73,6 @@ public class JiggleExportSinglePartition extends VoltProcedure {
         voltExecuteSQL(true);
 
         // Retun to caller
-        return null;
+        return getTransactionId();
     }
 }

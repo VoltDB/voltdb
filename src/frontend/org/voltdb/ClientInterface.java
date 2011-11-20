@@ -1099,6 +1099,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 //So that the modified version is reserialized, null out the lazy copy
                 task.unserializedParams = null;
+            } else if (task.procName.equals("@SnapshotSave")) {
+                m_snapshotDaemon.requestUserSnapshot(task, c);
+                return;
             }
         }
 

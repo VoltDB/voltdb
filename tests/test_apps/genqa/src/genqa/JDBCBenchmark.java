@@ -32,7 +32,7 @@
  * blazing speeds when many clients are connected to it.
  */
 
-package voter;
+package genqa;
 
 import java.sql.CallableStatement;
 import java.sql.Connection;
@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.Random;
 
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.jdbc.IVoltDBConnection;
@@ -49,8 +50,7 @@ import org.voltdb.jdbc.IVoltDBConnection;
 public class JDBCBenchmark
 {
     // Initialize some common constants and variables
-    private static final String ContestantNamesCSV = "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway,Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster,Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
-    private static final AtomicLongArray VotingBoardResults = new AtomicLongArray(4);
+    private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
 
     // Reference to the database connection we will use in them main thread
     private static Connection Con;
@@ -60,39 +60,41 @@ public class JDBCBenchmark
     {
         private final String url;
         private final long duration;
-        private final PhoneCallGenerator switchboard;
-        private final int maxVoteCount;
-        public ClientThread(String url, PhoneCallGenerator switchboard, long duration, int maxVoteCount) throws Exception
+        private final String procedure;
+        private final Random rand = new Random();
+        private final int poolSize;
+        private final long wait;
+        public ClientThread(String url, String procedure, int poolSize, long wait, long duration) throws Exception
         {
             this.url = url;
             this.duration = duration;
-            this.switchboard = switchboard;
-            this.maxVoteCount = maxVoteCount;
+            this.procedure = procedure;
+            this.poolSize = poolSize;
+            this.wait = wait;
         }
 
         @Override
         public void run()
         {
-            // Each thread gets its dedicated JDBC connection, and posts votes against it.
+            // Each thread gets its dedicated connection, and posts requests against it.
             Connection con = null;
             try
             {
                 con = DriverManager.getConnection(url, "", "");
-                final CallableStatement voteCS = con.prepareCall("{call Vote(?,?,?)}");
+                final CallableStatement procedureCS = con.prepareCall("{call " + procedure + "(?,?)}");
                 long endTime = System.currentTimeMillis() + (1000l * this.duration);
                 while (endTime > System.currentTimeMillis())
                 {
-                    PhoneCallGenerator.PhoneCall call = this.switchboard.receive();
-                    voteCS.setLong(1, call.phoneNumber);
-                    voteCS.setInt(2, call.contestantNumber);
-                    voteCS.setLong(3, this.maxVoteCount);
+                    procedureCS.setLong(1, (long)rand.nextInt(this.poolSize));
+                    procedureCS.setLong(2, this.wait);
                     try
                     {
-                        VotingBoardResults.incrementAndGet(voteCS.executeUpdate());
+                        procedureCS.executeUpdate();
+                        TrackingResults.incrementAndGet(0);
                     }
                     catch(Exception x)
                     {
-                        VotingBoardResults.incrementAndGet(3);
+                        TrackingResults.incrementAndGet(1);
                     }
                 }
             }
@@ -125,27 +127,28 @@ public class JDBCBenchmark
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("contestants", "contestant_count", "Number of contestants in the voting contest (from 1 to 10).", 6)
-                .add("max-votes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
+                .add("pool-size", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
+                .add("procedure", "procedure_name", "Procedure to call.", "JiggleSinglePartition")
+                .add("wait", "wait_duration", "Wait duration (only when calling one of the Wait procedures), in milliseconds.", 0)
                 .setArguments(args)
             ;
 
             // Retrieve parameters
-            int threadCount      = apph.intValue("threads");
-            long displayInterval = apph.longValue("display-interval");
-            long duration        = apph.longValue("duration");
-            String servers       = apph.stringValue("servers");
-            int port             = apph.intValue("port");
-            int contestantCount  = apph.intValue("contestants");
-            int maxVoteCount     = apph.intValue("max-votes");
-            final String csv     = apph.stringValue("stats");
+            final int threadCount      = apph.intValue("threads");
+            final long displayInterval = apph.longValue("display-interval");
+            final long duration        = apph.longValue("duration");
+            final String servers       = apph.stringValue("servers");
+            final int port             = apph.intValue("port");
+            final int poolSize         = apph.intValue("pool-size");
+            final String procedure     = apph.stringValue("procedure");
+            final long wait            = apph.intValue("wait");
+            final String csv           = apph.stringValue("stats");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
                 .validate("threads", (threadCount > 0))
-                .validate("contestants", (contestantCount > 0))
-                .validate("max-votes", (maxVoteCount > 0))
+                .validate("pool-size", (poolSize > 0))
+                .validate("wait", (wait >= 0))
             ;
 
             // Display actual parameters, for reference
@@ -179,25 +182,16 @@ public class JDBCBenchmark
             }
             System.out.println("Connected.  Starting benchmark.");
 
-            // Initialize the application
-            final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?)}");
-            initializeCS.setInt(1, contestantCount);
-            initializeCS.setString(2, ContestantNamesCSV);
-            final int maxContestants = initializeCS.executeUpdate();
-
-            // Get a Phone Call Generator that will simulate voter entries from the call center
-            PhoneCallGenerator switchboard = new PhoneCallGenerator(maxContestants);
-
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // Create a Timer task to display performance data on the Vote procedure
+            // Create a Timer task to display performance data on the procedure
             Timer timer = new Timer();
             timer.scheduleAtFixedRate(new TimerTask()
             {
                 @Override
                 public void run()
                 {
-                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Vote")); } catch(Exception x) {}
+                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics(procedure)); } catch(Exception x) {}
                 }
             }
             , displayInterval*1000l
@@ -209,7 +203,7 @@ public class JDBCBenchmark
             // Create multiple processing threads
             ArrayList<Thread> threads = new ArrayList<Thread>();
             for (int i = 0; i < threadCount; i++)
-                threads.add(new Thread(new ClientThread(url, switchboard, duration, maxVoteCount)));
+                threads.add(new Thread(new ClientThread(url, procedure, poolSize, wait, duration)));
 
             // Start threads
             for (Thread thread : threads)
@@ -228,48 +222,27 @@ public class JDBCBenchmark
 
             // Now print application results:
 
-            // 1. Voting Board statistics, Voting results and performance statistics
+            // 1. Tracking statistics
             System.out.printf(
               "-------------------------------------------------------------------------------------\n"
-            + " Voting Results\n"
+            + " Benchmark Results\n"
             + "-------------------------------------------------------------------------------------\n\n"
-            + "A total of %d votes was received...\n"
-            + " - %,9d Accepted\n"
-            + " - %,9d Rejected (Invalid Contestant)\n"
-            + " - %,9d Rejected (Maximum Vote Count Reached)\n"
+            + "A total of %d calls was received...\n"
+            + " - %,9d Succeeded\n"
             + " - %,9d Failed (Transaction Error)\n"
             + "\n\n"
             + "-------------------------------------------------------------------------------------\n"
-            + "Contestant Name\t\tVotes Received\n"
-            , Con.unwrap(IVoltDBConnection.class).getStatistics("Vote").getExecutionCount()
-            , VotingBoardResults.get(0)
-            , VotingBoardResults.get(1)
-            , VotingBoardResults.get(2)
-            , VotingBoardResults.get(3)
+            , TrackingResults.get(0)+TrackingResults.get(1)
+            , TrackingResults.get(0)
+            , TrackingResults.get(1)
             );
 
-            // 2. Voting results
-            final CallableStatement resultsCS = Con.prepareCall("{call Results}");
-            ResultSet result = resultsCS.executeQuery();
-            String winner = "";
-            long winnerVoteCount = 0;
-            while (result.next())
-            {
-                if (result.getLong(3) > winnerVoteCount)
-                {
-                    winnerVoteCount = result.getLong(3);
-                    winner = result.getString(1);
-                }
-                System.out.printf("%s\t\t%,14d\n", result.getString(1), result.getLong(3));
-            }
-            System.out.printf("\n\nThe Winner is: %s\n-------------------------------------------------------------------------------------\n", winner);
-
-            // 3. Performance statistics (we only care about the Vote procedure that we're benchmarking)
+            // 3. Performance statistics (we only care about the procedure that we're benchmarking)
             System.out.println(
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Vote").toString(false));
+            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics(procedure).toString(false));
 
             // Dump statistics to a CSV file
             Con.unwrap(IVoltDBConnection.class).saveStatistics(csv);
