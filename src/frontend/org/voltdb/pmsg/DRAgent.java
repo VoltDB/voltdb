@@ -1966,6 +1966,10 @@ public final class DRAgent {
     // optional string hostname = 1;
     boolean hasHostname();
     String getHostname();
+    
+    // optional int32 drport = 2;
+    boolean hasDrport();
+    int getDrport();
   }
   public static final class NodeInfo extends
       com.google.protobuf.GeneratedMessage
@@ -2028,8 +2032,19 @@ public final class DRAgent {
       }
     }
     
+    // optional int32 drport = 2;
+    public static final int DRPORT_FIELD_NUMBER = 2;
+    private int drport_;
+    public boolean hasDrport() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    public int getDrport() {
+      return drport_;
+    }
+    
     private void initFields() {
       hostname_ = "";
+      drport_ = 0;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -2046,6 +2061,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000001) == 0x00000001)) {
         output.writeBytes(1, getHostnameBytes());
       }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeInt32(2, drport_);
+      }
       getUnknownFields().writeTo(output);
     }
     
@@ -2058,6 +2076,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000001) == 0x00000001)) {
         size += com.google.protobuf.CodedOutputStream
           .computeBytesSize(1, getHostnameBytes());
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(2, drport_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -2185,6 +2207,8 @@ public final class DRAgent {
         super.clear();
         hostname_ = "";
         bitField0_ = (bitField0_ & ~0x00000001);
+        drport_ = 0;
+        bitField0_ = (bitField0_ & ~0x00000002);
         return this;
       }
       
@@ -2227,6 +2251,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000001;
         }
         result.hostname_ = hostname_;
+        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+          to_bitField0_ |= 0x00000002;
+        }
+        result.drport_ = drport_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -2245,6 +2273,9 @@ public final class DRAgent {
         if (other == org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance()) return this;
         if (other.hasHostname()) {
           setHostname(other.getHostname());
+        }
+        if (other.hasDrport()) {
+          setDrport(other.getDrport());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -2280,6 +2311,11 @@ public final class DRAgent {
             case 10: {
               bitField0_ |= 0x00000001;
               hostname_ = input.readBytes();
+              break;
+            }
+            case 16: {
+              bitField0_ |= 0x00000002;
+              drport_ = input.readInt32();
               break;
             }
           }
@@ -2322,6 +2358,27 @@ public final class DRAgent {
         bitField0_ |= 0x00000001;
         hostname_ = value;
         onChanged();
+      }
+      
+      // optional int32 drport = 2;
+      private int drport_ ;
+      public boolean hasDrport() {
+        return ((bitField0_ & 0x00000002) == 0x00000002);
+      }
+      public int getDrport() {
+        return drport_;
+      }
+      public Builder setDrport(int value) {
+        bitField0_ |= 0x00000002;
+        drport_ = value;
+        onChanged();
+        return this;
+      }
+      public Builder clearDrport() {
+        bitField0_ = (bitField0_ & ~0x00000002);
+        drport_ = 0;
+        onChanged();
+        return this;
       }
       
       // @@protoc_insertion_point(builder_scope:pmsg.NodeInfo)
@@ -4012,19 +4069,19 @@ public final class DRAgent {
       "\013partitionId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n" +
       "\005Pause\022\023\n\013partitionId\030\001 \001(\005\"X\n\010Response\022" +
       " \n\010nodeInfo\030\001 \003(\0132\016.pmsg.NodeInfo\022*\n\rpar" +
-      "titionInfo\030\002 \003(\0132\023.pmsg.PartitionInfo\"\034\n" +
-      "\010NodeInfo\022\020\n\010hostname\030\001 \001(\t\"\250\001\n\rPartitio" +
-      "nInfo\022\023\n\013partitionId\030\001 \001(\005\022\027\n\017oldestTime" +
-      "stamp\030\002 \001(\006\022\031\n\021lastSentTimestamp\030\003 \001(\006\022\036" +
-      "\n\026outstandingBufferCount\030\004 \001(\003\022\034\n\024outsta",
-      "ndingByteCount\030\005 \001(\003\022\020\n\010isPaused\030\006 \001(\010\"\347" +
-      "\001\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.Ctr" +
-      "lEnvelope.Type\022\026\n\003ack\030\002 \001(\0132\t.pmsg.Ack\022\032" +
-      "\n\005reset\030\003 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\004 \001(" +
-      "\0132\013.pmsg.Pause\022 \n\010response\030\005 \001(\0132\016.pmsg." +
-      "Response\">\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005" +
-      "PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005B\032\n\017org." +
-      "voltdb.pmsgB\007DRAgent"
+      "titionInfo\030\002 \003(\0132\023.pmsg.PartitionInfo\",\n" +
+      "\010NodeInfo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 " +
+      "\001(\005\"\250\001\n\rPartitionInfo\022\023\n\013partitionId\030\001 \001" +
+      "(\005\022\027\n\017oldestTimestamp\030\002 \001(\006\022\031\n\021lastSentT" +
+      "imestamp\030\003 \001(\006\022\036\n\026outstandingBufferCount",
+      "\030\004 \001(\003\022\034\n\024outstandingByteCount\030\005 \001(\003\022\020\n\010" +
+      "isPaused\030\006 \001(\010\"\347\001\n\014CtrlEnvelope\022%\n\004type\030" +
+      "\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\003ack\030\002 " +
+      "\001(\0132\t.pmsg.Ack\022\032\n\005reset\030\003 \001(\0132\013.pmsg.Res" +
+      "et\022\032\n\005pause\030\004 \001(\0132\013.pmsg.Pause\022 \n\010respon" +
+      "se\030\005 \001(\0132\016.pmsg.Response\">\n\004Type\022\007\n\003ACK\020" +
+      "\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RE" +
+      "SPONSE\020\005B\032\n\017org.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -4068,7 +4125,7 @@ public final class DRAgent {
           internal_static_pmsg_NodeInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_NodeInfo_descriptor,
-              new java.lang.String[] { "Hostname", },
+              new java.lang.String[] { "Hostname", "Drport", },
               org.voltdb.pmsg.DRAgent.NodeInfo.class,
               org.voltdb.pmsg.DRAgent.NodeInfo.Builder.class);
           internal_static_pmsg_PartitionInfo_descriptor =

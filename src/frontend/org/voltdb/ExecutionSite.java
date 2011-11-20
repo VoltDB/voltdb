@@ -405,6 +405,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
 
                 m_transactionQueue.shutdown();
+                m_partitionDRGateway.shutdown();
 
                 if (hsql != null) {
                     hsql.shutdown();

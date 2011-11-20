@@ -42,6 +42,7 @@ public class VoltDB {
     public static final int DEFAULT_INTERNAL_PORT = 3021;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
+    public static final int DEFAULT_DR_PORT = 5555;
 
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
@@ -162,6 +163,8 @@ public class VoltDB {
 
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
+
+        public int m_drAgentPortStart = DEFAULT_DR_PORT;
 
         public Configuration() { }
 
@@ -302,6 +305,11 @@ public class VoltDB {
                     usage();
                     System.exit(-1);
                 }
+            }
+
+            // set the dr agent's port config from properties
+            if (System.getenv().containsKey("dragentportoffset")) {
+                m_drAgentPortStart = Integer.parseInt(System.getenv("dragentportoffset"));
             }
         }
 

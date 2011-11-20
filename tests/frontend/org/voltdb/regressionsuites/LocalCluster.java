@@ -36,6 +36,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.OperationMode;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -111,6 +112,7 @@ public class LocalCluster implements VoltServerConfig {
     private final boolean m_isRejoinTest;
 
     private int m_voltStartCmdOffset;
+    private int m_voltStartModeOffset;
 
 
     /* class pipes a process's output to a file name.
@@ -323,28 +325,30 @@ public class LocalCluster implements VoltServerConfig {
                                            "rejoinhost",
                                            "-1",
                                            "leader",
-                                           "localhost");
+                                           "localhost",
+                                           "");
 
         List<String> command = m_procBuilder.command();
         // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = command.size() - 21;
-        m_debugOffset2 = command.size() - 20;
+        m_debugOffset1 = command.size() - 22;
+        m_debugOffset2 = command.size() - 21;
         if (m_debug) {
             command.add(m_debugOffset1, "");
             command.add(m_debugOffset1, "");
         }
 
-        m_voltFilePrefixOffset = command.size() - 21;
+        m_voltFilePrefixOffset = command.size() - 22;
         command.add(m_voltFilePrefixOffset, "");
 
-        m_licensePathOffset = command.size() - 17;
-        m_zkPortOffset = command.size() - 15;
-        m_timestampSaltOffset = command.size() - 13;
-        m_pathToDeploymentOffset = command.size() - 9;
-        m_portOffset = command.size() - 7;
-        m_adminPortOffset = command.size() - 5;
-        m_voltStartCmdOffset = command.size() - 4;
-        m_rejoinOffset = command.size() - 3;
+        m_licensePathOffset = command.size() - 18;
+        m_zkPortOffset = command.size() - 16;
+        m_timestampSaltOffset = command.size() - 14;
+        m_pathToDeploymentOffset = command.size() - 10;
+        m_portOffset = command.size() - 8;
+        m_adminPortOffset = command.size() - 6;
+        m_voltStartCmdOffset = command.size() - 5;
+        m_rejoinOffset = command.size() - 4;
+        m_voltStartModeOffset = command.size() - 1;
 
         if (m_target.isIPC) {
             command.add("");
@@ -423,6 +427,10 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
+        startUp(clearLocalDataDirectories, OperationMode.RUNNING);
+    }
+
+    public void startUp(boolean clearLocalDataDirectories, OperationMode startMode) {
         assert (!m_running);
         if (m_running) {
             return;
@@ -481,6 +489,7 @@ public class LocalCluster implements VoltServerConfig {
             config.m_port = VoltDB.DEFAULT_PORT;
             config.m_adminPort = m_baseAdminPort;
             config.m_startAction = START_ACTION.CREATE;
+            config.m_startMode = startMode;
             ArrayList<Integer> ports = new ArrayList<Integer>();
             for (EEProcess proc : m_eeProcs.get(0)) {
                 ports.add(proc.port());
@@ -495,7 +504,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories);
+            startOne(i, clearLocalDataDirectories, startMode.toString().toLowerCase());
         }
 
         // spin until all the pipes see the magic "Server completed.." string.
@@ -566,14 +575,20 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories) {
+    private void startOne(int hostId, boolean clearLocalDataDirectories, String startMode) {
         try {
+            // set the dragent's port offset
+            m_procBuilder.environment().put("dragentportoffset",
+                    String.valueOf(VoltDB.DEFAULT_DR_PORT + hostId * 2));
+
             // voltdb client/native ports move forward from 21212
             m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
             // voltdb admin-mode ports move backwards from 21211
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_voltStartCmdOffset, "create");
+            if (startMode != null)
+                m_procBuilder.command().set(m_voltStartModeOffset, startMode);
             m_procBuilder.command().set(m_rejoinOffset, "");
             m_procBuilder.command().set(m_licensePathOffset, ServerThread.getTestLicensePath());
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));

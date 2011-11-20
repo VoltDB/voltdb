@@ -81,6 +81,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         //where we aren't the coordinator because we are a replica of the coordinator.
         if (notice instanceof InitiateTaskMessage)
         {
+            // keep this around for DR/WAN purposes
+            m_invocation = ((InitiateTaskMessage) notice).getStoredProcedureInvocation();
+
             if (notice.getCoordinatorSiteId() == m_siteId) {
                 m_isCoordinator = true;
                 m_task = (InitiateTaskMessage) notice;
@@ -97,9 +100,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
                 m_task = null;
             }
-
-            // keep this around for DR/WAN purposes
-            m_invocation = m_task.getStoredProcedureInvocation();
         } else {
             m_task = null;
             m_durabilityFlag = null;

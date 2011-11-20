@@ -26,6 +26,7 @@ message Response {
 
 message NodeInfo {
     optional string hostname = 1;
+    optional int32 drport = 2;
 }
 
 message PartitionInfo {

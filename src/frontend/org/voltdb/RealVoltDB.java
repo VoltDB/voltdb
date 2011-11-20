@@ -651,6 +651,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         localMetadata += ":" + Integer.valueOf(m_config.m_port);
         localMetadata += ":" + Integer.valueOf(m_config.m_adminPort);
         localMetadata += ":" + Integer.valueOf(m_config.m_httpPort); // json
+        localMetadata += ":" + Integer.valueOf(m_config.m_drAgentPortStart);
         // possibly atomic swap from null to realz
         m_localMetadata = localMetadata;
     }
@@ -1703,7 +1704,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     /**
      * Metadata is currently of the format:
-     * IP:CIENTPORT:ADMINPORT:HTTPPORT]
+     * IP:CIENTPORT:ADMINPORT:HTTPPORT:DRPORT]
      */
     @Override
     public String getLocalMetadata() {

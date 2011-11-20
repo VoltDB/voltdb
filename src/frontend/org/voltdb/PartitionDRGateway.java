@@ -65,5 +65,6 @@ public class PartitionDRGateway {
     protected void init(int partitionId) {}
     public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
     public void tick(long txnId) {}
+    public void shutdown() {}
 
 }
