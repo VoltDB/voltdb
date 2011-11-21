@@ -95,6 +95,7 @@ public class TestFailuresSuite extends RegressionSuite {
                 client.callProcedure(callback, "ENG1850.insert", cid++, aid, pid, (pid+aid));
             }
         } while (cid < 1000);
+
         client.drain();
 
         VoltTable r1 = client.callProcedure("@AdHoc", "select count(*) from ENG1850;").getResults()[0];
@@ -116,6 +117,33 @@ public class TestFailuresSuite extends RegressionSuite {
         VoltTable r5 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid limit 1").getResults()[0];
         System.out.println("r5\n" + r5);
         assertEquals(1, r5.getRowCount());
+
+    }
+
+    public void testTicketEng1850_WhereOrderBy2() throws Exception
+    {
+        System.out.println("STARTING testTIcketEng1850_WhereOrderBy2");
+
+        // verify that selecting * where pid = 2 order by pid, aid gets the right number
+        // of tuples when <pid, null> exists in the relation (as this would be the first
+        // key found by moveToKeyOrGreater - verify this key is added to the output if
+        // it really exists
+
+        Client client = getClient();
+        // insert (cid, aid, pid, attr)
+        client.callProcedure("ENG1850.insert", 1, null, 2, 0);
+        client.callProcedure("ENG1850.insert", 2, 1, 2, 0);
+        client.callProcedure("ENG1850.insert", 3, 2, 2, 0);
+        client.callProcedure("ENG1850.insert", 4, 3, 3, 0);
+
+        VoltTable r1 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid").getResults()[0];
+        System.out.println(r1);
+        assertEquals(3, r1.getRowCount());
+
+        VoltTable r2 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by aid, pid").getResults()[0];
+        System.out.println(r2);
+        assertEquals(3, r2.getRowCount());
+
 
     }
 

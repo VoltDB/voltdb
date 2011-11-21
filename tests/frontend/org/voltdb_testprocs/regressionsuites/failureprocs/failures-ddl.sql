@@ -74,10 +74,10 @@ CREATE TABLE BAD_COMPARES (
 
 CREATE TABLE ENG1850 (
   cid int not null,
-  aid int not null,
+  aid int,
   pid int not null,
   attr int not null,
-  constraint pk_aid primary key (cid)
+  constraint pk_cid primary key (cid)
 );
 
 create index eng1850_tree_pid_aid on ENG1850 (
