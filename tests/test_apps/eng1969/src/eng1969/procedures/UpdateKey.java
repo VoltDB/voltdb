@@ -56,7 +56,7 @@ public class UpdateKey extends VoltProcedure {
 
     // get oldest group
     public final SQLStmt minAtimeGroupId =
-	new SQLStmt("select rowid_group from backed order by atime limit 1");
+        new SQLStmt("select rowid_group from backed order by atime limit 1");
 
     // lowest group id with minimum access time
     public final SQLStmt evictedGroup =
@@ -78,22 +78,22 @@ public class UpdateKey extends VoltProcedure {
         DB db = m_site.getLevelDBInstance();
         voltQueueSQL(check, rowid_group, rowid);
         VoltTable[] r1 = voltExecuteSQL();
-	if (r1[0].asScalarLong() == 0) {
+        if (r1[0].asScalarLong() == 0) {
             // System.out.println("Not found: " + rowid_group + "_" + rowid);
             // evict a key if necessary
             voltQueueSQL(residentGroups);
             VoltTable[] r2 = voltExecuteSQL();
             if (r2[0].asScalarLong() >= MAX_GROUPS) {
-		// System.out.printf("\tCurrent group count (%d) exceeds max (%d) - evicting!\n", 
-		//		  r2[0].asScalarLong(), MAX_GROUPS);
+                // System.out.printf("\tCurrent group count (%d) exceeds max (%d) - evicting!\n",
+                //                r2[0].asScalarLong(), MAX_GROUPS);
                 voltQueueSQL(minAtimeGroupId);
                 VoltTable[] r3 = voltExecuteSQL();
-		long groupId = r3[0].asScalarLong();
+                long groupId = r3[0].asScalarLong();
                 voltQueueSQL(evictedGroup, groupId);
                 VoltTable evictions = voltExecuteSQL()[0];
-		long evictedCount = 0;
+                long evictedCount = 0;
                 while (evictions.advanceRow()) {
-		    ++evictedCount;
+                    ++evictedCount;
                     // System.out.printf("\tEvicting (%d) groupId (%d_%d)\n", evictedCount,  groupId, evictions.getLong(0));
                     byte[] key = makeKey(groupId, evictions.getLong(0));
                     db.put(key, evictions.getVarbinary(1));
@@ -101,22 +101,22 @@ public class UpdateKey extends VoltProcedure {
 
                 voltQueueSQL(deleteEvicted, EXPECT_SCALAR_MATCH(evictedCount), groupId);
                 VoltTable[] r4 = voltExecuteSQL();
-		// System.out.println("Evicted " + r4[0].asScalarLong() + " rows. Expected: " + evictedCount);
+                // System.out.println("Evicted " + r4[0].asScalarLong() + " rows. Expected: " + evictedCount);
             }
 
             // TODO: this needs to iterate for all rowid keys
             byte[] oldpayload = db.get(makeKey(rowid_group, rowid));
             if (oldpayload == null) {
-                VoltDB.crashLocalVoltDB("Could not find payload from expected key: " + 
-					rowid_group + "_" + rowid, false, null);
+                VoltDB.crashLocalVoltDB("Could not find payload from expected key: " +
+                                        rowid_group + "_" + rowid, false, null);
             }
-	    // System.out.println("\tMigrating key: " + rowid_group + "_" + rowid);
+            // System.out.println("\tMigrating key: " + rowid_group + "_" + rowid);
             voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), rowid_group, rowid, this.getTransactionId(), oldpayload);
             voltExecuteSQL();
         }
 
         // perform in the in-memory update
-	// System.out.println("Updating atime on key: " + rowid_group + "_" + rowid);
+        // System.out.println("Updating atime on key: " + rowid_group + "_" + rowid);
         voltQueueSQL(update, EXPECT_SCALAR_MATCH(1), this.getTransactionId(), payload, rowid_group, rowid);
         return 0;
     }

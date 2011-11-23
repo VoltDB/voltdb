@@ -13,7 +13,7 @@ add them to the voltdb/lib or voltdb/voltdb directories.
 
 I modified VoltProcedure to make the m_site variable protected, allowing
 user authored procedures access to the execution site. I added an accessor
-to a leveldb api/database instance via the SiteProcedureConnection 
+to a leveldb api/database instance via the SiteProcedureConnection
 interface.  Finally, I initialized per-site leveldb instances in the
 ExecutionSite constructor.
 
@@ -87,7 +87,7 @@ setting run-loader to false/true in the run.sh AsyncBenchmark script.
  * Integration was relatively simple. It is easy to manage this logic
    from with a stored procedure. LevelDB is trivial to use.
 
- * Throughput: with all local work and the full dataset in RAM, my 
+ * Throughput: with all local work and the full dataset in RAM, my
    desktop managed 25,000 UpdateKey transactions / second.
 
  * Latency: doing the leveldb seeks blocking at the site destroys
@@ -105,5 +105,5 @@ setting run-loader to false/true in the run.sh AsyncBenchmark script.
 
 
 
- 
- 
+
+
