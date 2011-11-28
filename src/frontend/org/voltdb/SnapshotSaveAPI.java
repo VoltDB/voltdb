@@ -246,6 +246,13 @@ public class SnapshotSaveAPI
     public static void createSnapshotCompletionNode(long txnId,
                                                     boolean isTruncation,
                                                     int hosts) {
+        if (hosts == 0) {
+            VoltDB.crashGlobalVoltDB("Hosts must be greater than 0", true, null);
+        }
+        if (!(txnId > 0)) {
+            VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
+        }
+
         ByteBuffer buf = ByteBuffer.allocate(17);
         buf.putLong(txnId);
         buf.putInt(hosts);

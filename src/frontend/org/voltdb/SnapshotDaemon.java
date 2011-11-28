@@ -1072,7 +1072,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 try {
                     m_procedureCallbacks.remove(handle).clientCallback(response);
                 } catch (Exception e) {
-                    hostLog.warn(e);
+                    hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
                     throw e;
                 }
                 return null;

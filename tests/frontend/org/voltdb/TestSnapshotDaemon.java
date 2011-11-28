@@ -78,7 +78,7 @@ public class TestSnapshotDaemon {
                  * think that this is an error.
                  */
                 ColumnInfo column1 = new ColumnInfo("RESULT", VoltType.STRING);
-                ColumnInfo column2 = new ColumnInfo("BLAH", VoltType.STRING);
+                ColumnInfo column2 = new ColumnInfo("ERR_MSG", VoltType.STRING);
                 VoltTable result = new VoltTable(new ColumnInfo[] {column1, column2});
                 result.addRow("SUCCESS", "BLAH");
 
@@ -464,7 +464,7 @@ public class TestSnapshotDaemon {
                 resultTable.addRow(
                         "/tmp",
                         "woobie_2",
-                        0,
+                        2,
                         2,
                         0,
                         "",
@@ -474,7 +474,7 @@ public class TestSnapshotDaemon {
                 resultTable.addRow(
                         "/tmp",
                         "woobie_5",
-                        0,
+                        5,
                         5,
                         0,
                         "",
@@ -484,7 +484,7 @@ public class TestSnapshotDaemon {
                 resultTable.addRow(
                         "/tmp",
                         "woobie_3",
-                        0,
+                        3,
                         3,
                         0,
                         "",
