@@ -44,6 +44,13 @@ CREATE TABLE CHANGE_COLUMNS (
   HASNULL INTEGER -- this column is added
 );
 
+CREATE TABLE ENG_2025 (
+ key    varchar(250) not null,
+ value  varbinary(1048576) not null,
+ value2 varbinary(36) default null,
+ PRIMARY KEY (key)
+);
+
 -- This table's columns change types
 CREATE TABLE CHANGE_TYPES (
   ID INTEGER,

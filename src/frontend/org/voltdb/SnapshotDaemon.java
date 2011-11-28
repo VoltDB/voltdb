@@ -276,6 +276,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 for (Map.Entry<Long, TruncationSnapshotAttempt> entry : foundSnapshots.entrySet()) {
                     if (!m_truncationSnapshotAttempts.containsKey(entry.getKey())) {
+                        loggingLog.info("Truncation snapshot scan discovered new snapshot txnid " + entry.getKey() +
+                                " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                         m_truncationSnapshotAttempts.put(entry.getKey(), entry.getValue());
                     }
                 }
@@ -294,16 +296,24 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         boolean foundMostRecentSuccess = false;
         Iterator<Map.Entry<Long, TruncationSnapshotAttempt>> iter =
             m_truncationSnapshotAttempts.descendingMap().entrySet().iterator();
+        loggingLog.info("Snapshot daemon grooming truncation snapshots");
         while (iter.hasNext()) {
             Map.Entry<Long, TruncationSnapshotAttempt> entry = iter.next();
             TruncationSnapshotAttempt snapshotAttempt = entry.getValue();
             if (!foundMostRecentSuccess) {
                 if (snapshotAttempt.finished) {
+                    loggingLog.info("Found most recent successful snapshot txnid " + entry.getKey()
+                            + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                     foundMostRecentSuccess = true;
+                } else {
+                    loggingLog.info("Retaining possible partial snapshot txnid " + entry.getKey()
+                            + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                 }
             } else {
-                iter.remove();
+                loggingLog.info("Deleting old unecessary snapshot txnid " + entry.getKey()
+                        + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                 toDelete.add(entry.getValue());
+                iter.remove();
             }
         }
 
@@ -376,7 +386,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                     loggingLog.error("Error during scan and group of truncation snapshots");
                                 }
                             }
-                        }, 0, 30, TimeUnit.MINUTES);
+                        }, 0, 1, TimeUnit.HOURS);
                         truncationRequestExistenceCheck();
                         userSnapshotRequestExistenceCheck();
                         return;
