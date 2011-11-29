@@ -199,7 +199,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[33] = 'e';
     m_templateSingleLongTable[34] = 's';
     m_templateSingleLongTable[38] = 1; // row count
-    m_templateSingleLongTable[43] = 8; // row size
+    m_templateSingleLongTable[42] = 8; // row size
 
     // required for catalog loading.
     m_executorContext = new ExecutorContext(siteId,
