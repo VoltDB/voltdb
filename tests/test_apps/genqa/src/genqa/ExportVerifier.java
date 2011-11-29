@@ -86,7 +86,9 @@ public class ExportVerifier {
         m_dataPath = new File(args[1]);
         if (!m_dataPath.exists() || !m_dataPath.isDirectory())
         {
-            throw new IOException("Issue with export data path");
+            if (!m_dataPath.mkdir()) {
+                throw new IOException("Issue with export data path");
+            }
         }
 
         //checkForMoreExportFiles();

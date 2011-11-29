@@ -77,6 +77,13 @@ public class AsyncExportClient
         {
             m_nonce = nonce;
             m_txnLogPath = txnLogPath;
+
+            File logPath = new File(m_txnLogPath);
+            if (!logPath.exists()) {
+                if (!logPath.mkdir()) {
+                    System.err.println("Problem creating log directory");
+                }
+            }
         }
 
         public void createNewFile() throws IOException
