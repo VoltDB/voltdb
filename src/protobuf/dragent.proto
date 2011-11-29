@@ -20,8 +20,9 @@ message Response {
     // all known nodes globally
     //  first entry is self
     repeated NodeInfo nodeInfo = 1;
+    optional int32 globalPartitionCount = 2;
     // local partitions
-    repeated PartitionInfo partitionInfo = 2;
+    repeated PartitionInfo partitionInfo = 3;
 }
 
 message NodeInfo {
