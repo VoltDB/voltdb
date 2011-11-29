@@ -666,7 +666,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // initialize the DR gateway
         int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
-        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId);
+        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, false);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -697,7 +697,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // initialize the DR gateway
         int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
-        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId);
+        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, m_recovering);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -1155,7 +1155,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             // send to DR Agent if conditions are right
             StoredProcedureInvocation invocation = txnState.getInvocation();
             if ((invocation != null) && (m_recovering == false)) {
-                m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+                if (!txnState.needsRollback()) {
+                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+                }
             }
 
             // reset for error checking purposes
@@ -2301,6 +2303,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     }
                     else {
                         cr = wrapper.call(txnState, itask.getParameters());
+
+                        if (cr.getResults().length > 0) {
+                            VoltTable r = cr.getResults()[0];
+                            //System.err.printf("Position is %d\n", r.m_buffer.position());
+
+                            if (r.m_buffer.position() == 44) {
+                                System.err.println("Position is 44");
+                            }
+                        }
+
                         response.setResults(cr, itask);
                     }
                     // record the results of write transactions to the transaction state

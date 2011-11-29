@@ -288,19 +288,19 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
     /**
      * @return MD5 hash as int of the tables in the result. Only hashes first bits of big results.
      */
-    int getHashOfTableResults() {
+    public int getHashOfTableResults() {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             for (int i = 0; i < results.length; ++i) {
                 ByteBuffer buf = results[i].m_buffer;
-                if (buf.limit() > MAX_HASH_BYTES) {
-                    if (buf.hasArray()) {
-                        md.update(buf.array(), buf.arrayOffset(), MAX_HASH_BYTES);
-                    }
+                int len = buf.limit();
+                assert(len > 0);
+                if (len > MAX_HASH_BYTES) {
+                    len = MAX_HASH_BYTES;
+                    buf.limit(MAX_HASH_BYTES);
                 }
-                else {
-                    md.update(buf);
-                }
+                md.update(buf);
+                buf.limit(len);
             }
             byte[] digest = md.digest();
             return ByteArrayUtils.bytesToInt(digest, 0);
@@ -309,6 +309,5 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
             e.printStackTrace();
             return 0;
         }
-
     }
 }

@@ -30,7 +30,7 @@ public class PartitionDRGateway {
      * @param partitionId partition id
      * @return Instance of PartitionDRGateway
      */
-    public static PartitionDRGateway getInstance(int partitionId) {
+    public static PartitionDRGateway getInstance(int partitionId, boolean rejoiningAtStartup) {
 
         PartitionDRGateway pdrg = null;
 
@@ -57,12 +57,12 @@ public class PartitionDRGateway {
         }
 
         // init the instance and return
-        pdrg.init(partitionId);
+        pdrg.init(partitionId, rejoiningAtStartup);
         return pdrg;
     }
 
     // empty methods for community edition
-    protected void init(int partitionId) {}
+    protected void init(int partitionId, boolean rejoiningAtStartup) {}
     public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
     public void tick(long txnId) {}
     public void shutdown() {}

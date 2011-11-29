@@ -1139,7 +1139,6 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      */
     private final long cheesyCheckSum() {
         final int mypos = m_buffer.position();
-        m_buffer.limit(mypos);
         m_buffer.position(0);
         long checksum = 0;
         if (m_buffer.hasArray()) {
@@ -1154,8 +1153,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 checksum += m_buffer.get();
             }
         }
-        m_buffer.limit(m_buffer.capacity());
         m_buffer.position(mypos);
+        assert(verifyTableInvariants());
         return checksum;
     }
 
