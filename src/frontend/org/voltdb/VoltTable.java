@@ -62,6 +62,10 @@ in the string.
 
 This format allows the entire table to be slurped into memory without having to look at it much.
 
+Note that it is assumed that the pre and post-conditions for all methods are:
+1) buffer.position() is at the end of data
+2) buffer.limit() is at the end of data
+
 TODO(evanj): In the future, it would be nice to avoid having to copy it in some cases. For
 example, most of the data coming from C++ either is consumed immediately by the stored procedure
 or is sent immediately to the client. However, it is tough to avoid copying when we don't know for
@@ -1139,7 +1143,6 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      */
     private final long cheesyCheckSum() {
         final int mypos = m_buffer.position();
-        m_buffer.limit(mypos);
         m_buffer.position(0);
         long checksum = 0;
         if (m_buffer.hasArray()) {
@@ -1154,8 +1157,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 checksum += m_buffer.get();
             }
         }
-        m_buffer.limit(m_buffer.capacity());
         m_buffer.position(mypos);
+        assert(verifyTableInvariants());
         return checksum;
     }
 
