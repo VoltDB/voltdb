@@ -32,6 +32,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.planner.QueryPlanner;
@@ -44,6 +45,8 @@ import org.voltdb.utils.Encoder;
  * interactively accept SQL and outputs plans on standard out.
  */
 public class PlannerTool {
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final String POISON_SQL = "*kill*";
 
@@ -242,8 +245,7 @@ public class PlannerTool {
         try {
             process = pb.start();
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            hostLog.error("Failed to start out of process planner, AdHoc SQL will not work", e);
         }
         OutputStreamWriter in = new OutputStreamWriter(process.getOutputStream());
 
