@@ -86,7 +86,9 @@ public class ExportVerifier {
         m_dataPath = new File(args[1]);
         if (!m_dataPath.exists() || !m_dataPath.isDirectory())
         {
-            throw new IOException("Issue with export data path");
+            if (!m_dataPath.mkdir()) {
+                throw new IOException("Issue with export data path");
+            }
         }
 
         //checkForMoreExportFiles();
@@ -95,7 +97,9 @@ public class ExportVerifier {
         m_clientPath = new File(args[2]);
         if (!m_clientPath.exists() || !m_clientPath.isDirectory())
         {
-            throw new IOException("Issue with transaction ID path");
+            if (!m_clientPath.mkdir()) {
+                throw new IOException("Issue with transaction ID path");
+            }
         }
 
         //checkForMoreClientFiles();

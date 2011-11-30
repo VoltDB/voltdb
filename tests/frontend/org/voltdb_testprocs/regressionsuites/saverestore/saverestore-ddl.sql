@@ -50,6 +50,12 @@ CREATE TABLE CHANGE_COLUMNS (
 --  HASNULL INTEGER -- this column will appear
 );
 
+CREATE TABLE ENG_2025 (
+ key    varchar(250) not null,
+ value  varbinary(1048576) not null,
+ PRIMARY KEY (key)
+);
+
 -- This table's columns change types
 CREATE TABLE CHANGE_TYPES (
   ID INTEGER,

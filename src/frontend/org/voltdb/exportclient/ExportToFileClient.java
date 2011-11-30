@@ -25,7 +25,6 @@ import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -861,8 +860,10 @@ public class ExportToFileClient extends ExportClientBase {
                 boolean invalidDir = false;
                 outdir = new File(args[ii + 1]);
                 if (!outdir.exists()) {
-                    System.err.println("Error: " + outdir.getPath() + " does not exist");
-                    invalidDir = true;
+                    if (!outdir.mkdir()) {
+                        System.err.println("Error: " + outdir.getPath() + " cannot be created");
+                        invalidDir = true;
+                    }
                 }
                 if (!outdir.canRead()) {
                     System.err.println("Error: " + outdir.getPath() + " does not have read permission set");

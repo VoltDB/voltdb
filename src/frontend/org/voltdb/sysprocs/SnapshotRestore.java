@@ -258,7 +258,6 @@ public class SnapshotRestore extends VoltSystemProcedure
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         SystemProcedureExecutionContext context)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers)
         {
             assert(params.toArray()[0] != null);
@@ -410,6 +409,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
+            String hostname = ConnectionUtil.getHostnameOrAddress();
             VoltTable result = ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
@@ -532,6 +532,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (IOException e)
             {
+                String hostname = ConnectionUtil.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
                               "Unable to load table: " + table_name +
@@ -540,19 +541,35 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
 
             try {
+                final Table new_catalog_table = getCatalogTable(table_name);
+                Boolean needsConversion = null;
                 while (savefile.hasMoreChunks())
                 {
                     VoltTable table = null;
 
-                        final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
-                        if (c == null) {
-                            continue;//Should be equivalent to break
-                        }
-                        VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, true);
-                        Table new_catalog_table = getCatalogTable(table_name);
+                    final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
+                    if (c == null) {
+                        continue;//Should be equivalent to break
+                    }
+
+                    if (needsConversion == null) {
+                        VoltTable old_table =
+                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
+                        needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
+                    }
+
+                    if (needsConversion.booleanValue()) {
+                        VoltTable old_table =
+                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
                         table = SavedTableConverter.convertTable(old_table,
-                                                                 new_catalog_table);
-                        c.discard();
+                                                             new_catalog_table);
+                    } else {
+                        ByteBuffer copy = ByteBuffer.allocate(c.b.remaining());
+                        copy.put(c.b);
+                        copy.flip();
+                        table = PrivateVoltTableFactory.createVoltTableFromBuffer(copy, true);
+                    }
+                    c.discard();
 
                     try
                     {
@@ -569,12 +586,14 @@ public class SnapshotRestore extends VoltSystemProcedure
                 }
 
             } catch (IOException e) {
+                String hostname = ConnectionUtil.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
                               "Unable to load table: " + table_name +
                               " error: " + e.getMessage());
                 return new DependencyPair(dependency_id, result);
             } catch (VoltTypeException e) {
+                String hostname = ConnectionUtil.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
                               "Unable to load table: " + table_name +
@@ -582,6 +601,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 return new DependencyPair(dependency_id, result);
             }
 
+            String hostname = ConnectionUtil.getHostnameOrAddress();
             VoltTable result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, table_name, -1, result_str,
                              error_msg);
@@ -638,7 +658,9 @@ public class SnapshotRestore extends VoltSystemProcedure
                 error_msg = e.getMessage();
             }
             VoltTable result = constructResultsTable();
-            result.addRow(m_hostId, hostname, m_siteId, table_name, -1,
+            //Use null hostname to avoid DNS lookup that might be slow
+            //if DNS caching is not enabled
+            result.addRow(m_hostId, null, m_siteId, table_name, -1,
                              result_str, error_msg);
             return new DependencyPair(dependency_id, result);
         }
@@ -758,7 +780,9 @@ public class SnapshotRestore extends VoltSystemProcedure
                 error_msg = e.getMessage();
             }
             VoltTable result = constructResultsTable();
-            result.addRow(m_hostId, hostname, m_siteId, table_name, partition_id,
+            //Use null hostname to avoid DNS lookup that might be slow
+            //if DNS caching is not enabled
+            result.addRow(m_hostId, null, m_siteId, table_name, partition_id,
                           result_str, error_msg);
             return new DependencyPair(dependency_id, result);
         }
@@ -989,6 +1013,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     {
         FilenameFilter has_nonce = new FilenameFilter()
         {
+            @Override
             public boolean accept(File dir, String file)
             {
                 return file.startsWith(fileNonce) && file.endsWith(".vpt");
@@ -1264,6 +1289,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     private VoltTable performDistributeReplicatedTable(String tableName,
                                                        int siteId)
     {
+        System.out.println("Performing distribute replicated table for table " + tableName);
         String hostname = ConnectionUtil.getHostnameOrAddress();
         TableSaveFile savefile = null;
         try
@@ -1285,34 +1311,35 @@ public class SnapshotRestore extends VoltSystemProcedure
         results[0].addRow(m_hostId, hostname, m_siteId, tableName, -1,
                 "SUCCESS", "NO DATA TO DISTRIBUTE");
         final Table new_catalog_table = getCatalogTable(tableName);
+        System.out.println("new_catalog_table is " + new_catalog_table.getTypeName() + " for table name " + tableName);
         Boolean needsConversion = null;
 
         try {
             while (savefile.hasMoreChunks())
             {
                 VoltTable table = null;
-                    final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
-                    if (c == null) {
-                        continue;//Should be equivalent to break
-                    }
+                final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
+                if (c == null) {
+                    continue;//Should be equivalent to break
+                }
 
-                    if (needsConversion == null) {
-                        VoltTable old_table =
-                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
-                        needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
-                    }
-                    if (needsConversion.booleanValue()) {
-                        VoltTable old_table =
-                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
-                        table = SavedTableConverter.convertTable(old_table,
-                                                             new_catalog_table);
-                    } else {
-                        ByteBuffer copy = ByteBuffer.allocate(c.b.remaining());
-                        copy.put(c.b);
-                        copy.flip();
-                        table = PrivateVoltTableFactory.createVoltTableFromBuffer(copy, true);
-                    }
-                    c.discard();
+                if (needsConversion == null) {
+                    VoltTable old_table =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
+                    needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
+                }
+                if (needsConversion.booleanValue()) {
+                    VoltTable old_table =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
+                    table = SavedTableConverter.convertTable(old_table,
+                                                         new_catalog_table);
+                } else {
+                    ByteBuffer copy = ByteBuffer.allocate(c.b.remaining());
+                    copy.put(c.b);
+                    copy.flip();
+                    table = PrivateVoltTableFactory.createVoltTableFromBuffer(copy, true);
+                }
+                c.discard();
 
                 SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -1401,6 +1428,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         results[0].addRow(m_hostId, hostname, m_siteId, tableName, 0,
                 "SUCCESS", "NO DATA TO DISTRIBUTE");
         final Table new_catalog_table = getCatalogTable(tableName);
+        System.out.println("new_catalog_table is " + new_catalog_table.getTypeName() + " for table name " + tableName);
         Boolean needsConversion = null;
         org.voltdb.utils.DBBPool.BBContainer c = null;
         try {

@@ -38,12 +38,8 @@
  * VoltDB cluster with the number of servers required for your needs.
  */
 
-package genqa;
+package eng1969;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -58,108 +54,20 @@ import org.voltdb.client.exampleutils.IRateLimiter;
 import org.voltdb.client.exampleutils.LatencyLimiter;
 import org.voltdb.client.exampleutils.RateLimiter;
 
-public class AsyncExportClient
+public class AsyncBenchmark
 {
-    // Transactions between catalog swaps.
-    public static long CATALOG_SWAP_INTERVAL = 500000;
-    // Number of txn ids per client log file.
-    public static long CLIENT_TXNID_FILE_SIZE = 250000;
-
-    static class TxnIdWriter
-    {
-        String m_nonce;
-        String m_txnLogPath;
-        FileOutputStream m_curFile = null;
-        OutputStreamWriter m_outs = null;
-        long m_count = 0;
-
-        public TxnIdWriter(String nonce, String txnLogPath)
-        {
-            m_nonce = nonce;
-            m_txnLogPath = txnLogPath;
-
-            File logPath = new File(m_txnLogPath);
-            if (!logPath.exists()) {
-                if (!logPath.mkdir()) {
-                    System.err.println("Problem creating log directory");
-                }
-            }
-        }
-
-        public void createNewFile() throws IOException
-        {
-            if (m_curFile != null)
-            {
-                m_outs.close();
-                m_curFile.flush();
-                m_curFile.close();
-            }
-            File blah = new File(m_txnLogPath, m_count + "-" + m_nonce + "-txns");
-            m_curFile = new FileOutputStream(blah);
-            m_outs = new OutputStreamWriter(m_curFile);
-        }
-
-        public void write(String txnId) throws IOException
-        {
-            if ((m_count % CLIENT_TXNID_FILE_SIZE) == 0)
-            {
-                createNewFile();
-            }
-            m_outs.write(txnId);
-            m_count++;
-        }
-    }
-
-    static class AsyncCallback implements ProcedureCallback
-    {
-        private final TxnIdWriter m_writer;
-        public AsyncCallback(TxnIdWriter writer)
-        {
-            super();
-            m_writer = writer;
-        }
-        @Override
-        public void clientCallback(ClientResponse clientResponse) {
-            // Track the result of the request (Success, Failure)
-            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
-            {
-                TrackingResults.incrementAndGet(0);
-                try
-                {
-                    m_writer.write(clientResponse.getResults()[0].asScalarLong() + "\n");
-                }
-                catch (IOException e)
-                {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-            }
-            else
-            {
-                TrackingResults.incrementAndGet(1);
-            }
-        }
-    }
-
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
 
     // Reference to the database connection we will use
     private static ClientConnection Con;
 
-    private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
-    private static File deployment = new File("deployment.xml");
-
     // Application entry point
     public static void main(String[] args)
     {
         try
         {
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
             // Use the AppHelper utility class to retrieve command line application parameters
-
             // Define parameters and pull from command line
             AppHelper apph = new AppHelper(AsyncBenchmark.class.getCanonicalName())
                 .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
@@ -167,11 +75,12 @@ public class AsyncExportClient
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
                 .add("pool-size", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
-                .add("procedure", "procedure_name", "Procedure to call.", "JiggleExportSinglePartition")
+                .add("procedure", "procedure_name", "Procedure to call.", "UpdateKey")
+                .add("wait", "wait_duration", "Wait duration (only when calling one of the Wait procedures), in milliseconds.", 0)
                 .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
-                .add("catalog-swap", "Swap catalogs from the client", "true")
+                .add("run-loader", "Run the leveldb loader", "true")
                 .setArguments(args)
             ;
 
@@ -182,17 +91,17 @@ public class AsyncExportClient
             final int port             = apph.intValue("port");
             final int poolSize         = apph.intValue("pool-size");
             final String procedure     = apph.stringValue("procedure");
+            final long wait            = apph.intValue("wait");
             final long rateLimit       = apph.longValue("rate-limit");
             final boolean autoTune     = apph.booleanValue("auto-tune");
             final double latencyTarget = apph.doubleValue("latency-target");
-            final boolean catalogSwap  = apph.booleanValue("catalog-swap");
             final String csv           = apph.stringValue("stats");
-
-            TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
+            final boolean runLoader    = apph.booleanValue("run-loader");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
                 .validate("pool-size", (duration > 0))
+                .validate("wait", (wait >= 0))
                 .validate("rate-limit", (rateLimit > 0))
                 .validate("latency-target", (latencyTarget > 0))
             ;
@@ -200,12 +109,8 @@ public class AsyncExportClient
             // Display actual parameters, for reference
             apph.printActualUsage();
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
             // Get a client connection - we retry for a while in case the server hasn't started yet
             Con = ClientConnectionPool.getWithRetry(servers, port);
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Create a Timer task to display performance data on the procedure
             Timer timer = new Timer();
@@ -221,46 +126,29 @@ public class AsyncExportClient
             , displayInterval*1000l
             );
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
             // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
-            IRateLimiter limiter = null;
-            if (autoTune)
-                limiter = new LatencyLimiter(Con, procedure, latencyTarget, rateLimit);
-            else
-                limiter = new RateLimiter(rateLimit);
+            IRateLimiter limiter = autoTune ?
+                    new LatencyLimiter(Con, procedure, latencyTarget, rateLimit) :
+                    new RateLimiter(rateLimit);
+
+            // Run the loader first.
+            if (runLoader) {
+                doLoader(poolSize);
+            }
 
             // Run the benchmark loop for the requested duration
             final long endTime = System.currentTimeMillis() + (1000l * duration);
             Random rand = new Random();
-            int swap_count = 0;
-            boolean first_cat = false;
             while (endTime > System.currentTimeMillis())
             {
-                // Post the request, asynchronously
-                Con.executeAsync(new AsyncCallback(writer),
-                                 procedure,
-                                 (long)rand.nextInt(poolSize),
-                                 0);
-                swap_count++;
-                if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
-                {
-                    System.out.println("Changing catalogs...");
-                    Con.updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
-                    first_cat = !first_cat;
-                }
+                doBenchmark(procedure, poolSize, rand, wait);
+
                 // Use the limiter to throttle client activity
                 limiter.throttle();
             }
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
             // We're done - stop the performance statistics display task
             timer.cancel();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-            Con.drain();
-            Thread.sleep(10000);
 
             // Now print application results:
 
@@ -288,11 +176,7 @@ public class AsyncExportClient
 
             // Dump statistics to a CSV file
             Con.saveStatistics(csv);
-
             Con.close();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
         }
         catch(Exception x)
         {
@@ -300,4 +184,67 @@ public class AsyncExportClient
             x.printStackTrace();
         }
     }
+
+    // There are poolSize rowid_groups in the database (default = 100,000)
+    // Each rowid_group has 1000 unique rowids such that (rowid_group, rowid) is unique.
+    // This gives 100M records in the DB by default.
+    private static void doBenchmark(String procedure, final int poolSize, final Random rand, long wait) throws Exception {
+
+        final int totalPartitions = 4;
+        final int maxGroupsPerPartition = 1000;
+
+        // ~1% chance of cold data
+        boolean coldData = (Math.abs(rand.nextLong()) % 100) <= 1;
+
+        long rowid_group = coldData ?
+                Math.abs(rand.nextLong()) % poolSize :
+                Math.abs(rand.nextLong()) % (totalPartitions * maxGroupsPerPartition);
+
+        long rowid = Math.abs(rand.nextLong()) % 1000;
+
+        Con.executeAsync(new ProcedureCallback()
+        {
+            @Override
+            public void clientCallback(ClientResponse response) throws Exception
+            {
+                // Track the result of the request (Success, Failure)
+                if (response.getStatus() == ClientResponse.SUCCESS)
+                    TrackingResults.incrementAndGet(0);
+                else
+                    TrackingResults.incrementAndGet(1);
+            }
+        }
+        , procedure
+        , rowid
+        , rowid_group
+        , new String("ABCDEFGHIJKLMNOPQRSTUVWXYZ").getBytes()
+        );
+    }
+
+    private static void doLoader(final int poolSize) throws Exception {
+        for (int i=0; i <= poolSize; i++) {
+            for (int rowid = 0; rowid < 1000; rowid++) {
+                Con.executeAsync(new ProcedureCallback()
+                {
+                    @Override
+                    public void clientCallback(ClientResponse response) throws Exception
+                    {
+                        if (response.getStatus() != ClientResponse.SUCCESS) {
+                            System.out.println("Loader failed with response: " + response.getStatusString());
+                        }
+                    }
+                }
+                , "CreateKey"
+                , Long.valueOf(rowid)
+                , Long.valueOf(i)
+                , new String("ABCDEF").getBytes()
+                );
+            }
+            if (i % 10000 == 0) {
+                System.out.println("Loaded " + i + " groups.");
+            }
+        }
+    }
+
+
 }

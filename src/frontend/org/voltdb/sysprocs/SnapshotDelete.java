@@ -70,7 +70,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, final ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        //String hostname = ConnectionUtil.getHostnameOrAddress();
         errorString = null;
         VoltTable result = constructFragmentResultsTable();
         if (fragmentId == SysProcFragmentId.PF_snapshotDelete)
@@ -96,15 +96,20 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
                         final String paths[] = (String[])params.toArray()[0];
                         final String nonces[] = (String[])params.toArray()[1];
+                        StringBuilder sb = new StringBuilder();
+                        sb.append("Deleting files: ");
                         for (int ii = 0; ii < paths.length; ii++) {
                             List<File> relevantFiles = retrieveRelevantFiles(paths[ii], nonces[ii]);
                             if (relevantFiles != null) {
                                 for (final File f : relevantFiles) {
+                                    sb.append(f.getPath());
+                                    sb.append(',');
                                     //long size = f.length();
                                     boolean deleted = f.delete();
                                 }
                             }
                         }
+                        hostLog.info(sb.toString());
                     }
                 }.start();
             }
