@@ -210,14 +210,16 @@ final class ClientImpl implements Client {
      * @throws NoConnectionsException
      */
     @Override
-    public final ClientResponse callProcedure(long txnId, long originalTxnId,
-                                              String procName, Object... parameters)
+    public final ClientResponse callProcedure(long originalTxnId,
+                                              String procName,
+                                              Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation =
-              new ProcedureInvocation(txnId, originalTxnId, m_handle.getAndIncrement(), procName, parameters);
+              new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
+                                      procName, parameters);
         return callProcedure(cb, invocation);
     }
 
@@ -264,7 +266,6 @@ final class ClientImpl implements Client {
 
     @Override
     public final boolean callProcedure(
-            long txnId,
             long originalTxnId,
             ProcedureCallback callback,
             String procName,
@@ -274,7 +275,8 @@ final class ClientImpl implements Client {
             ((ProcedureArgumentCacher)callback).setArgs(parameters);
         }
         ProcedureInvocation invocation =
-            new ProcedureInvocation(txnId, originalTxnId, m_handle.getAndIncrement(), procName, parameters);
+            new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
+                                    procName, parameters);
         return callProcedure(callback, m_expectedOutgoingMessageSize, invocation);
     }
 

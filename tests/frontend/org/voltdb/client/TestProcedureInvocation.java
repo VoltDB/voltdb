@@ -216,13 +216,12 @@ public class TestProcedureInvocation extends TestCase{
      * @throws IOException
      */
     public void testWriteReplicated() throws IOException {
-        ProcedureInvocation invocation = new ProcedureInvocation(1, 0, 0, "test", 1);
+        ProcedureInvocation invocation = new ProcedureInvocation(0, 0, "test", 1);
         FastSerializer fs = new FastSerializer();
         fs.writeObject(invocation);
 
         FastDeserializer fds = new FastDeserializer(fs.getBytes());
         StoredProcedureInvocation spi = fds.readObject(StoredProcedureInvocation.class);
-        assertEquals(1, spi.getTxnId());
         assertEquals(0, spi.getOriginalTxnId());
     }
 

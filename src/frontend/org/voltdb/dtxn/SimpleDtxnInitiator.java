@@ -145,12 +145,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final long now)
     {
         long txnId;
-        if (invocation.getType() == ProcedureInvocationType.REPLICATED) {
-            txnId = invocation.getTxnId();
-            m_idManager.updateState(txnId);
-        } else {
-            txnId = m_idManager.getNextUniqueTransactionId();
-        }
+        txnId = m_idManager.getNextUniqueTransactionId();
         createTransaction(connectionId, connectionHostname, adminConnection, txnId,
                           invocation, isReadOnly, isSinglePartition, isEveryPartition,
                           partitions, numPartitions, clientData, messageSize, now);

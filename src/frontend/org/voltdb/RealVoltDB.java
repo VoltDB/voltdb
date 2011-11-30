@@ -167,7 +167,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
     CountDownLatch m_hasCatalog;
-    List<AsyncCompilerWorkThread> m_compilerThread = new ArrayList<AsyncCompilerWorkThread>();
+    AsyncCompilerWorkThread m_compilerThread = null;
 
     DeploymentType m_deployment;
 
@@ -440,7 +440,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                m_config.m_timestampTestingSalt);
                     portOffset += 2;
                     m_clientInterfaces.add(ci);
-                    m_compilerThread.add(ci.getCompilerThread());
+                    m_compilerThread = ci.getCompilerThread();
                 }
             }
 
@@ -556,10 +556,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             @Override
             public void run() {
                 try {
-                    for (AsyncCompilerWorkThread thread : m_compilerThread)
-                    {
-                        thread.ensureLoadedPlanner();
-                    }
+                    m_compilerThread.ensureLoadedPlanner();
                 }
                 catch (Exception ex) {
                     log.warn(ex.getMessage(), ex);

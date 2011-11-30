@@ -43,11 +43,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     String procName = null;
 
     /*
-     * The new txn ID the procedure invocation will be assigned with in the
-     * current cluster. -1 means not set.
-     */
-    long txnId = -1;
-    /*
      * The original txn ID the procedure invocation was assigned with. It's
      * saved here so that if the procedure needs it for determinism, we can
      * provide it again. -1 means not set.
@@ -73,7 +68,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         copy.clientHandle = clientHandle;
         copy.params = params;
         copy.procName = procName;
-        copy.txnId = txnId;
         copy.originalTxnId = originalTxnId;
         if (unserializedParams != null)
         {
@@ -88,17 +82,12 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     }
 
     private void setType() {
-        type = txnId == -1 && originalTxnId == -1 ? ProcedureInvocationType.ORIGINAL
-                                                  : ProcedureInvocationType.REPLICATED;
+        type = originalTxnId == -1 ? ProcedureInvocationType.ORIGINAL
+                                   : ProcedureInvocationType.REPLICATED;
     }
 
     public void setProcName(String name) {
         procName = name;
-    }
-
-    public void setTxnId(long txnId) {
-        this.txnId = txnId;
-        setType();
     }
 
     public void setOriginalTxnId(long txnId) {
@@ -125,10 +114,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     public String getProcName() {
         return procName;
-    }
-
-    public long getTxnId() {
-        return txnId;
     }
 
     public long getOriginalTxnId() {
@@ -177,7 +162,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          * second one is the original txn ID.
          */
         if (type == ProcedureInvocationType.REPLICATED) {
-            txnId = in.readLong();
             originalTxnId = in.readLong();
         }
 
@@ -199,11 +183,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     public void writeExternal(FastSerializer out) throws IOException {
         assert(!((params == null) && (unserializedParams == null)));
         assert((params != null) || (unserializedParams != null));
-        assert((txnId == -1 && originalTxnId == -1) ||
-               (txnId != -1 && originalTxnId != -1));
         out.write(type.getValue());//version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
-            out.writeLong(txnId);
             out.writeLong(originalTxnId);
         }
         out.writeString(procName);

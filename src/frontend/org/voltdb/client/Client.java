@@ -157,7 +157,7 @@ public interface Client {
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    ClientResponse callProcedure(long txnId, long originalTxnId,
+    ClientResponse callProcedure(long originalTxnId,
                                  String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException;
 
@@ -189,7 +189,7 @@ public interface Client {
      * @return <code>true</code> if the procedure was queued and
      *         <code>false</code> otherwise
      */
-    boolean callProcedure(long txnId, long originalTxnId, ProcedureCallback callback,
+    boolean callProcedure(long originalTxnId, ProcedureCallback callback,
                           String procName, Object... parameters)
     throws IOException, NoConnectionsException;
 

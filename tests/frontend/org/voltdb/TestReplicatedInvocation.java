@@ -79,7 +79,7 @@ public class TestReplicatedInvocation {
     public void testReplicatedInvocation() throws Exception {
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
-        ClientResponse response = client.callProcedure(2, 3, "ReplicatedProcedure", 1, "haha");
+        ClientResponse response = client.callProcedure(3, "ReplicatedProcedure", 1, "haha");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         VoltTable result = response.getResults()[0];
         result.advanceRow();

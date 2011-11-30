@@ -543,8 +543,8 @@ public class Inits {
                     hostLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { currSiteId }, null);
                     m_rvdb.m_messenger.createLocalSite(currSiteId);
                 }
-                // Create an agreement site for every local initiator
-                if (site.getShareagreement()) {
+                // Create an agreement site for every initiator
+                if (site.getIsexec() == false) {
                     agreementSiteIds.add(currSiteId);
                     if (sitesHostId == m_rvdb.m_myHostId) {
                         myAgreementSiteId = currSiteId;

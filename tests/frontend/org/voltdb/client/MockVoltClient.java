@@ -277,8 +277,7 @@ public class MockVoltClient implements Client {
     }
 
     @Override
-    public ClientResponse callProcedure(long txnId,
-                                        long originalTxnId,
+    public ClientResponse callProcedure(long originalTxnId,
                                         String procName,
                                         Object... parameters) throws IOException,
                                                              NoConnectionsException,
@@ -288,8 +287,7 @@ public class MockVoltClient implements Client {
     }
 
     @Override
-    public boolean callProcedure(long txnId,
-                                 long originalTxnId,
+    public boolean callProcedure(long originalTxnId,
                                  ProcedureCallback callback,
                                  String procName,
                                  Object... parameters) throws IOException,
