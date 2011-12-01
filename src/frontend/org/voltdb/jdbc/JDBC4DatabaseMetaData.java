@@ -17,12 +17,17 @@
 
 package org.voltdb.jdbc;
 
-import java.sql.*;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.RowIdLifetime;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 
-import org.voltdb.*;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
 public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 {
@@ -73,6 +78,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether the current user can call all the procedures returned by the method getProcedures.
+    @Override
     public boolean allProceduresAreCallable() throws SQLException
     {
         checkClosed();
@@ -80,6 +86,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether the current user can use all the tables returned by the method getTables in a SELECT statement.
+    @Override
     public boolean allTablesAreSelectable() throws SQLException
     {
         checkClosed();
@@ -87,6 +94,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a SQLException while autoCommit is true indicates that all open ResultSets are closed, even ones that are holdable.
+    @Override
     public boolean autoCommitFailureClosesAllResultSets() throws SQLException
     {
         checkClosed();
@@ -94,6 +102,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a data definition statement within a transaction forces the transaction to commit.
+    @Override
     public boolean dataDefinitionCausesTransactionCommit() throws SQLException
     {
         checkClosed();
@@ -101,6 +110,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database ignores a data definition statement within a transaction.
+    @Override
     public boolean dataDefinitionIgnoredInTransactions() throws SQLException
     {
         checkClosed();
@@ -108,6 +118,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether or not a visible row delete can be detected by calling the method ResultSet.rowDeleted.
+    @Override
     public boolean deletesAreDetected(int type) throws SQLException
     {
         checkClosed();
@@ -115,6 +126,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether the return value for the method getMaxRowSize includes the SQL data types LONGVARCHAR and LONGVARBINARY.
+    @Override
     public boolean doesMaxRowSizeIncludeBlobs() throws SQLException
     {
         checkClosed();
@@ -122,6 +134,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the given attribute of the given type for a user-defined type (UDT) that is available in the given schema and catalog.
+    @Override
     public ResultSet getAttributes(String catalog, String schemaPattern, String typeNamePattern, String attributeNamePattern) throws SQLException
     {
         checkClosed();
@@ -129,6 +142,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of a table's optimal set of columns that uniquely identifies a row.
+    @Override
     public ResultSet getBestRowIdentifier(String catalog, String schema, String table, int scope, boolean nullable) throws SQLException
     {
         checkClosed();
@@ -136,6 +150,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the catalog names available in this database.
+    @Override
     public ResultSet getCatalogs() throws SQLException
     {
         checkClosed();
@@ -145,6 +160,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the String that this database uses as the separator between a catalog and table name.
+    @Override
     public String getCatalogSeparator() throws SQLException
     {
         checkClosed();
@@ -152,6 +168,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the database vendor's preferred term for "catalog".
+    @Override
     public String getCatalogTerm() throws SQLException
     {
         checkClosed();
@@ -159,6 +176,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a list of the client info properties that the driver supports.
+    @Override
     public ResultSet getClientInfoProperties() throws SQLException
     {
         checkClosed();
@@ -166,6 +184,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the access rights for a table's columns.
+    @Override
     public ResultSet getColumnPrivileges(String catalog, String schema, String table, String columnNamePattern) throws SQLException
     {
         checkClosed();
@@ -174,6 +193,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves a description of table columns available in the specified catalog.
     // TODO: implement pattern filtering somewhere (preferably server-side)
+    @Override
     public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
         assert(tableNamePattern != null && !tableNamePattern.isEmpty());
@@ -196,6 +216,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the connection that produced this metadata object.
+    @Override
     public Connection getConnection() throws SQLException
     {
         checkClosed();
@@ -203,6 +224,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the foreign key columns in the given foreign key table that reference the primary key or the columns representing a unique constraint of the parent table (could be the same or a different table).
+    @Override
     public ResultSet getCrossReference(String parentCatalog, String parentSchema, String parentTable, String foreignCatalog, String foreignSchema, String foreignTable) throws SQLException
     {
         checkClosed();
@@ -210,6 +232,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the major version number of the underlying database.
+    @Override
     public int getDatabaseMajorVersion() throws SQLException
     {
         checkClosed();
@@ -217,6 +240,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the minor version number of the underlying database.
+    @Override
     public int getDatabaseMinorVersion() throws SQLException
     {
         checkClosed();
@@ -224,6 +248,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the name of this database product.
+    @Override
     public String getDatabaseProductName() throws SQLException
     {
         checkClosed();
@@ -231,6 +256,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the version number of this database product.
+    @Override
     public String getDatabaseProductVersion() throws SQLException
     {
         checkClosed();
@@ -238,6 +264,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves this database's default transaction isolation level.
+    @Override
     public int getDefaultTransactionIsolation() throws SQLException
     {
         checkClosed();
@@ -245,18 +272,21 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves this JDBC driver's major version number.
+    @Override
     public int getDriverMajorVersion()
     {
         return 1;
     }
 
     // Retrieves this JDBC driver's minor version number.
+    @Override
     public int getDriverMinorVersion()
     {
         return 0;
     }
 
     // Retrieves the name of this JDBC driver.
+    @Override
     public String getDriverName() throws SQLException
     {
         checkClosed();
@@ -264,6 +294,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the version number of this JDBC driver as a String.
+    @Override
     public String getDriverVersion() throws SQLException
     {
         checkClosed();
@@ -271,6 +302,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the foreign key columns that reference the given table's primary key columns (the foreign keys exported by a table).
+    @Override
     public ResultSet getExportedKeys(String catalog, String schema, String table) throws SQLException
     {
         checkClosed();
@@ -278,6 +310,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves all the "extra" characters that can be used in unquoted identifier names (those beyond a-z, A-Z, 0-9 and _).
+    @Override
     public String getExtraNameCharacters() throws SQLException
     {
         checkClosed();
@@ -285,6 +318,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the given catalog's system or user function parameters and return type.
+    @Override
     public ResultSet getFunctionColumns(String catalog, String schemaPattern, String functionNamePattern, String columnNamePattern) throws SQLException
     {
         checkClosed();
@@ -292,6 +326,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the system and user functions available in the given catalog.
+    @Override
     public ResultSet getFunctions(String catalog, String schemaPattern, String functionNamePattern) throws SQLException
     {
         checkClosed();
@@ -299,6 +334,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the string used to quote SQL identifiers.
+    @Override
     public String getIdentifierQuoteString() throws SQLException
     {
         checkClosed();
@@ -306,6 +342,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the primary key columns that are referenced by the given table's foreign key columns (the primary keys imported by a table) throws SQLException.
+    @Override
     public ResultSet getImportedKeys(String catalog, String schema, String table) throws SQLException
     {
         checkClosed();
@@ -316,6 +353,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // NOTE: currently returns the NON_UNIQUE column as a TINYINT due
     // to lack of boolean support in VoltTable schemas.
     // TODO: implement pattern filtering somewhere (preferably server-side)
+    @Override
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) throws SQLException
     {
         assert(table != null && !table.isEmpty());
@@ -337,6 +375,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the major JDBC version number for this driver.
+    @Override
     public int getJDBCMajorVersion() throws SQLException
     {
         checkClosed();
@@ -344,6 +383,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the minor JDBC version number for this driver.
+    @Override
     public int getJDBCMinorVersion() throws SQLException
     {
         checkClosed();
@@ -351,6 +391,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of hex characters this database allows in an inline binary literal.
+    @Override
     public int getMaxBinaryLiteralLength() throws SQLException
     {
         checkClosed();
@@ -358,6 +399,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters that this database allows in a catalog name.
+    @Override
     public int getMaxCatalogNameLength() throws SQLException
     {
         checkClosed();
@@ -365,6 +407,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters this database allows for a character literal.
+    @Override
     public int getMaxCharLiteralLength() throws SQLException
     {
         checkClosed();
@@ -372,6 +415,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters this database allows for a column name.
+    @Override
     public int getMaxColumnNameLength() throws SQLException
     {
         checkClosed();
@@ -379,6 +423,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of columns this database allows in a GROUP BY clause.
+    @Override
     public int getMaxColumnsInGroupBy() throws SQLException
     {
         checkClosed();
@@ -386,6 +431,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of columns this database allows in an index.
+    @Override
     public int getMaxColumnsInIndex() throws SQLException
     {
         checkClosed();
@@ -393,6 +439,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of columns this database allows in an ORDER BY clause.
+    @Override
     public int getMaxColumnsInOrderBy() throws SQLException
     {
         checkClosed();
@@ -400,6 +447,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of columns this database allows in a SELECT list.
+    @Override
     public int getMaxColumnsInSelect() throws SQLException
     {
         checkClosed();
@@ -407,6 +455,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of columns this database allows in a table.
+    @Override
     public int getMaxColumnsInTable() throws SQLException
     {
         checkClosed();
@@ -414,6 +463,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of concurrent connections to this database that are possible.
+    @Override
     public int getMaxConnections() throws SQLException
     {
         checkClosed();
@@ -421,6 +471,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters that this database allows in a cursor name.
+    @Override
     public int getMaxCursorNameLength() throws SQLException
     {
         checkClosed();
@@ -428,6 +479,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of bytes this database allows for an index, including all of the parts of the index.
+    @Override
     public int getMaxIndexLength() throws SQLException
     {
         checkClosed();
@@ -435,6 +487,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters that this database allows in a procedure name.
+    @Override
     public int getMaxProcedureNameLength() throws SQLException
     {
         checkClosed();
@@ -442,6 +495,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of bytes this database allows in a single row.
+    @Override
     public int getMaxRowSize() throws SQLException
     {
         checkClosed();
@@ -449,6 +503,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters that this database allows in a schema name.
+    @Override
     public int getMaxSchemaNameLength() throws SQLException
     {
         checkClosed();
@@ -456,6 +511,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters this database allows in an SQL statement.
+    @Override
     public int getMaxStatementLength() throws SQLException
     {
         checkClosed();
@@ -463,6 +519,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of active statements to this database that can be open at the same time.
+    @Override
     public int getMaxStatements() throws SQLException
     {
         checkClosed();
@@ -470,6 +527,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters this database allows in a table name.
+    @Override
     public int getMaxTableNameLength() throws SQLException
     {
         checkClosed();
@@ -477,6 +535,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of tables this database allows in a SELECT statement.
+    @Override
     public int getMaxTablesInSelect() throws SQLException
     {
         checkClosed();
@@ -484,6 +543,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the maximum number of characters this database allows in a user name.
+    @Override
     public int getMaxUserNameLength() throws SQLException
     {
         checkClosed();
@@ -491,6 +551,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a comma-separated list of math functions available with this database.
+    @Override
     public String getNumericFunctions() throws SQLException
     {
         checkClosed();
@@ -499,6 +560,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves a description of the given table's primary key columns.
     // TODO: implement pattern filtering somewhere (preferably server-side)
+    @Override
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException
     {
         assert(table != null && !table.isEmpty());
@@ -518,6 +580,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves a description of the given catalog's stored procedure parameter and result columns.
     // TODO: implement pattern filtering somewhere (preferably server-side)
+    @Override
     public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern, String columnNamePattern) throws SQLException
     {
         assert(procedureNamePattern != null && !procedureNamePattern.isEmpty());
@@ -541,6 +604,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves a description of the stored procedures available in the given catalog.
     // TODO: implement pattern filtering somewhere (preferably server-side)
+    @Override
     public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern) throws SQLException
     {
         if (procedureNamePattern != null && !procedureNamePattern.equals("%"))
@@ -553,6 +617,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the database vendor's preferred term for "procedure".
+    @Override
     public String getProcedureTerm() throws SQLException
     {
         checkClosed();
@@ -560,6 +625,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves this database's default holdability for ResultSet objects.
+    @Override
     public int getResultSetHoldability() throws SQLException
     {
         checkClosed();
@@ -567,6 +633,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Indicates whether or not this data source supports the SQL ROWID type, and if so the lifetime for which a RowId object remains valid.
+    @Override
     public RowIdLifetime getRowIdLifetime() throws SQLException
     {
         checkClosed();
@@ -574,6 +641,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the schema names available in this database.
+    @Override
     public ResultSet getSchemas() throws SQLException
     {
         checkClosed();
@@ -581,6 +649,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the schema names available in this database.
+    @Override
     public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException
     {
         checkClosed();
@@ -588,6 +657,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the database vendor's preferred term for "schema".
+    @Override
     public String getSchemaTerm() throws SQLException
     {
         checkClosed();
@@ -595,6 +665,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the string that can be used to escape wildcard characters.
+    @Override
     public String getSearchStringEscape() throws SQLException
     {
         checkClosed();
@@ -602,6 +673,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a comma-separated list of all of this database's SQL keywords that are NOT also SQL:2003 keywords.
+    @Override
     public String getSQLKeywords() throws SQLException
     {
         checkClosed();
@@ -609,6 +681,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Indicates whether the SQLSTATE returned by SQLException.getSQLState is X/Open (now known as Open Group) SQL CLI or SQL:2003.
+    @Override
     public int getSQLStateType() throws SQLException
     {
         checkClosed();
@@ -616,6 +689,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a comma-separated list of string functions available with this database.
+    @Override
     public String getStringFunctions() throws SQLException
     {
         checkClosed();
@@ -623,6 +697,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the table hierarchies defined in a particular schema in this database.
+    @Override
     public ResultSet getSuperTables(String catalog, String schemaPattern, String tableNamePattern) throws SQLException
     {
         checkClosed();
@@ -630,6 +705,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the user-defined type (UDT) hierarchies defined in a particular schema in this database.
+    @Override
     public ResultSet getSuperTypes(String catalog, String schemaPattern, String typeNamePattern) throws SQLException
     {
         checkClosed();
@@ -637,6 +713,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a comma-separated list of system functions available with this database.
+    @Override
     public String getSystemFunctions() throws SQLException
     {
         checkClosed();
@@ -644,6 +721,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the access rights for each table available in a catalog.
+    @Override
     public ResultSet getTablePrivileges(String catalog, String schemaPattern, String tableNamePattern) throws SQLException
     {
         checkClosed();
@@ -652,6 +730,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves a description of the tables available in the given catalog.
     // TODO: implement pattern filtering somewhere (preferably server-side)
+    @Override
     public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types) throws SQLException
     {
         if ((tableNamePattern != null && !tableNamePattern.equals("%")) ||
@@ -678,6 +757,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the table types available in this database.
+    @Override
     public ResultSet getTableTypes() throws SQLException
     {
         checkClosed();
@@ -690,6 +770,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a comma-separated list of the time and date functions available with this database.
+    @Override
     public String getTimeDateFunctions() throws SQLException
     {
         checkClosed();
@@ -697,6 +778,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of all the data types supported by this database.
+    @Override
     public ResultSet getTypeInfo() throws SQLException
     {
         checkClosed();
@@ -704,6 +786,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of the user-defined types (UDTs) defined in a particular schema.
+    @Override
     public ResultSet getUDTs(String catalog, String schemaPattern, String typeNamePattern, int[] types) throws SQLException
     {
         checkClosed();
@@ -711,6 +794,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the URL for this DBMS.
+    @Override
     public String getURL() throws SQLException
     {
         checkClosed();
@@ -718,6 +802,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves the user name as known to this database.
+    @Override
     public String getUserName() throws SQLException
     {
         checkClosed();
@@ -725,6 +810,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of a table's columns that are automatically updated when any value in a row is updated.
+    @Override
     public ResultSet getVersionColumns(String catalog, String schema, String table) throws SQLException
     {
         checkClosed();
@@ -732,6 +818,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether or not a visible row insert can be detected by calling the method ResultSet.rowInserted.
+    @Override
     public boolean insertsAreDetected(int type) throws SQLException
     {
         checkClosed();
@@ -739,6 +826,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a catalog appears at the start of a fully qualified table name.
+    @Override
     public boolean isCatalogAtStart() throws SQLException
     {
         checkClosed();
@@ -746,6 +834,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database is in read-only mode.
+    @Override
     public boolean isReadOnly() throws SQLException
     {
         checkClosed();
@@ -753,6 +842,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Indicates whether updates made to a LOB are made on a copy or directly to the LOB.
+    @Override
     public boolean locatorsUpdateCopy() throws SQLException
     {
         checkClosed();
@@ -760,6 +850,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports concatenations between NULL and non-NULL values being NULL.
+    @Override
     public boolean nullPlusNonNullIsNull() throws SQLException
     {
         checkClosed();
@@ -767,6 +858,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether NULL values are sorted at the end regardless of sort order.
+    @Override
     public boolean nullsAreSortedAtEnd() throws SQLException
     {
         checkClosed();
@@ -774,6 +866,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether NULL values are sorted at the start regardless of sort order.
+    @Override
     public boolean nullsAreSortedAtStart() throws SQLException
     {
         checkClosed();
@@ -781,6 +874,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether NULL values are sorted high.
+    @Override
     public boolean nullsAreSortedHigh() throws SQLException
     {
         checkClosed();
@@ -788,6 +882,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether NULL values are sorted low.
+    @Override
     public boolean nullsAreSortedLow() throws SQLException
     {
         checkClosed();
@@ -795,6 +890,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether deletes made by others are visible.
+    @Override
     public boolean othersDeletesAreVisible(int type) throws SQLException
     {
         checkClosed();
@@ -802,6 +898,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether inserts made by others are visible.
+    @Override
     public boolean othersInsertsAreVisible(int type) throws SQLException
     {
         checkClosed();
@@ -809,6 +906,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether updates made by others are visible.
+    @Override
     public boolean othersUpdatesAreVisible(int type) throws SQLException
     {
         checkClosed();
@@ -816,6 +914,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a result set's own deletes are visible.
+    @Override
     public boolean ownDeletesAreVisible(int type) throws SQLException
     {
         checkClosed();
@@ -823,6 +922,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a result set's own inserts are visible.
+    @Override
     public boolean ownInsertsAreVisible(int type) throws SQLException
     {
         checkClosed();
@@ -830,6 +930,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether for the given type of ResultSet object, the result set's own updates are visible.
+    @Override
     public boolean ownUpdatesAreVisible(int type) throws SQLException
     {
         checkClosed();
@@ -837,6 +938,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database treats mixed case unquoted SQL identifiers as case insensitive and stores them in lower case.
+    @Override
     public boolean storesLowerCaseIdentifiers() throws SQLException
     {
         checkClosed();
@@ -844,6 +946,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database treats mixed case quoted SQL identifiers as case insensitive and stores them in lower case.
+    @Override
     public boolean storesLowerCaseQuotedIdentifiers() throws SQLException
     {
         checkClosed();
@@ -851,6 +954,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database treats mixed case unquoted SQL identifiers as case insensitive and stores them in mixed case.
+    @Override
     public boolean storesMixedCaseIdentifiers() throws SQLException
     {
         checkClosed();
@@ -858,6 +962,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database treats mixed case quoted SQL identifiers as case insensitive and stores them in mixed case.
+    @Override
     public boolean storesMixedCaseQuotedIdentifiers() throws SQLException
     {
         checkClosed();
@@ -865,6 +970,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database treats mixed case unquoted SQL identifiers as case insensitive and stores them in upper case.
+    @Override
     public boolean storesUpperCaseIdentifiers() throws SQLException
     {
         checkClosed();
@@ -872,6 +978,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database treats mixed case quoted SQL identifiers as case insensitive and stores them in upper case.
+    @Override
     public boolean storesUpperCaseQuotedIdentifiers() throws SQLException
     {
         checkClosed();
@@ -879,6 +986,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports ALTER TABLE with add column.
+    @Override
     public boolean supportsAlterTableWithAddColumn() throws SQLException
     {
         checkClosed();
@@ -886,6 +994,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports ALTER TABLE with drop column.
+    @Override
     public boolean supportsAlterTableWithDropColumn() throws SQLException
     {
         checkClosed();
@@ -893,6 +1002,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the ANSI92 entry level SQL grammar.
+    @Override
     public boolean supportsANSI92EntryLevelSQL() throws SQLException
     {
         checkClosed();
@@ -900,6 +1010,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the ANSI92 full SQL grammar supported.
+    @Override
     public boolean supportsANSI92FullSQL() throws SQLException
     {
         checkClosed();
@@ -907,6 +1018,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the ANSI92 intermediate SQL grammar supported.
+    @Override
     public boolean supportsANSI92IntermediateSQL() throws SQLException
     {
         checkClosed();
@@ -914,6 +1026,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports batch updates.
+    @Override
     public boolean supportsBatchUpdates() throws SQLException
     {
         checkClosed();
@@ -921,6 +1034,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a catalog name can be used in a data manipulation statement.
+    @Override
     public boolean supportsCatalogsInDataManipulation() throws SQLException
     {
         checkClosed();
@@ -928,6 +1042,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a catalog name can be used in an index definition statement.
+    @Override
     public boolean supportsCatalogsInIndexDefinitions() throws SQLException
     {
         checkClosed();
@@ -935,6 +1050,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a catalog name can be used in a privilege definition statement.
+    @Override
     public boolean supportsCatalogsInPrivilegeDefinitions() throws SQLException
     {
         checkClosed();
@@ -942,6 +1058,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a catalog name can be used in a procedure call statement.
+    @Override
     public boolean supportsCatalogsInProcedureCalls() throws SQLException
     {
         checkClosed();
@@ -949,6 +1066,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a catalog name can be used in a table definition statement.
+    @Override
     public boolean supportsCatalogsInTableDefinitions() throws SQLException
     {
         checkClosed();
@@ -956,6 +1074,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports column aliasing.
+    @Override
     public boolean supportsColumnAliasing() throws SQLException
     {
         checkClosed();
@@ -963,6 +1082,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the JDBC scalar function CONVERT for the conversion of one JDBC type to another.
+    @Override
     public boolean supportsConvert() throws SQLException
     {
         checkClosed();
@@ -970,6 +1090,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the JDBC scalar function CONVERT for conversions between the JDBC types fromType and toType.
+    @Override
     public boolean supportsConvert(int fromType, int toType) throws SQLException
     {
         checkClosed();
@@ -977,6 +1098,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the ODBC Core SQL grammar.
+    @Override
     public boolean supportsCoreSQLGrammar() throws SQLException
     {
         checkClosed();
@@ -984,6 +1106,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports correlated subqueries.
+    @Override
     public boolean supportsCorrelatedSubqueries() throws SQLException
     {
         checkClosed();
@@ -991,6 +1114,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports both data definition and data manipulation statements within a transaction.
+    @Override
     public boolean supportsDataDefinitionAndDataManipulationTransactions() throws SQLException
     {
         checkClosed();
@@ -998,6 +1122,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports only data manipulation statements within a transaction.
+    @Override
     public boolean supportsDataManipulationTransactionsOnly() throws SQLException
     {
         checkClosed();
@@ -1005,6 +1130,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether, when table correlation names are supported, they are restricted to being different from the names of the tables.
+    @Override
     public boolean supportsDifferentTableCorrelationNames() throws SQLException
     {
         checkClosed();
@@ -1012,6 +1138,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports expressions in ORDER BY lists.
+    @Override
     public boolean supportsExpressionsInOrderBy() throws SQLException
     {
         checkClosed();
@@ -1019,6 +1146,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the ODBC Extended SQL grammar.
+    @Override
     public boolean supportsExtendedSQLGrammar() throws SQLException
     {
         checkClosed();
@@ -1026,6 +1154,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports full nested outer joins.
+    @Override
     public boolean supportsFullOuterJoins() throws SQLException
     {
         checkClosed();
@@ -1033,6 +1162,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether auto-generated keys can be retrieved after a statement has been executed
+    @Override
     public boolean supportsGetGeneratedKeys() throws SQLException
     {
         checkClosed();
@@ -1040,6 +1170,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports some form of GROUP BY clause.
+    @Override
     public boolean supportsGroupBy() throws SQLException
     {
         checkClosed();
@@ -1047,6 +1178,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports using columns not included in the SELECT statement in a GROUP BY clause provided that all of the columns in the SELECT statement are included in the GROUP BY clause.
+    @Override
     public boolean supportsGroupByBeyondSelect() throws SQLException
     {
         checkClosed();
@@ -1054,6 +1186,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports using a column that is not in the SELECT statement in a GROUP BY clause.
+    @Override
     public boolean supportsGroupByUnrelated() throws SQLException
     {
         checkClosed();
@@ -1061,6 +1194,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the SQL Integrity Enhancement Facility.
+    @Override
     public boolean supportsIntegrityEnhancementFacility() throws SQLException
     {
         checkClosed();
@@ -1068,6 +1202,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports specifying a LIKE escape clause.
+    @Override
     public boolean supportsLikeEscapeClause() throws SQLException
     {
         checkClosed();
@@ -1075,6 +1210,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database provides limited support for outer joins.
+    @Override
     public boolean supportsLimitedOuterJoins() throws SQLException
     {
         checkClosed();
@@ -1082,6 +1218,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the ODBC Minimum SQL grammar.
+    @Override
     public boolean supportsMinimumSQLGrammar() throws SQLException
     {
         checkClosed();
@@ -1089,6 +1226,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database treats mixed case unquoted SQL identifiers as case sensitive and as a result stores them in mixed case.
+    @Override
     public boolean supportsMixedCaseIdentifiers() throws SQLException
     {
         checkClosed();
@@ -1096,6 +1234,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database treats mixed case quoted SQL identifiers as case sensitive and as a result stores them in mixed case.
+    @Override
     public boolean supportsMixedCaseQuotedIdentifiers() throws SQLException
     {
         checkClosed();
@@ -1103,6 +1242,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether it is possible to have multiple ResultSet objects returned from a CallableStatement object simultaneously.
+    @Override
     public boolean supportsMultipleOpenResults() throws SQLException
     {
         checkClosed();
@@ -1110,6 +1250,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports getting multiple ResultSet objects from a single call to the method execute.
+    @Override
     public boolean supportsMultipleResultSets() throws SQLException
     {
         checkClosed();
@@ -1117,6 +1258,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database allows having multiple transactions open at once (on different connections) throws SQLException.
+    @Override
     public boolean supportsMultipleTransactions() throws SQLException
     {
         checkClosed();
@@ -1124,6 +1266,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports named parameters to callable statements.
+    @Override
     public boolean supportsNamedParameters() throws SQLException
     {
         checkClosed();
@@ -1131,6 +1274,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether columns in this database may be defined as non-nullable.
+    @Override
     public boolean supportsNonNullableColumns() throws SQLException
     {
         checkClosed();
@@ -1138,6 +1282,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports keeping cursors open across commits.
+    @Override
     public boolean supportsOpenCursorsAcrossCommit() throws SQLException
     {
         checkClosed();
@@ -1145,6 +1290,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports keeping cursors open across rollbacks.
+    @Override
     public boolean supportsOpenCursorsAcrossRollback() throws SQLException
     {
         checkClosed();
@@ -1152,6 +1298,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports keeping statements open across commits.
+    @Override
     public boolean supportsOpenStatementsAcrossCommit() throws SQLException
     {
         checkClosed();
@@ -1159,6 +1306,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports keeping statements open across rollbacks.
+    @Override
     public boolean supportsOpenStatementsAcrossRollback() throws SQLException
     {
         checkClosed();
@@ -1166,6 +1314,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports using a column that is not in the SELECT statement in an ORDER BY clause.
+    @Override
     public boolean supportsOrderByUnrelated() throws SQLException
     {
         checkClosed();
@@ -1173,6 +1322,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports some form of outer join.
+    @Override
     public boolean supportsOuterJoins() throws SQLException
     {
         checkClosed();
@@ -1180,6 +1330,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports positioned DELETE statements.
+    @Override
     public boolean supportsPositionedDelete() throws SQLException
     {
         checkClosed();
@@ -1187,6 +1338,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports positioned UPDATE statements.
+    @Override
     public boolean supportsPositionedUpdate() throws SQLException
     {
         checkClosed();
@@ -1194,6 +1346,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the given concurrency type in combination with the given result set type.
+    @Override
     public boolean supportsResultSetConcurrency(int type, int concurrency) throws SQLException
     {
         checkClosed();
@@ -1203,6 +1356,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the given result set holdability.
+    @Override
     public boolean supportsResultSetHoldability(int holdability) throws SQLException
     {
         checkClosed();
@@ -1210,6 +1364,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the given result set type.
+    @Override
     public boolean supportsResultSetType(int type) throws SQLException
     {
         checkClosed();
@@ -1219,6 +1374,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports savepoints.
+    @Override
     public boolean supportsSavepoints() throws SQLException
     {
         checkClosed();
@@ -1226,6 +1382,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a schema name can be used in a data manipulation statement.
+    @Override
     public boolean supportsSchemasInDataManipulation() throws SQLException
     {
         checkClosed();
@@ -1233,6 +1390,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a schema name can be used in an index definition statement.
+    @Override
     public boolean supportsSchemasInIndexDefinitions() throws SQLException
     {
         checkClosed();
@@ -1240,6 +1398,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a schema name can be used in a privilege definition statement.
+    @Override
     public boolean supportsSchemasInPrivilegeDefinitions() throws SQLException
     {
         checkClosed();
@@ -1247,6 +1406,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a schema name can be used in a procedure call statement.
+    @Override
     public boolean supportsSchemasInProcedureCalls() throws SQLException
     {
         checkClosed();
@@ -1254,6 +1414,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether a schema name can be used in a table definition statement.
+    @Override
     public boolean supportsSchemasInTableDefinitions() throws SQLException
     {
         checkClosed();
@@ -1261,6 +1422,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports SELECT FOR UPDATE statements.
+    @Override
     public boolean supportsSelectForUpdate() throws SQLException
     {
         checkClosed();
@@ -1268,6 +1430,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports statement pooling.
+    @Override
     public boolean supportsStatementPooling() throws SQLException
     {
         checkClosed();
@@ -1275,6 +1438,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports invoking user-defined or vendor functions using the stored procedure escape syntax.
+    @Override
     public boolean supportsStoredFunctionsUsingCallSyntax() throws SQLException
     {
         checkClosed();
@@ -1282,6 +1446,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports stored procedure calls that use the stored procedure escape syntax.
+    @Override
     public boolean supportsStoredProcedures() throws SQLException
     {
         checkClosed();
@@ -1289,6 +1454,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports subqueries in comparison expressions.
+    @Override
     public boolean supportsSubqueriesInComparisons() throws SQLException
     {
         checkClosed();
@@ -1296,6 +1462,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports subqueries in EXISTS expressions.
+    @Override
     public boolean supportsSubqueriesInExists() throws SQLException
     {
         checkClosed();
@@ -1303,6 +1470,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports subqueries in IN expressions.
+    @Override
     public boolean supportsSubqueriesInIns() throws SQLException
     {
         checkClosed();
@@ -1310,6 +1478,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports subqueries in quantified expressions.
+    @Override
     public boolean supportsSubqueriesInQuantifieds() throws SQLException
     {
         checkClosed();
@@ -1317,6 +1486,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports table correlation names.
+    @Override
     public boolean supportsTableCorrelationNames() throws SQLException
     {
         checkClosed();
@@ -1324,6 +1494,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports the given transaction isolation level.
+    @Override
     public boolean supportsTransactionIsolationLevel(int level) throws SQLException
     {
         checkClosed();
@@ -1333,6 +1504,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports transactions.
+    @Override
     public boolean supportsTransactions() throws SQLException
     {
         checkClosed();
@@ -1340,6 +1512,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports SQL UNION.
+    @Override
     public boolean supportsUnion() throws SQLException
     {
         checkClosed();
@@ -1347,6 +1520,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database supports SQL UNION ALL.
+    @Override
     public boolean supportsUnionAll() throws SQLException
     {
         checkClosed();
@@ -1354,6 +1528,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether or not a visible row update can be detected by calling the method ResultSet.rowUpdated.
+    @Override
     public boolean updatesAreDetected(int type) throws SQLException
     {
         checkClosed();
@@ -1361,6 +1536,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database uses a file for each table.
+    @Override
     public boolean usesLocalFilePerTable() throws SQLException
     {
         checkClosed();
@@ -1368,6 +1544,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves whether this database stores tables in a local file.
+    @Override
     public boolean usesLocalFiles() throws SQLException
     {
         checkClosed();
@@ -1375,6 +1552,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Returns true if this either implements the interface argument or is directly or indirectly a wrapper for an object that does.
+    @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException
     {
         checkClosed();
@@ -1382,6 +1560,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Returns an object that implements the given interface to allow access to non-standard methods, or standard methods not exposed by the proxy.
+    @Override
     public <T> T unwrap(Class<T> iface)    throws SQLException
     {
         checkClosed();
@@ -1393,5 +1572,16 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
          {
             throw SQLError.get(SQLError.ILLEGAL_ARGUMENT, iface.toString());
         }
+    }
+
+    public ResultSet getPseudoColumns(String catalog, String schemaPattern,
+            String tableNamePattern, String columnNamePattern)
+            throws SQLException {
+        checkClosed();
+        throw SQLError.noSupport();
+    }
+
+    public boolean generatedKeyAlwaysReturned() throws SQLException {
+        throw SQLError.noSupport();
     }
 }

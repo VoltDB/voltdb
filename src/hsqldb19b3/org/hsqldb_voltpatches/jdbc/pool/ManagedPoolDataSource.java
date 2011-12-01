@@ -34,6 +34,7 @@ package org.hsqldb_voltpatches.jdbc.pool;
 import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,6 +43,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.logging.Logger;
+
 import javax.sql.ConnectionEvent;
 import javax.sql.ConnectionEventListener;
 import javax.sql.PooledConnection;
@@ -538,7 +541,7 @@ public class ManagedPoolDataSource implements javax.sql.DataSource,
     private void reclaimAbandonedConnections() {
 
         long     now                  = System.currentTimeMillis();
-        long     sessionTimeoutMillis = ((long) sessionTimeout) * 1000L;
+        long     sessionTimeoutMillis = sessionTimeout * 1000L;
         Iterator iterator             = this.connectionsInUse.iterator();
         List     abandonedConnections = new ArrayList();
 
@@ -604,7 +607,7 @@ public class ManagedPoolDataSource implements javax.sql.DataSource,
         long loginTimeoutExpiration = 0;
 
         if (getLoginTimeout() > 0) {
-            loginTimeoutExpiration = 1000L * ((long) getLoginTimeout());
+            loginTimeoutExpiration = 1000L * getLoginTimeout();
         }
 
         return loginTimeoutExpiration;
@@ -1195,5 +1198,9 @@ public class ManagedPoolDataSource implements javax.sql.DataSource,
                + "\n    Init Size: " + getInitialSize() + "\n    Conn Props: "
                + getConnectionProperties() + "\n    Validation Query: "
                + validationQuery + '\n';
+    }
+
+    public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+        throw new SQLFeatureNotSupportedException();
     }
 }

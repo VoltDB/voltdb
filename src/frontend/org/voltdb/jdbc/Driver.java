@@ -17,12 +17,18 @@
 
 package org.voltdb.jdbc;
 
-import java.sql.*;
-import java.util.*;
-import java.util.regex.*;
-import org.voltdb.*;
-import org.voltdb.client.*;
-import org.voltdb.client.exampleutils.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.DriverPropertyInfo;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.util.Enumeration;
+import java.util.Properties;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.voltdb.client.exampleutils.ClientConnectionPool;
 
 public class Driver implements java.sql.Driver
 {
@@ -47,6 +53,7 @@ public class Driver implements java.sql.Driver
         // Required for Class.forName().newInstance()
     }
 
+    @Override
     public Connection connect(String url, Properties info) throws SQLException
     {
         if(acceptsURL(url))
@@ -89,28 +96,37 @@ public class Driver implements java.sql.Driver
         return null;
     }
 
+    @Override
     public boolean acceptsURL(String url) throws SQLException
     {
         return Pattern.compile("^jdbc:voltdb://.+", Pattern.CASE_INSENSITIVE).matcher(url).matches();
     }
 
+    @Override
     public int getMajorVersion()
     {
         return MAJOR_VERSION;
     }
 
+    @Override
     public int getMinorVersion()
     {
         return MINOR_VERSION;
     }
 
+    @Override
     public DriverPropertyInfo[] getPropertyInfo(String url, Properties loginProps) throws SQLException
     {
         return new DriverPropertyInfo[0];
     }
 
+    @Override
     public boolean jdbcCompliant()
     {
         return false;
+    }
+
+    public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+        throw new SQLFeatureNotSupportedException();
     }
 }

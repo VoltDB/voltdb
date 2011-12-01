@@ -22,12 +22,12 @@
  */
 package voltcache;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.Random;
-import java.io.ByteArrayOutputStream;
-import java.io.ByteArrayInputStream;
-import java.util.zip.GZIPOutputStream;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class PayloadProcessor
 {
@@ -86,7 +86,7 @@ public class PayloadProcessor
             this.ValueBase[i] = (byte)this.Rand.nextInt(64);
 
         // Get the base key format string used to generate keys
-        this.KeyFormat = "K%1$#" + (this.KeySize-1) + "s";
+        this.KeyFormat = "K%1$" + String.valueOf(this.KeySize-1) + "s";
     }
 
     public Pair generateForStore()
