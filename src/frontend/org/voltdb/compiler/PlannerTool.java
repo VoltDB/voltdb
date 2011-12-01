@@ -18,10 +18,14 @@
 package org.voltdb.compiler;
 
 import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Date;
@@ -232,7 +236,11 @@ public class PlannerTool {
 
         ArrayList<String> cmd = new ArrayList<String>();
 
-        cmd.add("java");
+        try {
+            cmd.add(org.voltdb.utils.MiscUtils.getJavaPath());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         cmd.add("-cp");
         cmd.add(classpath);
         cmd.add("-Xmx256m");

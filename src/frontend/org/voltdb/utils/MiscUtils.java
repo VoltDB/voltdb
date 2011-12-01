@@ -16,9 +16,13 @@
  */
 package org.voltdb.utils;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
@@ -26,6 +30,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.eclipse.jetty.util.log.Log;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.VoltLogger;
 
@@ -211,5 +216,70 @@ public class MiscUtils {
         }
         return build;
 
+    }
+
+    private static String checkForJavaHomeInEnvironment() throws Exception {
+        String javahome = System.getenv("JAVA_HOME");
+        if (javahome != null) {
+            File f = new File(new File(javahome, "bin"), "java");
+            if (f.exists() && f.canExecute()) {
+                return f.getAbsolutePath();
+            } else {
+                hostLog.warn("JAVA_HOME environment variable (" + javahome +
+                        ") was set, but could not find an executable java binary at " + f.getAbsolutePath());
+            }
+        } else {
+            hostLog.warn("JAVA_HOME environment variable was not set, couldn't be used to find a java binary");
+        }
+        return null;
+    }
+
+    private static String checkForJavaInPath() throws Exception {
+        Process p = Runtime.getRuntime().exec("which java");
+        p.waitFor();
+        InputStream is = p.getInputStream();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        int read = 0;
+        while ((read = is.read()) != -1) {
+            baos.write(read);
+        }
+        String java = new String(baos.toByteArray(), "UTF-8").trim();
+        if (java != null) {
+            File f = new File(java);
+            if (f.exists() && f.canExecute()) {
+                return f.getAbsolutePath();
+            } else {
+                hostLog.warn("Attempted to discover java binary from PATH using 'which java' (" +
+                        java + ") but an executable binary was not found at " + f.getAbsolutePath());
+            }
+        }
+        return null;
+    }
+
+    public static String getJavaPath() throws Exception {
+        String javahome = System.getProperties().getProperty("java.home");
+        if (javahome != null) {
+            File f = new File(javahome + "/bin/java");
+            if (f.exists() && f.canExecute()) {
+                return f.getAbsolutePath();
+            } else {
+                hostLog.warn("Couldn't find java binary in java home (" + javahome + ") defined by " +
+                        "the java.home system property. Path checked was " + f.getAbsolutePath());
+            }
+        } else {
+            hostLog.warn("java.home system property not defined");
+        }
+        String javaPath = checkForJavaHomeInEnvironment();
+        if (javaPath == null) {
+          javaPath = checkForJavaInPath();
+        }
+        if (javaPath == null) {
+            hostLog.error(
+                    "Could not find executable java binary in the java.home property specified by " +
+                    "the JVM, or in the Java home specified  by the JAVA_HOME environment variable, " +
+                    " or in the PATH");
+            throw new Exception("Could not find java binary");
+        }
+        return javaPath;
     }
 }
