@@ -345,7 +345,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             VOLT_TRACE("INDEX_LOOKUP_TYPE_EQ nsks: %d moveToKeyOrGreater '%s'",
                        m_numOfSearchkeys, m_searchKey.debugNoHeader().c_str());
             // need to move to or greater to find (x,_) when doing a partial covering search.
-            m_index->moveToKeyOrGreater(&m_searchKey);
+            if (m_searchKey.getSchema()->columnCount() > m_numOfSearchkeys) {
+                m_index->moveToKeyOrGreater(&m_searchKey);
+            }
+            // but must move strictly to key otherwise to support hash index API
+            else {
+                m_index->moveToKey(&m_searchKey);
+            }
         }
         else if (m_lookupType == INDEX_LOOKUP_TYPE_GT)
         {
