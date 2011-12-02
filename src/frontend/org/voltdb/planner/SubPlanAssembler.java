@@ -161,7 +161,6 @@ public abstract class SubPlanAssembler {
         retval.index = index;
 
         // Non-scannable indexes require equality, full coverage expressions
-        // TODO: Should be metadata on the IndexType instance.
         final boolean indexScannable =
             (index.getType() == IndexType.BALANCED_TREE.getValue()) ||
             (index.getType() == IndexType.BTREE.getValue());
@@ -289,17 +288,16 @@ public abstract class SubPlanAssembler {
 
         // If IndexUseType is the default of COVERING_UNIQUE_EQUALITY, and not
         // all columns are covered (but some are with equality)
-        // then it is possible to scan use GT. The columns not covered will have
-        // null supplied. This will not execute
-        // if there is already a GT or LT lookup type set because those also
-        // change the IndexUseType to INDEX_SCAN
+        // then it is possible to scan use GTE. The columns not covered will have
+        // null supplied. This will not execute if there is already a GT or LT lookup
+        // type set because those also change the IndexUseType to INDEX_SCAN
         // Maybe setting the IndexUseType should be done separately from
         // determining if the last expression is GT/LT?
         if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY &&
             retval.indexExprs.size() < index.getColumns().size())
         {
             retval.use = IndexUseType.INDEX_SCAN;
-            retval.lookupType = IndexLookupType.GT;
+            retval.lookupType = IndexLookupType.GTE;
         }
 
         if ((indexScannable == false)) {

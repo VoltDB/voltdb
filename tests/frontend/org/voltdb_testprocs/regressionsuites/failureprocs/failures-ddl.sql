@@ -73,10 +73,10 @@ CREATE TABLE BAD_COMPARES (
 );
 
 CREATE TABLE ENG1850 (
-  cid int not null,
-  aid int,
-  pid int not null,
-  attr int not null,
+  cid INTEGER not null,
+  aid INTEGER,
+  pid INTEGER,
+  attr INTEGER,
   constraint pk_cid primary key (cid)
 );
 
