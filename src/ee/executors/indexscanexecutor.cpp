@@ -228,6 +228,16 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
 
+    // Need to move GTE to find (x,_) when doing a partial covering search.
+    // the planner sometimes lies in this case: index_lookup_type_eq is incorrect.
+    // Index_lookup_type_gte is necessary. Make the change here.
+    if (m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
+        m_searchKey.getSchema()->columnCount() > m_numOfSearchkeys)
+    {
+        VOLT_TRACE("Setting lookup type to GTE for partial covering key.");
+        m_lookupType = INDEX_LOOKUP_TYPE_GTE;
+    }
+
     return true;
 }
 
@@ -340,18 +350,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     if (m_numOfSearchkeys > 0)
     {
+        VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                   m_lookupType, m_numOfSearchkeys, m_searchKey.debugNoHeader().c_str());
+
         if (m_lookupType == INDEX_LOOKUP_TYPE_EQ)
         {
-            VOLT_TRACE("INDEX_LOOKUP_TYPE_EQ nsks: %d moveToKeyOrGreater '%s'",
-                       m_numOfSearchkeys, m_searchKey.debugNoHeader().c_str());
-            // need to move to or greater to find (x,_) when doing a partial covering search.
-            if (m_searchKey.getSchema()->columnCount() > m_numOfSearchkeys) {
-                m_index->moveToKeyOrGreater(&m_searchKey);
-            }
-            // but must move strictly to key otherwise to support hash index API
-            else {
-                m_index->moveToKey(&m_searchKey);
-            }
+            m_index->moveToKey(&m_searchKey);
         }
         else if (m_lookupType == INDEX_LOOKUP_TYPE_GT)
         {
@@ -387,10 +391,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // We have to different nextValue() methods for different lookup types
     //
     while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
-            !(m_tuple = m_index->nextValue()).isNullTuple()) ||
+            !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
            ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || m_numOfSearchkeys == 0) &&
             !(m_tuple = m_index->nextValue()).isNullTuple()))
-
     {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
         //
