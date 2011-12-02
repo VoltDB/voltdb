@@ -266,7 +266,6 @@ public class Inits {
                     }
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
-
                     m_rvdb.m_messenger.sendCatalog(catalogBytes);
                 }
                 catch (IOException e) {
@@ -479,14 +478,14 @@ public class Inits {
         }
     }
 
-    class SetupStartMode extends InitWork {
-        SetupStartMode() {
+    class SetupReplicationRole extends InitWork {
+        SetupReplicationRole() {
         }
 
         @Override
         public void run() {
             // See if we should bring the server up in WAN replication mode
-            m_rvdb.setStartMode(m_config.m_startMode);
+            m_rvdb.setReplicationRole(m_config.m_replicationRole);
         }
     }
 

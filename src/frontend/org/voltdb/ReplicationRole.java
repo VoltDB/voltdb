@@ -17,19 +17,17 @@
 
 package org.voltdb;
 
-/**
- * All the operational modes VoltDB can be in
- */
-public enum OperationMode {
-    INITIALIZING, RUNNING, PAUSED, SHUTTINGDOWN;
+public enum ReplicationRole
+{
+    PRIMARY, SECONDARY, NONE;
 
     /**
-     * Get the operation mode from its ordinal value.
+     * Get the replication role from its ordinal value.
      * @param val
      * @return
      */
-    public static OperationMode get(byte val) {
-        for (OperationMode mode : OperationMode.values()) {
+    public static ReplicationRole get(byte val) {
+        for (ReplicationRole mode : ReplicationRole.values()) {
             if (mode.ordinal() == val) {
                 return mode;
             }

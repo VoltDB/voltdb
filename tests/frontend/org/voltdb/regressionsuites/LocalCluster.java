@@ -37,6 +37,7 @@ import java.util.logging.Logger;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.OperationMode;
+import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -283,6 +284,12 @@ public class LocalCluster implements VoltServerConfig {
             m_buildDir = System.getProperty("user.dir") + "/obj/release";
         else
             m_buildDir = buildDir;
+
+        String jzmq_dir = System.getenv("VOLTDB_JZMQ_DIR"); // via build.xml
+        if (jzmq_dir == null)
+            jzmq_dir = System.getProperty("user.dir") + "/third_party/cpp/jnilib";
+        System.out.println("Looking for jzmq native lib in: " + jzmq_dir);
+
         m_failureState = failureState;
         //m_failureState = FailureState.ALL_RUNNING;
 
@@ -297,7 +304,7 @@ public class LocalCluster implements VoltServerConfig {
         // processes of VoltDBs using the compiled jar file.
         m_pipes = new ArrayList<PipeToFile>();
         m_procBuilder = new ProcessBuilder("java",
-                                           "-Djava.library.path=" + m_buildDir + "/nativelibs",
+                                           "-Djava.library.path=" + m_buildDir + "/nativelibs" + ":" + jzmq_dir,
                                            "-Dlog4j.configuration=log4j.xml",
                                            "-DLOG_SEGMENT_SIZE=8",
                                            "-ea",
@@ -427,10 +434,10 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
-        startUp(clearLocalDataDirectories, OperationMode.RUNNING);
+        startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
-    public void startUp(boolean clearLocalDataDirectories, OperationMode startMode) {
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
         assert (!m_running);
         if (m_running) {
             return;
@@ -489,7 +496,7 @@ public class LocalCluster implements VoltServerConfig {
             config.m_port = VoltDB.DEFAULT_PORT;
             config.m_adminPort = m_baseAdminPort;
             config.m_startAction = START_ACTION.CREATE;
-            config.m_startMode = startMode;
+            config.m_replicationRole = role;
             ArrayList<Integer> ports = new ArrayList<Integer>();
             for (EEProcess proc : m_eeProcs.get(0)) {
                 ports.add(proc.port());
@@ -504,7 +511,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories, startMode.toString().toLowerCase());
+            startOne(i, clearLocalDataDirectories, role.toString().toLowerCase());
         }
 
         // spin until all the pipes see the magic "Server completed.." string.

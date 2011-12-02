@@ -136,8 +136,11 @@ public class VoltDB {
         /** start up action */
         public START_ACTION m_startAction = START_ACTION.START;
 
-        /** start mode: normal, primary, secondary */
+        /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
+
+        /** replication role: primary, secondary */
+        public ReplicationRole m_replicationRole = ReplicationRole.NONE;
 
         /**
          * At rejoin time an interface will be selected. It will be the
@@ -268,9 +271,9 @@ public class VoltDB {
                 }
 
                 else if (arg.equals("primary")) {
-                    m_startMode = OperationMode.PRIMARY;
+                    m_replicationRole = ReplicationRole.PRIMARY;
                 } else if (arg.equals("secondary")) {
-                    m_startMode = OperationMode.SECONDARY;
+                    m_replicationRole = ReplicationRole.SECONDARY;
                 }
 
                 // handle timestampsalt

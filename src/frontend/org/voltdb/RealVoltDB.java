@@ -218,13 +218,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     CommandLog m_commandLog;
 
-    /*
-     * TODO: Primary and secondary modes are not set correctly after
-     * pause/resume cycles, it's only set on startup and rejoin for the
-     * prototype.
-     */
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
-    OperationMode m_startMode = null;
+    private OperationMode m_startMode = null;
+    private ReplicationRole m_replicationRole = null;
 
     // metadata is currently of the format:
     // IP:CIENTPORT:ADMINPORT:HTTPPORT
@@ -431,7 +427,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         ClientInterface.create(m_network,
                                                m_messenger,
                                                m_catalogContext,
-                                               m_startMode == OperationMode.SECONDARY,
+                                               m_replicationRole == ReplicationRole.SECONDARY,
                                                m_catalogContext.numberOfNodes,
                                                currSiteId,
                                                site.getInitiatorid(),
@@ -902,9 +898,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         if (m_startMode == OperationMode.PAUSED) {
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
-        } else if (m_startMode == OperationMode.PRIMARY) {
+        }
+
+        if (m_replicationRole == ReplicationRole.PRIMARY) {
                 hostLog.info("Started as primary cluster.");
-        } else if (m_startMode == OperationMode.SECONDARY) {
+        } else if (m_replicationRole == ReplicationRole.SECONDARY) {
             hostLog.info("Started as secondary cluster. Clients can only call read-only procedures.");
         }
         if (httpPortExtraLogMessage != null)
@@ -1684,6 +1682,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void setStartMode(OperationMode mode) {
         m_startMode = mode;
+    }
+
+    @Override
+    public OperationMode getStartMode()
+    {
+        return m_startMode;
+    }
+
+    @Override
+    public void setReplicationRole(ReplicationRole role)
+    {
+        m_replicationRole = role;
+    }
+
+    public ReplicationRole getReplicationRole()
+    {
+        return m_replicationRole;
     }
 
     /**

@@ -67,13 +67,15 @@ public class MockVoltDB implements VoltDBInterface
         }
     };
     private OperationMode m_mode = OperationMode.RUNNING;
-    private volatile String m_localMetadata = "0.0.0.0:0:0:0";
+    private volatile String m_localMetadata = "127.0.0.1:21212:21211:-1:5555";
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
     final AgreementSite m_agreementSite;
     private final ZooKeeper m_zk;
     boolean m_noLoadLib = false;
     public boolean shouldIgnoreCrashes = false;
+    OperationMode m_startMode = OperationMode.RUNNING;
+    ReplicationRole m_replicationRole = ReplicationRole.NONE;
 
     public MockVoltDB()
     {
@@ -137,6 +139,7 @@ public class MockVoltDB implements VoltDBInterface
     public void addHost(int hostId)
     {
         getCluster().getHosts().add(Integer.toString(hostId));
+        m_clusterMetadata.put(hostId, m_localMetadata);
     }
 
     public void addPartition(int partitionId)
@@ -482,7 +485,26 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void setStartMode(OperationMode mode) {}
+    public void setStartMode(OperationMode mode) {
+        m_startMode = mode;
+    }
+
+    @Override
+    public OperationMode getStartMode()
+    {
+        return m_startMode;
+    }
+
+        @Override
+    public void setReplicationRole(ReplicationRole role)
+    {
+        m_replicationRole = role;
+    }
+
+    public ReplicationRole getReplicationRole()
+    {
+        return m_replicationRole;
+    }
 
     @Override
     public ZooKeeper getZK() {

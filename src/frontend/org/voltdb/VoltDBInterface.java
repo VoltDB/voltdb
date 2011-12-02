@@ -167,6 +167,12 @@ public interface VoltDBInterface
      */
     public void setStartMode(OperationMode mode);
 
+    public OperationMode getStartMode();
+
+    public void setReplicationRole(ReplicationRole role);
+
+    public ReplicationRole getReplicationRole();
+
     /**
      * Set the operation mode of this server.
      * @param mode the operational mode to enter

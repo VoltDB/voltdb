@@ -38,11 +38,11 @@ public class PartitionDRGateway {
 
         PartitionDRGateway pdrg = null;
 
-        RealVoltDB rvdb = (RealVoltDB) VoltDB.instance();
+        VoltDBInterface vdb = VoltDB.instance();
 
         // if this is a primary cluster in a DR-enabled scenario
         //  try to load the real version of this class
-        if (rvdb.m_startMode == OperationMode.PRIMARY) {
+        if (vdb.getReplicationRole() == ReplicationRole.PRIMARY) {
             try {
                 Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
                 Object obj = pdrgiClass.newInstance();

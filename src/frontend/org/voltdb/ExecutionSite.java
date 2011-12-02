@@ -666,8 +666,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         m_indexStats = null;
 
         // initialize the DR gateway
-        int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
-        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, false, new File("/tmp"));
+        m_partitionDRGateway = new PartitionDRGateway();
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -1116,6 +1115,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public void runLoop(boolean loopUntilPoison) {
         while (m_shouldContinue) {
             TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
+            m_currentTransactionState = currentTxnState;
             if (currentTxnState == null) {
                 // poll the messaging layer for a while as this site has nothing to do
                 // this will likely have a message/several messages immediately in a heavy workload
@@ -2322,7 +2322,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     // skip for multi-partition txns because only 1 of k+1 partitions will
                     //  have the real results
                     if ((!itask.isReadOnly()) && itask.isSinglePartition()) {
-                        m_currentTransactionState.storeResults(cr);
+                        txnState.storeResults(cr);
                     }
                 }
             }
