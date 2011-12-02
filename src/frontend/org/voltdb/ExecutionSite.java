@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -666,7 +667,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // initialize the DR gateway
         int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
-        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, false);
+        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, false, new File("/tmp"));
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -697,7 +698,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // initialize the DR gateway
         int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
-        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, m_recovering);
+        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "wan-overflow");
+        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, m_recovering, overflowDir);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();

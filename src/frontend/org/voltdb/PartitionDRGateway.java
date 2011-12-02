@@ -17,6 +17,9 @@
 
 package org.voltdb;
 
+import java.io.File;
+import java.io.IOException;
+
 /**
  * Stub class that provides a gateway to the InvocationBufferServer when
  * WAN-based DR is enabled. If no DR, then it acts as a noop stub.
@@ -28,9 +31,10 @@ public class PartitionDRGateway {
      * Load the full subclass if it should, otherwise load the
      * noop stub.
      * @param partitionId partition id
+     * @param overflowDir
      * @return Instance of PartitionDRGateway
      */
-    public static PartitionDRGateway getInstance(int partitionId, boolean rejoiningAtStartup) {
+    public static PartitionDRGateway getInstance(int partitionId, boolean rejoiningAtStartup, File overflowDir) {
 
         PartitionDRGateway pdrg = null;
 
@@ -57,12 +61,16 @@ public class PartitionDRGateway {
         }
 
         // init the instance and return
-        pdrg.init(partitionId, rejoiningAtStartup);
+        try {
+            pdrg.init(partitionId, rejoiningAtStartup, overflowDir);
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
+        }
         return pdrg;
     }
 
     // empty methods for community edition
-    protected void init(int partitionId, boolean rejoiningAtStartup) {}
+    protected void init(int partitionId, boolean rejoiningAtStartup, File overflowDir) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
     public void tick(long txnId) {}
     public void shutdown() {}
