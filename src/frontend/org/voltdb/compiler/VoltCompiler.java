@@ -710,8 +710,9 @@ public class VoltCompiler {
         final Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         for (Table table : db.getTables()) {
             if (table.getIsreplicated()) {
-                compilerLog.debug("Skipping creation of CRUD procedures for replicated table " +
+                compilerLog.debug("Creating multi-partition insert procedure for replicated table " +
                         table.getTypeName());
+                generateCrudReplicatedInsert(table);
                 continue;
             }
 
@@ -727,7 +728,13 @@ public class VoltCompiler {
                 continue;
             }
 
-            // CRUD requires pkey. Pkeys are stored as constraints.
+            // get the partition column
+            final Column partitioncolumn = table.getPartitioncolumn();
+
+            // all partitioned tables get insert crud procs
+            crudprocs.add(generateCrudInsert(table, partitioncolumn));
+
+            // select/delete/update crud requires pkey. Pkeys are stored as constraints.
             final CatalogMap<Constraint> constraints = table.getConstraints();
             final Iterator<Constraint> it = constraints.iterator();
             Constraint pkey = null;
@@ -740,13 +747,13 @@ public class VoltCompiler {
             }
 
             if (pkey == null) {
-                compilerLog.debug("Skipping creation of CRUD procedures for partitioned table " +
+                compilerLog.debug("Skipping creation of CRUD select/delete/update for partitioned table " +
                         table.getTypeName() + " because no primary key is declared.");
                 continue;
             }
 
-            // Primary key must include the partition column for the table.
-            final Column partitioncolumn = table.getPartitioncolumn();
+            // Primary key must include the partition column for the table
+            // for select/delete/update
             boolean pkeyHasPartitionColumn = false;
             CatalogMap<ColumnRef> pkeycols = pkey.getIndex().getColumns();
             Iterator<ColumnRef> pkeycolsit = pkeycols.iterator();
@@ -759,13 +766,13 @@ public class VoltCompiler {
             }
 
             if (!pkeyHasPartitionColumn) {
-                compilerLog.debug("Skipping creation of CRUD procedures for partitioned table " +
+                compilerLog.debug("Skipping creation of CRUD select/delete/update for partitioned table " +
                         table.getTypeName() + " because primary key does not include the partitioning column.");
                 continue;
             }
 
+            // select, delete and updarte here (insert generated above)
             crudprocs.add(generateCrudSelect(table, partitioncolumn, pkey));
-            crudprocs.add(generateCrudInsert(table, partitioncolumn, pkey));
             crudprocs.add(generateCrudDelete(table, partitioncolumn, pkey));
             crudprocs.add(generateCrudUpdate(table, partitioncolumn, pkey));
         }
@@ -939,7 +946,7 @@ public class VoltCompiler {
      *  "insert into <table> values (?, ?, ...);"
      */
     private ProcedureDescriptor generateCrudInsert(Table table,
-            Column partitioncolumn, Constraint pkey)
+            Column partitioncolumn)
     {
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO " + table.getTypeName() + " VALUES ");
@@ -962,6 +969,33 @@ public class VoltCompiler {
         compilerLog.info("Synthesized built-in INSERT procedure: " +
                 sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
                 partitioninfo);
+
+        return pd;
+    }
+
+    /**
+     * Create a statement like:
+     *  "insert into <table> values (?, ?, ...);"
+     *  for a replicated table.
+     */
+    private ProcedureDescriptor generateCrudReplicatedInsert(Table table) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("INSERT INTO " + table.getTypeName() + " VALUES ");
+
+        generateCrudColumnList(table, sb);
+        sb.append(";");
+
+        ProcedureDescriptor pd =
+            new ProcedureDescriptor(
+                    new ArrayList<String>(),  // groups
+                    table.getTypeName() + ".insert",        // className
+                    sb.toString(),            // singleStmt
+                    null,                     // joinOrder
+                    null,                     // table.column:offset
+                    true);                    // builtin statement
+
+        compilerLog.info("Synthesized built-in INSERT multi-partition procedure: " +
+                sb.toString() + " for " + table.getTypeName());
 
         return pd;
     }

@@ -23,7 +23,10 @@
 
 package org.voltdb.jdbc;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.sql.Connection;
@@ -241,8 +244,8 @@ public class TestJDBCDriver {
             }
             count++;
         }
-        // 7 tables * 4 CRUD/table + 2 procedures
-        assertEquals(7 * 4 + 2, count);
+        // 7 tables * 4 CRUD/table + 2 procedures + 1 for replicated insert
+        assertEquals(7 * 4 + 2 + 1, count);
     }
 
     @Test

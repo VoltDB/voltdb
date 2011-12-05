@@ -113,6 +113,7 @@ public class SystemProcedureCatalog {
         listing.put("@BalancePartitions",       new Config("org.voltdb.sysprocs.BalancePartitions", false, false, true));
         listing.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false, true,  false));
         listing.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false));
+        listing.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", false, false, false));
     }
 
 }

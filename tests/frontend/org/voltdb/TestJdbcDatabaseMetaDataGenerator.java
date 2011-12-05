@@ -27,12 +27,12 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
+import junit.framework.TestCase;
+
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.BuildDirectoryUtils;
-
-import junit.framework.TestCase;
 
 public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 {
@@ -132,7 +132,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         {
             if (expected instanceof String)
             {
-                assertTrue(((String)expected).equals((String)value));
+                assertTrue(((String)expected).equals(value));
             }
             else
             {
@@ -379,7 +379,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals("INDEX1_TREE", indexes.get("INDEX_NAME", VoltType.STRING));
-        assertEquals((short)java.sql.DatabaseMetaData.tableIndexOther,
+        assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
@@ -387,7 +387,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals("INDEX1_TREE", indexes.get("INDEX_NAME", VoltType.STRING));
-        assertEquals((short)java.sql.DatabaseMetaData.tableIndexOther,
+        assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
@@ -395,7 +395,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals("INDEX2_HASH", indexes.get("INDEX_NAME", VoltType.STRING));
-        assertEquals((short)java.sql.DatabaseMetaData.tableIndexHashed,
+        assertEquals(java.sql.DatabaseMetaData.tableIndexHashed,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
@@ -403,7 +403,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals("INDEX2_HASH", indexes.get("INDEX_NAME", VoltType.STRING));
-        assertEquals((short)java.sql.DatabaseMetaData.tableIndexHashed,
+        assertEquals(java.sql.DatabaseMetaData.tableIndexHashed,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
@@ -411,7 +411,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertTrue(((String)indexes.get("INDEX_NAME", VoltType.STRING)).contains("PK_TREE"));
-        assertEquals((short)java.sql.DatabaseMetaData.tableIndexOther,
+        assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
@@ -484,7 +484,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltTable params = dut.getMetaData("ProcedureColumns");
         System.out.println(params);
         assertEquals(20, params.getColumnCount());
-        assertEquals(2, params.getRowCount());
+        assertEquals(4, params.getRowCount()); // 2 real and 2 crud inserts
         assertTrue(moveToMatchingRow(params, "PROCEDURE_NAME", "proc1"));
         assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
         assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("PRECISION", VoltType.INTEGER));

@@ -45,10 +45,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.AdHocPlannedStmt;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWorkThread;
@@ -69,6 +71,7 @@ import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.WriteStream;
+import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.Encoder;
@@ -1061,8 +1064,38 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // Horrible, hackish, stupid sysproc special casing...
             //
 
+            if (task.procName.equals("@LoadSinglepartitionTable")) {
+                int[] involvedPartitions = null;
+                // break out the Hashinator and calculate the appropriate partition
+                try {
+                    CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+                    Object valueToHash = LoadSinglepartitionTable.partitionValueFromInvocation(
+                            tables, task);
+                    involvedPartitions = new int[] { TheHashinator.hashToPartition(valueToHash) };
+                }
+                catch (Exception e) {
+                    authLog.warn(e.getMessage());
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                             new VoltTable[0], e.getMessage(), task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
+                assert(involvedPartitions != null);
+                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                                              handler.isAdmin(),
+                                              task,
+                                              false, // read only
+                                              true,  // single partition
+                                              false, // every site
+                                              involvedPartitions, involvedPartitions.length,
+                                              c, buf.capacity(),
+                                              now);
+                return;
+            }
+
             // Updating a catalog needs to divert to the catalog processing thread
-            if (task.procName.equals("@UpdateApplicationCatalog")) {
+            else if (task.procName.equals("@UpdateApplicationCatalog")) {
                 ParameterSet params = null;
                 try {
                     params = task.getParams();
