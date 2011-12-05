@@ -139,10 +139,10 @@ public class ConnectionUtil {
      * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
      * The last object is the build string
      */
-    public static Object[] getAuthenticatedExportConnection(
-            String host, String username, byte[] hashedPassword, int port) throws IOException
+    public static Object[] getAuthenticatedExportConnection(InetSocketAddress address,
+            String username, byte[] hashedPassword) throws IOException
     {
-        return getAuthenticatedConnection("export", host, username, hashedPassword, port);
+        return getAuthenticatedConnection("export", address, username, hashedPassword);
     }
 
     public static String getHostnameOrAddress() {
@@ -202,21 +202,27 @@ public class ConnectionUtil {
             }
         }
     }
+
     private static Object[] getAuthenticatedConnection(
             String service, String host, String username, byte[] hashedPassword, int port)
     throws IOException {
+        InetSocketAddress address = new InetSocketAddress(host, port);
+        return getAuthenticatedConnection(service, address, username, hashedPassword);
+    }
+    private static Object[] getAuthenticatedConnection(
+            String service, InetSocketAddress addr, String username, byte[] hashedPassword)
+    throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
-        InetSocketAddress addr = new InetSocketAddress(host, port);
         if (addr.isUnresolved()) {
-            throw new java.net.UnknownHostException(host);
+            throw new java.net.UnknownHostException(addr.getHostName());
         }
         SocketChannel aChannel = SocketChannel.open(addr);
         returnArray[0] = aChannel;
         assert(aChannel.isConnected());
         if (!aChannel.isConnected()) {
             // TODO Can open() be asynchronous if configureBlocking(true)?
-            throw new IOException("Failed to open host " + host);
+            throw new IOException("Failed to open host " + addr.getHostName());
         }
         final long retvals[] = new long[4];
         returnArray[1] = retvals;

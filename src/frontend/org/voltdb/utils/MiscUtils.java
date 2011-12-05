@@ -31,6 +31,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.eclipse.jetty.util.log.Log;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.VoltLogger;
 
@@ -281,5 +283,29 @@ public class MiscUtils {
             throw new Exception("Could not find java binary");
         }
         return javaPath;
+    }
+
+    public static String formatHostMetadataFromJSON(String json) {
+        try {
+            JSONObject obj = new JSONObject(json);
+            StringBuilder sb = new StringBuilder();
+
+            JSONArray interfaces = (JSONArray) obj.get("interfaces");
+
+            for (int ii = 0; ii < interfaces.length(); ii++) {
+                sb.append(interfaces.getString(ii));
+                if (ii + 1 < interfaces.length()) {
+                    sb.append(" ");
+                }
+            }
+            sb.append(" ");
+            sb.append(obj.getString("clientPort")).append(',');
+            sb.append(obj.getString("adminPort")).append(',');
+            sb.append(obj.getString("httpPort"));
+            return sb.toString();
+        } catch (Exception e) {
+            hostLog.warn("Unable to format host metadata " + json, e);
+        }
+        return "";
     }
 }

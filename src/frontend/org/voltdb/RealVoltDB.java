@@ -28,6 +28,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
@@ -59,6 +60,8 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.agreement.ZKUtil;
@@ -89,6 +92,7 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.SystemStatsCollector;
@@ -214,7 +218,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public boolean recovering() { return m_recovering; }
 
-    private long m_recoveryStartTime = System.currentTimeMillis();
+    private final long m_recoveryStartTime = System.currentTimeMillis();
 
     CommandLog m_commandLog;
 
@@ -223,7 +227,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // metadata is currently of the format:
     // IP:CIENTPORT:ADMINPORT:HTTPPORT
-    volatile String m_localMetadata = "0.0.0.0:0:0:0";
+    volatile String m_localMetadata = "";
     final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
     // methods accessed via the singleton
@@ -597,53 +601,94 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     void collectLocalNetworkMetadata() {
-        String localMetadata = "";
+        boolean threw = false;
+        JSONStringer stringer = new JSONStringer();
+        try {
+            stringer.object();
+            stringer.key("interfaces").array();
 
-        /*
-         * If no interface was specified, do a ton of work
-         * to identify all ipv4 interfaces and turn them into a
-         * , separated list since the server will accept on
-         * any of them.
-         */
-        if (m_config.m_externalInterface.equals("")) {
-            LinkedList<NetworkInterface> interfaces = new LinkedList<NetworkInterface>();
-            try {
-                Enumeration<NetworkInterface> intfEnum = NetworkInterface.getNetworkInterfaces();
-                while (intfEnum.hasMoreElements()) {
-                    NetworkInterface intf = intfEnum.nextElement();
-                    if (intf.isLoopback() || !intf.isUp()) {
-                        continue;
+            /*
+             * If no interface was specified, do a ton of work
+             * to identify all ipv4 or ipv6 interfaces and
+             * marshal them into JSON. Always put the ipv4 address first
+             * so that the export client will use it
+             */
+            if (m_config.m_externalInterface.equals("")) {
+                LinkedList<NetworkInterface> interfaces = new LinkedList<NetworkInterface>();
+                try {
+                    Enumeration<NetworkInterface> intfEnum = NetworkInterface.getNetworkInterfaces();
+                    while (intfEnum.hasMoreElements()) {
+                        NetworkInterface intf = intfEnum.nextElement();
+                        if (intf.isLoopback() || !intf.isUp()) {
+                            continue;
+                        }
+                        interfaces.offer(intf);
                     }
-                    interfaces.offer(intf);
+                } catch (SocketException e) {
+                    throw new RuntimeException(e);
                 }
-            } catch (SocketException e) {
-                throw new RuntimeException(e);
-            }
 
-            while (!interfaces.isEmpty()) {
-                NetworkInterface intf = interfaces.poll();
-                Enumeration<InetAddress> inetAddrs = intf.getInetAddresses();
-                Inet4Address addr = null;
-                while (inetAddrs.hasMoreElements()) {
-                    InetAddress inetAddr = inetAddrs.nextElement();
-                    if (inetAddr instanceof Inet4Address) {
-                        addr = (Inet4Address)inetAddr;
-                        break;
+                if (interfaces.isEmpty()) {
+                    stringer.value("localhost");
+                } else {
+
+                    boolean addedIp = false;
+                    while (!interfaces.isEmpty()) {
+                        NetworkInterface intf = interfaces.poll();
+                        Enumeration<InetAddress> inetAddrs = intf.getInetAddresses();
+                        Inet6Address inet6addr = null;
+                        Inet4Address inet4addr = null;
+                        while (inetAddrs.hasMoreElements()) {
+                            InetAddress addr = inetAddrs.nextElement();
+                            if (addr instanceof Inet6Address) {
+                                inet6addr = (Inet6Address)addr;
+                                if (!inet6addr.isLinkLocalAddress()) {
+                                    inet6addr = null;
+                                }
+                            } else if (addr instanceof Inet4Address) {
+                                inet4addr = (Inet4Address)addr;
+                            }
+                        }
+                        if (inet4addr != null) {
+                            stringer.value(inet4addr.getHostAddress());
+                            addedIp = true;
+                        }
+                        if (inet6addr != null) {
+                            stringer.value(inet6addr.getHostAddress());
+                            addedIp = true;
+                        }
+                    }
+                    if (!addedIp) {
+                        stringer.value("localhost");
                     }
                 }
-                localMetadata += addr.getHostAddress();
-                if (interfaces.peek() != null) {
-                    localMetadata += ",";
-                }
+            } else {
+                stringer.value(m_config.m_externalInterface);
             }
-        } else {
-            localMetadata = m_config.m_externalInterface;
+        } catch (Exception e) {
+            threw = true;
+            hostLog.warn("Error while collecting data about local network interfaces", e);
         }
-        localMetadata += ":" + Integer.valueOf(m_config.m_port);
-        localMetadata += ":" + Integer.valueOf(m_config.m_adminPort);
-        localMetadata += ":" + Integer.valueOf(m_config.m_httpPort); // json
-        // possibly atomic swap from null to realz
-        m_localMetadata = localMetadata;
+        try {
+            if (threw) {
+                stringer = new JSONStringer();
+                stringer.object();
+                stringer.key("interfaces").array();
+                stringer.value("localhost");
+                stringer.endArray();
+            } else {
+                stringer.endArray();
+            }
+            stringer.key("clientPort").value(m_config.m_port);
+            stringer.key("adminPort").value(m_config.m_adminPort);
+            stringer.key("httpPort").value(m_config.m_httpPort);
+            stringer.endObject();
+            JSONObject obj = new JSONObject(stringer.toString());
+            // possibly atomic swap from null to realz
+            m_localMetadata = obj.toString(4);
+        } catch (Exception e) {
+            hostLog.warn("Failed to collect data about lcoal network interfaces", e);
+        }
     }
 
     void startNetworkAndCreateZKClient() {
@@ -987,14 +1032,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         // print out cluster membership
-        hostLog.info("About to list cluster interfaces for all nodes with format ip:client-port:admin-port:http-port");
+        hostLog.info("About to list cluster interfaces for all nodes with format [ip1 ip2 ... ipN] client-port:admin-port:http-port");
         for (int hostId : m_catalogContext.siteTracker.getAllLiveHosts()) {
             if (hostId == m_messenger.getHostId()) {
-                hostLog.info(String.format("  Host id: %d with interfaces: %s [SELF]", hostId, getLocalMetadata()));
+                hostLog.info(
+                        String.format(
+                                "  Host id: %d with interfaces: %s [SELF]",
+                                hostId,
+                                MiscUtils.formatHostMetadataFromJSON(getLocalMetadata())));
             }
             else {
                 String hostMeta = m_clusterMetadata.get(hostId);
-                hostLog.info(String.format("  Host id: %d with interfaces: %s [PEER]", hostId, hostMeta));
+                hostLog.info(
+                        String.format(
+                                "  Host id: %d with interfaces: %s [PEER]",
+                                hostId,
+                                MiscUtils.formatHostMetadataFromJSON(hostMeta)));
             }
         }
     }
@@ -1397,7 +1450,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     /** Associate transaction ids to contexts */
-    private HashMap<Long, ContextTracker>m_txnIdToContextTracker =
+    private final HashMap<Long, ContextTracker>m_txnIdToContextTracker =
         new HashMap<Long, ContextTracker>();
 
     @Override
@@ -1680,8 +1733,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      * Note: this may include failed nodes so check for live ones
      *  and filter this if needed.
      *
-     * Metadata is currently of the format:
-     * IP:CIENTPORT:ADMINPORT:HTTPPORT]
+     * Metadata is currently a JSON object
      */
     @Override
     public Map<Integer, String> getClusterMetadataMap() {
@@ -1689,8 +1741,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     /**
-     * Metadata is currently of the format:
-     * IP:CIENTPORT:ADMINPORT:HTTPPORT]
+     * Metadata is now a JSON object
      */
     @Override
     public String getLocalMetadata() {

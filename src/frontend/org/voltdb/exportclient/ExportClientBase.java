@@ -25,6 +25,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
@@ -288,12 +291,20 @@ public abstract class ExportClientBase {
                     // successfully connected to one server, now rebuild the set of servers in the world
                     m_servers.clear();
                     m_logger.info("Discovered topology " + exportConnection.hosts.toString());
-                    for (String hostname : exportConnection.hosts) {
-                        assert(hostname.contains(":"));
-                        String[] parts = hostname.split(":");
-                        int port = m_useAdminPorts ? Integer.valueOf(parts[2]) : Integer.valueOf(parts[1]);
-                        InetSocketAddress addr = new InetSocketAddress(parts[0].split(",")[0], port);
-                        m_servers.add(addr);
+                    for (String hostInfo : exportConnection.hosts) {
+                        try {
+                            JSONObject obj = new JSONObject(hostInfo);
+                            JSONArray interfaces = obj.getJSONArray("interfaces");
+                            if (interfaces.length() == 0) {
+                                throw new RuntimeException("No interfaces listed for one host");
+                            }
+                            String intf = interfaces.getString(0);
+                            int port = m_useAdminPorts ? obj.getInt("adminPort") : obj.getInt("clientPort");
+                            InetSocketAddress addr = new InetSocketAddress(intf, port);
+                            m_servers.add(addr);
+                        } catch (JSONException e) {
+                            m_logger.error("JSON parsing exception while attempting to process: " + hostInfo, e);
+                        }
                     }
                 }
                 else {
