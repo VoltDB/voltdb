@@ -23,6 +23,8 @@ message Response {
     optional int32 globalPartitionCount = 2;
     // local partitions
     repeated PartitionInfo partitionInfo = 3;
+    // status. 0 means ok
+    optional int32 status = 4 [default = 0];
 }
 
 message NodeInfo {
@@ -37,6 +39,7 @@ message PartitionInfo {
     optional int64 outstandingBufferCount = 4;
     optional int64 outstandingByteCount = 5;
     optional bool isPaused = 6;
+    optional bool isSynced = 7;
 }
 
 message CtrlEnvelope {
