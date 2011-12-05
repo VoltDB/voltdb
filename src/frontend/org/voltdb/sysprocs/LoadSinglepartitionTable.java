@@ -38,7 +38,6 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -124,14 +123,6 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
         if (catStmt == null) {
             throw new VoltAbortException(
                     String.format("Unable to find SQL statement for found table %s: BAD",
-                            tableName));
-        }
-
-        // the first and only fragment for single-partition stmts is named "0"
-        PlanFragment frag = catStmt.getFragments().get("0");
-        if (frag == null) {
-            throw new VoltAbortException(
-                    String.format("Unable to find fragment for SQL statemen for table %st: BAD",
                             tableName));
         }
 

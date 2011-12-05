@@ -709,13 +709,6 @@ public class VoltCompiler {
 
         final Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         for (Table table : db.getTables()) {
-            if (table.getIsreplicated()) {
-                compilerLog.debug("Creating multi-partition insert procedure for replicated table " +
-                        table.getTypeName());
-                generateCrudReplicatedInsert(table);
-                continue;
-            }
-
             if (CatalogUtil.isTableExportOnly(db, table)) {
                 compilerLog.debug("Skipping creation of CRUD procedures for export-only table " +
                         table.getTypeName());
@@ -725,6 +718,13 @@ public class VoltCompiler {
             if (table.getMaterializer() != null) {
                 compilerLog.debug("Skipping creation of CRUD procedures for view " +
                         table.getTypeName());
+                continue;
+            }
+
+            if (table.getIsreplicated()) {
+                compilerLog.debug("Creating multi-partition insert procedure for replicated table " +
+                        table.getTypeName());
+                crudprocs.add(generateCrudReplicatedInsert(table));
                 continue;
             }
 

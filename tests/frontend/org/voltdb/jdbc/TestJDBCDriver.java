@@ -244,8 +244,9 @@ public class TestJDBCDriver {
             }
             count++;
         }
-        // 7 tables * 4 CRUD/table + 2 procedures + 1 for replicated insert
-        assertEquals(7 * 4 + 2 + 1, count);
+        // 7 tables * 4 CRUD/table + 2 procedures +
+        // 3 for replicated insert or insert where partition key !in primary
+        assertEquals(7 * 4 + 2 + 3, count);
     }
 
     @Test
