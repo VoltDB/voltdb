@@ -130,14 +130,14 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
         SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
         SQLStmtInitializer.initSQLStmt(stmt, catStmt);
 
-        Object[] params = new Object[columnCount];
-
         long queued = 0;
         long executed = 0;
 
         // make sure at the start of the table
         table.resetRowPosition();
         for (int i = 0; table.advanceRow(); ++i) {
+            Object[] params = new Object[columnCount];
+
             // get the parameters from the volt table
             for (int col = 0; col < columnCount; ++col) {
                 params[col] = table.get(col, table.getColumnType(col));
