@@ -18,3 +18,4 @@ obj/
 /voltdb/voltdb*.jar
 /.DS_Store
 debugoutput/
+/voltdbroot/
