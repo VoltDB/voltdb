@@ -1,0 +1,4 @@
+This directory contains the source files for the revised Hello, World! example  described in [tbd]. 
+
+The tutorial is designed to demonstrate coding practices that can maximize your use of VoltDB. A shell script (run.sh) is provided to help build and run the example.
+
