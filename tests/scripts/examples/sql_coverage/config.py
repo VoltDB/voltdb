@@ -35,6 +35,10 @@
                       "ddl": "strings-DDL.sql",
                       "template": "basic-strings.sql",
                       "normalizer": "normalizer.py"},
+    "partial-covering": {"schema": "partial-covering-schema.py",
+                         "ddl": "partial-covering-DDL.sql",
+                         "template": "partial-covering.sql",
+                         "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, DISABLING
 # also, the generator fails to generates statements for:
 # Template "SELECT * FROM _table WHERE (_variable _cmp _value[int64]) _logic (_variable _cmp _variable)" failed to yield SQL statements
