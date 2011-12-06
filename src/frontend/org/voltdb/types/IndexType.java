@@ -26,8 +26,7 @@ public enum IndexType {
     INVALID         (0),
     BALANCED_TREE   (1),
     HASH_TABLE      (2),
-    ARRAY           (3),
-    BTREE           (4);
+    BTREE           (3);
 
     IndexType(int val) {
         assert (this.ordinal() == val) :
@@ -77,8 +76,6 @@ public enum IndexType {
         switch (this) {
         case BALANCED_TREE:
             return "_TREE";
-        case ARRAY:
-            return "_ARRAY";
         case BTREE:
         case HASH_TABLE:
             return "";

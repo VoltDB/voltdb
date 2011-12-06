@@ -98,7 +98,7 @@ public class TestCoveringIndexPlans extends TestCase {
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER2_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.GT, ispn.getLookupType());
+        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
         assertEquals(1, ispn.getSearchKeyExpressions().size());
     }
 
@@ -134,7 +134,7 @@ public class TestCoveringIndexPlans extends TestCase {
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.GT, ispn.getLookupType());
+        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
     }
 
@@ -152,7 +152,7 @@ public class TestCoveringIndexPlans extends TestCase {
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.GT, ispn.getLookupType());
+        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
     }
 
