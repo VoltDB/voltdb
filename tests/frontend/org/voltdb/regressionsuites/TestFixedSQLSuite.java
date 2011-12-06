@@ -93,7 +93,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable r5 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid limit 1").getResults()[0];
         System.out.println("r5\n" + r5);
         assertEquals(1, r5.getRowCount());
-
     }
 
     public void testTicketEng1850_WhereOrderBy2() throws Exception
@@ -122,10 +121,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
         System.out.println(r1);
         assertEquals(isHSQL() ? 2: 3, r1.getRowCount());
 
-        System.out.println("WhereOrderBy2(): FAILING CASE:");
         VoltTable r2 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by aid, pid").getResults()[0];
         System.out.println(r2);
         assertEquals(isHSQL() ? 2 : 3, r2.getRowCount());
+
+        VoltTable r3 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid > 1 order by pid, aid").getResults()[0];
+        System.out.println(r3);
+        assertEquals(isHSQL() ?  2 :  3, r3.getRowCount());
+
+        VoltTable r4 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2").getResults()[0];
+        System.out.println(r4);
+        assertEquals(isHSQL() ? 2 : 3, r4.getRowCount());
     }
 
     public void testTicketENG1232() throws Exception {
