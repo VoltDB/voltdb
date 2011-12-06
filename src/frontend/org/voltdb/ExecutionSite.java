@@ -2066,8 +2066,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public Map<Integer, List<VoltTable>>
     recursableRun(TransactionState currentTxnState)
     {
-        do
-        {
+        while (m_shouldContinue) {
             if (currentTxnState.doWork(m_recovering)) {
                 if (currentTxnState.needsRollback())
                 {
@@ -2119,7 +2118,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
                 }
             }
-        } while (true);
+        }
+        // should only get here on shutdown
+        return null;
     }
 
     /*
