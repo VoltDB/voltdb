@@ -95,7 +95,11 @@
         "ddl": "pushdown-DDL.sql",
         "template": "pushdown.sql",
         "normalizer": "normalizer.py"},
-
+# THESE ALL SUCCEED, USE TEMPLATE INPUT
+    "partial-covering": {"schema": "partial-covering-schema.py",
+        "ddl": "partial-covering-DDL.sql",
+        "template": "partial-covering.sql",
+        "normalizer": "normalizer.py"},
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION, THE
 # REGRESSION SET IS NEXT TO USELESS, SKIPPING IT
 #    "advanced-decimal": {"schema": "decimal-schema.py",

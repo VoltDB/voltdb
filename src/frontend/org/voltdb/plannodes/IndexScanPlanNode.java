@@ -81,7 +81,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
-    // XXX-IZZY use more specific data later, perhaps, rather than whole object
     protected Index m_catalogIndex = null;
 
     public IndexScanPlanNode() {
@@ -303,8 +302,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         int tuplesToRead = 0;
 
         // minor priorities for index types (tiebreakers)
-        if (m_catalogIndex.getType() == IndexType.ARRAY.getValue())
-            tuplesToRead = 1;
         if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue())
             tuplesToRead = 2;
         if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||

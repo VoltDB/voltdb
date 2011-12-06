@@ -617,19 +617,6 @@ public class DDLCompiler {
         {
             index.setType(IndexType.BALANCED_TREE.getValue());
         }
-        else if (indexNameNoCase.contains("array"))
-        {
-            if (!has_nonint_col)
-            {
-                index.setType(IndexType.ARRAY.getValue());
-            }
-            else
-            {
-                String msg = "Index " + name + " in table " + table.getTypeName() +
-                             " uses a non-arrayable column: " + nonint_col_name;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-        }
         else if (indexNameNoCase.contains("hash"))
         {
             if (!has_nonint_col)
@@ -696,8 +683,8 @@ public class DDLCompiler {
                 String constraintNameNoCase = name.toLowerCase();
                 if (constraintNameNoCase.contains("tree"))
                     catalog_index.setType(IndexType.BALANCED_TREE.getValue());
-                if (constraintNameNoCase.contains("array"))
-                    catalog_index.setType(IndexType.ARRAY.getValue());
+                if (constraintNameNoCase.contains("hash"))
+                    catalog_index.setType(IndexType.HASH_TABLE.getValue());
             }
 
             catalog_const = table.getConstraints().add(name);

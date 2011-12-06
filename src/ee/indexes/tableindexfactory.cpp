@@ -50,7 +50,6 @@
 #include "catalog/index.h"
 #include "indexes/tableindex.h"
 #include "indexes/indexkey.h"
-#include "indexes/arrayuniqueindex.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
 #include "indexes/CompactingTreeMultiMapIndex.h"
 #include "indexes/CompactingHashUniqueIndex.h"
@@ -83,10 +82,6 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         ints_only = false;
     }
 
-    // a bit of a hack, this should be improved later
-    if ((ints_only) && (unique) && (type == ARRAY_INDEX)) {
-        return new ArrayUniqueIndex(schemeCopy);
-    }
     if ((ints_only) && (type == BALANCED_TREE_INDEX) && (unique)) {
         if (keySize <= sizeof(uint64_t)) {
             return new CompactingTreeUniqueIndex<IntsKey<1>, IntsComparator<1>, IntsEqualityChecker<1> >(schemeCopy);
