@@ -72,14 +72,3 @@ CREATE TABLE BAD_COMPARES (
   PRIMARY KEY (ID)
 );
 
-CREATE TABLE ENG1850 (
-  cid INTEGER not null,
-  aid INTEGER,
-  pid INTEGER,
-  attr INTEGER,
-  constraint pk_cid primary key (cid)
-);
-
-create index eng1850_tree_pid_aid on ENG1850 (
-  pid, aid
-);
