@@ -127,7 +127,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         VoltTable r3 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid > 1 order by pid, aid").getResults()[0];
         System.out.println(r3);
-        assertEquals(isHSQL() ?  2 :  3, r3.getRowCount());
+        assertEquals(isHSQL() ?  3 :  4, r3.getRowCount());
 
         VoltTable r4 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2").getResults()[0];
         System.out.println(r4);
