@@ -225,8 +225,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
     OperationMode m_startMode = null;
 
-    // metadata is currently of the format:
-    // IP:CIENTPORT:ADMINPORT:HTTPPORT
     volatile String m_localMetadata = "";
     final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
@@ -642,7 +640,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             InetAddress addr = inetAddrs.nextElement();
                             if (addr instanceof Inet6Address) {
                                 inet6addr = (Inet6Address)addr;
-                                if (!inet6addr.isLinkLocalAddress()) {
+                                if (inet6addr.isLinkLocalAddress()) {
                                     inet6addr = null;
                                 }
                             } else if (addr instanceof Inet4Address) {
