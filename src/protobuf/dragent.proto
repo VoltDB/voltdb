@@ -17,14 +17,23 @@ message Pause {
 }
 
 message Response {
+    enum ReplicationMode {
+        IDLE = 1;
+        SYNCING_REPLICATED = 2;
+        SYNCING_PARTITIONED = 3;
+        ACTIVE = 4;
+        UNAVAILABLE = 5;
+    }
+    optional ReplicationMode mode = 1;
+    optional fixed64 snapshotTimestamp = 2;
     // all known nodes globally
     //  first entry is self
-    repeated NodeInfo nodeInfo = 1;
-    optional int32 globalPartitionCount = 2;
+    repeated NodeInfo nodeInfo = 3;
+    optional int32 globalPartitionCount = 4;
     // local partitions
-    repeated PartitionInfo partitionInfo = 3;
+    repeated PartitionInfo partitionInfo = 5;
     // status. 0 means ok
-    optional int32 status = 4 [default = 0];
+    optional int32 status = 6 [default = 0];
 }
 
 message NodeInfo {
@@ -34,12 +43,21 @@ message NodeInfo {
 
 message PartitionInfo {
     optional int32 partitionId = 1;
+
+    // info for active replication
     optional fixed64 oldestTimestamp = 2;
     optional fixed64 lastSentTimestamp = 3;
-    optional int64 outstandingBufferCount = 4;
-    optional int64 outstandingByteCount = 5;
-    optional bool isPaused = 6;
-    optional bool isSynced = 7;
+
+    // info for syncing snapshots
+    optional int64 lowestTupleIndex = 4;
+    optional int64 lastSentTupleIndex = 5;
+    optional int64 totalTupleCount = 6;
+
+    // common info
+    optional int64 outstandingBufferCount = 7;
+    optional int64 outstandingByteCount = 8;
+    optional bool isPaused = 9;
+    optional bool isSynced = 10;
 }
 
 message CtrlEnvelope {
@@ -49,6 +67,8 @@ message CtrlEnvelope {
         PAUSE = 3;
         QUERY = 4;
         RESPONSE = 5;
+        SNAPSHOT_REQ = 6;
+        STOP_SYNC = 7;
     }
     required Type type = 1;
     optional Ack ack = 2;
