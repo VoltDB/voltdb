@@ -153,4 +153,13 @@ public class TestPlansOrderBy extends TestCase {
                      "group by T.T_PKEY " +
                      "order by T.T_PKEY;", 0);
     }
+
+    public void testOrderDescWithEquality() {
+        AbstractPlanNode pn = null;
+        pn = compile("SELECT * FROM T WHERE T_PKEY = 2 ORDER BY T_PKEY DESC, T_D1 DESC", 0);
+        if (pn != null) {
+            assertFalse(pn.findAllNodesOfType(PlanNodeType.INDEXSCAN).isEmpty());
+            assertFalse(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
+        }
+    }
 }

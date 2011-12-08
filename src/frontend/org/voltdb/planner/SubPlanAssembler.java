@@ -253,6 +253,19 @@ public abstract class SubPlanAssembler {
                 AbstractExpression expr = eqColumns.get(col).remove(0);
                 retval.indexExprs.add(expr);
                 retval.endExprs.add(expr);
+
+                /*
+                 * The index executor cannot handle desc order if the lookup
+                 * type is equal. This includes partial index coverage cases
+                 * with only equality expressions.
+                 *
+                 * Setting the sort direction to invalid here will make
+                 * PlanAssembler generate a suitable order by plan node after
+                 * the scan.
+                 */
+                if (retval.sortDirection == SortDirectionType.DESC) {
+                    retval.sortDirection = SortDirectionType.INVALID;
+                }
             } else {
                 if (gtColumns.containsKey(col) && (gtColumns.get(col).size() >= 0)) {
                     AbstractExpression expr = gtColumns.get(col).remove(0);
