@@ -12334,8 +12334,25 @@ SELECT A2,A3 from _table WHERE A2 > 5 ORDER BY A2, A3
 SELECT A2,A3 from _table WHERE A2 < 5 ORDER BY A3, A2
 SELECT A2,A3 from _table WHERE A2 > 5 ORDER BY A3, A2
 
-SELECT _variable FROM _table WHERE _variable _cmp _value[int:0,10] ORDER BY _variable 
+SELECT _variable FROM _table WHERE _variable _cmp _value[int:0,10] ORDER BY _variable
 SELECT _variable, _variable, _variable FROM _table WHERE A2 _cmp _value[int:0,10] ORDER BY A2, A3
 
+SELECT A1 from _table WHERE A1 < 5 ORDER BY A1 DESC
+SELECT A1 from _table WHERE A1 > 5 ORDER BY A1 DESC
+
+SELECT A1 FROM _table WHERE A2 = 5 ORDER BY A2 DESC, A3 DESC, A4 DESC
+SELECT A1 FROM _table WHERE A2 = 5 AND A3 < 5 ORDER BY A2 DESC, A3 DESC, A4 DESC
+SELECT A1 FROM _table WHERE A2 = 5 AND A3 > 5 ORDER BY A2 DESC, A3 DESC, A4 DESC
+
+SELECT A2,A3 from _table WHERE A2 < 5 ORDER BY A2 DESC
+SELECT A2,A3 from _table WHERE A2 > 5 ORDER BY A2 DESC
+
+SELECT A2,A3 from _table WHERE A2 < 5 ORDER BY A2 DESC, A3 DESC
+SELECT A2,A3 from _table WHERE A2 > 5 ORDER BY A2 DESC, A3 DESC
+
+SELECT A2,A3 from _table WHERE A2 < 5 ORDER BY A3 DESC, A2 DESC
+SELECT A2,A3 from _table WHERE A2 > 5 ORDER BY A3 DESC, A2 DESC
+
+
 -- This number permutations exceeds the tool's capabilities.
--- SELECT _variable, _variable FROM _table WHERE _variable _cmp _value[int:0,10] ORDER BY _variable, _variable 
+-- SELECT _variable, _variable FROM _table WHERE _variable _cmp _value[int:0,10] ORDER BY _variable, _variable
