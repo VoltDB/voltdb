@@ -292,7 +292,8 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             for (int i = 0; i < results.length; ++i) {
-                ByteBuffer buf = results[i].m_buffer;
+                final ByteBuffer buf = results[i].m_buffer.duplicate();
+                buf.position(0);
                 int len = buf.limit();
                 assert(len > 0);
                 if (len > MAX_HASH_BYTES) {
@@ -300,7 +301,6 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
                     buf.limit(MAX_HASH_BYTES);
                 }
                 md.update(buf);
-                buf.limit(len);
             }
             byte[] digest = md.digest();
             return ByteArrayUtils.bytesToInt(digest, 0);
