@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -190,6 +191,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private boolean m_hasDTXNBackPressure = false;
 
+    private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
+    private ScheduledFuture<?> m_maxConnectionUpdater;
+
     /**
      * Way too much data tied up sending responses to clients.
      * Wait until they receive data or have been booted.
@@ -204,12 +208,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private volatile boolean m_running = true;
         private Thread m_thread = null;
         private boolean m_isAdmin;
-
-        /**
-         * Limit on maximum number of connections. This should be set by inspecting ulimit -n, but
-         * that isn't being done.
-         */
-        private final int MAX_CONNECTIONS = 4000;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -313,7 +311,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     /*
                      * Enforce a limit on the maximum number of connections
                      */
-                    if (m_numConnections.get() == MAX_CONNECTIONS) {
+                    if (m_numConnections.get() == MAX_CONNECTIONS.get()) {
                         networkLog.warn("Rejected connection from " +
                                 socket.socket().getRemoteSocketAddress() +
                                 " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
@@ -1467,6 +1465,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // to the dispatcher..  Or write a "stop reading and flush
     // all your read buffers" events .. or something ..
     protected void shutdown() throws InterruptedException {
+        if (m_maxConnectionUpdater != null) {
+            m_maxConnectionUpdater.cancel(false);
+        }
         if (m_acceptor != null) {
             m_acceptor.shutdown();
         }
@@ -1484,6 +1485,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     public void startAcceptingConnections() throws IOException {
+        /*
+         * Periodically check the limit on the number of open files
+         */
+        m_maxConnectionUpdater = VoltDB.instance().scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                Integer limit = org.voltdb.utils.CLibrary.getOpenFileLimit();
+                if (limit != null) {
+                    //Leave 300 files open for "stuff"
+                    MAX_CONNECTIONS.set(limit - 300);
+                }
+            }
+        }, 0, 10, TimeUnit.MINUTES);
         m_acceptor.start();
         if (m_adminAcceptor != null)
         {
