@@ -34,7 +34,8 @@ public class CLibrary {
         public long rlim_max = 0;
     }
 
-    public static final int RLIMIT_NOFILE = 7;
+    public static final int RLIMIT_NOFILE_LINUX = 7;
+    public static final int RLIMIT_NOFILE_MAC_OS_X = 8;
 
     public static native final int getrlimit(int resource, Rlimit rlimit);
 
@@ -45,7 +46,10 @@ public class CLibrary {
     public static Integer getOpenFileLimit() {
         try {
             Rlimit rlimit = new Rlimit();
-            int retval = getrlimit(RLIMIT_NOFILE, rlimit);
+            int retval =
+                getrlimit(
+                    System.getProperty("os.name").equals("Linux") ? RLIMIT_NOFILE_LINUX : RLIMIT_NOFILE_MAC_OS_X,
+                            rlimit);
             if (retval != 0) {
                 return null;
             } else if (rlimit.rlim_cur >= 1024) {
