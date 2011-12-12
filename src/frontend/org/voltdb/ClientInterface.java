@@ -1145,15 +1145,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
             if (involvedPartitions != null) {
-                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
-                                              handler.isAdmin(),
-                                              task,
-                                              catProc.getReadonly(),
-                                              catProc.getSinglepartition(),
-                                              catProc.getEverysite(),
-                                              involvedPartitions, involvedPartitions.length,
-                                              c, buf.capacity(),
-                                              now);
+                boolean success =
+                    m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                                                  handler.isAdmin(),
+                                                  task,
+                                                  catProc.getReadonly(),
+                                                  catProc.getSinglepartition(),
+                                                  catProc.getEverysite(),
+                                                  involvedPartitions, involvedPartitions.length,
+                                                  c, buf.capacity(),
+                                                  now);
+                if (!success)
+                {
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                               new VoltTable[0],
+                                               "Unable to create transaction",
+                                               task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
             }
         }
         // dispatch a sysproc

@@ -102,6 +102,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final DtxnInitiatorMailbox m_mailbox;
     private final int m_siteId;
     private final int m_hostId;
+    private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
     public SimpleDtxnInitiator(CatalogContext context,
                                Messenger messenger, int hostId, int siteId,
@@ -130,7 +131,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
 
     @Override
-    public synchronized void createTransaction(
+    public synchronized boolean createTransaction(
                                   final long connectionId,
                                   final String connectionHostname,
                                   final boolean adminConnection,
@@ -146,13 +147,15 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     {
         long txnId;
         txnId = m_idManager.getNextUniqueTransactionId();
-        createTransaction(connectionId, connectionHostname, adminConnection, txnId,
-                          invocation, isReadOnly, isSinglePartition, isEveryPartition,
-                          partitions, numPartitions, clientData, messageSize, now);
+        boolean retval =
+            createTransaction(connectionId, connectionHostname, adminConnection, txnId,
+                              invocation, isReadOnly, isSinglePartition, isEveryPartition,
+                              partitions, numPartitions, clientData, messageSize, now);
+        return retval;
     }
 
     @Override
-    public synchronized void createTransaction(
+    public synchronized boolean createTransaction(
                                   final long connectionId,
                                   final String connectionHostname,
                                   final boolean adminConnection,
@@ -171,12 +174,25 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         assert(partitions != null);
         assert(numPartitions >= 1);
 
+        if (invocation.getType() == ProcedureInvocationType.REPLICATED)
+        {
+            if (invocation.getOriginalTxnId() <= m_lastSeenOriginalTxnId)
+            {
+                hostLog.info("Dropping duplicate replicated transaction, txnid: " + invocation.getOriginalTxnId() + ", last seen: " + m_lastSeenOriginalTxnId);
+                return false;
+            }
+            else
+            {
+                m_lastSeenOriginalTxnId = invocation.getOriginalTxnId();
+            }
+        }
+
         if (isSinglePartition || isEveryPartition)
         {
             createSinglePartitionTxn(connectionId, connectionHostname, adminConnection,
                                      txnId, invocation, isReadOnly,
                                      partitions, clientData, messageSize, now);
-            return;
+            return true;
         }
         else
         {
@@ -228,6 +244,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         connectionHostname,
                                                         adminConnection);
             dispatchMultiPartitionTxn(txn);
+            return true;
         }
     }
 

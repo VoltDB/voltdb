@@ -159,7 +159,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         }
 
         @Override
-        public void createTransaction(long connectionId,
+        public boolean createTransaction(long connectionId,
                                       String connectionHostname,
                                       boolean adminConnection,
                                       StoredProcedureInvocation invocation,
@@ -175,10 +175,11 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                               0, invocation, isReadOnly, isSinglePartition,
                               isEverySite, partitions, numPartitions,
                               clientData, messageSize, now);
+            return true;
         }
 
         @Override
-        public void createTransaction(long connectionId,
+        public boolean createTransaction(long connectionId,
                                       String connectionHostname,
                                       boolean adminConnection,
                                       long txnId,
@@ -206,6 +207,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             ClientResponseImpl response = new ClientResponseImpl(ClientResponse.SUCCESS,
                                                                  results, null);
             ((WriteStream) clientData).enqueue(response);
+            return true;
         }
 
         @Override

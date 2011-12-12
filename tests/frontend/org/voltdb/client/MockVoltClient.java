@@ -129,6 +129,8 @@ public class MockVoltClient implements Client {
     public int numCalls = 0;
     public boolean resetAfterCall = true;
     public String abortMessage;
+    public long lastOrigTxnId = Long.MIN_VALUE;
+    public boolean origTxnIdOrderCorrect = true;
 
     @Override
     public boolean callProcedure(ProcedureCallback callback, String procName,
@@ -292,9 +294,18 @@ public class MockVoltClient implements Client {
                                  String procName,
                                  Object... parameters) throws IOException,
                                                       NoConnectionsException {
+        System.out.println("Received procedure call for " + procName + " with original TXN ID: " + originalTxnId);
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
+        if (originalTxnId <= lastOrigTxnId)
+        {
+            origTxnIdOrderCorrect = false;
+        }
+        else
+        {
+            lastOrigTxnId = originalTxnId;
+        }
 
         return true;
     }

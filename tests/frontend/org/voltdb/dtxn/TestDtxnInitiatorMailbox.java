@@ -207,7 +207,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public void createTransaction(long connectionId,
+        public boolean createTransaction(long connectionId,
                                       String connectionHostname,
                                       boolean adminConnection,
                                       StoredProcedureInvocation invocation,
@@ -218,10 +218,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       Object clientData, int messageSize,
                                       long now)
         {
+            return true;
         }
 
         @Override
-        public void createTransaction(long connectionId,
+        public boolean createTransaction(long connectionId,
                                       String connectionHostname,
                                       boolean adminConnection,
                                       long txnId,
@@ -235,6 +236,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       int messageSize,
                                       long now)
         {
+            return true;
         }
 
         @Override
