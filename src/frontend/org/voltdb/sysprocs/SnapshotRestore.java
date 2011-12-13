@@ -431,7 +431,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 m_fileNonce = (String) params.toArray()[1];
                 TRACE_LOG.trace("Checking saved table state for restore of: "
                                 + m_filePath + ", " + m_fileNonce);
-                File[] savefiles = retrieveRelevantFiles(m_filePath, m_fileNonce);
+                File[] savefiles = SnapshotUtil.retrieveRelevantFiles(m_filePath, m_fileNonce);
                 if (savefiles == null) {
                     return new DependencyPair(DEP_restoreScan, result);
                 }
@@ -1006,23 +1006,6 @@ public class SnapshotRestore extends VoltSystemProcedure
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_restoreDistributeExportSequenceNumbersResults);
         return results;
-    }
-
-    private final File[] retrieveRelevantFiles(String filePath,
-                                               final String fileNonce)
-    {
-        FilenameFilter has_nonce = new FilenameFilter()
-        {
-            @Override
-            public boolean accept(File dir, String file)
-            {
-                return file.startsWith(fileNonce) && file.endsWith(".vpt");
-            }
-        };
-
-        File save_dir = new VoltFile(filePath);
-        File[] save_files = save_dir.listFiles(has_nonce);
-        return save_files;
     }
 
     private VoltTable constructResultsTable()

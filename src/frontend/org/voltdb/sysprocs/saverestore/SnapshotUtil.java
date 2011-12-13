@@ -25,6 +25,7 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -47,6 +48,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Host;
@@ -799,5 +802,39 @@ public class SnapshotUtil {
             retval[ii++] = Integer.parseInt(p.getTypeName());
         }
         return retval;
+    }
+
+
+    public static File[] retrieveRelevantFiles(String filePath,
+                                               final String fileNonce)
+    {
+        FilenameFilter has_nonce = new FilenameFilter()
+        {
+            @Override
+            public boolean accept(File dir, String file)
+            {
+                return file.startsWith(fileNonce) && file.endsWith(".vpt");
+            }
+        };
+
+        File save_dir = new VoltFile(filePath);
+        File[] save_files = save_dir.listFiles(has_nonce);
+        return save_files;
+    }
+
+    public static boolean didSnapshotRequestSucceed(VoltTable results[]) {
+        final VoltTable result = results[0];
+        if (result.getColumnCount() == 1) {
+            return false;
+        }
+
+        //assert(result.getColumnName(1).equals("TABLE"));
+        boolean success = true;
+        while (result.advanceRow()) {
+            if (!result.getString("RESULT").equals("SUCCESS")) {
+                success = false;
+            }
+        }
+        return success;
     }
 }

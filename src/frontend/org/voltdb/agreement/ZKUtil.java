@@ -227,6 +227,27 @@ public class ZKUtil {
         }
     }
 
+    public static class FutureWatcher implements org.apache.zookeeper_voltpatches.Watcher {
+        private final CountDownLatch done = new CountDownLatch(1);
+        private WatchedEvent event;
+
+        @Override
+        public void process(WatchedEvent event) {
+            this.event = event;
+            done.countDown();
+        }
+
+        public WatchedEvent get() throws InterruptedException {
+            done.await();
+            return event;
+        }
+
+        public WatchedEvent get(long timeout, TimeUnit unit) throws InterruptedException {
+            done.await(timeout, unit);
+            return event;
+        }
+    }
+
     public static class StringCallback implements
          org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback {
         private final CountDownLatch done = new CountDownLatch(1);

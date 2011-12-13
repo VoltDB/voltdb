@@ -106,7 +106,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                     LinkedList<SnapshotCompletionInterest> interests =
                                             new LinkedList<SnapshotCompletionInterest>(m_interests);
                                     for (SnapshotCompletionInterest i : interests) {
-                                        i.snapshotCompleted(0, true);
+                                        i.snapshotCompleted( "", 0, true);
                                     }
                                     break;
                                 }
@@ -133,7 +133,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     File catalogJarFile;
     String deploymentPath;
 
-    private AtomicInteger m_count = new AtomicInteger();
+    private final AtomicInteger m_count = new AtomicInteger();
     volatile int m_hostCount = 0;
     volatile boolean m_done = false;
     final Set<String> m_unexpectedSPIs = new HashSet<String>();

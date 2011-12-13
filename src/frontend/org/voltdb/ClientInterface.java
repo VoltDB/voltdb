@@ -204,7 +204,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final VoltNetwork m_network;
         private volatile boolean m_running = true;
         private Thread m_thread = null;
-        private boolean m_isAdmin;
+        private final boolean m_isAdmin;
 
         /**
          * Limit on maximum number of connections. This should be set by inspecting ulimit -n, but
@@ -617,7 +617,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         private Connection m_connection;
         private final String m_hostname;
-        private boolean m_isAdmin;
+        private final boolean m_isAdmin;
 
         /**
          * Must use username to do a lookup via the auth system
@@ -1556,5 +1556,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         return client_stats;
+    }
+
+    public SnapshotDaemon getSnapshotDaemon() {
+        return m_snapshotDaemon;
     }
 }

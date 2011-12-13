@@ -515,7 +515,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
                     int hosts = VoltDB.instance().getCatalogContext().siteTracker
                                       .getAllLiveHosts().size();
-                    SnapshotSaveAPI.createSnapshotCompletionNode(snapshotTxnId,
+                    SnapshotSaveAPI.createSnapshotCompletionNode( nonce, snapshotTxnId,
                                                                  true, hosts);
                     /*
                      * Truncation requests tend to come in clusters, wait 5 seconds before
@@ -1488,7 +1488,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     @Override
-    public CountDownLatch snapshotCompleted(final long txnId, final boolean truncation) {
+    public CountDownLatch snapshotCompleted(final String nonce, final long txnId, final boolean truncation) {
         if (!truncation) {
             return new CountDownLatch(0);
         }

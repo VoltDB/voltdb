@@ -23,6 +23,7 @@ import java.util.concurrent.*;
 import org.apache.zookeeper_voltpatches.*;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.logging.VoltLogger;
 
 public class SnapshotCompletionMonitor {
@@ -33,6 +34,7 @@ public class SnapshotCompletionMonitor {
             0L, TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<Runnable>(),
             new ThreadFactory() {
+                @Override
                 public Thread newThread(Runnable r) {
                     return new Thread(r, "SnapshotCompletionMonitor");
                 }
@@ -124,19 +126,20 @@ public class SnapshotCompletionMonitor {
         }
     }
 
-    private void processSnapshotData(byte data[]) {
+    private void processSnapshotData(byte data[]) throws Exception {
         if (data == null) {
             return;
         }
-        ByteBuffer buf = ByteBuffer.wrap(data);
-        long txnId = buf.getLong();
-        int totalNodes = buf.getInt();
-        int totalNodesFinished = buf.getInt();
-        boolean truncation = buf.get() == 1;
+        JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
+        long txnId = jsonObj.getLong("txnId");
+        int totalNodes = jsonObj.getInt("hosts");
+        int totalNodesFinished = jsonObj.getInt("finishedHosts");
+        String nonce = jsonObj.getString("nonce");
+        boolean truncation = jsonObj.getBoolean("isTruncation");
 
         if (totalNodes == totalNodesFinished) {
             for (SnapshotCompletionInterest interest : m_interests) {
-                interest.snapshotCompleted(txnId, truncation);
+                interest.snapshotCompleted(nonce, txnId, truncation);
             }
         }
     }

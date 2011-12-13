@@ -59,12 +59,14 @@ import org.json_voltpatches.JSONArray;
 public class TableSaveFile
 {
 
-    private static class Container extends BBContainer {
+    public static class Container extends BBContainer {
+        public final int partitionId;
         @SuppressWarnings("unused")
         private final BBContainer m_origin;
-        Container(ByteBuffer b, long pointer, BBContainer origin) {
+        Container(ByteBuffer b, long pointer, BBContainer origin, int partitionId) {
             super(b, pointer);
             m_origin = origin;
+            this.partitionId = partitionId;
         }
 
         @Override
@@ -573,7 +575,7 @@ public class TableSaveFile
                         final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
                         final ByteBuffer b = originContainer.b;
                         final long pointer = org.voltdb.utils.DBBPool.getBufferAddress(b);
-                        c = new Container(b, pointer, originContainer);
+                        c = new Container(b, pointer, originContainer, nextChunkPartitionId);
                     }
 
                     /*
