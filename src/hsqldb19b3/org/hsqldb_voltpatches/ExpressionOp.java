@@ -542,7 +542,7 @@ public class ExpressionOp extends Expression {
         case OpTypes.AVG:               element = "avg"; break;
         case OpTypes.SQL_FUNCTION:      element = "function"; break;
         default:
-            throw new HSQLParseException("Unsupported Operation: " +
+            throw new HSQLParseException("Unsupported Expresion Operation: " +
                                          String.valueOf(opType));
         }
 

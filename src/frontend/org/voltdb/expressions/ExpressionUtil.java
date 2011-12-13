@@ -39,6 +39,7 @@ public abstract class ExpressionUtil {
      * Expression on its RIGHT side. The follow types of Expressions do not need a right child:
      *      OPERATOR_NOT
      *      COMPARISON_IN
+     *      OPERATOR_IS_NULL
      *      AggregageExpression
      *
      * @param exp
@@ -48,6 +49,7 @@ public abstract class ExpressionUtil {
         assert(exp != null);
         return (exp.getExpressionType() != ExpressionType.OPERATOR_NOT &&
                 exp.getExpressionType() != ExpressionType.COMPARE_IN &&
+                exp.getExpressionType() != ExpressionType.OPERATOR_IS_NULL &&
                 !(exp instanceof AggregateExpression));
     }
 
@@ -201,11 +203,15 @@ public abstract class ExpressionUtil {
             // Everything else...
             //
             } else {
-                //
                 // TODO: Need to figure out how COMPARE_IN is going to work
-                //
                 throw new NotImplementedException("The '" + exp_type + "' Expression is not yet supported");
             }
+        // -------------------------------
+        // UNARY BOOLEAN OPERATORS
+        // -------------------------------
+        } else if (exp instanceof OperatorExpression && exp_type == ExpressionType.OPERATOR_IS_NULL) {
+            retType = VoltType.BIGINT;
+            retSize = retType.getLengthInBytesForFixedTypes();
         // -------------------------------
         // AGGREGATES
         // -------------------------------

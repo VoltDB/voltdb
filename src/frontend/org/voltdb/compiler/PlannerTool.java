@@ -421,6 +421,7 @@ public class PlannerTool {
                 else {
                     System.out.println("ERROR: UNKNOWN PLANNING ERROR\n");
                 }
+                e.printStackTrace();
                 continue;
             }
             if (plan == null) {
@@ -429,7 +430,7 @@ public class PlannerTool {
                     System.out.println("ERROR: " + plannerMsg + "\n");
                 }
                 else {
-                    System.out.println("ERROR: UNKNOWN PLANNING ERROR\n");
+                    System.out.println("ERROR: UNKNOWN PLANNING ERROR (null plan created.)\n");
                 }
                 continue;
             }

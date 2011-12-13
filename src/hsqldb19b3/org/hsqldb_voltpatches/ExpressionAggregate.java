@@ -318,7 +318,7 @@ public class ExpressionAggregate extends Expression {
         case OpTypes.SQL_FUNCTION:      element = "function"; break;
         case OpTypes.SIMPLE_COLUMN:     element = "simplecolumn"; break;
         default:
-            throw new HSQLParseException("Unsupported Operation: " +
+            throw new HSQLParseException("Unsupported Aggregate Operation: " +
                                          String.valueOf(opType));
         }
 

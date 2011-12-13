@@ -195,6 +195,10 @@ operatorFactory(ExpressionType et,
        ret = new OperatorNotExpression(lc);
        break;
 
+     case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
+         ret = new OperatorIsNullExpression(lc);
+         break;
+
      case (EXPRESSION_TYPE_OPERATOR_MOD):
        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "Mod operator is not yet supported.");
@@ -408,6 +412,7 @@ expressionFactory(json_spirit::Object &obj,
     case (EXPRESSION_TYPE_OPERATOR_MOD):
     case (EXPRESSION_TYPE_OPERATOR_CAST):
     case (EXPRESSION_TYPE_OPERATOR_NOT):
+    case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
         ret = operatorFactory(et, lc, rc);
     break;
 
