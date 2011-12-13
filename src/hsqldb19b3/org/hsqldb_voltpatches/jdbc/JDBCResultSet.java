@@ -41,23 +41,21 @@ import java.sql.Array;
 import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Date;
+import java.sql.NClob;
 import java.sql.Ref;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.RowId;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
+import java.sql.SQLXML;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Map;
 
-//#ifdef JAVA6
-import java.sql.NClob;
-import java.sql.RowId;
-import java.sql.SQLXML;
-
-//#endif JAVA6
 import org.hsqldb_voltpatches.ColumnBase;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
@@ -628,6 +626,7 @@ public class JDBCResultSet implements ResultSet {
      */
 
 //#ifdef DEPRECATEDJDBC
+    @Deprecated
     public BigDecimal getBigDecimal(int columnIndex,
                                     int scale) throws SQLException {
 
@@ -873,6 +872,7 @@ public class JDBCResultSet implements ResultSet {
      */
 
 //#ifdef DEPRECATEDJDBC
+    @Deprecated
     public java.io.InputStream getUnicodeStream(
             int columnIndex) throws SQLException {
 
@@ -1096,6 +1096,7 @@ public class JDBCResultSet implements ResultSet {
      */
 
 //#ifdef DEPRECATEDJDBC
+    @Deprecated
     public BigDecimal getBigDecimal(String columnLabel,
                                     int scale) throws SQLException {
         return getBigDecimal(findColumn(columnLabel), scale);
@@ -1239,6 +1240,7 @@ public class JDBCResultSet implements ResultSet {
      */
 
 //#ifdef DEPRECATEDJDBC
+    @Deprecated
     public java.io.InputStream getUnicodeStream(
             String columnLabel) throws SQLException {
         return getUnicodeStream(findColumn(columnLabel));
@@ -7184,5 +7186,14 @@ public class JDBCResultSet implements ResultSet {
             preparedStatement = new JDBCPreparedStatement(s.connection,
                     result);
         }
+    }
+
+    public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
+        throw new SQLException();
+    }
+
+    public <T> T getObject(String columnLabel, Class<T> type)
+            throws SQLException {
+        throw new SQLException();
     }
 }

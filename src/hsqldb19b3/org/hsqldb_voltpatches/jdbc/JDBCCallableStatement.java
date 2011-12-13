@@ -31,27 +31,25 @@
 
 package org.hsqldb_voltpatches.jdbc;
 
-import java.io.Reader;
 import java.io.InputStream;
+import java.io.Reader;
 import java.math.BigDecimal;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
 import java.sql.Clob;
 import java.sql.Date;
+import java.sql.NClob;
 import java.sql.Ref;
+import java.sql.RowId;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Map;
 
-//#ifdef JAVA6
-import java.sql.NClob;
-import java.sql.RowId;
-import java.sql.SQLXML;
-
-//#endif JAVA6
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
@@ -731,6 +729,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      */
 
 //#ifdef DEPRECATEDJDBC
+    @Deprecated
     public synchronized BigDecimal getBigDecimal(int parameterIndex,
             int scale) throws SQLException {
 
@@ -4728,5 +4727,23 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
 
     private boolean trackNull(Object o) {
         return (wasNullValue = (o == null));
+    }
+
+    public void closeOnCompletion() throws SQLException {
+        throw new SQLException();
+    }
+
+    public boolean isCloseOnCompletion() throws SQLException {
+        throw new SQLException();
+    }
+
+    public <T> T getObject(int parameterIndex, Class<T> type)
+            throws SQLException {
+        throw new SQLException();
+    }
+
+    public <T> T getObject(String parameterName, Class<T> type)
+            throws SQLException {
+        throw new SQLException();
     }
 }

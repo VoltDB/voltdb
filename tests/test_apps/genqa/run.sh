@@ -82,12 +82,13 @@ function async-export() {
     mkdir $CLIENTLOG
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --display-interval=5 \
-        --duration=6000 \
+        --duration=900 \
         --servers=localhost \
         --port=21212 \
         --pool-size=100000 \
         --rate-limit=10000 \
         --auto-tune=false \
+        --catalog-swap=false \
         --latency-target=10.0
 }
 
@@ -131,7 +132,7 @@ function jdbc-benchmark() {
         --wait=0
 }
 
-function export() {
+function export-tofile() {
     rm -rf $EXPORTDATA/*
     mkdir $EXPORTDATA
     java -classpath obj:$CLASSPATH:obj org.voltdb.exportclient.ExportToFileClient \
@@ -142,6 +143,25 @@ function export() {
         --nonce export \
         --period 1
 }
+
+function export-tosqoop() {
+    echo "Running sqoop export process"
+    #rm -rf $EXPORTDATA
+    #Change these if sqoop or hadoop are installed elsewhere
+    export SQOOP_HOME="/usr/lib/sqoop"
+    export HADOOP_HOME="/usr/lib/hadoop"
+    H_PATH="$HADOOP_HOME/*:$HADOOP_HOME/conf:$HADOOP_HOME/lib/*"
+    S_PATH="$SQOOP_HOME/*:$SQOOP_HOME/lib/*"
+    export CLASSPATH="$CLASSPATH:$H_PATH:$S_PATH"
+    java org.voltdb.hadoop.VoltDBSqoopExportClient \
+       --connect client \
+       --servers localhost \
+       --verbose \
+       --period 3 \
+       --target-dir /tmp/sqoop-export \
+       --nonce ExportData 
+}
+
 
 function exportverify() {
     java -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \

@@ -271,7 +271,6 @@ CTX.INPUT['plannodes'] = """
 """
 
 CTX.INPUT['indexes'] = """
- arrayuniqueindex.cpp
  tableindex.cpp
  tableindexfactory.cpp
  IndexStats.cpp

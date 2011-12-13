@@ -41,6 +41,7 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 
 
@@ -182,6 +183,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             }
             stringer.endObject();
             String jsonString = stringer.toString();
+            JSONObject jsonObj = new JSONObject(jsonString);
+            jsonString = jsonObj.toString(4);
             jsonBytes = jsonString.getBytes("UTF-8");
         } catch (Exception e) {
             throw new IOException(e);

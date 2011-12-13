@@ -26,6 +26,8 @@ import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.SQLStmtInitializer;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -35,6 +37,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
 
@@ -70,9 +73,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
     public DependencyPair executePlanFragment(
             HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
-        // Return the standard status schema for sysprocs
-        VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-        result.addRow(VoltSystemProcedure.STATUS_OK);
+        // Return a single long for modified rowcount
+        VoltTable result = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
 
         if (fragmentId == SysProcFragmentId.PF_distribute) {
             assert context.getCluster().getTypeName() != null;
@@ -82,22 +84,61 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             assert params.toArray()[0] != null;
             assert params.toArray()[1] != null;
 
+            String tableName = (String) params.toArray()[0];
+            VoltTable toInsert = (VoltTable) params.toArray()[1];
+
+            // add the partition id
+            long currentPartition = Long.parseLong(context.getSite().getPartition().getTypeName());
+            result.addRow(currentPartition);
+
             try {
                 // voltLoadTable is void. Assume success or exception.
                 super.voltLoadTable(context.getCluster().getTypeName(),
                                     context.getDatabase().getTypeName(),
-                                    (String) (params.toArray()[0]),
-                                    (VoltTable) (params.toArray()[1]));
+                                    tableName,
+                                    toInsert);
+                // return the number of rows inserted
+                result.addRow(toInsert.getRowCount());
             }
             catch (VoltAbortException e) {
                 // must continue and reply with dependency.
                 e.printStackTrace();
+                // report -1 rows inserted, though this might be false
+                result.addRow(-1);
             }
             return new DependencyPair(DEP_distribute, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_aggregate) {
+            long[] modifiedTuples = new long[context.getCluster().getPartitions().size()];
+            List<VoltTable> deps = dependencies.get(DEP_distribute);
+            assert(deps.size() > 0);
+
+            // go through all the deps and find one mod tuple count per partition
+            for (VoltTable t : deps) {
+                t.advanceRow();
+                int partitionId = (int) t.getLong(0);
+                t.advanceRow();
+                long rowsModified = t.getLong(0);
+
+                if (modifiedTuples[partitionId] == 0) {
+                    modifiedTuples[partitionId] = rowsModified;
+                }
+                else {
+                    if (modifiedTuples[partitionId] != rowsModified)
+                        throw new RuntimeException(
+                                "@LoadMultipartitionTable received different tuple mod counts from two replicas.");
+                }
+            }
+
+            // sum up all the modified rows from all partitions
+            long rowsModified = 0;
+            for (long l : modifiedTuples)
+                rowsModified += l;
+
+            result.addRow(rowsModified);
             return new DependencyPair(DEP_aggregate, result);
         }
+
         // must handle every dependency id.
         assert (false);
         return null;
@@ -116,7 +157,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
      * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}
      * @throws VoltAbortException
      */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+    public long run(SystemProcedureExecutionContext ctx,
             String tableName, VoltTable table)
             throws VoltAbortException {
         VoltTable[] results;
@@ -127,38 +168,69 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         // split up the incoming table .. then send those partial
         // tables to the appropriate sites.
 
-        Table catTable = m_cluster.getDatabases().get("database").getTables()
-                                  .getIgnoreCase(tableName);
+        Table catTable = ctx.getDatabase().getTables().getIgnoreCase(tableName);
         if (catTable == null) {
             throw new VoltAbortException("Table not present in catalog.");
         }
+        // fix any case problems
+        tableName = catTable.getTypeName();
+
+        // check that the schema of the input matches
+        int columnCount = table.getColumnCount();
+
+        // find the insert statement for this table
+        String insertProcName = String.format("%s.insert", tableName);
+        Procedure proc = ctx.getDatabase().getProcedures().get(insertProcName);
+        if (proc == null) {
+            throw new VoltAbortException(
+                    String.format("Unable to locate auto-generated CRUD insert statement for table %s",
+                            tableName));
+        }
+
+        // statements of all single-statement procs are named "sql"
+        Statement catStmt = proc.getStatements().get("sql");
+        if (catStmt == null) {
+            throw new VoltAbortException(
+                    String.format("Unable to find SQL statement for found table %s: BAD",
+                            tableName));
+        }
+
+        // create a SQLStmt instance on the fly (unusual to do)
+        SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
+        SQLStmtInitializer.initSQLStmt(stmt, catStmt);
+
         if (catTable.getIsreplicated()) {
-            pfs = new SynthesizedPlanFragment[2];
+            long queued = 0;
+            long executed = 0;
 
-            // create a work unit to invoke super.loadTable() on each site.
-            pfs[1] = new SynthesizedPlanFragment();
-            pfs[1].fragmentId = SysProcFragmentId.PF_distribute;
-            pfs[1].outputDepId = DEP_distribute;
-            pfs[1].inputDepIds = new int[] {};
-            pfs[1].multipartition = true;
-            ParameterSet params = new ParameterSet();
-            params.setParameters(tableName, table);
-            pfs[1].parameters = params;
+            // make sure at the start of the table
+            table.resetRowPosition();
+            for (int i = 0; table.advanceRow(); ++i) {
+                Object[] params = new Object[columnCount];
 
-            // create a work unit to aggregate the results.
-            // MULTIPARTION_DEPENDENCY bit set, requiring result from each site
-            pfs[0] = new SynthesizedPlanFragment();
-            pfs[0].fragmentId = SysProcFragmentId.PF_aggregate;
-            pfs[0].outputDepId = DEP_aggregate;
-            pfs[0].inputDepIds = new int[] { DEP_distribute };
-            pfs[0].multipartition = false;
-            pfs[0].parameters = new ParameterSet();
+                // get the parameters from the volt table
+                for (int col = 0; col < columnCount; ++col) {
+                    params[col] = table.get(col, table.getColumnType(col));
+                }
 
-            // distribute and execute the fragments providing pfs and id
-            // of the aggregator's output dependency table.
-            results = executeSysProcPlanFragments(pfs, DEP_aggregate);
-            return results;
-        } else {
+                // queue an insert and count it
+                voltQueueSQL(stmt, params);
+                ++queued;
+
+                // every 100 statements, exec the batch
+                // 100 is an arbitrary number
+                if ((i % 100) == 0) {
+                    executed += executeSQL();
+                }
+            }
+            // execute any leftover batched statements
+            if (queued > executed) {
+                executed += executeSQL();
+            }
+
+            return executed;
+        }
+        else {
             // find the index and type of the partitioning attribute
             int partitionCol = catTable.getPartitioncolumn().getIndex();
             int intType = catTable.getPartitioncolumn().getType();
@@ -216,8 +288,30 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
             // send these forth in to the world .. and wait
             results = executeSysProcPlanFragments(pfs, DEP_aggregate);
-            return results;
+            return results[0].asScalarLong();
         }
+    }
 
+    /**
+     * Execute a set of queued inserts. Ensure each insert successfully
+     * inserts one row. Throw exception if not.
+     *
+     * @return Count of rows inserted.
+     * @throws VoltAbortException if any failure at all.
+     */
+    long executeSQL() throws VoltAbortException {
+        long count = 0;
+        VoltTable[] results = voltExecuteSQL();
+        for (VoltTable result : results) {
+            long dmlUpdated = result.asScalarLong();
+            if (dmlUpdated == 0) {
+                throw new VoltAbortException("Insert failed for tuple.");
+            }
+            if (dmlUpdated > 1) {
+                throw new VoltAbortException("Insert modified more than one tuple.");
+            }
+            ++count;
+        }
+        return count;
     }
 }

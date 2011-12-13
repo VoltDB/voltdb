@@ -95,10 +95,9 @@ public class ExportConnection {
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(m_password);
         Object[] cxndata =
             ConnectionUtil.
-            getAuthenticatedExportConnection(serverAddr.getHostName(),
+            getAuthenticatedExportConnection(serverAddr,
                                              m_username,
-                                             hashedPassword,
-                                             serverAddr.getPort());
+                                             hashedPassword);
 
         m_socket = (SocketChannel) cxndata[0];
         m_socket.socket().setTcpNoDelay(true);

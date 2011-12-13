@@ -20,6 +20,7 @@
     <sequential>
         <javac
             target="1.6"
+            source="1.6"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -1524,7 +1525,7 @@ TEST CASES
 <target name='junitclass'
     description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
 
-    <condition property="timeoutLength" value="${timeoutLength}" else='600000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
     </condition>
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">

@@ -625,25 +625,28 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public long getCurrentTxnId();
         public long getNextUndo();
         public ExecutionSite getExecutionSite();
+        public HashMap<String, VoltProcedure> getProcedures();
     }
 
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
         @Override
-        public Database getDatabase()               { return m_context.database; }
+        public Database getDatabase()                         { return m_context.database; }
         @Override
-        public Cluster getCluster()                 { return m_context.cluster; }
+        public Cluster getCluster()                           { return m_context.cluster; }
         @Override
-        public Site getSite()                       { return getCatalogSite(); }
+        public Site getSite()                                 { return getCatalogSite(); }
         @Override
-        public ExecutionEngine getExecutionEngine() { return ee; }
+        public ExecutionEngine getExecutionEngine()           { return ee; }
         @Override
-        public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
+        public long getLastCommittedTxnId()                   { return lastCommittedTxnId; }
         @Override
-        public long getCurrentTxnId()         { return m_currentTransactionState.txnId; }
+        public long getCurrentTxnId()                         { return m_currentTransactionState.txnId; }
         @Override
-        public long getNextUndo()                   { return getNextUndoToken(); }
+        public long getNextUndo()                             { return getNextUndoToken(); }
         @Override
-        public ExecutionSite getExecutionSite()     { return ExecutionSite.this; }
+        public ExecutionSite getExecutionSite()               { return ExecutionSite.this; }
+        @Override
+        public HashMap<String, VoltProcedure> getProcedures() { return procs; }
     }
 
     SystemProcedureContext m_systemProcedureContext;

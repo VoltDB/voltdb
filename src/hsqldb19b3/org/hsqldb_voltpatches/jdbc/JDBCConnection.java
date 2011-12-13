@@ -31,31 +31,27 @@
 
 package org.hsqldb_voltpatches.jdbc;
 
+import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.NClob;
 import java.sql.PreparedStatement;
+import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
+import java.sql.SQLXML;
+import java.sql.Savepoint;
 import java.sql.Statement;
+import java.sql.Struct;
 import java.util.Calendar;
 import java.util.Map;
-
-//#ifdef JAVA4
-import java.sql.Savepoint;
-
-//#endif JAVA4
-//#ifdef JAVA6
-import java.sql.Array;
-import java.sql.SQLClientInfoException;
-import java.sql.NClob;
-import java.sql.SQLXML;
-import java.sql.Struct;
 import java.util.Properties;
+import java.util.concurrent.Executor;
 
-//#endif JAVA6
 import org.hsqldb_voltpatches.DatabaseManager;
 import org.hsqldb_voltpatches.DatabaseURL;
 import org.hsqldb_voltpatches.Error;
@@ -67,10 +63,6 @@ import org.hsqldb_voltpatches.lib.StringUtil;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
-
-import java.sql.SQLData;
-import java.sql.SQLOutput;
-import java.sql.SQLInput;
 
 /* $Id: JDBCConnection.java 3001 2009-06-04 12:31:11Z fredt $ */
 
@@ -3480,5 +3472,26 @@ public class JDBCConnection implements Connection {
         }
 
         return i;
+    }
+
+    public void setSchema(String schema) throws SQLException {
+        throw new SQLException();
+    }
+
+    public String getSchema() throws SQLException {
+        throw new SQLException();
+    }
+
+    public void abort(Executor executor) throws SQLException {
+        throw new SQLException();
+    }
+
+    public void setNetworkTimeout(Executor executor, int milliseconds)
+            throws SQLException {
+        throw new SQLException();
+    }
+
+    public int getNetworkTimeout() throws SQLException {
+        throw new SQLException();
     }
 }

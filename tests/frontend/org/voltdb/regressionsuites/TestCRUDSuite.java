@@ -132,7 +132,7 @@ public class TestCRUDSuite extends RegressionSuite {
     {
         Client client = getClient();
         try {
-            client.callProcedure("P2.insert", 0, "ABC");
+            client.callProcedure("P2.delete", 0, "ABC");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("was not found"));
             return;
@@ -144,7 +144,7 @@ public class TestCRUDSuite extends RegressionSuite {
     {
         Client client = getClient();
         try {
-            client.callProcedure("P3.insert", 0, "ABC");
+            client.callProcedure("P3.delete", 0, "ABC");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("was not found"));
             return;
@@ -156,7 +156,7 @@ public class TestCRUDSuite extends RegressionSuite {
     {
         Client client = getClient();
         try {
-            client.callProcedure("R1.insert", 0, "ABC");
+            client.callProcedure("R1.delete", 0, "ABC");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("was not found"));
             return;

@@ -720,10 +720,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler1 = new VoltCompiler();
         final VoltCompiler compiler2 = new VoltCompiler();
-
-        // TODO: temporary fix so this would compile was to remove second argument (cluster_config)
         final Catalog catalog = compiler1.compileCatalog(projectPath);
-
         final String cat1 = catalog.serialize();
         final boolean success = compiler2.compile(projectPath, testout_jar, System.out, null);
         final String cat2 = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
@@ -1265,7 +1262,6 @@ public class TestVoltCompiler extends TestCase {
                                        IndexType.BALANCED_TREE};
 
     boolean[] can_be_hash = {true, true, true, true, false, false, true, false};
-    boolean[] can_be_array = {true, true, true, true, false, false, true, false};
     boolean[] can_be_tree = {true, true, true, true, true, true, true, true};
 
     public void testDDLCompilerIndexDefaultTypes()
@@ -1304,32 +1300,6 @@ public class TestVoltCompiler extends TestCase {
                              d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id_hash").getType());
                 assertEquals(IndexType.HASH_TABLE.getValue(),
                              d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum_hash").getType());
-            }
-            else
-            {
-                assertTrue(c.hasErrors());
-            }
-        }
-    }
-
-    public void testDDLCompilerArrayIndexAllowed()
-    {
-        for (int i = 0; i < column_types.length; i++)
-        {
-            final String s =
-                "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
-                "create index idx_t_id_array on t(id);\n" +
-                "create index idx_t_idnum_array on t(id,num);";
-            VoltCompiler c = compileForDDLTest(getPathForSchema(s), can_be_array[i]);
-            if (can_be_array[i])
-            {
-                // do appropriate index exists checks
-                assertFalse(c.hasErrors());
-                Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
-                assertEquals(IndexType.ARRAY.getValue(),
-                             d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id_array").getType());
-                assertEquals(IndexType.ARRAY.getValue(),
-                             d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum_array").getType());
             }
             else
             {

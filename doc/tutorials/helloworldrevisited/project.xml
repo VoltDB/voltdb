@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+       <schemas>
+           <schema path='helloworld.sql' />
+       </schemas>
+       <procedures>
+           <procedure class='Insert' />
+            <procedure class='RegisterUser' />
+           <procedure class='SignIn' />
+       </procedures>
+       <partitions>
+           <partition table='USERACCOUNT' column='EMAIL' />
+       </partitions>
+    </database>
+</project>

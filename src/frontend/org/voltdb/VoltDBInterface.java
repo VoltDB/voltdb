@@ -19,6 +19,8 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -210,6 +212,6 @@ public interface VoltDBInterface
      * @param unit
      *            Time unit
      */
-    public void scheduleWork(Runnable work, long initialDelay, long delay,
+    public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay,
                              TimeUnit unit);
 }

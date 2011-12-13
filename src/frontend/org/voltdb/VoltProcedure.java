@@ -42,7 +42,6 @@ import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
-import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
@@ -298,9 +297,8 @@ public abstract class VoltProcedure {
                          */
                         SQLStmt stmt = (SQLStmt) f.get(this);
 
-                        stmt.catStmt = s;
-
-                        initSQLStmt(stmt);
+                        // done in a static method in an abstract class so users don't call it
+                        SQLStmtInitializer.initSQLStmt(stmt, s);
 
                     } catch (IllegalArgumentException e) {
                         e.printStackTrace();
@@ -315,8 +313,10 @@ public abstract class VoltProcedure {
         else {
             Statement catStmt = catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
             SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
-            stmt.catStmt = catStmt;
-            initSQLStmt(stmt);
+
+            // done in a static method in an abstract class so users don't call it
+            SQLStmtInitializer.initSQLStmt(stmt, catStmt);
+
             m_cachedSingleStmt[0] = stmt;
 
             m_procMethod = null;
@@ -338,27 +338,6 @@ public abstract class VoltProcedure {
                 assert(m_paramTypeIsArray[param.getIndex()] == false);
                 m_paramTypeComponentType[param.getIndex()] = null;
             }
-        }
-    }
-
-    final void initSQLStmt(SQLStmt stmt) {
-        stmt.numFragGUIDs = stmt.catStmt.getFragments().size();
-        PlanFragment fragments[] = new PlanFragment[stmt.numFragGUIDs];
-        stmt.fragGUIDs = new long[stmt.numFragGUIDs];
-        int i = 0;
-        for (PlanFragment frag : stmt.catStmt.getFragments()) {
-            fragments[i] = frag;
-            stmt.fragGUIDs[i] = CatalogUtil.getUniqueIdForFragment(frag);
-            i++;
-        }
-
-        stmt.numStatementParamJavaTypes = stmt.catStmt.getParameters().size();
-        //StmtParameter parameters[] = new StmtParameter[stmt.numStatementParamJavaTypes];
-        stmt.statementParamJavaTypes = new byte[stmt.numStatementParamJavaTypes];
-        for (StmtParameter param : stmt.catStmt.getParameters()) {
-            //parameters[i] = param;
-            stmt.statementParamJavaTypes[param.getIndex()] = (byte)param.getJavatype();
-            i++;
         }
     }
 

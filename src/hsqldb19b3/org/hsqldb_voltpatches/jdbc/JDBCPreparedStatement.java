@@ -44,26 +44,21 @@ import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.Date;
+import java.sql.NClob;
+import java.sql.ParameterMetaData;
 import java.sql.PreparedStatement;
 import java.sql.Ref;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.RowId;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
+import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 
-//#ifdef JAVA4
-import java.sql.ParameterMetaData;
-
-//#endif JAVA4
-//#ifdef JAVA6
-import java.sql.NClob;
-import java.sql.RowId;
-import java.sql.SQLXML;
-
-//#endif JAVA6
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
@@ -459,7 +454,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setFloat(int parameterIndex,
                                       float x) throws SQLException {
-        setDouble(parameterIndex, (double) x);
+        setDouble(parameterIndex, x);
     }
 
     /**
@@ -759,6 +754,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
 
 //#ifdef DEPRECATEDJDBC
+    @Deprecated
     public synchronized void setUnicodeStream(int parameterIndex,
             java.io.InputStream x, int length) throws SQLException {
 
@@ -1828,7 +1824,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         int[]           updateCounts = new int[navigator.getSize()];
 
         for (int i = 0; i < updateCounts.length; i++) {
-            Object[] data = (Object[]) navigator.getNext();
+            Object[] data = navigator.getNext();
 
             updateCounts[i] = ((Integer) data[0]).intValue();
         }
@@ -4306,4 +4302,12 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
     /** Is part of a Result. */
     protected final boolean isResult;
+
+    public void closeOnCompletion() throws SQLException {
+        throw new SQLException();
+    }
+
+    public boolean isCloseOnCompletion() throws SQLException {
+        throw new SQLException();
+    }
 }

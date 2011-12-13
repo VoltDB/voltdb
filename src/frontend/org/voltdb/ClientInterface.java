@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,10 +44,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.AdHocPlannedStmt;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWorkThread;
@@ -67,6 +70,7 @@ import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.WriteStream;
+import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.Encoder;
@@ -191,6 +195,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private boolean m_hasDTXNBackPressure = false;
 
+    private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
+    private ScheduledFuture<?> m_maxConnectionUpdater;
+
     /**
      * Way too much data tied up sending responses to clients.
      * Wait until they receive data or have been booted.
@@ -205,12 +212,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private volatile boolean m_running = true;
         private Thread m_thread = null;
         private final boolean m_isAdmin;
-
-        /**
-         * Limit on maximum number of connections. This should be set by inspecting ulimit -n, but
-         * that isn't being done.
-         */
-        private final int MAX_CONNECTIONS = 4000;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -314,7 +315,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     /*
                      * Enforce a limit on the maximum number of connections
                      */
-                    if (m_numConnections.get() == MAX_CONNECTIONS) {
+                    if (m_numConnections.get() == MAX_CONNECTIONS.get()) {
                         networkLog.warn("Rejected connection from " +
                                 socket.socket().getRemoteSocketAddress() +
                                 " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
@@ -1049,6 +1050,36 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // Horrible, hackish, stupid sysproc special casing...
             //
 
+            if (task.procName.equals("@LoadSinglepartitionTable")) {
+                int[] involvedPartitions = null;
+                // break out the Hashinator and calculate the appropriate partition
+                try {
+                    CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+                    Object valueToHash = LoadSinglepartitionTable.partitionValueFromInvocation(
+                            tables, task);
+                    involvedPartitions = new int[] { TheHashinator.hashToPartition(valueToHash) };
+                }
+                catch (Exception e) {
+                    authLog.warn(e.getMessage());
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                             new VoltTable[0], e.getMessage(), task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
+                assert(involvedPartitions != null);
+                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                                              handler.isAdmin(),
+                                              task,
+                                              false, // read only
+                                              true,  // single partition
+                                              false, // every site
+                                              involvedPartitions, involvedPartitions.length,
+                                              c, buf.capacity(),
+                                              now);
+                return;
+            }
+
             // Updating a catalog needs to divert to the catalog processing thread
             if (task.procName.equals("@UpdateApplicationCatalog")) {
                 ParameterSet params = task.getParams();
@@ -1363,6 +1394,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // to the dispatcher..  Or write a "stop reading and flush
     // all your read buffers" events .. or something ..
     protected void shutdown() throws InterruptedException {
+        if (m_maxConnectionUpdater != null) {
+            m_maxConnectionUpdater.cancel(false);
+        }
         if (m_acceptor != null) {
             m_acceptor.shutdown();
         }
@@ -1380,6 +1414,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     public void startAcceptingConnections() throws IOException {
+        /*
+         * Periodically check the limit on the number of open files
+         */
+        m_maxConnectionUpdater = VoltDB.instance().scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                Integer limit = org.voltdb.utils.CLibrary.getOpenFileLimit();
+                if (limit != null) {
+                    //Leave 300 files open for "stuff"
+                    MAX_CONNECTIONS.set(limit - 300);
+                }
+            }
+        }, 0, 10, TimeUnit.MINUTES);
         m_acceptor.start();
         if (m_adminAcceptor != null)
         {
