@@ -427,7 +427,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         ClientInterface.create(m_network,
                                                m_messenger,
                                                m_catalogContext,
-                                               m_replicationRole == ReplicationRole.SECONDARY,
+                                               m_replicationRole,
                                                m_catalogContext.numberOfNodes,
                                                currSiteId,
                                                site.getInitiatorid(),
@@ -1693,7 +1693,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void setReplicationRole(ReplicationRole role)
     {
-        m_replicationRole = role;
+        if (m_replicationRole == null) {
+            m_replicationRole = role;
+        } else if (m_replicationRole == ReplicationRole.SECONDARY) {
+            if (role != ReplicationRole.PRIMARY) {
+                hostLog.error("Cannot change replication role to " + role);
+                return;
+            }
+
+            hostLog.info("Changing replication role from " + m_replicationRole +
+                         " to " + role);
+            m_replicationRole = role;
+            for (ClientInterface ci : m_clientInterfaces) {
+                ci.setReplicationRole(m_replicationRole);
+            }
+        }
     }
 
     public ReplicationRole getReplicationRole()

@@ -34,11 +34,11 @@ public class SecondaryInvocationAcceptancePolicy extends InvocationAcceptancePol
 
     private boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
                                  boolean isReadOnly, WriteStream s) {
-        if (!isOn) {
-            return true;
-        }
-
         if (invocation.getType() == ProcedureInvocationType.ORIGINAL) {
+            if (!isOn) {
+                return true;
+            }
+
             // hackish way to check if an adhoc query is read-only
             if (invocation.procName.equals("@AdHoc")) {
                 String sql = (String) invocation.getParams().toArray()[0];
@@ -58,6 +58,17 @@ public class SecondaryInvocationAcceptancePolicy extends InvocationAcceptancePol
                 return false;
             }
         } else {
+            if (!isOn) {
+                final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                               new VoltTable[0],
+                                               "Replicated procedure " + invocation.procName +
+                                               " is dropped from cluster",
+                                               invocation.clientHandle);
+                s.enqueue(errorResponse);
+                return false;
+            }
+
             if (isReadOnly) {
                 final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -87,6 +98,10 @@ public class SecondaryInvocationAcceptancePolicy extends InvocationAcceptancePol
                                 Config sysProc, WriteStream s) {
         if (invocation == null || sysProc == null) {
             return false;
+        }
+        if (invocation.getType() == ProcedureInvocationType.ORIGINAL && sysProc.allowedInSecondary) {
+            // white-listed sysprocs
+            return true;
         }
         return shouldAccept(user, invocation, sysProc.readOnly, s);
     }

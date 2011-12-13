@@ -220,6 +220,7 @@ var IVoltDB = (function(){
                           , '@SystemInformation': ['SysInfoSelector']
                           , '@UpdateApplicationCatalog': ['varchar', 'varchar']
                           , '@UpdateLogging': ['xml']
+                          , '@Promote': []
                         };
         return this;
     }
@@ -284,6 +285,7 @@ var IVoltDB = (function(){
                                                   , '@SystemInformation': ['Selector (SysInfoSelector)', 'Returns Table[]']
                                                   , '@UpdateApplicationCatalog': ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]']
                                                   , '@UpdateLogging': ['Configuration (xml)', 'Returns Table[]']
+                                                  , '@Promote': ['Returns bit']
                                                   };
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);

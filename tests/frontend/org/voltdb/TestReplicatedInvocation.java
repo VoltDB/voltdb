@@ -25,21 +25,85 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Map.Entry;
+
 import static org.junit.Assert.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.messaging.FastSerializable;
+import org.voltdb.network.WriteStream;
+import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.VoltFile;
 
 public class TestReplicatedInvocation {
     ServerThread server;
     File root;
     ReplicationRole role = ReplicationRole.SECONDARY;
+
+    static class MockWriteStream implements WriteStream {
+        @Override
+        public boolean hadBackPressure() {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        @Override
+        public boolean enqueue(BBContainer c) {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        @Override
+        public boolean enqueue(FastSerializable f) {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        @Override
+        public boolean enqueue(FastSerializable f, int expectedSize) {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        @Override
+        public boolean enqueue(DeferredSerialization ds) {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        @Override
+        public boolean enqueue(ByteBuffer b) {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        @Override
+        public int calculatePendingWriteDelta(long now) {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        @Override
+        public int getOutstandingMessageCount() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+    }
 
     @Before
     public void setUp() throws IOException {
@@ -103,6 +167,57 @@ public class TestReplicatedInvocation {
         }
         if (role == ReplicationRole.SECONDARY) {
             fail("Should not succeed on secondary cluster");
+        }
+    }
+
+    @Test
+    public void testSysprocAcceptanceOnSecondary() {
+        SecondaryInvocationAcceptancePolicy policy = new SecondaryInvocationAcceptancePolicy(true);
+        for (Entry<String, Config> e : SystemProcedureCatalog.listing.entrySet()) {
+            StoredProcedureInvocation invocation = new StoredProcedureInvocation();
+            invocation.procName = e.getKey();
+            if (e.getKey().equalsIgnoreCase("@UpdateApplicationCatalog") ||
+                e.getKey().equalsIgnoreCase("@SnapshotRestore") ||
+                e.getKey().equalsIgnoreCase("@BalancePartitions") ||
+                e.getKey().equalsIgnoreCase("@LoadMultipartitionTable")) {
+                assertFalse(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
+            } else {
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
+            }
+        }
+    }
+
+    /**
+     * Test promoting a slave to master
+     * @throws Exception
+     */
+    @Test
+    public void testPromote() throws Exception {
+        if (role != ReplicationRole.SECONDARY) {
+            return;
+        }
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+        ClientResponse resp = client.callProcedure("@SystemInformation", "overview");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable result = resp.getResults()[0];
+        while (result.advanceRow()) {
+            if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
+                assertTrue(result.getString("VALUE").equalsIgnoreCase("secondary"));
+            }
+        }
+
+        resp = client.callProcedure("@Promote");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        resp = client.callProcedure("@SystemInformation", "overview");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        result = resp.getResults()[0];
+        while (result.advanceRow()) {
+            if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
+                assertTrue(result.getString("VALUE").equalsIgnoreCase("primary"));
+            }
         }
     }
 }

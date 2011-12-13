@@ -711,6 +711,7 @@ public class SQLCommand
         Procedures.put("@SystemInformation", Arrays.asList("sysinfoselector"));
         Procedures.put("@UpdateApplicationCatalog", Arrays.asList("varchar", "varchar"));
         Procedures.put("@UpdateLogging", Arrays.asList("varchar"));
+        Procedures.put("@Promote", new ArrayList<String>());
     }
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
