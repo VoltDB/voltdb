@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -227,6 +228,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private OperationMode m_startMode = null;
     private ReplicationRole m_replicationRole = null;
 
+    private ScheduledFuture<?> m_startPlannerTask = null;
+
     volatile String m_localMetadata = "";
     final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
@@ -239,7 +242,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     HeartbeatThread heartbeatThread;
-    private ScheduledExecutorService m_periodicWorkThread;
+    private ScheduledThreadPoolExecutor m_periodicWorkThread;
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
@@ -312,14 +315,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (availableProcessors > 4) {
                 poolSize = 2;
             }
-            m_periodicWorkThread =
-                    new ScheduledThreadPoolExecutor(poolSize, new ThreadFactory() {
-                        @Override
-                        public Thread newThread(Runnable r) {
-                            return new Thread(r, "Periodic Work");
-                        }
-                    });
-
+            m_periodicWorkThread = MiscUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize);
             buildClusterMesh(isRejoin);
 
             // do the many init tasks in the Inits class
@@ -683,6 +679,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             stringer.key("clientPort").value(m_config.m_port);
             stringer.key("adminPort").value(m_config.m_adminPort);
             stringer.key("httpPort").value(m_config.m_httpPort);
+            stringer.key("drPort").value(m_config.m_drAgentPortStart);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
             // possibly atomic swap from null to realz
@@ -1175,6 +1172,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public void shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
             m_mode = OperationMode.SHUTTINGDOWN;
+            if (m_startPlannerTask != null) {
+                if (!m_startPlannerTask.isDone()) {
+                    if (!m_startPlannerTask.cancel(false)) {
+                        try {
+                            m_startPlannerTask.get();
+                        } catch (ExecutionException e) {
+                            hostLog.error("Error starting planner thread", e);
+                        }
+                    }
+                }
+                m_startPlannerTask = null;
+            }
             m_executionSitesRecovered = false;
             m_agreementSiteRecovered = false;
             m_snapshotCompletionMonitor.shutdown();
@@ -1841,14 +1850,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                              long initialDelay,
                              long delay,
                              TimeUnit unit) {
-        synchronized (m_periodicWorkThread) {
-            if (delay > 0) {
-                return m_periodicWorkThread.scheduleWithFixedDelay(work,
-                                                            initialDelay, delay,
-                                                            unit);
-            } else {
-                return m_periodicWorkThread.schedule(work, initialDelay, unit);
-            }
+        if (delay > 0) {
+            return m_periodicWorkThread.scheduleWithFixedDelay(work,
+                                                        initialDelay, delay,
+                                                        unit);
+        } else {
+            return m_periodicWorkThread.schedule(work, initialDelay, unit);
         }
     }
 }

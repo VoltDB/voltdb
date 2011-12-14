@@ -27,6 +27,9 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -221,6 +224,17 @@ public class MiscUtils {
 
     }
 
+
+    /*
+     * Have shutdown actually means shutdown. Tasks that need to complete should use
+     * futures.
+     */
+    public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize) {
+        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
+        ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+        ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        return ses;
+    }
 
     public static ThreadFactory getThreadFactory(String name) {
         return getThreadFactory(name, 1024 * 1024);
