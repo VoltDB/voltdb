@@ -27,6 +27,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -218,6 +220,30 @@ public class MiscUtils {
         }
         return build;
 
+    }
+
+    /*
+     * Have shutdown actually means shutdown. Tasks that need to complete should use
+     * futures.
+     */
+    public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize) {
+        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
+        ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+        ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        return ses;
+    }
+
+    public static ThreadFactory getThreadFactory(String name) {
+        return getThreadFactory(name, 1024 * 1024);
+    }
+
+    public static ThreadFactory getThreadFactory(final String name, final int stackSize) {
+        return new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(null, r, name, stackSize);
+            }
+        };
     }
 
     private static String checkForJavaHomeInEnvironment() throws Exception {

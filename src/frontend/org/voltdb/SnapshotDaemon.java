@@ -410,7 +410,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private void processTruncationRequestEvent(final WatchedEvent event) {
         if (event.getType() == EventType.NodeCreated) {
             /*
-             * Do it five seconds later because these requests tend to come in bunches
+             * Do it 10 seconds later because these requests tend to come in bunches
              * and we want one truncation snapshot to do truncation for all nodes
              * so we don't get them back to back
              */
@@ -515,41 +515,32 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
                     int hosts = VoltDB.instance().getCatalogContext().siteTracker
                                       .getAllLiveHosts().size();
+                    try {
+                        m_zk.delete("/request_truncation_snapshot", -1);
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB(
+                                "Unexpected error deleting truncation snapshot request", true, e);
+                    }
                     SnapshotSaveAPI.createSnapshotCompletionNode(snapshotTxnId,
                                                                  true, hosts);
-                    /*
-                     * Truncation requests tend to come in clusters, wait 5 seconds before
-                     * deleting the request so that they don't always happen back to back
-                     */
-                    m_es.schedule(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                try {
-                                    m_zk.delete("/request_truncation_snapshot", -1);
-                                } catch (Exception e) {
-                                    VoltDB.crashLocalVoltDB(
-                                            "Unexpected error deleting truncation snapshot request", true, e);
-                                }
-                                TruncationSnapshotAttempt snapshotAttempt =
-                                    m_truncationSnapshotAttempts.get(snapshotTxnId);
-                                if (snapshotAttempt == null) {
-                                    snapshotAttempt = new TruncationSnapshotAttempt();
-                                    m_truncationSnapshotAttempts.put(snapshotTxnId, snapshotAttempt);
-                                }
-                                snapshotAttempt.nonce = nonce;
-                                snapshotAttempt.path = snapshotPath;
-                            } finally {
-                                try {
-                                    truncationRequestExistenceCheck();
-                                } catch (Exception e) {
-                                    VoltDB.crashLocalVoltDB(
-                                            "Unexpected error checking for existence of truncation snapshot request"
-                                            , true, e);
-                                }
-                            }
+                    try {
+                        TruncationSnapshotAttempt snapshotAttempt =
+                            m_truncationSnapshotAttempts.get(snapshotTxnId);
+                        if (snapshotAttempt == null) {
+                            snapshotAttempt = new TruncationSnapshotAttempt();
+                            m_truncationSnapshotAttempts.put(snapshotTxnId, snapshotAttempt);
                         }
-                    }, m_truncationGatheringPeriod, TimeUnit.SECONDS);
+                        snapshotAttempt.nonce = nonce;
+                        snapshotAttempt.path = snapshotPath;
+                    } finally {
+                        try {
+                            truncationRequestExistenceCheck();
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB(
+                                    "Unexpected error checking for existence of truncation snapshot request"
+                                    , true, e);
+                        }
+                    }
                 } else {
                     loggingLog.info("Retrying log truncation snapshot in 60 seconds");
                     /*

@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -510,8 +511,20 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 VoltDB.crashLocalVoltDB("Selected recover before txn was earlier than the  proposed recover before txn", true, null);
             }
             m_recoverBeforeTxn = selectedRecoverBeforeTxn;
+            m_minTxnIdAfterRecovery = m_recoverBeforeTxn;//anything before this precedes the snapshot
             m_recoverySnapshot = bpm.m_payload;
             m_recoveryStage = RecoveryStage.RECEIVED_SNAPSHOT;
+            /*
+             * Clean out all txns from before the snapshot
+             */
+            Iterator<Map.Entry< Long, AgreementTransactionState>> iter = m_transactionsById.entrySet().iterator();
+            while (iter.hasNext()) {
+                final Map.Entry< Long, AgreementTransactionState> entry = iter.next();
+                if (entry.getKey() <= m_minTxnIdAfterRecovery) {
+                    m_txnQueue.faultTransaction(entry.getValue());
+                    iter.remove();
+                }
+            }
         } else if (message instanceof FaultMessage) {
             FaultMessage fm = (FaultMessage)message;
 
