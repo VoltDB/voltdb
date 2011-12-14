@@ -88,8 +88,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable r2 = client.callProcedure("@AdHoc", "select count(*) from P1 where not desc is null").getResults()[0];
         System.out.println(r2);
         assertTrue(r2.asScalarLong() == 3);
-    }
 
+        VoltTable r3 = client.callProcedure("@AdHoc", "select count(*) from P1 where NOT (id=2 and desc is null)").getResults()[0];
+        System.out.println(r3);
+        assertTrue(r3.asScalarLong() == 7);
+
+        VoltTable r4 = client.callProcedure("@AdHoc", "select count(*) from P1 where NOT (id=6 and desc is null)").getResults()[0];
+        System.out.println(r4);
+        assertTrue(r4.asScalarLong() == 8);
+
+    }
 
     public void testTicketEng1850_WhereOrderBy() throws Exception
     {

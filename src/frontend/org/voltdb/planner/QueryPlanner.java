@@ -115,7 +115,6 @@ public class QueryPlanner {
         } catch (HSQLParseException e) {
             // XXXLOG probably want a real log message here
             m_recentErrorMsg = e.getMessage();
-            e.printStackTrace();
             return null;
         }
 
@@ -134,20 +133,17 @@ public class QueryPlanner {
         }
         catch (Exception e) {
             m_recentErrorMsg = e.getMessage();
-            e.printStackTrace();
             return null;
         }
         if (initialParsedStmt == null)
         {
             m_recentErrorMsg = "Failed to parse SQL statement: " + sql;
-            System.out.println(m_recentErrorMsg);
             return null;
         }
         if ((initialParsedStmt.tableList.size() > maxTablesPerJoin) && (initialParsedStmt.joinOrder == null)) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + sql + " because a join of > 5 tables was requested"
                                + " without specifying a join order. See documentation for instructions on manually" +
                                  " specifying a join order";
-            System.out.println(m_recentErrorMsg);
             return null;
         }
 
