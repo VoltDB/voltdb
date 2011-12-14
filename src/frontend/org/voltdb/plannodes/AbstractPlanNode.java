@@ -526,7 +526,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         catch (JSONException e)
         {
             e.printStackTrace();
-            System.exit(-1);
+            throw new RuntimeException(e.getMessage(), e);
         }
         return stringer.toString();
     }

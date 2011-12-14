@@ -158,7 +158,7 @@ public abstract class AbstractParsedStmt {
 
         if (doc == null) {
             System.err.println("Unexpected error parsing hsql parsed stmt xml");
-            System.exit(-1);
+            throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
         }
 
         Node docElement = doc.getDocumentElement();
@@ -360,7 +360,7 @@ public abstract class AbstractParsedStmt {
             expr = exprType.getExpressionClass().newInstance();
         } catch (Exception e) {
             e.printStackTrace();
-            System.exit(-1);
+            throw new RuntimeException(e.getMessage(), e);
         }
         expr.setExpressionType(exprType);
 
