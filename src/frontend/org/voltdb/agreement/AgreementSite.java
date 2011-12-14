@@ -225,11 +225,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_knownFailedSites.addAll(failedSiteIds);
         m_handledFailedSites.addAll(m_knownFailedSites);
         m_idManager = new TransactionIdManager( initiatorId, 0);
+        // note, the agreement site always uses the safety dance, even
+        // if it could skip it if there was one node
         m_txnQueue =
             new RestrictedPriorityQueue(
                     MiscUtils.toArray(agreementSiteIds),
                     myAgreementSiteId, mailbox,
-                    VoltDB.AGREEMENT_MAILBOX_ID);
+                    VoltDB.AGREEMENT_MAILBOX_ID, true);
         m_safetyState = new ExecutorTxnIdSafetyState(myAgreementSiteId, MiscUtils.toArray(agreementSiteIds));
         for (Integer sid : failedSiteIds) {
             m_txnQueue.gotFaultForInitiator(sid);

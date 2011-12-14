@@ -510,7 +510,7 @@ public class TestExecutionSite extends TestCase {
         public
         RestrictedPriorityARRR(int[] initiatorSiteIds, int siteId, Mailbox mbox)
         {
-            super(initiatorSiteIds, siteId, mbox, VoltDB.DTXN_MAILBOX_ID);
+            super(initiatorSiteIds, siteId, mbox, VoltDB.DTXN_MAILBOX_ID, true);
         }
     }
 

@@ -760,12 +760,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             if (s.getIsexec() == false)
                 initiatorIds[index++] = Integer.parseInt(s.getTypeName());
 
+        // turn off the safety dance for single-node voltdb
+        boolean useSafetyDance = m_context.numberOfNodes > 1;
+
         assert(m_mailbox != null);
         RestrictedPriorityQueue retval = new RestrictedPriorityQueue(
                 initiatorIds,
                 siteId,
                 m_mailbox,
-                VoltDB.DTXN_MAILBOX_ID);
+                VoltDB.DTXN_MAILBOX_ID,
+                useSafetyDance);
         return retval;
     }
 

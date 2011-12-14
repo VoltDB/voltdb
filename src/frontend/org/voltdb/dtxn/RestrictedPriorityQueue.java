@@ -120,18 +120,20 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
     private final int m_mailboxId;
+    final boolean m_useSafetyDance;
 
     /**
      * Tell this queue about all initiators. If any initiators
      * are later referenced that aren't in this list, trip
      * an assertion.
      */
-    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId, Mailbox mbox, int mailboxId) {
+    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId, Mailbox mbox, int mailboxId, boolean useSafetyDance) {
         m_siteId = siteId;
         m_mailbox = mbox;
         m_mailboxId = mailboxId;
         for (int id : initiatorSiteIds)
             m_initiatorData.put(id, new LastInitiatorData());
+        m_useSafetyDance = useSafetyDance;
     }
 
     /**
@@ -355,7 +357,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         if (lid == null) {
             // what does this mean???
         }
-        else if (ts.txnId > lid.m_lastSafeTxnId) {
+        // if the txn is newer than the last safe txn from initiatior, block
+        //  except if this RPQ has safety turned off
+        else if (m_useSafetyDance && (ts.txnId > lid.m_lastSafeTxnId)) {
             newState = QueueState.BLOCKED_SAFETY;
             executeStateChange(newState, ts, lid);
             return m_state;
