@@ -72,19 +72,27 @@ public class TestPlannerTool extends TestCase {
         }
         catch (Exception e) {}
 
+        // commented out code put the big stat
+        /*int i = 0;
+        while (i == 0) {
+            long start = System.currentTimeMillis();*/
         // try just the right amount of tables
         try {
-            result = m_pt.planSql("select * from CUSTOMER, STOCK, ORDERS, ORDER_LINE where " +
+            result = m_pt.planSql("select * from CUSTOMER, STOCK, ORDERS, ORDER_LINE, NEW_ORDER where " +
                 "CUSTOMER.C_W_ID = CUSTOMER.C_W_ID and " +
                 "CUSTOMER.C_W_ID = STOCK.S_W_ID and " +
                 "CUSTOMER.C_W_ID = ORDERS.O_W_ID and " +
                 "CUSTOMER.C_W_ID = ORDER_LINE.OL_W_ID and " +
+                "CUSTOMER.C_W_ID = NEW_ORDER.NO_W_ID and " +
                 "CUSTOMER.C_W_ID = 0", true);
         }
         catch (Exception e) {
             e.printStackTrace();
             fail();
         }
+        /*    long duration = System.currentTimeMillis() - start;
+            System.out.printf("Nasty query took %.2f seconds\n", duration / 1000.0);
+        }*/
 
         // try garbage
         try {

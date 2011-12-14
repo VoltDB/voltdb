@@ -39,7 +39,7 @@ public class PlannerTool {
     final CatalogContext m_context;
     final HSQLInterface m_hsql;
 
-    public static final int AD_HOC_JOINED_TABLE_LIMIT = 4;
+    public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
     public static class Result {
         String onePlan = null;

@@ -17,10 +17,9 @@
 
 package org.voltdb.planner;
 
+import java.io.File;
 import java.io.PrintStream;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -49,6 +48,7 @@ public class QueryPlanner {
     String m_recentErrorMsg;
     boolean m_useGlobalIds;
     boolean m_quietPlanner;
+    final boolean m_generateAllJSONPlans;
 
     /**
      * Initialize planner with physical schema info and a reference to HSQLDB parser.
@@ -72,6 +72,7 @@ public class QueryPlanner {
         m_estimates = estimates;
         m_useGlobalIds = useGlobalIds;
         m_quietPlanner = suppressDebugOutput;
+        m_generateAllJSONPlans = System.getProperties().contains("saveplans");
     }
 
     /**
@@ -117,8 +118,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (!m_quietPlanner)
-        {
+        if (!m_quietPlanner) {
             // output the xml from hsql to disk for debugging
             PrintStream xmlDebugOut =
                 BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-xml", procName + "_" + stmtName + ".xml");
@@ -147,8 +147,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (!m_quietPlanner)
-        {
+        if (!m_quietPlanner) {
             // output a description of the parsed stmt
             PrintStream parsedDebugOut =
                 BuildDirectoryUtils.getDebugOutputPrintStream("statement-parsed", procName + "_" + stmtName + ".txt");
@@ -159,12 +158,8 @@ public class QueryPlanner {
         // get ready to find the plan with minimal cost
         CompiledPlan rawplan = null;
         CompiledPlan bestPlan = null;
+        String bestFilename = null;
         double minCost = Double.MAX_VALUE;
-
-        HashMap<String, String> planOutputs = new HashMap<String, String>();
-        HashMap<String, String> dotPlanOutputs = new HashMap<String, String>();
-        HashMap<String, String> explainPlanOutputs = new HashMap<String, String>();
-        String winnerName = "";
 
         // index of the currently being "costed" plan
         int i = 0;
@@ -213,6 +208,20 @@ public class QueryPlanner {
                     boolean result = planGraph.computeEstimatesRecursively(stats, m_cluster, m_db, m_estimates, paramHints);
                     assert(result);
 
+                    // compute the cost based on the resources using the current cost model
+                    plan.cost = costModel.getPlanCost(stats);
+
+                    // filename for debug output
+                    String filename = String.valueOf(i++);
+
+                    // find the minimum cost plan
+                    if (plan.cost < minCost) {
+                        minCost = plan.cost;
+                        // free the PlanColumns held by the previous best plan
+                        bestPlan = plan;
+                        bestFilename = filename;
+                    }
+
                     // GENERATE JSON DEBUGGING OUTPUT BEFORE WE CLEAN UP THE
                     // PlanColumns
                     // convert a tree into an execution list
@@ -220,47 +229,55 @@ public class QueryPlanner {
 
                     // get the json serialized version of the plan
                     String json = null;
-                    try {
-                        String crunchJson = nodeList.toJSONString();
-                        //System.out.println(crunchJson);
-                        //System.out.flush();
-                        JSONObject jobj = new JSONObject(crunchJson);
-                        json = jobj.toString(4);
-                    } catch (JSONException e2) {
-                        // Any plan that can't be serialized to JSON to
-                        // write to debugging output is also going to fail
-                        // to get written to the catalog, to sysprocs, etc.
-                        // Just bail.
-                        m_recentErrorMsg = "Plan for sql: '" + sql +
-                                           "' can't be serialized to JSON";
-                        return null;
+
+                    if (!m_quietPlanner) {
+                        if (m_generateAllJSONPlans) {
+                            try {
+                                String crunchJson = nodeList.toJSONString();
+                                //System.out.println(crunchJson);
+                                //System.out.flush();
+                                JSONObject jobj = new JSONObject(crunchJson);
+                                json = jobj.toString(4);
+                            } catch (JSONException e2) {
+                                // Any plan that can't be serialized to JSON to
+                                // write to debugging output is also going to fail
+                                // to get written to the catalog, to sysprocs, etc.
+                                // Just bail.
+                                m_recentErrorMsg = "Plan for sql: '" + sql +
+                                                   "' can't be serialized to JSON";
+                                return null;
+                            }
+
+                            // output a description of the parsed stmt
+                            json = "PLAN:\n" + json;
+                            json = "COST: " + String.valueOf(plan.cost) + "\n" + json;
+                            assert (plan.sql != null);
+                            json = "SQL: " + plan.sql + "\n" + json;
+
+                            // write json to disk
+                            PrintStream candidatePlanOut =
+                                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
+                                                                                  filename + "-json.txt");
+                            candidatePlanOut.println(json);
+                            candidatePlanOut.close();
+
+                            // create a graph friendly version
+                            candidatePlanOut =
+                                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
+                                                                                  filename + ".dot");
+                            candidatePlanOut.println(nodeList.toDOTString("name"));
+                            candidatePlanOut.close();
+                        }
+
+                        // get the explained plan for the node
+                        plan.explainedPlan = planGraph.toExplainPlanString();
+                        PrintStream candidatePlanOut =
+                                BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
+                                                                              filename + ".txt");
+
+                        candidatePlanOut.println(plan.explainedPlan);
+                        candidatePlanOut.close();
                     }
-
-                    // compute the cost based on the resources using the current cost model
-                    plan.cost = costModel.getPlanCost(stats);
-
-                    // find the minimum cost plan
-                    if (plan.cost < minCost) {
-                        minCost = plan.cost;
-                        // free the PlanColumns held by the previous best plan
-                        bestPlan = plan;
-                    }
-
-                    // output a description of the parsed stmt
-                    String filename = String.valueOf(i++);
-                    if (bestPlan == plan) winnerName = filename;
-                    json = "PLAN:\n" + json;
-                    json = "COST: " + String.valueOf(plan.cost) + "\n" + json;
-                    assert (plan.sql != null);
-                    json = "SQL: " + plan.sql + "\n" + json;
-                    planOutputs.put(filename, json);
-
-                    // create a graph friendly version
-                    dotPlanOutputs.put(filename, nodeList.toDOTString("name"));
-
-                    // get the explained plan for the node
-                    plan.explainedPlan = planGraph.toExplainPlanString();
-                    explainPlanOutputs.put(filename, plan.explainedPlan);
                 }
             }
         }
@@ -277,45 +294,36 @@ public class QueryPlanner {
 
         if (!m_quietPlanner)
         {
-            // print all the plans to disk for debugging
-            for (Entry<String, String> output : planOutputs.entrySet()) {
-                String filename = output.getKey();
-                if (winnerName.equals(filename)) {
-                    filename = "WINNER " + filename;
-                }
-                PrintStream candidatePlanOut =
-                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                                  filename + "-json.txt");
+            // find out where debugging is going
+            String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
+                    "/" + BuildDirectoryUtils.rootPath + "statement-all-plans/" +
+                    procName + "_" + stmtName + "/";
+            String winnerFilename, winnerFilenameRenamed;
+            File winnerFile, winnerFileRenamed;
 
-                candidatePlanOut.println(output.getValue());
-                candidatePlanOut.close();
+            // if outputting full stuff
+            if (m_generateAllJSONPlans) {
+                // rename the winner json plan
+                winnerFilename = prefix + bestFilename + "-json.txt";
+                winnerFile = new File(winnerFilename);
+                winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + "-json.txt";
+                winnerFileRenamed = new File(winnerFilenameRenamed);
+                winnerFile.renameTo(winnerFileRenamed);
+
+                // rename the winner dot plan
+                winnerFilename = prefix + bestFilename + ".dot";
+                winnerFile = new File(winnerFilename);
+                winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + ".dot";
+                winnerFileRenamed = new File(winnerFilenameRenamed);
+                winnerFile.renameTo(winnerFileRenamed);
             }
 
-            for (Entry<String, String> output : dotPlanOutputs.entrySet()) {
-                String filename = output.getKey();
-                if (winnerName.equals(filename)) {
-                    filename = "WINNER " + filename;
-                }
-                PrintStream candidatePlanOut =
-                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                                  filename + ".dot");
-
-                candidatePlanOut.println(output.getValue());
-                candidatePlanOut.close();
-            }
-
-            for (Entry<String, String> output : explainPlanOutputs.entrySet()) {
-                String filename = output.getKey();
-                if (winnerName.equals(filename)) {
-                    filename = "WINNER " + filename;
-                }
-                PrintStream candidatePlanOut =
-                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                                  filename + ".txt");
-
-                candidatePlanOut.println(output.getValue());
-                candidatePlanOut.close();
-            }
+            // rename the winner explain plan
+            winnerFilename = prefix + bestFilename + ".txt";
+            winnerFile = new File(winnerFilename);
+            winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + ".txt";
+            winnerFileRenamed = new File(winnerFilenameRenamed);
+            winnerFile.renameTo(winnerFileRenamed);
 
             // output the plan statistics to disk for debugging
             PrintStream plansOut =
