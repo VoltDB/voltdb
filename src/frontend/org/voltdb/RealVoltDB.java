@@ -50,6 +50,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
@@ -1792,17 +1793,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public void scheduleWork(Runnable work,
+    public ScheduledFuture<?> scheduleWork(Runnable work,
                              long initialDelay,
                              long delay,
                              TimeUnit unit) {
         synchronized (m_periodicWorkThread) {
             if (delay > 0) {
-                m_periodicWorkThread.scheduleWithFixedDelay(work,
+                return m_periodicWorkThread.scheduleWithFixedDelay(work,
                                                             initialDelay, delay,
                                                             unit);
             } else {
-                m_periodicWorkThread.schedule(work, initialDelay, unit);
+                return m_periodicWorkThread.schedule(work, initialDelay, unit);
             }
         }
     }
