@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -238,7 +239,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     HeartbeatThread heartbeatThread;
-    private ScheduledExecutorService m_periodicWorkThread;
+    private ScheduledThreadPoolExecutor m_periodicWorkThread;
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
@@ -311,14 +312,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (availableProcessors > 4) {
                 poolSize = 2;
             }
-            m_periodicWorkThread =
-                    new ScheduledThreadPoolExecutor(poolSize, new ThreadFactory() {
-                        @Override
-                        public Thread newThread(Runnable r) {
-                            return new Thread(r, "Periodic Work");
-                        }
-                    });
-
+            m_periodicWorkThread = MiscUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize);
             buildClusterMesh(isRejoin);
 
             // do the many init tasks in the Inits class
@@ -1797,14 +1791,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                              long initialDelay,
                              long delay,
                              TimeUnit unit) {
-        synchronized (m_periodicWorkThread) {
-            if (delay > 0) {
-                return m_periodicWorkThread.scheduleWithFixedDelay(work,
-                                                            initialDelay, delay,
-                                                            unit);
-            } else {
-                return m_periodicWorkThread.schedule(work, initialDelay, unit);
-            }
+        if (delay > 0) {
+            return m_periodicWorkThread.scheduleWithFixedDelay(work,
+                                                        initialDelay, delay,
+                                                        unit);
+        } else {
+            return m_periodicWorkThread.schedule(work, initialDelay, unit);
         }
     }
 }
