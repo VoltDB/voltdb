@@ -544,7 +544,7 @@ public class ExpressionOp extends Expression {
         case OpTypes.IS_NULL:           element = "is_null"; break;
         case OpTypes.NOT:               element = "not"; break;
         default:
-            throw new HSQLParseException("Unsupported Expresion Operation: " +
+            throw new HSQLParseException("Unsupported Expression Operation: " +
                                          String.valueOf(opType));
         }
 
