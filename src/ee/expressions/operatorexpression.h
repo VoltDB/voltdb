@@ -59,7 +59,7 @@ namespace voltdb {
 
 
 /*
- * Unary operators. Currently just operator NOT.
+ * Unary operators. (NOT and IS_NULL)
  */
 
 class OperatorNotExpression : public AbstractExpression {
@@ -82,6 +82,31 @@ private:
     AbstractExpression *m_left;
 };
 
+class OperatorIsNullExpression : public AbstractExpression {
+  public:
+    OperatorIsNullExpression(AbstractExpression *left)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_IS_NULL) {
+            m_left = left;
+    };
+
+   NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+       assert(m_left);
+       NValue tmp = m_left->eval(tuple1, tuple2);
+       if (tmp.isNull()) {
+           return NValue::getTrue();
+       }
+       else {
+           return NValue::getFalse();
+       }
+   }
+
+   std::string debugInfo(const std::string &spacer) const {
+       return (spacer + "OperatorIsNullExpression");
+   }
+
+  private:
+   AbstractExpression *m_left;
+};
 
 
 /*

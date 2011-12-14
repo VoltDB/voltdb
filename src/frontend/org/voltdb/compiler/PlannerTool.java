@@ -156,7 +156,6 @@ public class PlannerTool {
         }
 
         retval.replicatedDML = plan.replicatedTableDML;
-
         return retval;
     }
 }

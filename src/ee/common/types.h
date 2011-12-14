@@ -236,6 +236,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_MOD                    = 6, // left % right (both must be integer)
     EXPRESSION_TYPE_OPERATOR_CAST                   = 7, // explicitly cast left as right (right is integer in ValueType enum)
     EXPRESSION_TYPE_OPERATOR_NOT                    = 8, // logical not operator
+    EXPRESSION_TYPE_OPERATOR_IS_NULL                = 9, // is null test.
 
     // -----------------------------
     // Comparison Operators

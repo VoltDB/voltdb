@@ -671,7 +671,6 @@ public class VoltCompiler {
         // Generate the auto-CRUD procedure descriptors. This creates
         // procedure descriptors to insert, delete, select and update
         // tables, with some caveats. (See ENG-1601).
-        // Disabled pending: ENG-1660.
         List<ProcedureDescriptor> autoCrudProcedures = generateCrud(m_catalog);
         procedures.addAll(autoCrudProcedures);
 
