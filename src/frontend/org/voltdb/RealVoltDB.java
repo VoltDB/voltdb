@@ -49,12 +49,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -339,6 +336,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     System.exit(-1);
                 }
             }
+
+            collectLocalNetworkMetadata();
+            m_clusterMetadata.put(m_messenger.getHostId(), getLocalMetadata());
 
             /*
              * Create execution sites runners (and threads) for all exec sites except the first one.
@@ -979,9 +979,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         for (String line : lines) {
             hostLog.info(line.trim());
         }
-
-        collectLocalNetworkMetadata();
-        m_clusterMetadata.put(m_messenger.getHostId(), getLocalMetadata());
 
         /*
          * Publish our cluster metadata, and then retrieve the metadata
