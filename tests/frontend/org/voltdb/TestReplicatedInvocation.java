@@ -179,9 +179,13 @@ public class TestReplicatedInvocation {
             if (e.getKey().equalsIgnoreCase("@UpdateApplicationCatalog") ||
                 e.getKey().equalsIgnoreCase("@SnapshotRestore") ||
                 e.getKey().equalsIgnoreCase("@BalancePartitions") ||
-                e.getKey().equalsIgnoreCase("@LoadMultipartitionTable")) {
+                e.getKey().equalsIgnoreCase("@LoadMultipartitionTable") ||
+                e.getKey().equalsIgnoreCase("@LoadSinglePartitionTable")) {
                 assertFalse(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
             } else {
+                if (!policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream())) {
+                    System.out.println(e.getKey());
+                }
                 assertTrue(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
             }
         }
