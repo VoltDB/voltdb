@@ -209,7 +209,9 @@ public abstract class ExpressionUtil {
         // -------------------------------
         // UNARY BOOLEAN OPERATORS
         // -------------------------------
-        } else if (exp instanceof OperatorExpression && exp_type == ExpressionType.OPERATOR_IS_NULL) {
+        } else if (exp instanceof OperatorExpression &&
+                (exp_type == ExpressionType.OPERATOR_IS_NULL ||
+                 exp_type == ExpressionType.OPERATOR_NOT)) {
             retType = VoltType.BIGINT;
             retSize = retType.getLengthInBytesForFixedTypes();
         // -------------------------------
