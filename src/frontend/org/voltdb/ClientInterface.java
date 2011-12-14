@@ -779,7 +779,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltNetwork network,
             Messenger messenger,
             CatalogContext context,
-            boolean isSecondary,
+            ReplicationRole replicationRole,
             int hostCount,
             int siteId,
             int initiatorId,
@@ -828,7 +828,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(context, siteId);
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
-                port, adminPort, context, network, isSecondary, siteId, initiator,
+                port, adminPort, context, network, replicationRole, siteId, initiator,
                 plannerThread, allPartitions);
         onBackPressure.m_ci = ci;
         offBackPressure.m_ci = ci;
@@ -837,7 +837,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network,
-                    boolean isSecondary, int siteId, TransactionInitiator initiator,
+                    ReplicationRole replicationRole, int siteId, TransactionInitiator initiator,
                     AsyncCompilerWorkThread plannerThread, int[] allPartitions)
     {
         m_catalogContext.set(context);
@@ -854,13 +854,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
 
-        registerPolicies(isSecondary);
+        registerPolicies(replicationRole);
     }
 
-    private void registerPolicies(boolean isSecondary) {
+    private void registerPolicies(ReplicationRole replicationRole) {
         registerPolicy(new InvocationPermissionPolicy(true));
         registerPolicy(new ParameterDeserializationPolicy(true));
-        registerPolicy(new SecondaryInvocationAcceptancePolicy(isSecondary));
+        registerPolicy(new SecondaryInvocationAcceptancePolicy(replicationRole == ReplicationRole.SECONDARY));
 
         registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
         registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
@@ -910,6 +910,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
         return true;
+    }
+
+    /**
+     * Called when the replication role of the cluster changes.
+     * @param role
+     */
+    public void setReplicationRole(ReplicationRole role) {
+        List<InvocationAcceptancePolicy> policies = m_policies.get(null);
+        if (policies != null) {
+            for (InvocationAcceptancePolicy policy : policies) {
+                if (policy instanceof SecondaryInvocationAcceptancePolicy) {
+                    policy.setMode(role == ReplicationRole.SECONDARY);
+                }
+            }
+        }
     }
 
     AsyncCompilerWorkThread getCompilerThread() {
@@ -1161,15 +1176,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
             if (involvedPartitions != null) {
-                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
-                                              handler.isAdmin(),
-                                              task,
-                                              catProc.getReadonly(),
-                                              catProc.getSinglepartition(),
-                                              catProc.getEverysite(),
-                                              involvedPartitions, involvedPartitions.length,
-                                              c, buf.capacity(),
-                                              now);
+                boolean success =
+                    m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                                                  handler.isAdmin(),
+                                                  task,
+                                                  catProc.getReadonly(),
+                                                  catProc.getSinglepartition(),
+                                                  catProc.getEverysite(),
+                                                  involvedPartitions, involvedPartitions.length,
+                                                  c, buf.capacity(),
+                                                  now);
+                if (!success)
+                {
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                               new VoltTable[0],
+                                               "Unable to create transaction",
+                                               task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
             }
         }
         // dispatch a sysproc

@@ -52,7 +52,7 @@ public abstract class TransactionInitiator {
      * @param clientData Client data returned with the completed transaction
      * @param messageSize Size in bytes of the message that created this invocation
      */
-    public abstract void createTransaction(
+    public abstract boolean createTransaction(
             long connectionId,
             final String connectionHostname,
             boolean adminConnection,
@@ -98,7 +98,7 @@ public abstract class TransactionInitiator {
      * @param messageSize
      *            Size in bytes of the message that created this invocation
      */
-    public abstract void createTransaction(
+    public abstract boolean createTransaction(
             long connectionId,
             final String connectionHostname,
             boolean adminConnection,
