@@ -1036,13 +1036,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
 
-                m_asyncCompilerWorkThread.planSQL(sql,
+                boolean success = m_asyncCompilerWorkThread.planSQL(sql,
                                                   partitionParam,
                                                   task.clientHandle,
                                                   handler.connectionId(),
                                                   handler.m_hostname,
                                                   handler.isAdmin(),
                                                   c);
+                // basic backpressure used when the planner queue is too deep,
+                //  or... less optimally, when the adhoc planner hangs
+                if (!success) {
+                    final ClientResponseImpl errorResponse =
+                            new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                                   new VoltTable[0],
+                                                   "Adhoc SQL planner busy. Try again later. " +
+                                                   "If you see this message repeatedly, you may try restarting the VoltDB node.",
+                                                   task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                }
                 return;
             }
             else if (!user.hasSystemProcPermission()) {
@@ -1410,14 +1421,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         //System.out.printf("Sending tick after %d ms pause.\n", delta);
         //System.out.flush();
-
-        // this code ensures that things put in the out of process
-        // planner make it out
-        long delta = time - m_lastCompilerThreadPoke;
-        if (delta > POKE_INTERVAL) {
-            m_lastCompilerThreadPoke = time;
-            m_asyncCompilerWorkThread.verifyEverthingIsKosher();
-        }
 
         // check for catalog updates
         if (m_shouldUpdateCatalog.compareAndSet(true, false)) {

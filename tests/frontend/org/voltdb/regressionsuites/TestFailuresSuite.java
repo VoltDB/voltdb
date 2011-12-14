@@ -32,8 +32,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.AsyncCompilerWorkThread;
-import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadDecimalToVarcharCompare;
@@ -435,32 +433,6 @@ public class TestFailuresSuite extends RegressionSuite {
             fail();
         } catch (ProcCallException e) {
         }
-    }
-
-    // Try a SQL stmt that will almost certainly kill the out of process planner
-    // Make sure it doesn't kill the system
-    public void testKillOPPlanner() throws IOException, ProcCallException {
-        System.out.println("STARTING testKillOPPlanner");
-        if (isHSQL() || isValgrind() || isLocalCluster()) return;
-        AsyncCompilerWorkThread.m_OOPTimeout = 5000;
-        Client client = getClient();
-
-        try {
-            // "*kill*" should kill the planner process
-            client.callProcedure("@AdHoc", PlannerTool.POISON_SQL);
-            fail();
-        }
-        catch (ProcCallException e) {}
-
-        // a short pause to recover the planning process
-        try {
-            Thread.sleep(200);
-        } catch (InterruptedException e) {
-            fail();
-        }
-
-        // make sure we can call adhocs
-        client.callProcedure("@AdHoc", "select * from new_order;");
     }
 
     public void testAppStatus() throws Exception {

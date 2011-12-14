@@ -25,47 +25,19 @@ package org.voltdb.planner;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
 
+import org.voltdb.CatalogContext;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 
-public class TestOutOfProcessPlanning extends TestCase {
+public class TestPlannerTool extends TestCase {
 
     PlannerTool m_pt = null;
-
-    class PlannerKillerThread extends Thread {
-        AtomicBoolean m_shouldStop = new AtomicBoolean(false);
-        String m_serializedCatalog = null;
-        int m_timeout = 2000;
-
-        public PlannerKillerThread(int timeout)
-        {
-            m_timeout = timeout;
-        }
-
-        @Override
-        public void run() {
-            while (m_shouldStop.get() == false) {
-                //if (m_pt.expensiveIsRunningCheck() == false) {
-                //  m_pt =
-                //}
-
-                if (m_pt.perhapsIsHung(m_timeout)) {
-                    m_pt.kill();
-                    m_pt = PlannerTool.createPlannerToolProcess(m_serializedCatalog);
-                }
-
-                Thread.yield();
-            }
-        }
-
-    }
 
     public void testSimple() throws IOException {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
@@ -74,18 +46,19 @@ public class TestOutOfProcessPlanning extends TestCase {
 
         byte[] bytes = CatalogUtil.toBytes(new File("tpcc-oop.jar"));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        Catalog catalog = new Catalog();
+        catalog.execute(serializedCatalog);
+        CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
 
-        m_pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
-
-        PlannerKillerThread ptKiller = new PlannerKillerThread(2000);
-        ptKiller.m_serializedCatalog = serializedCatalog;
-        ptKiller.start();
+        m_pt = new PlannerTool(context);
 
         PlannerTool.Result result = null;
         result = m_pt.planSql("select * from warehouse;", false);
         System.out.println(result);
 
-        result = m_pt.planSql("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
+        // try too many tables
+        try {
+            result = m_pt.planSql("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
                 "WAREHOUSE.W_ID = DISTRICT.D_W_ID and " +
                 "WAREHOUSE.W_ID = CUSTOMER.C_W_ID and " +
                 "WAREHOUSE.W_ID = CUSTOMER_NAME.C_W_ID and " +
@@ -95,10 +68,30 @@ public class TestOutOfProcessPlanning extends TestCase {
                 "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
                 "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
                 "WAREHOUSE.W_ID = 0", false);
-        System.out.println(result);
+            fail();
+        }
+        catch (Exception e) {}
 
-        result = m_pt.planSql("ryan likes the yankees", false);
-        System.out.println(result);
+        // try just the right amount of tables
+        try {
+            result = m_pt.planSql("select * from CUSTOMER, STOCK, ORDERS, ORDER_LINE where " +
+                "CUSTOMER.C_W_ID = CUSTOMER.C_W_ID and " +
+                "CUSTOMER.C_W_ID = STOCK.S_W_ID and " +
+                "CUSTOMER.C_W_ID = ORDERS.O_W_ID and " +
+                "CUSTOMER.C_W_ID = ORDER_LINE.OL_W_ID and " +
+                "CUSTOMER.C_W_ID = 0", true);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+
+        // try garbage
+        try {
+            result = m_pt.planSql("ryan likes the yankees", false);
+            fail();
+        }
+        catch (Exception e) {}
 
         try {
             Thread.sleep(500);
@@ -107,21 +100,17 @@ public class TestOutOfProcessPlanning extends TestCase {
             e1.printStackTrace();
         }
 
-        result = m_pt.planSql("ryan likes the yankees", false);
-        System.out.println(result);
+        try {
+            result = m_pt.planSql("ryan likes the yankees", false);
+            fail();
+        }
+        catch (Exception e) {}
 
         result = m_pt.planSql("select * from warehouse;", false);
         System.out.println(result);
 
         final File jar = new File("tpcc-oop.jar");
         jar.delete();
-
-        ptKiller.m_shouldStop.set(true);
-        try {
-            ptKiller.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 
     public void testBadDDL() throws IOException
@@ -145,28 +134,15 @@ public class TestOutOfProcessPlanning extends TestCase {
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        m_pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
+        CatalogContext context = new CatalogContext(0, c, bytes, 0, 0, 0);
 
-        PlannerKillerThread ptKiller = new PlannerKillerThread(60000);
-        ptKiller.m_serializedCatalog = serializedCatalog;
-        ptKiller.start();
+        m_pt = new PlannerTool(context);
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
-        PlannerTool.Result result = null;
-        result = m_pt.planSql("select * from A;", false);
-        System.out.println(result);
-        assertNotSame("Stream closed", result.getErrors());
-        assertNull(result.getErrors());
+        m_pt.planSql("select * from A;", false);
 
         final File jar = new File("testbadddl-oop.jar");
         jar.delete();
-
-        ptKiller.m_shouldStop.set(true);
-        try {
-            ptKiller.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 }

@@ -93,6 +93,7 @@ public class QueryPlanner {
             String stmtName,
             String procName,
             boolean singlePartition,
+            int maxTablesPerJoin,
             ScalarValueHints[] paramHints) {
         assert(costModel != null);
         assert(sql != null);
@@ -139,7 +140,7 @@ public class QueryPlanner {
             m_recentErrorMsg = "Failed to parse SQL statement: " + sql;
             return null;
         }
-        if (initialParsedStmt.tableList.size() > 5 && initialParsedStmt.joinOrder == null) {
+        if ((initialParsedStmt.tableList.size() > maxTablesPerJoin) && (initialParsedStmt.joinOrder == null)) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + sql + " because a join of > 5 tables was requested"
                                + " without specifying a join order. See documentation for instructions on manually" +
                                  " specifying a join order";

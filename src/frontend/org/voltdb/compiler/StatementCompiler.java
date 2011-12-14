@@ -52,6 +52,8 @@ import org.voltdb.utils.Encoder;
  */
 public abstract class StatementCompiler {
 
+    public static final int DEFAULT_MAX_JOIN_TABLES = 5;
+
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, String stmt, String joinOrder, boolean singlePartition)
@@ -104,7 +106,7 @@ public abstract class StatementCompiler {
         try {
             plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
                     catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(),
-                    catalogStmt.getSinglepartition(), null);
+                    catalogStmt.getSinglepartition(), DEFAULT_MAX_JOIN_TABLES, null);
         } catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());

@@ -41,6 +41,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
@@ -142,7 +143,8 @@ public class PlannerTestAideDeCamp {
 
         CompiledPlan plan = null;
         plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(), catalogStmt.getSinglepartition(), null);
+                                   catalogStmt.getParent().getTypeName(), catalogStmt.getSinglepartition(),
+                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
 
         if (plan == null)
         {

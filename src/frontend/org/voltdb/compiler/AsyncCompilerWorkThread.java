@@ -31,9 +31,11 @@ import org.voltdb.utils.Encoder;
 
 public class AsyncCompilerWorkThread extends Thread {
 
+    // if more than this amount of work is queued, backpressure
+    static final int MAX_QUEUE_DEPTH = 250;
+
     LinkedBlockingQueue<AsyncCompilerWork> m_work = new LinkedBlockingQueue<AsyncCompilerWork>();
     final ArrayDeque<AsyncCompilerResult> m_finished = new ArrayDeque<AsyncCompilerResult>();
-    //HSQLInterface m_hsql;
     PlannerTool m_ptool;
     int counter = 0;
     final int m_siteId;
@@ -49,45 +51,10 @@ public class AsyncCompilerWorkThread extends Thread {
 
     public AsyncCompilerWorkThread(CatalogContext context, int siteId) {
         m_ptool = null;
-        //m_hsql = null;
         m_siteId = siteId;
         m_context = context;
 
         setName("Ad Hoc Planner");
-    }
-
-    public synchronized void ensureLoadedPlanner() {
-        // if the process was created but is dead, clear the placeholder
-        if ((m_ptool != null) && (m_ptool.expensiveIsRunningCheck() == false)) {
-            ahpLog.error("Planner process died on its own. It will be restarted if needed.");
-            m_ptool = null;
-        }
-        // if no placeholder, create a new plannertool
-        if (m_ptool == null) {
-            m_ptool = PlannerTool.createPlannerToolProcess(m_context.catalog.serialize());
-        }
-    }
-
-    public void verifyEverthingIsKosher() {
-        if (m_ptool != null) {
-            // check if the planner process has been blocked for 10 seconds
-            if (m_ptool.perhapsIsHung(m_OOPTimeout)) {
-                ahpLog.error("Out-of-process planner unresponsive.");
-                // Get the actual cause of death, maybe
-                if (!m_ptool.expensiveIsRunningCheck())
-                {
-                    int exit_code = m_ptool.getExitValue();
-                    ahpLog.error("  Out-of-process planner died with exit code: " + exit_code);
-                }
-                else
-                {
-                    ahpLog.error("  Out-of-process planner appears to have hung.  Killing it off.");
-                    ahpLog.error("  Last attempted to plan SQL: " + m_ptool.getLastSql());
-                }
-                m_ptool.kill();
-                m_ptool = null;
-            }
-        }
     }
 
     public void shutdown() {
@@ -115,7 +82,7 @@ public class AsyncCompilerWorkThread extends Thread {
      * @param adminConnection Did this invocation arrive on an admin port?
      * @param clientData Data supplied by ClientInterface (typically a VoltPort) that will be in the PlannedStmt produced later.
      */
-    public void planSQL(
+    public boolean planSQL(
             String sql,
             Object partitionParam,
             long clientHandle,
@@ -132,7 +99,11 @@ public class AsyncCompilerWorkThread extends Thread {
         work.hostname = hostname;
         work.adminConnection = adminConnection;
         work.clientData = clientData;
+        if (m_work.size() > MAX_QUEUE_DEPTH) {
+            return false;
+        }
         m_work.add(work);
+        return true;
     }
 
     public void prepareCatalogUpdate(
@@ -175,10 +146,9 @@ public class AsyncCompilerWorkThread extends Thread {
                 m_context = VoltDB.instance().getCatalogContext();
                 // kill the planner process which has an outdated catalog
                 // it will get created again for the next stmt
-                if (m_ptool != null) {
-                    m_ptool.kill();
-                    m_ptool = null;
-                }
+                if (m_ptool != null)
+                    m_ptool.shutdown(); // cleans up hsql
+                m_ptool = null;
             }
 
             AsyncCompilerResult result = null;
@@ -198,8 +168,10 @@ public class AsyncCompilerWorkThread extends Thread {
                 e.printStackTrace();
             }
         }
-        if (m_ptool != null)
-            m_ptool.kill();
+        if (m_ptool != null) {
+            m_ptool.shutdown(); // cleans up hsql
+            m_ptool = null;
+        }
     }
 
     public void notifyShouldUpdateCatalog() {
@@ -218,7 +190,8 @@ public class AsyncCompilerWorkThread extends Thread {
         plannedStmt.catalogVersion = m_context.catalogVersion;
 
         try {
-            ensureLoadedPlanner();
+            if (m_ptool == null)
+                m_ptool = new PlannerTool(m_context);
 
             PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam != null);
 
@@ -228,7 +201,6 @@ public class AsyncCompilerWorkThread extends Thread {
             plannedStmt.isReplicatedTableDML = result.replicatedDML;
             plannedStmt.sql = work.sql;
             plannedStmt.partitionParam = work.partitionParam;
-            plannedStmt.errorMsg = result.errors;
         }
         catch (Exception e) {
             plannedStmt.errorMsg = "Unexpected Ad Hoc Planning Error: " + e.getMessage();

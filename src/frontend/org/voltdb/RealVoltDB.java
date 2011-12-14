@@ -546,19 +546,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES);
-
-        // try to start the adhoc planner once
-        scheduleWork(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    m_compilerThread.ensureLoadedPlanner();
-                }
-                catch (Exception ex) {
-                    log.warn(ex.getMessage(), ex);
-                }
-            }
-        }, 10, -1, TimeUnit.SECONDS);
     }
 
     void readDeploymentAndCreateStarterCatalogContext() {
