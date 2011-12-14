@@ -228,8 +228,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private OperationMode m_startMode = null;
     private ReplicationRole m_replicationRole = null;
 
-    private ScheduledFuture<?> m_startPlannerTask = null;
-
     volatile String m_localMetadata = "";
     final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
@@ -1172,18 +1170,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public void shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
             m_mode = OperationMode.SHUTTINGDOWN;
-            if (m_startPlannerTask != null) {
-                if (!m_startPlannerTask.isDone()) {
-                    if (!m_startPlannerTask.cancel(false)) {
-                        try {
-                            m_startPlannerTask.get();
-                        } catch (ExecutionException e) {
-                            hostLog.error("Error starting planner thread", e);
-                        }
-                    }
-                }
-                m_startPlannerTask = null;
-            }
             m_executionSitesRecovered = false;
             m_agreementSiteRecovered = false;
             m_snapshotCompletionMonitor.shutdown();
