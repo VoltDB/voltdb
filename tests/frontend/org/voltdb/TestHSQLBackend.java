@@ -58,6 +58,8 @@ public class TestHSQLBackend extends TestCase {
                 org.voltdb.compiler.procedures.MilestoneOneCombined.class);
 
         assertTrue(builder.compile("test.jar"));
+        final File jar = new File("test.jar");
+        jar.deleteOnExit();
 
         // start VoltDB server using hsqlsb backend
         ServerThread server = new ServerThread( "test.jar", builder.getPathToDeployment(), BackendTarget.HSQLDB_BACKEND);
@@ -92,6 +94,8 @@ public class TestHSQLBackend extends TestCase {
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
 
         builder.compile(catalogJar, 1, 1, 0);
+        final File jar = new File(catalogJar);
+        jar.deleteOnExit();
 
         ServerThread server = new ServerThread(catalogJar, builder.getPathToDeployment(), BackendTarget.HSQLDB_BACKEND);
         server.start();
@@ -120,6 +124,8 @@ public class TestHSQLBackend extends TestCase {
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
+        final File jar = new File(catalogJar);
+        jar.deleteOnExit();
 
         builder.compile(catalogJar, 1, 1, 0);
         String pathToDeployment = builder.getPathToDeployment();
@@ -151,6 +157,8 @@ public class TestHSQLBackend extends TestCase {
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
+        final File jar = new File(catalogJar);
+        jar.deleteOnExit();
 
         builder.compile(catalogJar, 1, 1, 0);
 
