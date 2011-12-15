@@ -48,7 +48,7 @@ public class QueryPlanner {
     String m_recentErrorMsg;
     boolean m_useGlobalIds;
     boolean m_quietPlanner;
-    final boolean m_generateAllJSONPlans;
+    final boolean m_fullDebug;
 
     /**
      * Initialize planner with physical schema info and a reference to HSQLDB parser.
@@ -72,7 +72,7 @@ public class QueryPlanner {
         m_estimates = estimates;
         m_useGlobalIds = useGlobalIds;
         m_quietPlanner = suppressDebugOutput;
-        m_generateAllJSONPlans = System.getProperties().contains("saveplans");
+        m_fullDebug = System.getProperties().contains("compilerdebug");
     }
 
     /**
@@ -118,7 +118,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (!m_quietPlanner) {
+        if (!m_quietPlanner && m_fullDebug) {
             // output the xml from hsql to disk for debugging
             PrintStream xmlDebugOut =
                 BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-xml", procName + "_" + stmtName + ".xml");
@@ -147,7 +147,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (!m_quietPlanner) {
+        if (!m_quietPlanner && m_fullDebug) {
             // output a description of the parsed stmt
             PrintStream parsedDebugOut =
                 BuildDirectoryUtils.getDebugOutputPrintStream("statement-parsed", procName + "_" + stmtName + ".txt");
@@ -231,7 +231,7 @@ public class QueryPlanner {
                     String json = null;
 
                     if (!m_quietPlanner) {
-                        if (m_generateAllJSONPlans) {
+                        if (m_fullDebug) {
                             try {
                                 String crunchJson = nodeList.toJSONString();
                                 //System.out.println(crunchJson);
@@ -302,7 +302,7 @@ public class QueryPlanner {
             File winnerFile, winnerFileRenamed;
 
             // if outputting full stuff
-            if (m_generateAllJSONPlans) {
+            if (m_fullDebug) {
                 // rename the winner json plan
                 winnerFilename = prefix + bestFilename + "-json.txt";
                 winnerFile = new File(winnerFilename);
@@ -325,11 +325,13 @@ public class QueryPlanner {
             winnerFileRenamed = new File(winnerFilenameRenamed);
             winnerFile.renameTo(winnerFileRenamed);
 
-            // output the plan statistics to disk for debugging
-            PrintStream plansOut =
-                BuildDirectoryUtils.getDebugOutputPrintStream("statement-stats", procName + "_" + stmtName + ".txt");
-            plansOut.println(stats.toString());
-            plansOut.close();
+            if (m_fullDebug) {
+                // output the plan statistics to disk for debugging
+                PrintStream plansOut =
+                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-stats", procName + "_" + stmtName + ".txt");
+                plansOut.println(stats.toString());
+                plansOut.close();
+            }
         }
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments

@@ -59,6 +59,8 @@ public abstract class StatementCompiler {
             Statement catalogStmt, String stmt, String joinOrder, boolean singlePartition)
     throws VoltCompiler.VoltCompilerException {
 
+        boolean compilerDebug = System.getProperties().contains("compilerdebug");
+
         // Cleanup whitespace newlines for catalog compatibility
         // and to make statement parsing easier.
         stmt = stmt.replaceAll("\n", " ");
@@ -179,26 +181,32 @@ public abstract class StatementCompiler {
             planFragment.setHasdependencies(fragment.hasDependencies);
             planFragment.setMultipartition(fragment.multiPartition);
 
-            String json = null;
-            try {
-                JSONObject jobj = new JSONObject(node_list.toJSONString());
-                json = jobj.toString(4);
-            } catch (JSONException e2) {
-                e2.printStackTrace();
-                throw compiler.new VoltCompilerException(e2.getMessage());
+            String json = node_list.toJSONString();
+
+            // if we're generating more than just explain plans
+            if (compilerDebug) {
+                String prettyJson = null;
+
+                try {
+                    JSONObject jobj = new JSONObject(json);
+                    prettyJson = jobj.toString(4);
+                } catch (JSONException e2) {
+                    e2.printStackTrace();
+                    throw compiler.new VoltCompilerException(e2.getMessage());
+                }
+
+                // output the plan to disk for debugging
+                plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
+                        "statement-winner-plan-fragments", name + "-" + String.valueOf(i) + ".txt");
+                plansOut.println(prettyJson);
+                plansOut.close();
+
+                // output the plan to disk for debugging
+                plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
+                        "statement-winner-plan-fragments", name + String.valueOf(i) + ".dot");
+                plansOut.println(node_list.toDOTString(name + "-" + String.valueOf(i)));
+                plansOut.close();
             }
-
-            // output the plan to disk for debugging
-            plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                    "statement-winner-plan-fragments", name + "-" + String.valueOf(i++) + ".txt");
-            plansOut.println(json);
-            plansOut.close();
-
-            // output the plan to disk for debugging
-            plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                    "statement-winner-plan-fragments", name + String.valueOf(i) + ".dot");
-            plansOut.println(node_list.toDOTString(name + "-" + String.valueOf(i)));
-            plansOut.close();
 
             // Place serialized version of PlanNodeTree into a PlanFragment
             try {
@@ -210,6 +218,9 @@ public abstract class StatementCompiler {
                 e.printStackTrace();
                 throw compiler.new VoltCompilerException(e.getMessage());
             }
+
+            // increment the counter for fragment id
+            i++;
         }
     }
 
