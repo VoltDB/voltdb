@@ -20,6 +20,8 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * This class just lets you get a PrintStream backed by a file
@@ -31,20 +33,29 @@ public abstract class BuildDirectoryUtils {
 
     public static final String rootPath = "debugoutput/";
 
+    static String m_debugRoot = null;
+    static Set<String> m_seenPaths = new TreeSet<String>();
+
     public static PrintStream getDebugOutputPrintStream(final String dir, final String filename) {
-        String path;
-        if (System.getenv("TEST_DIR") != null) {
-            path = System.getenv("TEST_DIR") + File.separator + rootPath + dir;
-        } else {
-            path = rootPath + dir;
+        // cache the root of the folder
+        if (m_debugRoot == null) {
+            if (System.getenv("TEST_DIR") != null) {
+                m_debugRoot = System.getenv("TEST_DIR") + File.separator + rootPath;
+            } else {
+                m_debugRoot = rootPath;
+            }
         }
-        File d = new File(path);
-        d.mkdirs();
-        //if (!success) return null;
-        String filepath = path + "/" + filename;
+
+        // don't call mkdirs more than once per subdir, so keep a cache
+        String subFolderPath = m_debugRoot + File.separator + dir;
+        if (!m_seenPaths.contains(subFolderPath)) {
+            File f = new File(subFolderPath);
+            f.mkdirs();
+            m_seenPaths.add(subFolderPath);
+        }
+
+        String filepath = subFolderPath + File.separator + filename;
         File f = new File(filepath);
-        if (f.exists()) f.delete();
-        //if (f.canWrite() == false) return null;
         try {
             return new PrintStream(f);
         } catch (FileNotFoundException e) {
