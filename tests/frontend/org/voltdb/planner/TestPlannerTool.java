@@ -42,7 +42,17 @@ public class TestPlannerTool extends TestCase {
     public void testSimple() throws IOException {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addAllDefaults();
+        final File jar = new File("tpcc-oop.jar");
+        jar.deleteOnExit();
+
+        //long start = System.nanoTime();
+        //for (int i = 0; i < 10000; i++) {
         builder.compile("tpcc-oop.jar");
+        /*    long end = System.nanoTime();
+            System.err.printf("Took %.3f seconds to compile.\n",
+                    (end - start) / 1000000000.0);
+            start = end;
+        }*/
 
         byte[] bytes = CatalogUtil.toBytes(new File("tpcc-oop.jar"));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
@@ -116,9 +126,6 @@ public class TestPlannerTool extends TestCase {
 
         result = m_pt.planSql("select * from warehouse;", false);
         System.out.println(result);
-
-        final File jar = new File("tpcc-oop.jar");
-        jar.delete();
     }
 
     public void testBadDDL() throws IOException
@@ -136,6 +143,8 @@ public class TestPlannerTool extends TestCase {
                                  "SELECT * FROM A WHERE C1 = ?;",
                                  "A.C1: 0");
 
+        final File jar = new File("testbadddl-oop.jar");
+        jar.deleteOnExit();
         builder.compile("testbadddl-oop.jar");
         byte[] bytes = CatalogUtil.toBytes(new File("testbadddl-oop.jar"));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
@@ -149,8 +158,5 @@ public class TestPlannerTool extends TestCase {
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
         m_pt.planSql("select * from A;", false);
-
-        final File jar = new File("testbadddl-oop.jar");
-        jar.delete();
     }
 }
