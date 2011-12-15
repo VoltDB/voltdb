@@ -108,6 +108,14 @@ public class TestAdHocQueries extends TestCase {
         // We inserted a 1,1,1 row way earlier
         assertEquals(2, result.getRowCount());
 
+        // try something like the queries in ENG-1242
+        try {
+            client.callProcedure("@AdHoc", "select * from blah; dfvsdfgvdf select * from blah WHERE IVAL = 1;");
+            fail("Bad SQL failed to throw expected exception");
+        }
+        catch (Exception e) {}
+        client.callProcedure("@AdHoc", "select\n* from blah;");
+
         // try a decimal calculation (ENG-1093)
         modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (2, '2011-06-24 10:30:26', 1.12345*1);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
