@@ -46,6 +46,8 @@ public enum ExpressionType {
         // explicitly cast left as right (right is integer in ValueType enum)
     OPERATOR_NOT                   (OperatorExpression.class,  8),
         // logical not
+    OPERATOR_IS_NULL               (OperatorExpression.class, 9),
+        // unary null evaluation
 
     // ----------------------------
     // Binary Comparison

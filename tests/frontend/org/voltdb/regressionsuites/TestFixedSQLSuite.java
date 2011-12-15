@@ -49,6 +49,56 @@ public class TestFixedSQLSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class };
 
+    public void testTicketEng2250_IsNull() throws Exception
+    {
+        System.out.println("STARTING testTicketEng2250_IsNull");
+        Client client = getClient();
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PRIMARY KEY (ID)
+                );
+        */
+        System.out.println("Eng2250: null entries.");
+        for(int id=0; id < 5; id++) {
+            client.callProcedure(callback, "P1.insert", id, null, 10, 1.1);
+            client.drain();
+        }
+        System.out.println("Eng2250: not null entries.");
+        for (int id=5; id < 8; id++) {
+            client.callProcedure(callback, "P1.insert", id,"description", 10, 1.1);
+            client.drain();
+        }
+        VoltTable r1 = client.callProcedure("@AdHoc", "select count(*) from P1 where desc is null").getResults()[0];
+        System.out.println(r1);
+        assertTrue(r1.asScalarLong() == 5);
+
+        VoltTable r2 = client.callProcedure("@AdHoc", "select count(*) from P1 where not desc is null").getResults()[0];
+        System.out.println(r2);
+        assertTrue(r2.asScalarLong() == 3);
+
+        VoltTable r3 = client.callProcedure("@AdHoc", "select count(*) from P1 where NOT (id=2 and desc is null)").getResults()[0];
+        System.out.println(r3);
+        assertTrue(r3.asScalarLong() == 7);
+
+        VoltTable r4 = client.callProcedure("@AdHoc", "select count(*) from P1 where NOT (id=6 and desc is null)").getResults()[0];
+        System.out.println(r4);
+        assertTrue(r4.asScalarLong() == 8);
+
+    }
+
     public void testTicketEng1850_WhereOrderBy() throws Exception
     {
         System.out.println("STARTING testTicketENG1850_WhereOrderBy");

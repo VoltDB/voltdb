@@ -413,6 +413,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_NOT: {
         return "OPERATOR_NOT";
     }
+    case EXPRESSION_TYPE_OPERATOR_IS_NULL: {
+        return "OPERATOR_IS_NULL";
+    }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";
     }
@@ -497,6 +500,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_CAST;
     } else if (str == "OPERATOR_NOT") {
         return EXPRESSION_TYPE_OPERATOR_NOT;
+    } else if (str == "OPERATOR_IS_NULL") {
+        return EXPRESSION_TYPE_OPERATOR_IS_NULL;
     } else if (str == "COMPARE_EQUAL") {
         return EXPRESSION_TYPE_COMPARE_EQUAL;
     } else if (str == "COMPARE_NOTEQUAL") {

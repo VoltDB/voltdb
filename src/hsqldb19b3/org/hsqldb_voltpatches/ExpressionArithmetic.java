@@ -501,8 +501,10 @@ public class ExpressionArithmetic extends Expression {
         case OpTypes.MAX:               element = "max"; break;
         case OpTypes.AVG:               element = "avg"; break;
         case OpTypes.SQL_FUNCTION:      element = "function"; break;
+        case OpTypes.IS_NULL:           element = "is_null"; break;
+        case OpTypes.NOT:               element = "not"; break;
         default:
-            throw new HSQLParseException("Unsupported Operation: " +
+            throw new HSQLParseException("Unsupported Expression Arithmetic Operation: " +
                                          String.valueOf(opType));
         }
 
