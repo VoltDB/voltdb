@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -82,7 +83,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
-    private final ScheduledExecutorService m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
+    private final ScheduledThreadPoolExecutor m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
                 return new Thread(r, "SnapshotDaemon");
@@ -179,6 +180,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private State m_state = State.STARTUP;
 
     SnapshotDaemon() {
+        m_es.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+        m_es.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 
         m_frequencyUnit = null;
         m_retain = 0;
