@@ -77,9 +77,6 @@ public:
     std::string debugInfo(const std::string &spacer) const {
         return (spacer + "OptimizedOperatorNotExpression");
     }
-
-private:
-    AbstractExpression *m_left;
 };
 
 class OperatorIsNullExpression : public AbstractExpression {
@@ -103,9 +100,6 @@ class OperatorIsNullExpression : public AbstractExpression {
    std::string debugInfo(const std::string &spacer) const {
        return (spacer + "OperatorIsNullExpression");
    }
-
-  private:
-   AbstractExpression *m_left;
 };
 
 
