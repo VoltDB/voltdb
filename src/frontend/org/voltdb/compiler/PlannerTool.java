@@ -99,7 +99,7 @@ public class PlannerTool {
         // remove any spaces or newlines
         sql = sql.trim();
 
-        hostLog.info("recieved sql stmt: " + sql);
+        hostLog.debug("received sql stmt: " + sql);
 
         //////////////////////
         // PLAN THE STMT
