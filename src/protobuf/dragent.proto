@@ -26,14 +26,15 @@ message Response {
     }
     optional ReplicationMode mode = 1;
     optional fixed64 snapshotTimestamp = 2;
+    optional fixed64 instanceIdHash = 3;
     // all known nodes globally
     //  first entry is self
-    repeated NodeInfo nodeInfo = 3;
-    optional int32 globalPartitionCount = 4;
+    repeated NodeInfo nodeInfo = 4;
+    optional int32 globalPartitionCount = 5;
     // local partitions
-    repeated PartitionInfo partitionInfo = 5;
+    repeated PartitionInfo partitionInfo = 6;
     // status. 0 means ok
-    optional int32 status = 6 [default = 0];
+    optional int32 status = 7 [default = 0];
 }
 
 message NodeInfo {
