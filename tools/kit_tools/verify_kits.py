@@ -5,7 +5,7 @@ from fabric.api import run, cd, local, get, settings, lcd
 from fabric_ssh_config import getSSHInfoForHost
 
 verifydir = "/tmp/" + os.getenv('USER') + "/verifytemp"
-version = "2.1.2"
+version = "2.1.3"
 
 ################################################
 # SETUP A DIST & TOOLS IN A TEMP DIR
@@ -60,5 +60,3 @@ with settings(host_string=voltmini[1],disable_known_hosts=True,key_filename=volt
     runTests()
     setupVerifyDir("MAC", "voltdb-ent-%s" % version)
     runTests()
-
-
