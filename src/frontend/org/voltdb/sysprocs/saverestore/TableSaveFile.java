@@ -24,14 +24,17 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.zip.CRC32;
 
 
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
@@ -42,19 +45,9 @@ import org.json_voltpatches.JSONArray;
 /**
  * An abstraction around a table's save file for restore.  Deserializes the
  * meta-data that was stored when the table was saved and makes it available
- * to clients.  This follows the structure in
- * src/ee/storage/TableDiskHeader.{h,cpp} and looks like:
- *
- * Header length - 4 octet integer
- * version       - 4 octet integer
- * Host ID       - 4 octet integer (this is the name, *not* the GUID)
- * Cluster name  - VoltDB serialized string (2 octet length followed by chars)
- * Database name - VoltDB serialized string
- * Table name    - VoltDB serialized string
- * isReplicated  - 1 octet, indicates whether the table was replicated
- *   The following fields are conditional on isReplicated == false
- * Partition Ids - Array of 4 octet integer ids for partitions in this file
- * Total Hosts - The number of hosts for this table when it was saved
+ * to clients.  The meta data is stored as a JSON blob with length prefixing and a CRC
+ * as well as a byte to that is set once the file is completely written and synced.
+ * A VoltTable header describing the schema is follows the JSON blob.
  */
 public class TableSaveFile
 {
@@ -80,7 +73,7 @@ public class TableSaveFile
      * big enough...
      */
     private static final int DEFAULT_CHUNKSIZE =
-        org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength + (1024 * 256);
+            org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength + (1024 * 256);
 
     public TableSaveFile(
             FileChannel dataIn,
@@ -95,7 +88,7 @@ public class TableSaveFile
             int readAheadChunks,
             Integer[] relevantPartitionIds,
             boolean continueOnCorruptedChunk) throws IOException
-    {
+            {
         try {
             EELibraryLoader.loadExecutionEngineLibrary(true);
             if (relevantPartitionIds == null) {
@@ -231,6 +224,7 @@ public class TableSaveFile
                 m_databaseName = fd.readString();
                 m_tableName = fd.readString();
                 m_isReplicated = fd.readBoolean();
+                m_isCompressed = false;
                 if (!m_isReplicated) {
                     m_partitionIds = (int[])fd.readArray(int.class);
                     if (!m_completed) {
@@ -261,6 +255,7 @@ public class TableSaveFile
                 m_databaseName = obj.getString("databaseName");
                 m_tableName = obj.getString("tableName");
                 m_isReplicated = obj.getBoolean("isReplicated");
+                m_isCompressed = obj.optBoolean("isCompressed", false);
                 if (!m_isReplicated) {
                     JSONArray partitionIds = obj.getJSONArray("partitionIds");
                     m_partitionIds = new int[partitionIds.length()];
@@ -295,7 +290,7 @@ public class TableSaveFile
         } catch (JSONException e) {
             throw new IOException(e);
         }
-    }
+            }
 
     public int[] getVersionNumber()
     {
@@ -334,6 +329,10 @@ public class TableSaveFile
     public boolean isReplicated()
     {
         return m_isReplicated;
+    }
+
+    public boolean isCompressed() {
+        return m_isCompressed;
     }
 
     public int getTotalPartitions() {
@@ -416,39 +415,39 @@ public class TableSaveFile
         }
         return m_hasMoreChunks || !m_availableChunks.isEmpty();
     }
-//
-//    /**
-//     * A wrapper for the in memory storage for a table chunk
-//     * that counts the number of times the chunk is discarded
-//     * and only returns the memory back to the pool when the
-//     * chunk has been read by enough times. This is necessary
-//     * for replicated tables so that they only have to
-//     *
-//     */
-//    private class ChunkCounter {
-//
-//        private ChunkCounter(BBContainer c, int chunkIndex) {
-//            m_container = c;
-//            m_chunkIndex = chunkIndex;
-//        }
-//
-//        private BBContainer fetch() {
-//            m_fetches++;
-//            if (m_fetches == m_fetchCount) {
-//                return m_container;
-//            }
-//        }
-//
-//        private final BBContainer m_container;
-//        private int m_chunkIndex;
-//        private int m_fetches = 0;
-//    }
+    //
+    //    /**
+    //     * A wrapper for the in memory storage for a table chunk
+    //     * that counts the number of times the chunk is discarded
+    //     * and only returns the memory back to the pool when the
+    //     * chunk has been read by enough times. This is necessary
+    //     * for replicated tables so that they only have to
+    //     *
+    //     */
+    //    private class ChunkCounter {
+    //
+    //        private ChunkCounter(BBContainer c, int chunkIndex) {
+    //            m_container = c;
+    //            m_chunkIndex = chunkIndex;
+    //        }
+    //
+    //        private BBContainer fetch() {
+    //            m_fetches++;
+    //            if (m_fetches == m_fetchCount) {
+    //                return m_container;
+    //            }
+    //        }
+    //
+    //        private final BBContainer m_container;
+    //        private int m_chunkIndex;
+    //        private int m_fetches = 0;
+    //    }
 
-//    /**
-//     * Number of times a chunk must be fetched before its buffer can
-//     * be returned to the pool
-//     */
-//    private final int m_fetchCount;
+    //    /**
+    //     * Number of times a chunk must be fetched before its buffer can
+    //     * be returned to the pool
+    //     */
+    //    private final int m_fetchCount;
 
     private final FileChannel m_saveFile;
     private final ByteBuffer m_tableHeader;
@@ -460,6 +459,7 @@ public class TableSaveFile
     private final String m_databaseName;
     private final String m_tableName;
     private final boolean m_isReplicated;
+    private final boolean m_isCompressed;
     private final int m_partitionIds[];
     private final int m_totalPartitions;
     private final long m_txnId;
@@ -494,10 +494,14 @@ public class TableSaveFile
     private class ChunkReader implements Runnable {
 
         private void readChunks() {
-            int chunksRead = 0;
+            //For reading the compressed input.
+            ByteBuffer fileInputBuffer =
+                    ByteBuffer.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
+
             while (m_hasMoreChunks) {
+
                 /*
-                 * Limit the number of chunk reads at any one time.
+                 * Limit the number of chunk materialized into memory at one time
                  */
                 try {
                     m_chunkReads.acquire();
@@ -518,7 +522,7 @@ public class TableSaveFile
                         }
                     }
                     chunkLengthB.flip();
-                    final int nextChunkLength = chunkLengthB.getInt();
+                    int nextChunkLength = chunkLengthB.getInt();
                     expectedAnotherChunk = true;
 
                     /*
@@ -559,9 +563,35 @@ public class TableSaveFile
                         throw new IOException("Corrupted TableSaveFile chunk has negative chunk length");
                     }
 
-                    if (nextChunkLength > DEFAULT_CHUNKSIZE) {
-                        throw new IOException("Corrupted TableSaveFile chunk has unreasonable length " +
-                                "> DEFAULT_CHUNKSIZE bytes");
+                    if (isCompressed()) {
+                        if (nextChunkLength > fileInputBuffer.capacity()) {
+                            throw new IOException("Corrupted TableSaveFile chunk has unreasonable length " +
+                                    "> DEFAULT_CHUNKSIZE bytes");
+                        }
+                    } else {
+                        if (nextChunkLength > DEFAULT_CHUNKSIZE) {
+                            throw new IOException("Corrupted TableSaveFile chunk has unreasonable length " +
+                                    "> DEFAULT_CHUNKSIZE bytes");
+                        }
+                    }
+
+                    /*
+                     * Go fetch the compressed data so that the uncompressed size is known
+                     * and use that to set nextChunkLength to be the uncompressed length,
+                     * the code ahead that constructs the volt table is expecting
+                     * the uncompressed size/data since it is producing an uncompressed table
+                     */
+                    if (isCompressed()) {
+                        fileInputBuffer.clear();
+                        fileInputBuffer.limit(nextChunkLength);
+                        while (fileInputBuffer.hasRemaining()) {
+                            final int read = m_saveFile.read(fileInputBuffer);
+                            if (read == -1) {
+                                throw new EOFException();
+                            }
+                        }
+                        fileInputBuffer.flip();
+                        nextChunkLength = CompressionService.uncompressedLength(fileInputBuffer);
                     }
 
                     /*
@@ -598,15 +628,29 @@ public class TableSaveFile
                          * after the header once the CRC has been calculated.
                          */
                         c.b.clear();
-                        c.b.limit((nextChunkLength - 8)  + m_tableHeader.capacity());
+                        //The length of the chunk already includes space for the 4-byte row count
+                        //even though it is at the end, but we need to also leave at the end for the CRC calc
+                        if (isCompressed()) {
+                            c.b.limit(nextChunkLength  + m_tableHeader.capacity() + 4);
+                        } else {
+                            //Before compression the chunk length included the stuff added in the EE
+                            //like the 2 CRCs and partition id. It is only -8 because we still need the 4-bytes
+                            //of padding to move the row count in when constructing the volt table format.
+                            c.b.limit((nextChunkLength - 8)  + m_tableHeader.capacity());
+                        }
                         m_tableHeader.position(0);
                         c.b.put(m_tableHeader);
                         c.b.position(c.b.position() + 4);//Leave space for row count to be moved into
                         checksumStartPosition = c.b.position();
-                        while (c.b.hasRemaining()) {
-                            final int read = m_saveFile.read(c.b);
-                            if (read == -1) {
-                                throw new EOFException();
+                        if (isCompressed()) {
+                            CompressionService.decompressBuffer(fileInputBuffer, c.b);
+                            c.b.position(c.b.limit());
+                        } else {
+                            while (c.b.hasRemaining()) {
+                                final int read = m_saveFile.read(c.b);
+                                if (read == -1) {
+                                    throw new EOFException();
+                                }
                             }
                         }
                         c.b.position(c.b.position() - 4);
@@ -671,7 +715,7 @@ public class TableSaveFile
                             }
                         }
                     }
-                    ++chunksRead;
+
                     synchronized (TableSaveFile.this) {
                         m_availableChunks.offer(c);
                         TableSaveFile.this.notifyAll();

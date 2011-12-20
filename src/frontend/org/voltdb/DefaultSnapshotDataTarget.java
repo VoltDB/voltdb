@@ -39,6 +39,7 @@ import java.util.zip.CRC32;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.json_voltpatches.JSONObject;
@@ -54,6 +55,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     public static volatile boolean m_simulateFullDiskWritingHeader = false;
     public static volatile boolean m_simulateFullDiskWritingChunk = false;
 
+    private static final ByteBuffer m_compressionBuffer =
+            ByteBuffer.allocateDirect(CompressionService.maxCompressedLength(1024 * 1024 * 2 + Short.MAX_VALUE));
     private final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
@@ -101,15 +104,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     private static final ScheduledExecutorService m_syncService = Executors.newSingleThreadScheduledExecutor(
             new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
-            return new Thread(
-                    Thread.currentThread().getThreadGroup(),
-                    r,
-                    "Snapshot sync service ",
-                    131072);
-        }
-    });
+                @Override
+                public Thread newThread(Runnable r) {
+                    return new Thread(
+                            Thread.currentThread().getThreadGroup(),
+                            r,
+                            "Snapshot sync service ",
+                            131072);
+                }
+            });
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -122,7 +125,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final int partitionIds[],
             final VoltTable schemaTable,
             final long txnId) throws IOException {
-            this(
+        this(
                 file,
                 hostId,
                 clusterName,
@@ -172,6 +175,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             stringer.key("databaseName").value(databaseName);
             stringer.key("tableName").value(tableName.toUpperCase());
             stringer.key("isReplicated").value(isReplicated);
+            stringer.key("isCompressed").value(true);
             if (!isReplicated) {
                 stringer.key("partitionIds").array();
                 for (int partitionId : partitionIds) {
@@ -292,21 +296,21 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         return 4;
     }
 
+    /*
+     * Prepend length is basically synonymous with writing actual tuple data and not
+     * the header.
+     */
     private Future<?> write(final BBContainer tupleData, final boolean prependLength) {
         if (m_writeFailed) {
             tupleData.discard();
             return null;
         }
 
-        if (prependLength) {
-            tupleData.b.putInt(tupleData.b.remaining() - 4);
-            tupleData.b.position(0);
-        }
-
         m_outstandingWriteTasks.incrementAndGet();
         Future<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
+                boolean tupleDataDiscarded = false;
                 try {
                     if (m_acceptOneWrite) {
                         m_acceptOneWrite = false;
@@ -319,11 +323,37 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
 
-                    m_bytesAllowedBeforeSync.acquire(tupleData.b.remaining());
+                    ByteBuffer bufferToWrite = tupleData.b;
+                    if (prependLength) {
+                        //The format is no longer treated completely opaque, compression is skipping
+                        //the first 16 bytes to skip the CRCs, partition ID, and length prefix
+                        //It was more convenient to make the changes to TableSaveFile if these bytes are left
+                        //uncompressed. Now the length prefix refers only to the compressed portion
+                        //beyond the first 16 bytes
+                        m_compressionBuffer.clear();
+                        m_compressionBuffer.position(16);
+                        tupleData.b.position(16);
+                        final int compressedSize = CompressionService.compressBuffer(tupleData.b, m_compressionBuffer);
+                        //Copy over the 12 uncompressed bytes containing the partition ID and 2 CRCs
+                        //Then generate the length value and place that, then discard the uncompressed buffer
+                        m_compressionBuffer.limit(16 + compressedSize);
+                        m_compressionBuffer.position(4);
+                        tupleData.b.position(4);
+                        tupleData.b.limit(16);
+                        m_compressionBuffer.put(tupleData.b);
+                        m_compressionBuffer.position(0);
+                        m_compressionBuffer.putInt(m_compressionBuffer.remaining() - 16);
+                        m_compressionBuffer.position(0);
+                        tupleDataDiscarded = true;
+                        tupleData.discard();
+                        bufferToWrite = m_compressionBuffer;
+                    }
+
+                    m_bytesAllowedBeforeSync.acquire(bufferToWrite.remaining());
 
                     int totalWritten = 0;
-                    while (tupleData.b.hasRemaining()) {
-                        totalWritten += m_channel.write(tupleData.b);
+                    while (bufferToWrite.hasRemaining()) {
+                        totalWritten += m_channel.write(bufferToWrite);
                     }
                     m_bytesWritten += totalWritten;
                     m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
@@ -333,7 +363,9 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_writeFailed = true;
                     throw e;
                 } finally {
-                    tupleData.discard();
+                    if (!tupleDataDiscarded) {
+                        tupleData.discard();
+                    }
                     synchronized (m_outstandingWriteTasks) {
                         if (m_outstandingWriteTasks.decrementAndGet() == 0) {
                             m_outstandingWriteTasks.notify();
