@@ -176,7 +176,13 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
         if (invocation.getType() == ProcedureInvocationType.REPLICATED)
         {
-            if (invocation.getOriginalTxnId() <= m_lastSeenOriginalTxnId)
+            /*
+             * Ning - @LoadSinglepartTable and @LoadMultipartTable always have
+             * the same txnId which is the txnId of the snapshot.
+             */
+            if (!(invocation.getProcName().equalsIgnoreCase("@LoadSinglepartitionTable") ||
+                  invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
+                invocation.getOriginalTxnId() <= m_lastSeenOriginalTxnId)
             {
                 hostLog.info("Dropping duplicate replicated transaction, txnid: " + invocation.getOriginalTxnId() + ", last seen: " + m_lastSeenOriginalTxnId);
                 return false;
