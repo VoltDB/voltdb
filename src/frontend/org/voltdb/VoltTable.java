@@ -34,6 +34,7 @@ import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 /*
@@ -124,7 +125,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * String representation of <code>MAX_SERIALIZED_TABLE_LENGTH</code>.
      */
     public static final String MAX_SERIALIZED_TABLE_LENGTH_STR =
-        String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
+            String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
 
     static final int NULL_STRING_INDICATOR = -1;
     static final String METADATA_ENCODING = "US-ASCII";
@@ -585,7 +586,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
 
                         default:
                             throw new VoltTypeException("Unsupported type: " +
-                                                        columnType);
+                                    columnType);
                         }
                     } else {
 
@@ -608,10 +609,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                             if (columnType.wouldCastOverflow(n1))
                             {
                                 throw new VoltTypeException("Cast of " +
-                                                            n1.doubleValue() +
-                                                            " to " +
-                                                            columnType.toString() +
-                                                            " would overflow");
+                                        n1.doubleValue() +
+                                        " to " +
+                                        columnType.toString() +
+                                        " would overflow");
                             }
                             m_buffer.put(n1.byteValue());
                             break;
@@ -622,8 +623,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                             if (columnType.wouldCastOverflow(n2))
                             {
                                 throw new VoltTypeException("Cast to " +
-                                                            columnType.toString() +
-                                                            " would overflow");
+                                        columnType.toString() +
+                                        " would overflow");
                             }
                             m_buffer.putShort(n2.shortValue());
                             break;
@@ -634,8 +635,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                             if (columnType.wouldCastOverflow(n3))
                             {
                                 throw new VoltTypeException("Cast to " +
-                                                            columnType.toString() +
-                                                            " would overflow");
+                                        columnType.toString() +
+                                        " would overflow");
                             }
                             m_buffer.putInt(n3.intValue());
                             break;
@@ -646,8 +647,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                             if (columnType.wouldCastOverflow(n4))
                             {
                                 throw new VoltTypeException("Cast to " +
-                                                            columnType.toString() +
-                                                            " would overflow");
+                                        columnType.toString() +
+                                        " would overflow");
                             }
                             m_buffer.putLong(n4.longValue());
                             break;
@@ -659,8 +660,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                             if (columnType.wouldCastOverflow(n5))
                             {
                                 throw new VoltTypeException("Cast to " +
-                                                            columnType.toString() +
-                                                            " would overflow");
+                                        columnType.toString() +
+                                        " would overflow");
                             }
                             m_buffer.putDouble(n5.doubleValue());
                             break;
@@ -693,8 +694,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                             }
                             if (value instanceof byte[]) {
                                 if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
-                                        throw new VoltOverflowException(
-                                                "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                                    throw new VoltOverflowException(
+                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
                                 writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                             }
                             break;
@@ -736,9 +737,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                     // revert any added tuples and strings
                     m_buffer.position(pos);
                     throw new VoltTypeException("Value for column " + col + " (" +
-                                                getColumnName(col) + ") is type " +
-                                                value.getClass().getSimpleName() + " when type " + columnType +
-                    " was expected.");
+                            getColumnName(col) + ") is type " +
+                            value.getClass().getSimpleName() + " when type " + columnType +
+                            " was expected.");
                 }
             }
 
@@ -1322,5 +1323,20 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      */
     public void setStatusCode(byte code) {
         m_buffer.put( 4, code);
+    }
+
+    public byte[] getCompressedBytes() throws IOException {
+        int startPosition = m_buffer.position();
+        try {
+            m_buffer.position(0);
+            if (m_buffer.isDirect()) {
+                return CompressionService.compressBuffer(m_buffer);
+            } else {
+                assert(m_buffer.hasArray());
+                return CompressionService.compressBytes(m_buffer.array(), m_buffer.position(), m_buffer.limit());
+            }
+        } finally {
+            m_buffer.position(startPosition);
+        }
     }
 }

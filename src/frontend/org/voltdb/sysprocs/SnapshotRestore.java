@@ -66,13 +66,14 @@ import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.sysprocs.saverestore.TableSaveFileState;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
 import org.json_voltpatches.*;
 import org.voltdb.utils.Pair;
 
 @ProcInfo (
-    singlePartition = false
-)
+        singlePartition = false
+        )
 public class SnapshotRestore extends VoltSystemProcedure
 {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotRestore.class.getName());
@@ -80,9 +81,9 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     private static final int DEP_restoreScan = (int)
-        SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+            SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_restoreScanResults = (int)
-        SysProcFragmentId.PF_restoreScanResults;
+            SysProcFragmentId.PF_restoreScanResults;
 
     /*
      * Plan fragments for retrieving the digests
@@ -91,9 +92,9 @@ public class SnapshotRestore extends VoltSystemProcedure
      * by a plan fragment.
      */
     private static final int DEP_restoreDigestScan = (int)
-        SysProcFragmentId.PF_restoreDigestScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+            SysProcFragmentId.PF_restoreDigestScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_restoreDigestScanResults = (int)
-        SysProcFragmentId.PF_restoreDigestScanResults;
+            SysProcFragmentId.PF_restoreDigestScanResults;
 
     /*
      * Plan fragments for distributing the full set of export sequence numbers
@@ -102,9 +103,9 @@ public class SnapshotRestore extends VoltSystemProcedure
      * which is used to truncate export data on disk from after the snapshot
      */
     private static final int DEP_restoreDistributeExportSequenceNumbers = (int)
-        SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+            SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_restoreDistributeExportSequenceNumbersResults = (int)
-        SysProcFragmentId.PF_restoreDistributeExportSequenceNumbersResults;
+            SysProcFragmentId.PF_restoreDistributeExportSequenceNumbersResults;
 
     private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
@@ -136,7 +137,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         // this loop.  The restore planner called in @SnapshotRestore should
         // ensure that we can, in fact, find files for all these partitions.
         HashSet<Integer> relevantPartitionSet =
-            new HashSet<Integer>();
+                new HashSet<Integer>();
         for (int part_id : relevantPartitionIds)
         {
             relevantPartitionSet.add(part_id);
@@ -144,12 +145,12 @@ public class SnapshotRestore extends VoltSystemProcedure
 
         for (int originalHostId : originalHostIds) {
             final File f = getSaveFileForPartitionedTable(filePath, fileNonce,
-                                                          tableName,
-                                                          originalHostId);
+                    tableName,
+                    originalHostId);
             TableSaveFile savefile = getTableSaveFile(
-                            f,
-                            org.voltdb.VoltDB.instance().getLocalSites().size() * 4,
-                            relevantPartitionSet.toArray(new Integer[relevantPartitionSet.size()]));
+                    f,
+                    org.voltdb.VoltDB.instance().getLocalSites().size() * 4,
+                    relevantPartitionSet.toArray(new Integer[relevantPartitionSet.size()]));
 
             m_saveFiles.offer(savefile);
             for (int part_id : savefile.getPartitionIds())
@@ -200,34 +201,34 @@ public class SnapshotRestore extends VoltSystemProcedure
         super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_restoreScan, this);
         site.registerPlanFragment(SysProcFragmentId.PF_restoreScanResults,
-                                  this);
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreLoadReplicatedTable,
-                                  this);
+                PF_restoreLoadReplicatedTable,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreLoadReplicatedTableResults,
-                                  this);
+                PF_restoreLoadReplicatedTableResults,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreDistributeReplicatedTable,
-                                  this);
+                PF_restoreDistributeReplicatedTable,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreDistributePartitionedTable,
-                                  this);
+                PF_restoreDistributePartitionedTable,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreDistributePartitionedTableResults,
-                                  this);
+                PF_restoreDistributePartitionedTableResults,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreSendReplicatedTable,
-                                  this);
+                PF_restoreSendReplicatedTable,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreSendReplicatedTableResults,
-                                  this);
+                PF_restoreSendReplicatedTableResults,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreSendPartitionedTable,
-                                  this);
+                PF_restoreSendPartitionedTable,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
-                                  PF_restoreSendPartitionedTableResults,
-                                  this);
+                PF_restoreSendPartitionedTableResults,
+                this);
         site.registerPlanFragment(SysProcFragmentId.
                 PF_restoreDigestScan,
                 this);
@@ -243,8 +244,8 @@ public class SnapshotRestore extends VoltSystemProcedure
         m_cluster = cluster;
         m_siteId = site.getCorrespondingSiteId();
         m_hostId =
-            Integer.valueOf(m_cluster.getSites().get(String.valueOf(m_siteId)).
-                            getHost().getTypeName());
+                Integer.valueOf(m_cluster.getSites().get(String.valueOf(m_siteId)).
+                        getHost().getTypeName());
         // XXX HACK GIANT HACK given the current assumption that there is
         // only one database per cluster, I'm asserting this and then
         // skirting around the need to have the database name in order to get
@@ -256,7 +257,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     @Override
     public DependencyPair
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
-                        SystemProcedureExecutionContext context)
+            SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers)
         {
@@ -269,11 +270,11 @@ public class SnapshotRestore extends VoltSystemProcedure
             // Choose the lowest site ID on this host to truncate export data
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+                    VoltDB.instance().getCatalogContext().siteTracker.
+                    getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
-            ExportManager.instance().
+                ExportManager.instance().
                 truncateExportToTxnId(snapshotTxnId);
             }
             try {
@@ -282,7 +283,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
                 //Sequence numbers for every table and partition
                 Map<String, Map<Integer, Long>> exportSequenceNumbers =
-                    (Map<String, Map<Integer, Long>>)ois.readObject();
+                        (Map<String, Map<Integer, Long>>)ois.readObject();
                 Database db = context.getDatabase();
                 Integer myPartitionId = context.getExecutionSite().getCorrespondingPartitionId();
 
@@ -306,7 +307,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     }
 
                     Long sequenceNumber =
-                        sequenceNumberPerPartition.get(myPartitionId);
+                            sequenceNumberPerPartition.get(myPartitionId);
                     if (sequenceNumber == null) {
                         HOST_LOG.warn("Could not find an export sequence number for table " + name +
                                 " partition " + myPartitionId +
@@ -356,8 +357,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+                    VoltDB.instance().getCatalogContext().siteTracker.
+                    getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 try {
@@ -367,9 +368,9 @@ public class SnapshotRestore extends VoltSystemProcedure
                     // distribution fragments, so two sites on the same node
                     // can't be attempting to set and clear this HashSet simultaneously
                     TRACE_LOG.trace("Checking saved table digest state for restore of: "
-                                    + m_filePath + ", " + m_fileNonce);
+                            + m_filePath + ", " + m_fileNonce);
                     List<JSONObject> digests =
-                        SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce);
+                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce);
 
                     for (JSONObject obj : digests) {
                         result.addRow(obj.toString(), "SUCCESS", null);
@@ -415,8 +416,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+                    VoltDB.instance().getCatalogContext().siteTracker.
+                    getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 // implicitly synchronized by the way restore operates.
@@ -430,7 +431,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 m_filePath = (String) params.toArray()[0];
                 m_fileNonce = (String) params.toArray()[1];
                 TRACE_LOG.trace("Checking saved table state for restore of: "
-                                + m_filePath + ", " + m_fileNonce);
+                        + m_filePath + ", " + m_fileNonce);
                 File[] savefiles = SnapshotUtil.retrieveRelevantFiles(m_filePath, m_fileNonce);
                 if (savefiles == null) {
                     return new DependencyPair(DEP_restoreScan, result);
@@ -455,16 +456,16 @@ public class SnapshotRestore extends VoltSystemProcedure
                             int partitionIds[] = savefile.getPartitionIds();
                             for (int pid : partitionIds) {
                                 result.addRow(m_hostId,
-                                              hostname,
-                                              savefile.getHostId(),
-                                              savefile.getHostname(),
-                                              savefile.getClusterName(),
-                                              savefile.getDatabaseName(),
-                                              savefile.getTableName(),
-                                              savefile.getTxnId(),
-                                              is_replicated,
-                                              pid,
-                                              savefile.getTotalPartitions());
+                                        hostname,
+                                        savefile.getHostId(),
+                                        savefile.getHostname(),
+                                        savefile.getClusterName(),
+                                        savefile.getDatabaseName(),
+                                        savefile.getTableName(),
+                                        savefile.getTxnId(),
+                                        is_replicated,
+                                        pid,
+                                        savefile.getTotalPartitions());
                             }
                         } finally {
                             savefile.close();
@@ -527,7 +528,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             try
             {
                 savefile =
-                    getTableSaveFile(getSaveFileForReplicatedTable(table_name), 3, null);
+                        getTableSaveFile(getSaveFileForReplicatedTable(table_name), 3, null);
                 assert(savefile.getCompleted());
             }
             catch (IOException e)
@@ -535,8 +536,8 @@ public class SnapshotRestore extends VoltSystemProcedure
                 String hostname = ConnectionUtil.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
-                              "Unable to load table: " + table_name +
-                              " error: " + e.getMessage());
+                        "Unable to load table: " + table_name +
+                        " error: " + e.getMessage());
                 return new DependencyPair(dependency_id, result);
             }
 
@@ -554,15 +555,15 @@ public class SnapshotRestore extends VoltSystemProcedure
 
                     if (needsConversion == null) {
                         VoltTable old_table =
-                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
+                                PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
                         needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
                     }
 
                     if (needsConversion.booleanValue()) {
                         VoltTable old_table =
-                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
+                                PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
                         table = SavedTableConverter.convertTable(old_table,
-                                                             new_catalog_table);
+                                new_catalog_table);
                     } else {
                         ByteBuffer copy = ByteBuffer.allocate(c.b.remaining());
                         copy.put(c.b);
@@ -574,8 +575,8 @@ public class SnapshotRestore extends VoltSystemProcedure
                     try
                     {
                         super.voltLoadTable(context.getCluster().getTypeName(),
-                                            context.getDatabase().getTypeName(),
-                                            table_name, table);
+                                context.getDatabase().getTypeName(),
+                                table_name, table);
                     }
                     catch (VoltAbortException e)
                     {
@@ -589,22 +590,22 @@ public class SnapshotRestore extends VoltSystemProcedure
                 String hostname = ConnectionUtil.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
-                              "Unable to load table: " + table_name +
-                              " error: " + e.getMessage());
+                        "Unable to load table: " + table_name +
+                        " error: " + e.getMessage());
                 return new DependencyPair(dependency_id, result);
             } catch (VoltTypeException e) {
                 String hostname = ConnectionUtil.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
-                              "Unable to load table: " + table_name +
-                              " error: " + e.getMessage());
+                        "Unable to load table: " + table_name +
+                        " error: " + e.getMessage());
                 return new DependencyPair(dependency_id, result);
             }
 
             String hostname = ConnectionUtil.getHostnameOrAddress();
             VoltTable result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, table_name, -1, result_str,
-                             error_msg);
+                    error_msg);
             try {
                 savefile.close();
             } catch (IOException e) {
@@ -614,7 +615,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             return new DependencyPair( dependency_id, result);
         }
         else if (fragmentId ==
-            SysProcFragmentId.PF_restoreDistributeReplicatedTable)
+                SysProcFragmentId.PF_restoreDistributeReplicatedTable)
         {
             m_haveDoneRestore = true;
             // XXX I tested this with a hack that cannot be replicated
@@ -628,12 +629,12 @@ public class SnapshotRestore extends VoltSystemProcedure
             int site_id = (Integer) params.toArray()[1];
             int dependency_id = (Integer) params.toArray()[2];
             TRACE_LOG.trace("Distributing replicated table: " + table_name +
-                            " to: " + site_id);
+                    " to: " + site_id);
             VoltTable result = performDistributeReplicatedTable(table_name, site_id);
             return new DependencyPair(dependency_id, result);
         }
         else if (fragmentId ==
-            SysProcFragmentId.PF_restoreSendReplicatedTable)
+                SysProcFragmentId.PF_restoreSendReplicatedTable)
         {
             m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
@@ -642,17 +643,22 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(params.toArray()[3] != null);
             String table_name = (String) params.toArray()[0];
             int dependency_id = (Integer) params.toArray()[1];
-            VoltTable table = (VoltTable) params.toArray()[2];
+            byte compressedTable[] = (byte[]) params.toArray()[2];
             TRACE_LOG.trace("Received replicated table: " + table_name);
             String result_str = "SUCCESS";
             String error_msg = "";
             try
             {
+                VoltTable table =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(
+                                ByteBuffer.wrap(
+                                        CompressionService.decompressBytes(compressedTable)),
+                                        true);
                 super.voltLoadTable(context.getCluster().getTypeName(),
-                                    context.getDatabase().getTypeName(),
-                                    table_name, table);
+                        context.getDatabase().getTypeName(),
+                        table_name, table);
             }
-            catch (VoltAbortException e)
+            catch (Exception e)
             {
                 result_str = "FAILURE";
                 error_msg = e.getMessage();
@@ -661,11 +667,11 @@ public class SnapshotRestore extends VoltSystemProcedure
             //Use null hostname to avoid DNS lookup that might be slow
             //if DNS caching is not enabled
             result.addRow(m_hostId, null, m_siteId, table_name, -1,
-                             result_str, error_msg);
+                    result_str, error_msg);
             return new DependencyPair(dependency_id, result);
         }
         else if (fragmentId ==
-            SysProcFragmentId.PF_restoreSendReplicatedTableResults)
+                SysProcFragmentId.PF_restoreSendReplicatedTableResults)
         {
             m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
@@ -686,7 +692,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             return new DependencyPair(dependency_id, result);
         }
         else if (fragmentId ==
-            SysProcFragmentId.PF_restoreLoadReplicatedTableResults)
+                SysProcFragmentId.PF_restoreLoadReplicatedTableResults)
         {
             m_haveDoneRestore = true;
             TRACE_LOG.trace("Aggregating replicated table restore results");
@@ -708,7 +714,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             return new DependencyPair(dependency_id, result);
         }
         else if (fragmentId ==
-            SysProcFragmentId.PF_restoreDistributePartitionedTable)
+                SysProcFragmentId.PF_restoreDistributePartitionedTable)
         {
             m_haveDoneRestore = true;
             Object paramsA[] = params.toArray();
@@ -724,16 +730,16 @@ public class SnapshotRestore extends VoltSystemProcedure
 
             for (int partition_id : relevantPartitions) {
                 TRACE_LOG.trace("Distributing partitioned table: " + table_name +
-                                " partition id: " + partition_id);
+                        " partition id: " + partition_id);
             }
 
             VoltTable result =
-                performDistributePartitionedTable(table_name, originalHosts,
-                                                  relevantPartitions);
+                    performDistributePartitionedTable(table_name, originalHosts,
+                            relevantPartitions);
             return new DependencyPair( dependency_id, result);
         }
         else if (fragmentId ==
-            SysProcFragmentId.PF_restoreDistributePartitionedTableResults)
+                SysProcFragmentId.PF_restoreDistributePartitionedTableResults)
         {
             m_haveDoneRestore = true;
             TRACE_LOG.trace("Aggregating partitioned table restore results");
@@ -754,7 +760,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             return new DependencyPair(dependency_id, result);
         }
         else if (fragmentId ==
-            SysProcFragmentId.PF_restoreSendPartitionedTable)
+                SysProcFragmentId.PF_restoreSendPartitionedTable)
         {
             m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
@@ -764,17 +770,23 @@ public class SnapshotRestore extends VoltSystemProcedure
             String table_name = (String) params.toArray()[0];
             int partition_id = (Integer) params.toArray()[1];
             int dependency_id = (Integer) params.toArray()[2];
-            VoltTable table = (VoltTable) params.toArray()[3];
+            byte compressedTable[] = (byte[]) params.toArray()[3];
+
             TRACE_LOG.trace("Received partitioned table: " + table_name);
             String result_str = "SUCCESS";
             String error_msg = "";
             try
             {
+                VoltTable table =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(
+                                ByteBuffer.wrap(
+                                        CompressionService.decompressBytes(compressedTable)),
+                                        true);
                 super.voltLoadTable(context.getCluster().getTypeName(),
-                                    context.getDatabase().getTypeName(),
-                                    table_name, table);
+                        context.getDatabase().getTypeName(),
+                        table_name, table);
             }
-            catch (VoltAbortException e)
+            catch (Exception e)
             {
                 result_str = "FAILURE";
                 error_msg = e.getMessage();
@@ -783,11 +795,11 @@ public class SnapshotRestore extends VoltSystemProcedure
             //Use null hostname to avoid DNS lookup that might be slow
             //if DNS caching is not enabled
             result.addRow(m_hostId, null, m_siteId, table_name, partition_id,
-                          result_str, error_msg);
+                    result_str, error_msg);
             return new DependencyPair(dependency_id, result);
         }
         else if (fragmentId ==
-            SysProcFragmentId.PF_restoreSendPartitionedTableResults)
+                SysProcFragmentId.PF_restoreSendPartitionedTableResults)
         {
             m_haveDoneRestore = true;
             assert(params.toArray()[0] != null);
@@ -812,11 +824,11 @@ public class SnapshotRestore extends VoltSystemProcedure
         return null;
     }
 
-   // private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
+    // private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String path, String nonce) throws VoltAbortException
-    {
+            {
         if (m_haveDoneRestore) {
             throw new VoltAbortException("Cluster has already been restored or has failed a restore." +
                     " Restart the cluster before doing another restore.");
@@ -833,7 +845,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
         try {
             Pair<List<JSONObject>, Map<String, Map<Integer, Long>>> digestScanResult =
-                performRestoreDigestScanWork();
+                    performRestoreDigestScanWork();
             digests = digestScanResult.getFirst();
             exportSequenceNumbers = digestScanResult.getSecond();
         } catch (VoltAbortException e) {
@@ -944,9 +956,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             oos.close();
 
             results =
-                performDistributeExportSequenceNumbers(
-                        exportSequenceNumberBytes,
-                        digests.get(0).getLong("txnId"));
+                    performDistributeExportSequenceNumbers(
+                            exportSequenceNumberBytes,
+                            digests.get(0).getLong("txnId"));
         } catch (IOException e) {
             throw new VoltAbortException(e);
         } catch (JSONException e) {
@@ -969,15 +981,15 @@ public class SnapshotRestore extends VoltSystemProcedure
         pw.printf("%.2f", duration);
         HOST_LOG.info("Finished restore of " + path + " with nonce: "
                 + nonce + " in " + sw.toString() + " seconds");
-//        m_sampler.setShouldStop();
-//        try {
-//            m_sampler.join();
-//        } catch (InterruptedException e) {
-//            // TODO Auto-generated catch block
-//            e.printStackTrace();
-//        }
+        //        m_sampler.setShouldStop();
+        //        try {
+        //            m_sampler.join();
+        //        } catch (InterruptedException e) {
+        //            // TODO Auto-generated catch block
+        //            e.printStackTrace();
+        //        }
         return results;
-    }
+            }
 
     private VoltTable[] performDistributeExportSequenceNumbers(
             byte[] exportSequenceNumberBytes,
@@ -1032,10 +1044,10 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private static File getSaveFileForPartitionedTable(
-                                                String filePath,
-                                                String fileNonce,
-                                                String tableName,
-                                                int originalHostId)
+            String filePath,
+            String fileNonce,
+            String tableName,
+            int originalHostId)
     {
         StringBuilder filename_builder = new StringBuilder(fileNonce);
         filename_builder.append("-");
@@ -1050,18 +1062,18 @@ public class SnapshotRestore extends VoltSystemProcedure
             File saveFile,
             int readAheadChunks,
             Integer relevantPartitionIds[]) throws IOException
-    {
+            {
         FileInputStream savefile_input = new FileInputStream(saveFile);
         TableSaveFile savefile =
-            new TableSaveFile(
-                    savefile_input.getChannel(),
-                    readAheadChunks,
-                    relevantPartitionIds);
+                new TableSaveFile(
+                        savefile_input.getChannel(),
+                        readAheadChunks,
+                        relevantPartitionIds);
         return savefile;
-    }
+            }
 
     private final VoltTable[] performRestoreScanWork(String filePath,
-                                                     String fileNonce)
+            String fileNonce)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -1090,102 +1102,102 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private final Pair<List<JSONObject>, Map<String, Map<Integer, Long>>> performRestoreDigestScanWork()
-{
-    SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+    {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
-    // This fragment causes each execution site to confirm the likely
-    // success of writing tables to disk
-    pfs[0] = new SynthesizedPlanFragment();
-    pfs[0].fragmentId = SysProcFragmentId.PF_restoreDigestScan;
-    pfs[0].outputDepId = DEP_restoreDigestScan;
-    pfs[0].inputDepIds = new int[] {};
-    pfs[0].multipartition = true;
-    pfs[0].parameters = new ParameterSet();
+        // This fragment causes each execution site to confirm the likely
+        // success of writing tables to disk
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_restoreDigestScan;
+        pfs[0].outputDepId = DEP_restoreDigestScan;
+        pfs[0].inputDepIds = new int[] {};
+        pfs[0].multipartition = true;
+        pfs[0].parameters = new ParameterSet();
 
-    // This fragment aggregates the save-to-disk sanity check results
-    pfs[1] = new SynthesizedPlanFragment();
-    pfs[1].fragmentId = SysProcFragmentId.PF_restoreDigestScanResults;
-    pfs[1].outputDepId = DEP_restoreDigestScanResults;
-    pfs[1].inputDepIds = new int[] { DEP_restoreDigestScan };
-    pfs[1].multipartition = false;
-    pfs[1].parameters = new ParameterSet();
+        // This fragment aggregates the save-to-disk sanity check results
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_restoreDigestScanResults;
+        pfs[1].outputDepId = DEP_restoreDigestScanResults;
+        pfs[1].inputDepIds = new int[] { DEP_restoreDigestScan };
+        pfs[1].multipartition = false;
+        pfs[1].parameters = new ParameterSet();
 
-    VoltTable[] results;
-    results = executeSysProcPlanFragments(pfs, DEP_restoreDigestScanResults);
+        VoltTable[] results;
+        results = executeSysProcPlanFragments(pfs, DEP_restoreDigestScanResults);
 
-    HashMap<String, Map<Integer, Long>> exportSequenceNumbers =
-        new HashMap<String, Map<Integer, Long>>();
+        HashMap<String, Map<Integer, Long>> exportSequenceNumbers =
+                new HashMap<String, Map<Integer, Long>>();
 
-    Long digestTxnId = null;
-    ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
-    /*
-     * Retrieve and aggregate the per table per partition sequence numbers from
-     * all the digest files retrieved across the cluster
-     */
-    try {
-        while (results[0].advanceRow()) {
-            if (results[0].getString("RESULT").equals("FAILURE")) {
-                throw new VoltAbortException(results[0].getString("ERR_MSG"));
-            }
-            JSONObject digest = new JSONObject(results[0].getString(0));
-            digests.add(digest);
-
-            /*
-             * Validate that the digests are all from the same snapshot
-             */
-            if (digestTxnId == null) {
-                digestTxnId = digest.getLong("txnId");
-            } else {
-                if (digest.getLong("txnId") != digestTxnId) {
-                    throw new VoltAbortException("Retrieved a digest with txnId " + digest.getLong("txnId") +
-                            " that doesn't match the txnId seen previously " + digestTxnId + " inspect the digests" +
-                            " with the provided nonce and ensure that they are all really from the same snapshot");
+        Long digestTxnId = null;
+        ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
+        /*
+         * Retrieve and aggregate the per table per partition sequence numbers from
+         * all the digest files retrieved across the cluster
+         */
+        try {
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    throw new VoltAbortException(results[0].getString("ERR_MSG"));
                 }
-            }
+                JSONObject digest = new JSONObject(results[0].getString(0));
+                digests.add(digest);
 
-            /*
-             * Snapshots from pre 1.3 VoltDB won't have sequence numbers
-             * Doing nothing will default it to zero.
-             */
-            if (digest.has("exportSequenceNumbers")) {
                 /*
-                 * An array of entries for each table
+                 * Validate that the digests are all from the same snapshot
                  */
-                JSONArray sequenceNumbers = digest.getJSONArray("exportSequenceNumbers");
-                for (int ii = 0; ii < sequenceNumbers.length(); ii++) {
-                    /*
-                     * An object containing all the sequence numbers for its partitions
-                     * in this table. This will be a subset since it is from a single digest
-                     */
-                    JSONObject tableSequenceNumbers = sequenceNumbers.getJSONObject(ii);
-                    String tableName = tableSequenceNumbers.getString("exportTableName");
-
-                    Map<Integer,Long> partitionSequenceNumbers =
-                        exportSequenceNumbers.get(tableName);
-                    if (partitionSequenceNumbers == null) {
-                        partitionSequenceNumbers = new HashMap<Integer,Long>();
-                        exportSequenceNumbers.put(tableName, partitionSequenceNumbers);
+                if (digestTxnId == null) {
+                    digestTxnId = digest.getLong("txnId");
+                } else {
+                    if (digest.getLong("txnId") != digestTxnId) {
+                        throw new VoltAbortException("Retrieved a digest with txnId " + digest.getLong("txnId") +
+                                " that doesn't match the txnId seen previously " + digestTxnId + " inspect the digests" +
+                                " with the provided nonce and ensure that they are all really from the same snapshot");
                     }
+                }
 
+                /*
+                 * Snapshots from pre 1.3 VoltDB won't have sequence numbers
+                 * Doing nothing will default it to zero.
+                 */
+                if (digest.has("exportSequenceNumbers")) {
                     /*
-                     * Array of objects containing partition and sequence number pairs
+                     * An array of entries for each table
                      */
-                    JSONArray sourcePartitionSequenceNumbers =
-                        tableSequenceNumbers.getJSONArray("sequenceNumberPerPartition");
-                    for (int zz = 0; zz < sourcePartitionSequenceNumbers.length(); zz++) {
-                        int partition = sourcePartitionSequenceNumbers.getJSONObject(zz).getInt("partition");
-                        long sequenceNumber =
-                            sourcePartitionSequenceNumbers.getJSONObject(zz).getInt("exportSequenceNumber");
-                        partitionSequenceNumbers.put(partition, sequenceNumber);
+                    JSONArray sequenceNumbers = digest.getJSONArray("exportSequenceNumbers");
+                    for (int ii = 0; ii < sequenceNumbers.length(); ii++) {
+                        /*
+                         * An object containing all the sequence numbers for its partitions
+                         * in this table. This will be a subset since it is from a single digest
+                         */
+                        JSONObject tableSequenceNumbers = sequenceNumbers.getJSONObject(ii);
+                        String tableName = tableSequenceNumbers.getString("exportTableName");
+
+                        Map<Integer,Long> partitionSequenceNumbers =
+                                exportSequenceNumbers.get(tableName);
+                        if (partitionSequenceNumbers == null) {
+                            partitionSequenceNumbers = new HashMap<Integer,Long>();
+                            exportSequenceNumbers.put(tableName, partitionSequenceNumbers);
+                        }
+
+                        /*
+                         * Array of objects containing partition and sequence number pairs
+                         */
+                        JSONArray sourcePartitionSequenceNumbers =
+                                tableSequenceNumbers.getJSONArray("sequenceNumberPerPartition");
+                        for (int zz = 0; zz < sourcePartitionSequenceNumbers.length(); zz++) {
+                            int partition = sourcePartitionSequenceNumbers.getJSONObject(zz).getInt("partition");
+                            long sequenceNumber =
+                                    sourcePartitionSequenceNumbers.getJSONObject(zz).getInt("exportSequenceNumber");
+                            partitionSequenceNumbers.put(partition, sequenceNumber);
+                        }
                     }
                 }
             }
+        } catch (JSONException e) {
+            throw new VoltAbortException(e);
         }
-    } catch (JSONException e) {
-        throw new VoltAbortException(e);
+        return Pair.of((List<JSONObject>)digests, (Map<String, Map<Integer, Long>>)exportSequenceNumbers);
     }
-    return Pair.of((List<JSONObject>)digests, (Map<String, Map<Integer, Long>>)exportSequenceNumbers);
-}
 
     private Set<Table> getTablesToRestore(Set<String> savedTableNames)
     {
@@ -1202,8 +1214,8 @@ public class SnapshotRestore extends VoltSystemProcedure
                 {
                     // LOG_TRIAGE reconsider info level here?
                     HOST_LOG.info("Table: " + table.getTypeName() + " was saved " +
-                                  "but is now a materialized table and will " +
-                                  "not be loaded from disk");
+                            "but is now a materialized table and will " +
+                            "not be loaded from disk");
                 }
             }
             else
@@ -1211,8 +1223,8 @@ public class SnapshotRestore extends VoltSystemProcedure
                 if (table.getMaterializer() == null && !CatalogUtil.isTableExportOnly(m_database, table))
                 {
                     HOST_LOG.info("Table: " + table.getTypeName() + " does not have " +
-                                  "any savefile data and so will not be loaded " +
-                                  "from disk");
+                            "any savefile data and so will not be loaded " +
+                            "from disk");
                 }
             }
         }
@@ -1222,55 +1234,55 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private VoltTable[]
-    performTableRestoreWork(ClusterSaveFileState savefileState) throws VoltAbortException
-    {
+            performTableRestoreWork(ClusterSaveFileState savefileState) throws VoltAbortException
+            {
         Set<Table> tables_to_restore =
-            getTablesToRestore(savefileState.getSavedTableNames());
+                getTablesToRestore(savefileState.getSavedTableNames());
         VoltTable[] restore_results = new VoltTable[1];
         restore_results[0] = constructResultsTable();
         ArrayList<SynthesizedPlanFragment[]> restorePlans =
-            new ArrayList<SynthesizedPlanFragment[]>();
+                new ArrayList<SynthesizedPlanFragment[]>();
 
-        for (Table t : tables_to_restore) {
-            TableSaveFileState table_state =
-                savefileState.getTableState(t.getTypeName());
-            SynthesizedPlanFragment[] restore_plan =
-                table_state.generateRestorePlan(t);
-            if (restore_plan == null) {
-                HOST_LOG.error(
-                        "Unable to generate restore plan for " + t.getTypeName() + " table not restored");
-                throw new VoltAbortException(
-                        "Unable to generate restore plan for " + t.getTypeName() + " table not restored");
-            }
-            restorePlans.add(restore_plan);
-        }
+                for (Table t : tables_to_restore) {
+                    TableSaveFileState table_state =
+                            savefileState.getTableState(t.getTypeName());
+                    SynthesizedPlanFragment[] restore_plan =
+                            table_state.generateRestorePlan(t);
+                    if (restore_plan == null) {
+                        HOST_LOG.error(
+                                "Unable to generate restore plan for " + t.getTypeName() + " table not restored");
+                        throw new VoltAbortException(
+                                "Unable to generate restore plan for " + t.getTypeName() + " table not restored");
+                    }
+                    restorePlans.add(restore_plan);
+                }
 
-        Iterator<Table> tableIterator = tables_to_restore.iterator();
-        for (SynthesizedPlanFragment[] restore_plan : restorePlans)
-        {
-            Table table = tableIterator.next();
-            TableSaveFileState table_state =
-                savefileState.getTableState(table.getTypeName());
-            TRACE_LOG.trace("Performing restore for table: " + table.getTypeName());
-            TRACE_LOG.trace("Plan has fragments: " + restore_plan.length);
-            VoltTable[] results =
-                executeSysProcPlanFragments(restore_plan,
-                                            table_state.getRootDependencyId());
-            while (results[0].advanceRow())
-            {
-                // this will actually add the active row of results[0]
-                restore_results[0].add(results[0]);
+                Iterator<Table> tableIterator = tables_to_restore.iterator();
+                for (SynthesizedPlanFragment[] restore_plan : restorePlans)
+                {
+                    Table table = tableIterator.next();
+                    TableSaveFileState table_state =
+                            savefileState.getTableState(table.getTypeName());
+                    TRACE_LOG.trace("Performing restore for table: " + table.getTypeName());
+                    TRACE_LOG.trace("Plan has fragments: " + restore_plan.length);
+                    VoltTable[] results =
+                            executeSysProcPlanFragments(restore_plan,
+                                    table_state.getRootDependencyId());
+                    while (results[0].advanceRow())
+                    {
+                        // this will actually add the active row of results[0]
+                        restore_results[0].add(results[0]);
+                    }
+                }
+                return restore_results;
             }
-        }
-        return restore_results;
-    }
 
     // XXX I hacked up a horrible one-off in my world to test this code.
     // I believe that it will work for at least one new node, but
     // there's not a good way to add a unit test for this at the moment,
     // so the emma coverage is weak.
     private VoltTable performDistributeReplicatedTable(String tableName,
-                                                       int siteId)
+            int siteId)
     {
         System.out.println("Performing distribute replicated table for table " + tableName);
         String hostname = ConnectionUtil.getHostnameOrAddress();
@@ -1278,15 +1290,15 @@ public class SnapshotRestore extends VoltSystemProcedure
         try
         {
             savefile =
-                getTableSaveFile(getSaveFileForReplicatedTable(tableName), 3, null);
+                    getTableSaveFile(getSaveFileForReplicatedTable(tableName), 3, null);
             assert(savefile.getCompleted());
         }
         catch (IOException e)
         {
             VoltTable result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
-                          "Unable to load table: " + tableName +
-                          " error: " + e.getMessage());
+                    "Unable to load table: " + tableName +
+                    " error: " + e.getMessage());
             return result;
         }
 
@@ -1300,7 +1312,6 @@ public class SnapshotRestore extends VoltSystemProcedure
         try {
             while (savefile.hasMoreChunks())
             {
-                VoltTable table = null;
                 final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
                 if (c == null) {
                     continue;//Should be equivalent to break
@@ -1308,19 +1319,19 @@ public class SnapshotRestore extends VoltSystemProcedure
 
                 if (needsConversion == null) {
                     VoltTable old_table =
-                        PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
+                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
                     needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
                 }
+
+                byte compressedTable[];
                 if (needsConversion.booleanValue()) {
                     VoltTable old_table =
-                        PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
-                    table = SavedTableConverter.convertTable(old_table,
-                                                         new_catalog_table);
+                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
+                    VoltTable new_table = SavedTableConverter.convertTable(old_table,
+                            new_catalog_table);
+                    compressedTable = new_table.getCompressedBytes();
                 } else {
-                    ByteBuffer copy = ByteBuffer.allocate(c.b.remaining());
-                    copy.put(c.b);
-                    copy.flip();
-                    table = PrivateVoltTableFactory.createVoltTableFromBuffer(copy, true);
+                    compressedTable = CompressionService.compressBuffer(c.b);
                 }
                 c.discard();
 
@@ -1334,13 +1345,13 @@ public class SnapshotRestore extends VoltSystemProcedure
                 pfs[0].inputDepIds = new int[] {};
                 pfs[0].multipartition = false;
                 ParameterSet params = new ParameterSet();
-                params.setParameters(tableName, result_dependency_id, table);
+                params.setParameters(tableName, result_dependency_id, compressedTable);
                 pfs[0].parameters = params;
 
                 int final_dependency_id = TableSaveFileState.getNextDependencyId();
                 pfs[1] = new SynthesizedPlanFragment();
                 pfs[1].fragmentId =
-                    SysProcFragmentId.PF_restoreSendReplicatedTableResults;
+                        SysProcFragmentId.PF_restoreSendReplicatedTableResults;
                 pfs[1].outputDepId = final_dependency_id;
                 pfs[1].inputDepIds = new int[] { result_dependency_id };
                 pfs[1].multipartition = false;
@@ -1348,44 +1359,44 @@ public class SnapshotRestore extends VoltSystemProcedure
                 result_params.setParameters(final_dependency_id);
                 pfs[1].parameters = result_params;
                 TRACE_LOG.trace("Sending replicated table: " + tableName + " to site id:" +
-                         siteId);
+                        siteId);
                 results =
-                    executeSysProcPlanFragments(pfs, final_dependency_id);
+                        executeSysProcPlanFragments(pfs, final_dependency_id);
             }
         } catch (IOException e) {
             VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
             result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
-                          "Unable to load table: " + tableName +
-                          " error: " + e.getMessage());
+                    "Unable to load table: " + tableName +
+                    " error: " + e.getMessage());
             return result;
         } catch (VoltTypeException e) {
             VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
             result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
-                          "Unable to load table: " + tableName +
-                          " error: " + e.getMessage());
+                    "Unable to load table: " + tableName +
+                    " error: " + e.getMessage());
             return result;
         }
         return results[0];
     }
 
     private VoltTable performDistributePartitionedTable(String tableName,
-                                                        int originalHostIds[],
-                                                        int relevantPartitionIds[])
+            int originalHostIds[],
+            int relevantPartitionIds[])
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
         // XXX This is all very similar to the splitting code in
         // LoadMultipartitionTable.  Consider ways to consolidate later
         Map<Integer, Integer> sites_to_partitions =
-            new HashMap<Integer, Integer>();
+                new HashMap<Integer, Integer>();
         for (Site site : VoltDB.instance().getCatalogContext().siteTracker.getUpSites())
         {
             if (site.getPartition() != null)
             {
                 sites_to_partitions.put(Integer.parseInt(site.getTypeName()),
-                                        Integer.parseInt(site.getPartition().
-                                                         getTypeName()));
+                        Integer.parseInt(site.getPartition().
+                                getTypeName()));
             }
         }
 
@@ -1402,8 +1413,8 @@ public class SnapshotRestore extends VoltSystemProcedure
         {
             VoltTable result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0], "FAILURE",
-                          "Unable to load table: " + tableName +
-                          " error: " + e.getMessage());
+                    "Unable to load table: " + tableName +
+                    " error: " + e.getMessage());
             return result;
         }
 
@@ -1419,59 +1430,59 @@ public class SnapshotRestore extends VoltSystemProcedure
             {
                 VoltTable table = null;
 
-                    c = null;
-                    c = getNextChunk();
-                    if (c == null) {
-                        continue;//Should be equivalent to break
-                    }
+                c = null;
+                c = getNextChunk();
+                if (c == null) {
+                    continue;//Should be equivalent to break
+                }
 
-                    if (needsConversion == null) {
-                        VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
-                        needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
-                    }
+                if (needsConversion == null) {
+                    VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
+                    needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
+                }
 
-                    final VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, true);
-                    if (needsConversion) {
-                        table = SavedTableConverter.convertTable(old_table,
-                                                                 new_catalog_table);
-                    } else {
-                        table = old_table;
-                    }
+                final VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, true);
+                if (needsConversion) {
+                    table = SavedTableConverter.convertTable(old_table,
+                            new_catalog_table);
+                } else {
+                    table = old_table;
+                }
 
 
-                VoltTable[] partitioned_tables =
-                    createPartitionedTables(tableName, table);
+                byte[][] partitioned_tables =
+                        createPartitionedTables(tableName, table);
                 if (c != null) {
                     c.discard();
                 }
 
                 int[] dependencyIds = new int[sites_to_partitions.size()];
                 SynthesizedPlanFragment[] pfs =
-                    new SynthesizedPlanFragment[sites_to_partitions.size() + 1];
+                        new SynthesizedPlanFragment[sites_to_partitions.size() + 1];
                 int pfs_index = 0;
                 for (int site_id : sites_to_partitions.keySet())
                 {
                     int partition_id = sites_to_partitions.get(site_id);
                     dependencyIds[pfs_index] =
-                        TableSaveFileState.getNextDependencyId();
+                            TableSaveFileState.getNextDependencyId();
                     pfs[pfs_index] = new SynthesizedPlanFragment();
                     pfs[pfs_index].fragmentId =
-                        SysProcFragmentId.PF_restoreSendPartitionedTable;
+                            SysProcFragmentId.PF_restoreSendPartitionedTable;
                     pfs[pfs_index].siteId = site_id;
                     pfs[pfs_index].multipartition = false;
                     pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
                     pfs[pfs_index].inputDepIds = new int [] {};
                     ParameterSet params = new ParameterSet();
                     params.setParameters(tableName, partition_id,
-                                         dependencyIds[pfs_index],
-                                         partitioned_tables[partition_id]);
+                            dependencyIds[pfs_index],
+                            partitioned_tables[partition_id]);
                     pfs[pfs_index].parameters = params;
                     ++pfs_index;
                 }
                 int result_dependency_id = TableSaveFileState.getNextDependencyId();
                 pfs[sites_to_partitions.size()] = new SynthesizedPlanFragment();
                 pfs[sites_to_partitions.size()].fragmentId =
-                    SysProcFragmentId.PF_restoreSendPartitionedTableResults;
+                        SysProcFragmentId.PF_restoreSendPartitionedTableResults;
                 pfs[sites_to_partitions.size()].multipartition = false;
                 pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
                 pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
@@ -1479,30 +1490,30 @@ public class SnapshotRestore extends VoltSystemProcedure
                 params.setParameters(result_dependency_id);
                 pfs[sites_to_partitions.size()].parameters = params;
                 results =
-                    executeSysProcPlanFragments(pfs, result_dependency_id);
+                        executeSysProcPlanFragments(pfs, result_dependency_id);
             }
         } catch (IOException e) {
             VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
             result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
-                          "FAILURE", "Unable to load table: " + tableName +
-                          " error: " + e.getMessage());
+                    "FAILURE", "Unable to load table: " + tableName +
+                    " error: " + e.getMessage());
             return result;
         } catch (VoltTypeException e) {
             VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
             result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
-                          "FAILURE", "Unable to load table: " + tableName +
-                          " error: " + e.getMessage());
+                    "FAILURE", "Unable to load table: " + tableName +
+                    " error: " + e.getMessage());
             return result;
         }
 
         return results[0];
-   }
+    }
 
-    private VoltTable[] createPartitionedTables(String tableName,
-                                                VoltTable loadedTable)
-    {
+    private byte[][] createPartitionedTables(String tableName,
+            VoltTable loadedTable) throws IOException
+            {
         int number_of_partitions = m_cluster.getPartitions().size();
         Table catalog_table = m_database.getTables().getIgnoreCase(tableName);
         assert(!catalog_table.getIsreplicated());
@@ -1510,14 +1521,14 @@ public class SnapshotRestore extends VoltSystemProcedure
         // find the index and type of the partitioning attribute
         int partition_col = catalog_table.getPartitioncolumn().getIndex();
         VoltType partition_type =
-            VoltType.get((byte) catalog_table.getPartitioncolumn().getType());
+                VoltType.get((byte) catalog_table.getPartitioncolumn().getType());
 
         // create a table for each partition
         VoltTable[] partitioned_tables = new VoltTable[number_of_partitions];
         for (int i = 0; i < partitioned_tables.length; i++) {
             partitioned_tables[i] =
-                loadedTable.clone(loadedTable.getUnderlyingBufferSize() /
-                                  number_of_partitions);
+                    loadedTable.clone(loadedTable.getUnderlyingBufferSize() /
+                            number_of_partitions);
         }
 
         // split the input table into per-partition units
@@ -1527,8 +1538,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             try
             {
                 partition =
-                    TheHashinator.hashToPartition(loadedTable.get(partition_col,
-                                                          partition_type));
+                        TheHashinator.hashToPartition(loadedTable.get(partition_col,
+                                partition_type));
             }
             catch (Exception e)
             {
@@ -1539,8 +1550,12 @@ public class SnapshotRestore extends VoltSystemProcedure
             partitioned_tables[partition].add(loadedTable);
         }
 
-        return partitioned_tables;
-    }
+        byte compressedTables[][] = new byte[number_of_partitions][];
+        for (int ii = 0; ii < compressedTables.length; ii++) {
+            compressedTables[ii] = partitioned_tables[ii].getCompressedBytes();
+        }
+        return compressedTables;
+            }
 
     private Table getCatalogTable(String tableName)
     {

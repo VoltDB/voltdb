@@ -107,14 +107,18 @@ public final class CompressionService {
         return result;
     }
 
-    public static byte[] compressBytes(byte bytes[]) throws IOException {
+    public static byte[] compressBytes(byte bytes[], int offset, int length) throws IOException {
         IOBuffers buffers = getBuffersForCompression(bytes.length, false);
-        buffers.input.put(bytes);
+        buffers.input.put(bytes, offset, length);
         buffers.input.flip();
         final int compressedSize = Snappy.compress(buffers.input, buffers.output);
         final byte compressed[] = new byte[compressedSize];
         buffers.output.get(compressed);
         return compressed;
+    }
+
+    public static byte[] compressBytes(byte bytes[]) throws IOException {
+        return compressBytes(bytes, 0, bytes.length);
     }
 
     public static Future<byte[]> decompressBufferAsync(final ByteBuffer input) throws IOException {
