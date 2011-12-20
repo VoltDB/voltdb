@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.CountDownLatch;
 import java.util.zip.CRC32;
@@ -307,6 +308,17 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         }
 
         m_outstandingWriteTasks.incrementAndGet();
+
+        Future<byte[]> compressionTask = null;
+        if (prependLength) {
+            tupleData.b.position(tupleData.b.position() + 16);
+            compressionTask = CompressionService.compressBufferAsync(tupleData.b);
+        }
+        //Need to be able to null this out to prevent pack rat on the future
+        //that wraps up the result of the write
+        final AtomicReference<Future<byte[]>> compressionTaskFinal =
+            new AtomicReference<Future<byte[]>>(compressionTask);
+
         Future<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
@@ -323,49 +335,75 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
 
-                    ByteBuffer bufferToWrite = tupleData.b;
-                    if (prependLength) {
-                        //The format is no longer treated completely opaque, compression is skipping
-                        //the first 16 bytes to skip the CRCs, partition ID, and length prefix
-                        //It was more convenient to make the changes to TableSaveFile if these bytes are left
-                        //uncompressed. Now the length prefix refers only to the compressed portion
-                        //beyond the first 16 bytes
-                        m_compressionBuffer.clear();
-                        m_compressionBuffer.position(16);
-                        tupleData.b.position(16);
-                        final int compressedSize = CompressionService.compressBuffer(tupleData.b, m_compressionBuffer);
-                        //Copy over the 12 uncompressed bytes containing the partition ID and 2 CRCs
-                        //Then generate the length value and place that, then discard the uncompressed buffer
-                        m_compressionBuffer.limit(16 + compressedSize);
-                        m_compressionBuffer.position(4);
-                        tupleData.b.position(4);
-                        tupleData.b.limit(16);
-                        m_compressionBuffer.put(tupleData.b);
-                        m_compressionBuffer.position(0);
-                        m_compressionBuffer.putInt(m_compressionBuffer.remaining() - 16);
-                        m_compressionBuffer.position(0);
-                        tupleDataDiscarded = true;
-                        tupleData.discard();
-                        bufferToWrite = m_compressionBuffer;
-                    }
-
-                    m_bytesAllowedBeforeSync.acquire(bufferToWrite.remaining());
-
+//                    ByteBuffer bufferToWrite = tupleData.b;
+//                    if (prependLength) {
+//                        //The format is no longer treated completely opaque, compression is skipping
+//                        //the first 16 bytes to skip the CRCs, partition ID, and length prefix
+//                        //It was more convenient to make the changes to TableSaveFile if these bytes are left
+//                        //uncompressed. Now the length prefix refers only to the compressed portion
+//                        //beyond the first 16 bytes
+//                        m_compressionBuffer.clear();
+//                        m_compressionBuffer.position(16);
+//                        tupleData.b.position(16);
+//                        final int compressedSize = CompressionService.compressBuffer(tupleData.b, m_compressionBuffer);
+//                        //Copy over the 12 uncompressed bytes containing the partition ID and 2 CRCs
+//                        //Then generate the length value and place that, then discard the uncompressed buffer
+//                        m_compressionBuffer.limit(16 + compressedSize);
+//                        m_compressionBuffer.position(4);
+//                        tupleData.b.position(4);
+//                        tupleData.b.limit(16);
+//                        m_compressionBuffer.put(tupleData.b);
+//                        m_compressionBuffer.position(0);
+//                        m_compressionBuffer.putInt(m_compressionBuffer.remaining() - 16);
+//                        m_compressionBuffer.position(0);
+//                        tupleDataDiscarded = true;
+//                        tupleData.discard();
+//                        bufferToWrite = m_compressionBuffer;
+//                    }
+//
+//                    m_bytesAllowedBeforeSync.acquire(bufferToWrite.remaining());
+//
+//                    int totalWritten = 0;
+//                    while (bufferToWrite.hasRemaining()) {
+//                        totalWritten += m_channel.write(bufferToWrite);
+//                    }
+//                    m_bytesWritten += totalWritten;
+//                    m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                     int totalWritten = 0;
-                    while (bufferToWrite.hasRemaining()) {
-                        totalWritten += m_channel.write(bufferToWrite);
+                    if (prependLength) {
+                        ByteBuffer payloadBuffer = null;
+                        try {
+                            payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get().get());
+                        } finally {
+                            compressionTaskFinal.set(null);
+                        }
+                        ByteBuffer lengthPrefix = ByteBuffer.allocate(16);
+                        m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining() + 16);
+                        lengthPrefix.putInt(payloadBuffer.remaining());
+                        lengthPrefix.putInt(tupleData.b.getInt(4));
+                        lengthPrefix.putInt(tupleData.b.getInt(8));
+                        lengthPrefix.putInt(tupleData.b.getInt(12));
+                        lengthPrefix.flip();
+                        while (lengthPrefix.hasRemaining()) {
+                            totalWritten += m_channel.write(lengthPrefix);
+                        }
+                        while (payloadBuffer.hasRemaining()) {
+                            totalWritten += m_channel.write(payloadBuffer);
+                        }
+                    } else {
+                        while (tupleData.b.hasRemaining()) {
+                            totalWritten += m_channel.write(tupleData.b);
+                        }
                     }
-                    m_bytesWritten += totalWritten;
-                    m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
+                  m_bytesWritten += totalWritten;
+                  m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                 } catch (IOException e) {
                     m_writeException = e;
                     hostLog.error("Error while attempting to write snapshot data to file " + m_file, e);
                     m_writeFailed = true;
                     throw e;
                 } finally {
-                    if (!tupleDataDiscarded) {
-                        tupleData.discard();
-                    }
+                    tupleData.discard();
                     synchronized (m_outstandingWriteTasks) {
                         if (m_outstandingWriteTasks.decrementAndGet() == 0) {
                             m_outstandingWriteTasks.notify();

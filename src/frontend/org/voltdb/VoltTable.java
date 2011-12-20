@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONArray;
@@ -35,6 +36,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Encoder;
 
 /*
@@ -1334,6 +1336,21 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
             } else {
                 assert(m_buffer.hasArray());
                 return CompressionService.compressBytes(m_buffer.array(), m_buffer.position(), m_buffer.limit());
+            }
+        } finally {
+            m_buffer.position(startPosition);
+        }
+    }
+
+    public Future<byte[]> getCompressedBytesAsync() throws IOException {
+        int startPosition = m_buffer.position();
+        try {
+            m_buffer.position(0);
+            if (m_buffer.isDirect()) {
+                return CompressionService.compressBufferAsync(m_buffer.duplicate());
+            } else {
+                assert(m_buffer.hasArray());
+                return CompressionService.compressBytesAsync(m_buffer.array(), m_buffer.position(), m_buffer.limit());
             }
         } finally {
             m_buffer.position(startPosition);

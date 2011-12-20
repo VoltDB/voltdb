@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.io.*;
 
 import org.voltdb.BackendTarget;
@@ -1492,14 +1493,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 results =
                         executeSysProcPlanFragments(pfs, result_dependency_id);
             }
-        } catch (IOException e) {
-            VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
-            result = constructResultsTable();
-            result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
-                    "FAILURE", "Unable to load table: " + tableName +
-                    " error: " + e.getMessage());
-            return result;
-        } catch (VoltTypeException e) {
+        } catch (Exception e) {
             VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
             result = constructResultsTable();
             result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
@@ -1512,7 +1506,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private byte[][] createPartitionedTables(String tableName,
-            VoltTable loadedTable) throws IOException
+            VoltTable loadedTable) throws Exception
             {
         int number_of_partitions = m_cluster.getPartitions().size();
         Table catalog_table = m_database.getTables().getIgnoreCase(tableName);
@@ -1550,12 +1544,19 @@ public class SnapshotRestore extends VoltSystemProcedure
             partitioned_tables[partition].add(loadedTable);
         }
 
+        /*
+         * Get all hands on deck for compression
+         */
+        ArrayList<Future<byte[]>> compressTableTasks = new ArrayList<Future<byte[]>>();
+        for (int ii = 0; ii < number_of_partitions; ii++) {
+            compressTableTasks.add(partitioned_tables[ii].getCompressedBytesAsync());
+        }
         byte compressedTables[][] = new byte[number_of_partitions][];
         for (int ii = 0; ii < compressedTables.length; ii++) {
-            compressedTables[ii] = partitioned_tables[ii].getCompressedBytes();
+            compressedTables[ii] = compressTableTasks.get(ii).get();
         }
         return compressedTables;
-            }
+    }
 
     private Table getCatalogTable(String tableName)
     {

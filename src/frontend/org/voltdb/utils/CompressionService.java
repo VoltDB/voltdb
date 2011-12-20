@@ -23,6 +23,7 @@ import java.util.zip.*;
 import java.nio.ByteBuffer;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Base64;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.xerial.snappy.Snappy;
 
 public final class CompressionService {
@@ -88,6 +89,18 @@ public final class CompressionService {
         input.clear();
 
         return buffers;
+    }
+
+    public static Future<byte[]> compressBufferAsync(final ByteBuffer buffer) {
+        assert(buffer.isDirect());
+        return m_executor.submit(new Callable<byte[]>() {
+
+            @Override
+            public byte[] call() throws Exception {
+                return compressBuffer(buffer);
+            }
+
+        });
     }
 
     public static int compressBuffer(ByteBuffer buffer, ByteBuffer output) throws IOException {
@@ -280,5 +293,15 @@ public final class CompressionService {
         System.out.println(CompressionService.decompressBytes(CompressionService.compressBytes(new byte[][] {testBytes}, true), true)[0].length);
         CompressionService.decompressBytes(CompressionService.compressBytes(new byte[][] {testBytes}));
         CompressionService.decompressBytes(CompressionService.compressBytes(new byte[][] {testBytes}));
+    }
+
+    public static Future<byte[]> compressBytesAsync(final byte[] array, final int position,
+            final int limit) {
+        return m_executor.submit(new Callable<byte[]>() {
+                @Override
+                public byte[] call() throws Exception {
+                    return compressBytes(array, position, limit);
+                }
+        });
     }
 }

@@ -187,12 +187,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                                             message.b.array(), message.b.position() + 4, message.b.remaining() - 4);
                             ByteBuffer contents = ByteBuffer.wrap(compressedBytes);
                             lengthPrefix.putInt(compressedBytes.length).flip();
-                            while (lengthPrefix.hasRemaining() || contents.hasRemaining()) {
-                                if (lengthPrefix.hasRemaining()) {
-                                    m_sc.write(new ByteBuffer[] { lengthPrefix, contents } );
-                                } else {
-                                    m_sc.write(contents);
-                                }
+                            while (lengthPrefix.hasRemaining()) {
+                                m_sc.write(lengthPrefix);
+                            }
+                            while (contents.hasRemaining()) {
+                                m_sc.write(contents);
                             }
                         }
                     } catch (IOException e) {
