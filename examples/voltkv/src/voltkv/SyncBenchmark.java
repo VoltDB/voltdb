@@ -163,6 +163,7 @@ public class SyncBenchmark
                 .add("key-size", "key_size", "Size of the keys in number of characters. Max: 250", 50)
                 .add("min-value-size", "min_value_size", "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576", 1000)
                 .add("max-value-size", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
+                .add("entropy", "entropy", "How compressible the payload should be, lower is more compressible", 127)
                 .add("use-compression", "use_compression", "Whether value blobs should be compressed (GZip) for storage in the database (true|false).", false)
                 .setArguments(args)
             ;
@@ -181,6 +182,7 @@ public class SyncBenchmark
             int maxValueSize       = apph.intValue("max-value-size");
             boolean useCompression = apph.booleanValue("use-compression");
             final String csv       = apph.stringValue("stats");
+            final int entropy      = apph.intValue("entropy");
 
 
             // Validate parameters
@@ -203,7 +205,7 @@ public class SyncBenchmark
             Con = ClientConnectionPool.getWithRetry(servers, port);
 
             // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
-            final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, poolSize, useCompression);
+            final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, entropy, poolSize, useCompression);
 
             // Initialize the store
             if (preload)
@@ -277,14 +279,14 @@ public class SyncBenchmark
             , GetStoreResults.get(1)
             , GetCompressionResults.get(0)/1048576l
             , GetCompressionResults.get(1)/1048576l
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*(double)duration)
+            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
             , PutStoreResults.get(0)
             , PutStoreResults.get(1)
             , PutCompressionResults.get(0)/1048576l
             , PutCompressionResults.get(1)/1048576l
-            , ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*(double)duration)
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*(double)duration)
-            + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*(double)duration)
+            , ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
+            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
+            + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
             );
 
             // 2. Overall performance statistics for GET/PUT operations

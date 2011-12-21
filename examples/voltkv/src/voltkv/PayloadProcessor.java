@@ -64,26 +64,31 @@ public class PayloadProcessor
         }
     }
 
-    private final byte[] ValueBase;
     private final int KeySize;
     private final int MinValueSize;
     private final int MaxValueSize;
     private final int PoolSize;
     private final boolean UseCompression;
     public final String KeyFormat;
-    private final Random Rand = new Random();
-    public PayloadProcessor(int keySize, int minValueSize, int maxValueSize, int poolSize, boolean useCompression)
+    private final int Entropy;
+    private final Random Rand = new Random(0);
+    public PayloadProcessor(
+            int keySize,
+            int minValueSize,
+            int maxValueSize,
+            int entropy,
+            int poolSize,
+            boolean useCompression)
     {
         this.KeySize = keySize;
         this.MinValueSize = minValueSize;
         this.MaxValueSize = maxValueSize;
         this.PoolSize = poolSize;
         this.UseCompression = useCompression;
-        this.ValueBase = new byte[this.MaxValueSize];
-
-        // Set the "64" to whatever number of "values" from 256 you want included in the payload, the lower the number the more compressible the payload
-        for (int i=0; i < this.MaxValueSize; i++)
-            this.ValueBase[i] = (byte)this.Rand.nextInt(64);
+        this.Entropy = entropy;
+        if (entropy < 1 || entropy > 127) {
+            throw new IllegalArgumentException("Entropy must be a number between 1 and 127");
+        }
 
         // Get the base key format string used to generate keys
         this.KeyFormat = "K%1$" + String.valueOf(this.KeySize-1) + "s";
@@ -92,7 +97,10 @@ public class PayloadProcessor
     public Pair generateForStore()
     {
         final String key = String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
-        final byte[] rawValue = Arrays.copyOfRange(this.ValueBase,0,this.MinValueSize+this.Rand.nextInt(this.MaxValueSize-this.MinValueSize+1));
+        final byte[] rawValue = new byte[this.MinValueSize+this.Rand.nextInt(this.MaxValueSize-this.MinValueSize+1)];
+        for (int ii = 0; ii < rawValue.length; ii++) {
+            rawValue[ii] = (byte)(Rand.nextInt(127) % Entropy);
+        }
         if (this.UseCompression)
             return new Pair(key, rawValue, gzip(rawValue));
         else

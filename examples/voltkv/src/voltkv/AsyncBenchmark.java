@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 
 import org.voltdb.client.exampleutils.AppHelper;
@@ -88,6 +89,7 @@ public class AsyncBenchmark
                 .add("key-size", "key_size", "Size of the keys in number of characters. Max: 250", 50)
                 .add("min-value-size", "min_value_size", "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576", 1000)
                 .add("max-value-size", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
+                .add("entropy", "entropy", "How compressible the payload should be, lower is more compressible", 127)
                 .add("use-compression", "use_compression", "Whether value blobs should be compressed (GZip) for storage in the database (true|false).", false)
                 .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
@@ -111,7 +113,7 @@ public class AsyncBenchmark
             boolean autoTune       = apph.booleanValue("auto-tune");
             double latencyTarget   = apph.doubleValue("latency-target");
             final String csv       = apph.stringValue("stats");
-
+            final int entropy      = apph.intValue("entropy");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
@@ -134,14 +136,20 @@ public class AsyncBenchmark
             Con = ClientConnectionPool.getWithRetry(servers, port);
 
             // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
-            final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, poolSize, useCompression);
+            final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, entropy, poolSize, useCompression);
 
             // Initialize the store
             if (preload)
             {
                 System.out.print("Initializing data store... ");
-                for(int i=0;i<poolSize;i+=1000)
-                    Con.execute("Initialize", i, Math.min(i+1000,poolSize), processor.KeyFormat, processor.generateForStore().getStoreValue());
+                for(int i=0;i<poolSize;i++) {
+                    Con.executeAsync(
+                            new NullCallback(),
+                            "Put",
+                            String.format(processor.KeyFormat, i),
+                            processor.generateForStore().getStoreValue());
+                }
+                Con.drain();
                 System.out.println(" Done.");
             }
 
@@ -166,9 +174,9 @@ public class AsyncBenchmark
             // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
             IRateLimiter limiter = null;
             if (autoTune)
-                limiter = (IRateLimiter)new LatencyLimiter(Con, "Get", latencyTarget, rateLimit);
+                limiter = new LatencyLimiter(Con, "Get", latencyTarget, rateLimit);
             else
-                limiter = (IRateLimiter)new RateLimiter(rateLimit);
+                limiter = new RateLimiter(rateLimit);
 
             // Run the benchmark loop for the requested duration
             long endTime = System.currentTimeMillis() + (1000l * duration);
@@ -273,14 +281,14 @@ public class AsyncBenchmark
             , GetStoreResults.get(1)
             , GetCompressionResults.get(0)/1048576l
             , GetCompressionResults.get(1)/1048576l
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*(double)duration)
+            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
             , PutStoreResults.get(0)
             , PutStoreResults.get(1)
             , PutCompressionResults.get(0)/1048576l
             , PutCompressionResults.get(1)/1048576l
-            , ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*(double)duration)
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*(double)duration)
-            + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*(double)duration)
+            , ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
+            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
+            + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
             );
 
             // 2. Overall performance statistics for GET/PUT operations

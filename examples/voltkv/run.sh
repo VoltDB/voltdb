@@ -64,6 +64,7 @@ function async-benchmark() {
         --key-size=32 \
         --min-value-size=1024 \
         --max-value-size=1024 \
+        --entropy=127 \
         --use-compression=false \
         --rate-limit=100000 \
         --auto-tune=true \
