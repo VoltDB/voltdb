@@ -37,6 +37,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -69,7 +70,7 @@ public class TestTableSaveFile extends TestCase {
         int headerLength = b.getInt();
         b.position(b.position() + headerLength);// at row count
         final int rowCount = b.getInt();
-        ByteBuffer chunkBuffer = ByteBuffer.allocate(b.remaining() + 16
+        ByteBuffer chunkBuffer = ByteBuffer.allocateDirect(b.remaining() + 16
                 + target.getHeaderSize());
         chunkBuffer.position(target.getHeaderSize());
         chunkBuffer.mark();
@@ -81,15 +82,13 @@ public class TestTableSaveFile extends TestCase {
         partitionIdCRC.update(partitionIdBytes);
         chunkBuffer.putInt((int) partitionIdCRC.getValue());
         final int crcPosition = chunkBuffer.position();
-        final CRC32 crc = new CRC32();
         chunkBuffer.position(chunkBuffer.position() + 4);
         chunkBuffer.put(b);
         chunkBuffer.putInt(rowCount);
         chunkBuffer.position(crcPosition + 4);
-        crc.update(chunkBuffer.array(), chunkBuffer.position(), chunkBuffer
-                .remaining());
+        final int crc = DBBPool.getBufferCRC32(chunkBuffer, chunkBuffer.position(), chunkBuffer.remaining());
         chunkBuffer.position(crcPosition);
-        chunkBuffer.putInt((int) crc.getValue());
+        chunkBuffer.putInt(crc);
         chunkBuffer.position(0);
         target.write(new BBContainer(chunkBuffer, 0) {
 

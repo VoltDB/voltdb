@@ -49,9 +49,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -228,6 +231,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     volatile String m_localMetadata = "";
     final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
+    private ExecutorService m_computationService;
+
     // methods accessed via the singleton
     @Override
     public void startSampler() {
@@ -274,6 +279,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_hasCatalog = new CountDownLatch(1);
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
+
+            m_computationService = Executors.newFixedThreadPool(
+                    Runtime.getRuntime().availableProcessors(),
+                    new ThreadFactory() {
+                        private int threadIndex = 0;
+                        @Override
+                        public synchronized Thread  newThread(Runnable r) {
+                            Thread t = new Thread(null, r, "Computation service thread - " + threadIndex++, 131072);
+                            t.setDaemon(true);
+                            return t;
+                        }
+
+                    });
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -1263,6 +1281,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_clientInterfaces.clear();
 
             ExportManager.instance().shutdown();
+            m_computationService.shutdown();
+            m_computationService.awaitTermination(1, TimeUnit.DAYS);
+            m_computationService = null;
 
             // probably unnecessary
             System.gc();
@@ -1854,5 +1875,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         } else {
             return m_periodicWorkThread.schedule(work, initialDelay, unit);
         }
+    }
+
+    @Override
+    public ExecutorService getComputationService() {
+        return m_computationService;
     }
 }

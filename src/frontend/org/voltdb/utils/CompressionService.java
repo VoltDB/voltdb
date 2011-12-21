@@ -21,6 +21,9 @@ import java.util.*;
 import java.io.*;
 import java.util.zip.*;
 import java.nio.ByteBuffer;
+
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -48,6 +51,9 @@ public final class CompressionService {
         m_buffers.remove();
     }
 
+    /*
+     * The executor service is only used if the VoltDB computation service is not available.
+     */
     private static final ExecutorService m_executor =
             Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), new ThreadFactory() {
                 private int threadIndex = 0;
@@ -93,7 +99,7 @@ public final class CompressionService {
 
     public static Future<byte[]> compressBufferAsync(final ByteBuffer buffer) {
         assert(buffer.isDirect());
-        return m_executor.submit(new Callable<byte[]>() {
+        return submitCompressionTask(new Callable<byte[]>() {
 
             @Override
             public byte[] call() throws Exception {
@@ -135,7 +141,7 @@ public final class CompressionService {
     }
 
     public static Future<byte[]> decompressBufferAsync(final ByteBuffer input) throws IOException {
-        return m_executor.submit(new Callable<byte[]>() {
+        return submitCompressionTask(new Callable<byte[]>() {
 
             @Override
             public byte[] call() throws Exception {
@@ -229,7 +235,7 @@ public final class CompressionService {
         }
         ArrayList<Future<byte[]>> futures = new ArrayList<Future<byte[]>>(bytes.length);
         for (final byte bts[] : bytes) {
-            futures.add(m_executor.submit(new Callable<byte[]>() {
+            futures.add(submitCompressionTask(new Callable<byte[]>() {
 
                 @Override
                 public byte[] call() throws Exception {
@@ -264,7 +270,7 @@ public final class CompressionService {
         }
         ArrayList<Future<byte[]>> futures = new ArrayList<Future<byte[]>>(bytes.length);
         for (final byte bts[] : bytes) {
-            futures.add(m_executor.submit(new Callable<byte[]>() {
+            futures.add(submitCompressionTask(new Callable<byte[]>() {
 
                 @Override
                 public byte[] call() throws Exception {
@@ -297,11 +303,22 @@ public final class CompressionService {
 
     public static Future<byte[]> compressBytesAsync(final byte[] array, final int position,
             final int limit) {
-        return m_executor.submit(new Callable<byte[]>() {
+        return submitCompressionTask(new Callable<byte[]>() {
                 @Override
                 public byte[] call() throws Exception {
                     return compressBytes(array, position, limit);
                 }
         });
+    }
+
+    public static Future<byte[]> submitCompressionTask(Callable<byte[]> task) {
+        VoltDBInterface instance = VoltDB.instance();
+        if (VoltDB.instance() != null) {
+            ExecutorService es = instance.getComputationService();
+            if (es != null) {
+                return es.submit(task);
+            }
+        }
+        return m_executor.submit(task);
     }
 }

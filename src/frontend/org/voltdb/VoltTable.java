@@ -1328,7 +1328,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     }
 
     public byte[] getCompressedBytes() throws IOException {
-        int startPosition = m_buffer.position();
+        final int startPosition = m_buffer.position();
         try {
             m_buffer.position(0);
             if (m_buffer.isDirect()) {
@@ -1343,7 +1343,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     }
 
     public Future<byte[]> getCompressedBytesAsync() throws IOException {
-        int startPosition = m_buffer.position();
+        final int startPosition = m_buffer.position();
         try {
             m_buffer.position(0);
             if (m_buffer.isDirect()) {
@@ -1355,5 +1355,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         } finally {
             m_buffer.position(startPosition);
         }
+    }
+
+    public ByteBuffer getBuffer() {
+        return m_buffer.asReadOnlyBuffer();
     }
 }

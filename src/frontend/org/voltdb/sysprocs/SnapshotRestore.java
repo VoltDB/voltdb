@@ -1545,7 +1545,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         }
 
         /*
-         * Get all hands on deck for compression
+         * Get all hands on deck for compression, do it async to minimize latency
          */
         ArrayList<Future<byte[]>> compressTableTasks = new ArrayList<Future<byte[]>>();
         for (int ii = 0; ii < number_of_partitions; ii++) {

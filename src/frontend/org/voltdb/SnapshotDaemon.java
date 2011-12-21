@@ -86,7 +86,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private final ScheduledThreadPoolExecutor m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
-                return new Thread(r, "SnapshotDaemon");
+                return new Thread(null, r, "SnapshotDaemon", 131072);
             }
         },
         new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
@@ -95,7 +95,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private DaemonInitiator m_initiator;
     private long m_nextCallbackHandle;
     private String m_truncationSnapshotPath;
-    private boolean m_isLeader = false;
 
     /*
      * Before doing truncation snapshot operations, wait a few seconds
@@ -378,7 +377,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 if (stat == null) {
                     try {
                         m_zk.create("/snapshot_truncation_master", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                        m_isLeader = true;
                         loggingLog.info("This node was selected as the leader for snapshot truncation");
                         m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
                             @Override

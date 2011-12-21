@@ -25,6 +25,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import junit.framework.TestCase;
@@ -32,8 +33,10 @@ import junit.framework.TestCase;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.messaging.FastSerializableTestUtil;
+import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.CompressionService;
 
 public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
@@ -234,6 +237,56 @@ public class TestVoltTable extends TestCase {
         for (int i = 0; i < LONGS_TO_RESIZE; ++i) {
             assertEquals(i, t.fetchRow(i).getLong(0));
         }
+    }
+
+    public void testCompression() throws Exception {
+        testResizedTable();
+        byte compressedBytes[] = t.getCompressedBytes();
+        FastSerializer fs = new FastSerializer();
+        fs.writeObject(t);
+
+        byte uncompressedBytes[] = fs.getBytes();
+        assertTrue(uncompressedBytes.length > compressedBytes.length);
+
+        compressedBytes = t.getCompressedBytesAsync().get();
+        assertTrue(uncompressedBytes.length > compressedBytes.length);
+
+        byte decompressedBytes[] = CompressionService.decompressBytes(compressedBytes);
+        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(decompressedBytes), true);
+
+        fs = new FastSerializer();
+        fs.writeObject(vt);
+        byte bytesForComparison[] = fs.getBytes();
+        assertTrue(java.util.Arrays.equals(bytesForComparison, uncompressedBytes));
+    }
+
+    public void testCompressionDirect() throws Exception {
+        testResizedTable();
+        ByteBuffer view = t.getBuffer();
+        int position = view.position();
+        view.position(0);
+        ByteBuffer copy = ByteBuffer.allocateDirect(view.limit());
+        copy.put(view);
+        copy.position(position);
+        VoltTable tDirect = PrivateVoltTableFactory.createVoltTableFromBuffer(copy, true);
+
+        byte compressedBytes[] = tDirect.getCompressedBytes();
+        FastSerializer fs = new FastSerializer();
+        fs.writeObject(tDirect);
+
+        byte uncompressedBytes[] = fs.getBytes();
+        assertTrue(uncompressedBytes.length > compressedBytes.length);
+
+        compressedBytes = tDirect.getCompressedBytesAsync().get();
+        assertTrue(uncompressedBytes.length > compressedBytes.length);
+
+        byte decompressedBytes[] = CompressionService.decompressBytes(compressedBytes);
+        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(decompressedBytes), true);
+
+        fs = new FastSerializer();
+        fs.writeObject(vt);
+        byte bytesForComparison[] = fs.getBytes();
+        assertTrue(java.util.Arrays.equals(bytesForComparison, uncompressedBytes));
     }
 
     @SuppressWarnings("deprecation")

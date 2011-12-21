@@ -56,8 +56,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     public static volatile boolean m_simulateFullDiskWritingHeader = false;
     public static volatile boolean m_simulateFullDiskWritingChunk = false;
 
-    private static final ByteBuffer m_compressionBuffer =
-            ByteBuffer.allocateDirect(CompressionService.maxCompressedLength(1024 * 1024 * 2 + Short.MAX_VALUE));
     private final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
@@ -314,15 +312,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             tupleData.b.position(tupleData.b.position() + 16);
             compressionTask = CompressionService.compressBufferAsync(tupleData.b);
         }
+
         //Need to be able to null this out to prevent pack rat on the future
-        //that wraps up the result of the write
+        //that wraps up the result of the write.
         final AtomicReference<Future<byte[]>> compressionTaskFinal =
             new AtomicReference<Future<byte[]>>(compressionTask);
 
         Future<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
-                boolean tupleDataDiscarded = false;
                 try {
                     if (m_acceptOneWrite) {
                         m_acceptOneWrite = false;
@@ -335,40 +333,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
 
-//                    ByteBuffer bufferToWrite = tupleData.b;
-//                    if (prependLength) {
-//                        //The format is no longer treated completely opaque, compression is skipping
-//                        //the first 16 bytes to skip the CRCs, partition ID, and length prefix
-//                        //It was more convenient to make the changes to TableSaveFile if these bytes are left
-//                        //uncompressed. Now the length prefix refers only to the compressed portion
-//                        //beyond the first 16 bytes
-//                        m_compressionBuffer.clear();
-//                        m_compressionBuffer.position(16);
-//                        tupleData.b.position(16);
-//                        final int compressedSize = CompressionService.compressBuffer(tupleData.b, m_compressionBuffer);
-//                        //Copy over the 12 uncompressed bytes containing the partition ID and 2 CRCs
-//                        //Then generate the length value and place that, then discard the uncompressed buffer
-//                        m_compressionBuffer.limit(16 + compressedSize);
-//                        m_compressionBuffer.position(4);
-//                        tupleData.b.position(4);
-//                        tupleData.b.limit(16);
-//                        m_compressionBuffer.put(tupleData.b);
-//                        m_compressionBuffer.position(0);
-//                        m_compressionBuffer.putInt(m_compressionBuffer.remaining() - 16);
-//                        m_compressionBuffer.position(0);
-//                        tupleDataDiscarded = true;
-//                        tupleData.discard();
-//                        bufferToWrite = m_compressionBuffer;
-//                    }
-//
-//                    m_bytesAllowedBeforeSync.acquire(bufferToWrite.remaining());
-//
-//                    int totalWritten = 0;
-//                    while (bufferToWrite.hasRemaining()) {
-//                        totalWritten += m_channel.write(bufferToWrite);
-//                    }
-//                    m_bytesWritten += totalWritten;
-//                    m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                     int totalWritten = 0;
                     if (prependLength) {
                         ByteBuffer payloadBuffer = null;
@@ -395,8 +359,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             totalWritten += m_channel.write(tupleData.b);
                         }
                     }
-                  m_bytesWritten += totalWritten;
-                  m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
+                    m_bytesWritten += totalWritten;
+                    m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                 } catch (IOException e) {
                     m_writeException = e;
                     hostLog.error("Error while attempting to write snapshot data to file " + m_file, e);

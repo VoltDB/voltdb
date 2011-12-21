@@ -19,6 +19,7 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -214,4 +215,10 @@ public interface VoltDBInterface
      */
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay,
                              TimeUnit unit);
+
+    /**
+     * Return an executor service for running non-blocking but computationally expensive
+     * tasks.
+     */
+    public ExecutorService getComputationService();
 }

@@ -31,6 +31,8 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -80,6 +82,7 @@ public class MockVoltDB implements VoltDBInterface
     public boolean shouldIgnoreCrashes = false;
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
+    private final ExecutorService m_es = Executors.newSingleThreadExecutor();
 
     public MockVoltDB()
     {
@@ -407,6 +410,8 @@ public class MockVoltDB implements VoltDBInterface
     {
         m_snapshotCompletionMonitor.shutdown();
         m_zk.close();
+        m_es.shutdown();
+        m_es.awaitTermination( 1, TimeUnit.DAYS);
         m_agreementSite.shutdown();
     }
 
@@ -551,5 +556,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay, TimeUnit unit) {
         return null;
+    }
+
+    @Override
+    public ExecutorService getComputationService() {
+        return m_es;
     }
 }
