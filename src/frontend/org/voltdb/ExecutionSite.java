@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -117,6 +118,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     final ExecutionEngine ee;
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
+
+    private long m_startupTime = System.currentTimeMillis();
+    private PartitionDRGateway m_partitionDRGateway = null;
 
     /*
      * Recover a site at a time to make the interval in which other sites
@@ -402,6 +406,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
 
                 m_transactionQueue.shutdown();
+                m_partitionDRGateway.shutdown();
 
                 if (hsql != null) {
                     hsql.shutdown();
@@ -662,6 +667,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         m_starvationTracker = null;
         m_tableStats = null;
         m_indexStats = null;
+
+        // initialize the DR gateway
+        m_partitionDRGateway = new PartitionDRGateway();
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -689,6 +697,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         registerFaultHandler(NodeFailureFault.NODE_FAILURE_EXECUTION_SITE,
                              m_faultHandler,
                              FaultType.NODE_FAILURE);
+
+        // initialize the DR gateway
+        int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
+        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "wan-overflow");
+        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, m_recovering, overflowDir);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -1029,6 +1042,20 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
                 m_currentTransactionState = currentTxnState;
                 if (currentTxnState == null) {
+                    /*
+                     * check if we got no response because the queue is empty
+                     * and, if so... get a txnid with which to poke the
+                     * PartitionDRGateway.
+                     *
+                     * If the txnId is from before the process started, caused by command
+                     * log replay, then ignore it.
+                     */
+                    long seenTxnId = m_transactionQueue.getEarliestSeenTxnIdAcrossInitiatorsWhenEmpty();
+                    long seenTxnTime = TransactionIdManager.getTimestampFromTransactionId(seenTxnId);
+                    if (seenTxnTime > m_startupTime) {
+                        m_partitionDRGateway.tick(seenTxnId);
+                    }
+
                     // poll the messaging layer for a while as this site has nothing to do
                     // this will likely have a message/several messages immediately in a heavy workload
                     // Before blocking record the starvation
@@ -1095,6 +1122,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public void runLoop(boolean loopUntilPoison) {
         while (m_shouldContinue) {
             TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
+            m_currentTransactionState = currentTxnState;
             if (currentTxnState == null) {
                 // poll the messaging layer for a while as this site has nothing to do
                 // this will likely have a message/several messages immediately in a heavy workload
@@ -1131,6 +1159,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             // release everything through the end of the current window.
             else if (latestUndoToken > txnState.getBeginUndoToken()) {
                 ee.releaseUndoToken(latestUndoToken);
+            }
+
+            // send to DR Agent if conditions are right
+            StoredProcedureInvocation invocation = txnState.getInvocation();
+            if ((invocation != null) && (m_recovering == false)) {
+                if (!txnState.needsRollback()) {
+                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+                }
             }
 
             // reset for error checking purposes
@@ -2037,8 +2073,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public Map<Integer, List<VoltTable>>
     recursableRun(TransactionState currentTxnState)
     {
-        do
-        {
+        while (m_shouldContinue) {
             if (currentTxnState.doWork(m_recovering)) {
                 if (currentTxnState.needsRollback())
                 {
@@ -2090,7 +2125,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
                 }
             }
-        } while (true);
+        }
+        // should only get here on shutdown
+        return null;
     }
 
     /*
@@ -2266,16 +2303,34 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                    result.toString()));
                 }
                 if (callerParams != null) {
+                    ClientResponseImpl cr = null;
                     if (wrapper instanceof VoltSystemProcedure) {
                         final Object[] combinedParams = new Object[callerParams.length + 1];
                         combinedParams[0] = m_systemProcedureContext;
                         for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                        final ClientResponseImpl cr = wrapper.call(txnState, combinedParams);
+                        cr = wrapper.call(txnState, combinedParams);
                         response.setResults(cr, itask);
                     }
                     else {
-                        final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
+                        cr = wrapper.call(txnState, itask.getParameters());
+
+                        if (cr.getResults().length > 0) {
+                            VoltTable r = cr.getResults()[0];
+                            //System.err.printf("Position is %d\n", r.m_buffer.position());
+
+                            if (r.m_buffer.position() == 44) {
+                                System.err.println("Position is 44");
+                            }
+                        }
+
                         response.setResults(cr, itask);
+                    }
+                    // record the results of write transactions to the transaction state
+                    // this may be used to verify the WAN slave cluster gets the same value
+                    // skip for multi-partition txns because only 1 of k+1 partitions will
+                    //  have the real results
+                    if ((!itask.isReadOnly()) && itask.isSinglePartition()) {
+                        txnState.storeResults(cr);
                     }
                 }
             }

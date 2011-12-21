@@ -21,7 +21,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
@@ -46,6 +48,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected boolean m_done = false;
     protected long m_beginUndoToken;
     protected boolean m_needsRollback = false;
+    protected ClientResponseImpl m_response = null;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -94,6 +97,14 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract boolean doWork(boolean recovering);
 
+    public void storeResults(ClientResponseImpl response) {
+        m_response = response;
+    }
+
+    public ClientResponseImpl getResults() {
+        return m_response;
+    }
+
     public boolean shouldResumeProcedure() {
         return false;
     }
@@ -112,6 +123,8 @@ public abstract class TransactionState extends OrderableTransaction  {
     {
         return m_needsRollback;
     }
+
+    public abstract StoredProcedureInvocation getInvocation();
 
     public void createFragmentWork(int[] partitions, FragmentTaskMessage task) {
         String msg = "The current transaction context of type " + this.getClass().getName();

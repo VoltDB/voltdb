@@ -21,5 +21,19 @@ package org.voltdb;
  * All the operational modes VoltDB can be in
  */
 public enum OperationMode {
-    INITIALIZING, RUNNING, PAUSED, SHUTTINGDOWN
+    INITIALIZING, RUNNING, PAUSED, SHUTTINGDOWN;
+
+    /**
+     * Get the operation mode from its ordinal value.
+     * @param val
+     * @return
+     */
+    public static OperationMode get(byte val) {
+        for (OperationMode mode : OperationMode.values()) {
+            if (mode.ordinal() == val) {
+                return mode;
+            }
+        }
+        throw new AssertionError("Unknown mode: " + val);
+    }
 }

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.ExecutionSite;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -51,6 +52,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     protected HashMap<Integer, WorkUnit> m_missingDependencies = null;
     protected ArrayList<WorkUnit> m_stackFrameDropWUs = null;
     protected Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
+    protected final StoredProcedureInvocation m_invocation; // for DR sending purposes
 
     private InitiateResponseMessage m_response;
     private HashSet<Integer> m_outstandingAcks = null;
@@ -79,6 +81,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         //where we aren't the coordinator because we are a replica of the coordinator.
         if (notice instanceof InitiateTaskMessage)
         {
+            // keep this around for DR/WAN purposes
+            m_invocation = ((InitiateTaskMessage) notice).getStoredProcedureInvocation();
+
             if (notice.getCoordinatorSiteId() == m_siteId) {
                 m_isCoordinator = true;
                 m_task = (InitiateTaskMessage) notice;
@@ -98,6 +103,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         } else {
             m_task = null;
             m_durabilityFlag = null;
+            m_invocation = null;
         }
     }
 
@@ -700,6 +706,11 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     @Override
     public boolean isDurable() {
         return m_durabilityFlag == null ? true : m_durabilityFlag.get();
+    }
+
+    @Override
+    public StoredProcedureInvocation getInvocation() {
+        return m_invocation;
     }
 
 }

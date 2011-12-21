@@ -25,13 +25,11 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -82,10 +80,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
-    private final ScheduledExecutorService m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
+    private final ScheduledThreadPoolExecutor m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
-                return new Thread(r, "SnapshotDaemon");
+                return new Thread(null, r, "SnapshotDaemon", 131072);
             }
         },
         new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
@@ -94,7 +92,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private DaemonInitiator m_initiator;
     private long m_nextCallbackHandle;
     private String m_truncationSnapshotPath;
-    private boolean m_isLeader = false;
 
     /*
      * Before doing truncation snapshot operations, wait a few seconds
@@ -179,6 +176,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private State m_state = State.STARTUP;
 
     SnapshotDaemon() {
+        m_es.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+        m_es.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 
         m_frequencyUnit = null;
         m_retain = 0;
@@ -375,7 +374,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 if (stat == null) {
                     try {
                         m_zk.create("/snapshot_truncation_master", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                        m_isLeader = true;
                         loggingLog.info("This node was selected as the leader for snapshot truncation");
                         m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
                             @Override
@@ -521,7 +519,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         VoltDB.crashLocalVoltDB(
                                 "Unexpected error deleting truncation snapshot request", true, e);
                     }
-                    SnapshotSaveAPI.createSnapshotCompletionNode(snapshotTxnId,
+                    SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
                                                                  true, hosts);
                     try {
                         TruncationSnapshotAttempt snapshotAttempt =
@@ -1479,7 +1477,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     @Override
-    public CountDownLatch snapshotCompleted(final long txnId, final boolean truncation) {
+    public CountDownLatch snapshotCompleted(final String nonce, final long txnId, final boolean truncation) {
         if (!truncation) {
             return new CountDownLatch(0);
         }

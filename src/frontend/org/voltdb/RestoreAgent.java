@@ -181,7 +181,7 @@ SnapshotCompletionInterest {
      * A thread to keep on sending fake heartbeats until the restore is
      * complete, or otherwise the RPQ is gonna be clogged.
      */
-    private Thread m_restoreHeartbeatThread = new Thread(new Runnable() {
+    private final Thread m_restoreHeartbeatThread = new Thread(new Runnable() {
         @Override
         public void run() {
             while (m_state == State.RESTORE) {
@@ -193,7 +193,7 @@ SnapshotCompletionInterest {
         }
     });
 
-    private Runnable m_restorePlanner = new Runnable() {
+    private final Runnable m_restorePlanner = new Runnable() {
         @Override
         public void run() {
             boolean planned = false;
@@ -1230,7 +1230,7 @@ SnapshotCompletionInterest {
      * snapshot.
      */
     @Override
-    public CountDownLatch snapshotCompleted(long txnId,
+    public CountDownLatch snapshotCompleted(final String nonce, long txnId,
                                             boolean truncationSnapshot) {
         if (!truncationSnapshot) {
             VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",

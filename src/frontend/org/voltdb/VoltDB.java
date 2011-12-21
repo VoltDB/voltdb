@@ -42,6 +42,7 @@ public class VoltDB {
     public static final int DEFAULT_INTERNAL_PORT = 3021;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
+    public static final int DEFAULT_DR_PORT = 5555;
 
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
@@ -135,6 +136,12 @@ public class VoltDB {
         /** start up action */
         public START_ACTION m_startAction = START_ACTION.START;
 
+        /** start mode: normal, paused*/
+        public OperationMode m_startMode = OperationMode.RUNNING;
+
+        /** replication role: primary, secondary */
+        public ReplicationRole m_replicationRole = ReplicationRole.NONE;
+
         /**
          * At rejoin time an interface will be selected. It will be the
          * internal interface specified on the command line. If none is specified
@@ -159,6 +166,8 @@ public class VoltDB {
 
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
+
+        public int m_drAgentPortStart = DEFAULT_DR_PORT;
 
         public Configuration() { }
 
@@ -261,6 +270,12 @@ public class VoltDB {
                     m_startAction = START_ACTION.START;
                 }
 
+                else if (arg.equals("primary")) {
+                    m_replicationRole = ReplicationRole.PRIMARY;
+                } else if (arg.equals("secondary")) {
+                    m_replicationRole = ReplicationRole.SECONDARY;
+                }
+
                 // handle timestampsalt
                 else if (arg.equals("timestampsalt")) {
                     m_timestampTestingSalt = Long.parseLong(args[++i]);
@@ -293,6 +308,11 @@ public class VoltDB {
                     usage();
                     System.exit(-1);
                 }
+            }
+
+            // set the dr agent's port config from properties
+            if (System.getenv().containsKey("dragentportoffset")) {
+                m_drAgentPortStart = Integer.parseInt(System.getenv("dragentportoffset"));
             }
         }
 

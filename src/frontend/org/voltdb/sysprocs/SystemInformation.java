@@ -332,42 +332,38 @@ public class SystemInformation extends VoltSystemProcedure
                                VoltSystemProcedure.CTYPE_ID),
                 new ColumnInfo("KEY", VoltType.STRING),
                 new ColumnInfo("VALUE", VoltType.STRING));
+        int hostId = VoltDB.instance().getHostMessenger().getHostId();
 
         // host name and IP address.
         InetAddress addr = org.voltdb.client.ConnectionUtil.getLocalAddress();
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "IPADDRESS", addr.getHostAddress());
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "HOSTNAME", addr.getHostName());
+        vt.addRow(hostId, "IPADDRESS", addr.getHostAddress());
+        vt.addRow(hostId, "HOSTNAME", addr.getHostName());
 
         // build string
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "BUILDSTRING", VoltDB.instance().getBuildString());
+        vt.addRow(hostId, "BUILDSTRING", VoltDB.instance().getBuildString());
 
         // version
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "VERSION", VoltDB.instance().getVersionString());
+        vt.addRow(hostId, "VERSION", VoltDB.instance().getVersionString());
 
         // catalog path
         String path = VoltDB.instance().getConfig().m_pathToCatalog;
         if (!path.startsWith("http"))
             path = (new File(path)).getAbsolutePath();
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "CATALOG", path);
+        vt.addRow(hostId, "CATALOG", path);
 
         // deployment path
         path = VoltDB.instance().getConfig().m_pathToDeployment;
         if (!path.startsWith("http"))
             path = (new File(path)).getAbsolutePath();
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "DEPLOYMENT", path);
+        vt.addRow(hostId, "DEPLOYMENT", path);
 
         String cluster_state = VoltDB.instance().getMode().toString();
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "CLUSTERSTATE", cluster_state);
+        vt.addRow(hostId, "CLUSTERSTATE", cluster_state);
 
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "LASTCATALOGUPDATETXNID",
+        String replication_role = VoltDB.instance().getReplicationRole().toString();
+        vt.addRow(hostId, "REPLICATIONROLE", replication_role);
+
+        vt.addRow(hostId, "LASTCATALOGUPDATETXNID",
                   Long.toString(VoltDB.instance().getCatalogContext().m_transactionId));
 
         return vt;

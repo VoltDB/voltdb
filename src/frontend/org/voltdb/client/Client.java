@@ -144,6 +144,24 @@ public interface Client {
         throws IOException, NoConnectionsException, ProcCallException;
 
     /**
+     * Synchronously invoke a replicated procedure. Blocks until a result is
+     * available. A {@link ProcCallException} is thrown if the response is
+     * anything other then success.
+     *
+     * @param procName
+     *            <code>class</code> name (not qualified by package) of the
+     *            procedure to execute.
+     * @param parameters
+     *            vararg list of procedure's parameter values.
+     * @return array of VoltTable results.
+     * @throws org.voltdb.client.ProcCallException
+     * @throws NoConnectionsException
+     */
+    ClientResponse callProcedure(long originalTxnId,
+                                 String procName, Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
      * Asynchronously invoke a procedure. Does not guarantee that the invocation is actually queued. If there
      * is backpressure on all connections to the cluster then the invocation will not be queued. Check the return value
      * to determine if queuing actually took place.
@@ -153,6 +171,26 @@ public interface Client {
      * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise
      */
     public boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
+    throws IOException, NoConnectionsException;
+
+    /**
+     * Asynchronously invoke a replicated procedure. Does not guarantee that the
+     * invocation is actually queued. If there is backpressure on all
+     * connections to the cluster then the invocation will not be queued. Check
+     * the return value to determine if queuing actually took place.
+     *
+     * @param callback
+     *            ProcedureCallback that will be invoked with procedure results.
+     * @param procName
+     *            class name (not qualified by package) of the procedure to
+     *            execute.
+     * @param parameters
+     *            vararg list of procedure's parameter values.
+     * @return <code>true</code> if the procedure was queued and
+     *         <code>false</code> otherwise
+     */
+    boolean callProcedure(long originalTxnId, ProcedureCallback callback,
+                          String procName, Object... parameters)
     throws IOException, NoConnectionsException;
 
     /**

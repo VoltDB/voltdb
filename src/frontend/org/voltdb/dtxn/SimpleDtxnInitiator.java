@@ -53,6 +53,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.HeartbeatMessage;
@@ -101,6 +102,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final DtxnInitiatorMailbox m_mailbox;
     private final int m_siteId;
     private final int m_hostId;
+    private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
     public SimpleDtxnInitiator(CatalogContext context,
                                Messenger messenger, int hostId, int siteId,
@@ -129,7 +131,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
 
     @Override
-    public synchronized void createTransaction(
+    public synchronized boolean createTransaction(
                                   final long connectionId,
                                   final String connectionHostname,
                                   final boolean adminConnection,
@@ -143,14 +145,17 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final int messageSize,
                                   final long now)
     {
-        long txnId = m_idManager.getNextUniqueTransactionId();
-        createTransaction(connectionId, connectionHostname, adminConnection, txnId,
-                          invocation, isReadOnly, isSinglePartition, isEveryPartition,
-                          partitions, numPartitions, clientData, messageSize, now);
+        long txnId;
+        txnId = m_idManager.getNextUniqueTransactionId();
+        boolean retval =
+            createTransaction(connectionId, connectionHostname, adminConnection, txnId,
+                              invocation, isReadOnly, isSinglePartition, isEveryPartition,
+                              partitions, numPartitions, clientData, messageSize, now);
+        return retval;
     }
 
     @Override
-    public synchronized void createTransaction(
+    public synchronized boolean createTransaction(
                                   final long connectionId,
                                   final String connectionHostname,
                                   final boolean adminConnection,
@@ -169,19 +174,38 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         assert(partitions != null);
         assert(numPartitions >= 1);
 
+        if (invocation.getType() == ProcedureInvocationType.REPLICATED)
+        {
+            /*
+             * Ning - @LoadSinglepartTable and @LoadMultipartTable always have
+             * the same txnId which is the txnId of the snapshot.
+             */
+            if (!(invocation.getProcName().equalsIgnoreCase("@LoadSinglepartitionTable") ||
+                  invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
+                invocation.getOriginalTxnId() <= m_lastSeenOriginalTxnId)
+            {
+                hostLog.info("Dropping duplicate replicated transaction, txnid: " + invocation.getOriginalTxnId() + ", last seen: " + m_lastSeenOriginalTxnId);
+                return false;
+            }
+            else
+            {
+                m_lastSeenOriginalTxnId = invocation.getOriginalTxnId();
+            }
+        }
+
         if (isSinglePartition || isEveryPartition)
         {
             createSinglePartitionTxn(connectionId, connectionHostname, adminConnection,
                                      txnId, invocation, isReadOnly,
                                      partitions, clientData, messageSize, now);
-            return;
+            return true;
         }
         else
         {
             SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
             ArrayList<Integer> sitesOnThisHost =
-                tracker.m_hostsToSites.get(m_hostId);
-            int coordinatorId = sitesOnThisHost.get(1);
+                tracker.getLiveExecutionSitesForHost(m_hostId);
+            int coordinatorId = sitesOnThisHost.get(0);
             ArrayList<Integer> replicaIds = new ArrayList<Integer>();
             for (Integer replica : tracker.getAllSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
                 if (replica != coordinatorId && tracker.getAllLiveSites().contains(replica)) {
@@ -226,6 +250,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         connectionHostname,
                                                         adminConnection);
             dispatchMultiPartitionTxn(txn);
+            return true;
         }
     }
 

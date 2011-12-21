@@ -31,11 +31,15 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
@@ -69,16 +73,32 @@ public class MockVoltDB implements VoltDBInterface
         }
     };
     private OperationMode m_mode = OperationMode.RUNNING;
-    private volatile String m_localMetadata = "0.0.0.0:0:0:0";
+    private volatile String m_localMetadata;
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
     final AgreementSite m_agreementSite;
     private final ZooKeeper m_zk;
     boolean m_noLoadLib = false;
     public boolean shouldIgnoreCrashes = false;
+    OperationMode m_startMode = OperationMode.RUNNING;
+    ReplicationRole m_replicationRole = ReplicationRole.NONE;
+    private final ExecutorService m_es = Executors.newSingleThreadExecutor();
 
     public MockVoltDB()
     {
+        try {
+            JSONObject obj = new JSONObject();
+            JSONArray jsonArray = new JSONArray();
+            jsonArray.put("127.0.0.1");
+            obj.put("interfaces", jsonArray);
+            obj.put("clientPort", 21212);
+            obj.put("adminPort", 21211);
+            obj.put("httpPort", -1);
+            obj.put("drPort", 5555);
+            m_localMetadata = obj.toString(4);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         m_catalog = new Catalog();
         m_catalog.execute("add / clusters " + m_clusterName);
         m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
@@ -139,6 +159,7 @@ public class MockVoltDB implements VoltDBInterface
     public void addHost(int hostId)
     {
         getCluster().getHosts().add(Integer.toString(hostId));
+        m_clusterMetadata.put(hostId, m_localMetadata);
     }
 
     public void addPartition(int partitionId)
@@ -146,7 +167,7 @@ public class MockVoltDB implements VoltDBInterface
         getCluster().getPartitions().add(Integer.toString(partitionId));
     }
 
-    private Hashtable<Integer, ExecutionSite> m_localSites = new Hashtable<Integer, ExecutionSite>();
+    private final Hashtable<Integer, ExecutionSite> m_localSites = new Hashtable<Integer, ExecutionSite>();
 
     public void addSite(int siteId, int hostId, int partitionId, boolean isExec)
     {
@@ -389,6 +410,8 @@ public class MockVoltDB implements VoltDBInterface
     {
         m_snapshotCompletionMonitor.shutdown();
         m_zk.close();
+        m_es.shutdown();
+        m_es.awaitTermination( 1, TimeUnit.DAYS);
         m_agreementSite.shutdown();
     }
 
@@ -484,7 +507,27 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void setStartMode(OperationMode mode) {}
+    public void setStartMode(OperationMode mode) {
+        m_startMode = mode;
+    }
+
+    @Override
+    public OperationMode getStartMode()
+    {
+        return m_startMode;
+    }
+
+        @Override
+    public void setReplicationRole(ReplicationRole role)
+    {
+        m_replicationRole = role;
+    }
+
+    @Override
+    public ReplicationRole getReplicationRole()
+    {
+        return m_replicationRole;
+    }
 
     @Override
     public ZooKeeper getZK() {
@@ -513,5 +556,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay, TimeUnit unit) {
         return null;
+    }
+
+    @Override
+    public ExecutorService getComputationService() {
+        return m_es;
     }
 }

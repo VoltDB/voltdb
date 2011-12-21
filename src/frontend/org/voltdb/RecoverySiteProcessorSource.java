@@ -43,6 +43,7 @@ import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Pair;
@@ -146,7 +147,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
     private long m_bytesSent = 0;
 
-    private AtomicLong m_timeSpentSerializing = new AtomicLong();
+    private final AtomicLong m_timeSpentSerializing = new AtomicLong();
 
     private volatile boolean m_ioclosed = false;
 
@@ -156,20 +157,49 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         @Override
         public void run() {
             try {
+                final ByteBuffer compressionBuffer =
+                        ByteBuffer.allocateDirect(
+                                CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
                 while (true) {
                     BBContainer message = m_outgoing.take();
                     if (message.b == null) {
                         return;
                     }
+
                     try {
-                        while (message.b.hasRemaining()) {
-                            m_sc.write(message.b);
+                        if (message.b.isDirect()) {
+                            //Leave space for a new length prefix
+                            compressionBuffer.clear().position(4);
+                            //Skip length prefix, not useful before compression
+                            message.b.position(message.b.position() + 4);
+                            final int compressedSize =
+                                    CompressionService.compressBuffer( message.b, compressionBuffer);
+                            compressionBuffer.putInt(0, compressedSize);
+                            compressionBuffer.limit(4 + compressedSize);
+                            compressionBuffer.position(0);
+                            while (compressionBuffer.hasRemaining()) {
+                                m_sc.write(compressionBuffer);
+                            }
+                        } else {
+                            ByteBuffer lengthPrefix = ByteBuffer.allocate(4);
+                            byte compressedBytes[] =
+                                    CompressionService.compressBytes(
+                                            message.b.array(), message.b.position() + 4, message.b.remaining() - 4);
+                            ByteBuffer contents = ByteBuffer.wrap(compressedBytes);
+                            lengthPrefix.putInt(compressedBytes.length).flip();
+                            while (lengthPrefix.hasRemaining()) {
+                                m_sc.write(lengthPrefix);
+                            }
+                            while (contents.hasRemaining()) {
+                                m_sc.write(contents);
+                            }
                         }
                     } catch (IOException e) {
                         recoveryLog.error("Error writing recovery message", e);
                     } finally {
                         message.discard();
                     }
+
                 }
             } catch (InterruptedException e) {
                 return;

@@ -44,12 +44,15 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
@@ -135,7 +138,19 @@ public abstract class VoltProcedure {
      * @return transaction id
      */
     public long getTransactionId() {
-        return m_currentTxnState.txnId;
+        InitiateTaskMessage task = null;
+        if (m_currentTxnState instanceof SinglePartitionTxnState) {
+            task = ((SinglePartitionTxnState) m_currentTxnState).getInitiateTaskMessage();
+        } else if (m_currentTxnState instanceof MultiPartitionParticipantTxnState) {
+            task = ((MultiPartitionParticipantTxnState) m_currentTxnState).getInitiateTaskMessage();
+        }
+
+        long txnId = m_currentTxnState.txnId;
+        if (task != null) {
+            txnId = task.getStoredProcedureInvocation().getOriginalTxnId();
+        }
+
+        return txnId == -1 ? m_currentTxnState.txnId : txnId;
     }
 
     private boolean m_initialized;
@@ -704,7 +719,7 @@ public abstract class VoltProcedure {
     public Random getSeededRandomNumberGenerator() {
         // this value is memoized here and reset at the beginning of call(...).
         if (m_cachedRNG == null) {
-            m_cachedRNG = new Random(m_currentTxnState.txnId);
+            m_cachedRNG = new Random(getTransactionId());
         }
         return m_cachedRNG;
     }
@@ -719,7 +734,7 @@ public abstract class VoltProcedure {
      * UTC (Universal Coordinated Time is like GMT).
      */
     public Date getTransactionTime() {
-        long ts = TransactionIdManager.getTimestampFromTransactionId(m_currentTxnState.txnId);
+        long ts = TransactionIdManager.getTimestampFromTransactionId(getTransactionId());
         return new Date(ts);
     }
 

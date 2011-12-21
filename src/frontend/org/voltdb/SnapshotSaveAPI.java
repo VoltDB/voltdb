@@ -34,6 +34,8 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.agreement.ZKUtil;
@@ -222,7 +224,7 @@ public class SnapshotSaveAPI
          * Race with the others to create the place where will count down to completing the snapshot
          */
         int hosts = context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size();
-        createSnapshotCompletionNode(txnId, isTruncation, hosts);
+        createSnapshotCompletionNode( nonce, txnId, isTruncation, hosts);
 
         try {
             cb1.get();
@@ -243,7 +245,8 @@ public class SnapshotSaveAPI
      * @param isTruncation Whether or not this is a truncation snapshot
      * @param hosts The total number of live hosts
      */
-    public static void createSnapshotCompletionNode(long txnId,
+    public static void createSnapshotCompletionNode(String nonce,
+                                                    long txnId,
                                                     boolean isTruncation,
                                                     int hosts) {
         if (hosts == 0) {
@@ -253,16 +256,26 @@ public class SnapshotSaveAPI
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
 
-        ByteBuffer buf = ByteBuffer.allocate(17);
-        buf.putLong(txnId);
-        buf.putInt(hosts);
-        buf.putInt(0);
-        buf.put(isTruncation ? 1 : (byte) 0);
+        byte  nodeBytes[] = null;
+        try {
+            JSONStringer stringer = new JSONStringer();
+            stringer.object();
+            stringer.key("txnId").value(txnId);
+            stringer.key("hosts").value(hosts);
+            stringer.key("isTruncation").value(isTruncation);
+            stringer.key("finishedHosts").value(0);
+            stringer.key("nonce").value(nonce);
+            stringer.endObject();
+            JSONObject jsonObj = new JSONObject(stringer.toString());
+            nodeBytes = jsonObj.toString(4).getBytes("UTF-8");
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error serializing snapshot completion node JSON", true, e);
+        }
 
         ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
         final String snapshotPath = "/completed_snapshots/" + txnId;
         VoltDB.instance().getZK().create(
-                snapshotPath, buf.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
+                snapshotPath, nodeBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                 cb, null);
 
         try {

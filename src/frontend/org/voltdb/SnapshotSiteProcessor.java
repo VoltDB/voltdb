@@ -27,6 +27,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.logging.VoltLogger;
@@ -457,23 +458,24 @@ public class SnapshotSiteProcessor {
                 VoltDB.crashVoltDB();
             }
 
-            final ByteBuffer buf = ByteBuffer.wrap(data);
-            if (buf.getLong() != txnId) {
-                hostLog.fatal("TxnId should match");
-                VoltDB.crashVoltDB();
-            }
-            if (buf.getInt() != numHosts) {
-                hostLog.fatal("Num hosts should match");
-                VoltDB.crashVoltDB();
-            }
-            int numHostsFinished = buf.getInt() + 1;
-            buf.putInt(12, numHostsFinished);
-            if (!snapshotSuccess) {
-                hostLog.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
-                buf.put(16, (byte)0);
-            }
             try {
-                zk.setData(snapshotPath, buf.array(), stat.getVersion());
+                JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
+                if (jsonObj.getLong("txnId") != txnId) {
+                    hostLog.fatal("TxnId should match");
+                    VoltDB.crashVoltDB();
+                }
+                if (jsonObj.getInt("hosts") != numHosts) {
+                    hostLog.fatal("Num hosts should match");
+                    VoltDB.crashVoltDB();
+                }
+                int numHostsFinished = jsonObj.getInt("finishedHosts") + 1;
+                jsonObj.put("finishedHosts", numHostsFinished);
+                if (!snapshotSuccess) {
+                    hostLog.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
+                    jsonObj.put("isTruncation", false);
+                }
+
+                zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
                 continue;
             } catch (Exception e) {

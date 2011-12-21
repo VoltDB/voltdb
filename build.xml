@@ -452,6 +452,11 @@ DISTRIBUTION
             <include name="nativelibs/libvoltdb*" />
         </fileset>
     </copy>
+    <copy todir="${dist.dir}/voltdb" flatten="true" >
+        <fileset dir="." defaultexcludes="yes">
+            <include name="third_party/cpp/jnilib/libjzmq*" />
+        </fileset>
+    </copy>
 
     <!-- save the symbols from the shared library -->
     <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
@@ -544,6 +549,7 @@ DISTRIBUTION
             <exclude name="bin/"/>
             <exclude name="voltdb/libvoltdb*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
+            <exclude name="voltdb/libjzmq*"/>
         </fileset>
     </copy>
 
@@ -1102,7 +1108,7 @@ TEST CASES
             showoutput="@{showoutput}"
         >
             <classpath refid='project.classpath' />
-            <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
+            <jvmarg value="-Djava.library.path=${build.dir}/nativelibs:${base.dir}/third_party/cpp/jnilib" />
             <jvmarg value="-server" />
             <jvmarg value="-Xcheck:jni" />
             <jvmarg value="-Xmx2048m"/>

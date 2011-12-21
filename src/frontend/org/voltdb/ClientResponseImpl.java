@@ -18,6 +18,8 @@
 package org.voltdb;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
@@ -27,6 +29,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.ByteArrayUtils;
 
 /**
  * Packages up the data to be sent back to the client as a stored
@@ -34,6 +37,8 @@ import org.voltdb.messaging.FastSerializer;
  *
  */
 public class ClientResponseImpl implements FastSerializable, ClientResponse, JSONString {
+    private static final int MAX_HASH_BYTES = 1024 * 10; // hash the first 10k
+
     private boolean setProperly = false;
     private byte status = 0;
     private String statusString = null;
@@ -127,14 +132,17 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         setResults(status, results, extra);
     }
 
+    @Override
     public byte getStatus() {
         return status;
     }
 
+    @Override
     public VoltTable[] getResults() {
         return results;
     }
 
+    @Override
     public String getStatusString() {
         return statusString;
     }
@@ -147,6 +155,7 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         return clientHandle;
     }
 
+    @Override
     public SerializableException getException() {
         return m_exception;
     }
@@ -274,5 +283,31 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
             throw new RuntimeException("Failed to serialized a parameter set to JSON.", e);
         }
         return js.toString();
+    }
+
+    /**
+     * @return MD5 hash as int of the tables in the result. Only hashes first bits of big results.
+     */
+    public int getHashOfTableResults() {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            for (int i = 0; i < results.length; ++i) {
+                final ByteBuffer buf = results[i].m_buffer.duplicate();
+                buf.position(0);
+                int len = buf.limit();
+                assert(len > 0);
+                if (len > MAX_HASH_BYTES) {
+                    len = MAX_HASH_BYTES;
+                    buf.limit(MAX_HASH_BYTES);
+                }
+                md.update(buf);
+            }
+            byte[] digest = md.digest();
+            return ByteArrayUtils.bytesToInt(digest, 0);
+        } catch (NoSuchAlgorithmException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return 0;
+        }
     }
 }

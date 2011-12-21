@@ -42,6 +42,7 @@ import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Pair;
@@ -130,6 +131,9 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             @Override
             public void run() {
                 try {
+                    final ByteBuffer compressionBuffer =
+                            ByteBuffer.allocateDirect(
+                                    CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
                     while (true) {
                         ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
                         while (lengthBuffer.hasRemaining()) {
@@ -145,14 +149,20 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                         try {
                             ByteBuffer messageBuffer = container.b;
                             messageBuffer.clear();
-                            messageBuffer.limit(lengthBuffer.getInt());
-                            while(messageBuffer.hasRemaining()) {
-                                int read = m_sc.read(messageBuffer);
+                            compressionBuffer.clear();
+                            compressionBuffer.limit(lengthBuffer.getInt());
+                            while(compressionBuffer.hasRemaining()) {
+                                int read = m_sc.read(compressionBuffer);
                                 if (read == -1) {
                                     throw new EOFException();
                                 }
                             }
-                            messageBuffer.flip();
+                            compressionBuffer.flip();
+                            int uncompressedSize =
+                                    CompressionService.decompressBuffer(
+                                            compressionBuffer,
+                                            messageBuffer);
+                            messageBuffer.limit(uncompressedSize);
                             recoveryLog.trace("Received message");
                             m_incoming.offer(container);
                             m_mailbox.deliver(new RecoveryMessage());

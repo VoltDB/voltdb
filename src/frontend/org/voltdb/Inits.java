@@ -266,7 +266,6 @@ public class Inits {
                     }
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
-
                     m_rvdb.m_messenger.sendCatalog(catalogBytes);
                 }
                 catch (IOException e) {
@@ -456,7 +455,7 @@ public class Inits {
 
         @Override
         public void run() {
-            int adminPort = VoltDB.DEFAULT_ADMIN_PORT;;
+            int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
 
             // See if we should bring the server up in admin mode
             if (m_deployment.getAdminMode() != null) {
@@ -476,6 +475,17 @@ public class Inits {
                 adminPort = m_config.m_adminPort;
             // other places might use config to figure out the port
             m_config.m_adminPort = adminPort;
+        }
+    }
+
+    class SetupReplicationRole extends InitWork {
+        SetupReplicationRole() {
+        }
+
+        @Override
+        public void run() {
+            // See if we should bring the server up in WAN replication mode
+            m_rvdb.setReplicationRole(m_config.m_replicationRole);
         }
     }
 

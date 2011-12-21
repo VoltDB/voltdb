@@ -49,8 +49,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
@@ -225,10 +225,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     CommandLog m_commandLog;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
-    OperationMode m_startMode = null;
+    private OperationMode m_startMode = null;
+    private ReplicationRole m_replicationRole = null;
 
     volatile String m_localMetadata = "";
     final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
+
+    private ExecutorService m_computationService;
 
     // methods accessed via the singleton
     @Override
@@ -276,6 +279,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_hasCatalog = new CountDownLatch(1);
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
+
+            m_computationService = Executors.newFixedThreadPool(
+                    Runtime.getRuntime().availableProcessors(),
+                    new ThreadFactory() {
+                        private int threadIndex = 0;
+                        @Override
+                        public synchronized Thread  newThread(Runnable r) {
+                            Thread t = new Thread(null, r, "Computation service thread - " + threadIndex++, 131072);
+                            t.setDaemon(true);
+                            return t;
+                        }
+
+                    });
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -338,6 +354,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     System.exit(-1);
                 }
             }
+
+            collectLocalNetworkMetadata();
+            m_clusterMetadata.put(m_messenger.getHostId(), getLocalMetadata());
 
             /*
              * Create execution sites runners (and threads) for all exec sites except the first one.
@@ -423,13 +442,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         ClientInterface.create(m_network,
                                                m_messenger,
                                                m_catalogContext,
+                                               m_replicationRole,
                                                m_catalogContext.numberOfNodes,
                                                currSiteId,
                                                site.getInitiatorid(),
                                                config.m_port + portOffset,
                                                config.m_adminPort + portOffset,
                                                m_config.m_timestampTestingSalt);
-                    portOffset++;
+                    portOffset += 2;
                     m_clientInterfaces.add(ci);
                     m_compilerThread = ci.getCompilerThread();
                 }
@@ -662,6 +682,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             stringer.key("clientPort").value(m_config.m_port);
             stringer.key("adminPort").value(m_config.m_adminPort);
             stringer.key("httpPort").value(m_config.m_httpPort);
+            stringer.key("drPort").value(m_config.m_drAgentPortStart);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
             // possibly atomic swap from null to realz
@@ -921,6 +942,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         if (m_startMode == OperationMode.PAUSED) {
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
         }
+
+        if (m_replicationRole == ReplicationRole.PRIMARY) {
+                hostLog.info("Started as primary cluster.");
+        } else if (m_replicationRole == ReplicationRole.SECONDARY) {
+            hostLog.info("Started as secondary cluster. Clients can only call read-only procedures.");
+        }
         if (httpPortExtraLogMessage != null)
             hostLog.info(httpPortExtraLogMessage);
         if (httpPort != -1) {
@@ -957,9 +984,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         for (String line : lines) {
             hostLog.info(line.trim());
         }
-
-        collectLocalNetworkMetadata();
-        m_clusterMetadata.put(m_messenger.getHostId(), getLocalMetadata());
 
         /*
          * Publish our cluster metadata, and then retrieve the metadata
@@ -1244,6 +1268,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_clientInterfaces.clear();
 
             ExportManager.instance().shutdown();
+            m_computationService.shutdown();
+            m_computationService.awaitTermination(1, TimeUnit.DAYS);
+            m_computationService = null;
 
             // probably unnecessary
             System.gc();
@@ -1708,6 +1735,38 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         m_startMode = mode;
     }
 
+    @Override
+    public OperationMode getStartMode()
+    {
+        return m_startMode;
+    }
+
+    @Override
+    public void setReplicationRole(ReplicationRole role)
+    {
+        if (m_replicationRole == null) {
+            m_replicationRole = role;
+        } else if (m_replicationRole == ReplicationRole.SECONDARY) {
+            if (role != ReplicationRole.PRIMARY) {
+                hostLog.error("Cannot change replication role to " + role);
+                return;
+            }
+
+            hostLog.info("Changing replication role from " + m_replicationRole +
+                         " to " + role);
+            m_replicationRole = role;
+            for (ClientInterface ci : m_clientInterfaces) {
+                ci.setReplicationRole(m_replicationRole);
+            }
+        }
+    }
+
+    @Override
+    public ReplicationRole getReplicationRole()
+    {
+        return m_replicationRole;
+    }
+
     /**
      * Get the metadata map for the wholes cluster.
      * Note: this may include failed nodes so check for live ones
@@ -1721,7 +1780,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     /**
+<<<<<<< HEAD
+     * Metadata is currently of the format:
+     * IP:CIENTPORT:ADMINPORT:HTTPPORT:DRPORT]
+=======
      * Metadata is now a JSON object
+>>>>>>> master
      */
     @Override
     public String getLocalMetadata() {
@@ -1798,5 +1862,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         } else {
             return m_periodicWorkThread.schedule(work, initialDelay, unit);
         }
+    }
+
+    @Override
+    public ExecutorService getComputationService() {
+        return m_computationService;
     }
 }

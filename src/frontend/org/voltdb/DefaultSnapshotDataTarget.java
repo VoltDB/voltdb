@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.CountDownLatch;
 import java.util.zip.CRC32;
@@ -39,6 +40,7 @@ import java.util.zip.CRC32;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.json_voltpatches.JSONObject;
@@ -101,15 +103,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     private static final ScheduledExecutorService m_syncService = Executors.newSingleThreadScheduledExecutor(
             new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
-            return new Thread(
-                    Thread.currentThread().getThreadGroup(),
-                    r,
-                    "Snapshot sync service ",
-                    131072);
-        }
-    });
+                @Override
+                public Thread newThread(Runnable r) {
+                    return new Thread(
+                            Thread.currentThread().getThreadGroup(),
+                            r,
+                            "Snapshot sync service ",
+                            131072);
+                }
+            });
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -122,7 +124,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final int partitionIds[],
             final VoltTable schemaTable,
             final long txnId) throws IOException {
-            this(
+        this(
                 file,
                 hostId,
                 clusterName,
@@ -172,6 +174,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             stringer.key("databaseName").value(databaseName);
             stringer.key("tableName").value(tableName.toUpperCase());
             stringer.key("isReplicated").value(isReplicated);
+            stringer.key("isCompressed").value(true);
             if (!isReplicated) {
                 stringer.key("partitionIds").array();
                 for (int partitionId : partitionIds) {
@@ -292,18 +295,29 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         return 4;
     }
 
+    /*
+     * Prepend length is basically synonymous with writing actual tuple data and not
+     * the header.
+     */
     private Future<?> write(final BBContainer tupleData, final boolean prependLength) {
         if (m_writeFailed) {
             tupleData.discard();
             return null;
         }
 
+        m_outstandingWriteTasks.incrementAndGet();
+
+        Future<byte[]> compressionTask = null;
         if (prependLength) {
-            tupleData.b.putInt(tupleData.b.remaining() - 4);
-            tupleData.b.position(0);
+            tupleData.b.position(tupleData.b.position() + 16);
+            compressionTask = CompressionService.compressBufferAsync(tupleData.b);
         }
 
-        m_outstandingWriteTasks.incrementAndGet();
+        //Need to be able to null this out to prevent pack rat on the future
+        //that wraps up the result of the write.
+        final AtomicReference<Future<byte[]>> compressionTaskFinal =
+            new AtomicReference<Future<byte[]>>(compressionTask);
+
         Future<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
@@ -319,11 +333,31 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
 
-                    m_bytesAllowedBeforeSync.acquire(tupleData.b.remaining());
-
                     int totalWritten = 0;
-                    while (tupleData.b.hasRemaining()) {
-                        totalWritten += m_channel.write(tupleData.b);
+                    if (prependLength) {
+                        ByteBuffer payloadBuffer = null;
+                        try {
+                            payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get().get());
+                        } finally {
+                            compressionTaskFinal.set(null);
+                        }
+                        ByteBuffer lengthPrefix = ByteBuffer.allocate(16);
+                        m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining() + 16);
+                        lengthPrefix.putInt(payloadBuffer.remaining());
+                        lengthPrefix.putInt(tupleData.b.getInt(4));
+                        lengthPrefix.putInt(tupleData.b.getInt(8));
+                        lengthPrefix.putInt(tupleData.b.getInt(12));
+                        lengthPrefix.flip();
+                        while (lengthPrefix.hasRemaining()) {
+                            totalWritten += m_channel.write(lengthPrefix);
+                        }
+                        while (payloadBuffer.hasRemaining()) {
+                            totalWritten += m_channel.write(payloadBuffer);
+                        }
+                    } else {
+                        while (tupleData.b.hasRemaining()) {
+                            totalWritten += m_channel.write(tupleData.b);
+                        }
                     }
                     m_bytesWritten += totalWritten;
                     m_bytesWrittenSinceLastSync.addAndGet(totalWritten);

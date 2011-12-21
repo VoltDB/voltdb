@@ -18,9 +18,6 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -28,6 +25,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
@@ -119,6 +117,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final AtomicInteger m_numConnections = new AtomicInteger(0);
 
+    /**
+     * Policies used to determine if we can accept an invocation.
+     */
+    private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
+            new HashMap<String, List<InvocationAcceptancePolicy>>();
+
     // clock time of last call to the initiator's tick()
     static final int POKE_INTERVAL = 1000;
     private long m_lastCompilerThreadPoke = 0;
@@ -207,7 +211,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final VoltNetwork m_network;
         private volatile boolean m_running = true;
         private Thread m_thread = null;
-        private boolean m_isAdmin;
+        private final boolean m_isAdmin;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -614,7 +618,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         private Connection m_connection;
         private final String m_hostname;
-        private boolean m_isAdmin;
+        private final boolean m_isAdmin;
 
         /**
          * Must use username to do a lookup via the auth system
@@ -775,6 +779,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltNetwork network,
             Messenger messenger,
             CatalogContext context,
+            ReplicationRole replicationRole,
             int hostCount,
             int siteId,
             int initiatorId,
@@ -823,7 +828,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(context, siteId);
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
-                port, adminPort, context, network, siteId, initiator,
+                port, adminPort, context, network, replicationRole, siteId, initiator,
                 plannerThread, allPartitions);
         onBackPressure.m_ci = ci;
         offBackPressure.m_ci = ci;
@@ -831,9 +836,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return ci;
     }
 
-    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network, int siteId,
-                    TransactionInitiator initiator, AsyncCompilerWorkThread plannerThread,
-                    int[] allPartitions)
+    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network,
+                    ReplicationRole replicationRole, int siteId, TransactionInitiator initiator,
+                    AsyncCompilerWorkThread plannerThread, int[] allPartitions)
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
@@ -848,6 +853,78 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
+
+        registerPolicies(replicationRole);
+    }
+
+    private void registerPolicies(ReplicationRole replicationRole) {
+        registerPolicy(new InvocationPermissionPolicy(true));
+        registerPolicy(new ParameterDeserializationPolicy(true));
+        registerPolicy(new SecondaryInvocationAcceptancePolicy(replicationRole == ReplicationRole.SECONDARY));
+
+        registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
+        registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
+    }
+
+    private void registerPolicy(InvocationAcceptancePolicy policy) {
+        List<InvocationAcceptancePolicy> policies = m_policies.get(null);
+        if (policies == null) {
+            policies = new ArrayList<InvocationAcceptancePolicy>();
+            m_policies.put(null, policies);
+        }
+        policies.add(policy);
+    }
+
+    private void registerPolicy(String procName, InvocationAcceptancePolicy policy) {
+        List<InvocationAcceptancePolicy> policies = m_policies.get(procName);
+        if (policies == null) {
+            policies = new ArrayList<InvocationAcceptancePolicy>();
+            m_policies.put(procName, policies);
+        }
+        policies.add(policy);
+    }
+
+    /**
+     * Check the procedure invocation against a set of policies to see if it
+     * should be rejected.
+     *
+     * @param name The procedure name, null for generic policies.
+     * @return true to proceed, false to reject.
+     */
+    private boolean checkPolicies(String name, AuthSystem.AuthUser user,
+                                  final StoredProcedureInvocation task,
+                                  final Procedure catProc,
+                                  Config sysProc, WriteStream s) {
+        List<InvocationAcceptancePolicy> policies = m_policies.get(name);
+        if (policies != null) {
+            for (InvocationAcceptancePolicy policy : policies) {
+                if (catProc != null) {
+                    if (!policy.shouldAccept(user, task, catProc, s)) {
+                        return false;
+                    }
+                } else {
+                    if (!policy.shouldAccept(user, task, sysProc, s)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Called when the replication role of the cluster changes.
+     * @param role
+     */
+    public void setReplicationRole(ReplicationRole role) {
+        List<InvocationAcceptancePolicy> policies = m_policies.get(null);
+        if (policies != null) {
+            for (InvocationAcceptancePolicy policy : policies) {
+                if (policy instanceof SecondaryInvocationAcceptancePolicy) {
+                    policy.setMode(role == ReplicationRole.SECONDARY);
+                }
+            }
+        }
     }
 
     AsyncCompilerWorkThread getCompilerThread() {
@@ -911,7 +988,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // Check for admin mode restrictions before proceeding any further
         VoltDBInterface instance = VoltDB.instance();
-        if (instance.getMode() != OperationMode.RUNNING && !handler.isAdmin())
+        if (instance.getMode() == OperationMode.PAUSED && !handler.isAdmin())
         {
             final ClientResponseImpl errorResponse =
                 new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
@@ -949,75 +1026,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return;
         }
 
-        //
-        // evaluate user permissions
-        //
-
-        if (sysProc == null) {
-            if (!user.hasPermission(catProc)) {
-                authLog.l7dlog(Level.INFO,
-                        LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),
-                        new String[] { user.m_name, task.procName }, null);
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0],
-                            "User does not have permission to invoke " + task.procName,
-                            task.clientHandle);
-                c.writeStream().enqueue(errorResponse);
-                return;
-            }
+        // Check procedure policies
+        if (!checkPolicies(null, user, task, catProc, sysProc, c.writeStream()) ||
+            !checkPolicies(task.procName, user, task, catProc, sysProc, c.writeStream())) {
+            return;
         }
-        else {
-            if (task.procName.startsWith("@AdHoc")) {
-                // AdHoc requires unique permission. Then has to plan in a separate thread.
-                if (!user.hasAdhocPermission()) {
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                               new VoltTable[0], "User does not have @AdHoc permission", task.clientHandle);
-                    authLog.l7dlog(Level.INFO,
-                                   LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
-                                   new String[] {user.m_name}, null);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
-                }
-                ParameterSet params = null;
-                try {
-                    params = task.getParams();
-                } catch (RuntimeException e) {
-                    Writer result = new StringWriter();
-                    PrintWriter pw = new PrintWriter(result);
-                    e.printStackTrace(pw);
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                               new VoltTable[0],
-                                               "Exception while deserializing procedure params\n" +
-                                               result.toString(),
-                                               task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
-                }
-                // note the second secret param
-                if (params.m_params.length > 2) {
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                               new VoltTable[0],
-                                               "Adhoc system procedure requires exactly one or two parameters, " +
-                                               "the SQL statement to execute with an optional partitioning value.",
-                                               task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
-                }
-                // check the types are both strings
-                if ((params.m_params[0] instanceof String) == false) {
-                    final ClientResponseImpl errorResponse =
-                            new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                                   new VoltTable[0],
-                                                   "Adhoc system procedure requires sql in the String type only.",
-                                                   task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
-                }
 
+        if (sysProc != null) {
+            if (task.procName.startsWith("@AdHoc")) {
+                ParameterSet params = task.getParams();
                 String sql = (String) params.m_params[0];
 
                 // get the partition param if it exists
@@ -1052,20 +1069,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                    task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                 }
-                return;
-            }
-            else if (!user.hasSystemProcPermission()) {
-                authLog.l7dlog(Level.INFO,
-                               LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
-                               new String[] { user.m_name, task.procName },
-                               null);
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(
-                                           ClientResponseImpl.UNEXPECTED_FAILURE,
-                                           new VoltTable[0],
-                                           "User " + user.m_name + " does not have sysproc permission",
-                                           task.clientHandle);
-                c.writeStream().enqueue(errorResponse);
                 return;
             }
 
@@ -1104,57 +1107,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             // Updating a catalog needs to divert to the catalog processing thread
-            else if (task.procName.equals("@UpdateApplicationCatalog")) {
-                ParameterSet params = null;
-                try {
-                    params = task.getParams();
-                } catch (RuntimeException e) {
-                    Writer result = new StringWriter();
-                    PrintWriter pw = new PrintWriter(result);
-                    e.printStackTrace(pw);
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                               new VoltTable[0],
-                                               "Exception while deserializing procedure params\n" +
-                                               result.toString(),
-                                               task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
-                }
-                if (params.m_params.length != 2 ||
-                    params.m_params[0] == null ||
-                    params.m_params[1] == null)
-                {
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                               new VoltTable[0],
-                                               "UpdateApplicationCatalog system procedure requires exactly " +
-                                               "two parameters, the catalog bytes and the deployment file " +
-                                               "string.",
-                                               task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
-                }
-
+            if (task.procName.equals("@UpdateApplicationCatalog")) {
+                ParameterSet params = task.getParams();
                 byte[] catalogBytes = null;
-                boolean isHex = false;
                 if (params.m_params[0] instanceof String) {
-                    isHex = Encoder.isHexEncodedString((String) params.m_params[0]);
-                }
-                if (isHex) {
                     catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
                 } else if (params.m_params[0] instanceof byte[]) {
                     catalogBytes = (byte[]) params.m_params[0];
-                } else {
-                    final ClientResponseImpl errorResp =
-                            new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                                   new VoltTable[0],
-                                                   "UpdateApplicationCatalog system procedure takes the " +
-                                                   "catalog bytes as a byte array. The received parameter " +
-                                                   "is of type " + params.m_params[0].getClass() + ".",
-                                                   task.clientHandle);
-                    c.writeStream().enqueue(errorResp);
-                    return;
                 }
                 String deploymentString = (String) params.m_params[1];
 
@@ -1187,22 +1146,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             else if (task.procName.equals("@SystemInformation"))
             {
-                ParameterSet params = null;
-                try {
-                    params = task.getParams();
-                } catch (RuntimeException e) {
-                    Writer result = new StringWriter();
-                    PrintWriter pw = new PrintWriter(result);
-                    e.printStackTrace(pw);
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                               new VoltTable[0],
-                                               "Exception while deserializing procedure params\n" +
-                                               result.toString(),
-                                               task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
-                }
+                ParameterSet params = task.getParams();
                 // hacky: support old @SystemInformation behavior by
                 // filling in a missing selector to get the overview key/value info
                 if (params.m_params.length == 0)
@@ -1243,15 +1187,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
             if (involvedPartitions != null) {
-                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
-                                              handler.isAdmin(),
-                                              task,
-                                              catProc.getReadonly(),
-                                              catProc.getSinglepartition(),
-                                              catProc.getEverysite(),
-                                              involvedPartitions, involvedPartitions.length,
-                                              c, buf.capacity(),
-                                              now);
+                boolean success =
+                    m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                                                  handler.isAdmin(),
+                                                  task,
+                                                  catProc.getReadonly(),
+                                                  catProc.getSinglepartition(),
+                                                  catProc.getEverysite(),
+                                                  involvedPartitions, involvedPartitions.length,
+                                                  c, buf.capacity(),
+                                                  now);
+                if (!success)
+                {
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                               new VoltTable[0],
+                                               "Unable to create transaction",
+                                               task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
             }
         }
         // dispatch a sysproc
@@ -1677,5 +1632,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         return client_stats;
+    }
+
+    public SnapshotDaemon getSnapshotDaemon() {
+        return m_snapshotDaemon;
     }
 }

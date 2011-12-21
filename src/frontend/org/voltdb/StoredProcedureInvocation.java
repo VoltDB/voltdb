@@ -25,6 +25,7 @@ import java.util.concurrent.FutureTask;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
@@ -37,7 +38,16 @@ import org.voltdb.messaging.FastSerializer;
  */
 public class StoredProcedureInvocation implements FastSerializable, JSONString {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    ProcedureInvocationType type = ProcedureInvocationType.ORIGINAL;
     String procName = null;
+
+    /*
+     * The original txn ID the procedure invocation was assigned with. It's
+     * saved here so that if the procedure needs it for determinism, we can
+     * provide it again. -1 means not set.
+     */
+    long originalTxnId = -1;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -54,9 +64,11 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     public StoredProcedureInvocation getShallowCopy()
     {
         StoredProcedureInvocation copy = new StoredProcedureInvocation();
+        copy.type = type;
         copy.clientHandle = clientHandle;
         copy.params = params;
         copy.procName = procName;
+        copy.originalTxnId = originalTxnId;
         if (unserializedParams != null)
         {
             copy.unserializedParams = unserializedParams.duplicate();
@@ -69,8 +81,18 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         return copy;
     }
 
+    private void setType() {
+        type = originalTxnId == -1 ? ProcedureInvocationType.ORIGINAL
+                                   : ProcedureInvocationType.REPLICATED;
+    }
+
     public void setProcName(String name) {
         procName = name;
+    }
+
+    public void setOriginalTxnId(long txnId) {
+        originalTxnId = txnId;
+        setType();
     }
 
     public void setParams(final Object... parameters) {
@@ -86,8 +108,16 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         unserializedParams = null;
     }
 
+    public ProcedureInvocationType getType() {
+        return type;
+    }
+
     public String getProcName() {
         return procName;
+    }
+
+    public long getOriginalTxnId() {
+        return originalTxnId;
     }
 
     public ParameterSet getParams() {
@@ -123,7 +153,18 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     @Override
     public void readExternal(FastDeserializer in) throws IOException {
-        in.readByte();//skip version
+        byte version = in.readByte();// version number also embeds the type
+        type = ProcedureInvocationType.typeFromByte(version);
+
+        /*
+         * If it's a replicated invocation, there should be two txn IDs
+         * following the version byte. The first txn ID is the new txn ID, the
+         * second one is the original txn ID.
+         */
+        if (type == ProcedureInvocationType.REPLICATED) {
+            originalTxnId = in.readLong();
+        }
+
         procName = in.readString();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
@@ -142,7 +183,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     public void writeExternal(FastSerializer out) throws IOException {
         assert(!((params == null) && (unserializedParams == null)));
         assert((params != null) || (unserializedParams != null));
-        out.write(0);//version
+        out.write(type.getValue());//version and type, version is currently 0
+        if (type == ProcedureInvocationType.REPLICATED) {
+            out.writeLong(originalTxnId);
+        }
         out.writeString(procName);
         out.writeLong(clientHandle);
         if (unserializedParams != null)
@@ -156,7 +200,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     @Override
     public String toString() {
-        String retval = "Invocation: " + procName + "(";
+        String retval = type.name() + " Invocation: " + procName + "(";
         ParameterSet params = getParams();
         if (params != null)
             for (Object o : params.toArray()) {
@@ -169,7 +213,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     }
 
     public void getDumpContents(StringBuilder sb) {
-        sb.append("Invocation: ").append(procName).append("(");
+        sb.append(type.name()).append("Invocation: ").append(procName).append("(");
         ParameterSet params = getParams();
         if (params != null)
             for (Object o : params.toArray()) {

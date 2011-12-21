@@ -20,124 +20,229 @@ import java.util.concurrent.*;
 import java.util.*;
 import java.io.*;
 import java.util.zip.*;
+import java.nio.ByteBuffer;
+
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Base64;
+import org.voltdb.utils.DBBPool.BBContainer;
+import org.xerial.snappy.Snappy;
 
 public final class CompressionService {
 
-    private final static class DeflationTool {
-        public DeflationTool(ByteArrayOutputStream baos, int compressionSetting) {
-            this.baos = baos;
-            this.deflater = new Deflater(compressionSetting);
-            this.defOutputStream = new DeflaterOutputStream(baos, deflater, 4096);
+    private static class IOBuffers {
+        private final ByteBuffer input;
+        private final ByteBuffer output;
+
+        private IOBuffers(ByteBuffer input, ByteBuffer output) {
+            this.input = input;
+            this.output = output;
         }
-        final ByteArrayOutputStream baos;
-        final Deflater deflater;
-        final DeflaterOutputStream defOutputStream;
+    }
+    private static ThreadLocal<IOBuffers> m_buffers = new ThreadLocal<IOBuffers>() {
+        @Override
+        protected IOBuffers initialValue() {
+            return new IOBuffers(ByteBuffer.allocateDirect(1024 * 32), ByteBuffer.allocateDirect(1024 * 32));
+        }
+    };
+
+    public static void releaseThreadLocal() {
+        m_buffers.remove();
     }
 
-    private final static class InflationTool {
-        public InflationTool(ByteArrayOutputStream baos) {
-            this.baos = baos;
-            infOutputStream = new InflaterOutputStream(baos, inflater, 4096);
-        }
-        final ByteArrayOutputStream baos;
-        final Inflater inflater = new Inflater();
-        final InflaterOutputStream infOutputStream;
-    }
-
-    private static ThreadLocal<ByteArrayOutputStream> m_baos = new ThreadLocal<ByteArrayOutputStream>() {
-        @Override
-        protected ByteArrayOutputStream initialValue() {
-            return new ByteArrayOutputStream();
-        }
-    };
-
-    private static ThreadLocal<Map<Integer, DeflationTool>> m_deflationTools = new ThreadLocal<Map<Integer, DeflationTool>>() {
-        @Override
-        protected Map<Integer, DeflationTool> initialValue() {
-            HashMap<Integer, DeflationTool> tools = new HashMap<Integer, DeflationTool>();
-            ByteArrayOutputStream baos = m_baos.get();
-            tools.put(Deflater.BEST_SPEED, new DeflationTool(baos, Deflater.BEST_SPEED));
-            tools.put(Deflater.BEST_COMPRESSION, new DeflationTool(baos, Deflater.BEST_COMPRESSION));
-            tools.put(Deflater.DEFAULT_COMPRESSION, new DeflationTool(baos, Deflater.DEFAULT_COMPRESSION));
-            return tools;
-        }
-    };
-
-    private static ThreadLocal<InflationTool> m_inflationTools = new ThreadLocal<InflationTool>() {
-        @Override
-        protected InflationTool initialValue() {
-            return new InflationTool(m_baos.get());
-        }
-    };
-
+    /*
+     * The executor service is only used if the VoltDB computation service is not available.
+     */
     private static final ExecutorService m_executor =
-        Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), new ThreadFactory() {
-            private int threadIndex = 0;
+            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), new ThreadFactory() {
+                private int threadIndex = 0;
+                @Override
+                public synchronized Thread  newThread(Runnable r) {
+                    Thread t = new Thread(r, "Compression service thread - " + threadIndex++);
+                    t.setDaemon(true);
+                    return t;
+                }
+
+            });
+
+    private static IOBuffers getBuffersForCompression(int length, boolean inputNotUsed) {
+        IOBuffers buffers = m_buffers.get();
+        ByteBuffer input = buffers.input;
+        ByteBuffer output = buffers.output;
+
+        final int maxCompressedLength = Snappy.maxCompressedLength(length);
+
+        /*
+         * A direct byte buffer might be provided in which case no input buffer is needed
+         */
+        boolean changedBuffer = false;
+        if (!inputNotUsed && input.capacity() < length) {
+            input = ByteBuffer.allocateDirect(Math.max(input.capacity() * 2, length));
+            changedBuffer = true;
+        }
+
+        if (output.capacity() < maxCompressedLength) {
+            output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, maxCompressedLength));
+            changedBuffer = true;
+        }
+
+        if (changedBuffer) {
+            buffers = new IOBuffers(input, output);
+            m_buffers.set(buffers);
+        }
+        output.clear();
+        input.clear();
+
+        return buffers;
+    }
+
+    public static Future<byte[]> compressBufferAsync(final ByteBuffer buffer) {
+        assert(buffer.isDirect());
+        return submitCompressionTask(new Callable<byte[]>() {
+
             @Override
-            public synchronized Thread  newThread(Runnable r) {
-                Thread t = new Thread(r, "Compression service thread - " + threadIndex++);
-                t.setDaemon(true);
-                return t;
+            public byte[] call() throws Exception {
+                return compressBuffer(buffer);
             }
 
         });
-
-    public static byte[] compressBytes(byte bytes[]) throws IOException {
-        return compressBytes(bytes, Deflater.BEST_SPEED);
     }
 
-    public static byte[] compressBytes(byte bytes[], int setting) throws IOException {
-        final DeflationTool tool = m_deflationTools.get().get(setting);
-        tool.baos.reset();
-        tool.deflater.reset();
-        tool.defOutputStream.write(bytes);
-        tool.defOutputStream.finish();
-        tool.defOutputStream.flush();
-        return tool.baos.toByteArray();
+    public static int compressBuffer(ByteBuffer buffer, ByteBuffer output) throws IOException {
+        assert(buffer.isDirect());
+        assert(output.isDirect());
+        return Snappy.compress(buffer, output);
+    }
+
+    public static byte[] compressBuffer(ByteBuffer buffer) throws IOException {
+        assert(buffer.isDirect());
+        IOBuffers buffers = getBuffersForCompression(buffer.remaining(), true);
+        ByteBuffer output = buffers.output;
+
+        final int compressedSize = Snappy.compress(buffer, output);
+        byte result[] = new byte[compressedSize];
+        output.get(result);
+        return result;
+    }
+
+    public static byte[] compressBytes(byte bytes[], int offset, int length) throws IOException {
+        IOBuffers buffers = getBuffersForCompression(bytes.length, false);
+        buffers.input.put(bytes, offset, length);
+        buffers.input.flip();
+        final int compressedSize = Snappy.compress(buffers.input, buffers.output);
+        final byte compressed[] = new byte[compressedSize];
+        buffers.output.get(compressed);
+        return compressed;
+    }
+
+    public static byte[] compressBytes(byte bytes[]) throws IOException {
+        return compressBytes(bytes, 0, bytes.length);
+    }
+
+    public static Future<byte[]> decompressBufferAsync(final ByteBuffer input) throws IOException {
+        return submitCompressionTask(new Callable<byte[]>() {
+
+            @Override
+            public byte[] call() throws Exception {
+                return decompressBuffer(input);
+            }
+
+        });
+    }
+
+    public static byte[] decompressBuffer(final ByteBuffer compressed) throws IOException {
+        assert(compressed.isDirect());
+        IOBuffers buffers = m_buffers.get();
+        ByteBuffer input = buffers.input;
+        ByteBuffer output = buffers.output;
+
+        final int uncompressedLength = Snappy.uncompressedLength(input);
+        if (output.capacity() < uncompressedLength) {
+            output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, uncompressedLength));
+            buffers = new IOBuffers(input, output);
+            m_buffers.set(buffers);
+        }
+        output.clear();
+
+        final int actualUncompressedLength = Snappy.uncompress(input, output);
+        assert(uncompressedLength == actualUncompressedLength);
+
+        byte result[] = new byte[actualUncompressedLength];
+        output.get(result);
+        return result;
+    }
+
+    public static int maxCompressedLength(int uncompressedSize) {
+        return Snappy.maxCompressedLength(uncompressedSize);
+    }
+
+    public static int uncompressedLength(ByteBuffer compressed) throws IOException {
+        assert(compressed.isDirect());
+        return Snappy.uncompressedLength(compressed);
+    }
+
+    public static int decompressBuffer(final ByteBuffer compressed, final ByteBuffer uncompressed) throws IOException {
+        assert(compressed.isDirect());
+        assert(uncompressed.isDirect());
+
+        return Snappy.uncompress(compressed, uncompressed);
     }
 
     public static byte[] decompressBytes(byte bytes[]) throws IOException {
-        final InflationTool tool = m_inflationTools.get();
-        tool.baos.reset();
-        tool.inflater.reset();
+        IOBuffers buffers = m_buffers.get();
+        ByteBuffer input = buffers.input;
+        ByteBuffer output = buffers.output;
 
-        tool.infOutputStream.write(bytes);
-        tool.infOutputStream.finish();
-        tool.infOutputStream.flush();
-        return tool.baos.toByteArray();
+        if (input.capacity() < bytes.length){
+            input = ByteBuffer.allocateDirect(Math.max(input.capacity() * 2, bytes.length));
+            buffers = new IOBuffers(input, output);
+            m_buffers.set(buffers);
+        }
+
+        input.clear();
+        input.put(bytes);
+        input.flip();
+
+        final int uncompressedLength = Snappy.uncompressedLength(input);
+        if (output.capacity() < uncompressedLength) {
+            output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, uncompressedLength));
+            buffers = new IOBuffers(input, output);
+            m_buffers.set(buffers);
+        }
+        output.clear();
+
+        final int actualUncompressedLength = Snappy.uncompress(input, output);
+        assert(uncompressedLength == actualUncompressedLength);
+
+        byte result[] = new byte[actualUncompressedLength];
+        output.get(result);
+        return result;
     }
+
 
     public static byte[][] compressBytes(byte bytes[][]) throws Exception {
-        return compressBytes(bytes, Deflater.BEST_SPEED, false);
+        return compressBytes(bytes, false);
     }
 
-    public static byte[][] compressBytes(byte bytes[][], int setting) throws Exception {
-        return compressBytes(bytes, setting, false);
-    }
-
-    public static byte[][] compressBytes(byte bytes[][], boolean base64Encode) throws Exception {
-        return compressBytes(bytes, Deflater.BEST_SPEED, base64Encode);
-    }
-
-    public static byte[][] compressBytes(byte bytes[][],final int setting, final boolean base64Encode) throws Exception {
+    public static byte[][] compressBytes(byte bytes[][], final boolean base64Encode) throws Exception {
         if (bytes.length == 1) {
             if (base64Encode) {
-                return new byte[][] {Base64.encodeBytesToBytes(compressBytes(bytes[0], setting))};
+                return new byte[][] {Base64.encodeBytesToBytes(compressBytes(bytes[0]))};
             } else {
-                return new byte[][] {compressBytes(bytes[0], setting)};
+                return new byte[][] {compressBytes(bytes[0])};
             }
         }
         ArrayList<Future<byte[]>> futures = new ArrayList<Future<byte[]>>(bytes.length);
         for (final byte bts[] : bytes) {
-            futures.add(m_executor.submit(new Callable<byte[]>() {
+            futures.add(submitCompressionTask(new Callable<byte[]>() {
 
                 @Override
                 public byte[] call() throws Exception {
                     if (base64Encode) {
-                        return Base64.encodeBytesToBytes(compressBytes(bts, setting));
+                        return Base64.encodeBytesToBytes(compressBytes(bts));
                     } else {
-                        return compressBytes(bts, setting);
+                        return compressBytes(bts);
                     }
                 }
 
@@ -165,7 +270,7 @@ public final class CompressionService {
         }
         ArrayList<Future<byte[]>> futures = new ArrayList<Future<byte[]>>(bytes.length);
         for (final byte bts[] : bytes) {
-            futures.add(m_executor.submit(new Callable<byte[]>() {
+            futures.add(submitCompressionTask(new Callable<byte[]>() {
 
                 @Override
                 public byte[] call() throws Exception {
@@ -194,5 +299,26 @@ public final class CompressionService {
         System.out.println(CompressionService.decompressBytes(CompressionService.compressBytes(new byte[][] {testBytes}, true), true)[0].length);
         CompressionService.decompressBytes(CompressionService.compressBytes(new byte[][] {testBytes}));
         CompressionService.decompressBytes(CompressionService.compressBytes(new byte[][] {testBytes}));
+    }
+
+    public static Future<byte[]> compressBytesAsync(final byte[] array, final int position,
+            final int limit) {
+        return submitCompressionTask(new Callable<byte[]>() {
+                @Override
+                public byte[] call() throws Exception {
+                    return compressBytes(array, position, limit);
+                }
+        });
+    }
+
+    public static Future<byte[]> submitCompressionTask(Callable<byte[]> task) {
+        VoltDBInterface instance = VoltDB.instance();
+        if (VoltDB.instance() != null) {
+            ExecutorService es = instance.getComputationService();
+            if (es != null) {
+                return es.submit(task);
+            }
+        }
+        return m_executor.submit(task);
     }
 }

@@ -96,6 +96,8 @@ class VoltQueryClient(cmd.Cmd):
 
         self.shutdown = VoltProcedure(self.fs, "@Shutdown")
 
+        self.promote = VoltProcedure(self.fs, "@Promote")
+
         self.response = None
 
     def __safe_call(self, proc, params = None, response = True, timeout = None):
@@ -320,6 +322,18 @@ Get the statistics:
     def help_sysinfo(self):
         self.safe_print("Get system information")
         self.safe_print("\tsysinfo {OVERVIEW|DEPLOYMENT}")
+
+    def do_promote(self, command):
+        if self.fs == None:
+            return
+        self.safe_print("Switching to master")
+        self.response = self.__safe_call(self.promote,
+                                         timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_promote(self):
+        self.safe_print("Switch to master")
+        self.safe_print("\tpromote")
 
     def do_updatecatalog(self, command):
         if self.fs == None:

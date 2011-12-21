@@ -17,8 +17,6 @@
 package org.voltdb.utils;
 
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -32,7 +30,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.eclipse.jetty.util.log.Log;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.licensetool.LicenseApi;
