@@ -68,7 +68,7 @@ run.sh sync-benchmark: start the synchronous client, more than 1 client is permi
 
 run.sh jdbc-benchmark: start the JDBC client, more than 1 client is permitted.
 
-run.sh compile       : build the catalog
+run.sh catalog       : build the catalog
 
 run.sh clean         : remove compiled files
 
