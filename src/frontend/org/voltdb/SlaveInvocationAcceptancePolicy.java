@@ -99,8 +99,9 @@ public class SlaveInvocationAcceptancePolicy extends InvocationAcceptancePolicy 
         if (invocation == null || sysProc == null) {
             return false;
         }
-        if (invocation.getType() == ProcedureInvocationType.ORIGINAL && sysProc.allowedInSlave) {
-            // white-listed sysprocs
+        if (invocation.getType() == ProcedureInvocationType.ORIGINAL && sysProc.allowedInSlave &&
+            !invocation.procName.equalsIgnoreCase("@AdHoc")) {
+            // white-listed sysprocs, adhoc is a special case
             return true;
         }
         return shouldAccept(user, invocation, sysProc.readOnly, s);

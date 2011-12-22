@@ -182,6 +182,12 @@ public class TestReplicatedInvocation {
                 e.getKey().equalsIgnoreCase("@LoadMultipartitionTable") ||
                 e.getKey().equalsIgnoreCase("@LoadSinglePartitionTable")) {
                 assertFalse(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
+            } else if (e.getKey().equalsIgnoreCase("@AdHoc")) {
+                invocation.setParams("select * from A");
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
+
+                invocation.setParams("insert into A values (1, 2, 3)");
+                assertFalse(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
             } else {
                 if (!policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream())) {
                     System.out.println(e.getKey());
@@ -220,7 +226,7 @@ public class TestReplicatedInvocation {
         result = resp.getResults()[0];
         while (result.advanceRow()) {
             if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
-                assertTrue(result.getString("VALUE").equalsIgnoreCase("primary"));
+                assertTrue(result.getString("VALUE").equalsIgnoreCase("master"));
             }
         }
     }
