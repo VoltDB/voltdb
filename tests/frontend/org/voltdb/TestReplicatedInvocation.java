@@ -47,7 +47,7 @@ import org.voltdb.utils.VoltFile;
 public class TestReplicatedInvocation {
     ServerThread server;
     File root;
-    ReplicationRole role = ReplicationRole.SECONDARY;
+    ReplicationRole role = ReplicationRole.SLAVE;
 
     static class MockWriteStream implements WriteStream {
         @Override
@@ -158,21 +158,21 @@ public class TestReplicatedInvocation {
         try {
             client.callProcedure("A.insert", 1);
         } catch (ProcCallException e) {
-            if (role == ReplicationRole.SECONDARY) {
+            if (role == ReplicationRole.SLAVE) {
                 client.close();
                 return;
             } else {
                 throw e;
             }
         }
-        if (role == ReplicationRole.SECONDARY) {
-            fail("Should not succeed on secondary cluster");
+        if (role == ReplicationRole.SLAVE) {
+            fail("Should not succeed on slave cluster");
         }
     }
 
     @Test
-    public void testSysprocAcceptanceOnSecondary() {
-        SecondaryInvocationAcceptancePolicy policy = new SecondaryInvocationAcceptancePolicy(true);
+    public void testSysprocAcceptanceOnSlave() {
+        SlaveInvocationAcceptancePolicy policy = new SlaveInvocationAcceptancePolicy(true);
         for (Entry<String, Config> e : SystemProcedureCatalog.listing.entrySet()) {
             StoredProcedureInvocation invocation = new StoredProcedureInvocation();
             invocation.procName = e.getKey();
@@ -197,7 +197,7 @@ public class TestReplicatedInvocation {
      */
     @Test
     public void testPromote() throws Exception {
-        if (role != ReplicationRole.SECONDARY) {
+        if (role != ReplicationRole.SLAVE) {
             return;
         }
 
@@ -208,7 +208,7 @@ public class TestReplicatedInvocation {
         VoltTable result = resp.getResults()[0];
         while (result.advanceRow()) {
             if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
-                assertTrue(result.getString("VALUE").equalsIgnoreCase("secondary"));
+                assertTrue(result.getString("VALUE").equalsIgnoreCase("slave"));
             }
         }
 
