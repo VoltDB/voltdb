@@ -344,6 +344,15 @@ public class VoltDB {
                 hostLog.fatal("The deployment file location is empty.");
             }
 
+            if (m_replicationRole == ReplicationRole.SLAVE) {
+                if (m_startAction == START_ACTION.RECOVER) {
+                    isValid = false;
+                    hostLog.fatal("Slave cluster only supports create database");
+                } else {
+                    m_startAction = START_ACTION.CREATE;
+                }
+            }
+
             return isValid;
         }
 
