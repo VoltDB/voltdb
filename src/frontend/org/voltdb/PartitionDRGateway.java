@@ -47,11 +47,7 @@ public class PartitionDRGateway {
                 Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
                 Object obj = pdrgiClass.newInstance();
                 pdrg = (PartitionDRGateway) obj;
-
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(
-                        "Configured as master cluster but unable to load DR code",
-                        false, null);
             }
         }
 
