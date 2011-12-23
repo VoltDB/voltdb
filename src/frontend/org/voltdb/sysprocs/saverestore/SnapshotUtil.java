@@ -76,6 +76,7 @@ public class SnapshotUtil {
      */
     public static Runnable writeSnapshotDigest(
         long txnId,
+        long catalogCRC,
         String path,
         String nonce,
         List<Table> tables,
@@ -119,7 +120,7 @@ public class SnapshotUtil {
                 stringer.endObject();
             }
             stringer.endArray();
-            stringer.key("catalogCRC").value(VoltDB.instance().getCatalogContext().catalogCRC);
+            stringer.key("catalogCRC").value(catalogCRC);
             stringer.endObject();
         } catch (JSONException e) {
             throw new IOException(e);

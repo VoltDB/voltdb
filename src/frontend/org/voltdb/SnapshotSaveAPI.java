@@ -309,6 +309,7 @@ public class SnapshotSaveAPI
 
                 Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                         txnId,
+                        context.getExecutionSite().m_context.catalogCRC,
                         file_path,
                         file_nonce,
                         tables,

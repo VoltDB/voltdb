@@ -365,6 +365,8 @@ public class SystemInformation extends VoltSystemProcedure
 
         vt.addRow(hostId, "LASTCATALOGUPDATETXNID",
                   Long.toString(VoltDB.instance().getCatalogContext().m_transactionId));
+        vt.addRow(hostId, "CATALOGCRC",
+                Long.toString(VoltDB.instance().getCatalogContext().catalogCRC));
 
         return vt;
     }
