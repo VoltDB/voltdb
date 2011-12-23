@@ -40,6 +40,7 @@ message Response {
 message NodeInfo {
     optional string hostname = 1;
     optional int32 drport = 2;
+    optional fixed64 catalogCRC = 3;
 }
 
 message PartitionInfo {

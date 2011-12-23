@@ -62,6 +62,7 @@ public class MockVoltClient implements Client {
         super();
     }
 
+    @Override
     public ClientResponse callProcedure(String procName, Object... parameters) throws ProcCallException {
         numCalls += 1;
         calledName = procName;
@@ -125,7 +126,7 @@ public class MockVoltClient implements Client {
 
     public String calledName;
     public Object[] calledParameters;
-    public VoltTable[] nextResult;
+    public volatile VoltTable[] nextResult;
     public int numCalls = 0;
     public boolean resetAfterCall = true;
     public String abortMessage;

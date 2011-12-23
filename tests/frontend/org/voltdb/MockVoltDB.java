@@ -281,7 +281,12 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public CatalogContext getCatalogContext()
     {
-        m_context = new CatalogContext( System.currentTimeMillis(), m_catalog, null, 0, 0, 0);
+        m_context = new CatalogContext( System.currentTimeMillis(), m_catalog, null, 0, 0, 0) {
+            @Override
+            public long getCatalogCRC() {
+                return 13;
+            }
+        };
         return m_context;
     }
 

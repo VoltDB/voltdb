@@ -321,17 +321,21 @@ public class SystemInformation extends VoltSystemProcedure
         return results;
     }
 
+    public static VoltTable constructOverviewTable() {
+        return new VoltTable(
+                new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
+                        VoltSystemProcedure.CTYPE_ID),
+         new ColumnInfo("KEY", VoltType.STRING),
+         new ColumnInfo("VALUE", VoltType.STRING));
+    }
+
     /**
      * Accumulate per-host information and return as a table.
      * This function does the real work. Everything else is
      * boilerplate sysproc stuff.
      */
     private VoltTable populateOverviewTable(SystemProcedureExecutionContext context) {
-        VoltTable vt = new VoltTable(
-                new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
-                               VoltSystemProcedure.CTYPE_ID),
-                new ColumnInfo("KEY", VoltType.STRING),
-                new ColumnInfo("VALUE", VoltType.STRING));
+        VoltTable vt = constructOverviewTable();
         int hostId = VoltDB.instance().getHostMessenger().getHostId();
 
         // host name and IP address.
@@ -366,7 +370,7 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "LASTCATALOGUPDATETXNID",
                   Long.toString(VoltDB.instance().getCatalogContext().m_transactionId));
         vt.addRow(hostId, "CATALOGCRC",
-                Long.toString(VoltDB.instance().getCatalogContext().catalogCRC));
+                Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
         return vt;
     }

@@ -49,7 +49,7 @@ public class CatalogContext {
     public final int numberOfNodes;
     public final SiteTracker siteTracker;
     public final int catalogVersion;
-    public final long catalogCRC;
+    private final long catalogCRC;
     public final long deploymentCRC;
     public long m_transactionId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
@@ -231,5 +231,9 @@ public class CatalogContext {
             hostLog.info("Database will retain a history of " + ssched.getRetain() +
                          " snapshots, generated every " + msg + ".");
         }
+    }
+
+    public long getCatalogCRC() {
+        return catalogCRC;
     }
 }

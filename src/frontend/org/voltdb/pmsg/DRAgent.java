@@ -2345,6 +2345,10 @@ public final class DRAgent {
     // optional int32 drport = 2;
     boolean hasDrport();
     int getDrport();
+    
+    // optional fixed64 catalogCRC = 3;
+    boolean hasCatalogCRC();
+    long getCatalogCRC();
   }
   public static final class NodeInfo extends
       com.google.protobuf.GeneratedMessage
@@ -2417,9 +2421,20 @@ public final class DRAgent {
       return drport_;
     }
     
+    // optional fixed64 catalogCRC = 3;
+    public static final int CATALOGCRC_FIELD_NUMBER = 3;
+    private long catalogCRC_;
+    public boolean hasCatalogCRC() {
+      return ((bitField0_ & 0x00000004) == 0x00000004);
+    }
+    public long getCatalogCRC() {
+      return catalogCRC_;
+    }
+    
     private void initFields() {
       hostname_ = "";
       drport_ = 0;
+      catalogCRC_ = 0L;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -2439,6 +2454,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         output.writeInt32(2, drport_);
       }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeFixed64(3, catalogCRC_);
+      }
       getUnknownFields().writeTo(output);
     }
     
@@ -2455,6 +2473,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
           .computeInt32Size(2, drport_);
+      }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeFixed64Size(3, catalogCRC_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -2584,6 +2606,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000001);
         drport_ = 0;
         bitField0_ = (bitField0_ & ~0x00000002);
+        catalogCRC_ = 0L;
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
       
@@ -2630,6 +2654,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000002;
         }
         result.drport_ = drport_;
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
+        result.catalogCRC_ = catalogCRC_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -2651,6 +2679,9 @@ public final class DRAgent {
         }
         if (other.hasDrport()) {
           setDrport(other.getDrport());
+        }
+        if (other.hasCatalogCRC()) {
+          setCatalogCRC(other.getCatalogCRC());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -2691,6 +2722,11 @@ public final class DRAgent {
             case 16: {
               bitField0_ |= 0x00000002;
               drport_ = input.readInt32();
+              break;
+            }
+            case 25: {
+              bitField0_ |= 0x00000004;
+              catalogCRC_ = input.readFixed64();
               break;
             }
           }
@@ -2752,6 +2788,27 @@ public final class DRAgent {
       public Builder clearDrport() {
         bitField0_ = (bitField0_ & ~0x00000002);
         drport_ = 0;
+        onChanged();
+        return this;
+      }
+      
+      // optional fixed64 catalogCRC = 3;
+      private long catalogCRC_ ;
+      public boolean hasCatalogCRC() {
+        return ((bitField0_ & 0x00000004) == 0x00000004);
+      }
+      public long getCatalogCRC() {
+        return catalogCRC_;
+      }
+      public Builder setCatalogCRC(long value) {
+        bitField0_ |= 0x00000004;
+        catalogCRC_ = value;
+        onChanged();
+        return this;
+      }
+      public Builder clearCatalogCRC() {
+        bitField0_ = (bitField0_ & ~0x00000004);
+        catalogCRC_ = 0L;
         onChanged();
         return this;
       }
@@ -4685,22 +4742,22 @@ public final class DRAgent {
       "nInfo\022\021\n\006status\030\007 \001(\005:\0010\"i\n\017ReplicationM",
       "ode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLICATED\020\002\022\027\n" +
       "\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTIVE\020\004\022\017\n\013UN" +
-      "AVAILABLE\020\005\",\n\010NodeInfo\022\020\n\010hostname\030\001 \001(" +
-      "\t\022\016\n\006drport\030\002 \001(\005\"\211\002\n\rPartitionInfo\022\023\n\013p" +
-      "artitionId\030\001 \001(\005\022\027\n\017oldestTimestamp\030\002 \001(" +
-      "\006\022\031\n\021lastSentTimestamp\030\003 \001(\006\022\030\n\020lowestTu" +
-      "pleIndex\030\004 \001(\003\022\032\n\022lastSentTupleIndex\030\005 \001" +
-      "(\003\022\027\n\017totalTupleCount\030\006 \001(\003\022\036\n\026outstandi" +
-      "ngBufferCount\030\007 \001(\003\022\034\n\024outstandingByteCo" +
-      "unt\030\010 \001(\003\022\020\n\010isPaused\030\t \001(\010\022\020\n\010isSynced\030",
-      "\n \001(\010\"\210\002\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.p" +
-      "msg.CtrlEnvelope.Type\022\026\n\003ack\030\002 \001(\0132\t.pms" +
-      "g.Ack\022\032\n\005reset\030\003 \001(\0132\013.pmsg.Reset\022\032\n\005pau" +
-      "se\030\004 \001(\0132\013.pmsg.Pause\022 \n\010response\030\005 \001(\0132" +
-      "\016.pmsg.Response\"_\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESE" +
-      "T\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022" +
-      "\020\n\014SNAPSHOT_REQ\020\006\022\r\n\tSTOP_SYNC\020\007B\032\n\017org." +
-      "voltdb.pmsgB\007DRAgent"
+      "AVAILABLE\020\005\"@\n\010NodeInfo\022\020\n\010hostname\030\001 \001(" +
+      "\t\022\016\n\006drport\030\002 \001(\005\022\022\n\ncatalogCRC\030\003 \001(\006\"\211\002" +
+      "\n\rPartitionInfo\022\023\n\013partitionId\030\001 \001(\005\022\027\n\017" +
+      "oldestTimestamp\030\002 \001(\006\022\031\n\021lastSentTimesta" +
+      "mp\030\003 \001(\006\022\030\n\020lowestTupleIndex\030\004 \001(\003\022\032\n\022la" +
+      "stSentTupleIndex\030\005 \001(\003\022\027\n\017totalTupleCoun" +
+      "t\030\006 \001(\003\022\036\n\026outstandingBufferCount\030\007 \001(\003\022" +
+      "\034\n\024outstandingByteCount\030\010 \001(\003\022\020\n\010isPause",
+      "d\030\t \001(\010\022\020\n\010isSynced\030\n \001(\010\"\210\002\n\014CtrlEnvelo" +
+      "pe\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEnvelope.Typ" +
+      "e\022\026\n\003ack\030\002 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\003 \001(\013" +
+      "2\013.pmsg.Reset\022\032\n\005pause\030\004 \001(\0132\013.pmsg.Paus" +
+      "e\022 \n\010response\030\005 \001(\0132\016.pmsg.Response\"_\n\004T" +
+      "ype\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QU" +
+      "ERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\r\n" +
+      "\tSTOP_SYNC\020\007B\032\n\017org.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -4744,7 +4801,7 @@ public final class DRAgent {
           internal_static_pmsg_NodeInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_NodeInfo_descriptor,
-              new java.lang.String[] { "Hostname", "Drport", },
+              new java.lang.String[] { "Hostname", "Drport", "CatalogCRC", },
               org.voltdb.pmsg.DRAgent.NodeInfo.class,
               org.voltdb.pmsg.DRAgent.NodeInfo.Builder.class);
           internal_static_pmsg_PartitionInfo_descriptor =
