@@ -24,10 +24,11 @@ package voltkv;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.util.Arrays;
 import java.util.Random;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+
+import java.nio.ByteBuffer;
 
 public class PayloadProcessor
 {
@@ -72,6 +73,12 @@ public class PayloadProcessor
     public final String KeyFormat;
     private final int Entropy;
     private final Random Rand = new Random(0);
+
+    /*
+     * Volt deals with 2 megs at the most so 4 megabytes of entropy is plenty
+     */
+    private final ByteBuffer entropyBytes = ByteBuffer.allocate (1024 * 1024 * 4);
+
     public PayloadProcessor(
             int keySize,
             int minValueSize,
@@ -89,7 +96,9 @@ public class PayloadProcessor
         if (entropy < 1 || entropy > 127) {
             throw new IllegalArgumentException("Entropy must be a number between 1 and 127");
         }
-
+        while (entropyBytes.hasRemaining()) {
+            entropyBytes.put((byte)(Rand.nextInt(127) % Entropy));
+        }
         // Get the base key format string used to generate keys
         this.KeyFormat = "K%1$" + String.valueOf(this.KeySize-1) + "s";
     }
@@ -98,8 +107,11 @@ public class PayloadProcessor
     {
         final String key = String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
         final byte[] rawValue = new byte[this.MinValueSize+this.Rand.nextInt(this.MaxValueSize-this.MinValueSize+1)];
-        for (int ii = 0; ii < rawValue.length; ii++) {
-            rawValue[ii] = (byte)(Rand.nextInt(127) % Entropy);
+        if (entropyBytes.remaining() > rawValue.length){
+            entropyBytes.get(rawValue);
+        } else {
+            entropyBytes.position(0);
+            entropyBytes.get(rawValue);
         }
         if (this.UseCompression)
             return new Pair(key, rawValue, gzip(rawValue));
