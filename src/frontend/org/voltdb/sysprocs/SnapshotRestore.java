@@ -1285,7 +1285,6 @@ public class SnapshotRestore extends VoltSystemProcedure
     private VoltTable performDistributeReplicatedTable(String tableName,
             int siteId)
     {
-        System.out.println("Performing distribute replicated table for table " + tableName);
         String hostname = ConnectionUtil.getHostnameOrAddress();
         TableSaveFile savefile = null;
         try
@@ -1307,7 +1306,6 @@ public class SnapshotRestore extends VoltSystemProcedure
         results[0].addRow(m_hostId, hostname, m_siteId, tableName, -1,
                 "SUCCESS", "NO DATA TO DISTRIBUTE");
         final Table new_catalog_table = getCatalogTable(tableName);
-        System.out.println("new_catalog_table is " + new_catalog_table.getTypeName() + " for table name " + tableName);
         Boolean needsConversion = null;
 
         try {
@@ -1423,7 +1421,6 @@ public class SnapshotRestore extends VoltSystemProcedure
         results[0].addRow(m_hostId, hostname, m_siteId, tableName, 0,
                 "SUCCESS", "NO DATA TO DISTRIBUTE");
         final Table new_catalog_table = getCatalogTable(tableName);
-        System.out.println("new_catalog_table is " + new_catalog_table.getTypeName() + " for table name " + tableName);
         Boolean needsConversion = null;
         org.voltdb.utils.DBBPool.BBContainer c = null;
         try {

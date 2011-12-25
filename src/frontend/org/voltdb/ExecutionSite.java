@@ -2313,16 +2313,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     }
                     else {
                         cr = wrapper.call(txnState, itask.getParameters());
-
-                        if (cr.getResults().length > 0) {
-                            VoltTable r = cr.getResults()[0];
-                            //System.err.printf("Position is %d\n", r.m_buffer.position());
-
-                            if (r.m_buffer.position() == 44) {
-                                System.err.println("Position is 44");
-                            }
-                        }
-
                         response.setResults(cr, itask);
                     }
                     // record the results of write transactions to the transaction state
