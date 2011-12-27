@@ -33,7 +33,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -81,7 +80,7 @@ public class MockVoltDB implements VoltDBInterface
     boolean m_noLoadLib = false;
     public boolean shouldIgnoreCrashes = false;
     OperationMode m_startMode = OperationMode.RUNNING;
-    ReplicationRole m_replicationRole = ReplicationRole.NONE;
+    ReplicationRole m_replicationRole = ReplicationRole.MASTER;
     private final ExecutorService m_es = Executors.newSingleThreadExecutor();
 
     public MockVoltDB()

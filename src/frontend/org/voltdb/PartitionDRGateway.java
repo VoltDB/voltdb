@@ -42,16 +42,12 @@ public class PartitionDRGateway {
 
         // if this is a primary cluster in a DR-enabled scenario
         //  try to load the real version of this class
-        if (vdb.getReplicationRole() == ReplicationRole.PRIMARY) {
+        if (vdb.getReplicationRole() == ReplicationRole.MASTER) {
             try {
                 Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
                 Object obj = pdrgiClass.newInstance();
                 pdrg = (PartitionDRGateway) obj;
-
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(
-                        "Configured as primary cluster but unable to load DR code",
-                        false, null);
             }
         }
 

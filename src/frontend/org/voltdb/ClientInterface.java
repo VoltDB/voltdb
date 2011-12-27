@@ -860,7 +860,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private void registerPolicies(ReplicationRole replicationRole) {
         registerPolicy(new InvocationPermissionPolicy(true));
         registerPolicy(new ParameterDeserializationPolicy(true));
-        registerPolicy(new SecondaryInvocationAcceptancePolicy(replicationRole == ReplicationRole.SECONDARY));
+        registerPolicy(new SlaveInvocationAcceptancePolicy(replicationRole == ReplicationRole.SLAVE));
 
         registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
         registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
@@ -920,8 +920,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         List<InvocationAcceptancePolicy> policies = m_policies.get(null);
         if (policies != null) {
             for (InvocationAcceptancePolicy policy : policies) {
-                if (policy instanceof SecondaryInvocationAcceptancePolicy) {
-                    policy.setMode(role == ReplicationRole.SECONDARY);
+                if (policy instanceof SlaveInvocationAcceptancePolicy) {
+                    policy.setMode(role == ReplicationRole.SLAVE);
                 }
             }
         }

@@ -943,9 +943,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
         }
 
-        if (m_replicationRole == ReplicationRole.PRIMARY) {
+        if (m_replicationRole == ReplicationRole.MASTER) {
                 hostLog.info("Started as primary cluster.");
-        } else if (m_replicationRole == ReplicationRole.SECONDARY) {
+        } else if (m_replicationRole == ReplicationRole.SLAVE) {
             hostLog.info("Started as secondary cluster. Clients can only call read-only procedures.");
         }
         if (httpPortExtraLogMessage != null)
@@ -1746,8 +1746,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     {
         if (m_replicationRole == null) {
             m_replicationRole = role;
-        } else if (m_replicationRole == ReplicationRole.SECONDARY) {
-            if (role != ReplicationRole.PRIMARY) {
+        } else if (m_replicationRole == ReplicationRole.SLAVE) {
+            if (role != ReplicationRole.MASTER) {
                 hostLog.error("Cannot change replication role to " + role);
                 return;
             }

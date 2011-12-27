@@ -139,8 +139,8 @@ public class VoltDB {
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
 
-        /** replication role: primary, secondary */
-        public ReplicationRole m_replicationRole = ReplicationRole.NONE;
+        /** replication role: master, slave */
+        public ReplicationRole m_replicationRole = ReplicationRole.MASTER;
 
         /**
          * At rejoin time an interface will be selected. It will be the
@@ -270,10 +270,8 @@ public class VoltDB {
                     m_startAction = START_ACTION.START;
                 }
 
-                else if (arg.equals("primary")) {
-                    m_replicationRole = ReplicationRole.PRIMARY;
-                } else if (arg.equals("secondary")) {
-                    m_replicationRole = ReplicationRole.SECONDARY;
+                else if (arg.equals("slave")) {
+                    m_replicationRole = ReplicationRole.SLAVE;
                 }
 
                 // handle timestampsalt
@@ -344,6 +342,15 @@ public class VoltDB {
             } else if (m_pathToDeployment.equals("")) {
                 isValid = false;
                 hostLog.fatal("The deployment file location is empty.");
+            }
+
+            if (m_replicationRole == ReplicationRole.SLAVE) {
+                if (m_startAction == START_ACTION.RECOVER) {
+                    isValid = false;
+                    hostLog.fatal("Slave cluster only supports create database");
+                } else {
+                    m_startAction = START_ACTION.CREATE;
+                }
             }
 
             return isValid;
