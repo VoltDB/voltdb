@@ -1161,9 +1161,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 ee.releaseUndoToken(latestUndoToken);
             }
 
-            // send to DR Agent if conditions are right
+            /*
+             * send to DR Agent if conditions are right
+             *
+             * If the txnId is from before the process started, caused by command
+             * log replay, then ignore it.
+             */
             StoredProcedureInvocation invocation = txnState.getInvocation();
-            if ((invocation != null) && (m_recovering == false)) {
+            long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
+            if ((invocation != null) && (m_recovering == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
                 }
