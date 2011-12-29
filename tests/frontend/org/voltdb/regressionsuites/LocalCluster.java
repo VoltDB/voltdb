@@ -593,7 +593,7 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_voltStartCmdOffset, "create");
-            if (ReplicationRole.SLAVE.toString().equalsIgnoreCase(startMode))
+            if (ReplicationRole.REPLICA.toString().equalsIgnoreCase(startMode))
                 m_procBuilder.command().set(m_voltStartModeOffset, startMode);
             m_procBuilder.command().set(m_rejoinOffset, "");
             m_procBuilder.command().set(m_licensePathOffset, ServerThread.getTestLicensePath());

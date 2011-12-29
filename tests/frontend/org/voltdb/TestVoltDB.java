@@ -88,9 +88,9 @@ public class TestVoltDB extends TestCase {
         VoltDB.Configuration cfg16 = new VoltDB.Configuration(args16);
         assertEquals(START_ACTION.START, cfg16.m_startAction);
 
-        String args17[] = { "slave" };
+        String args17[] = { "replica" };
         VoltDB.Configuration cfg17 = new VoltDB.Configuration(args17);
-        assertEquals(ReplicationRole.SLAVE, cfg17.m_replicationRole);
+        assertEquals(ReplicationRole.REPLICA, cfg17.m_replicationRole);
 
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
@@ -124,18 +124,18 @@ public class TestVoltDB extends TestCase {
         config = new VoltDB.Configuration(args6);
         assertFalse(config.validate());
 
-        // slave with non-create
-        String[] args7 = {"leader", "hola", "deployment", "teststring4", "slave", "recover"};
+        // replica with non-create
+        String[] args7 = {"leader", "hola", "deployment", "teststring4", "replica", "recover"};
         config = new VoltDB.Configuration(args7);
         assertFalse(config.validate());
 
-        // slave with create
-        String[] args8 = {"leader", "hola", "deployment", "teststring4", "slave", "create"};
+        // replica with create
+        String[] args8 = {"leader", "hola", "deployment", "teststring4", "replica", "create"};
         config = new VoltDB.Configuration(args8);
         assertTrue(config.validate());
 
-        // slave with default
-        String[] args9 = {"leader", "hola", "deployment", "teststring4", "slave"};
+        // replica with default
+        String[] args9 = {"leader", "hola", "deployment", "teststring4", "replica"};
         config = new VoltDB.Configuration(args9);
         assertTrue(config.validate());
         assertEquals(START_ACTION.CREATE, config.m_startAction);

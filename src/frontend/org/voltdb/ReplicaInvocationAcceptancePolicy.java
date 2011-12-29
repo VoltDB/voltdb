@@ -27,8 +27,8 @@ import org.voltdb.network.WriteStream;
  * secondary cluster. Secondary cluster only accepts read-only procedures from
  * normal clients, and write procedures from DR agent.
  */
-public class SlaveInvocationAcceptancePolicy extends InvocationAcceptancePolicy {
-    public SlaveInvocationAcceptancePolicy(boolean isOn) {
+public class ReplicaInvocationAcceptancePolicy extends InvocationAcceptancePolicy {
+    public ReplicaInvocationAcceptancePolicy(boolean isOn) {
         super(isOn);
     }
 
@@ -52,7 +52,7 @@ public class SlaveInvocationAcceptancePolicy extends InvocationAcceptancePolicy 
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                new VoltTable[0],
                                                "Write procedure " + invocation.procName +
-                                               " is not allowed in slave cluster",
+                                               " is not allowed in replica cluster",
                                                invocation.clientHandle);
                 s.enqueue(errorResponse);
                 return false;
@@ -74,7 +74,7 @@ public class SlaveInvocationAcceptancePolicy extends InvocationAcceptancePolicy 
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                new VoltTable[0],
                                                "Read replicated procedure " + invocation.procName +
-                                               " is dropped from slave cluster",
+                                               " is dropped from replica cluster",
                                                invocation.clientHandle);
                 s.enqueue(errorResponse);
                 return false;
@@ -99,7 +99,7 @@ public class SlaveInvocationAcceptancePolicy extends InvocationAcceptancePolicy 
         if (invocation == null || sysProc == null) {
             return false;
         }
-        if (invocation.getType() == ProcedureInvocationType.ORIGINAL && sysProc.allowedInSlave &&
+        if (invocation.getType() == ProcedureInvocationType.ORIGINAL && sysProc.allowedInReplica &&
             !invocation.procName.equalsIgnoreCase("@AdHoc")) {
             // white-listed sysprocs, adhoc is a special case
             return true;

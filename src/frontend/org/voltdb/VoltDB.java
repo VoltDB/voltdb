@@ -139,7 +139,7 @@ public class VoltDB {
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
 
-        /** replication role: master, slave */
+        /** replication role: master, replica */
         public ReplicationRole m_replicationRole = ReplicationRole.MASTER;
 
         /**
@@ -270,8 +270,8 @@ public class VoltDB {
                     m_startAction = START_ACTION.START;
                 }
 
-                else if (arg.equals("slave")) {
-                    m_replicationRole = ReplicationRole.SLAVE;
+                else if (arg.equals("replica")) {
+                    m_replicationRole = ReplicationRole.REPLICA;
                 }
 
                 // handle timestampsalt
@@ -344,10 +344,10 @@ public class VoltDB {
                 hostLog.fatal("The deployment file location is empty.");
             }
 
-            if (m_replicationRole == ReplicationRole.SLAVE) {
+            if (m_replicationRole == ReplicationRole.REPLICA) {
                 if (m_startAction == START_ACTION.RECOVER) {
                     isValid = false;
-                    hostLog.fatal("Slave cluster only supports create database");
+                    hostLog.fatal("Replica cluster only supports create database");
                 } else {
                     m_startAction = START_ACTION.CREATE;
                 }

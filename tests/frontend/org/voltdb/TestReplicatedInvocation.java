@@ -47,7 +47,7 @@ import org.voltdb.utils.VoltFile;
 public class TestReplicatedInvocation {
     ServerThread server;
     File root;
-    ReplicationRole role = ReplicationRole.SLAVE;
+    ReplicationRole role = ReplicationRole.REPLICA;
 
     static class MockWriteStream implements WriteStream {
         @Override
@@ -158,21 +158,21 @@ public class TestReplicatedInvocation {
         try {
             client.callProcedure("A.insert", 1);
         } catch (ProcCallException e) {
-            if (role == ReplicationRole.SLAVE) {
+            if (role == ReplicationRole.REPLICA) {
                 client.close();
                 return;
             } else {
                 throw e;
             }
         }
-        if (role == ReplicationRole.SLAVE) {
-            fail("Should not succeed on slave cluster");
+        if (role == ReplicationRole.REPLICA) {
+            fail("Should not succeed on replica cluster");
         }
     }
 
     @Test
-    public void testSysprocAcceptanceOnSlave() {
-        SlaveInvocationAcceptancePolicy policy = new SlaveInvocationAcceptancePolicy(true);
+    public void testSysprocAcceptanceOnReplica() {
+        ReplicaInvocationAcceptancePolicy policy = new ReplicaInvocationAcceptancePolicy(true);
         for (Entry<String, Config> e : SystemProcedureCatalog.listing.entrySet()) {
             StoredProcedureInvocation invocation = new StoredProcedureInvocation();
             invocation.procName = e.getKey();
@@ -198,12 +198,12 @@ public class TestReplicatedInvocation {
     }
 
     /**
-     * Test promoting a slave to master
+     * Test promoting a replica to master
      * @throws Exception
      */
     @Test
     public void testPromote() throws Exception {
-        if (role != ReplicationRole.SLAVE) {
+        if (role != ReplicationRole.REPLICA) {
             return;
         }
 
@@ -214,7 +214,7 @@ public class TestReplicatedInvocation {
         VoltTable result = resp.getResults()[0];
         while (result.advanceRow()) {
             if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
-                assertTrue(result.getString("VALUE").equalsIgnoreCase("slave"));
+                assertTrue(result.getString("VALUE").equalsIgnoreCase("replica"));
             }
         }
 

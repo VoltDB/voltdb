@@ -47,19 +47,19 @@ public class SystemProcedureCatalog {
         public final boolean everySite;
         public final boolean commercial;
         // whether normal clients can call this sysproc in secondary
-        public final boolean allowedInSlave;
+        public final boolean allowedInReplica;
 
         public Config(String className,
                 boolean readOnly,
                 boolean everySite,
                 boolean commercial,
-                boolean allowedInSlave)
+                boolean allowedInReplica)
         {
             this.className = className;
             this.readOnly = readOnly;
             this.everySite = everySite;
             this.commercial = commercial;
-            this.allowedInSlave = allowedInSlave;
+            this.allowedInReplica = allowedInReplica;
         }
 
         boolean getEverysite() {
