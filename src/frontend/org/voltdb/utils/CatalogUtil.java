@@ -103,10 +103,10 @@ public abstract class CatalogUtil {
         String serializedCatalog = null;
         try {
             InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
-            byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);  
+            byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
 
             if (null == serializedCatalogBytes) throw new VoltTypeException("Database catalog not found - please build your application using the current verison of VoltDB.");
-            
+
             serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
         } catch (IOException e) {
             if (log != null)
