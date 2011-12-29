@@ -46,6 +46,7 @@ import javax.xml.validation.SchemaFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
@@ -102,9 +103,12 @@ public abstract class CatalogUtil {
         String serializedCatalog = null;
         try {
             InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
-            byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+            byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);  
+
+            if (null == serializedCatalogBytes) throw new VoltTypeException("Database catalog not found - please build your application using the current verison of VoltDB.");
+            
             serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
-        } catch (Exception e) {
+        } catch (IOException e) {
             if (log != null)
                 log.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CatalogReadFailure.name(), e);
             return null;
