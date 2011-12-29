@@ -430,7 +430,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().startsWith("Unable to read from catalog"));
+            assertTrue(e.getMessage().startsWith("Database catalog not found"));
         }
     }
 
