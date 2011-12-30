@@ -67,7 +67,7 @@ public class SystemInformation extends VoltSystemProcedure
     static final int DEP_systemInformationAggregate = (int)
         SysProcFragmentId.PF_systemInformationAggregate;
 
-    private static final ColumnInfo clusterInfoSchema[] = new ColumnInfo[]
+    public static final ColumnInfo clusterInfoSchema[] = new ColumnInfo[]
     {
         new ColumnInfo("PROPERTY", VoltType.STRING),
         new ColumnInfo("VALUE", VoltType.STRING)

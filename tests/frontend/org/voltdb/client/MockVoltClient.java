@@ -53,6 +53,9 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.voltdb.VoltTable;
 
@@ -74,8 +77,10 @@ public class MockVoltClient implements Client {
             throw e;
         }
 
-        final VoltTable[] result = nextResult;
-        if (resetAfterCall) nextResult = null;
+        VoltTable[] candidateResult = null;
+        if (!nextResults.isEmpty()) candidateResult = nextResults.get(0);
+        final VoltTable[] result = candidateResult;
+        if (resetAfterCall && !nextResults.isEmpty()) nextResults.remove(0);
         return new ClientResponse() {
 
             @Override
@@ -108,7 +113,7 @@ public class MockVoltClient implements Client {
 
             @Override
             public byte getStatus() {
-                return 0;
+                return ClientResponse.SUCCESS;
             }
 
             @Override
@@ -126,7 +131,8 @@ public class MockVoltClient implements Client {
 
     public String calledName;
     public Object[] calledParameters;
-    public volatile VoltTable[] nextResult;
+    public final List<VoltTable[]> nextResults =
+            Collections.synchronizedList(new LinkedList<VoltTable[]>());
     public int numCalls = 0;
     public boolean resetAfterCall = true;
     public String abortMessage;

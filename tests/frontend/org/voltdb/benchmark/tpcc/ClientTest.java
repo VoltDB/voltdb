@@ -71,7 +71,7 @@ public class ClientTest extends TestCase {
         generator = new MockRandomGenerator();
         client = new TPCCClient(mockClient, generator, new Clock.Mock(),
                 ScaleParameters.makeDefault((int) WAREHOUSES));
-        mockClient.nextResult = new VoltTable[0];
+        mockClient.nextResults.add(new VoltTable[0]);
         mockClient.resetAfterCall = false;
     }
 
@@ -86,7 +86,7 @@ public class ClientTest extends TestCase {
     public void testStockLevel() throws IOException {
         VoltTable t = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
         t.addRow(0);
-        mockClient.nextResult = new VoltTable[]{ t };
+        mockClient.nextResults.add(new VoltTable[]{ t });
         client.m_tpccSim.doStockLevel();
         assertEquals(Constants.STOCK_LEVEL, mockClient.calledName);
         assertEquals(3, mockClient.calledParameters.length);
@@ -128,7 +128,7 @@ public class ClientTest extends TestCase {
         for (int i = 0; i < Constants.DISTRICTS_PER_WAREHOUSE; ++i) {
             orders.addRow((long) i);
         }
-        mockClient.nextResult = new VoltTable[]{ orders };
+        mockClient.nextResults.add(new VoltTable[]{ orders });
         client.m_tpccSim.doDelivery();
         assertEquals("delivery", mockClient.calledName);
         assertEquals(3, mockClient.calledParameters.length);
