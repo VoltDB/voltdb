@@ -80,7 +80,7 @@ public class MockVoltDB implements VoltDBInterface
     boolean m_noLoadLib = false;
     public boolean shouldIgnoreCrashes = false;
     OperationMode m_startMode = OperationMode.RUNNING;
-    ReplicationRole m_replicationRole = ReplicationRole.MASTER;
+    ReplicationRole m_replicationRole = ReplicationRole.NONE;
     private final ExecutorService m_es = Executors.newSingleThreadExecutor();
 
     public MockVoltDB()

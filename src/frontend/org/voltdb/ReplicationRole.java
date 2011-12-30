@@ -19,7 +19,7 @@ package org.voltdb;
 
 public enum ReplicationRole
 {
-    MASTER, REPLICA;
+    MASTER, REPLICA, NONE;
 
     /**
      * Get the replication role from its ordinal value.

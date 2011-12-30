@@ -433,7 +433,7 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
-        startUp(clearLocalDataDirectories, ReplicationRole.MASTER);
+        startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
     public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
@@ -593,7 +593,8 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_voltStartCmdOffset, "create");
-            if (ReplicationRole.REPLICA.toString().equalsIgnoreCase(startMode))
+            if (ReplicationRole.MASTER.toString().equalsIgnoreCase(startMode)
+                || ReplicationRole.REPLICA.toString().equalsIgnoreCase(startMode))
                 m_procBuilder.command().set(m_voltStartModeOffset, startMode);
             m_procBuilder.command().set(m_rejoinOffset, "");
             m_procBuilder.command().set(m_licensePathOffset, ServerThread.getTestLicensePath());

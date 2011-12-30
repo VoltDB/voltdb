@@ -140,7 +140,7 @@ public class VoltDB {
         public OperationMode m_startMode = OperationMode.RUNNING;
 
         /** replication role: master, replica */
-        public ReplicationRole m_replicationRole = ReplicationRole.MASTER;
+        public ReplicationRole m_replicationRole = ReplicationRole.NONE;
 
         /**
          * At rejoin time an interface will be selected. It will be the
@@ -270,7 +270,9 @@ public class VoltDB {
                     m_startAction = START_ACTION.START;
                 }
 
-                else if (arg.equals("replica")) {
+                else if (arg.equals("master")) {
+                    m_replicationRole = ReplicationRole.MASTER;
+                } else if (arg.equals("replica")) {
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
 
