@@ -1509,6 +1509,7 @@ TEST CASES
                 format="@{format}">
                 <fileset dir="@{srcdir}">
                     <include name="**/*.@{language}"/>
+                    <exclude name="**/pmsg/*.@{language}"/>
                 </fileset>
             </cpdtask>
         </sequential>
