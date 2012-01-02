@@ -88,7 +88,7 @@ if [ "$JAVA_HOME" != "" ]; then
 fi
 
 # check envvars to see if a user overrides log4j conf
-if [ -n "${LOG4J_CONFIG_PATH:-x}" ]; then
+if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   if [ -f "$VOLTDB_HOME/src/frontend/log4j.xml" ]; then
     LOG4J_CONFIG_PATH=$VOLTDB_HOME/src/frontend/log4j.xml
   elif [ -f "$VOLTDB_HOME/voltdb/log4j.xml" ]; then
@@ -100,7 +100,7 @@ if [ -n "${LOG4J_CONFIG_PATH:-x}" ]; then
 fi
 
 VOLTDBJAR=`ls $VOLTDB_HOME/voltdb/voltdb-2.*.jar`
-if [ -n "${VOLTDBJAR:+x}" ]; then
+if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=$VOLTDBJAR
 else
   echo "Couldn't find compiled VoltDB jar to run."
