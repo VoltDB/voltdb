@@ -29,7 +29,7 @@ public class BinaryPayloadMessage extends VoltMessage {
     public BinaryPayloadMessage( byte metadata[], byte payload[]) {
         m_payload = payload;
         m_metadata = metadata;
-        if (metadata == null || metadata.length != 16) {
+        if (metadata == null || metadata.length > Short.MAX_VALUE) {
             throw new IllegalArgumentException();
         }
     }
@@ -37,7 +37,7 @@ public class BinaryPayloadMessage extends VoltMessage {
     @Override
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        m_metadata = new byte[16];
+        m_metadata = new byte[m_buffer.getShort()];
         m_buffer.get(m_metadata);
         final int payloadLength = m_buffer.getInt();
         if (payloadLength > -1) {
@@ -51,7 +51,7 @@ public class BinaryPayloadMessage extends VoltMessage {
 
     @Override
     protected void flattenToBuffer(DBBPool pool) throws IOException {
-        int msgsize = m_metadata.length + 4;
+        int msgsize = m_metadata.length + 6;
         if (m_payload != null) {
             msgsize += m_payload.length;
         }
@@ -64,6 +64,7 @@ public class BinaryPayloadMessage extends VoltMessage {
 
         m_buffer.position(HEADER_SIZE);
         m_buffer.put(BINARY_PAYLOAD_ID);
+        m_buffer.putShort((short)m_metadata.length);
         m_buffer.put(m_metadata);
         if (m_payload == null) {
             m_buffer.putInt(-1);
