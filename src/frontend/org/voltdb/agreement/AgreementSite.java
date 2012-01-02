@@ -67,6 +67,7 @@ import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
 import org.voltdb.messaging.VoltMessage;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.MiscUtils;
@@ -514,7 +515,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             }
             m_recoverBeforeTxn = selectedRecoverBeforeTxn;
             m_minTxnIdAfterRecovery = m_recoverBeforeTxn;//anything before this precedes the snapshot
-            m_recoverySnapshot = bpm.m_payload;
+            try {
+                m_recoverySnapshot = CompressionService.decompressBytes(bpm.m_payload);
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Unable to decompress ZK snapshot", true, e);
+            }
             m_recoveryStage = RecoveryStage.RECEIVED_SNAPSHOT;
             /*
              * Clean out all txns from before the snapshot
@@ -577,8 +582,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_server.getZKDatabase().serializeSnapshot(boa);
         dos.flush();
         defos.finish();
-        byte databaseBytes[] = baos.toByteArray();
-        ByteBuffer metadata = ByteBuffer.allocate(16);
+        byte databaseBytes[] = CompressionService.compressBytes(baos.toByteArray());
+        ByteBuffer metadata = ByteBuffer.allocate(8);
         metadata.putLong(txnId);
         BinaryPayloadMessage bpm = new BinaryPayloadMessage( metadata.array(), databaseBytes);
         try {
