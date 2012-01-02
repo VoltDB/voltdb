@@ -20,8 +20,8 @@ package org.voltdb;
 import java.util.Iterator;
 
 public class IndexStats extends SiteStatsSource {
-    public IndexStats(String name, int siteId) {
-        super(name, siteId, true);
+    public IndexStats( int siteId) {
+        super(siteId, true);
     }
 
     @Override

@@ -25,11 +25,6 @@ import java.util.Iterator;
  */
 public abstract class StatsSource {
 
-    /**
-     * Name of this source of statistical information
-     */
-    private final String name;
-
     private final Integer m_hostId;
     private final String m_hostname;
 
@@ -56,7 +51,7 @@ public abstract class StatsSource {
      * @param name
      * @param isEE If this source represents statistics from EE
      */
-    public StatsSource(String name, boolean isEE) {
+    public StatsSource(boolean isEE) {
         populateColumnSchema(columns);
 
         for (int ii = 0; ii < columns.size(); ii++) {
@@ -73,8 +68,6 @@ public abstract class StatsSource {
         }
         m_hostname = hostname;
         m_hostId = hostId;
-
-        this.name = name;
 
         m_isEEStats = isEE;
     }
@@ -98,14 +91,6 @@ public abstract class StatsSource {
      */
     public ArrayList<ColumnInfo> getColumnSchema() {
         return columns;
-    }
-
-    /**
-     * Get the name of this source of statistical information
-     * @return Name of this source
-     */
-    public String getName() {
-        return name;
     }
 
     /**
@@ -162,6 +147,7 @@ public abstract class StatsSource {
     }
 
     private Long now = System.currentTimeMillis();
+
     /**
      * Update the parameter array with the latest values. This is similar
      * to populateColumnSchema in that it must be overriden by

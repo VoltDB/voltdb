@@ -1059,8 +1059,7 @@ public abstract class VoltProcedure {
          * Constructor requires no args because it has access to the enclosing classes members.
          */
         public ProcedureStatsCollector() {
-            super(m_site.getCorrespondingSiteId() + " " + m_catProc.getClassname(),
-                  m_site.getCorrespondingSiteId(), false);
+            super( m_site.getCorrespondingSiteId(), false);
         }
 
         /**

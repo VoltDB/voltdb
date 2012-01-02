@@ -29,5 +29,13 @@ public enum SysProcSelector {
     LIVECLIENTS,      // info about the currently connected clients
     MANAGEMENT,       //Returns pretty much everything
 
-    SNAPSHOTSTATUS;
+    SNAPSHOTSTATUS,
+
+    /*
+     * WANPARTITION and WANNODE are internal names
+     * Externally the selector is just "WAN"
+     */
+    WANPARTITION,
+    WANNODE;
+
 }

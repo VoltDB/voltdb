@@ -190,7 +190,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
 
         // Register the snapshot status to the StatsAgent
-        SnapshotStatus snapshotStatus = new SnapshotStatus("Snapshot Status");
+        SnapshotStatus snapshotStatus = new SnapshotStatus();
         VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.SNAPSHOTSTATUS,
                                                               0,
                                                               snapshotStatus);

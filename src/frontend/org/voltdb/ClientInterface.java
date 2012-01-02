@@ -18,6 +18,8 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -50,6 +52,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmt;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWorkThread;
@@ -125,7 +128,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     // clock time of last call to the initiator's tick()
     static final int POKE_INTERVAL = 1000;
-    private long m_lastCompilerThreadPoke = 0;
+    private final long m_lastCompilerThreadPoke = 0;
 
     private final int m_allPartitions[];
     final int m_siteId;
@@ -976,6 +979,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return m_initiator;
     }
 
+    private void sendErrorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {
+        String realReason = reason;
+        if (e != null) {
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            e.printStackTrace(pw);
+            realReason = sw.toString();
+        }
+        if (log) {
+            hostLog.warn(realReason);
+        }
+        final ClientResponseImpl errorResponse =
+            new ClientResponseImpl(status,
+                                 new VoltTable[0], realReason, handle);
+        c.writeStream().enqueue(errorResponse);
+    }
+
     /**
      *
      * @param port
@@ -1159,6 +1179,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             } else if (task.procName.equals("@SnapshotSave")) {
                 m_snapshotDaemon.requestUserSnapshot(task, c);
                 return;
+            } else if (task.procName.equals("@Statistics")) {
+                ParameterSet params = task.getParams();
+                if (((String)params.toArray()[0]).equals("WAN")) {
+                    try {
+                        VoltDB.instance().getStatsAgent().collectStats(c, task.clientHandle, "WAN");
+                    } catch (Exception e) {
+                        sendErrorResponse( c, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+                    }
+                    return;
+                }
             }
         }
 

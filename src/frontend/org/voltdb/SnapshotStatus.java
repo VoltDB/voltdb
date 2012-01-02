@@ -71,8 +71,8 @@ public class SnapshotStatus extends StatsSource {
         }
     }
 
-    public SnapshotStatus(String name) {
-        super(name, false);
+    public SnapshotStatus() {
+        super(false);
     }
 
     @Override

@@ -74,8 +74,8 @@ public class LatencyStats extends SiteStatsSource {
     private long m_max = (m_latencyBuckets.length - 1) * BUCKET_RANGE;
     private static final long BUCKET_RANGE = 10; // 10ms
 
-    public LatencyStats(String name, int siteId) {
-        super(name, siteId, false);
+    public LatencyStats(int siteId) {
+        super(siteId, false);
         VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.LATENCY, 0, this);
     }
 

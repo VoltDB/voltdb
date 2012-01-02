@@ -223,7 +223,7 @@ public class MiscUtils {
      * Have shutdown actually means shutdown. Tasks that need to complete should use
      * futures.
      */
-    public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize) {
+    public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize, int stackSize) {
         ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
         ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
@@ -238,7 +238,9 @@ public class MiscUtils {
         return new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
-                return new Thread(null, r, name, stackSize);
+                Thread t = new Thread(null, r, name, stackSize);
+                t.setDaemon(true);
+                return t;
             }
         };
     }

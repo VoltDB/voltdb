@@ -328,7 +328,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (availableProcessors > 4) {
                 poolSize = 2;
             }
-            m_periodicWorkThread = MiscUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize);
+            m_periodicWorkThread = MiscUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize, 1024 * 128);
             buildClusterMesh(isRejoin);
 
             // do the many init tasks in the Inits class
@@ -455,14 +455,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            m_partitionCountStats = new PartitionCountStats("Partition Count Stats",
-                                                            m_catalogContext.numberOfPartitions);
+            m_partitionCountStats = new PartitionCountStats( m_catalogContext.numberOfPartitions);
             m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
                                              0, m_partitionCountStats);
-            m_ioStats = new IOStats("IO Stats");
+            m_ioStats = new IOStats();
             m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
                                              0, m_ioStats);
-            m_memoryStats = new MemoryStats("Memory Stats");
+            m_memoryStats = new MemoryStats();
             m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
                                              0, m_memoryStats);
             // Create the statistics manager and register it to JMX registry
@@ -1262,7 +1261,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_network = null;
 
             //Also for test code that expects a fresh stats agent
-            m_statsAgent = new StatsAgent();
+            if (m_statsAgent != null) {
+                m_statsAgent.shutdown();
+                m_statsAgent = null;
+            }
 
             // The network iterates this list. Clear it after network's done.
             m_clientInterfaces.clear();

@@ -27,8 +27,8 @@ import org.voltdb.VoltTable.ColumnInfo;
  */
 public class StarvationTracker extends SiteStatsSource {
 
-    public StarvationTracker(String name, int siteId) {
-        super(name, siteId, false);
+    public StarvationTracker( int siteId) {
+        super( siteId, false);
         m_lastStartTime = m_startTime = System.nanoTime();
     }
 

@@ -16,19 +16,75 @@
  */
 package org.voltdb;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import org.json_voltpatches.JSONObject;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.BinaryPayloadMessage;
+import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.LocalObjectMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.VoltMessage;
+import org.voltdb.network.Connection;
+import org.voltdb.utils.CompressionService;
 
 /**
  * Agent responsible for collecting stats on this host.
  *
  */
 public class StatsAgent {
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final byte JSON_PAYLOAD = 0;
+    private static final byte STATS_PAYLOAD = 1;
+    private static final int MAX_IN_FLIGHT_REQUESTS = 5;
+
+    private long m_nextRequestId = 0;
+    private Mailbox m_mailbox;
+    private final ScheduledThreadPoolExecutor m_es =
+        org.voltdb.utils.MiscUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, 1024 * 128);
+
     private final HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>> registeredStatsSources =
         new HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>>();
 
     private final HashSet<SysProcSelector> handledSelectors = new HashSet<SysProcSelector>();
+
+    private static class PendingStatsRequest {
+        private final String selector;
+        private final Connection c;
+        private final long clientData;
+        private int expectedStatsResponses;
+        private final VoltTable aggregateTables[];
+        public PendingStatsRequest(
+                String selector,
+                Connection c,
+                long clientData,
+                int expectedResponses,
+                VoltTable aggregateTables[]) {
+            this.selector = selector;
+            this.c = c;
+            this.clientData = clientData;
+            this.expectedStatsResponses = expectedResponses;
+            this.aggregateTables = aggregateTables;
+        }
+    }
+
+    private final Map<Long, PendingStatsRequest> m_pendingRequests = new HashMap<Long, PendingStatsRequest>();
 
     public StatsAgent() {
         SysProcSelector selectors[] = SysProcSelector.values();
@@ -36,6 +92,271 @@ public class StatsAgent {
             registeredStatsSources.put(selectors[ii], new HashMap<Integer, ArrayList<StatsSource>>());
         }
         handledSelectors.add(SysProcSelector.PROCEDURE);
+    }
+
+    public Mailbox getMailbox(final HostMessenger hostMessenger, final int siteId) {
+        m_mailbox = new Mailbox() {
+
+            @Override
+            public void send(int siteId, int mailboxId, VoltMessage message)
+                    throws MessagingException {
+                assert(message != null);
+                hostMessenger.send(siteId, mailboxId, message);
+            }
+
+            @Override
+            public void send(int[] siteIds, int mailboxId, VoltMessage message)
+                    throws MessagingException {
+                assert(message != null);
+                assert(siteIds != null);
+                hostMessenger.send(siteIds, mailboxId, message);
+            }
+
+            @Override
+            public void deliver(final VoltMessage message) {
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        handleMailboxMessage(message);
+                    }
+                });
+            }
+
+            @Override
+            public void deliverFront(VoltMessage message) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recv() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(long timeout) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recv(Subject[] s) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(Subject[] s) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(Subject[] s, long timeout) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public int getSiteId() {
+                return siteId;
+            }
+
+        };
+        return m_mailbox;
+    }
+
+    private void handleMailboxMessage(VoltMessage message) {
+        try {
+            if (message instanceof LocalObjectMessage) {
+                LocalObjectMessage lom = (LocalObjectMessage)message;
+                ((Runnable)lom.payload).run();
+            } else if (message instanceof BinaryPayloadMessage) {
+                BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
+                byte payload[] = CompressionService.decompressBytes(bpm.m_payload);
+                if (bpm.m_metadata[0] == JSON_PAYLOAD) {
+                    String jsonString = new String(payload, "UTF-8");
+                    JSONObject obj = new JSONObject(jsonString);
+                    handleJSONMessage(obj);
+                } else if (bpm.m_metadata[0] == STATS_PAYLOAD) {
+                    handleStatsResponse(payload);
+                }
+            }
+        } catch (Exception e) {
+            hostLog.error("Exception processing message in stats agent " + message, e);
+        }
+
+    }
+
+    private void handleStatsResponse(byte[] payload) throws Exception {
+        ByteBuffer buf = ByteBuffer.wrap(payload);
+        Long requestId = buf.getLong();
+
+        PendingStatsRequest request = m_pendingRequests.get(requestId);
+        if (request == null) {
+            hostLog.warn("Received a stats response for stats request " + requestId + " that no longer exists");
+            return;
+        }
+
+        if (buf.hasRemaining()) {
+            for (int ii = 0; ii < request.aggregateTables.length; ii++) {
+                final int tableLength = buf.getInt();
+                int oldLimit = buf.limit();
+                buf.limit(buf.position() + tableLength);
+                ByteBuffer tableBuf = buf.slice();
+                buf.position(buf.limit()).limit(oldLimit);
+                //Lazy init the aggregate table using the first result
+                if (request.aggregateTables[ii] == null) {
+                    ByteBuffer copy = ByteBuffer.allocate(tableBuf.capacity() * 2);
+                    copy.put(tableBuf);
+                    copy.limit(copy.position());
+                    copy.position(0);
+                    VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( copy, false);
+                    request.aggregateTables[ii] = vt;
+                } else {
+                    VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( tableBuf, true);
+                    while (vt.advanceRow()) {
+                        request.aggregateTables[ii].add(vt);
+                    }
+                }
+            }
+        }
+
+        request.expectedStatsResponses--;
+        if (request.expectedStatsResponses > 0) return;
+
+        m_pendingRequests.remove(requestId);
+        sendStatsResponse(request);
+    }
+
+    public void collectStats(Connection c, long clientHandle, String selector) throws Exception {
+        assert(selector.equals("WAN"));
+        if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
+            final ClientResponseImpl errorResponse =
+                new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                     new VoltTable[0], "Too many pending stat requests", clientHandle);
+            c.writeStream().enqueue(errorResponse);
+            return;
+        }
+
+        PendingStatsRequest psr =
+            new PendingStatsRequest(
+                    selector,
+                    c,
+                    clientHandle,
+                    VoltDB.instance().getCatalogContext().numberOfNodes,
+                    new VoltTable[2]);
+        final long requestId = m_nextRequestId++;
+        m_pendingRequests.put(requestId, psr);
+        m_es.schedule(new Runnable() {
+            @Override
+            public void run() {
+                checkForRequestTimeout(requestId);
+            }
+        },
+        60,
+        TimeUnit.SECONDS);
+
+        JSONObject obj = new JSONObject();
+        obj.put("requestId", requestId);
+        obj.put("returnAddress", m_mailbox.getSiteId());
+        obj.put("selector", "WANNODE");
+        byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
+        final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
+        for (Integer host : st.getAllLiveHosts()) {
+            m_mailbox.send( st.getFirstNonExecSiteForHost(host), VoltDB.STATS_MAILBOX_ID, bpm);
+        }
+    }
+
+    private void checkForRequestTimeout(long requestId) {
+        PendingStatsRequest psr = m_pendingRequests.remove(requestId);
+        if (psr == null) {
+            return;
+        }
+        hostLog.warn("Stats request " + requestId + " timed out, sending error to client");
+
+        ClientResponseImpl response =
+            new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    Byte.MIN_VALUE,
+                    null,
+                    new VoltTable[0], "Stats request hit sixty second timeout before all responses were received");
+        response.setClientHandle(psr.clientData);
+        psr.c.writeStream().enqueue(response);
+    }
+
+    private void sendStatsResponse(PendingStatsRequest request) throws Exception {
+        byte statusCode = ClientResponse.SUCCESS;
+        String statusString = null;
+        /*
+         * It is possible not to receive a table response if a feature is not enabled
+         */
+        VoltTable responseTables[] = request.aggregateTables;
+        for (int ii = 0; ii < responseTables.length; ii++) {
+            if (responseTables[ii] == null) {
+                responseTables = new VoltTable[0];
+                statusCode = ClientResponse.GRACEFUL_FAILURE;
+                statusString =
+                    "Requested statistic \"" + request.selector +
+                    "\" is not supported in the current configuration";
+                break;
+            }
+        }
+
+        ClientResponseImpl response =
+            new ClientResponseImpl(statusCode, Byte.MIN_VALUE, null, responseTables, statusString);
+        response.setClientHandle(request.clientData);
+        request.c.writeStream().enqueue(response);
+    }
+
+    private void handleJSONMessage(JSONObject obj) throws Exception {
+        String selectorString = obj.getString("selector");
+        SysProcSelector selector = SysProcSelector.valueOf(selectorString);
+        if (selector == SysProcSelector.WANNODE) {
+            collectWANStats(obj);
+        }
+    }
+
+    private void collectWANStats(JSONObject obj) throws Exception {
+        List<Integer> catalogIds = Arrays.asList(new Integer[] { 0 });
+        Long now = System.currentTimeMillis();
+        long requestId = obj.getLong("requestId");
+        int returnAddress = obj.getInt("returnAddress");
+
+        VoltTable partitionStats = getStats(SysProcSelector.WANPARTITION, catalogIds, false, now);
+        VoltTable nodeStats = getStats(SysProcSelector.WANNODE, catalogIds, false, now);
+
+        /*
+         * Send a response with no data since the stats is not supported
+         */
+        if (partitionStats == null || nodeStats == null) {
+            ByteBuffer responseBuffer = ByteBuffer.allocate(8);
+            responseBuffer.putLong(requestId);
+            byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
+            BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
+            m_mailbox.send( returnAddress, VoltDB.STATS_MAILBOX_ID, bpm);
+            return;
+        }
+
+        ByteBuffer partitionStatsBuffer = partitionStats.getBuffer();
+        partitionStatsBuffer.position(0);
+
+        ByteBuffer nodeStatsBuffer = nodeStats.getBuffer();
+        nodeStatsBuffer.position(0);
+
+        ByteBuffer responseBuffer = ByteBuffer.allocate(
+                16 //requestId + a length prefix for each stats table
+                + partitionStatsBuffer.remaining() + nodeStatsBuffer.remaining());
+        responseBuffer.putLong(requestId);
+        responseBuffer.putInt(partitionStatsBuffer.remaining());
+        responseBuffer.put(partitionStatsBuffer);
+        responseBuffer.putInt(nodeStatsBuffer.remaining());
+        responseBuffer.put(nodeStatsBuffer);
+        byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
+
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
+        m_mailbox.send( returnAddress, VoltDB.STATS_MAILBOX_ID, bpm);
     }
 
     public synchronized void registerStatsSource(SysProcSelector selector, int catalogId, StatsSource source) {
@@ -53,7 +374,7 @@ public class StatsAgent {
 
     public synchronized VoltTable getStats(
             final SysProcSelector selector,
-            final ArrayList<Integer> catalogIds,
+            final List<Integer> catalogIds,
             final boolean interval,
             final Long now) {
         assert selector != null;
@@ -64,7 +385,14 @@ public class StatsAgent {
 
         assert catalogIdToStatsSources.get(catalogIds.get(0)) != null;
         ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogIds.get(0));
-        assert statsSources != null && statsSources.size() > 0;
+        //Let these two be null since they are for pro features
+        if (selector == SysProcSelector.WANNODE || selector == SysProcSelector.WANPARTITION) {
+            if (statsSources == null || statsSources.isEmpty()) {
+                return null;
+            }
+        } else {
+            assert statsSources != null && statsSources.size() > 0;
+        }
 
         /*
          * Some sources like TableStats use VoltTable to keep track of
@@ -113,5 +441,10 @@ public class StatsAgent {
             }
         }
         return resultTable;
+    }
+
+    public void shutdown() throws InterruptedException {
+        m_es.shutdown();
+        m_es.awaitTermination(1, TimeUnit.DAYS);
     }
 }

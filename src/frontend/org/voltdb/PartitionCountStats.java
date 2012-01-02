@@ -27,8 +27,8 @@ public class PartitionCountStats extends StatsSource {
 
     private final int m_partitionCount;
 
-    public PartitionCountStats(String name, int partitionCount) {
-        super(name, false);
+    public PartitionCountStats(int partitionCount) {
+        super(false);
         m_partitionCount = partitionCount;
     }
 

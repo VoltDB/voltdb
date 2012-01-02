@@ -116,8 +116,8 @@ public class DtxnInitiatorMailbox implements Mailbox
         m_hostMessenger = hostMessenger;
         m_siteId = siteId;
         m_safetyState = safetyState;
-        m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
-        m_latencies = new LatencyStats("Initiator " + siteId + " latency distribution", siteId);
+        m_stats = new InitiatorStats(siteId);
+        m_latencies = new LatencyStats(siteId);
         //m_txnIdResults =
         //    new HashMap<Long, VoltTable[]>();
         //m_txnIdResponses = new HashMap<Long, InitiateResponseMessage>();

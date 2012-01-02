@@ -207,7 +207,7 @@ public class Inits {
         SetupAdminMode
         StartHTTPServer
         InitHashinator
-        InitAgreementSite
+        InitAgreementSiteAndStatsAgent
 
         CreateRestoreAgentAndPlan <- InitAgreementSite
         DistributeCatalog <- InitAgreementSite, CreateRestoreAgentAndPlan
@@ -228,7 +228,7 @@ public class Inits {
 
     class DistributeCatalog extends InitWork {
         DistributeCatalog() {
-            dependsOn(InitAgreementSite.class);
+            dependsOn(InitAgreementSiteAndStatsAgent.class);
             dependsOn(CreateRestoreAgentAndPlan.class);
         }
 
@@ -521,8 +521,8 @@ public class Inits {
         }
     }
 
-    class InitAgreementSite extends InitWork {
-        InitAgreementSite() {
+    class InitAgreementSiteAndStatsAgent extends InitWork {
+        InitAgreementSiteAndStatsAgent() {
         }
 
         @Override
@@ -557,6 +557,9 @@ public class Inits {
             Mailbox agreementMailbox =
                     m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.AGREEMENT_MAILBOX_ID, false);
             try {
+                Mailbox statsMailbox =
+                    m_rvdb.getStatsAgent().getMailbox(VoltDB.instance().getHostMessenger(), myAgreementSiteId);
+                m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.STATS_MAILBOX_ID, statsMailbox);
                 m_rvdb.m_agreementSite =
                     new AgreementSite(
                             myAgreementSiteId,
@@ -579,7 +582,7 @@ public class Inits {
 
     class CreateRestoreAgentAndPlan extends InitWork {
         public CreateRestoreAgentAndPlan() {
-            dependsOn(InitAgreementSite.class);
+            dependsOn(InitAgreementSiteAndStatsAgent.class);
         }
 
         @Override

@@ -29,8 +29,8 @@ public abstract class SiteStatsSource extends StatsSource {
      */
     private final int m_siteId;
 
-    public SiteStatsSource(String name, int siteId, boolean isEE) {
-        super(name, isEE);
+    public SiteStatsSource(int siteId, boolean isEE) {
+        super(isEE);
         this.m_siteId = siteId;
     }
 

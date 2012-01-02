@@ -76,8 +76,8 @@ public class LiveClientStats extends StatsSource
         }
     }
 
-    public LiveClientStats(String name) {
-        super(name, false);
+    public LiveClientStats() {
+        super(false);
     }
 
     @Override

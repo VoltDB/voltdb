@@ -104,7 +104,7 @@ public class ExecutionSite
 implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 {
     private VoltLogger m_txnlog;
-    private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
+    private final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -119,7 +119,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
 
-    private long m_startupTime = System.currentTimeMillis();
+    private final long m_startupTime = System.currentTimeMillis();
     private PartitionDRGateway m_partitionDRGateway = null;
 
     /*
@@ -745,15 +745,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          snapshotPriority);
 
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
-        m_starvationTracker = new StarvationTracker(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
+        m_starvationTracker = new StarvationTracker( getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.STARVATION,
                                        Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
                                        m_starvationTracker);
-        m_tableStats = new TableStats(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
+        m_tableStats = new TableStats( getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.TABLE,
                                        Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
                                        m_tableStats);
-        m_indexStats = new IndexStats(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
+        m_indexStats = new IndexStats(getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.INDEX,
                                        Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
                                        m_indexStats);
