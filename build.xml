@@ -440,6 +440,8 @@ DISTRIBUTION
         </fileset>
     </copy>
 
+    <antcall target="copy_pro_bin"/>
+
     <!-- populate java and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="voltdb" defaultexcludes="yes">
@@ -915,6 +917,9 @@ JAVA COMPILATION
 <!-- This task only executes if the voltpro.flavor property is set. -->
 <target name="compile_pro" if="voltpro.flavor">
   <antcall target="voltpro.compile"/>
+</target>
+
+<target name="copy_pro_bin" if="voltpro.flavor">
   <copy todir="${dist.dir}/">
     <fileset dir="${voltpro.basedir}" includes="bin/**"/>
   </copy>
