@@ -438,7 +438,6 @@ DISTRIBUTION
             <include name="voltdb/**"/>
             <exclude name=".gitignore"/>
         </fileset>
-        <fileset dir="${voltpro.basedir}" includes="bin/**" erroronmissingdir="false"/>
     </copy>
 
     <!-- populate java and native libraries -->
