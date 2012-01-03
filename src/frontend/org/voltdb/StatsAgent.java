@@ -187,7 +187,7 @@ public class StatsAgent {
                     handleStatsResponse(payload);
                 }
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             hostLog.error("Exception processing message in stats agent " + message, e);
         }
 
@@ -240,7 +240,7 @@ public class StatsAgent {
             public void run() {
                 try {
                     collectStatsImpl(c, clientHandle, selector);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
                 }
             }
@@ -418,7 +418,6 @@ public class StatsAgent {
         final HashMap<Integer, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
         assert catalogIdToStatsSources != null;
 
-        assert catalogIdToStatsSources.get(catalogIds.get(0)) != null;
         ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogIds.get(0));
         //Let these two be null since they are for pro features
         if (selector == SysProcSelector.WANNODE || selector == SysProcSelector.WANPARTITION) {
