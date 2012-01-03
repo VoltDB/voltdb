@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -53,6 +54,7 @@ public class StatsAgent {
     private static final byte JSON_PAYLOAD = 0;
     private static final byte STATS_PAYLOAD = 1;
     private static final int MAX_IN_FLIGHT_REQUESTS = 5;
+    static int STATS_COLLECTION_TIMEOUT = 60 * 1000;
 
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
@@ -70,12 +72,15 @@ public class StatsAgent {
         private final long clientData;
         private int expectedStatsResponses;
         private final VoltTable aggregateTables[];
+        private final long startTime;
         public PendingStatsRequest(
                 String selector,
                 Connection c,
                 long clientData,
                 int expectedResponses,
-                VoltTable aggregateTables[]) {
+                VoltTable aggregateTables[],
+                long startTime) {
+            this.startTime = startTime;
             this.selector = selector;
             this.c = c;
             this.clientData = clientData;
@@ -229,14 +234,43 @@ public class StatsAgent {
         sendStatsResponse(request);
     }
 
-    public void collectStats(Connection c, long clientHandle, String selector) throws Exception {
+    public void collectStats(final Connection c, final long clientHandle, final String selector) throws Exception {
+        m_es.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    collectStatsImpl(c, clientHandle, selector);
+                } catch (Exception e) {
+                    hostLog.warn("Exception while attempting to collect stats", e);
+                }
+            }
+        });
+    }
+
+    private void collectStatsImpl(Connection c, long clientHandle, String selector) throws Exception {
         assert(selector.equals("WAN"));
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                                     new VoltTable[0], "Too many pending stat requests", clientHandle);
-            c.writeStream().enqueue(errorResponse);
-            return;
+            /*
+             * Defensively check for an expired request not caught
+             * by timeout check. Should never happen.
+             */
+            Iterator<PendingStatsRequest> iter = m_pendingRequests.values().iterator();
+            final long now = System.currentTimeMillis();
+            boolean foundExpiredRequest = false;
+            while (iter.hasNext()) {
+                PendingStatsRequest psr = iter.next();
+                if (now - psr.startTime > STATS_COLLECTION_TIMEOUT * 2) {
+                    iter.remove();
+                    foundExpiredRequest = true;
+                }
+            }
+            if (!foundExpiredRequest) {
+                final ClientResponseImpl errorResponse =
+                    new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                         new VoltTable[0], "Too many pending stat requests", clientHandle);
+                c.writeStream().enqueue(errorResponse);
+                return;
+            }
         }
 
         PendingStatsRequest psr =
@@ -245,7 +279,8 @@ public class StatsAgent {
                     c,
                     clientHandle,
                     VoltDB.instance().getCatalogContext().numberOfNodes,
-                    new VoltTable[2]);
+                    new VoltTable[2],
+                    System.currentTimeMillis());
         final long requestId = m_nextRequestId++;
         m_pendingRequests.put(requestId, psr);
         m_es.schedule(new Runnable() {
@@ -254,8 +289,8 @@ public class StatsAgent {
                 checkForRequestTimeout(requestId);
             }
         },
-        60,
-        TimeUnit.SECONDS);
+        STATS_COLLECTION_TIMEOUT,
+        TimeUnit.MILLISECONDS);
 
         JSONObject obj = new JSONObject();
         obj.put("requestId", requestId);
