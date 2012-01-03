@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2011 VoltDB Inc.
+ * Copyright (C) 2008-2012 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2011 VoltDB Inc.
+ * Copyright (C) 2008-2012 VoltDB Inc.
  *
  * VoltDB is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
