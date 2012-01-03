@@ -916,6 +916,9 @@ JAVA COMPILATION
 <!-- This task only executes if the voltpro.flavor property is set. -->
 <target name="compile_pro" if="voltpro.flavor">
   <antcall target="voltpro.compile"/>
+  <copy todir="${dist.dir}/">
+    <fileset dir="${voltpro.basedir}" includes="bin/**"/>
+  </copy>
 </target>
 
 
