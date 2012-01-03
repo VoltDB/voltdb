@@ -129,8 +129,7 @@ public class VoltDB {
         public int m_httpPort = Integer.MAX_VALUE;
 
         /** running the enterprise version? */
-        public final boolean m_isEnterprise =
-                (null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true));
+        public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
 
         public int m_deadHostTimeoutMS = 10000;
 
