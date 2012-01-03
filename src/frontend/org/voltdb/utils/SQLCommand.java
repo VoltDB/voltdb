@@ -593,7 +593,7 @@ public class SQLCommand
                     for (int i = 0; i < columnCount; i++)
                     {
                         Object v = t.get(i, t.getColumnType(i));
-                        if (v == null) v = "null";
+                        if (t.wasNull()) v = "NULL";
                         int l = t.getColumnType(i) == VoltType.VARBINARY ? ((byte[])v).length*2 : v.toString().length();
                         if (padding[i] < l)
                             padding[i] = l;
@@ -627,8 +627,8 @@ public class SQLCommand
                     for (int i = 0; i < columnCount; i++)
                     {
                         Object v = t.get(i, t.getColumnType(i));
-                        if (v == null)
-                            v = "null";
+                        if (t.wasNull())
+                            v = "NULL";
                         else if (t.getColumnType(i) == VoltType.VARBINARY)
                             v = byteArrayToHexString((byte[])v);
                         else
@@ -671,8 +671,8 @@ public class SQLCommand
                     {
                         if (i > 0) System.out.print(separator);
                         Object v = t.get(i, t.getColumnType(i));
-                        if (v == null)
-                            v = "null";
+                        if (t.wasNull())
+                            v = "NULL";
                         else if (t.getColumnType(i) == VoltType.VARBINARY)
                             v = byteArrayToHexString((byte[])v);
                         else
