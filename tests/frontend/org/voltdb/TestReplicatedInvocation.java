@@ -25,7 +25,6 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Map.Entry;
 
 import static org.junit.Assert.*;
@@ -39,9 +38,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.messaging.FastSerializable;
-import org.voltdb.network.WriteStream;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.VoltFile;
 
 public class TestReplicatedInvocation {
@@ -49,59 +45,10 @@ public class TestReplicatedInvocation {
     File root;
     ReplicationRole role = ReplicationRole.REPLICA;
 
-    static class MockWriteStream implements WriteStream {
-        @Override
-        public boolean hadBackPressure() {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(BBContainer c) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
+    static class MockWriteStream extends org.voltdb.network.MockWriteStream {
         @Override
         public boolean enqueue(FastSerializable f) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(FastSerializable f, int expectedSize) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(DeferredSerialization ds) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(ByteBuffer b) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public int calculatePendingWriteDelta(long now) {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        @Override
-        public boolean isEmpty() {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public int getOutstandingMessageCount() {
-            // TODO Auto-generated method stub
-            return 0;
+            return true;
         }
     }
 
