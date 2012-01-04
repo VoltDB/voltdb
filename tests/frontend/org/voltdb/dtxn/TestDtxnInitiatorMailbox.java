@@ -56,7 +56,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
     MockVoltDB m_mockVolt = null;
 
-    class MockWriteStream implements WriteStream
+    class MockWriteStream extends org.voltdb.network.MockWriteStream
     {
         boolean m_gotResponse;
 
@@ -76,60 +76,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public int calculatePendingWriteDelta(long now)
-        {
-            return 0;
-        }
-
-        @Override
-        public boolean enqueue(BBContainer c)
-        {
-            return false;
-        }
-
-        @Override
         public synchronized boolean enqueue(FastSerializable f)
         {
             m_gotResponse = true;
             notify();
             return false;
-        }
-
-        @Override
-        public boolean enqueue(FastSerializable f, int expectedSize)
-        {
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(DeferredSerialization ds)
-        {
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(ByteBuffer b)
-        {
-            return false;
-        }
-
-        @Override
-        public boolean hadBackPressure()
-        {
-            return false;
-        }
-
-        @Override
-        public boolean isEmpty()
-        {
-            return false;
-        }
-
-        @Override
-        public int getOutstandingMessageCount()
-        {
-            // TODO Auto-generated method stub
-            return 0;
         }
     }
 
@@ -137,7 +88,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
     };
 
-    class MockConnection implements Connection
+    class MockConnection extends org.voltdb.network.MockConnection
     {
         MockWriteStream m_writeStream;
 
@@ -147,52 +98,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public void disableReadSelection()
-        {
-        }
-
-        @Override
-        public void enableReadSelection()
-        {
-        }
-
-        @Override
-        public String getHostnameOrIP()
-        {
-            return null;
-        }
-
-        @Override
-        public NIOReadStream readStream()
-        {
-            return null;
-        }
-
-        @Override
         public WriteStream writeStream()
         {
             return m_writeStream;
         }
-
-        @Override
-        public void scheduleRunnable(Runnable r) {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void unregister() {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public long connectionId()
-        {
-            // TODO Auto-generated method stub
-            return -1;
-        }
-
     }
 
     class MockInitiator extends TransactionInitiator

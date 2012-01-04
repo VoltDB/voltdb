@@ -52,16 +52,23 @@ package org.voltdb.messaging;
 
 import java.util.*;
 
+import org.voltdb.VoltDB;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 
 public class MockMailbox implements Mailbox {
 
-    private static HashMap<Integer, MockMailbox> postoffice =
-        new HashMap<Integer, MockMailbox>();
+    public static HashMap<Integer, HashMap<Integer, Mailbox>> postoffice =
+        new HashMap<Integer, HashMap<Integer, Mailbox>>();
 
-    public static void registerMailbox(int siteId, MockMailbox mbox) {
-        postoffice.put(siteId, mbox);
+    static {
+        postoffice.put(VoltDB.DTXN_MAILBOX_ID, new HashMap<Integer, Mailbox>());
+        postoffice.put(VoltDB.AGREEMENT_MAILBOX_ID, new HashMap<Integer, Mailbox>());
+        postoffice.put(VoltDB.STATS_MAILBOX_ID, new HashMap<Integer, Mailbox>());
+    }
+
+    public static void registerMailbox(int siteId, int mailboxId, MockMailbox mbox) {
+        postoffice.get(mailboxId).put(siteId, mbox);
     }
 
     public MockMailbox() {
@@ -74,7 +81,7 @@ public class MockMailbox implements Mailbox {
     public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
         outgoingMessages.add(new Message(siteId, mailboxId, message));
 
-        MockMailbox dest = postoffice.get(siteId);
+        Mailbox dest = postoffice.get(mailboxId).get(siteId);
         if (dest != null) {
             dest.deliver(message);
         }
@@ -83,7 +90,7 @@ public class MockMailbox implements Mailbox {
     @Override
     public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
         for (int i=0; siteIds != null && i < siteIds.length; ++i) {
-            MockMailbox dest = postoffice.get(siteIds[i]);
+            Mailbox dest = postoffice.get(mailboxId).get(siteIds[i]);
             if (dest != null) {
                 dest.deliver(message);
             }

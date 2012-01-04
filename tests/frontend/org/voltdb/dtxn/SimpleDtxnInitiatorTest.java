@@ -61,6 +61,8 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MockMailbox;
 import org.voltdb.network.Connection;
+import org.voltdb.network.MockConnection;
+import org.voltdb.network.MockWriteStream;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DeferredSerialization;
@@ -128,115 +130,25 @@ public class SimpleDtxnInitiatorTest extends TestCase {
     }*/
 
     @SuppressWarnings("unused")
-    private final class DummyConnection implements Connection {
+    private final class DummyConnection extends MockConnection {
         private final DummyWriteStream writeStream = new DummyWriteStream();
-        @Override
-        public void disableReadSelection() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void enableReadSelection() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public NIOReadStream readStream() {
-            throw new UnsupportedOperationException();
-        }
 
         @Override
         public WriteStream writeStream() {
             return writeStream;
         }
-
-        @Override
-        public String getHostnameOrIP()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public void scheduleRunnable(Runnable r) {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void unregister() {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public long connectionId()
-        {
-            // TODO Auto-generated method stub
-            return -1;
-        }
-
     }
 
-    private final class DummyWriteStream implements WriteStream {
+    private final class DummyWriteStream extends MockWriteStream {
 
         @SuppressWarnings("unused")
         private ClientResponse response;
-
-        @Override
-        public boolean enqueue(final BBContainer c) {
-            // TODO Auto-generated method stub
-            return false;
-        }
 
         @Override
         public boolean enqueue(final FastSerializable f) {
             response = (ClientResponse)f;
             return true;
         }
-
-        @Override
-        public boolean enqueue(final FastSerializable f, final int expectedSize) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(final DeferredSerialization ds) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(final ByteBuffer b) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public boolean hadBackPressure() {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public int calculatePendingWriteDelta(long now) {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        @Override
-        public boolean isEmpty() {
-            throw new RuntimeException("Not implemented.");
-        }
-
-        @Override
-        public int getOutstandingMessageCount()
-        {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
     }
 
 //    public void testCreateTransactionComplete() {

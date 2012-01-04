@@ -211,7 +211,7 @@ public class TestExecutionEngine extends TestCase {
         tablesAndDestinations.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), destinations);
 
         final MockMailbox sourceMailbox = new MockMailbox();
-        MockMailbox.registerMailbox( sourceId, sourceMailbox);
+        MockMailbox.registerMailbox( sourceId, VoltDB.DTXN_MAILBOX_ID, sourceMailbox);
 
         final Runnable onSourceCompletion = new Runnable() {
             @Override
@@ -278,7 +278,7 @@ public class TestExecutionEngine extends TestCase {
         tablesAndSources.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), sourceId);
 
         final MockMailbox destinationMailbox = new MockMailbox();
-        MockMailbox.registerMailbox( destinationId, destinationMailbox);
+        MockMailbox.registerMailbox( destinationId, VoltDB.DTXN_MAILBOX_ID, destinationMailbox);
 
         final Runnable onDestinationCompletion = new Runnable() {
             @Override

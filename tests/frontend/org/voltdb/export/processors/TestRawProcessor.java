@@ -49,31 +49,12 @@ import org.voltdb.utils.DeferredSerialization;
 
 public class TestRawProcessor extends TestCase {
 
-    static class MockWriteStream implements WriteStream {
+    static class MockWriteStream extends org.voltdb.network.MockWriteStream {
         DBBPool pool = new DBBPool();
 
         LinkedBlockingDeque<ExportProtoMessage> writequeue =
             new LinkedBlockingDeque<ExportProtoMessage>();
 
-        @Override
-        public int calculatePendingWriteDelta(long now) {
-            return 0;
-        }
-
-        @Override
-        public boolean enqueue(BBContainer c) {
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(FastSerializable f) {
-            return false;
-        }
-
-        @Override
-        public boolean enqueue(FastSerializable f, int expectedSize) {
-            return false;
-        }
 
         @Override
         public boolean enqueue(DeferredSerialization ds) {
@@ -89,49 +70,10 @@ public class TestRawProcessor extends TestCase {
             }
             return true;
         }
-
-        @Override
-        public boolean enqueue(ByteBuffer b) {
-            return false;
-        }
-
-        @Override
-        public boolean hadBackPressure() {
-            return false;
-        }
-
-        @Override
-        public boolean isEmpty() {
-            return false;
-        }
-
-        @Override
-        public int getOutstandingMessageCount()
-        {
-            return writequeue.size();
-        }
     }
 
-    static class MockConnection implements Connection {
+    static class MockConnection extends org.voltdb.network.MockConnection {
         MockWriteStream m_writeStream = new MockWriteStream();
-
-        @Override
-        public void disableReadSelection() {
-        }
-
-        @Override
-        public void enableReadSelection() {
-        }
-
-        @Override
-        public String getHostnameOrIP() {
-            return null;
-        }
-
-        @Override
-        public NIOReadStream readStream() {
-            return null;
-        }
 
         @Override
         public WriteStream writeStream() {
@@ -140,23 +82,6 @@ public class TestRawProcessor extends TestCase {
 
         public ExportProtoMessage pollWriteStream() {
             return m_writeStream.writequeue.poll();
-        }
-
-        @Override
-        public void scheduleRunnable(Runnable r) {
-        }
-
-        @Override
-        public void unregister() {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public long connectionId()
-        {
-            // TODO Auto-generated method stub
-            return -1;
         }
     }
 

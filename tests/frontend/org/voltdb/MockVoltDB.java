@@ -52,8 +52,11 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MockMailbox;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
@@ -66,6 +69,26 @@ public class MockVoltDB implements VoltDBInterface
     int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = new HostMessenger() {
+        @Override
+        public void send(final int siteId, final int mailboxId, final VoltMessage message)
+            throws MessagingException {
+            Mailbox mailbox = MockMailbox.postoffice.get(mailboxId).get(siteId);
+            if (mailbox != null) {
+                mailbox.deliver(message);
+            }
+        }
+
+        @Override
+        public void send(int[] siteIds, int mailboxId, final VoltMessage message)
+            throws MessagingException {
+            for (int i : siteIds) {
+                Mailbox mailbox = MockMailbox.postoffice.get(mailboxId).get(i);
+                if (mailbox != null) {
+                    mailbox.deliver(message);
+                }
+            }
+        }
+
         @Override
         public int getHostId() {
             return 1;
@@ -125,8 +148,10 @@ public class MockVoltDB implements VoltDBInterface
         execSite.setPartition(partition);*/
 
         m_statsAgent = new StatsAgent();
+        Mailbox mbox = m_statsAgent.getMailbox(m_hostMessenger, 1);
+        MockMailbox.postoffice.get(VoltDB.STATS_MAILBOX_ID).put(1, mbox);
         MockMailbox mailbox = new MockMailbox();
-        MockMailbox.registerMailbox(1, mailbox);
+        MockMailbox.registerMailbox(1, VoltDB.AGREEMENT_MAILBOX_ID, mailbox);
         try {
             m_agreementSite =
                 new AgreementSite(
@@ -417,6 +442,7 @@ public class MockVoltDB implements VoltDBInterface
         m_es.shutdown();
         m_es.awaitTermination( 1, TimeUnit.DAYS);
         m_agreementSite.shutdown();
+        m_statsAgent.shutdown();
     }
 
     @Override

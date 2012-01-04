@@ -333,4 +333,8 @@ public class MiscUtils {
         }
         return "";
     }
+
+    public static boolean isPro() {
+        return null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+    }
 }

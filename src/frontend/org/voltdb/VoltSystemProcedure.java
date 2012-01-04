@@ -38,19 +38,19 @@ import org.voltdb.messaging.FragmentTaskMessage;
 public abstract class VoltSystemProcedure extends VoltProcedure {
 
     /** Standard column type for host/partition/site id columns */
-    protected static VoltType CTYPE_ID = VoltType.INTEGER;
+    public static final VoltType CTYPE_ID = VoltType.INTEGER;
 
     /** Standard column name for a host id column */
-    protected static String CNAME_HOST_ID = "HOST_ID";
+    public static final String CNAME_HOST_ID = "HOST_ID";
 
     /** Standard column name for a site id column */
-    protected static String CNAME_SITE_ID = "SITE_ID";
+    public static final String CNAME_SITE_ID = "SITE_ID";
 
     /** Standard column name for a partition id column */
-    protected static String CNAME_PARTITION_ID = "PARTITION_ID";
+    public static final String CNAME_PARTITION_ID = "PARTITION_ID";
 
     /** Standard schema for sysprocs returning a simple status table */
-    public static ColumnInfo STATUS_SCHEMA =
+    public static final ColumnInfo STATUS_SCHEMA =
         new ColumnInfo("STATUS", VoltType.BIGINT);   // public to fix javadoc linking warning
 
     /** Standard success return value for sysprocs returning STATUS_SCHEMA */
