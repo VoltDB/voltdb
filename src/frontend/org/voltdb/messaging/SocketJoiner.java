@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.voltdb.OperationMode;
+import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.logging.Level;
@@ -580,6 +581,8 @@ public class SocketJoiner extends Thread {
                 }
                 // set the admin mode here, not in the local deployment file for rejoining nodes
                 VoltDB.instance().setStartMode(OperationMode.get((byte) in.read()));
+                // set the replication role here
+                VoltDB.instance().setReplicationRole(ReplicationRole.get((byte) in.read()));
                 // read the current catalog
                 int catalogLength = in.readInt();
                 byte[] catalogBytes = new byte[catalogLength];
@@ -811,6 +814,8 @@ public class SocketJoiner extends Thread {
             }
             // send the admin mode here, don't use local deployment file for rejoining nodes
             out.write(VoltDB.instance().getMode().ordinal());
+            // send the replication role here
+            out.write(VoltDB.instance().getReplicationRole().ordinal());
             // write the catalog contents
             out.writeInt(catalogBytes.length);
             out.write(catalogBytes);

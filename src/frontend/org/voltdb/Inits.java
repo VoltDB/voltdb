@@ -484,8 +484,12 @@ public class Inits {
 
         @Override
         public void run() {
-            // See if we should bring the server up in WAN replication mode
-            m_rvdb.setReplicationRole(m_config.m_replicationRole);
+            // rejoining nodes figure out the replication role from other nodes
+            if (!m_isRejoin)
+            {
+                // See if we should bring the server up in WAN replication mode
+                m_rvdb.setReplicationRole(m_config.m_replicationRole);
+            }
         }
     }
 

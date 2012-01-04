@@ -755,7 +755,8 @@ public class LocalCluster implements VoltServerConfig {
                         + m_debugPortOffset++ + ",server=y,suspend=n");
             }
             m_procBuilder.command().set(m_zkPortOffset, Integer.toString(2181 + hostId));
-
+            // Rejoin should never need to be told the operating mode
+            m_procBuilder.command().set(m_voltStartModeOffset, "");
             Process proc = m_procBuilder.start();
             start = System.currentTimeMillis();
 
