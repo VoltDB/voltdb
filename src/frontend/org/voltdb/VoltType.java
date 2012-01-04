@@ -264,7 +264,6 @@ public enum VoltType {
      */
     public int getLengthInBytesForFixedTypes() {
         if (m_lengthInBytes == -1) {
-            Thread.dumpStack();
             throw new RuntimeException(
                     "Asking for fixed size for non-fixed or unknown type.");
 
