@@ -184,7 +184,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                   invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
                 invocation.getOriginalTxnId() <= m_lastSeenOriginalTxnId)
             {
-                hostLog.info("Dropping duplicate replicated transaction, txnid: " + invocation.getOriginalTxnId() + ", last seen: " + m_lastSeenOriginalTxnId);
+                hostLog.debug("Dropping duplicate replicated transaction, txnid: " + invocation.getOriginalTxnId() + ", last seen: " + m_lastSeenOriginalTxnId);
                 return false;
             }
             else

@@ -1229,10 +1229,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                   now);
                 if (!success)
                 {
+                    // HACK: this return is for the WAN agent so that it
+                    // will move along on duplicate replicated transactions
+                    // reported by the slave cluster.  We report "SUCCESS"
+                    // to keep the agent from choking.  ENG-2334
                     final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new ClientResponseImpl(ClientResponseImpl.SUCCESS,
                                                new VoltTable[0],
-                                               "Unable to create transaction",
+                                               "Duplicate replicated transaction; already succeeded",
                                                task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                     return;
