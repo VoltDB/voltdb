@@ -946,7 +946,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster.");
         } else if (m_replicationRole == ReplicationRole.REPLICA) {
             hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster. " +
-            		     "Clients can only call read-only procedures.");
+                             "Clients can only call read-only procedures.");
         }
         if (httpPortExtraLogMessage != null)
             hostLog.info(httpPortExtraLogMessage);
