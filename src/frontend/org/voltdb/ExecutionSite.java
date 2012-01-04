@@ -700,7 +700,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // initialize the DR gateway
         int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
-        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "wan-overflow");
+        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "wan_overflow");
         m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, m_recovering, overflowDir);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
