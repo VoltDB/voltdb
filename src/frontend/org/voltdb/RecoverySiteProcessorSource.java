@@ -593,7 +593,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         if (nextTxnId < m_stopBeforeTxnId) {
             return;
         }
-        recoveryLog.trace(
+        recoveryLog.info(
                 "Starting recovery of " + m_destinationSiteId + " work before txnId " + nextTxnId);
         while (true) {
             while (m_allowedBuffers.get() > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {

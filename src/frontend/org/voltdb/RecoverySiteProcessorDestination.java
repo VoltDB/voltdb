@@ -370,7 +370,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             return;
         }
 
-        recoveryLog.trace(
+        recoveryLog.info(
                 "Starting recovery before txnid " + txnId +
                 " for site " + m_siteId + " from " + m_sourceSiteId);
 
@@ -551,7 +551,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         if (stopBeforeOrSkipPast) {
             m_stopBeforeTxnId = ackMessage.getLong();
             recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
-                    sourceSite + " will sync after txnId " + m_stopBeforeTxnId);
+                    sourceSite + " will sync before txnId " + m_stopBeforeTxnId);
         } else {
             m_skipPastTxnId = ackMessage.getLong();
             recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
