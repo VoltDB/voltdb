@@ -286,30 +286,25 @@ public class SnapshotSave extends VoltSystemProcedure
         String async = (block == 0) ? "Asynchronously" : "Synchronously";
         HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
 
+        ColumnInfo[] error_result_columns = new ColumnInfo[2];
+        int ii = 0;
+        error_result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+        error_result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
         if (path == null || path.equals("")) {
-            ColumnInfo[] result_columns = new ColumnInfo[1];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("Provided path was null or the empty string");
+            VoltTable results[] = new VoltTable[] { new VoltTable(error_result_columns) };
+            results[0].addRow("FAILURE", "Provided path was null or the empty string");
             return results;
         }
 
         if (nonce == null || nonce.equals("")) {
-            ColumnInfo[] result_columns = new ColumnInfo[1];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("Provided nonce was null or the empty string");
+            VoltTable results[] = new VoltTable[] { new VoltTable(error_result_columns) };
+            results[0].addRow("FAILURE", "Provided nonce was null or the empty string");
             return results;
         }
 
         if (nonce.contains("-") || nonce.contains(",")) {
-            ColumnInfo[] result_columns = new ColumnInfo[1];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("Provided nonce " + nonce + " contains a prohitibited character (- or ,)");
+            VoltTable results[] = new VoltTable[] { new VoltTable(error_result_columns) };
+            results[0].addRow("FAILURE", "Provided nonce " + nonce + " contains a prohibited character (- or ,)");
             return results;
         }
 
