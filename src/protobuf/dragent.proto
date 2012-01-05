@@ -7,6 +7,10 @@ message Ack {
     optional fixed64 timestamp = 2;
 }
 
+message SnapshotReq {
+    optional string nonce = 1;
+}
+
 message Reset {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
@@ -78,4 +82,5 @@ message CtrlEnvelope {
     optional Reset reset = 3;
     optional Pause pause = 4;
     optional Response response = 5;
+    optional SnapshotReq snapshotReq = 6;
 }
