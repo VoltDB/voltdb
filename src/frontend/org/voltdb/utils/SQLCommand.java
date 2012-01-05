@@ -690,7 +690,7 @@ public class SQLCommand
     // VoltDB connection support
     private static Client VoltDB;
     private static final List<String> Types = Arrays.asList("tinyint","smallint","integer","bigint","float","decimal","varchar","timestamp","varbinary");
-    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "WAN", "SNAPSHOTSTATUS");
+    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "WAN");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
@@ -712,6 +712,9 @@ public class SQLCommand
         Procedures.put("@UpdateApplicationCatalog", Arrays.asList("varchar", "varchar"));
         Procedures.put("@UpdateLogging", Arrays.asList("varchar"));
         Procedures.put("@Promote", new ArrayList<String>());
+        Procedures.put("@SnapshotStatus", new ArrayList<String>());
+        Procedures.put("@AdHoc", new ArrayList<String>(Arrays.asList("varchar")));
+        Procedures.put("@AdHocSP", new ArrayList<String>(Arrays.asList("varchar", "bigint")));
     }
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
