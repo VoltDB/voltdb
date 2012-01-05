@@ -1181,7 +1181,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return;
             } else if (task.procName.equals("@Statistics")) {
                 ParameterSet params = task.getParams();
-                if (((String)params.toArray()[0]).equals("WAN")) {
+                // Okay, this is hacky...we're going to check for non-zero
+                // params length here so we can do this test, but we're going
+                // to let zero params @Statistics calls drop through so that
+                // we get consistent error reporting when the number of
+                // parameters to a stored procedure doesn't match what's expected
+                if ((params.m_params.length != 0) &&
+                    (((String)params.toArray()[0]).equals("WAN")))
+                {
                     try {
                         VoltDB.instance().getStatsAgent().collectStats(c, task.clientHandle, "WAN");
                     } catch (Exception e) {

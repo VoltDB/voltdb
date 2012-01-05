@@ -197,7 +197,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         try {
             client.callProcedure("@Statistics");
         }
-        catch (Exception ex) {
+        catch (ProcCallException ex) {
+            // All badness gets turned into ProcCallExceptions, so we need
+            // to check specifically for this error, otherwise things that
+            // crash the cluster also turn into ProcCallExceptions and don't
+            // trigger failure (ENG-2347)
+            assertEquals("VOLTDB ERROR: PROCEDURE Statistics EXPECTS 3 PARAMS, BUT RECEIVED 1",
+                         ex.getMessage());
             exceptionThrown = true;
         }
         assertTrue(exceptionThrown);
@@ -207,7 +213,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         try {
             client.callProcedure("@Statistics", "garbage", 0);
         }
-        catch (Exception ex) {
+        catch (ProcCallException ex) {
             exceptionThrown = true;
         }
         assertTrue(exceptionThrown);

@@ -358,7 +358,7 @@ public abstract class VoltProcedure {
 
         if (paramList.length != m_paramTypesLength) {
             m_statsCollector.endProcedure( false, true);
-            String msg = "PROCEDURE " + m_catProc.getTypeName() + " EXPECTS " + String.valueOf(m_paramTypesLength) +
+            String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypesLength) +
                 " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
             status = ClientResponseImpl.GRACEFUL_FAILURE;
             return getErrorResponse(status, msg, null);
@@ -369,7 +369,7 @@ public abstract class VoltProcedure {
                 paramList[i] = tryToMakeCompatible( i, paramList[i]);
             } catch (Exception e) {
                 m_statsCollector.endProcedure( false, true);
-                String msg = "PROCEDURE " + m_catProc.getTypeName() + " TYPE ERROR FOR PARAMETER " + i +
+                String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                         ": " + e.getMessage();
                 status = ClientResponseImpl.GRACEFUL_FAILURE;
                 return getErrorResponse(status, msg, null);
@@ -1083,7 +1083,7 @@ public abstract class VoltProcedure {
                 {
                     if (Math.abs(delta) > 1000000000)
                     {
-                        log.info("Procedure: " + m_catProc.getTypeName() +
+                        log.info("Procedure: " + m_procedureName +
                                  " recorded a negative execution time larger than one second: " +
                                  delta);
                     }
