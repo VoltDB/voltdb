@@ -197,8 +197,10 @@ public class SocketJoiner extends Thread {
                 runPrimary();
             }
             else {
-                if (m_hostLog != null)
-                    m_hostLog.info("Connecting to the VoltDB cluster leader...");
+                if (m_hostLog != null) {
+                    m_hostLog.info("Connecting to the VoltDB cluster leader "
+                            + m_coordIp + ":" + m_internalPort);
+                }
                 runNonPrimary();
             }
         }
@@ -473,7 +475,7 @@ public class SocketJoiner extends Thread {
                     byte[] ipBytes = new byte[ipSize];
                     in.readFully(ipBytes);
                     InetAddress ip = InetAddress.getByAddress(ipBytes);
-                    LOG.debug("Opening non-primary socket: " + ip.toString());
+                    if(m_hostLog != null) m_hostLog.info("Connecting to non-leader node: " + ip.toString());
                     inetsockaddr = new InetSocketAddress(ip, m_internalPort + hostId);
                     newSock = SocketChannel.open(inetsockaddr);
                 }
