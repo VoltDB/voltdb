@@ -59,6 +59,9 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
     static final String JSON_TYPE_KEY = "type";
     static final String JSON_EXCEPTION_KEY = "exception";
 
+    // Error string returned on duplicate replicated transaction from WAN agent
+    public static final String DUPE_TRANSACTION = "Rejected duplicate replicated transaction";
+
     /** opaque data optionally provided by and returned to the client */
     private long clientHandle = -1;
 

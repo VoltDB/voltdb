@@ -1241,9 +1241,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // reported by the slave cluster.  We report "SUCCESS"
                     // to keep the agent from choking.  ENG-2334
                     final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                new VoltTable[0],
-                                               "Duplicate replicated transaction; already succeeded",
+                                               ClientResponseImpl.DUPE_TRANSACTION,
                                                task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                     return;

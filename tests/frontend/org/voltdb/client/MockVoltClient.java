@@ -57,6 +57,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
@@ -64,6 +65,8 @@ public class MockVoltClient implements Client {
     public MockVoltClient() {
         super();
     }
+
+    ProcedureCallback m_callback = null;
 
     @Override
     public ClientResponse callProcedure(String procName, Object... parameters) throws ProcCallException {
@@ -305,6 +308,7 @@ public class MockVoltClient implements Client {
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
+        m_callback = callback;
         if (originalTxnId <= lastOrigTxnId)
         {
             origTxnIdOrderCorrect = false;
@@ -315,5 +319,11 @@ public class MockVoltClient implements Client {
         }
 
         return true;
+    }
+
+    public void pokeLastCallback(final byte status, final String message) throws Exception
+    {
+        ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
+        m_callback.clientCallback(clientResponse);
     }
 }
