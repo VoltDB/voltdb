@@ -3300,39 +3300,35 @@ public final class DRAgent {
     boolean hasPartitionId();
     int getPartitionId();
     
-    // optional fixed64 oldestTimestamp = 2;
-    boolean hasOldestTimestamp();
-    long getOldestTimestamp();
-    
-    // optional fixed64 lastSentTimestamp = 3;
+    // optional fixed64 lastSentTimestamp = 2;
     boolean hasLastSentTimestamp();
     long getLastSentTimestamp();
     
-    // optional int64 lowestTupleIndex = 4;
+    // optional int64 lowestTupleIndex = 3;
     boolean hasLowestTupleIndex();
     long getLowestTupleIndex();
     
-    // optional int64 lastSentTupleIndex = 5;
+    // optional int64 lastSentTupleIndex = 4;
     boolean hasLastSentTupleIndex();
     long getLastSentTupleIndex();
     
-    // optional int64 totalTupleCount = 6;
+    // optional int64 totalTupleCount = 5;
     boolean hasTotalTupleCount();
     long getTotalTupleCount();
     
-    // optional int64 outstandingBufferCount = 7;
+    // optional int64 outstandingBufferCount = 6;
     boolean hasOutstandingBufferCount();
     long getOutstandingBufferCount();
     
-    // optional int64 outstandingByteCount = 8;
+    // optional int64 outstandingByteCount = 7;
     boolean hasOutstandingByteCount();
     long getOutstandingByteCount();
     
-    // optional bool isPaused = 9;
+    // optional bool isPaused = 8;
     boolean hasIsPaused();
     boolean getIsPaused();
     
-    // optional bool isSynced = 10;
+    // optional bool isSynced = 9;
     boolean hasIsSynced();
     boolean getIsSynced();
   }
@@ -3375,91 +3371,81 @@ public final class DRAgent {
       return partitionId_;
     }
     
-    // optional fixed64 oldestTimestamp = 2;
-    public static final int OLDESTTIMESTAMP_FIELD_NUMBER = 2;
-    private long oldestTimestamp_;
-    public boolean hasOldestTimestamp() {
-      return ((bitField0_ & 0x00000002) == 0x00000002);
-    }
-    public long getOldestTimestamp() {
-      return oldestTimestamp_;
-    }
-    
-    // optional fixed64 lastSentTimestamp = 3;
-    public static final int LASTSENTTIMESTAMP_FIELD_NUMBER = 3;
+    // optional fixed64 lastSentTimestamp = 2;
+    public static final int LASTSENTTIMESTAMP_FIELD_NUMBER = 2;
     private long lastSentTimestamp_;
     public boolean hasLastSentTimestamp() {
-      return ((bitField0_ & 0x00000004) == 0x00000004);
+      return ((bitField0_ & 0x00000002) == 0x00000002);
     }
     public long getLastSentTimestamp() {
       return lastSentTimestamp_;
     }
     
-    // optional int64 lowestTupleIndex = 4;
-    public static final int LOWESTTUPLEINDEX_FIELD_NUMBER = 4;
+    // optional int64 lowestTupleIndex = 3;
+    public static final int LOWESTTUPLEINDEX_FIELD_NUMBER = 3;
     private long lowestTupleIndex_;
     public boolean hasLowestTupleIndex() {
-      return ((bitField0_ & 0x00000008) == 0x00000008);
+      return ((bitField0_ & 0x00000004) == 0x00000004);
     }
     public long getLowestTupleIndex() {
       return lowestTupleIndex_;
     }
     
-    // optional int64 lastSentTupleIndex = 5;
-    public static final int LASTSENTTUPLEINDEX_FIELD_NUMBER = 5;
+    // optional int64 lastSentTupleIndex = 4;
+    public static final int LASTSENTTUPLEINDEX_FIELD_NUMBER = 4;
     private long lastSentTupleIndex_;
     public boolean hasLastSentTupleIndex() {
-      return ((bitField0_ & 0x00000010) == 0x00000010);
+      return ((bitField0_ & 0x00000008) == 0x00000008);
     }
     public long getLastSentTupleIndex() {
       return lastSentTupleIndex_;
     }
     
-    // optional int64 totalTupleCount = 6;
-    public static final int TOTALTUPLECOUNT_FIELD_NUMBER = 6;
+    // optional int64 totalTupleCount = 5;
+    public static final int TOTALTUPLECOUNT_FIELD_NUMBER = 5;
     private long totalTupleCount_;
     public boolean hasTotalTupleCount() {
-      return ((bitField0_ & 0x00000020) == 0x00000020);
+      return ((bitField0_ & 0x00000010) == 0x00000010);
     }
     public long getTotalTupleCount() {
       return totalTupleCount_;
     }
     
-    // optional int64 outstandingBufferCount = 7;
-    public static final int OUTSTANDINGBUFFERCOUNT_FIELD_NUMBER = 7;
+    // optional int64 outstandingBufferCount = 6;
+    public static final int OUTSTANDINGBUFFERCOUNT_FIELD_NUMBER = 6;
     private long outstandingBufferCount_;
     public boolean hasOutstandingBufferCount() {
-      return ((bitField0_ & 0x00000040) == 0x00000040);
+      return ((bitField0_ & 0x00000020) == 0x00000020);
     }
     public long getOutstandingBufferCount() {
       return outstandingBufferCount_;
     }
     
-    // optional int64 outstandingByteCount = 8;
-    public static final int OUTSTANDINGBYTECOUNT_FIELD_NUMBER = 8;
+    // optional int64 outstandingByteCount = 7;
+    public static final int OUTSTANDINGBYTECOUNT_FIELD_NUMBER = 7;
     private long outstandingByteCount_;
     public boolean hasOutstandingByteCount() {
-      return ((bitField0_ & 0x00000080) == 0x00000080);
+      return ((bitField0_ & 0x00000040) == 0x00000040);
     }
     public long getOutstandingByteCount() {
       return outstandingByteCount_;
     }
     
-    // optional bool isPaused = 9;
-    public static final int ISPAUSED_FIELD_NUMBER = 9;
+    // optional bool isPaused = 8;
+    public static final int ISPAUSED_FIELD_NUMBER = 8;
     private boolean isPaused_;
     public boolean hasIsPaused() {
-      return ((bitField0_ & 0x00000100) == 0x00000100);
+      return ((bitField0_ & 0x00000080) == 0x00000080);
     }
     public boolean getIsPaused() {
       return isPaused_;
     }
     
-    // optional bool isSynced = 10;
-    public static final int ISSYNCED_FIELD_NUMBER = 10;
+    // optional bool isSynced = 9;
+    public static final int ISSYNCED_FIELD_NUMBER = 9;
     private boolean isSynced_;
     public boolean hasIsSynced() {
-      return ((bitField0_ & 0x00000200) == 0x00000200);
+      return ((bitField0_ & 0x00000100) == 0x00000100);
     }
     public boolean getIsSynced() {
       return isSynced_;
@@ -3467,7 +3453,6 @@ public final class DRAgent {
     
     private void initFields() {
       partitionId_ = 0;
-      oldestTimestamp_ = 0L;
       lastSentTimestamp_ = 0L;
       lowestTupleIndex_ = 0L;
       lastSentTupleIndex_ = 0L;
@@ -3493,31 +3478,28 @@ public final class DRAgent {
         output.writeInt32(1, partitionId_);
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
-        output.writeFixed64(2, oldestTimestamp_);
+        output.writeFixed64(2, lastSentTimestamp_);
       }
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
-        output.writeFixed64(3, lastSentTimestamp_);
+        output.writeInt64(3, lowestTupleIndex_);
       }
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
-        output.writeInt64(4, lowestTupleIndex_);
+        output.writeInt64(4, lastSentTupleIndex_);
       }
       if (((bitField0_ & 0x00000010) == 0x00000010)) {
-        output.writeInt64(5, lastSentTupleIndex_);
+        output.writeInt64(5, totalTupleCount_);
       }
       if (((bitField0_ & 0x00000020) == 0x00000020)) {
-        output.writeInt64(6, totalTupleCount_);
+        output.writeInt64(6, outstandingBufferCount_);
       }
       if (((bitField0_ & 0x00000040) == 0x00000040)) {
-        output.writeInt64(7, outstandingBufferCount_);
+        output.writeInt64(7, outstandingByteCount_);
       }
       if (((bitField0_ & 0x00000080) == 0x00000080)) {
-        output.writeInt64(8, outstandingByteCount_);
+        output.writeBool(8, isPaused_);
       }
       if (((bitField0_ & 0x00000100) == 0x00000100)) {
-        output.writeBool(9, isPaused_);
-      }
-      if (((bitField0_ & 0x00000200) == 0x00000200)) {
-        output.writeBool(10, isSynced_);
+        output.writeBool(9, isSynced_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -3534,39 +3516,35 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeFixed64Size(2, oldestTimestamp_);
+          .computeFixed64Size(2, lastSentTimestamp_);
       }
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeFixed64Size(3, lastSentTimestamp_);
+          .computeInt64Size(3, lowestTupleIndex_);
       }
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt64Size(4, lowestTupleIndex_);
+          .computeInt64Size(4, lastSentTupleIndex_);
       }
       if (((bitField0_ & 0x00000010) == 0x00000010)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt64Size(5, lastSentTupleIndex_);
+          .computeInt64Size(5, totalTupleCount_);
       }
       if (((bitField0_ & 0x00000020) == 0x00000020)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt64Size(6, totalTupleCount_);
+          .computeInt64Size(6, outstandingBufferCount_);
       }
       if (((bitField0_ & 0x00000040) == 0x00000040)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt64Size(7, outstandingBufferCount_);
+          .computeInt64Size(7, outstandingByteCount_);
       }
       if (((bitField0_ & 0x00000080) == 0x00000080)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt64Size(8, outstandingByteCount_);
+          .computeBoolSize(8, isPaused_);
       }
       if (((bitField0_ & 0x00000100) == 0x00000100)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeBoolSize(9, isPaused_);
-      }
-      if (((bitField0_ & 0x00000200) == 0x00000200)) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeBoolSize(10, isSynced_);
+          .computeBoolSize(9, isSynced_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -3694,24 +3672,22 @@ public final class DRAgent {
         super.clear();
         partitionId_ = 0;
         bitField0_ = (bitField0_ & ~0x00000001);
-        oldestTimestamp_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000002);
         lastSentTimestamp_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000004);
+        bitField0_ = (bitField0_ & ~0x00000002);
         lowestTupleIndex_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000008);
+        bitField0_ = (bitField0_ & ~0x00000004);
         lastSentTupleIndex_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000010);
+        bitField0_ = (bitField0_ & ~0x00000008);
         totalTupleCount_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000020);
+        bitField0_ = (bitField0_ & ~0x00000010);
         outstandingBufferCount_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000040);
+        bitField0_ = (bitField0_ & ~0x00000020);
         outstandingByteCount_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000080);
+        bitField0_ = (bitField0_ & ~0x00000040);
         isPaused_ = false;
-        bitField0_ = (bitField0_ & ~0x00000100);
+        bitField0_ = (bitField0_ & ~0x00000080);
         isSynced_ = false;
-        bitField0_ = (bitField0_ & ~0x00000200);
+        bitField0_ = (bitField0_ & ~0x00000100);
         return this;
       }
       
@@ -3757,37 +3733,33 @@ public final class DRAgent {
         if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
           to_bitField0_ |= 0x00000002;
         }
-        result.oldestTimestamp_ = oldestTimestamp_;
+        result.lastSentTimestamp_ = lastSentTimestamp_;
         if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
           to_bitField0_ |= 0x00000004;
         }
-        result.lastSentTimestamp_ = lastSentTimestamp_;
+        result.lowestTupleIndex_ = lowestTupleIndex_;
         if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
           to_bitField0_ |= 0x00000008;
         }
-        result.lowestTupleIndex_ = lowestTupleIndex_;
+        result.lastSentTupleIndex_ = lastSentTupleIndex_;
         if (((from_bitField0_ & 0x00000010) == 0x00000010)) {
           to_bitField0_ |= 0x00000010;
         }
-        result.lastSentTupleIndex_ = lastSentTupleIndex_;
+        result.totalTupleCount_ = totalTupleCount_;
         if (((from_bitField0_ & 0x00000020) == 0x00000020)) {
           to_bitField0_ |= 0x00000020;
         }
-        result.totalTupleCount_ = totalTupleCount_;
+        result.outstandingBufferCount_ = outstandingBufferCount_;
         if (((from_bitField0_ & 0x00000040) == 0x00000040)) {
           to_bitField0_ |= 0x00000040;
         }
-        result.outstandingBufferCount_ = outstandingBufferCount_;
+        result.outstandingByteCount_ = outstandingByteCount_;
         if (((from_bitField0_ & 0x00000080) == 0x00000080)) {
           to_bitField0_ |= 0x00000080;
         }
-        result.outstandingByteCount_ = outstandingByteCount_;
+        result.isPaused_ = isPaused_;
         if (((from_bitField0_ & 0x00000100) == 0x00000100)) {
           to_bitField0_ |= 0x00000100;
-        }
-        result.isPaused_ = isPaused_;
-        if (((from_bitField0_ & 0x00000200) == 0x00000200)) {
-          to_bitField0_ |= 0x00000200;
         }
         result.isSynced_ = isSynced_;
         result.bitField0_ = to_bitField0_;
@@ -3808,9 +3780,6 @@ public final class DRAgent {
         if (other == org.voltdb.pmsg.DRAgent.PartitionInfo.getDefaultInstance()) return this;
         if (other.hasPartitionId()) {
           setPartitionId(other.getPartitionId());
-        }
-        if (other.hasOldestTimestamp()) {
-          setOldestTimestamp(other.getOldestTimestamp());
         }
         if (other.hasLastSentTimestamp()) {
           setLastSentTimestamp(other.getLastSentTimestamp());
@@ -3874,46 +3843,41 @@ public final class DRAgent {
             }
             case 17: {
               bitField0_ |= 0x00000002;
-              oldestTimestamp_ = input.readFixed64();
+              lastSentTimestamp_ = input.readFixed64();
               break;
             }
-            case 25: {
+            case 24: {
               bitField0_ |= 0x00000004;
-              lastSentTimestamp_ = input.readFixed64();
+              lowestTupleIndex_ = input.readInt64();
               break;
             }
             case 32: {
               bitField0_ |= 0x00000008;
-              lowestTupleIndex_ = input.readInt64();
+              lastSentTupleIndex_ = input.readInt64();
               break;
             }
             case 40: {
               bitField0_ |= 0x00000010;
-              lastSentTupleIndex_ = input.readInt64();
+              totalTupleCount_ = input.readInt64();
               break;
             }
             case 48: {
               bitField0_ |= 0x00000020;
-              totalTupleCount_ = input.readInt64();
+              outstandingBufferCount_ = input.readInt64();
               break;
             }
             case 56: {
               bitField0_ |= 0x00000040;
-              outstandingBufferCount_ = input.readInt64();
+              outstandingByteCount_ = input.readInt64();
               break;
             }
             case 64: {
               bitField0_ |= 0x00000080;
-              outstandingByteCount_ = input.readInt64();
+              isPaused_ = input.readBool();
               break;
             }
             case 72: {
               bitField0_ |= 0x00000100;
-              isPaused_ = input.readBool();
-              break;
-            }
-            case 80: {
-              bitField0_ |= 0x00000200;
               isSynced_ = input.readBool();
               break;
             }
@@ -3944,190 +3908,169 @@ public final class DRAgent {
         return this;
       }
       
-      // optional fixed64 oldestTimestamp = 2;
-      private long oldestTimestamp_ ;
-      public boolean hasOldestTimestamp() {
-        return ((bitField0_ & 0x00000002) == 0x00000002);
-      }
-      public long getOldestTimestamp() {
-        return oldestTimestamp_;
-      }
-      public Builder setOldestTimestamp(long value) {
-        bitField0_ |= 0x00000002;
-        oldestTimestamp_ = value;
-        onChanged();
-        return this;
-      }
-      public Builder clearOldestTimestamp() {
-        bitField0_ = (bitField0_ & ~0x00000002);
-        oldestTimestamp_ = 0L;
-        onChanged();
-        return this;
-      }
-      
-      // optional fixed64 lastSentTimestamp = 3;
+      // optional fixed64 lastSentTimestamp = 2;
       private long lastSentTimestamp_ ;
       public boolean hasLastSentTimestamp() {
-        return ((bitField0_ & 0x00000004) == 0x00000004);
+        return ((bitField0_ & 0x00000002) == 0x00000002);
       }
       public long getLastSentTimestamp() {
         return lastSentTimestamp_;
       }
       public Builder setLastSentTimestamp(long value) {
-        bitField0_ |= 0x00000004;
+        bitField0_ |= 0x00000002;
         lastSentTimestamp_ = value;
         onChanged();
         return this;
       }
       public Builder clearLastSentTimestamp() {
-        bitField0_ = (bitField0_ & ~0x00000004);
+        bitField0_ = (bitField0_ & ~0x00000002);
         lastSentTimestamp_ = 0L;
         onChanged();
         return this;
       }
       
-      // optional int64 lowestTupleIndex = 4;
+      // optional int64 lowestTupleIndex = 3;
       private long lowestTupleIndex_ ;
       public boolean hasLowestTupleIndex() {
-        return ((bitField0_ & 0x00000008) == 0x00000008);
+        return ((bitField0_ & 0x00000004) == 0x00000004);
       }
       public long getLowestTupleIndex() {
         return lowestTupleIndex_;
       }
       public Builder setLowestTupleIndex(long value) {
-        bitField0_ |= 0x00000008;
+        bitField0_ |= 0x00000004;
         lowestTupleIndex_ = value;
         onChanged();
         return this;
       }
       public Builder clearLowestTupleIndex() {
-        bitField0_ = (bitField0_ & ~0x00000008);
+        bitField0_ = (bitField0_ & ~0x00000004);
         lowestTupleIndex_ = 0L;
         onChanged();
         return this;
       }
       
-      // optional int64 lastSentTupleIndex = 5;
+      // optional int64 lastSentTupleIndex = 4;
       private long lastSentTupleIndex_ ;
       public boolean hasLastSentTupleIndex() {
-        return ((bitField0_ & 0x00000010) == 0x00000010);
+        return ((bitField0_ & 0x00000008) == 0x00000008);
       }
       public long getLastSentTupleIndex() {
         return lastSentTupleIndex_;
       }
       public Builder setLastSentTupleIndex(long value) {
-        bitField0_ |= 0x00000010;
+        bitField0_ |= 0x00000008;
         lastSentTupleIndex_ = value;
         onChanged();
         return this;
       }
       public Builder clearLastSentTupleIndex() {
-        bitField0_ = (bitField0_ & ~0x00000010);
+        bitField0_ = (bitField0_ & ~0x00000008);
         lastSentTupleIndex_ = 0L;
         onChanged();
         return this;
       }
       
-      // optional int64 totalTupleCount = 6;
+      // optional int64 totalTupleCount = 5;
       private long totalTupleCount_ ;
       public boolean hasTotalTupleCount() {
-        return ((bitField0_ & 0x00000020) == 0x00000020);
+        return ((bitField0_ & 0x00000010) == 0x00000010);
       }
       public long getTotalTupleCount() {
         return totalTupleCount_;
       }
       public Builder setTotalTupleCount(long value) {
-        bitField0_ |= 0x00000020;
+        bitField0_ |= 0x00000010;
         totalTupleCount_ = value;
         onChanged();
         return this;
       }
       public Builder clearTotalTupleCount() {
-        bitField0_ = (bitField0_ & ~0x00000020);
+        bitField0_ = (bitField0_ & ~0x00000010);
         totalTupleCount_ = 0L;
         onChanged();
         return this;
       }
       
-      // optional int64 outstandingBufferCount = 7;
+      // optional int64 outstandingBufferCount = 6;
       private long outstandingBufferCount_ ;
       public boolean hasOutstandingBufferCount() {
-        return ((bitField0_ & 0x00000040) == 0x00000040);
+        return ((bitField0_ & 0x00000020) == 0x00000020);
       }
       public long getOutstandingBufferCount() {
         return outstandingBufferCount_;
       }
       public Builder setOutstandingBufferCount(long value) {
-        bitField0_ |= 0x00000040;
+        bitField0_ |= 0x00000020;
         outstandingBufferCount_ = value;
         onChanged();
         return this;
       }
       public Builder clearOutstandingBufferCount() {
-        bitField0_ = (bitField0_ & ~0x00000040);
+        bitField0_ = (bitField0_ & ~0x00000020);
         outstandingBufferCount_ = 0L;
         onChanged();
         return this;
       }
       
-      // optional int64 outstandingByteCount = 8;
+      // optional int64 outstandingByteCount = 7;
       private long outstandingByteCount_ ;
       public boolean hasOutstandingByteCount() {
-        return ((bitField0_ & 0x00000080) == 0x00000080);
+        return ((bitField0_ & 0x00000040) == 0x00000040);
       }
       public long getOutstandingByteCount() {
         return outstandingByteCount_;
       }
       public Builder setOutstandingByteCount(long value) {
-        bitField0_ |= 0x00000080;
+        bitField0_ |= 0x00000040;
         outstandingByteCount_ = value;
         onChanged();
         return this;
       }
       public Builder clearOutstandingByteCount() {
-        bitField0_ = (bitField0_ & ~0x00000080);
+        bitField0_ = (bitField0_ & ~0x00000040);
         outstandingByteCount_ = 0L;
         onChanged();
         return this;
       }
       
-      // optional bool isPaused = 9;
+      // optional bool isPaused = 8;
       private boolean isPaused_ ;
       public boolean hasIsPaused() {
-        return ((bitField0_ & 0x00000100) == 0x00000100);
+        return ((bitField0_ & 0x00000080) == 0x00000080);
       }
       public boolean getIsPaused() {
         return isPaused_;
       }
       public Builder setIsPaused(boolean value) {
-        bitField0_ |= 0x00000100;
+        bitField0_ |= 0x00000080;
         isPaused_ = value;
         onChanged();
         return this;
       }
       public Builder clearIsPaused() {
-        bitField0_ = (bitField0_ & ~0x00000100);
+        bitField0_ = (bitField0_ & ~0x00000080);
         isPaused_ = false;
         onChanged();
         return this;
       }
       
-      // optional bool isSynced = 10;
+      // optional bool isSynced = 9;
       private boolean isSynced_ ;
       public boolean hasIsSynced() {
-        return ((bitField0_ & 0x00000200) == 0x00000200);
+        return ((bitField0_ & 0x00000100) == 0x00000100);
       }
       public boolean getIsSynced() {
         return isSynced_;
       }
       public Builder setIsSynced(boolean value) {
-        bitField0_ |= 0x00000200;
+        bitField0_ |= 0x00000100;
         isSynced_ = value;
         onChanged();
         return this;
       }
       public Builder clearIsSynced() {
-        bitField0_ = (bitField0_ & ~0x00000200);
+        bitField0_ = (bitField0_ & ~0x00000100);
         isSynced_ = false;
         onChanged();
         return this;
@@ -5362,22 +5305,21 @@ public final class DRAgent {
       "ED\020\002\022\027\n\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTIVE\020" +
       "\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010NodeInfo\022\020\n\010hostna" +
       "me\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\ncatalogCRC\030\003" +
-      " \001(\006\"\211\002\n\rPartitionInfo\022\023\n\013partitionId\030\001 " +
-      "\001(\005\022\027\n\017oldestTimestamp\030\002 \001(\006\022\031\n\021lastSent" +
-      "Timestamp\030\003 \001(\006\022\030\n\020lowestTupleIndex\030\004 \001(" +
-      "\003\022\032\n\022lastSentTupleIndex\030\005 \001(\003\022\027\n\017totalTu" +
-      "pleCount\030\006 \001(\003\022\036\n\026outstandingBufferCount",
-      "\030\007 \001(\003\022\034\n\024outstandingByteCount\030\010 \001(\003\022\020\n\010" +
-      "isPaused\030\t \001(\010\022\020\n\010isSynced\030\n \001(\010\"\260\002\n\014Ctr" +
-      "lEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEnvel" +
-      "ope.Type\022\026\n\003ack\030\002 \001(\0132\t.pmsg.Ack\022\032\n\005rese" +
-      "t\030\003 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\004 \001(\0132\013.pm" +
-      "sg.Pause\022 \n\010response\030\005 \001(\0132\016.pmsg.Respon" +
-      "se\022&\n\013snapshotReq\030\006 \001(\0132\021.pmsg.SnapshotR" +
-      "eq\"_\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020" +
-      "\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_R" +
-      "EQ\020\006\022\r\n\tSTOP_SYNC\020\007B\032\n\017org.voltdb.pmsgB\007",
-      "DRAgent"
+      " \001(\006\"\360\001\n\rPartitionInfo\022\023\n\013partitionId\030\001 " +
+      "\001(\005\022\031\n\021lastSentTimestamp\030\002 \001(\006\022\030\n\020lowest" +
+      "TupleIndex\030\003 \001(\003\022\032\n\022lastSentTupleIndex\030\004" +
+      " \001(\003\022\027\n\017totalTupleCount\030\005 \001(\003\022\036\n\026outstan" +
+      "dingBufferCount\030\006 \001(\003\022\034\n\024outstandingByte",
+      "Count\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(\010\022\020\n\010isSynce" +
+      "d\030\t \001(\010\"\260\002\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027" +
+      ".pmsg.CtrlEnvelope.Type\022\026\n\003ack\030\002 \001(\0132\t.p" +
+      "msg.Ack\022\032\n\005reset\030\003 \001(\0132\013.pmsg.Reset\022\032\n\005p" +
+      "ause\030\004 \001(\0132\013.pmsg.Pause\022 \n\010response\030\005 \001(" +
+      "\0132\016.pmsg.Response\022&\n\013snapshotReq\030\006 \001(\0132\021" +
+      ".pmsg.SnapshotReq\"_\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RE" +
+      "SET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020" +
+      "\005\022\020\n\014SNAPSHOT_REQ\020\006\022\r\n\tSTOP_SYNC\020\007B\032\n\017or" +
+      "g.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -5437,7 +5379,7 @@ public final class DRAgent {
           internal_static_pmsg_PartitionInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_PartitionInfo_descriptor,
-              new java.lang.String[] { "PartitionId", "OldestTimestamp", "LastSentTimestamp", "LowestTupleIndex", "LastSentTupleIndex", "TotalTupleCount", "OutstandingBufferCount", "OutstandingByteCount", "IsPaused", "IsSynced", },
+              new java.lang.String[] { "PartitionId", "LastSentTimestamp", "LowestTupleIndex", "LastSentTupleIndex", "TotalTupleCount", "OutstandingBufferCount", "OutstandingByteCount", "IsPaused", "IsSynced", },
               org.voltdb.pmsg.DRAgent.PartitionInfo.class,
               org.voltdb.pmsg.DRAgent.PartitionInfo.Builder.class);
           internal_static_pmsg_CtrlEnvelope_descriptor =

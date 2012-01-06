@@ -52,19 +52,18 @@ message PartitionInfo {
     optional int32 partitionId = 1;
 
     // info for active replication
-    optional fixed64 oldestTimestamp = 2;
-    optional fixed64 lastSentTimestamp = 3;
+    optional fixed64 lastSentTimestamp = 2;
 
     // info for syncing snapshots
-    optional int64 lowestTupleIndex = 4;
-    optional int64 lastSentTupleIndex = 5;
-    optional int64 totalTupleCount = 6;
+    optional int64 lowestTupleIndex = 3;
+    optional int64 lastSentTupleIndex = 4;
+    optional int64 totalTupleCount = 5;
 
     // common info
-    optional int64 outstandingBufferCount = 7;
-    optional int64 outstandingByteCount = 8;
-    optional bool isPaused = 9;
-    optional bool isSynced = 10;
+    optional int64 outstandingBufferCount = 6;
+    optional int64 outstandingByteCount = 7;
+    optional bool isPaused = 8;
+    optional bool isSynced = 9;
 }
 
 message CtrlEnvelope {
