@@ -50,6 +50,7 @@
 package com.procedures;
 
 import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
@@ -61,6 +62,8 @@ import org.voltdb.VoltTable;
  * Loads initial data into TPCC tables.
  */
 public class LoadWarehouse extends VoltProcedure {
+
+    public static final SQLStmt writeStmt = new SQLStmt("INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public VoltTable[] run(short w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
         VoltTable stocks, VoltTable orders, VoltTable neworders, VoltTable orderLines, VoltTable histories)

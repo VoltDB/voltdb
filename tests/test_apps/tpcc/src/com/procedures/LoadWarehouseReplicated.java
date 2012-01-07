@@ -37,6 +37,8 @@ import org.voltdb.VoltTable;
  */
 public class LoadWarehouseReplicated extends VoltProcedure {
 
+    public final static SQLStmt writeStmt = new SQLStmt("INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
     public final SQLStmt checkItemExists = new SQLStmt("SELECT * FROM ITEM LIMIT 1");
 
     public VoltTable[] run(short w_id, VoltTable items, VoltTable customerNames)
