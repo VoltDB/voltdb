@@ -67,6 +67,7 @@ public class MockVoltClient implements Client {
     }
 
     ProcedureCallback m_callback = null;
+    boolean m_nextReturn = true;
 
     @Override
     public ClientResponse callProcedure(String procName, Object... parameters) throws ProcCallException {
@@ -318,12 +319,17 @@ public class MockVoltClient implements Client {
             lastOrigTxnId = originalTxnId;
         }
 
-        return true;
+        return m_nextReturn;
     }
 
     public void pokeLastCallback(final byte status, final String message) throws Exception
     {
         ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
         m_callback.clientCallback(clientResponse);
+    }
+
+    public void setNextReturn(boolean retval)
+    {
+        m_nextReturn = retval;
     }
 }
