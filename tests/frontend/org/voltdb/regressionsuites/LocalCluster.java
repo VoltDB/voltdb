@@ -585,7 +585,7 @@ public class LocalCluster implements VoltServerConfig {
         try {
             // set the dragent's port offset
             m_procBuilder.environment().put("dragentportoffset",
-                    String.valueOf(VoltDB.DEFAULT_DR_PORT + hostId * 2));
+                    String.valueOf(VoltDB.DEFAULT_DR_PORT + hostId * 3));
 
             // voltdb client/native ports move forward from 21212
             m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
