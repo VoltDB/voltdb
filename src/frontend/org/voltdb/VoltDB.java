@@ -27,7 +27,6 @@ import java.util.TimeZone;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * <code>VoltDB</code> is the main class for VoltDB server.
@@ -66,10 +65,9 @@ public class VoltDB {
 
     public static Charset UTF8ENCODING = Charset.forName("UTF-8");
 
-    // if VoltDB is running in your process, prepare to us GMT timezone
+    // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
-        //System.out.println(TimeZone.getTimeZone("GMT+0").getID());
-          TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
     }
     static {
         setDefaultTimezone();
