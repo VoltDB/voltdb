@@ -585,6 +585,9 @@ public class SocketJoiner extends Thread {
                 VoltDB.instance().setStartMode(OperationMode.get((byte) in.read()));
                 // set the replication role here
                 VoltDB.instance().setReplicationRole(ReplicationRole.get((byte) in.read()));
+                // set the replication active status here
+                boolean replicationActive = ((byte) in.read() == 0) ? false : true;
+                VoltDB.instance().setReplicationActive(replicationActive);
                 // read the current catalog
                 int catalogLength = in.readInt();
                 byte[] catalogBytes = new byte[catalogLength];
@@ -818,6 +821,8 @@ public class SocketJoiner extends Thread {
             out.write(VoltDB.instance().getMode().ordinal());
             // send the replication role here
             out.write(VoltDB.instance().getReplicationRole().ordinal());
+            // send the replication active status
+            out.write(VoltDB.instance().getReplicationActive() ? 1 : 0);
             // write the catalog contents
             out.writeInt(catalogBytes.length);
             out.write(catalogBytes);

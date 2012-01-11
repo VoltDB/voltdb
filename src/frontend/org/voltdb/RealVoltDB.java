@@ -189,6 +189,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // and this node is viable for replay
     volatile boolean m_recovering = false;
 
+    boolean m_replicationActive = false;
+
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
     private boolean m_executionSitesRecovered = false;
@@ -381,6 +383,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                         m_catalogContext,
                                         m_serializedCatalog,
                                         m_recovering,
+                                        m_replicationActive,
                                         m_downHosts,
                                         hostLog);
                             m_runners.add(runner);
@@ -408,6 +411,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                   m_serializedCatalog,
                                   null,
                                   m_recovering,
+                                  m_replicationActive,
                                   m_downHosts,
                                   m_catalogContext.m_transactionId);
             m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
@@ -1869,5 +1873,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public ExecutorService getComputationService() {
         return m_computationService;
+    }
+
+    @Override
+    public void setReplicationActive(boolean active)
+    {
+        m_replicationActive = active;
+    }
+
+    @Override
+    public boolean getReplicationActive()
+    {
+        return m_replicationActive;
     }
 }

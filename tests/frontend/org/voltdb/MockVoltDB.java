@@ -592,4 +592,18 @@ public class MockVoltDB implements VoltDBInterface
     public ExecutorService getComputationService() {
         return m_es;
     }
+
+    @Override
+    public void setReplicationActive(boolean active)
+    {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public boolean getReplicationActive()
+    {
+        // TODO Auto-generated method stub
+        return false;
+    }
 }

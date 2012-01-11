@@ -34,8 +34,11 @@ public class PartitionDRGateway {
      * @param overflowDir
      * @return Instance of PartitionDRGateway
      */
-    public static PartitionDRGateway getInstance(int partitionId, boolean rejoiningAtStartup, File overflowDir) {
-
+    public static PartitionDRGateway getInstance(int partitionId,
+                                                 boolean rejoiningAtStartup,
+                                                 boolean replicationActive,
+                                                 File overflowDir)
+    {
         PartitionDRGateway pdrg = null;
 
         VoltDBInterface vdb = VoltDB.instance();
@@ -58,7 +61,8 @@ public class PartitionDRGateway {
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, rejoiningAtStartup, overflowDir);
+            pdrg.init(partitionId, rejoiningAtStartup, replicationActive,
+                      overflowDir);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
@@ -66,7 +70,10 @@ public class PartitionDRGateway {
     }
 
     // empty methods for community edition
-    protected void init(int partitionId, boolean rejoiningAtStartup, File overflowDir) throws IOException {}
+    protected void init(int partitionId,
+                        boolean rejoiningAtStartup,
+                        boolean replicationActive,
+                        File overflowDir) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
     public void tick(long txnId) {}
     public void shutdown() {}

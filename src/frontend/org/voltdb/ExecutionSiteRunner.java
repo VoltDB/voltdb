@@ -34,6 +34,7 @@ public class ExecutionSiteRunner implements Runnable {
     private final String m_serializedCatalog;
     volatile ExecutionSite m_siteObj;
     private final boolean m_recovering;
+    private final boolean m_replicationActive;
     private final HashSet<Integer> m_failedHostIds;
     private final long m_txnId;
     private final VoltLogger m_hostLog;
@@ -43,11 +44,13 @@ public class ExecutionSiteRunner implements Runnable {
             final CatalogContext context,
             final String serializedCatalog,
             boolean recovering,
+            boolean replicationActive,
             HashSet<Integer> failedHostIds,
             VoltLogger hostLog) {
         m_siteId = siteId;
         m_serializedCatalog = serializedCatalog;
         m_recovering = recovering;
+        m_replicationActive = replicationActive;
         m_failedHostIds = failedHostIds;
         m_txnId = context.m_transactionId;
         m_hostLog = hostLog;
@@ -65,6 +68,7 @@ public class ExecutionSiteRunner implements Runnable {
                               m_serializedCatalog,
                               null,
                               m_recovering,
+                              m_replicationActive,
                               m_failedHostIds,
                               m_txnId);
         synchronized (this) {

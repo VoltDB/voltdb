@@ -676,6 +676,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                   final int siteId, String serializedCatalog,
                   RestrictedPriorityQueue transactionQueue,
                   boolean recovering,
+                  boolean replicationActive,
                   HashSet<Integer> failedHostIds,
                   final long txnId)
     {
@@ -701,7 +702,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         // initialize the DR gateway
         int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
         File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "wan_overflow");
-        m_partitionDRGateway = PartitionDRGateway.getInstance(partitionId, m_recovering, overflowDir);
+        m_partitionDRGateway =
+            PartitionDRGateway.getInstance(partitionId, m_recovering,
+                                           replicationActive, overflowDir);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
