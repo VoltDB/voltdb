@@ -297,9 +297,9 @@ public class StatsAgent {
         obj.put("returnAddress", m_mailbox.getSiteId());
         obj.put("selector", "WANNODE");
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
-        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
         final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
         for (Integer host : st.getAllLiveHosts()) {
+            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
             m_mailbox.send( st.getFirstNonExecSiteForHost(host), VoltDB.STATS_MAILBOX_ID, bpm);
         }
     }
