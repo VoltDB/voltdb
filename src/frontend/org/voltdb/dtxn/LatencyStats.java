@@ -85,6 +85,11 @@ public class LatencyStats extends SiteStatsSource {
      */
     public synchronized void logTransactionCompleted(int delta) {
         int bucketIndex = Math.min((int) (delta / BUCKET_RANGE), m_latencyBuckets.length - 1);
+
+        // if the host's clock moves backwards, bucketIndex can be negative
+        // this next line of code is a lie, but a beautiful one that keeps your server up
+        if (bucketIndex < 0) bucketIndex = 0;
+
         m_max = Math.max(delta, m_max);
         m_latencyBuckets[bucketIndex]++;
     }
