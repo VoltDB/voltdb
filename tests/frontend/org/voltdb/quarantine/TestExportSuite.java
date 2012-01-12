@@ -874,16 +874,17 @@ public class TestExportSuite extends RegressionSuite {
     public void testExportUpdateAppendOnly() throws IOException {
         System.out.println("testExportUpdateAppendOnly");
         final Client client = getClient();
-        boolean passed = false;
+        boolean threw = false;
         try {
             client.callProcedure("@AdHoc", "Update NO_NULLS SET A_TINYINT=0 WHERE PKEY=0;");
         }
         catch (final ProcCallException e) {
-            if (e.getMessage().contains("Illegal to update an export table.")) {
-                passed = true;
-            }
+            assertTrue("Updating an export table with adhoc returned a strange message",
+                       e.getMessage().contains("Illegal to update an export table."));
+            threw = true;
         }
-        assertTrue(passed);
+        assertTrue("Updating an export-only table failed to throw an exception",
+                   threw);
     }
 
     //

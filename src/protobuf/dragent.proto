@@ -2,6 +2,11 @@ package pmsg;
 option java_package = "org.voltdb.pmsg";
 option java_outer_classname = "DRAgent";
 
+message UUID {
+    required fixed64 instance = 1;
+    required fixed64 count = 2;
+}
+
 message Ack {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
@@ -28,18 +33,19 @@ message Response {
         ACTIVE = 4;
         UNAVAILABLE = 5;
     }
-    optional ReplicationMode mode = 1;
-    optional fixed64 snapshotTimestamp = 2;
-    optional fixed64 instanceIdHash = 3;
-    optional string version = 4;
+    required UUID id = 1;
+    optional ReplicationMode mode = 2;
+    optional fixed64 snapshotTimestamp = 3;
+    optional fixed64 instanceIdHash = 4;
+    optional string version = 5;
     // all known nodes globally
     //  first entry is self
-    repeated NodeInfo nodeInfo = 5;
-    optional int32 globalPartitionCount = 6;
+    repeated NodeInfo nodeInfo = 6;
+    optional int32 globalPartitionCount = 7;
     // local partitions
-    repeated PartitionInfo partitionInfo = 7;
+    repeated PartitionInfo partitionInfo = 8;
     // status. 0 means ok
-    optional int32 status = 8 [default = 0];
+    optional int32 status = 9 [default = 0];
 }
 
 message NodeInfo {
@@ -77,9 +83,10 @@ message CtrlEnvelope {
         STOP_SYNC = 7;
     }
     required Type type = 1;
-    optional Ack ack = 2;
-    optional Reset reset = 3;
-    optional Pause pause = 4;
-    optional Response response = 5;
-    optional SnapshotReq snapshotReq = 6;
+    required UUID id = 2;
+    optional Ack ack = 3;
+    optional Reset reset = 4;
+    optional Pause pause = 5;
+    optional Response response = 6;
+    optional SnapshotReq snapshotReq = 7;
 }
