@@ -114,7 +114,7 @@ public class PlannerTool {
                     costModel, sql, null, "PlannerTool", "PlannerToolProc",
                     singlePartition, AD_HOC_JOINED_TABLE_LIMIT, null);
         } catch (Exception e) {
-            throw new RuntimeException("Error creating planner ", e);
+            throw new RuntimeException("Error creating planner: " + e.getMessage(), e);
         }
         if (plan == null) {
             String plannerMsg = planner.getErrorMessage();
