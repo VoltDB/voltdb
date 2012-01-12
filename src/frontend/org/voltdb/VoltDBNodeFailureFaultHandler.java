@@ -102,10 +102,20 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
             public void run() {
                 // if we see an early fault (during startup), then it's ok not to
                 // notify the export manager
-                if (ExportManager.instance() == null)
-                    return;
-                //Notify the export manager the cluster topology has changed
-                ExportManager.instance().notifyOfClusterTopologyChange();
+                if (ExportManager.instance() != null) {
+                    //Notify the export manager the cluster topology has changed
+                    ExportManager.instance().notifyOfClusterTopologyChange();
+                }
+
+                // kill the cluster if this all happened too soon
+                if (VoltDB.instance().getHostMessenger().isLocalHostReady() == false) {
+                    // check that this isn't a rejoining node
+                    if (VoltDB.instance().getConfig().m_rejoinToHostAndPort == null) {
+                        String message = "Node fault detected before all nodes finished " +
+                                         "initializing. Cluster will not start.";
+                        VoltDB.crashGlobalVoltDB(message, false, null);
+                    }
+                }
             }
         }.start();
     }

@@ -65,6 +65,7 @@ public class HostMessenger implements Messenger {
 
     int m_localHostId;
     boolean m_initialized = false;
+    boolean m_localhostReady = false;
 
     private final SocketJoiner m_joiner;
     private final VoltNetwork m_network;
@@ -582,7 +583,13 @@ public class HostMessenger implements Messenger {
      * @param hostId The id of the host that is ready.
      */
     synchronized void hostIsReady(int hostId) {
+        if (hostId == m_localHostId)
+            m_localhostReady = true;
         m_hostsToWaitFor.decrementAndGet();
+    }
+
+    public synchronized boolean isLocalHostReady() {
+        return m_localhostReady;
     }
 
     @Override

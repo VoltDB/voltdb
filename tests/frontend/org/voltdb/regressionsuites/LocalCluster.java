@@ -61,6 +61,9 @@ public class LocalCluster implements VoltServerConfig {
     // will vary between -3 and 3 uniformly
     static final int TIMESTAMP_SALT_VARIANCE = 3;
 
+    // how long to wait for startup of external procs
+    static final long PIPE_WAIT_MAX_TIMEOUT = 60 * 1000;
+
     // configuration data
     final String m_jarFileName;
     final int m_siteCount;
@@ -130,17 +133,21 @@ public class LocalCluster implements VoltServerConfig {
 
         // set m_witnessReady when the m_token byte sequence is seen.
         AtomicBoolean m_witnessedReady;
+        AtomicBoolean m_eof = new AtomicBoolean(false);
         final String m_token;
         int m_hostId = Integer.MAX_VALUE;
         long m_initTime;
-        private boolean m_eof = false;
+
+        // memoize the process here so we can easily check for process death
+        Process m_process;
 
         PipeToFile(String filename, InputStream stream, String token,
-                   boolean appendLog) {
+                   boolean appendLog, Process proc) {
             m_witnessedReady = new AtomicBoolean(false);
             m_token = token;
             m_filename = filename;
             m_input = new BufferedReader(new InputStreamReader(stream));
+            m_process = proc;
             try {
                 m_writer = new FileWriter(filename, appendLog);
             }
@@ -148,6 +155,13 @@ public class LocalCluster implements VoltServerConfig {
                 Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
                 throw new RuntimeException(ex);
             }
+        }
+
+        /**
+         * Allow callers to get the process object to double check for death
+         */
+        Process getProcess() {
+            return m_process;
         }
 
         public int getHostId() {
@@ -160,11 +174,11 @@ public class LocalCluster implements VoltServerConfig {
             assert(m_writer != null);
             assert(m_input != null);
             boolean initLocationFound = false;
-            while (!m_eof) {
+            while (m_eof.get() != true) {
                 try {
                     String data = m_input.readLine();
                     if (data == null) {
-                        m_eof = true;
+                        m_eof.set(true);
                         continue;
                     }
 
@@ -200,11 +214,11 @@ public class LocalCluster implements VoltServerConfig {
                     m_writer.flush();
                 }
                 catch (IOException ex) {
-                    m_eof = true;
+                    m_eof.set(true);
                 }
             }
             synchronized (this) {
-                notify();
+                notifyAll();
             }
             try {
                 m_writer.close();
@@ -442,6 +456,7 @@ public class LocalCluster implements VoltServerConfig {
             return;
         }
 
+        // clear any logs, export or snapshot data for this run
         if (clearLocalDataDirectories) {
             try {
                 m_subRoots.clear();
@@ -449,7 +464,6 @@ public class LocalCluster implements VoltServerConfig {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-
         }
 
         // set to true to spew startup timing data
@@ -514,18 +528,33 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         // spin until all the pipes see the magic "Server completed.." string.
-        boolean allReady;
+        long startOfPipeWait = System.currentTimeMillis();
+        boolean allReady = false;
+        if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
         do {
-            if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
+            if ((System.currentTimeMillis() - startOfPipeWait) > PIPE_WAIT_MAX_TIMEOUT) {
+                break;
+            }
+
             allReady = true;
             for (PipeToFile pipeToFile : m_pipes) {
                 if (pipeToFile == null) {
                     continue;
                 }
                 synchronized(pipeToFile) {
+                    // if eof, then no point in waiting around
+                    if (pipeToFile.m_eof.get())
+                        continue;
+
+                    // if process is dead, no point in waiting around
+                    if (isProcessDead(pipeToFile.getProcess()))
+                        continue;
+
+                    // if not eof, then wait for statement of readiness
                     if (pipeToFile.m_witnessedReady.get() != true) {
                         try {
-                            pipeToFile.wait();
+                            // use a timeout to prevent a forever hang
+                            pipeToFile.wait(1000);
                         }
                         catch (InterruptedException ex) {
                             Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
@@ -536,9 +565,37 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
         } while (allReady == false);
+
         if (logtime) System.out.println("********** post witness: " + (System.currentTimeMillis() - startTime) + " ms");
-        if (!allReady) {
-            throw new RuntimeException("Not all processes became ready");
+
+        // verify all processes started up and count failures
+        int expectedProcesses = m_hostCount - (m_hasLocalServer ? 1 : 0);
+        int downProcesses = 0;
+        for (Process proc : m_cluster) {
+            if ((proc != null) && (isProcessDead(proc))) {
+                downProcesses++;
+            }
+        }
+
+        // throw an exception if there were failures starting up
+        if ((downProcesses > 0) || (allReady == false)) {
+            // poke all the external processes to die (no guarantees)
+            for (Process proc : m_cluster) {
+                if (proc != null) {
+                    try { proc.destroy(); } catch (Exception e) {}
+                }
+            }
+
+            if (downProcesses > 0) {
+                throw new RuntimeException(
+                        String.format("%d/%d external processes failed to start",
+                                downProcesses, expectedProcesses));
+            }
+            // this error case should only be from a timeout
+            if (!allReady) {
+                throw new RuntimeException(
+                        "One or more external processes failed to complete initialization.");
+            }
         }
 
         // Finally, make sure the local server thread is running and wait if it is not.
@@ -666,7 +723,7 @@ public class LocalCluster implements VoltServerConfig {
             }
             PipeToFile ptf = new PipeToFile(testoutputdir + File.separator +
                     getName() + "-" + hostId + ".txt", proc.getInputStream(),
-                    PipeToFile.m_initToken, false);
+                    PipeToFile.m_initToken, false, proc);
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -675,6 +732,19 @@ public class LocalCluster implements VoltServerConfig {
             System.out.println("Failed to start cluster process:" + ex.getMessage());
             Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
             assert (false);
+        }
+    }
+
+    /**
+     * Use the weird portable java way to figure out if a cluster is alive
+     */
+    private boolean isProcessDead(Process p) {
+        try {
+            p.exitValue();
+            return true; // if no exception, process died
+        }
+        catch (IllegalThreadStateException e) {
+            return false; // process is still alive
         }
     }
 
@@ -776,7 +846,7 @@ public class LocalCluster implements VoltServerConfig {
 
             ptf = new PipeToFile(testoutputdir + File.separator +
                     getName() + "-" + hostId + ".txt", proc.getInputStream(),
-                    PipeToFile.m_rejoinToken, true);
+                    PipeToFile.m_rejoinToken, true, proc);
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
                 // replace the existing dead proc
@@ -794,8 +864,16 @@ public class LocalCluster implements VoltServerConfig {
 
         // wait for the joining site to be ready
         synchronized (ptf) {
-            while (ptf.m_witnessedReady.get() != true && !ptf.m_eof) {
-                if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
+            if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
+            while (ptf.m_witnessedReady.get() != true) {
+                // if eof, then no point in waiting around
+                if (ptf.m_eof.get())
+                    break;
+
+                // if process is dead, no point in waiting around
+                if (isProcessDead(ptf.getProcess()))
+                    break;
+
                 try {
                     // wait for explicit notification
                     ptf.wait();

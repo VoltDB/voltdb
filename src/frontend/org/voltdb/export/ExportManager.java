@@ -177,7 +177,6 @@ public class ExportManager
      * @return The global single instance of the ExportManager.
      */
     public static ExportManager instance() {
-        assert (m_self != null);
         return m_self;
     }
 
