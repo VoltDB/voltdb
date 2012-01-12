@@ -70,21 +70,19 @@ public class StatsAgent {
         private final String selector;
         private final Connection c;
         private final long clientData;
-        private int expectedStatsResponses;
+        private int expectedStatsResponses = 0;
         private final VoltTable aggregateTables[];
         private final long startTime;
         public PendingStatsRequest(
                 String selector,
                 Connection c,
                 long clientData,
-                int expectedResponses,
                 VoltTable aggregateTables[],
                 long startTime) {
             this.startTime = startTime;
             this.selector = selector;
             this.c = c;
             this.clientData = clientData;
-            this.expectedStatsResponses = expectedResponses;
             this.aggregateTables = aggregateTables;
         }
     }
@@ -278,7 +276,6 @@ public class StatsAgent {
                     selector,
                     c,
                     clientHandle,
-                    VoltDB.instance().getCatalogContext().numberOfNodes,
                     new VoltTable[2],
                     System.currentTimeMillis());
         final long requestId = m_nextRequestId++;
@@ -299,6 +296,7 @@ public class StatsAgent {
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
         for (Integer host : st.getAllLiveHosts()) {
+            psr.expectedStatsResponses++;
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
             m_mailbox.send( st.getFirstNonExecSiteForHost(host), VoltDB.STATS_MAILBOX_ID, bpm);
         }
