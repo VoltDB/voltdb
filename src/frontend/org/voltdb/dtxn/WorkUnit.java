@@ -283,6 +283,11 @@ class WorkUnit
             map_id = siteId;
         }
 
+        // Check that the replica fragments are the same (non-deterministic SQL)
+        // (Note that this applies for k > 0)
+        // If not same, kill entire cluster and hide the bodies.
+        // In all seriousness, we have no valid way to recover from a non-deterministic event
+        // The safest thing is to make the user aware and stop doing potentially corrupt work.
         boolean duplicate_okay =
             m_dependencies.get(dependencyId).addResult(siteId, map_id, payload);
         if (!duplicate_okay)
@@ -291,7 +296,9 @@ class WorkUnit
             msg += "\n  from execution site: " + siteId;
             msg += "\n  Original results: " + m_dependencies.get(dependencyId).getResult(map_id).toString();
             msg += "\n  Mismatched results: " + payload.toString();
-            throw new RuntimeException(msg);
+            // die die die (German: the the the)
+            VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+            throw new RuntimeException(msg); // gets called only by test code
         }
     }
 

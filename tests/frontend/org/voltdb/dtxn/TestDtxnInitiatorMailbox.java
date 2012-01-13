@@ -22,7 +22,6 @@
  */
 package org.voltdb.dtxn;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Map;
 
@@ -41,11 +40,7 @@ import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.network.Connection;
-import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.EstTime;
 
 public class TestDtxnInitiatorMailbox extends TestCase
@@ -253,6 +248,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void setUp()
     {
         m_mockVolt = new MockVoltDB();
+        m_mockVolt.shouldIgnoreCrashes = true;
         m_mockVolt.addHost(HOST_ID);
         m_mockVolt.addPartition(0);
         m_mockVolt.addSite(1, HOST_ID, 0, true);

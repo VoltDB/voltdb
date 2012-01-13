@@ -25,6 +25,7 @@ import java.util.Set;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 
 /**
@@ -92,7 +93,11 @@ public class InFlightTxnState implements Serializable {
 
         VoltTable[] currResults = r.getResults();
 
-        // compare with other results if they exist
+        // Check that the replica results are the same (non-deterministic SQL)
+        // (Note that this applies for k > 0)
+        // If not same, kill entire cluster and hide the bodies.
+        // In all seriousness, we have no valid way to recover from a non-deterministic event
+        // The safest thing is to make the user aware and stop doing potentially corrupt work.
         if (resultsForComparison != null) {
             VoltTable[] curr_results = r.getResults();
             if (resultsForComparison.length != curr_results.length)
@@ -102,7 +107,9 @@ public class InFlightTxnState implements Serializable {
                 msg += "\n  from execution site: " + coordinatorId;
                 msg += "\n  Expected number of results: " + resultsForComparison.length;
                 msg += "\n  Mismatched number of results: " + curr_results.length;
-                throw new RuntimeException(msg);
+                // die die die
+                VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                throw new RuntimeException(msg); // gets called only by test code
             }
             for (int i = 0; i < resultsForComparison.length; ++i)
             {
@@ -113,7 +120,9 @@ public class InFlightTxnState implements Serializable {
                     msg += "\n  from execution site: " + coordinatorId;
                     msg += "\n  Expected results: " + resultsForComparison[i].toString();
                     msg += "\n  Mismatched results: " + curr_results[i].toString();
-                    throw new RuntimeException(msg);
+                    // die die die
+                    VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+					throw new RuntimeException(msg); // gets called only by test code
                 }
             }
         }
