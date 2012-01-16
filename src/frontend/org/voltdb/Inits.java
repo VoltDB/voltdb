@@ -208,10 +208,11 @@ public class Inits {
         StartHTTPServer
         InitHashinator
         InitAgreementSiteAndStatsAgent
+        SetupReplicationRole
 
         CreateRestoreAgentAndPlan <- InitAgreementSite
         DistributeCatalog <- InitAgreementSite, CreateRestoreAgentAndPlan
-        EnforceLicensing <- CreateRestoreAgentAndPlan
+        EnforceLicensing <- CreateRestoreAgentAndPlan, SetupReplicationRole
         LoadCatalog <- DistributeCatalog
         SetupCommandLogging <- LoadCatalog
         InitExport <- LoadCatalog
@@ -349,6 +350,7 @@ public class Inits {
             // cleanly shutdown the cluster. The network is created
             // in CreateRestoreAgentAndPlan ...
             dependsOn(CreateRestoreAgentAndPlan.class);
+            dependsOn(SetupReplicationRole.class);
         }
 
         @Override
@@ -357,9 +359,12 @@ public class Inits {
             // Make the leader the only license enforcer.
             boolean isLeader = (m_rvdb.m_myHostId == 0);
             if (m_config.m_isEnterprise && isLeader && !m_isRejoin) {
-                assert(m_config != null);
-                if (!MiscUtils.validateLicense(m_config.m_pathToLicense, m_deployment.getCluster().getHostcount())) {
-                    // validateLicense logs as appropriate. Exit call is here for testability.
+
+                if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
+                                               m_deployment.getCluster().getHostcount(),
+                                               m_rvdb.getReplicationRole()))
+                {
+                    // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
                 }
             }

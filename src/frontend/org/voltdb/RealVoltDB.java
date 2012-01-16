@@ -64,6 +64,8 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.agreement.ZKUtil;
@@ -246,6 +248,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     HeartbeatThread heartbeatThread;
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
 
+    // The configured license api: use to decide enterprise/cvommunity edition feature enablement
+    LicenseApi m_licenseApi;
+    LicenseApi getLicenseApi() { return m_licenseApi; }
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
@@ -332,6 +338,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             m_periodicWorkThread = MiscUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize, 1024 * 128);
             buildClusterMesh(isRejoin);
+
+            m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
 
             // do the many init tasks in the Inits class
             Inits inits = new Inits(this, 1);
@@ -1786,12 +1794,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     /**
-<<<<<<< HEAD
-     * Metadata is currently of the format:
-     * IP:CIENTPORT:ADMINPORT:HTTPPORT:DRPORT]
-=======
-     * Metadata is now a JSON object
->>>>>>> master
+     * Metadata is a JSON object
      */
     @Override
     public String getLocalMetadata() {
