@@ -35,6 +35,8 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.VoltLogger;
 
+import org.voltdb.ReplicationRole;
+
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -89,17 +91,15 @@ public class MiscUtils {
     }
 
     /**
-     * Validate the signature and business logic enforcement for a license.
-     * @param pathToLicense
-     * @param numberOfNodes
-     * @return true if the licensing constraints are met
+     * Instantiate the license api impl based on enterprise/community editions
      */
-    public static boolean validateLicense(String pathToLicense, int numberOfNodes) {
+    public static LicenseApi licenseApiFactory(String pathToLicense) {
+
         // verify the file exists.
         File licenseFile = new File(pathToLicense);
         if (licenseFile.exists() == false) {
             hostLog.fatal("Unable to open license file: " + pathToLicense);
-            return false;
+            return null;
         }
 
         // boilerplate to create a license api interface
@@ -112,27 +112,44 @@ public class MiscUtils {
                 licenseApi = (LicenseApi)licApiKlass.newInstance();
             } catch (InstantiationException e) {
                 hostLog.fatal("Unable to process license file: could not create license API.");
-                return false;
+                return null;
             } catch (IllegalAccessException e) {
                 hostLog.fatal("Unable to process license file: could not create license API.");
-                return false;
+                return null;
             }
         }
 
         if (licenseApi == null) {
             hostLog.fatal("Unable to load license file: could not create license API.");
-            return false;
+            return null;
         }
 
         // Initialize the API. This parses the file but does NOT verify signatures.
         if (licenseApi.initializeFromFile(licenseFile) == false) {
             hostLog.fatal("Unable to load license file: could not parse license.");
-            return false;
+            return null;
         }
 
         // Perform signature verification - detect modified files
         if (licenseApi.verify() == false) {
             hostLog.fatal("Unable to load license file: could not verify license signature.");
+            return null;
+        }
+
+        return licenseApi;
+    }
+
+    /**
+     * Validate the signature and business logic enforcement for a license.
+     * @return true if the licensing constraints are met
+     */
+    public static boolean validateLicense(LicenseApi licenseApi,
+            int numberOfNodes, ReplicationRole replicationRole)
+    {
+        // Delay the handling of an invalid license file until here so
+        // that the leader can terminate the full cluster.
+        if (licenseApi == null) {
+            hostLog.fatal("VoltDB license is not valid.");
             return false;
         }
 
@@ -150,6 +167,14 @@ public class MiscUtils {
                 // Expired commercial licenses are allowed but generate log messages.
                 hostLog.error("Warning, VoltDB commercial license expired on " + expiresStr + ".");
                 valid = false;
+            }
+        }
+
+        // enforce wan replication constraint
+        if (replicationRole == ReplicationRole.MASTER) {
+            if (licenseApi.isWanReplicationAllowed() == false) {
+                hostLog.fatal("Warning, VoltDB license does not allow use of WAN Replication.");
+                return false;
             }
         }
 
