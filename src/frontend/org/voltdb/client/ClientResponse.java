@@ -59,6 +59,10 @@ public interface ClientResponse {
      */
     public static final byte SERVER_UNAVAILABLE = -5;
 
+    /**
+     * Status code indicating that the request didn't receive a response before the per-client timeout.
+     */
+    public static final byte CONNECTION_TIMEOUT = -6;
 
     /**
      * Retrieve the status code returned by the server

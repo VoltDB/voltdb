@@ -151,13 +151,6 @@ public class MockVoltClient implements Client {
     }
 
     @Override
-    public void createConnection(String host, String program, String password)
-            throws UnknownHostException, IOException {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public void drain() throws NoConnectionsException {
         // TODO Auto-generated method stub
 
@@ -242,13 +235,6 @@ public class MockVoltClient implements Client {
     }
 
     @Override
-    public void createConnection(String host, int port, String username,
-            String password) throws UnknownHostException, IOException {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public void createConnection(String host) throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
 
@@ -289,17 +275,6 @@ public class MockVoltClient implements Client {
         return false;
     }
 
-    @Override
-    public ClientResponse callProcedure(long originalTxnId,
-                                        String procName,
-                                        Object... parameters) throws IOException,
-                                                             NoConnectionsException,
-                                                             ProcCallException {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
     public boolean callProcedure(long originalTxnId,
                                  ProcedureCallback callback,
                                  String procName,

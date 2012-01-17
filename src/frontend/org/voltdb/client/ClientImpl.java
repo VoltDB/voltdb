@@ -36,7 +36,7 @@ import org.voltdb.utils.DBBPool.BBContainer;
  *  and provides methods to call stored procedures and receive
  *  responses.
  */
-final class ClientImpl implements Client {
+public final class ClientImpl implements Client {
 
     private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
@@ -91,7 +91,8 @@ final class ClientImpl implements Client {
                 config.m_expectedOutgoingMessageSize,
                 config.m_maxArenaSizes,
                 config.m_heavyweight,
-                config.m_statsSettings);
+                config.m_statsSettings,
+                config.m_procedureCallTimeoutMS);
         m_distributer.addClientStatusListener(new CSL());
         m_username = config.m_username;
         m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
@@ -141,31 +142,6 @@ final class ClientImpl implements Client {
         return m_passwordHashCode;
     }
 
-    @Override
-    public void createConnection(String host, String program, String password)
-    throws UnknownHostException, IOException
-    {
-        createConnection(host, Client.VOLTDB_SERVER_PORT, program, password);
-    }
-
-    /**
-     * Create a connection to another VoltDB node.
-     * @param host Hostname or IP address of the host to connect to.
-     * @param port Port number to connect to.
-     * @param username Username to authorize. Username is ignored if authentication is disabled.
-     * @param password Password to authenticate. Password is ignored if authentication is disabled.
-     * @throws UnknownHostException
-     * @throws IOException
-     */
-    @Override
-    public void createConnection(String host, int port, String program, String password)
-        throws UnknownHostException, IOException
-    {
-        if (password == null) password = "";
-        byte[] hashedPassword = ConnectionUtil.getHashedPassword(password);
-        createConnectionWithHashedCredentials(host, port, program, hashedPassword);
-    }
-
     public void createConnectionWithHashedCredentials(String host, int port, String program, byte[] hashedPassword)
         throws IOException
     {
@@ -209,7 +185,6 @@ final class ClientImpl implements Client {
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    @Override
     public final ClientResponse callProcedure(long originalTxnId,
                                               String procName,
                                               Object... parameters)
@@ -264,7 +239,18 @@ final class ClientImpl implements Client {
         return callProcedure(callback, m_expectedOutgoingMessageSize, procName, parameters);
     }
 
-    @Override
+    /**
+     * Asynchronously invoke a replicated procedure. Does not guarantee that the
+     * invocation is actually queued. If there is backpressure on all
+     * connections to the cluster then the invocation will not be queued. Check
+     * the return value to determine if queuing actually took place.
+     *
+     * @param callback ProcedureCallback that will be invoked with procedure results.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return <code>true</code> if the procedure was queued and
+     *         <code>false</code> otherwise
+     */
     public final boolean callProcedure(
             long originalTxnId,
             ProcedureCallback callback,
@@ -422,11 +408,11 @@ final class ClientImpl implements Client {
         m_distributer.shutdown();
     }
 
-    public void addClientStatusListener(ClientStatusListener listener) {
+    public void addClientStatusListener(ClientStatusListenerExt listener) {
         m_distributer.addClientStatusListener(listener);
     }
 
-    public boolean removeClientStatusListener(ClientStatusListener listener) {
+    public boolean removeClientStatusListener(ClientStatusListenerExt listener) {
         return m_distributer.removeClientStatusListener(listener);
     }
 
@@ -446,7 +432,7 @@ final class ClientImpl implements Client {
         }
     }
 
-    class CSL implements ClientStatusListener {
+    class CSL extends ClientStatusListenerExt {
 
         @Override
         public void backpressure(boolean status) {
@@ -470,10 +456,6 @@ final class ClientImpl implements Client {
                     m_backpressureLock.notifyAll();
                 }
             }
-        }
-
-        @Override
-        public void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e) {
         }
 
     }

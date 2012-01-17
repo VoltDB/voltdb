@@ -25,6 +25,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.ClientResponseImpl;
@@ -52,7 +55,7 @@ class Distributer {
     // collection of connections to the cluster
     private final ArrayList<NodeConnection> m_connections = new ArrayList<NodeConnection>();
 
-    private final ArrayList<ClientStatusListener> m_listeners = new ArrayList<ClientStatusListener>();
+    private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<ClientStatusListenerExt>();
 
     //Selector and connection handling, does all work in blocking selection thread
     private final VoltNetwork m_network;
@@ -67,6 +70,11 @@ class Distributer {
     private final boolean m_useMultipleThreads;
 
     private final String m_hostname;
+
+    // timeout for individual procedure calls
+    private final long m_procedureCallTimeoutMS;
+
+    private final Timer m_timer;
 
     /**
      * Server's instances id. Unique for the cluster
@@ -150,15 +158,74 @@ class Distributer {
         }
     }
 
+    class CallExpiration extends TimerTask {
+        @Override
+        public void run() {
+
+            // make a threadsafe copy of all connections
+            ArrayList<NodeConnection> connections = new ArrayList<NodeConnection>();
+            synchronized (Distributer.this) {
+                connections.addAll(m_connections);
+            }
+
+            long now = System.currentTimeMillis();
+
+            // for each connection
+            for (NodeConnection c : connections) {
+                synchronized(c) {
+                    // for each outstanding procedure
+                    for (Entry<Long, CallbackBookeeping> e : c.m_callbacks.entrySet()) {
+                        long handle = e.getKey();
+                        CallbackBookeeping cb = e.getValue();
+
+                        // if the timeout is expired, call the callback and remove the
+                        // bookeeping data
+                        if ((cb.timestamp + m_procedureCallTimeoutMS) < now) {
+                            ClientResponseImpl r = new ClientResponseImpl(
+                                    ClientResponse.CONNECTION_TIMEOUT,
+                                    (byte)0,
+                                    "",
+                                    new VoltTable[0],
+                                    "No response recieved in the allotted time.");
+                            r.setClientHandle(handle);
+                            r.setClientRoundtrip((int) (now - cb.timestamp));
+                            r.setClusterRoundtrip((int) (now - cb.timestamp));
+
+                            try {
+                                cb.callback.clientCallback(r);
+                            } catch (Exception e1) {
+                                e1.printStackTrace();
+                            }
+                            c.m_callbacks.remove(e.getKey());
+                            c.m_callbacksToInvoke.decrementAndGet();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    class CallbackBookeeping {
+        public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name) {
+            this.timestamp = timestamp;
+            this.callback = callback;
+            this.name = name;
+        }
+        long timestamp;
+        ProcedureCallback callback;
+        String name;
+    }
+
     class NodeConnection extends VoltProtocolHandler implements org.voltdb.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
-        private final HashMap<Long, Object[]> m_callbacks;
+        private final HashMap<Long, CallbackBookeeping> m_callbacks;
         private final HashMap<String, ProcedureStats> m_stats
             = new HashMap<String, ProcedureStats>();
         private final int m_hostId;
         private final long m_connectionId;
         private Connection m_connection;
         private String m_hostname;
+        private int m_port;
         private boolean m_isConnected = true;
 
         private long m_invocationsCompleted = 0;
@@ -169,7 +236,7 @@ class Distributer {
         private long m_lastInvocationErrors = 0;
 
         public NodeConnection(long ids[]) {
-            m_callbacks = new HashMap<Long, Object[]>();
+            m_callbacks = new HashMap<Long, CallbackBookeeping>();
             m_hostId = (int)ids[0];
             m_connectionId = ids[1];
         }
@@ -189,7 +256,8 @@ class Distributer {
                     c.discard();
                     return;
                 }
-                m_callbacks.put(handle, new Object[] { System.currentTimeMillis(), callback, name });
+                long now = System.currentTimeMillis();
+                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
                 m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(c);
@@ -209,7 +277,8 @@ class Distributer {
                     }
                     return;
                 }
-                m_callbacks.put(handle, new Object[]{ System.currentTimeMillis(), callback, name });
+                long now = System.currentTimeMillis();
+                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
                 m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(f);
@@ -251,23 +320,31 @@ class Distributer {
             long callTime = 0;
             int delta = 0;
             synchronized (this) {
-                Object stuff[] = m_callbacks.remove(response.getClientHandle());
-
-                callTime = (Long)stuff[0];
-                delta = (int)(now - callTime);
-                cb = (ProcedureCallback)stuff[1];
-                m_invocationsCompleted++;
-                final byte status = response.getStatus();
-                boolean abort = false;
-                boolean error = false;
-                if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
-                    m_invocationAborts++;
-                    abort = true;
-                } else if (status != ClientResponse.SUCCESS) {
-                    m_invocationErrors++;
-                    error = true;
+                CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
+                // presumably (hopefully) this is a response for a timed-out message
+                if (stuff == null) {
+                    for (ClientStatusListenerExt listener : m_listeners) {
+                        listener.lateProcedureResponse(response, m_hostname, m_port);
+                    }
                 }
-                updateStats((String)stuff[2], delta, response.getClusterRoundtrip(), abort, error);
+                // handle a proper callback
+                else {
+                    callTime = stuff.timestamp;
+                    delta = (int)(now - callTime);
+                    cb = stuff.callback;
+                    m_invocationsCompleted++;
+                    final byte status = response.getStatus();
+                    boolean abort = false;
+                    boolean error = false;
+                    if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
+                        m_invocationAborts++;
+                        abort = true;
+                    } else if (status != ClientResponse.SUCCESS) {
+                        m_invocationErrors++;
+                        error = true;
+                    }
+                    updateStats(stuff.name, delta, response.getClusterRoundtrip(), abort, error);
+                }
             }
 
             if (cb != null) {
@@ -278,11 +355,6 @@ class Distributer {
                     uncaughtException(cb, response, e);
                 }
                 m_callbacksToInvoke.decrementAndGet();
-            }
-            else if (m_isConnected) {
-                // TODO: what's the right error path here?
-                assert(false);
-                System.err.println("Invalid response: no callback");
             }
         }
 
@@ -314,7 +386,7 @@ class Distributer {
                 synchronized (Distributer.this) {
                     m_connections.remove(this);
                     //Notify listeners that a connection has been lost
-                    for (ClientStatusListener s : m_listeners) {
+                    for (ClientStatusListenerExt s : m_listeners) {
                         s.connectionLost(m_hostname, m_connections.size());
                     }
                 }
@@ -326,11 +398,11 @@ class Distributer {
                         ClientResponse.CONNECTION_LOST, new VoltTable[0],
                         "Connection to database host (" + m_hostname +
                         ") was lost before a response was received");
-                for (final Object stuff[] : m_callbacks.values()) {
+                for (final CallbackBookeeping callBk : m_callbacks.values()) {
                     try {
-                        ((ProcedureCallback)stuff[1]).clientCallback(r);
+                        callBk.callback.clientCallback(r);
                     } catch (Exception e) {
-                        uncaughtException(((ProcedureCallback)stuff[1]), r, e);
+                        uncaughtException(callBk.callback, r, e);
                     }
                     m_callbacksToInvoke.decrementAndGet();
                 }
@@ -348,7 +420,7 @@ class Distributer {
                      * has ended thus resulting in a lost wakeup.
                      */
                     synchronized (Distributer.this) {
-                        for (final ClientStatusListener csl : m_listeners) {
+                        for (final ClientStatusListenerExt csl : m_listeners) {
                             csl.backpressure(false);
                         }
                     }
@@ -428,14 +500,15 @@ class Distributer {
     }
 
     Distributer() {
-        this( 128, null, false, null);
+        this(128, null, false, null, ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS);
     }
 
     Distributer(
             int expectedOutgoingMessageSize,
             int arenaSizes[],
             boolean useMultipleThreads,
-            StatsUploaderSettings statsSettings) {
+            StatsUploaderSettings statsSettings,
+            long procedureCallTimeoutMS) {
         if (statsSettings != null) {
             m_statsLoader = new ClientStatsLoader(statsSettings, this);
         } else {
@@ -446,7 +519,10 @@ class Distributer {
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_network.start();
         m_pool = new DBBPool(false, arenaSizes, false);
-        m_hostname = ConnectionUtil.getHostnameOrAddress();;
+        m_hostname = ConnectionUtil.getHostnameOrAddress();
+        m_procedureCallTimeoutMS = procedureCallTimeoutMS;
+        m_timer = new Timer("Distributer Timer");
+        m_timer.scheduleAtFixedRate(new CallExpiration(), 1000, 1000);
 
 //        new Thread() {
 //            @Override
@@ -521,6 +597,7 @@ class Distributer {
         m_connections.add(cxn);
         Connection c = m_network.registerChannel( aChannel, cxn);
         cxn.m_hostname = c.getHostnameOrIP();
+        cxn.m_port = port;
         cxn.m_connection = c;
     }
 
@@ -566,7 +643,7 @@ class Distributer {
 
             if (backpressure) {
                 cxn = null;
-                for (ClientStatusListener s : m_listeners) {
+                for (ClientStatusListenerExt s : m_listeners) {
                     s.backpressure(true);
                 }
             }
@@ -624,7 +701,7 @@ class Distributer {
 
     private void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
         boolean handledByClient = false;
-        for (ClientStatusListener csl : m_listeners) {
+        for (ClientStatusListenerExt csl : m_listeners) {
             if (csl instanceof ClientImpl.CSL) {
                 continue;
             }
@@ -640,13 +717,13 @@ class Distributer {
         }
     }
 
-    synchronized void addClientStatusListener(ClientStatusListener listener) {
+    synchronized void addClientStatusListener(ClientStatusListenerExt listener) {
         if (!m_listeners.contains(listener)) {
             m_listeners.add(listener);
         }
     }
 
-    synchronized boolean removeClientStatusListener(ClientStatusListener listener) {
+    synchronized boolean removeClientStatusListener(ClientStatusListenerExt listener) {
         return m_listeners.remove(listener);
     }
 

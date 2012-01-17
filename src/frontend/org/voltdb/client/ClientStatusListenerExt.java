@@ -19,17 +19,18 @@ package org.voltdb.client;
 
 /**
  * Listener that a client application can provide to a {@link Client} in order to receive notifications
- * when a connection is lost or backpressure occurs
+ * when certain events occur, such as backpressure or connection issues.
  *
+ * To use this class, implement one or more methods in a subclass and set it in your {@link ClientConfig}
+ * object.
  */
-@Deprecated
-public interface ClientStatusListener {
+public class ClientStatusListenerExt {
     /**
      * Notify listeners that a connection to a host was lost.
      * @param hostname Name of the host the connect was lost to
      * @param connectionsLeft Number of remaining connections this client has to the DB
      */
-    void connectionLost(String hostname, int connectionsLeft);
+    public void connectionLost(String hostname, int connectionsLeft) {}
 
     /**
      * Called by the client API whenever backpressure starts/stops. Backpressure is a condition
@@ -37,7 +38,24 @@ public interface ClientStatusListener {
      * queue invocations.
      * @param status <code>true</code> if there is backpressure and <code>false</code> otherwise.
      */
-    void backpressure(boolean status);
+    public void backpressure(boolean status) {}
 
-    void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e);
+    /**
+     * Called when a {@link ProcedureCallback#clientCallback(ClientResponse)} invocation throws
+     * an exception.
+     * @param callback The callback that threw an exception.
+     * @param r The response object passed to the callback.
+     * @param e The exception thrown by the callback.
+     */
+    public void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e) {}
+
+    /**
+     * Called when a response arrives on a connection that has already had its callback called
+     * due to an elapsed timeout.
+     *
+     * @param r The late response received.
+     * @param hostname The hostname or ip given at connection create time.
+     * @param port The port given at connection create time.
+     */
+    public void lateProcedureResponse(ClientResponse r, String hostname, int port) {}
 }

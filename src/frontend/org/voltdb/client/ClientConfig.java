@@ -14,12 +14,15 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.client;
 
 /**
  * Container for configuration settings for a Client
  */
 public class ClientConfig {
+
+    static final long DEFAULT_PROCEDURE_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
 
     /**
      * Clients may queue a wide variety of messages and a lot of them
@@ -29,7 +32,7 @@ public class ClientConfig {
 
     final String m_username;
     final String m_password;
-    final ClientStatusListener m_listener;
+    final ClientStatusListenerExt m_listener;
     int m_expectedOutgoingMessageSize = 128;
     int m_maxArenaSizes[] = new int[] {
             m_defaultMaxArenaSize,//16
@@ -51,6 +54,7 @@ public class ClientConfig {
     boolean m_heavyweight = false;
     int m_maxOutstandingTxns = 3000;
     StatsUploaderSettings m_statsSettings = null;
+    long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
 
     /**
      * Configuration for a client with no authentication credentials that will
@@ -69,7 +73,7 @@ public class ClientConfig {
      * @param password
      */
     public ClientConfig(String username, String password) {
-        this(username, password, null);
+        this(username, password, (ClientStatusListenerExt) null);
     }
 
     /**
@@ -79,7 +83,19 @@ public class ClientConfig {
      * @param password
      * @param listener
      */
+    @Deprecated
     public ClientConfig(String username, String password, ClientStatusListener listener) {
+        this(username, password, new ClientStatusListenerWrapper(listener));
+    }
+
+    /**
+     * Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.
+     * @param username
+     * @param password
+     * @param listener
+     */
+    public ClientConfig(String username, String password, ClientStatusListenerExt listener) {
         if (username == null) {
             m_username = "";
         } else {
@@ -91,6 +107,25 @@ public class ClientConfig {
             m_password = password;
         }
         m_listener = listener;
+    }
+
+    /**
+     * Set the timeout for procedure call. If the timeout expires before the call returns,
+     * the procedure callback will be called with status {@link ClientResponse#CONNECTION_TIMEOUT}.
+     * Synchronous procedures will throw an exception. If a response comes back after the
+     * expiration has triggered, then a callback method
+     * {@link ClientStatusListenerExt#lateProcedureResponse(ClientResponse, String, int)}
+     * will be called.
+     *
+     * Default value is 2 minutes if not set.
+     *
+     * Note that while specified in MS, this timeout is only accurate to within a second or so.
+     *
+     * @param ms Timeout value in milliseconds.
+     */
+    public void setProcedureCallTimeout(long ms) {
+        assert(ms > 0);
+        m_procedureCallTimeoutMS = ms;
     }
 
     /**

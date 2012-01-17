@@ -24,41 +24,6 @@ package org.voltdb.client;
 public abstract class ClientFactory {
 
     /**
-     * Create a {@link Client} with no connections that is optimized to send stored procedure invocations
-     * that serialize to the specified size. Also provides limits on what memory pool arenas should
-     * be allowed to grow to
-     * @param expectedOutgoingMessageSize Expected serialized size of most stored procedure invocations
-     * @param maxArenaSizes Maximum size each arena will be allowed to grow to. Can be <code>null</code>
-     * @param heavyweight If set to true the Client API will use multiple threads in order to be able
-     * to saturate bonded gigabit connections. Only set to true if you have at least 2 bonded links
-     * and intend to saturate them using this client instance. When set to false it can still saturate a gigabit
-     * connection. Arena sizes are ignored when heavy-weight is set. This is ignored on systems with < 4 cores.
-     * @param statsSettings Settings for uploading statistical information via JDBC. Can be null in which
-     * case statistics will not be uploaded.
-     * @return Newly constructed {@link Client}
-     * @see Client
-     * @deprecated As of 1.2. Since no username or password is specified when creating the client
-     * it is necessary to supply one when creating each connection and that makes it possible to connect
-     * with more than one set of credentials. When invoking procedures there is no way of knowing which set
-     * of credentials is being used. createConnection will generate an error if you attempt to createConnections
-     * with differing credentials.
-     */
-    @Deprecated
-    public static Client createClient(
-            int expectedOutgoingMessageSize,
-            int maxArenaSizes[],
-            boolean heavyweight,
-            StatsUploaderSettings statsSettings) {
-        //final int cores = Runtime.getRuntime().availableProcessors();
-        ClientConfig config = new ClientConfig();
-        config.setExpectedOutgoingMessageSize(expectedOutgoingMessageSize);
-        config.setMaxArenaSizes(maxArenaSizes);
-        config.setHeavyweight(heavyweight);
-        config.setStatsUploaderSettings(statsSettings);
-        return new ClientImpl(config);
-    }
-
-    /**
      * Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
      * that are 128 bytes in size. Authentication will use a blank username and password unless
      * you use the @deprecated createConnection methods.

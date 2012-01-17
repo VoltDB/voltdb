@@ -82,25 +82,7 @@ public interface Client {
      * @throws IOException
      */
     public void createConnection(String host)
-        throws UnknownHostException, IOException;
-
-     /**
-     * Create a connection to another VoltDB node. This version can only be used when
-     * the username and password were specified when the client was constructed.
-     * @param host Hostname or IP address of the host to connect to.
-     * @param username Username to authorize. Username is ignored if authentication is disabled.
-     * @param password Password to authenticate. Password is ignored if authentication is disabled.
-     * @throws UnknownHostException
-     * @throws IOException
-     * @deprecated This method is deprecated as of 1.2 because it makes it possible for a client
-     * to connect to servers with a different username and password. When invoking a procedure
-     * there is no way for the application to know what server will receive a given request.
-     * Provide a username and password when constructing the client instead and use the non-deprecated
-     * creat connection methods.
-     */
-    @Deprecated
-    public void createConnection(String host, String username, String password)
-        throws UnknownHostException, IOException;
+    throws UnknownHostException, IOException;
 
     /**
      * Create a connection to another VoltDB node. This version can only be used when
@@ -111,25 +93,7 @@ public interface Client {
      * @throws IOException
      */
     public void createConnection(String host, int port)
-        throws UnknownHostException, IOException;
-
-    /**
-     * Create a connection to another VoltDB node.
-     * @param host Hostname or IP address of the host to connect to.
-     * @param port Port number on remote host to connect to.
-     * @param username Username to authorize. Username is ignored if authentication is disabled.
-     * @param password Password to authenticate. Password is ignored if authentication is disabled.
-     * @throws UnknownHostException
-     * @throws IOException
-     * @deprecated This method is deprecated as of 1.2 because it makes it possible for a client
-     * to connect to servers with a different username and password. When invoking a procedure
-     * there is no way for the application to know what server will receive a given request.
-     * Provide a username and password when constructing the client instead and use the non-deprecated
-     * creat connection methods.
-     */
-    @Deprecated
-    public void createConnection(String host, int port, String username, String password)
-        throws UnknownHostException, IOException;
+    throws UnknownHostException, IOException;
 
     /**
      * Synchronously invoke a procedure. Blocks until a result is available. A {@link ProcCallException}
@@ -141,25 +105,7 @@ public interface Client {
      * @throws NoConnectionsException
      */
     public ClientResponse callProcedure(String procName, Object... parameters)
-        throws IOException, NoConnectionsException, ProcCallException;
-
-    /**
-     * Synchronously invoke a replicated procedure. Blocks until a result is
-     * available. A {@link ProcCallException} is thrown if the response is
-     * anything other then success.
-     *
-     * @param procName
-     *            <code>class</code> name (not qualified by package) of the
-     *            procedure to execute.
-     * @param parameters
-     *            vararg list of procedure's parameter values.
-     * @return array of VoltTable results.
-     * @throws org.voltdb.client.ProcCallException
-     * @throws NoConnectionsException
-     */
-    ClientResponse callProcedure(long originalTxnId,
-                                 String procName, Object... parameters)
-        throws IOException, NoConnectionsException, ProcCallException;
+    throws IOException, NoConnectionsException, ProcCallException;
 
     /**
      * Asynchronously invoke a procedure. Does not guarantee that the invocation is actually queued. If there
@@ -171,26 +117,6 @@ public interface Client {
      * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise
      */
     public boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
-    throws IOException, NoConnectionsException;
-
-    /**
-     * Asynchronously invoke a replicated procedure. Does not guarantee that the
-     * invocation is actually queued. If there is backpressure on all
-     * connections to the cluster then the invocation will not be queued. Check
-     * the return value to determine if queuing actually took place.
-     *
-     * @param callback
-     *            ProcedureCallback that will be invoked with procedure results.
-     * @param procName
-     *            class name (not qualified by package) of the procedure to
-     *            execute.
-     * @param parameters
-     *            vararg list of procedure's parameter values.
-     * @return <code>true</code> if the procedure was queued and
-     *         <code>false</code> otherwise
-     */
-    boolean callProcedure(long originalTxnId, ProcedureCallback callback,
-                          String procName, Object... parameters)
     throws IOException, NoConnectionsException;
 
     /**
@@ -212,7 +138,7 @@ public interface Client {
             ProcedureCallback callback,
             int expectedSerializedSize,
             String procName,
-             Object... parameters)
+            Object... parameters)
     throws IOException, NoConnectionsException;
 
     /**

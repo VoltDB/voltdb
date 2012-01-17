@@ -67,8 +67,9 @@ public class TestHSQLBackend extends TestCase {
         server.waitForInitialization();
 
         // run the test
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost", "program", "none");
+        ClientConfig config = new ClientConfig("program", "none");
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
 
         // call the insert procedure
         VoltTable[] results = client.callProcedure("MilestoneOneCombined", 99L, "TEST").getResults();
@@ -102,8 +103,9 @@ public class TestHSQLBackend extends TestCase {
         server.waitForInitialization();
 
         // run the test
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost", "program", "none");
+        ClientConfig config = new ClientConfig("program", "none");
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
 
         // call the insert procedure
         VoltTable[] results = client.callProcedure("@AdHoc", "select * from WAREHOUSE").getResults();
@@ -167,8 +169,9 @@ public class TestHSQLBackend extends TestCase {
         server.waitForInitialization();
 
         // run the test
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost", "program", "none");
+        ClientConfig config = new ClientConfig("program", "none");
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
 
         // call the insert procedure
         VoltTable[] results = client.callProcedure("@AdHoc", "INSERT INTO HISTORY VALUES (5, 5, 5, 5, 5, 100000, 2.5, 'nada');").getResults();

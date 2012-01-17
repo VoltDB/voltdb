@@ -222,7 +222,7 @@ public class TestDistributer extends TestCase {
         volatile VoltNetwork network;
     }
 
-    private static class CSL implements ClientStatusListener {
+    private static class CSL extends ClientStatusListenerExt {
         private volatile boolean m_exceptionHandled = false;
         @Override
         public void uncaughtException(ProcedureCallback callback,
@@ -309,7 +309,7 @@ public class TestDistributer extends TestCase {
 
             CSL csl = new CSL();
 
-            Distributer dist = new Distributer(128, null, false, null);
+            Distributer dist = new Distributer(128, null, false, null, ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);

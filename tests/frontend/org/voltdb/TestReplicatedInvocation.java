@@ -23,17 +23,22 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Map.Entry;
 
-import static org.junit.Assert.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -88,7 +93,7 @@ public class TestReplicatedInvocation {
      */
     @Test
     public void testReplicatedInvocation() throws Exception {
-        Client client = ClientFactory.createClient();
+        ClientImpl client = (ClientImpl) ClientFactory.createClient();
         client.createConnection("localhost");
         ClientResponse response = client.callProcedure(3, "ReplicatedProcedure", 1, "haha");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
