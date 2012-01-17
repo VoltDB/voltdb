@@ -36,7 +36,7 @@ import org.voltdb.utils.DBBPool.BBContainer;
  *  and provides methods to call stored procedures and receive
  *  responses.
  */
-public final class ClientImpl implements Client {
+public final class ClientImpl implements Client, ReplicaProcCaller {
 
     private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
@@ -177,27 +177,6 @@ public final class ClientImpl implements Client {
         return callProcedure(cb, invocation);
     }
 
-    /**
-     * Synchronously invoke a procedure call blocking until a result is available.
-     * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param parameters vararg list of procedure's parameter values.
-     * @return array of VoltTable results.
-     * @throws org.voltdb.client.ProcCallException
-     * @throws NoConnectionsException
-     */
-    public final ClientResponse callProcedure(long originalTxnId,
-                                              String procName,
-                                              Object... parameters)
-        throws IOException, NoConnectionsException, ProcCallException
-    {
-        final SyncCallback cb = new SyncCallback();
-        cb.setArgs(parameters);
-        final ProcedureInvocation invocation =
-              new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
-                                      procName, parameters);
-        return callProcedure(cb, invocation);
-    }
-
     private final ClientResponse callProcedure(SyncCallback cb, ProcedureInvocation invocation)
         throws IOException, NoConnectionsException, ProcCallException
     {
@@ -251,6 +230,7 @@ public final class ClientImpl implements Client {
      * @return <code>true</code> if the procedure was queued and
      *         <code>false</code> otherwise
      */
+    @Override
     public final boolean callProcedure(
             long originalTxnId,
             ProcedureCallback callback,

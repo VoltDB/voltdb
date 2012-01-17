@@ -41,6 +41,8 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ReplicaProcCaller;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.utils.VoltFile;
@@ -95,7 +97,11 @@ public class TestReplicatedInvocation {
     public void testReplicatedInvocation() throws Exception {
         ClientImpl client = (ClientImpl) ClientFactory.createClient();
         client.createConnection("localhost");
-        ClientResponse response = client.callProcedure(3, "ReplicatedProcedure", 1, "haha");
+        ReplicaProcCaller pc = client;
+        SyncCallback callback = new SyncCallback();
+        pc.callProcedure(3, callback, "ReplicatedProcedure", 1, "haha");
+        callback.waitForResponse();
+        ClientResponse response = callback.getResponse();
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         VoltTable result = response.getResults()[0];
         result.advanceRow();

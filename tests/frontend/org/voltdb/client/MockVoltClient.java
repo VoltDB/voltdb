@@ -61,7 +61,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
-public class MockVoltClient implements Client {
+public class MockVoltClient implements Client, ReplicaProcCaller{
     public MockVoltClient() {
         super();
     }
