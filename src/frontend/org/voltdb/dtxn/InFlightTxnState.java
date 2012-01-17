@@ -122,7 +122,7 @@ public class InFlightTxnState implements Serializable {
                     msg += "\n  Mismatched results: " + curr_results[i].toString();
                     // die die die
                     VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
-					throw new RuntimeException(msg); // gets called only by test code
+                    throw new RuntimeException(msg); // gets called only by test code
                 }
             }
         }
