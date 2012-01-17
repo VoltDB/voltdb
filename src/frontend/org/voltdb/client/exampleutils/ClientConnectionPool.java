@@ -16,7 +16,6 @@
  */
 package org.voltdb.client.exampleutils;
 
-import org.voltdb.client.Client;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
