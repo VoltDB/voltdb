@@ -61,6 +61,7 @@
 #include "common/RecoveryProtoMessage.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
+#include "logging/LogManager.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/TupleStreamWrapper.h"
@@ -985,12 +986,17 @@ void PersistentTable::doIdleCompaction() {
 void PersistentTable::doForcedCompaction() {
     if (m_recoveryContext != NULL)
     {
-        std::cout << "Deferring compaction until recovery is complete..." << std::endl;
+        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
+            "Deferring compaction until recovery is complete.");
         return;
     }
     bool hadWork1 = true;
     bool hadWork2 = true;
-    std::cout << "Doing forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
+
+    char msg[512];
+    snprintf(msg, sizeof(msg), "Doing forced compaction with allocated tuple count %ld", allocatedTupleCount());
+    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+
     int failedCompactionCountBefore = m_failedCompactionCount;
     while (compactionPredicate()) {
         assert(hadWork1 || hadWork2);
@@ -1011,11 +1017,11 @@ void PersistentTable::doForcedCompaction() {
              * This is a work around for ENG-939
              */
             if (m_failedCompactionCount % 5000 == 0) {
-                std::cerr << "Compaction predicate said there should be " <<
-                             "blocks to compact but no blocks were found " <<
-                             "to be eligible for compaction. This has " <<
-                             "occured " << m_failedCompactionCount <<
-                             " times." << std::endl;
+                snprintf(msg, sizeof(msg), "Compaction predicate said there should be "
+                         "blocks to compact but no blocks were found "
+                         "to be eligible for compaction. This has "
+                         "occured %d times.", m_failedCompactionCount);
+                LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, msg);
             }
             if (m_failedCompactionCount == 0) {
                 printBucketInfo();
@@ -1035,11 +1041,16 @@ void PersistentTable::doForcedCompaction() {
     //If compactions have been failing lately, but it didn't fail this time
     //then compaction progressed until the predicate was satisfied
     if (failedCompactionCountBefore > 0 && failedCompactionCountBefore == m_failedCompactionCount) {
-        std::cerr << "Recovered from a failed compaction scenario and compacted to the point that the compaction predicate was satisfied after " << failedCompactionCountBefore << " failed attempts" << std::endl;
+        snprintf(msg, sizeof(msg), "Recovered from a failed compaction scenario "
+                "and compacted to the point that the compaction predicate was "
+                "satisfied after %d failed attempts", failedCompactionCountBefore);
+        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, msg);
         m_failedCompactionCount = 0;
     }
+
     assert(!compactionPredicate());
-    std::cout << "Finished forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
+    snprintf(msg, sizeof(msg), "Finished forced compaction with allocated tuple count %ld", allocatedTupleCount());
+    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
 }
 
 void PersistentTable::printBucketInfo() {

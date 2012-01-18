@@ -32,7 +32,7 @@ class Logger {
 public:
 
     /**
-     * Constructor that initializes with logging off and caches a reference to a log proxy where log statements
+     * Constructor that initializes with logging at OFF and caches a reference to a log proxy where log statements
      * will be forwarded to.
      * @param proxy Log proxy where log statements should be forwarded to
      */
@@ -45,11 +45,7 @@ public:
      */
     inline bool isLoggable(LogLevel level) const {
         assert (level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
-        if (level >= m_level) {
-            return true;
-        } else {
-            return false;
-        }
+        return (level >= m_level);
     }
 
     /**
