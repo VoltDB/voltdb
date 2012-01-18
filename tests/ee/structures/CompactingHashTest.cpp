@@ -39,7 +39,7 @@ class StringComparator {
 public:
     int comparisons;
     StringComparator() : comparisons(0) {}
-    ~StringComparator() { printf("Compared Strings ### %d ### times\n", comparisons); fflush(stdout); }
+    ~StringComparator() {}
 
     inline int operator()(const string &lhs, const string &rhs) const {
         int *comp = const_cast<int*>(&comparisons);
@@ -135,11 +135,13 @@ void multiFuzzIteration() {
     if (alwaysSucceed) range = (int)log(range);
     else range = range % ITERATIONS * dups / 2;
 
-    printf("Running %.2f mix with %d dups, %d max and %s alwaysSucceed.\n",
+    if (0) {
+        printf("Running %.2f mix with %d dups, %d max and %s alwaysSucceed.\n",
            mix / (double)RAND_MAX,
            dups,
            range,
            alwaysSucceed ? "DO" : "DO NOT");
+    }
 
     // counters
     int insertions = 0;
@@ -220,7 +222,7 @@ void multiFuzzIteration() {
 
     volt.verify();
 
-    printf("  did %d insertions and %d deletions.\n", insertions, deletions);
+    if(0) { printf("  did %d insertions and %d deletions.\n", insertions, deletions); }
 }
 
 TEST_F(CompactingHashTest, Fuzz) {
@@ -306,9 +308,9 @@ TEST_F(CompactingHashTest, Benchmark) {
 
     timeval tp;
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // fflush(stdout);
 
     map<string,string>::const_iterator iter_stl;
 
@@ -321,10 +323,10 @@ TEST_F(CompactingHashTest, Benchmark) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
+    // fflush(stdout);
 
     voltdb::CompactingHashTable<uint64_t,uint64_t>::iterator iter;
 
@@ -358,10 +360,10 @@ TEST_F(CompactingHashTest, Benchmark) {
     ASSERT_TRUE(volt.verify());
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
+    // fflush(stdout);
 
     ASSERT_TRUE(volt.verify());
 }
@@ -374,7 +376,7 @@ TEST_F(CompactingHashTest, BenchmarkDel) {
 
     boost::unordered_multimap<string,int>::const_iterator iter_stl;
 
-    printf("Inserting into the STL Map\n");
+    // printf("Inserting into the STL Map\n");
 
     for (int i = 0; i < ITERATIONS; i++) {
         string val = keyFromInt(i);
@@ -398,7 +400,7 @@ TEST_F(CompactingHashTest, BenchmarkDel) {
 
     voltdb::CompactingHashTable<string, int>::iterator iter;
 
-    printf("Inserting into the VoltDB Map\n");
+    // printf("Inserting into the VoltDB Map\n");
 
     for (int i = 0; i < ITERATIONS; i++) {
         string val = keyFromInt(i);
@@ -422,11 +424,11 @@ TEST_F(CompactingHashTest, BenchmarkDel) {
 
     timeval tp;
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // fflush(stdout);
 
-    printf("Range From STL Map\n");
+    // printf("Range From STL Map\n");
 
     for (int i = 0; i < ITERATIONS; i += 2) {
         stl.erase(keyFromInt(i));
@@ -437,12 +439,12 @@ TEST_F(CompactingHashTest, BenchmarkDel) {
     //}
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
+    // fflush(stdout);
 
-    printf("Range From VoltDB Map\n");
+    // printf("Range From VoltDB Map\n");
 
     for (int i = 0; i < ITERATIONS; i += 2) {
         string val = keyFromInt(i);
@@ -452,14 +454,14 @@ TEST_F(CompactingHashTest, BenchmarkDel) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
+    // fflush(stdout);
 
     ASSERT_TRUE(volt.verify());
 
-    printf("Done!\n");
+    // printf("Done!\n");
 }
 
 TEST_F(CompactingHashTest, BenchmarkMulti) {
@@ -472,7 +474,7 @@ TEST_F(CompactingHashTest, BenchmarkMulti) {
 
     boost::unordered_multimap<string,int>::const_iterator iter_stl;
 
-    printf("Inserting into the STL Map\n");
+    // printf("Inserting into the STL Map\n");
 
     for (int i = 0; i < BATCH_COUNT; i++) {
         for (int j = 0; j < BATCH_SIZE; j++) {
@@ -483,7 +485,7 @@ TEST_F(CompactingHashTest, BenchmarkMulti) {
 
     voltdb::CompactingHashTable<string, int>::iterator iter;
 
-    printf("Inserting into the VoltDB Map\n");
+    // printf("Inserting into the VoltDB Map\n");
 
     for (int i = 0; i < BATCH_COUNT; i++) {
         for (int j = 0; j < BATCH_SIZE; j++) {
@@ -496,11 +498,10 @@ TEST_F(CompactingHashTest, BenchmarkMulti) {
 
     timeval tp;
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    fflush(stdout);
-
-    printf("Range From STL Map\n");
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // fflush(stdout);
+    // printf("Range From STL Map\n");
 
     for (int i = 0; i < ITERATIONS; i += 2) {
         int k = rand() % BATCH_COUNT;
@@ -518,12 +519,11 @@ TEST_F(CompactingHashTest, BenchmarkMulti) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
-    fflush(stdout);
-
-    printf("Range From VoltDB Map\n");
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
+    // fflush(stdout);
+    // printf("Range From VoltDB Map\n");
 
     for (int i = 0; i < ITERATIONS; i += 2) {
         int k = rand() % BATCH_COUNT;
@@ -539,14 +539,14 @@ TEST_F(CompactingHashTest, BenchmarkMulti) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
+    // fflush(stdout);
 
     ASSERT_TRUE(volt.verify());
 
-    printf("Done!\n");
+    // printf("Done!\n");
 }
 
 TEST_F(CompactingHashTest, Trivial) {

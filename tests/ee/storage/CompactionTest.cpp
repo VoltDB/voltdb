@@ -400,7 +400,6 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     DefaultTupleSerializer serializer;
     m_table->activateCopyOnWrite(&serializer, 0);
     for (int qq = 0; qq < 3; qq++) {
-        std::cout << "Starting iteration " << qq << std::endl;
 #ifdef MEMCHECK
         int serializationBufferSize = 22700;
 #else
