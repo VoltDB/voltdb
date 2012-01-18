@@ -690,7 +690,7 @@ class Distributer {
      * @throws InterruptedException
      */
     final void shutdown() throws InterruptedException {
-		// stop the old proc call reaper
+        // stop the old proc call reaper
         m_timer.cancel();
         if (m_statsLoader != null) {
             m_statsLoader.stop();
