@@ -130,7 +130,7 @@ TEST_F(FilterTest, SimpleFilter) {
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
     ComparisonExpression<CmpEq> *equal = new ComparisonExpression<CmpEq>(EXPRESSION_TYPE_COMPARE_EQUAL, tup_val_exp, const_val_exp);
 
-    ::printf("\nFilter:%s\n", equal->debug().c_str());
+    // ::printf("\nFilter:%s\n", equal->debug().c_str());
 
     int count = 0;
     TableIterator iter = table->iterator();
@@ -166,7 +166,7 @@ TEST_F(FilterTest, OrFilter) {
 
     ConjunctionExpression<ConjunctionOr> *predicate = new ConjunctionExpression<ConjunctionOr>(EXPRESSION_TYPE_CONJUNCTION_OR, comp_a, comp_b);
 
-    ::printf("\nFilter:%s\n", predicate->debug().c_str());
+    // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
     TableIterator iter = table->iterator();
@@ -206,7 +206,7 @@ TEST_F(FilterTest, AndFilter) {
                                                                 comp_a,
                                                                 comp_b);
 
-    ::printf("\nFilter:%s\n", predicate->debug().c_str());
+    // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
     TableIterator iter = table->iterator();
@@ -263,7 +263,7 @@ TEST_F(FilterTest, ComplexFilter) {
     AbstractExpression *predicate = conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, predicate2);
 
 
-    ::printf("\nFilter:%s\n", predicate->debug().c_str());
+    // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
     TableIterator iter = table->iterator();
@@ -300,15 +300,15 @@ TEST_F(FilterTest, SubstituteFilter) {
 
     AbstractExpression *predicate = conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, equal2);
 
-    ::printf("\nFilter:%s\n", predicate->debug().c_str());
+    // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     for (int64_t implantedValue = 1; implantedValue < 5; ++implantedValue) {
         NValueArray params(1);
         params[0] = ValueFactory::getBigIntValue(implantedValue);
         predicate->substitute(params);
-        ::printf("\nSubstituted Filter:%s\n", predicate->debug().c_str());
-        ::printf("\tLEFT:  %s\n", predicate->getLeft()->debug().c_str());
-        ::printf("\tRIGHT: %s\n", predicate->getRight()->debug().c_str());
+        // ::printf("\nSubstituted Filter:%s\n", predicate->debug().c_str());
+        // ::printf("\tLEFT:  %s\n", predicate->getLeft()->debug().c_str());
+        // ::printf("\tRIGHT: %s\n", predicate->getRight()->debug().c_str());
 
         int count = 0;
         TableIterator iter = table->iterator();

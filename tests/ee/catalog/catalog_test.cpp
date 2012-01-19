@@ -1259,7 +1259,6 @@ TEST_F(CatalogTest, HexDecode) {
     char output[len / 2 + 1];
     Catalog::hexDecodeString(val, output);
     output[len / 2] = '\0';
-    printf("%s\n", output);
 }
 int main() {
     return TestSuite::globalInstance()->runAll();

@@ -72,5 +72,4 @@ def write(x):
     p.stdin.write(x)
 write(script)
 retcode = p.wait()
-print "retcode:", retcode
 sys.exit(retcode)

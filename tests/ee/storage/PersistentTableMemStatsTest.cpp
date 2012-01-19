@@ -141,7 +141,7 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
         StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(1))) +
         StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(2)));
     //cout << "Allocating string mem for bytes: " << ValuePeeker::peekObjectLength(tuple.getNValue(1)) + sizeof(int32_t) << endl;
-    cout << "Adding bytes to table: " << added_bytes << endl;
+    //cout << "Adding bytes to table: " << added_bytes << endl;
 
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is

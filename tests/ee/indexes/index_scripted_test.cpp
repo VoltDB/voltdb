@@ -256,12 +256,8 @@ void setNewCurrent(const char *testName,
             cerr << "Unable to load index named: " << indexName << " on line: " << line << endl;
             exit(-1);
         }
-        cout << "Created " << indexName << " Index" << endl;
-
         currentIndexes.push_back(index);
     }
-
-    cout << "Ready to simulate run with " << currentIndexes.size() << " indexes" << " for test " << testName << endl;
 }
 
 void runTest()

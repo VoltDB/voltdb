@@ -134,7 +134,6 @@ TEST_F(TableSerializeTest, RoundTrip) {
     CopySerializeOutput serialize_out;
     table_->serializeTo(serialize_out);
     size_t size = serialize_out.size();
-    std::cout << "serialized size:" << size << std::endl;
 
     // Deserialize the table: verify that it matches the existing table
     ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
@@ -154,7 +153,6 @@ TEST_F(TableSerializeTest, RoundTrip) {
     CopySerializeOutput serialize_out2;
     deserialized->serializeTo(serialize_out2);
     size_t size2 = serialize_out2.size();
-    std::cout << "serialized size2:" << size2 << std::endl;
     ASSERT_EQ(size, size2);
     const void *data1 = serialize_out.data();
     const void *data2 = serialize_out2.data();

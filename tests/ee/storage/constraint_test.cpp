@@ -116,12 +116,10 @@ protected:
             pkey->tupleSchema = schema;
         }
         if (pkey) {
-            printf("creating table with pkey\n");
             table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
                                                      "test_table", schema, names, *pkey, -1, false, false);
         }
         else {
-            printf("creating table with no pkey\n");
             table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
                                                      "test_table", schema, names, -1, false, false);
         }
@@ -147,7 +145,6 @@ TEST_F(ConstraintTest, NotNull) {
                   allow_null[ctr]);
     }
     setTable();
-    ::printf("%s\n", table->debug().c_str());
 
     //
     // Insert tuples with different combinations of null values
@@ -169,7 +166,6 @@ TEST_F(ConstraintTest, NotNull) {
                     bool threwException = false;
                     try {
                         bool returned = this->table->insertTuple(tuple);
-                        printf("[%d %d %d %d] -> EXPECTED=%d RETURNED=%d\n", ctr0, ctr1, ctr2, ctr3, expected, returned);
                         EXPECT_EQ(expected, returned);
                     } catch (SerializableEEException &e) {
                         threwException = true;
@@ -202,7 +198,6 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
     TableIndexScheme pkey("idx_pkey", voltdb::BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, true, NULL);
 
     setTable(pkey);
-    ::printf("%s\n", table->debug().c_str());
 
     for (int64_t ctr = 0; ctr < NUM_OF_TUPLES; ctr++) {
         voltdb::TableTuple &tuple = this->table->tempTuple();
@@ -210,8 +205,6 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
         tuple.setNValue(0, ValueFactory::getBigIntValue(ctr));
         tuple.setNValue(1, ValueFactory::getBigIntValue(ctr));
         tuple.setNValue(2, ValueFactory::getBigIntValue(ctr));
-
-        std::cout << tuple.debug(table->name().c_str()) << std::endl;
 
         //
         // This should always succeed
