@@ -30,10 +30,10 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
 
+import junit.framework.TestCase;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-
-import junit.framework.*;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -101,6 +101,26 @@ public class TestDDLCompiler extends TestCase {
 
         hsql.runDDLCommand(ddl1);
 
+        String xml = hsql.getXMLFromCatalog();
+        System.out.println(xml);
+        assertTrue(xml != null);
+
+        hsql.close();
+    }
+
+    /**
+     * Before the fix for ENG-912, the following schema would work:
+     *  create table tmc (name varchar(32), user varchar(32));
+     * but this wouldn't:
+     *  create table tmc (name varchar(32), user varchar(32), primary key (name, user));
+     *
+     * Changes in HSQL's ParserDQL and ParserBase make this more consistent
+     */
+    public void testENG_912() throws HSQLParseException {
+        String schema = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
+        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+
+        hsql.runDDLCommand(schema);
         String xml = hsql.getXMLFromCatalog();
         System.out.println(xml);
         assertTrue(xml != null);
