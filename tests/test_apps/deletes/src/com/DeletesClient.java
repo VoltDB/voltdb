@@ -644,6 +644,7 @@ public class DeletesClient
         generateNames(16);
         Client client = null;
         ClientConfig config = new ClientConfig("program", "none");
+        config.setProcedureCallTimeout(Long.MAX_VALUE);
         client = ClientFactory.createClient(config);
         for (String server : servers) {
             try {
