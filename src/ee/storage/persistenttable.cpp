@@ -994,7 +994,8 @@ void PersistentTable::doForcedCompaction() {
     bool hadWork2 = true;
 
     char msg[512];
-    snprintf(msg, sizeof(msg), "Doing forced compaction with allocated tuple count %ld", allocatedTupleCount());
+    snprintf(msg, sizeof(msg), "Doing forced compaction with allocated tuple count %zd",
+             ((intmax_t)allocatedTupleCount()));
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
 
     int failedCompactionCountBefore = m_failedCompactionCount;
@@ -1049,7 +1050,8 @@ void PersistentTable::doForcedCompaction() {
     }
 
     assert(!compactionPredicate());
-    snprintf(msg, sizeof(msg), "Finished forced compaction with allocated tuple count %ld", allocatedTupleCount());
+    snprintf(msg, sizeof(msg), "Finished forced compaction with allocated tuple count %zd",
+             ((intmax_t)allocatedTupleCount()));
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
 }
 
