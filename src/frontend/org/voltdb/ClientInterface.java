@@ -198,6 +198,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private boolean m_hasDTXNBackPressure = false;
 
+    // MAX_CONNECTIONS is updated to be (FD LIMIT - 300) after startup
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
     private ScheduledFuture<?> m_maxConnectionUpdater;
 

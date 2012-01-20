@@ -58,8 +58,7 @@ public class AsyncCompilerWorkThread extends Thread {
     }
 
     public void shutdown() {
-        AdHocPlannerWork work = new AdHocPlannerWork();
-        work.shouldShutdown = true;
+        AdHocPlannerWork work = AdHocPlannerWork.forShutdown();
         m_work.add(work);
     }
 
@@ -91,14 +90,17 @@ public class AsyncCompilerWorkThread extends Thread {
             boolean adminConnection,
             Object clientData) {
 
-        AdHocPlannerWork work = new AdHocPlannerWork();
-        work.clientHandle = clientHandle;
-        work.sql = sql;
-        work.partitionParam = partitionParam;
-        work.connectionId = connectionId;
-        work.hostname = hostname;
-        work.adminConnection = adminConnection;
-        work.clientData = clientData;
+        AdHocPlannerWork work = new AdHocPlannerWork(
+                false, // shouldShutdown
+                clientHandle,
+                connectionId,
+                hostname,
+                adminConnection,
+                clientData,
+                sql,
+                partitionParam
+                );
+
         if (m_work.size() > MAX_QUEUE_DEPTH) {
             return false;
         }
@@ -115,14 +117,9 @@ public class AsyncCompilerWorkThread extends Thread {
             boolean adminConnection,
             int sequenceNumber,
             Object clientData) {
-        CatalogChangeWork work = new CatalogChangeWork();
-        work.clientHandle = clientHandle;
-        work.connectionId = connectionId;
-        work.hostname = hostname;
-        work.adminConnection = adminConnection;
-        work.clientData = clientData;
-        work.catalogBytes = catalogBytes;
-        work.deploymentString = deploymentString;
+        CatalogChangeWork work = new CatalogChangeWork(
+                clientHandle, connectionId, hostname, adminConnection,
+                clientData, catalogBytes, deploymentString);
         m_work.add(work);
     }
 
