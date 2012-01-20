@@ -1,4 +1,4 @@
-#!/usr/bin/env bash 
+#!/usr/bin/env bash
 
 APPNAME="deletes"
 VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar`
@@ -11,7 +11,7 @@ LEADER="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot plannerlog.txt voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client

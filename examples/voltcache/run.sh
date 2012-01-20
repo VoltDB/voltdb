@@ -9,7 +9,7 @@ LEADER="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME.api.jar voltdbroot plannerlog.txt voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME.api.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
