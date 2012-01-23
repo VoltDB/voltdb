@@ -12,7 +12,7 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar voltdbroot plannerlog.txt voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -159,7 +159,7 @@ function export-tosqoop() {
        --verbose \
        --period 3 \
        --target-dir /tmp/sqoop-export \
-       --nonce ExportData 
+       --nonce ExportData
 }
 
 

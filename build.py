@@ -425,10 +425,8 @@ elif CTX.PLATFORM == "Linux":
         name,value = name_value
         if name == "processor":
             numHardwareThreads = numHardwareThreads + 1
-print "Detected %d hardware threads to use during the build" % (numHardwareThreads)
 
 retval = os.system("make --directory=%s -j%d" % (CTX.OUTPUT_PREFIX, numHardwareThreads))
-print "Make returned: ", retval
 if retval != 0:
     sys.exit(-1)
 

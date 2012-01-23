@@ -31,6 +31,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
@@ -189,7 +190,9 @@ public class TestAdminMode extends RegressionSuite
     // Somewhat hacky test of the LIVECLIENTS @Statistics selector
     public void testBacklogAndPolling() throws Exception
     {
-        final Client adminclient = ClientFactory.createClient();
+        ClientConfig config = new ClientConfig();
+        config.setProcedureCallTimeout(600000);
+        final Client adminclient = ClientFactory.createClient(config);
         SocketChannel channel = getClientChannel();
 
         try {

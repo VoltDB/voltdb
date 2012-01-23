@@ -471,12 +471,18 @@ public class ParserDQL extends ParserBase {
         while (true) {
             if (session.isProcessingScript) {
 
+                /*
+                 * NOTE: Adding "strictSQLNames" as a param to the next two method
+                 * calls is a VoltDB addition to make reserved words more consistent.
+                 * SEE: ENG-912
+                 */
+
                 // for old scripts
-                if (!isSimpleName()) {
+                if (!isSimpleName(strictSQLNames)) {
                     token.isDelimitedIdentifier = true;
                 }
             } else {
-                checkIsSimpleName();
+                checkIsSimpleName(strictSQLNames);
             }
 
             if (!set.add(token.tokenString)) {

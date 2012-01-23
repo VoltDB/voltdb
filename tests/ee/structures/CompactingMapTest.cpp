@@ -37,7 +37,7 @@ class StringComparator {
 public:
     int comparisons;
     StringComparator() : comparisons(0) {}
-    ~StringComparator() { printf("Compared Strings ### %d ### times\n", comparisons); fflush(stdout); }
+    ~StringComparator() { }
 
     inline int operator()(const std::string &lhs, const std::string &rhs) const {
         int *comp = const_cast<int*>(&comparisons);
@@ -155,9 +155,9 @@ TEST_F(CompactingMapTest, Benchmark) {
 
     timeval tp;
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // fflush(stdout);
 
     std::map<std::string,std::string>::const_iterator iter_stl;
 
@@ -181,10 +181,10 @@ TEST_F(CompactingMapTest, Benchmark) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
+    // fflush(stdout);
 
     voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator iter;
 
@@ -215,10 +215,10 @@ TEST_F(CompactingMapTest, Benchmark) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
+    // fflush(stdout);
 
     for (iter_stl = stl.begin(); iter_stl != stl.end(); iter_stl++) {
         std::string key = iter_stl->first;
@@ -236,7 +236,7 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
 
     std::map<std::string,std::string>::const_iterator iter_stl;
 
-    printf("Inserting into the STL Map\n");
+    // printf("Inserting into the STL Map\n");
 
      for (int i = 0; i < ITERATIONS; i++) {
      std::string val = keyFromInt(i);
@@ -260,7 +260,7 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
 
     voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator iter;
 
-    printf("Inserting into the VoltDB Map\n");
+    // printf("Inserting into the VoltDB Map\n");
 
     for (int i = 0; i < ITERATIONS; i++) {
         std::string val = keyFromInt(i);
@@ -284,11 +284,11 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
 
     timeval tp;
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // fflush(stdout);
 
-    printf("Range From STL Map\n");
+    // printf("Range From STL Map\n");
 
     //for (int i = 0; i < ITERATIONS; i += 2) {
     //  stl.erase(keyFromInt(i));
@@ -299,12 +299,12 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
     //}
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
+    // fflush(stdout);
 
-    printf("Range From VoltDB Map\n");
+    // printf("Range From VoltDB Map\n");
 
     //for (int i = 0; i < ITERATIONS; i += 2) {
     //  volt.erase(keyFromInt(i));
@@ -315,12 +315,12 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
-    printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    // printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
+    // fflush(stdout);
 
-    printf("Done!\n");
+    // printf("Done!\n");
 }
 
 TEST_F(CompactingMapTest, Bounds) {
@@ -394,7 +394,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
 
     std::map<std::string,std::string>::const_iterator iter_stl;
 
-    printf("Inserting into the STL Map\n");
+    // printf("Inserting into the STL Map\n");
 
     for (int i = 0; i < BATCH_COUNT; i++) {
         for (int j = 0; j < BATCH_SIZE; j++) {
@@ -405,7 +405,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
 
     voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator iter;
 
-    printf("Inserting into the VoltDB Map\n");
+    // printf("Inserting into the VoltDB Map\n");
 
     for (int i = 0; i < BATCH_COUNT; i++) {
         for (int j = 0; j < BATCH_SIZE; j++) {
@@ -418,11 +418,11 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
 
     timeval tp;
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t1 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // int64_t t1 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    // fflush(stdout);
 
-    printf("Range From STL Map\n");
+    // printf("Range From STL Map\n");
 
     for (int i = 0; i < ITERATIONS; i += 2) {
         int k = rand() % BATCH_COUNT;
@@ -430,12 +430,12 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t2 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    printf("Time elapsed: %.2f\n", static_cast<double>(t2 - t1) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // int64_t t2 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    // printf("Time elapsed: %.2f\n", static_cast<double>(t2 - t1) / static_cast<double>(1000));
+    // fflush(stdout);
 
-    printf("Range From VoltDB Map\n");
+    // printf("Range From VoltDB Map\n");
 
     for (int i = 0; i < ITERATIONS; i += 2) {
         int k = rand() % BATCH_COUNT;
@@ -443,12 +443,12 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
     }
 
     gettimeofday(&tp, NULL);
-    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t3 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    printf("Time elapsed: %.2f\n", static_cast<double>(t3 - t2) / static_cast<double>(1000));
-    fflush(stdout);
+    // printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    // int64_t t3 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    // printf("Time elapsed: %.2f\n", static_cast<double>(t3 - t2) / static_cast<double>(1000));
+    // fflush(stdout);
 
-    printf("Done!\n");
+    // printf("Done!\n");
 }
 
 TEST_F(CompactingMapTest, Trivial) {
@@ -482,7 +482,7 @@ TEST_F(CompactingMapTest, Trivial) {
 }
 
 TEST_F(CompactingMapTest, RandomUnique) {
-    const int ITERATIONS = 1000;
+    const int ITERATIONS = 1001;
     const int BIGGEST_VAL = 100;
 
     const int INSERT = 0;
@@ -499,7 +499,6 @@ TEST_F(CompactingMapTest, RandomUnique) {
 
     for (int i = 0; i < ITERATIONS; i++) {
         if ((i % 1000) == 0) {
-            printf("Verifying at iteration %d\n", i);
             ASSERT_TRUE(volt.verify());
         }
 
@@ -546,7 +545,7 @@ TEST_F(CompactingMapTest, RandomUnique) {
 }
 
 TEST_F(CompactingMapTest, RandomMulti) {
-    const int ITERATIONS  = 1000;
+    const int ITERATIONS  = 1001;
     const int BIGGEST_VAL = 100;
 
     const int INSERT = 0;   int countInserts = 0;
@@ -556,7 +555,7 @@ TEST_F(CompactingMapTest, RandomMulti) {
     const int SIZE = 4;     int countSizes = 0; int size_greatest = 0;
     const int LBOUND = 5;   int lowerBounds = 0; int lb_greatestChain = 0;
     const int UBOUND = 6;   int upperBounds = 0; int ub_greatestChain = 0;
-    const int EQ_RANGE = 7; int equalRanges = 0;
+    const int EQ_RANGE = 7;
     const int TOTAL_OPS = 8;
 
     std::multimap<std::string, std::string> stl;
@@ -571,9 +570,8 @@ TEST_F(CompactingMapTest, RandomMulti) {
     // assert(false);
 
     for (int i = 0; i < ITERATIONS; i++) {
-        if ((i % 10000) == 0) {
+        if ((i % 1000) == 0) {
             ASSERT_TRUE(volt.verify());
-            std::cout << "verified at: " << i << " (" <<  i / (ITERATIONS/100) << "%)" << std::endl;
         }
 
         int op = rand() % TOTAL_OPS;
@@ -746,15 +744,14 @@ TEST_F(CompactingMapTest, RandomMulti) {
     }
 
     ASSERT_TRUE(volt.verify());
-    std::cout << "Inserts: " << countInserts << std::endl;
-    std::cout << "Erase: " << countErases << std::endl;
-    std::cout << "Erase(it): " << countEraseIts << std::endl;
-    std::cout << "Finds: " << countFinds << " found: " << countFinds_found << " not: " << countFinds_notFound;
-    std::cout << " find greatest chain: " <<  find_greatestChain << std::endl;
-    std::cout << "Sizes: " << countSizes << " greatest size: " << size_greatest << std::endl;
-    std::cout << "LowerBounds: " << lowerBounds << " lb greatest chain: " << lb_greatestChain << std::endl;
-    std::cout << "UpperBounds: " << upperBounds << " ub greatest chain: " << ub_greatestChain << std::endl;
-    std::cout << "EqualRange: " << equalRanges << std::endl;
+    // std::cout << "Inserts: " << countInserts << std::endl;
+    // std::cout << "Erase: " << countErases << std::endl;
+    // std::cout << "Erase(it): " << countEraseIts << std::endl;
+    // std::cout << "Finds: " << countFinds << " found: " << countFinds_found << " not: " << countFinds_notFound;
+    // std::cout << " find greatest chain: " <<  find_greatestChain << std::endl;
+    // std::cout << "Sizes: " << countSizes << " greatest size: " << size_greatest << std::endl;
+    // std::cout << "LowerBounds: " << lowerBounds << " lb greatest chain: " << lb_greatestChain << std::endl;
+    // std::cout << "UpperBounds: " << upperBounds << " ub greatest chain: " << ub_greatestChain << std::endl;
 }
 
 // ENG-1057

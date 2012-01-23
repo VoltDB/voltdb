@@ -11,7 +11,7 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot plannerlog.txt voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
