@@ -140,6 +140,14 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private final HashMap<Integer, Long> m_newestSafeTransactionForInitiatorLedger =
         new HashMap<Integer, Long>();
 
+    /**
+     * Expose the siteId - this necessary to address the mailboxes using
+     * the agreement site id hack.
+     */
+    public int siteId() {
+        return m_siteId;
+    }
+
     public static final class FaultMessage extends VoltMessage {
 
         public final Set<NodeFailureFault> nodeFaults;

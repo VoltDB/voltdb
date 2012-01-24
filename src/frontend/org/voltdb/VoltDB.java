@@ -49,6 +49,8 @@ public class VoltDB {
     public static final int DTXN_MAILBOX_ID = 0;
     public static final int AGREEMENT_MAILBOX_ID = 1;
     public static final int STATS_MAILBOX_ID = 2;
+    public static final int ASYNC_COMPILER_MAILBOX_ID = 3;
+    public static final int CLIENT_INTERFACE_MAILBOX_ID = 4;
 
     // temporary for single partition testing
     static final int FIRST_SITE_ID = 1;

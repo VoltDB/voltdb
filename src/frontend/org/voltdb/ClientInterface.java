@@ -26,6 +26,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltdb.compiler.AdHocPlannerWork;
+import org.voltdb.compiler.CatalogChangeWork;
+
+import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.messaging.LocalObjectMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.VoltMessage;
+
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
@@ -55,7 +66,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmt;
 import org.voltdb.compiler.AsyncCompilerResult;
-import org.voltdb.compiler.AsyncCompilerWorkThread;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
@@ -104,7 +114,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
     private final TransactionInitiator m_initiator;
-    private final AsyncCompilerWorkThread m_asyncCompilerWorkThread;
     private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
@@ -128,10 +137,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     // clock time of last call to the initiator's tick()
     static final int POKE_INTERVAL = 1000;
-    private final long m_lastCompilerThreadPoke = 0;
 
     private final int m_allPartitions[];
     final int m_siteId;
+
+    private final Mailbox m_mailbox;
 
     private final QueueMonitor m_clientQueueMonitor = new QueueMonitor() {
         private final int MAX_QUEABLE = 33554432;
@@ -828,12 +838,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     onBackPressure, offBackPressure,
                     timestampTestingSalt);
 
-        // create the adhoc planner thread
-        AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(context, siteId);
-        plannerThread.start();
         final ClientInterface ci = new ClientInterface(
-                port, adminPort, context, network, replicationRole, siteId, initiator,
-                plannerThread, allPartitions);
+           port, adminPort, context, network, replicationRole, siteId, initiator, allPartitions);
         onBackPressure.m_ci = ci;
         offBackPressure.m_ci = ci;
 
@@ -842,11 +848,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network,
                     ReplicationRole replicationRole, int siteId, TransactionInitiator initiator,
-                    AsyncCompilerWorkThread plannerThread, int[] allPartitions)
+                    int[] allPartitions)
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
-        m_asyncCompilerWorkThread = plannerThread;
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
@@ -859,6 +864,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
 
         registerPolicies(replicationRole);
+
+        m_mailbox = new LocalMailbox(VoltDB.instance().getHostMessenger(), siteId) {
+            LinkedBlockingDeque<VoltMessage> m_d = new LinkedBlockingDeque<VoltMessage>();
+            @Override
+            public void deliver(final VoltMessage message) {
+                m_d.offer(message);
+            }
+            @Override
+            public VoltMessage recv() {
+                return m_d.poll();
+            }
+        };
+        VoltDB.instance().getHostMessenger().
+            createMailbox(siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID, m_mailbox);
     }
 
     private void registerPolicies(ReplicationRole replicationRole) {
@@ -931,10 +950,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    AsyncCompilerWorkThread getCompilerThread() {
-        return m_asyncCompilerWorkThread;
-    }
-
     /**
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
@@ -969,7 +984,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void notifyOfCatalogUpdate() {
         m_shouldUpdateCatalog.set(true);
-        m_asyncCompilerWorkThread.notifyOfCatalogUpdate();
     }
 
     /**
@@ -1072,27 +1086,57 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
 
-                boolean success = m_asyncCompilerWorkThread.planSQL(sql,
-                                                  partitionParam,
-                                                  task.clientHandle,
-                                                  handler.connectionId(),
-                                                  handler.m_hostname,
-                                                  handler.isAdmin(),
-                                                  c);
-                // basic backpressure used when the planner queue is too deep,
-                //  or... less optimally, when the adhoc planner hangs
-                if (!success) {
+                LocalObjectMessage work = new LocalObjectMessage(
+                        new AdHocPlannerWork(
+                            m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                            false, task.clientHandle, handler.connectionId(),
+                            handler.m_hostname, handler.isAdmin(), c,
+                            sql, partitionParam));
+
+                try {
+                    m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
+                        VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+                } catch (MessagingException ex) {
                     final ClientResponseImpl errorResponse =
-                            new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                                   new VoltTable[0],
-                                                   "Adhoc SQL planner busy. Try again later. " +
-                                                   "If you see this message repeatedly, you may try restarting the VoltDB node.",
-                                                   task.clientHandle);
+                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
+                                task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                }
+
+                return;
+            }
+
+            // Updating a catalog needs to divert to the catalog processing thread
+            if (task.procName.equals("@UpdateApplicationCatalog")) {
+                ParameterSet params = task.getParams();
+                byte[] catalogBytes = null;
+                if (params.m_params[0] instanceof String) {
+                    catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
+                } else if (params.m_params[0] instanceof byte[]) {
+                    catalogBytes = (byte[]) params.m_params[0];
+                }
+                String deploymentString = (String) params.m_params[1];
+
+                LocalObjectMessage work = new LocalObjectMessage(
+                        new CatalogChangeWork(
+                            m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                            task.clientHandle, handler.connectionId(), handler.m_hostname,
+                            handler.isAdmin(), c, catalogBytes, deploymentString));
+
+                try {
+                    m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
+                        VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+                } catch (MessagingException ex) {
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
+                                                  " No data was read or written.",
+                                task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                 }
                 return;
             }
-
             //
             // Horrible, hackish, stupid sysproc special casing...
             //
@@ -1127,27 +1171,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return;
             }
 
-            // Updating a catalog needs to divert to the catalog processing thread
-            if (task.procName.equals("@UpdateApplicationCatalog")) {
-                ParameterSet params = task.getParams();
-                byte[] catalogBytes = null;
-                if (params.m_params[0] instanceof String) {
-                    catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
-                } else if (params.m_params[0] instanceof byte[]) {
-                    catalogBytes = (byte[]) params.m_params[0];
-                }
-                String deploymentString = (String) params.m_params[1];
-
-                m_asyncCompilerWorkThread.prepareCatalogUpdate(catalogBytes,
-                                                               deploymentString,
-                                                               task.clientHandle,
-                                                               handler.connectionId(),
-                                                               handler.m_hostname,
-                                                               handler.isAdmin(),
-                                                               handler.sequenceId(),
-                                                               c);
-                return;
-            }
 
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
@@ -1267,25 +1290,58 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     private final void checkForFinishedCompilerWork() {
-        if (m_asyncCompilerWorkThread == null) return;
+/*
+        // basic backpressure used when the planner queue is too deep,
+        //  or... less optimally, when the adhoc planner hangs
+        if (!success) {
+            final ClientResponseImpl errorResponse =
+                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "Adhoc SQL planner busy. Try again later. " +
+                        "If you see this message repeatedly, you may try restarting the VoltDB node.",
+                        task.clientHandle);
+            c.writeStream().enqueue(errorResponse);
+        }
+*/
+        VoltMessage message;
+        while ((message = m_mailbox.recv()) != null) {
 
-        AsyncCompilerResult result = null;
+            if (!(message instanceof LocalObjectMessage)) {
+                continue;
+            }
 
-        while ((result = m_asyncCompilerWorkThread.getPlannedStmt()) != null) {
+            final LocalObjectMessage lom = (LocalObjectMessage)message;
+            if (!(lom.payload instanceof AsyncCompilerResult)) {
+                continue;
+            }
+
+            final AsyncCompilerResult result = (AsyncCompilerResult)lom.payload;
             if (result.errorMsg == null) {
                 if (result instanceof AdHocPlannedStmt) {
                     final AdHocPlannedStmt plannedStmt = (AdHocPlannedStmt) result;
                     if (plannedStmt.catalogVersion != m_catalogContext.get().catalogVersion) {
-                         /* The adhoc planner learns of catalog updates after the EE and the
-                            rest of the system. If the adhoc sql was planned against an
-                            obsolete catalog, re-plan. */
-                        m_asyncCompilerWorkThread.planSQL(plannedStmt.sql,
-                                                          plannedStmt.partitionParam,
-                                                          plannedStmt.clientHandle,
-                                                          plannedStmt.connectionId,
-                                                          plannedStmt.hostname,
-                                                          plannedStmt.adminConnection,
-                                                          plannedStmt.clientData);
+
+                        /* The adhoc planner learns of catalog updates after the EE and the
+                           rest of the system. If the adhoc sql was planned against an
+                           obsolete catalog, re-plan. */
+
+                        LocalObjectMessage work = new LocalObjectMessage(
+                                new AdHocPlannerWork(
+                                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                                    false, plannedStmt.clientHandle, plannedStmt.connectionId,
+                                    plannedStmt.hostname, plannedStmt.adminConnection, plannedStmt.clientData,
+                                    plannedStmt.sql, plannedStmt.partitionParam));
+
+                        try {
+                            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
+                                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+                        } catch (MessagingException ex) {
+                            final ClientResponseImpl errorResponse =
+                                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                        new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
+                                        plannedStmt.clientHandle);
+                            ((Connection)(plannedStmt.clientData)).writeStream().enqueue(errorResponse);
+                        }
                     }
                     else {
                         // create the execution site task
@@ -1420,7 +1476,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // check for catalog updates
         if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
             m_catalogContext.set(VoltDB.instance().getCatalogContext());
-            m_asyncCompilerWorkThread.notifyShouldUpdateCatalog();
             /*
              * Update snapshot daemon settings.
              *
@@ -1474,10 +1529,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_adminAcceptor != null)
         {
             m_adminAcceptor.shutdown();
-        }
-        if (m_asyncCompilerWorkThread != null) {
-            m_asyncCompilerWorkThread.shutdown();
-            m_asyncCompilerWorkThread.join();
         }
         if (m_snapshotDaemon != null) {
             m_snapshotDaemon.shutdown();

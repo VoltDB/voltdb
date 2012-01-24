@@ -210,8 +210,8 @@ public class Inits {
         InitAgreementSiteAndStatsAgent
         SetupReplicationRole
 
-        CreateRestoreAgentAndPlan <- InitAgreementSite
-        DistributeCatalog <- InitAgreementSite, CreateRestoreAgentAndPlan
+        CreateRestoreAgentAndPlan <- InitAgreementSiteAndStatsAgent
+        DistributeCatalog <- InitAgreementSiteAndStatsAgent, CreateRestoreAgentAndPlan
         EnforceLicensing <- CreateRestoreAgentAndPlan, SetupReplicationRole
         LoadCatalog <- DistributeCatalog
         SetupCommandLogging <- LoadCatalog
@@ -566,9 +566,19 @@ public class Inits {
             Mailbox agreementMailbox =
                     m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.AGREEMENT_MAILBOX_ID, false);
             try {
+
+                // Hack in the construction of stats and async compiler mailboxes.
+                // they need the agreementSiteId until mailbox construction is
+                // sanitized. Note that the agents (not the mailboxes) are owned
+                // by RealVoltDB
                 Mailbox statsMailbox =
                     m_rvdb.getStatsAgent().getMailbox(VoltDB.instance().getHostMessenger(), myAgreementSiteId);
                 m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.STATS_MAILBOX_ID, statsMailbox);
+
+                Mailbox asyncCompilerMailbox =
+                    m_rvdb.getAsyncCompilerAgent().createMailbox(VoltDB.instance().getHostMessenger(), myAgreementSiteId);
+                m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.ASYNC_COMPILER_MAILBOX_ID, asyncCompilerMailbox);
+
                 m_rvdb.m_agreementSite =
                     new AgreementSite(
                             myAgreementSiteId,

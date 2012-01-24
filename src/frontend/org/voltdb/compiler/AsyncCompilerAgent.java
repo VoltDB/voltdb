@@ -17,11 +17,20 @@
 
 package org.voltdb.compiler;
 
-import java.util.ArrayDeque;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.lang.Runnable;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.CatalogContext;
+import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.messaging.LocalObjectMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.VoltMessage;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
@@ -29,150 +38,75 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
-public class AsyncCompilerWorkThread extends Thread {
-
-    // if more than this amount of work is queued, backpressure
-    static final int MAX_QUEUE_DEPTH = 250;
-
-    LinkedBlockingQueue<AsyncCompilerWork> m_work = new LinkedBlockingQueue<AsyncCompilerWork>();
-    final ArrayDeque<AsyncCompilerResult> m_finished = new ArrayDeque<AsyncCompilerResult>();
-    PlannerTool m_ptool;
-    int counter = 0;
-    final int m_siteId;
-    boolean m_isLoaded = false;
-    CatalogContext m_context;
-
-    public static int m_OOPTimeout = 60000;
+public class AsyncCompilerAgent {
 
     private static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
-    /** If this is true, update the catalog */
-    private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
+    // if more than this amount of work is queued, reject new work
+    static final int MAX_QUEUE_DEPTH = 250;
 
-    public AsyncCompilerWorkThread(CatalogContext context, int siteId) {
-        m_ptool = null;
-        m_siteId = siteId;
-        m_context = context;
+    // accept work via this mailbox
+    private Mailbox m_mailbox;
 
-        setName("Ad Hoc Planner");
-    }
+    // do work in this executor service
+    private final ExecutorService m_es =
+        MiscUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
 
-    public void shutdown() {
-        AdHocPlannerWork work = AdHocPlannerWork.forShutdown();
-        m_work.add(work);
-    }
+    // wraps the VoltPlanner and does the actual query planning
+    private PlannerTool m_ptool = null;
 
-    /**
-     * Set the flag that tells this thread to update its
-     * catalog when it's threadsafe.
-     */
-    public void notifyOfCatalogUpdate() {
-        m_shouldUpdateCatalog.set(true);
-    }
-
-    /**
-     *
-     * @param sql
-     * @param partitionInfo Standard partition info string for single-partition procs.
-     *                      NULL if multi-partition
-     * @param clientHandle Handle provided by the client application (not ClientInterface)
-     * @param connectionId
-     * @param hostname Hostname of the other end of the connection
-     * @param adminConnection Did this invocation arrive on an admin port?
-     * @param clientData Data supplied by ClientInterface (typically a VoltPort) that will be in the PlannedStmt produced later.
-     */
-    public boolean planSQL(
-            String sql,
-            Object partitionParam,
-            long clientHandle,
-            long connectionId,
-            String hostname,
-            boolean adminConnection,
-            Object clientData) {
-
-        AdHocPlannerWork work = new AdHocPlannerWork(
-                false, // shouldShutdown
-                clientHandle,
-                connectionId,
-                hostname,
-                adminConnection,
-                clientData,
-                sql,
-                partitionParam
-                );
-
-        if (m_work.size() > MAX_QUEUE_DEPTH) {
-            return false;
-        }
-        m_work.add(work);
-        return true;
-    }
-
-    public void prepareCatalogUpdate(
-            byte[] catalogBytes,
-            String deploymentString,
-            long clientHandle,
-            long connectionId,
-            String hostname,
-            boolean adminConnection,
-            int sequenceNumber,
-            Object clientData) {
-        CatalogChangeWork work = new CatalogChangeWork(
-                clientHandle, connectionId, hostname, adminConnection,
-                clientData, catalogBytes, deploymentString);
-        m_work.add(work);
-    }
-
-    public AsyncCompilerResult getPlannedStmt() {
-        synchronized (m_finished) {
-            return m_finished.poll();
+    // intended for integration test use. finish planning what's in
+    // the queue and terminate the TPE.
+    public void shutdown() throws InterruptedException {
+        if (m_es != null) {
+            m_es.shutdown();
+            m_es.awaitTermination(120, TimeUnit.SECONDS);
         }
     }
 
-    @Override
-    public void run() {
-        AsyncCompilerWork work = null;
+    public Mailbox createMailbox(final HostMessenger hostMessenger, final int siteId) {
+        m_mailbox = new LocalMailbox(hostMessenger, siteId) {
+            @Override
+            public void deliver(final VoltMessage message) {
+                try {
+                    m_es.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            handleMailboxMessage(message);
+                        }
+                    });
+                } catch (RejectedExecutionException rejected) {
+                    final LocalObjectMessage wrapper = (LocalObjectMessage)message;
+                    AsyncCompilerWork work = (AsyncCompilerWork)(wrapper.payload);
+                    AsyncCompilerResult retval = new AsyncCompilerResult();
+                    retval.clientHandle = work.clientHandle;
+                    retval.errorMsg = "Ad Hoc Planner is not available. Try again.";
+                    retval.connectionId = work.connectionId;
+                    retval.hostname = work.hostname;
+                    retval.adminConnection = work.adminConnection;
+                    retval.clientData = work.clientData;
+                }
+            }
+        };
+        return m_mailbox;
+    }
+
+    private void handleMailboxMessage(final VoltMessage message) {
+        final LocalObjectMessage wrapper = (LocalObjectMessage)message;
         try {
-            work = m_work.take();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        while (work.shouldShutdown == false) {
-            // deal with reloading the global catalog
-            if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
-                m_context = VoltDB.instance().getCatalogContext();
-                // kill the planner process which has an outdated catalog
-                // it will get created again for the next stmt
-                if (m_ptool != null)
-                    m_ptool.shutdown(); // cleans up hsql
-                m_ptool = null;
+            if (wrapper.payload instanceof AdHocPlannerWork) {
+                final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
+                final AsyncCompilerResult result = compileAdHocPlan(w);
+                m_mailbox.send(w.replySiteId, w.replyMailboxId, new LocalObjectMessage(result));
             }
-
-            AsyncCompilerResult result = null;
-            if (work instanceof AdHocPlannerWork)
-                result = compileAdHocPlan((AdHocPlannerWork) work);
-            if (work instanceof CatalogChangeWork)
-                result = prepareApplicationCatalogDiff((CatalogChangeWork) work);
-            assert(result != null);
-
-            synchronized (m_finished) {
-                m_finished.add(result);
+            else if (wrapper.payload instanceof CatalogChangeWork) {
+                final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
+                final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
+                m_mailbox.send(w.replySiteId, w.replyMailboxId, new LocalObjectMessage(result));
             }
-
-            try {
-                work = m_work.take();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        } catch (MessagingException ex) {
+            ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
         }
-        if (m_ptool != null) {
-            m_ptool.shutdown(); // cleans up hsql
-            m_ptool = null;
-        }
-    }
-
-    public void notifyShouldUpdateCatalog() {
-        m_shouldUpdateCatalog.set(true);
     }
 
     private AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
@@ -182,19 +116,23 @@ public class AsyncCompilerWorkThread extends Thread {
         plannedStmt.hostname = work.hostname;
         plannedStmt.adminConnection = work.adminConnection;
         plannedStmt.clientData = work.clientData;
+
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
-        plannedStmt.catalogVersion = m_context.catalogVersion;
+        CatalogContext context = VoltDB.instance().getCatalogContext();
+        if (m_ptool == null || m_ptool.m_context.catalogVersion != context.catalogVersion) {
+            if (m_ptool != null) {
+                // cleanly shutdown hsql
+                m_ptool.shutdown();
+            }
+            m_ptool = new PlannerTool(context);
+        }
+        plannedStmt.catalogVersion = context.catalogVersion;
 
         try {
-            if (m_ptool == null)
-                m_ptool = new PlannerTool(m_context);
-
             PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam != null);
-
             plannedStmt.aggregatorFragment = result.onePlan;
             plannedStmt.collectorFragment = result.allPlan;
-
             plannedStmt.isReplicatedTableDML = result.replicatedDML;
             plannedStmt.sql = work.sql;
             plannedStmt.partitionParam = work.partitionParam;

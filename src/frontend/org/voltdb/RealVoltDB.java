@@ -65,6 +65,8 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 
+import org.voltdb.compiler.AsyncCompilerAgent;
+
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
@@ -78,7 +80,6 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.compiler.AsyncCompilerWorkThread;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -161,6 +162,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private ArrayList<ExecutionSiteRunner> m_runners;
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
+    private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
+    public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     FaultDistributor m_faultManager;
     Object m_instanceId[];
     private PartitionCountStats m_partitionCountStats = null;
@@ -175,7 +178,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
     CountDownLatch m_hasCatalog;
-    AsyncCompilerWorkThread m_compilerThread = null;
 
     DeploymentType m_deployment;
 
@@ -274,6 +276,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_deployment = null;
             m_messenger = null;
             m_statsAgent = new StatsAgent();
+            m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
             m_instanceId = null;
             m_zk = null;
@@ -463,7 +466,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                m_config.m_timestampTestingSalt);
                     portOffset += 2;
                     m_clientInterfaces.add(ci);
-                    m_compilerThread = ci.getCompilerThread();
                 }
             }
 
@@ -1277,6 +1279,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (m_statsAgent != null) {
                 m_statsAgent.shutdown();
                 m_statsAgent = null;
+            }
+
+            if (m_asyncCompilerAgent != null) {
+                m_asyncCompilerAgent.shutdown();
+                m_asyncCompilerAgent = null;
             }
 
             // The network iterates this list. Clear it after network's done.
