@@ -33,26 +33,22 @@ public class ParameterDeserializationPolicy extends InvocationAcceptancePolicy {
     }
 
     @Override
-    public boolean shouldAccept(AuthUser user,
-                                StoredProcedureInvocation invocation,
-                                Config sysProc,
-                                WriteStream s) {
+    public ClientResponseImpl shouldAccept(AuthUser user,
+            StoredProcedureInvocation invocation,
+            Config sysProc) {
         try {
             invocation.getParams();
         } catch (RuntimeException e) {
             Writer result = new StringWriter();
             PrintWriter pw = new PrintWriter(result);
             e.printStackTrace(pw);
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "Exception while deserializing procedure params\n" +
-                                       result.toString(),
-                                       invocation.clientHandle);
-            s.enqueue(errorResponse);
-            return false;
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Exception while deserializing procedure params\n" +
+                    result.toString(),
+                    invocation.clientHandle);
         }
 
-        return true;
+        return null;
     }
 }

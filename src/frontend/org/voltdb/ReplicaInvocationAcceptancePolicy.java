@@ -32,11 +32,11 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationAcceptancePolic
         super(isOn);
     }
 
-    private boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
-                                 boolean isReadOnly, WriteStream s) {
+    private ClientResponseImpl shouldAcceptHelper(AuthUser user, StoredProcedureInvocation invocation,
+                                 boolean isReadOnly) {
         if (invocation.getType() == ProcedureInvocationType.ORIGINAL) {
             if (!isOn) {
-                return true;
+                return null;
             }
 
             // hackish way to check if an adhoc query is read-only
@@ -46,64 +46,51 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationAcceptancePolic
             }
 
             if (isReadOnly) {
-                return true;
+                return null;
             } else {
-                final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                               new VoltTable[0],
-                                               "Write procedure " + invocation.procName +
-                                               " is not allowed in replica cluster",
-                                               invocation.clientHandle);
-                s.enqueue(errorResponse);
-                return false;
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        "Write procedure " + invocation.procName +
+                        " is not allowed in replica cluster",
+                        invocation.clientHandle);
             }
         } else {
             if (!isOn) {
-                final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                               new VoltTable[0],
-                                               "Replicated procedure " + invocation.procName +
-                                               " is dropped from cluster",
-                                               invocation.clientHandle);
-                s.enqueue(errorResponse);
-                return false;
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        "Replicated procedure " + invocation.procName +
+                        " is dropped from cluster",
+                        invocation.clientHandle);
             }
 
             if (isReadOnly) {
-                final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                               new VoltTable[0],
-                                               "Read replicated procedure " + invocation.procName +
-                                               " is dropped from replica cluster",
-                                               invocation.clientHandle);
-                s.enqueue(errorResponse);
-                return false;
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        "Read replicated procedure " + invocation.procName +
+                        " is dropped from replica cluster",
+                        invocation.clientHandle);
             } else {
-                return true;
+                return null;
             }
         }
     }
 
     @Override
-    public boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
-                                Procedure proc, WriteStream s) {
+    public ClientResponseImpl shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
+                                Procedure proc) {
         if (invocation == null || proc == null) {
-            return false;
+            return null;
         }
-        return shouldAccept(user, invocation, proc.getReadonly(), s);
+        return shouldAcceptHelper(user, invocation, proc.getReadonly());
     }
 
     @Override
-    public boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
-                                Config sysProc, WriteStream s) {
-        if (invocation == null || sysProc == null) {
-            return false;
-        }
+    public ClientResponseImpl shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Config sysProc) {
         if (invocation.getType() == ProcedureInvocationType.ORIGINAL && sysProc.allowedInReplica &&
             !invocation.procName.equalsIgnoreCase("@AdHoc")) {
             // white-listed sysprocs, adhoc is a special case
-            return true;
+            return null;
         }
-        return shouldAccept(user, invocation, sysProc.readOnly, s);
+        return shouldAcceptHelper(user, invocation, sysProc.readOnly);
     }
 }

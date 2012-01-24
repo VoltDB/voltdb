@@ -915,27 +915,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * should be rejected.
      *
      * @param name The procedure name, null for generic policies.
-     * @return true to proceed, false to reject.
+     * @return ClientResponseImpl on error or null if okay.
      */
-    private boolean checkPolicies(String name, AuthSystem.AuthUser user,
+    private ClientResponseImpl checkPolicies(String name, AuthSystem.AuthUser user,
                                   final StoredProcedureInvocation task,
-                                  final Procedure catProc,
-                                  Config sysProc, WriteStream s) {
+                                  final Procedure catProc, Config sysProc) {
         List<InvocationAcceptancePolicy> policies = m_policies.get(name);
+        ClientResponseImpl error = null;
         if (policies != null) {
             for (InvocationAcceptancePolicy policy : policies) {
                 if (catProc != null) {
-                    if (!policy.shouldAccept(user, task, catProc, s)) {
-                        return false;
+                    if ((error = policy.shouldAccept(user, task, catProc)) != null) {
+                        return error;
                     }
                 } else {
-                    if (!policy.shouldAccept(user, task, sysProc, s)) {
-                        return false;
+                    if ((error = policy.shouldAccept(user, task, sysProc)) != null) {
+                        return error;
                     }
                 }
             }
         }
-        return true;
+        return null;
     }
 
     /**
@@ -1023,6 +1023,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final long now = System.currentTimeMillis();
         final FastDeserializer fds = new FastDeserializer(buf);
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
+        ClientResponseImpl error = null;
+
 
         // Check for admin mode restrictions before proceeding any further
         VoltDBInterface instance = VoltDB.instance();
@@ -1056,9 +1058,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // Check procedure policies
-        if (!checkPolicies(null, user, task, catProc, sysProc, ccxn.writeStream()) ||
-            !checkPolicies(task.procName, user, task, catProc, sysProc, ccxn.writeStream())) {
-            return null;
+        error = checkPolicies(null, user, task, catProc, sysProc);
+        if (error != null) {
+            return error;
+        }
+
+        error = checkPolicies(task.procName, user, task, catProc, sysProc);
+        if (error != null) {
+            return error;
         }
 
         if (sysProc != null) {

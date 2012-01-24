@@ -29,38 +29,31 @@ public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
     }
 
     @Override
-    public boolean shouldAccept(AuthUser user,
-                                StoredProcedureInvocation invocation,
-                                Config sysProc,
-                                WriteStream s) {
+    public ClientResponseImpl shouldAccept(AuthUser user,
+            StoredProcedureInvocation invocation,
+            Config sysProc) {
+
         if (!invocation.procName.equals("@AdHoc")) {
-            return true;
+            return null;
         }
 
         ParameterSet params = invocation.getParams();
         // note the second secret param
         if (params.m_params.length > 2) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "Adhoc system procedure requires exactly one or two parameters, " +
-                                       "the SQL statement to execute with an optional partitioning value.",
-                                       invocation.clientHandle);
-            s.enqueue(errorResponse);
-            return false;
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0], "Adhoc system procedure requires exactly one or two parameters, " +
+                    "the SQL statement to execute with an optional partitioning value.",
+                    invocation.clientHandle);
         }
         // check the types are both strings
         if ((params.m_params[0] instanceof String) == false) {
-            final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                           new VoltTable[0],
-                                           "Adhoc system procedure requires sql in the String type only.",
-                                           invocation.clientHandle);
-            s.enqueue(errorResponse);
-            return false;
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Adhoc system procedure requires sql in the String type only.",
+                    invocation.clientHandle);
         }
 
-        return true;
+        return null;
     }
 
 }
