@@ -49,6 +49,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         super(name);
     }
 
+    public void testPing() throws IOException, ProcCallException {
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure("@Ping");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
     public void testInvalidProcedureName() throws IOException {
         Client client = getClient();
         try {

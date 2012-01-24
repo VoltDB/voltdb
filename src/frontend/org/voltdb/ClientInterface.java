@@ -1018,6 +1018,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return;
         }
 
+        // ping just responds as fast as possible to show the connection is alive
+        // nb: ping is not a real procedure, so this is checked before other "sysprocs"
+        if (task.procName.equals("@Ping")) {
+            final ClientResponseImpl pingResponse =
+                    new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
+            c.writeStream().enqueue(pingResponse);
+            return;
+        }
+
         // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
         AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
@@ -1053,6 +1062,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         if (sysProc != null) {
+            // ad hoc query
             if (task.procName.startsWith("@AdHoc")) {
                 ParameterSet params = task.getParams();
                 String sql = (String) params.m_params[0];
