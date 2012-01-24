@@ -26,13 +26,14 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-
-import org.voltdb.client.ProcedureCallback;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
@@ -46,8 +47,17 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 
 public class TestFixedSQLSuite extends RegressionSuite {
 
+    /**
+     * Inner class procedure to see if we can invoke it.
+     */
+    public static class InnerProc extends VoltProcedure {
+        public long run() {
+            return 0L;
+        }
+    }
+
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class };
+    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class, InnerProc.class };
 
     public void testTicketEng2250_IsNull() throws Exception
     {
@@ -1173,6 +1183,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         rsp = client.callProcedure("Eng1316Update_R"); // update where id < 104
         assertTrue(rsp.getResults()[0].asScalarLong() == 4);
         assertEquals("modified_tuples", rsp.getResults()[0].getColumnName(0));
+    }
+
+    // make sure we can call an inner proc
+    public void testTicket2423() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
+        Client client = getClient();
+        client.callProcedure("TestFixedSQLSuite$InnerProc");
+        client.close();
+        // get it again to make sure the server is all good
+        client = getClient();
+        client.callProcedure("TestFixedSQLSuite$InnerProc");
     }
 
     //
