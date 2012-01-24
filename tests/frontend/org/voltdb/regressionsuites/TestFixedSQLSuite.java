@@ -1189,7 +1189,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     public void testTicket2423() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
         Client client = getClient();
         client.callProcedure("TestFixedSQLSuite$InnerProc");
-        client.close();
+        releaseClient(client);
         // get it again to make sure the server is all good
         client = getClient();
         client.callProcedure("TestFixedSQLSuite$InnerProc");
