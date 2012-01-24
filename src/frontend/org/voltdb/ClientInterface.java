@@ -671,7 +671,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void handleMessage(ByteBuffer message, Connection c) {
             try {
-                handleRead(message, this, c);
+                final ClientResponseImpl error = handleRead(message, this, c);
+                if (error != null) {
+                    c.writeStream().enqueue(error);
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -1016,7 +1019,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param port
      * * return True if an error was generated and needs to be returned to the client
      */
-    private final void handleRead(ByteBuffer buf, ClientInputHandler handler, Connection c) throws IOException {
+    private final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
         final long now = System.currentTimeMillis();
         final FastDeserializer fds = new FastDeserializer(buf);
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
@@ -1025,12 +1028,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         VoltDBInterface instance = VoltDB.instance();
         if (instance.getMode() == OperationMode.PAUSED && !handler.isAdmin())
         {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                                       new VoltTable[0], "Server is currently unavailable; try again later",
-                                       task.clientHandle);
-            c.writeStream().enqueue(errorResponse);
-            return;
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                    new VoltTable[0], "Server is currently unavailable; try again later",
+                    task.clientHandle);
         }
 
         // Deserialize the client's request and map to a catalog stored procedure
@@ -1040,31 +1040,25 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
 
         if (user == null) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                       new VoltTable[0], "User " + handler.m_username +
-                                       " has been removed from the system via a catalog update",
-                                       task.clientHandle);
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
-            c.writeStream().enqueue(errorResponse);
-            return;
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0], "User " + handler.m_username +
+                    " has been removed from the system via a catalog update",
+                    task.clientHandle);
         }
 
         if (catProc == null && sysProc == null) {
             String errorMessage = "Procedure " + task.procName + " was not found";
             authLog.l7dlog( Level.WARN, LogKeys.auth_ClientInterface_ProcedureNotFound.name(), new Object[] { task.procName }, null);
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(
-                        ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0], errorMessage, task.clientHandle);
-            c.writeStream().enqueue(errorResponse);
-            return;
+            return new ClientResponseImpl(
+                    ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0], errorMessage, task.clientHandle);
         }
 
         // Check procedure policies
-        if (!checkPolicies(null, user, task, catProc, sysProc, c.writeStream()) ||
-            !checkPolicies(task.procName, user, task, catProc, sysProc, c.writeStream())) {
-            return;
+        if (!checkPolicies(null, user, task, catProc, sysProc, ccxn.writeStream()) ||
+            !checkPolicies(task.procName, user, task, catProc, sysProc, ccxn.writeStream())) {
+            return null;
         }
 
         if (sysProc != null) {
@@ -1090,21 +1084,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         new AdHocPlannerWork(
                             m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
                             false, task.clientHandle, handler.connectionId(),
-                            handler.m_hostname, handler.isAdmin(), c,
+                            handler.m_hostname, handler.isAdmin(), ccxn,
                             sql, partitionParam));
 
                 try {
                     m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
                         VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
                 } catch (MessagingException ex) {
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
-                                task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
+                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                            new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
+                            task.clientHandle);
                 }
-
-                return;
+                return null;
             }
 
             // Updating a catalog needs to divert to the catalog processing thread
@@ -1122,20 +1113,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         new CatalogChangeWork(
                             m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
                             task.clientHandle, handler.connectionId(), handler.m_hostname,
-                            handler.isAdmin(), c, catalogBytes, deploymentString));
+                            handler.isAdmin(), ccxn, catalogBytes, deploymentString));
 
                 try {
                     m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
                         VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
                 } catch (MessagingException ex) {
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
-                                                  " No data was read or written.",
-                                task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
+                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                            new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
+                            " No data was read or written.",
+                            task.clientHandle);
                 }
-                return;
+                return null;
             }
             //
             // Horrible, hackish, stupid sysproc special casing...
@@ -1152,11 +1141,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 catch (Exception e) {
                     authLog.warn(e.getMessage());
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                             new VoltTable[0], e.getMessage(), task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
+                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0], e.getMessage(), task.clientHandle);
                 }
                 assert(involvedPartitions != null);
                 m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
@@ -1166,9 +1152,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                               true,  // single partition
                                               false, // every site
                                               involvedPartitions, involvedPartitions.length,
-                                              c, buf.capacity(),
+                                              ccxn, buf.capacity(),
                                               now);
-                return;
+                return null;
             }
 
 
@@ -1179,13 +1165,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             {
                 if (!handler.isAdmin())
                 {
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                               new VoltTable[0],
-                                               "" + task.procName + " is not available to this client",
-                                               task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
+                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0],
+                            "" + task.procName + " is not available to this client",
+                            task.clientHandle);
                 }
             }
             else if (task.procName.equals("@SystemInformation"))
@@ -1201,8 +1184,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 //So that the modified version is reserialized, null out the lazy copy
                 task.unserializedParams = null;
             } else if (task.procName.equals("@SnapshotSave")) {
-                m_snapshotDaemon.requestUserSnapshot(task, c);
-                return;
+                m_snapshotDaemon.requestUserSnapshot(task, ccxn);
+                return null;
             } else if (task.procName.equals("@Statistics")) {
                 ParameterSet params = task.getParams();
                 // Okay, this is hacky...we're going to check for non-zero
@@ -1214,11 +1197,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     (((String)params.toArray()[0]).equals("WAN")))
                 {
                     try {
-                        VoltDB.instance().getStatsAgent().collectStats(c, task.clientHandle, "WAN");
+                        VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "WAN");
                     } catch (Exception e) {
-                        sendErrorResponse( c, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+                        sendErrorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
                     }
-                    return;
+                    return null;
                 }
             }
         }
@@ -1244,7 +1227,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                              new VoltTable[0], errorMessage, task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
+                    ccxn.writeStream().enqueue(errorResponse);
                 }
             }
             if (involvedPartitions != null) {
@@ -1256,7 +1239,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                   catProc.getSinglepartition(),
                                                   catProc.getEverysite(),
                                                   involvedPartitions, involvedPartitions.length,
-                                                  c, buf.capacity(),
+                                                  ccxn, buf.capacity(),
                                                   now);
                 if (!success)
                 {
@@ -1264,13 +1247,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // will move along on duplicate replicated transactions
                     // reported by the slave cluster.  We report "SUCCESS"
                     // to keep the agent from choking.  ENG-2334
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                               new VoltTable[0],
-                                               ClientResponseImpl.DUPE_TRANSACTION,
-                                               task.clientHandle);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
+                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0],
+                            ClientResponseImpl.DUPE_TRANSACTION,
+                            task.clientHandle);
                 }
             }
         }
@@ -1284,9 +1264,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sysProc.getSinglepartition(),
                     sysProc.getEverysite(),
                     involvedPartitions, involvedPartitions.length,
-                    c, buf.capacity(),
+                    ccxn, buf.capacity(),
                     now);
         }
+
+        return null;
     }
 
     private final void checkForFinishedCompilerWork() {
