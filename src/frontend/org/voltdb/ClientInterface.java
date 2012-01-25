@@ -997,7 +997,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return m_initiator;
     }
 
-    private void sendErrorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {
+    private ClientResponseImpl errorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {
         String realReason = reason;
         if (e != null) {
             StringWriter sw = new StringWriter();
@@ -1008,10 +1008,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (log) {
             hostLog.warn(realReason);
         }
-        final ClientResponseImpl errorResponse =
-            new ClientResponseImpl(status,
-                                 new VoltTable[0], realReason, handle);
-        c.writeStream().enqueue(errorResponse);
+        return new ClientResponseImpl(status,
+                new VoltTable[0], realReason, handle);
     }
 
     /**
@@ -1206,7 +1204,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     try {
                         VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "WAN");
                     } catch (Exception e) {
-                        sendErrorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+                        return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
                     }
                     return null;
                 }
