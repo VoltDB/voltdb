@@ -1012,6 +1012,130 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new VoltTable[0], realReason, handle);
     }
 
+
+     ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
+        ParameterSet params = task.getParams();
+        String sql = (String) params.m_params[0];
+
+        // get the partition param if it exists
+        // null means MP-txn
+        Object partitionParam = null;
+        if (params.m_params.length > 1) {
+            if (params.m_params[1] == null) {
+                // nulls map to zero
+                partitionParam = new Long(0);
+                // skip actual null value because it means MP txn
+            }
+            else {
+                partitionParam = params.m_params[1];
+            }
+        }
+
+        LocalObjectMessage work = new LocalObjectMessage(
+                new AdHocPlannerWork(
+                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                    false, task.clientHandle, handler.connectionId(),
+                    handler.m_hostname, handler.isAdmin(), ccxn,
+                    sql, partitionParam));
+
+        try {
+            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
+                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+        } catch (MessagingException ex) {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
+                    task.clientHandle);
+        }
+        return null;
+    }
+
+    ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
+            ClientInputHandler handler, Connection ccxn)
+    {
+        ParameterSet params = task.getParams();
+        byte[] catalogBytes = null;
+        if (params.m_params[0] instanceof String) {
+            catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
+        } else if (params.m_params[0] instanceof byte[]) {
+            catalogBytes = (byte[]) params.m_params[0];
+        }
+        String deploymentString = (String) params.m_params[1];
+
+        LocalObjectMessage work = new LocalObjectMessage(
+                new CatalogChangeWork(
+                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                    task.clientHandle, handler.connectionId(), handler.m_hostname,
+                    handler.isAdmin(), ccxn, catalogBytes, deploymentString));
+
+        try {
+            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
+                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+        } catch (MessagingException ex) {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
+                    " No data was read or written.",
+                    task.clientHandle);
+        }
+        return null;
+    }
+
+    ClientResponseImpl dispatchLoadSinglepartitionTable(ByteBuffer buf,
+            StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn)
+    {
+        int[] involvedPartitions = null;
+        // break out the Hashinator and calculate the appropriate partition
+        try {
+            CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+            Object valueToHash = LoadSinglepartitionTable.partitionValueFromInvocation(
+                    tables, task);
+            involvedPartitions = new int[] { TheHashinator.hashToPartition(valueToHash) };
+        }
+        catch (Exception e) {
+            authLog.warn(e.getMessage());
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0], e.getMessage(), task.clientHandle);
+        }
+        assert(involvedPartitions != null);
+        m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                handler.isAdmin(),
+                task,
+                false, // read only
+                true,  // single partition
+                false, // every site
+                involvedPartitions, involvedPartitions.length,
+                ccxn, buf.capacity(),
+                System.currentTimeMillis());
+        return null;
+    }
+
+    ClientResponseImpl dispatchStatistics(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
+            ClientInputHandler handler, Connection ccxn) {
+        ParameterSet params = task.getParams();
+        // WAN uses the new StatsAgent. Other stats do not.
+        if ((params.m_params.length != 0) && (((String)params.toArray()[0]).equals("WAN"))) {
+            try {
+                VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "WAN");
+                return null;
+            } catch (Exception e) {
+                return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+            }
+        }
+        else {
+            int[] involvedPartitions = m_allPartitions;
+            m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                    handler.isAdmin(),
+                    task,
+                    sysProc.getReadonly(),
+                    sysProc.getSinglepartition(),
+                    sysProc.getEverysite(),
+                    involvedPartitions, involvedPartitions.length,
+                    ccxn, buf.capacity(),
+                    System.currentTimeMillis());
+            return null;
+        }
+    }
+
+
     /**
      *
      * @param port
@@ -1067,148 +1191,57 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         if (sysProc != null) {
+            // these have helpers that do all the work...
             if (task.procName.startsWith("@AdHoc")) {
-                ParameterSet params = task.getParams();
-                String sql = (String) params.m_params[0];
-
-                // get the partition param if it exists
-                // null means MP-txn
-                Object partitionParam = null;
-                if (params.m_params.length > 1) {
-                    if (params.m_params[1] == null) {
-                        // nulls map to zero
-                        partitionParam = new Long(0);
-                        // skip actual null value because it means MP txn
-                    }
-                    else {
-                        partitionParam = params.m_params[1];
-                    }
-                }
-
-                LocalObjectMessage work = new LocalObjectMessage(
-                        new AdHocPlannerWork(
-                            m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
-                            false, task.clientHandle, handler.connectionId(),
-                            handler.m_hostname, handler.isAdmin(), ccxn,
-                            sql, partitionParam));
-
-                try {
-                    m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
-                        VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
-                } catch (MessagingException ex) {
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                            new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
-                            task.clientHandle);
-                }
+                return dispatchAdHoc(task, handler, ccxn);
+            } else if (task.procName.equals("@UpdateApplicationCatalog")) {
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+            } else if (task.procName.equals("@LoadSinglepartitionTable")) {
+                return dispatchLoadSinglepartitionTable(buf, task, handler, ccxn);
+            } else if (task.procName.equals("@SnapshotSave")) {
+                m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
+            } else if (task.procName.equals("@Statistics")) {
+                return dispatchStatistics(sysProc, buf, task, handler, ccxn);
             }
 
-            // Updating a catalog needs to divert to the catalog processing thread
-            if (task.procName.equals("@UpdateApplicationCatalog")) {
-                ParameterSet params = task.getParams();
-                byte[] catalogBytes = null;
-                if (params.m_params[0] instanceof String) {
-                    catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
-                } else if (params.m_params[0] instanceof byte[]) {
-                    catalogBytes = (byte[]) params.m_params[0];
-                }
-                String deploymentString = (String) params.m_params[1];
-
-                LocalObjectMessage work = new LocalObjectMessage(
-                        new CatalogChangeWork(
-                            m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
-                            task.clientHandle, handler.connectionId(), handler.m_hostname,
-                            handler.isAdmin(), ccxn, catalogBytes, deploymentString));
-
-                try {
-                    m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
-                        VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
-                } catch (MessagingException ex) {
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                            new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
-                            " No data was read or written.",
-                            task.clientHandle);
-                }
-                return null;
-            }
-            //
-            // Horrible, hackish, stupid sysproc special casing...
-            //
-
-            if (task.procName.equals("@LoadSinglepartitionTable")) {
-                int[] involvedPartitions = null;
-                // break out the Hashinator and calculate the appropriate partition
-                try {
-                    CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-                    Object valueToHash = LoadSinglepartitionTable.partitionValueFromInvocation(
-                            tables, task);
-                    involvedPartitions = new int[] { TheHashinator.hashToPartition(valueToHash) };
-                }
-                catch (Exception e) {
-                    authLog.warn(e.getMessage());
-                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0], e.getMessage(), task.clientHandle);
-                }
-                assert(involvedPartitions != null);
-                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
-                                              handler.isAdmin(),
-                                              task,
-                                              false, // read only
-                                              true,  // single partition
-                                              false, // every site
-                                              involvedPartitions, involvedPartitions.length,
-                                              ccxn, buf.capacity(),
-                                              now);
-                return null;
-            }
-
+            // If you're going to copy and paste something, CnP the pattern
+            // up above.  -rtb.
 
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
-            else if (task.procName.equals("@Pause") ||
-                task.procName.equals("@Resume"))
-            {
-                if (!handler.isAdmin())
-                {
+            if (task.procName.equals("@Pause") || task.procName.equals("@Resume")) {
+                if (!handler.isAdmin()) {
                     return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                             new VoltTable[0],
                             "" + task.procName + " is not available to this client",
                             task.clientHandle);
                 }
             }
-            else if (task.procName.equals("@SystemInformation"))
-            {
+            else if (task.procName.equals("@SystemInformation")) {
                 ParameterSet params = task.getParams();
                 // hacky: support old @SystemInformation behavior by
                 // filling in a missing selector to get the overview key/value info
-                if (params.m_params.length == 0)
-                {
+                if (params.m_params.length == 0) {
                     params.m_params = new Object[1];
                     params.m_params[0] = new String("OVERVIEW");
                 }
                 //So that the modified version is reserialized, null out the lazy copy
                 task.unserializedParams = null;
-            } else if (task.procName.equals("@SnapshotSave")) {
-                m_snapshotDaemon.requestUserSnapshot(task, ccxn);
-                return null;
-            } else if (task.procName.equals("@Statistics")) {
-                ParameterSet params = task.getParams();
-                // Okay, this is hacky...we're going to check for non-zero
-                // params length here so we can do this test, but we're going
-                // to let zero params @Statistics calls drop through so that
-                // we get consistent error reporting when the number of
-                // parameters to a stored procedure doesn't match what's expected
-                if ((params.m_params.length != 0) &&
-                    (((String)params.toArray()[0]).equals("WAN")))
-                {
-                    try {
-                        VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "WAN");
-                    } catch (Exception e) {
-                        return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
-                    }
-                    return null;
-                }
             }
+
+            // the shared dispatch for sysprocs
+            int[] involvedPartitions = m_allPartitions;
+            m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                    handler.isAdmin(),
+                    task,
+                    sysProc.getReadonly(),
+                    sysProc.getSinglepartition(),
+                    sysProc.getEverysite(),
+                    involvedPartitions, involvedPartitions.length,
+                    ccxn, buf.capacity(),
+                    now);
+
         }
 
         // dispatch a user procedure
@@ -1233,61 +1266,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0], errorMessage, task.clientHandle);
                 }
             }
-            if (involvedPartitions != null) {
-                boolean success =
-                    m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
-                                                  handler.isAdmin(),
-                                                  task,
-                                                  catProc.getReadonly(),
-                                                  catProc.getSinglepartition(),
-                                                  catProc.getEverysite(),
-                                                  involvedPartitions, involvedPartitions.length,
-                                                  ccxn, buf.capacity(),
-                                                  now);
-                if (!success)
-                {
-                    // HACK: this return is for the WAN agent so that it
-                    // will move along on duplicate replicated transactions
-                    // reported by the slave cluster.  We report "SUCCESS"
-                    // to keep the agent from choking.  ENG-2334
-                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0],
-                            ClientResponseImpl.DUPE_TRANSACTION,
-                            task.clientHandle);
-                }
+            boolean success =
+                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                        handler.isAdmin(),
+                        task,
+                        catProc.getReadonly(),
+                        catProc.getSinglepartition(),
+                        catProc.getEverysite(),
+                        involvedPartitions, involvedPartitions.length,
+                        ccxn, buf.capacity(),
+                        now);
+            if (!success) {
+                // HACK: this return is for the WAN agent so that it
+                // will move along on duplicate replicated transactions
+                // reported by the slave cluster.  We report "SUCCESS"
+                // to keep the agent from choking.  ENG-2334
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        ClientResponseImpl.DUPE_TRANSACTION,
+                        task.clientHandle);
             }
         }
-        // dispatch a sysproc
-        else if (sysProc != null) {
-            int[] involvedPartitions = m_allPartitions;
-            m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
-                    handler.isAdmin(),
-                    task,
-                    sysProc.getReadonly(),
-                    sysProc.getSinglepartition(),
-                    sysProc.getEverysite(),
-                    involvedPartitions, involvedPartitions.length,
-                    ccxn, buf.capacity(),
-                    now);
-        }
-
         return null;
     }
 
     private final void checkForFinishedCompilerWork() {
-/*
-        // basic backpressure used when the planner queue is too deep,
-        //  or... less optimally, when the adhoc planner hangs
-        if (!success) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "Adhoc SQL planner busy. Try again later. " +
-                        "If you see this message repeatedly, you may try restarting the VoltDB node.",
-                        task.clientHandle);
-            c.writeStream().enqueue(errorResponse);
-        }
-*/
         VoltMessage message;
         while ((message = m_mailbox.recv()) != null) {
 
