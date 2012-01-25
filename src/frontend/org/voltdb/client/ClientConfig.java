@@ -23,6 +23,7 @@ package org.voltdb.client;
 public class ClientConfig {
 
     static final long DEFAULT_PROCEDURE_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
+    static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
 
     /**
      * Clients may queue a wide variety of messages and a lot of them
@@ -55,6 +56,7 @@ public class ClientConfig {
     int m_maxOutstandingTxns = 3000;
     StatsUploaderSettings m_statsSettings = null;
     long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
+    long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
 
     /**
      * Configuration for a client with no authentication credentials that will
@@ -117,7 +119,7 @@ public class ClientConfig {
      * {@link ClientStatusListenerExt#lateProcedureResponse(ClientResponse, String, int)}
      * will be called.
      *
-     * Default value is 2 minutes if not set.
+     * Default value is 2 minutes if not set. Value of 0 means forever.
      *
      * Note that while specified in MS, this timeout is only accurate to within a second or so.
      *
@@ -125,7 +127,30 @@ public class ClientConfig {
      */
     public void setProcedureCallTimeout(long ms) {
         assert(ms > 0);
+        if (ms < 0) ms = 0;
+        // 0 implies infinite, but use LONG_MAX to reduce branches to test
+        if (ms == 0) ms = Long.MAX_VALUE;
         m_procedureCallTimeoutMS = ms;
+    }
+
+    /**
+     * Set the timeout for reading from a connection. If a connection receives no responses,
+     * either from procedure calls or &amp;Pings, for the timeout time in milliseconds,
+     * then the connection will be assumed dead and the closed connection callback will
+     * be called.
+     *
+     * Default value is 2 minutes if not set. Value of 0 means forever.
+     *
+     * Note that while specified in MS, this timeout is only accurate to within a second or so.
+     *
+     * @param ms Timeout value in milliseconds.
+     */
+    public void setConnectionResponseTimeout(long ms) {
+        assert(ms > 0);
+        if (ms < 0) ms = 0;
+        // 0 implies infinite, but use LONG_MAX to reduce branches to test
+        if (ms == 0) ms = Long.MAX_VALUE;
+        m_connectionResponseTimeoutMS = ms;
     }
 
     /**

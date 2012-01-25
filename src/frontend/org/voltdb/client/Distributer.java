@@ -52,6 +52,9 @@ import org.voltdb.utils.Pair;
  *   to synchronized on the distributer and then an individual connection.
  */
 class Distributer {
+
+    static final long PING_HANDLE = Long.MAX_VALUE;
+
     // collection of connections to the cluster
     private final ArrayList<NodeConnection> m_connections = new ArrayList<NodeConnection>();
 
@@ -73,6 +76,7 @@ class Distributer {
 
     // timeout for individual procedure calls
     private final long m_procedureCallTimeoutMS;
+    private final long m_connectionResponseTimeoutMS;
 
     private final Timer m_timer;
 
@@ -173,6 +177,20 @@ class Distributer {
             // for each connection
             for (NodeConnection c : connections) {
                 synchronized(c) {
+                    // check for connection age
+                    long sinceLastResponse = now - c.m_lastResponseTime;
+
+                    // if outstanding ping and timeout, close the connection
+                    if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutMS)) {
+                        // this should trigger NodeConnection.stopping(..)
+                        c.m_connection.unregister();
+                    }
+
+                    // if 1/3 of the timeout since last response, send a ping
+                    if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutMS / 3))) {
+                        c.sendPing();
+                    }
+
                     // for each outstanding procedure
                     for (Entry<Long, CallbackBookeeping> e : c.m_callbacks.entrySet()) {
                         long handle = e.getKey();
@@ -227,6 +245,9 @@ class Distributer {
         private String m_hostname;
         private int m_port;
         private boolean m_isConnected = true;
+
+        long m_lastResponseTime = 0;
+        boolean m_outstandingPing = false;
 
         private long m_invocationsCompleted = 0;
         private long m_lastInvocationsCompleted = 0;
@@ -284,6 +305,20 @@ class Distributer {
             m_connection.writeStream().enqueue(f);
         }
 
+        void sendPing() {
+            ProcedureInvocation invocation = new ProcedureInvocation(PING_HANDLE, "@Ping");
+            final FastSerializer fs = new FastSerializer(m_pool, 128);
+            BBContainer c = null;
+            try {
+                c = fs.writeObjectForMessaging(invocation);
+            } catch (IOException e) {
+                fs.getBBContainer().discard();
+                throw new RuntimeException(e);
+            }
+            m_connection.writeStream().enqueue(c);
+            m_outstandingPing = true;
+        }
+
         /**
          * Update the procedures statistics
          * @param name Name of procedure being updated
@@ -320,6 +355,15 @@ class Distributer {
             long callTime = 0;
             int delta = 0;
             synchronized (this) {
+                // track the timestamp of the most recent read on this connection
+                m_lastResponseTime = now;
+
+                // handle ping response and get out
+                if (response.getClientHandle() == PING_HANDLE) {
+                    m_outstandingPing = false;
+                    return;
+                }
+
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
                 // presumably (hopefully) this is a response for a timed-out message
                 if (stuff == null) {
@@ -500,7 +544,9 @@ class Distributer {
     }
 
     Distributer() {
-        this(128, null, false, null, ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS);
+        this(128, null, false, null,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS);
     }
 
     Distributer(
@@ -508,7 +554,8 @@ class Distributer {
             int arenaSizes[],
             boolean useMultipleThreads,
             StatsUploaderSettings statsSettings,
-            long procedureCallTimeoutMS) {
+            long procedureCallTimeoutMS,
+            long connectionResponseTimeoutMS) {
         if (statsSettings != null) {
             m_statsLoader = new ClientStatsLoader(statsSettings, this);
         } else {
@@ -521,6 +568,7 @@ class Distributer {
         m_pool = new DBBPool(false, arenaSizes, false);
         m_hostname = ConnectionUtil.getHostnameOrAddress();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
+        m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
         m_timer = new Timer("Distributer Timer");
         m_timer.scheduleAtFixedRate(new CallExpiration(), 1000, 1000);
 

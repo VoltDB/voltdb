@@ -92,7 +92,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 config.m_maxArenaSizes,
                 config.m_heavyweight,
                 config.m_statsSettings,
-                config.m_procedureCallTimeoutMS);
+                config.m_procedureCallTimeoutMS,
+                config.m_connectionResponseTimeoutMS);
         m_distributer.addClientStatusListener(new CSL());
         m_username = config.m_username;
         m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);

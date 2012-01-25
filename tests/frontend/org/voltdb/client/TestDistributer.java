@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -48,6 +49,9 @@ public class TestDistributer extends TestCase {
 
     class MockInputHandler extends VoltProtocolHandler {
 
+        volatile boolean gotPing = false;
+        AtomicBoolean sendResponses = new AtomicBoolean(true);
+
         @Override
         public int getMaxRead() {
             return 8192;
@@ -59,14 +63,23 @@ public class TestDistributer extends TestCase {
                 FastDeserializer fds = new FastDeserializer(message);
                 StoredProcedureInvocation spi = fds.readObject(StoredProcedureInvocation.class);
 
-                VoltTable vt[] = new VoltTable[1];
-                vt[0] = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.BIGINT));
-                vt[0].addRow(1);
-                ClientResponseImpl response =
-                    new ClientResponseImpl(ClientResponseImpl.SUCCESS, vt, "Extra String", spi.getClientHandle());
-                c.writeStream().enqueue(response);
-                roundTrips.incrementAndGet();
-                System.err.println("Sending response.");
+                // record if we got a ping
+                if (spi.getProcName().equals("@Ping"))
+                    gotPing = true;
+
+                if (sendResponses.get()) {
+                    VoltTable vt[] = new VoltTable[1];
+                    vt[0] = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.BIGINT));
+                    vt[0].addRow(1);
+                    ClientResponseImpl response =
+                        new ClientResponseImpl(ClientResponseImpl.SUCCESS, vt, "Extra String", spi.getClientHandle());
+                    c.writeStream().enqueue(response);
+                    roundTrips.incrementAndGet();
+                    System.err.println("Sending response.");
+                }
+                else {
+                    System.err.println("Witholding response.");
+                }
             }
             catch (Exception ex) {
                 ex.printStackTrace();
@@ -121,6 +134,10 @@ public class TestDistributer extends TestCase {
         @Override
         public QueueMonitor writestreamMonitor() {
             return null;
+        }
+
+        public void stopResponding() {
+
         }
     }
 
@@ -309,7 +326,9 @@ public class TestDistributer extends TestCase {
 
             CSL csl = new CSL();
 
-            Distributer dist = new Distributer(128, null, false, null, ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS);
+            Distributer dist = new Distributer(128, null, false, null,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                    ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
@@ -358,6 +377,70 @@ public class TestDistributer extends TestCase {
                 volt2.join();
             }
         }
+    }
+
+
+    /**
+     * Test connection timeouts.
+     * Create a fake voltdb that runs all happy for a while, but
+     * then can be told to shut up if it knows what's good for it.
+     * Wait for the connection timeout to kill the connection and
+     * call the appropriate callbacks.
+     */
+    public void testResponseTimeout() throws Exception {
+
+        final CountDownLatch latch = new CountDownLatch(2);
+
+        class TimeoutMonitorPCB implements ProcedureCallback {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                assert(clientResponse.getStatus() == ClientResponse.CONNECTION_LOST);
+                latch.countDown();
+            }
+        }
+
+        class TimeoutMonitorCSL extends ClientStatusListenerExt {
+            @Override
+            public void connectionLost(String hostname, int connectionsLeft) {
+                latch.countDown();
+            }
+        }
+
+        // create a fake server and connect to it.
+        MockVolt volt = new MockVolt(20000);
+        volt.start();
+
+        // create distributer and connect it to the client
+        Distributer dist = new Distributer(128, null, false, null,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                1000 /* One second connection timeout */);
+        dist.addClientStatusListener(new TimeoutMonitorCSL());
+        dist.createConnection("localhost", "", "", 20000);
+
+        // make sure it connected
+        assertTrue(volt.handler != null);
+
+        // run fine for long enough to send some pings
+        Thread.sleep(4000);
+
+        // verify that a ping was sent
+        assertTrue(volt.handler.gotPing);
+
+        // tell the mock voltdb to stop responding
+        volt.handler.sendResponses.set(false);
+
+        // this call should hang until the connection is closed,
+        // then will be called with CONNECTION_LOST
+        ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
+        dist.queue(invocation, new TimeoutMonitorPCB(), 128, true);
+
+        // wait for both callbacks
+        latch.await();
+
+        // clean up
+        dist.shutdown();
+        volt.shutdown.set(true);
+        volt.join();
     }
 
     public void testClient() throws Exception {
