@@ -44,6 +44,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.utils.SnapshotVerifier;
 
 import com.deletes.Insert;
@@ -611,25 +612,42 @@ public class DeletesClient
 
     public static void main(String[] args)
     {
-        if (args.length != 7)
-        {
-            System.err.println("Client args: [average batch size] [num batches to keep] [cleanup frequency] [blocking snapshots (1 or 0)] [server list]");
-            System.exit(-1);
-        }
-        m_averageBatchSize = Integer.valueOf(args[0]);
-        m_batchesToKeep = Integer.valueOf(args[1]);
-        m_deceasedCleanupFreq = Integer.valueOf(args[2]);
-        m_snapshotFreq = Integer.valueOf(args[3]);
-        m_blockingSnapshots = Integer.valueOf(args[4]) != 0;
-        m_smallStrings = Integer.valueOf(args[5]) != 0;
+        // Use the AppHelper utility class to retrieve command line application parameters
+        // Define parameters and pull from command line
+        AppHelper apph = new AppHelper(DeletesClient.class.getCanonicalName())
+            .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 240)
+            .add("average-batch-size", "average_batch_size", "Average batch size", 150000)
+            .add("batches", "num_batches_to_keep", "Number of batches to keep", 5)
+            .add("cleanup-freq", "cleanup_frequency", "Cleanup frequency, in seconds.", 6)
+            .add("snapshot-freq", "cycles_between_snapshots", "Snapshot frequency, in seconds. -1 to turn off snapshots", -1)
+            .add("block-snapshots", "use_blocking_snapshots_snapshots", "Blocking snapshots (true|false)", "false")
+            .add("small-strings", "use_inline_strings", "Forces all the strings to be inlined strings (true|false)", "false")
+            .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
+
+            .setArguments(args)
+            ;
+
+        m_averageBatchSize = apph.intValue("average-batch-size");
+        m_batchesToKeep = apph.intValue("batches");
+        m_deceasedCleanupFreq = apph.intValue("cleanup-freq");
+        m_snapshotFreq = apph.intValue("snapshot-freq");
+        m_blockingSnapshots = apph.booleanValue("block-snapshots");
+        m_smallStrings = apph.booleanValue("small-strings");
+        long duration = apph.longValue("duration");
+        String commaSeparatedServers = apph.stringValue("servers");
+
+        apph.validate("average-batch-size", (m_averageBatchSize > 0));
+        apph.validate("batches", (m_batchesToKeep >= 0));
+        apph.validate("duration", (duration >= 0));
+        apph.validate("cleanup-freq", (m_deceasedCleanupFreq > 0));
+
+        apph.printActualUsage();
 
         System.out.println("Starting Deletes app with:");
         System.out.printf("\tAverage batch size of %d\n", m_averageBatchSize);
         System.out.printf("\tKeeping %d batches\n", m_batchesToKeep);
         System.out.printf("\tCleaning up deceased every %d batches\n", m_deceasedCleanupFreq);
         System.out.printf("\tSnapshotting every %d batches\n", m_snapshotFreq);
-
-        String commaSeparatedServers = args[6];
 
         // parse the server list
         List<String> servers = new LinkedList<String>();
@@ -670,7 +688,10 @@ public class DeletesClient
         long max_batch_counter = 0;
         boolean fill_max = false;
         long max_batch_remaining = 0;
-        while (true)
+
+        final long endTime = System.currentTimeMillis() + (1000l * duration);
+        final long startTime = System.currentTimeMillis();
+        while (endTime > System.currentTimeMillis())
         {
             // if (max_batch_counter == m_maxBatchFreq)
             // {
@@ -714,5 +735,6 @@ public class DeletesClient
 
             deleteBatch(client, m_batchesToKeep);
         }
+        System.out.printf("\tTotal runtime: %d seconds\n", (System.currentTimeMillis() - startTime) / 1000l);
     }
 }

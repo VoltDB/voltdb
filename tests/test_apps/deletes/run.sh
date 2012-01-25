@@ -43,13 +43,12 @@ function server() {
 
 # run the client that drives the example
 function client() {
-    echo "This hasn't been updated yet for deletes- sorry"
-    exit -1
     srccompile
     java -classpath obj:$CLASSPATH:obj com.DeletesClient \
-        --servers=localhost \
-        --duration=180 \
-        --warehouses=4
+        --servers=volt7a \
+        --duration=18 \
+        --small-strings=true\
+        --batches=4
 }
 
 function help() {
