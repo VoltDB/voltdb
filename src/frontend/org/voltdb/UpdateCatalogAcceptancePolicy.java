@@ -18,7 +18,6 @@ package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.network.WriteStream;
 import org.voltdb.utils.Encoder;
 
 /**
@@ -30,12 +29,11 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
     }
 
     @Override
-    public boolean shouldAccept(AuthUser user,
+    public ClientResponseImpl shouldAccept(AuthUser user,
                                 StoredProcedureInvocation invocation,
-                                Config sysProc,
-                                WriteStream s) {
+                                Config sysProc) {
         if (!invocation.procName.equals("@UpdateApplicationCatalog")) {
-            return true;
+            return null;
         }
 
         ParameterSet params = invocation.getParams();
@@ -43,15 +41,12 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
             params.m_params[0] == null ||
             params.m_params[1] == null)
         {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                       new VoltTable[0],
-                                       "UpdateApplicationCatalog system procedure requires exactly " +
-                                       "two parameters, the catalog bytes and the deployment file " +
-                                       "string.",
-                                       invocation.clientHandle);
-            s.enqueue(errorResponse);
-            return false;
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0],
+                    "UpdateApplicationCatalog system procedure requires exactly " +
+                    "two parameters, the catalog bytes and the deployment file " +
+                    "string.",
+                    invocation.clientHandle);
         }
 
         boolean isHex = false;
@@ -59,17 +54,14 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
             isHex = Encoder.isHexEncodedString((String) params.m_params[0]);
         }
         if (!isHex && !(params.m_params[0] instanceof byte[])) {
-            final ClientResponseImpl errorResp =
-                    new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                           new VoltTable[0],
-                                           "UpdateApplicationCatalog system procedure takes the " +
-                                           "catalog bytes as a byte array. The received parameter " +
-                                           "is of type " + params.m_params[0].getClass() + ".",
-                                           invocation.clientHandle);
-            s.enqueue(errorResp);
-            return false;
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0],
+                    "UpdateApplicationCatalog system procedure takes the " +
+                    "catalog bytes as a byte array. The received parameter " +
+                    "is of type " + params.m_params[0].getClass() + ".",
+                    invocation.clientHandle);
         }
 
-        return true;
+        return null;
     }
 }

@@ -22,12 +22,30 @@ import java.io.Serializable;
 public class AsyncCompilerWork implements Serializable {
     private static final long serialVersionUID = 6588086204761949082L;
 
-    boolean shouldShutdown = false;
-    long clientHandle = -1;
-    long connectionId = -1;
-    String hostname = "";
-    boolean adminConnection = false;
-    transient public Object clientData = null;
+    final int replySiteId;
+    final int replyMailboxId;
+
+    final boolean shouldShutdown;
+    final long clientHandle;
+    final long connectionId;
+    final String hostname;
+    final boolean adminConnection;
+    final transient public Object clientData;
+
+    public AsyncCompilerWork(int replySiteId, int replyMailboxId,
+            boolean shouldShutdown, long clientHandle,
+            long connectionId, String hostname, boolean adminConnection,
+            Object clientData)
+    {
+        this.replySiteId = replySiteId;
+        this.replyMailboxId = replyMailboxId;
+        this.shouldShutdown = shouldShutdown;
+        this.clientHandle = clientHandle;
+        this.connectionId = connectionId;
+        this.hostname = hostname;
+        this.adminConnection = adminConnection;
+        this.clientData = clientData;
+    }
 
     @Override
     public String toString() {

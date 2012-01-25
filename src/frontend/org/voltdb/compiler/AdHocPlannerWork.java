@@ -20,8 +20,25 @@ package org.voltdb.compiler;
 public class AdHocPlannerWork extends AsyncCompilerWork {
     private static final long serialVersionUID = -6567283432846270119L;
 
-    String sql = null;
-    Object partitionParam = null;
+    final String sql;
+    final Object partitionParam;
+
+    public AdHocPlannerWork(int replySiteId, int replyMailboxId,
+            boolean shouldShutdown, long clientHandle,
+            long connectionId, String hostname, boolean adminConnection,
+            Object clientData, String sql, Object partitionParam)
+    {
+        super(replySiteId, replyMailboxId,
+              shouldShutdown, clientHandle, connectionId, hostname,
+              adminConnection, clientData);
+        this.sql = sql;
+        this.partitionParam = partitionParam;
+    }
+
+    public static AdHocPlannerWork forShutdown(int replySiteId, int replyMailboxId) {
+        return new AdHocPlannerWork(replySiteId, replyMailboxId,
+                true, -1L, -1L, "", false, null, "", null);
+    }
 
     @Override
     public String toString() {

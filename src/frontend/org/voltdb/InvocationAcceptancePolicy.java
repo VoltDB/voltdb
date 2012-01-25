@@ -19,7 +19,6 @@ package org.voltdb;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.network.WriteStream;
 
 /**
  * Policy on whether or not to accept a type of stored procedure invocations. It
@@ -58,11 +57,11 @@ public abstract class InvocationAcceptancePolicy {
      * @param invocation The invocation
      * @param proc The procedure catalog object
      * @param s Write stream to queue error responses
-     * @return true to accept, false to reject
+     * @return ClientResponseImpl with error or null if accepted
      */
-    public boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
-                                Procedure proc, WriteStream s) {
-        return true;
+    public ClientResponseImpl shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
+            Procedure proc) {
+        return null;
     }
 
     /**
@@ -75,10 +74,10 @@ public abstract class InvocationAcceptancePolicy {
      * @param invocation The invocation
      * @param proc The system procedure catalog object
      * @param s Write stream to queue error responses
-     * @return true to accept, false to reject
+     * @return ClientResponseImpl with error or null if accepted
      */
-    public boolean shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
-                                Config sysProc, WriteStream s) {
-        return true;
+    public ClientResponseImpl shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
+            Config sysProc) {
+        return null;
     }
 }

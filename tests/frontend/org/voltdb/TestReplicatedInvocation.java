@@ -139,18 +139,19 @@ public class TestReplicatedInvocation {
                 e.getKey().equalsIgnoreCase("@BalancePartitions") ||
                 e.getKey().equalsIgnoreCase("@LoadMultipartitionTable") ||
                 e.getKey().equalsIgnoreCase("@LoadSinglePartitionTable")) {
-                assertFalse(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
+                // Rejected
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue()) != null);
             } else if (e.getKey().equalsIgnoreCase("@AdHoc")) {
+                // Accepted
                 invocation.setParams("select * from A");
-                assertTrue(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue()) == null);
 
+                // Rejected
                 invocation.setParams("insert into A values (1, 2, 3)");
-                assertFalse(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue()) != null);
             } else {
-                if (!policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream())) {
-                    System.out.println(e.getKey());
-                }
-                assertTrue(policy.shouldAccept(null, invocation, e.getValue(), new MockWriteStream()));
+                // Accepted
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue()) == null);
             }
         }
     }
