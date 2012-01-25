@@ -46,10 +46,10 @@ public class AsyncCompilerAgent {
     static final int MAX_QUEUE_DEPTH = 250;
 
     // accept work via this mailbox
-    private Mailbox m_mailbox;
+    Mailbox m_mailbox;
 
     // do work in this executor service
-    private final ExecutorService m_es =
+    final ExecutorService m_es =
         MiscUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
 
     // wraps the VoltPlanner and does the actual query planning
@@ -85,6 +85,12 @@ public class AsyncCompilerAgent {
                     retval.hostname = work.hostname;
                     retval.adminConnection = work.adminConnection;
                     retval.clientData = work.clientData;
+                    try {
+                        m_mailbox.send(work.replySiteId, work.replyMailboxId,
+                                       new LocalObjectMessage(retval));
+                    } catch (MessagingException ex) {
+                        ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
+                    }
                 }
             }
         };
@@ -109,7 +115,7 @@ public class AsyncCompilerAgent {
         }
     }
 
-    private AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
+    AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
         AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
         plannedStmt.clientHandle = work.clientHandle;
         plannedStmt.connectionId = work.connectionId;
