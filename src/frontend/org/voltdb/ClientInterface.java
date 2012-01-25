@@ -1231,10 +1231,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     authLog.l7dlog( Level.WARN,
                             LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
                             new Object[] { task.procName }, null);
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                             new VoltTable[0], errorMessage, task.clientHandle);
-                    ccxn.writeStream().enqueue(errorResponse);
+                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0], errorMessage, task.clientHandle);
                 }
             }
             if (involvedPartitions != null) {
