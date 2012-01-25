@@ -26,8 +26,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.ClientResponseImpl;
@@ -43,6 +45,7 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.Pair;
 
 /**
@@ -78,7 +81,11 @@ class Distributer {
     private final long m_procedureCallTimeoutMS;
     private final long m_connectionResponseTimeoutMS;
 
-    private final Timer m_timer;
+    //private final Timer m_timer;
+    private final ScheduledExecutorService m_ex =
+            Executors.newSingleThreadScheduledExecutor(
+                    MiscUtils.getThreadFactory("VoltDB Client Reaper Thread"));
+    ScheduledFuture<?> m_timeoutReaperHandle;
 
     /**
      * Server's instances id. Unique for the cluster
@@ -162,7 +169,7 @@ class Distributer {
         }
     }
 
-    class CallExpiration extends TimerTask {
+    class CallExpiration implements Runnable {
         @Override
         public void run() {
 
@@ -198,13 +205,14 @@ class Distributer {
 
                         // if the timeout is expired, call the callback and remove the
                         // bookeeping data
-                        if ((cb.timestamp + m_procedureCallTimeoutMS) < now) {
+                        if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
                             ClientResponseImpl r = new ClientResponseImpl(
                                     ClientResponse.CONNECTION_TIMEOUT,
                                     (byte)0,
                                     "",
                                     new VoltTable[0],
-                                    "No response recieved in the allotted time.");
+                                    String.format("No response received in the allotted time (set to %d ms).",
+                                            m_procedureCallTimeoutMS));
                             r.setClientHandle(handle);
                             r.setClientRoundtrip((int) (now - cb.timestamp));
                             r.setClusterRoundtrip((int) (now - cb.timestamp));
@@ -569,8 +577,9 @@ class Distributer {
         m_hostname = ConnectionUtil.getHostnameOrAddress();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
-        m_timer = new Timer("Distributer Timer");
-        m_timer.scheduleAtFixedRate(new CallExpiration(), 1000, 1000);
+
+        // schedule the task that looks for timed-out proc calls and connections
+        m_timeoutReaperHandle = m_ex.scheduleAtFixedRate(new CallExpiration(), 1, 1, TimeUnit.SECONDS);
 
 //        new Thread() {
 //            @Override
@@ -739,7 +748,10 @@ class Distributer {
      */
     final void shutdown() throws InterruptedException {
         // stop the old proc call reaper
-        m_timer.cancel();
+        m_timeoutReaperHandle.cancel(false);
+        m_ex.shutdown();
+        m_ex.awaitTermination(1, TimeUnit.SECONDS);
+
         if (m_statsLoader != null) {
             m_statsLoader.stop();
         }

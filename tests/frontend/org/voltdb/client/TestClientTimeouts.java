@@ -110,13 +110,24 @@ public class TestClientTimeouts extends TestCase {
             fail();
         }
         catch (ProcCallException e) {
-            assertTrue(e.getMessage().equals("No response recieved in the allotted time."));
+            assertTrue(e.getMessage().startsWith("No response received in the allotted time"));
         }
         // make sure the callback gets called
         assertTrue(csl.waitForCall(6000));
     }
 
-    /*public void testConnectionTimeout() {
+    public void testMaxTimeout() throws NoConnectionsException, IOException, ProcCallException {
+        CSL csl = new CSL();
 
-    }*/
+        ClientConfig config = new ClientConfig(null, null, csl);
+        config.setProcedureCallTimeout(0);
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
+
+        ClientResponse response = client.callProcedure("ArbitraryDurationProc", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        client.callProcedure("ArbitraryDurationProc", 3000);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
 }

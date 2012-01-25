@@ -389,14 +389,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         m_distributer.shutdown();
     }
 
-    public void addClientStatusListener(ClientStatusListenerExt listener) {
-        m_distributer.addClientStatusListener(listener);
-    }
-
-    public boolean removeClientStatusListener(ClientStatusListenerExt listener) {
-        return m_distributer.removeClientStatusListener(listener);
-    }
-
     @Override
     public void backpressureBarrier() throws InterruptedException {
         if (m_isShutdown) {

@@ -126,7 +126,7 @@ public class ClientConfig {
      * @param ms Timeout value in milliseconds.
      */
     public void setProcedureCallTimeout(long ms) {
-        assert(ms > 0);
+        assert(ms >= 0);
         if (ms < 0) ms = 0;
         // 0 implies infinite, but use LONG_MAX to reduce branches to test
         if (ms == 0) ms = Long.MAX_VALUE;
@@ -146,7 +146,7 @@ public class ClientConfig {
      * @param ms Timeout value in milliseconds.
      */
     public void setConnectionResponseTimeout(long ms) {
-        assert(ms > 0);
+        assert(ms >= 0);
         if (ms < 0) ms = 0;
         // 0 implies infinite, but use LONG_MAX to reduce branches to test
         if (ms == 0) ms = Long.MAX_VALUE;
