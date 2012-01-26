@@ -141,7 +141,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final int m_allPartitions[];
     final int m_siteId;
 
-    private final Mailbox m_mailbox;
+    final Mailbox m_mailbox;
 
     private final QueueMonitor m_clientQueueMonitor = new QueueMonitor() {
         private final int MAX_QUEABLE = 33554432;
@@ -1141,7 +1141,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param port
      * * return True if an error was generated and needs to be returned to the client
      */
-    private final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
+    final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
         final long now = System.currentTimeMillis();
         final FastDeserializer fds = new FastDeserializer(buf);
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
@@ -1296,7 +1296,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
-    private final void checkForFinishedCompilerWork() {
+    final void checkForFinishedCompilerWork() {
         VoltMessage message;
         while ((message = m_mailbox.recv()) != null) {
 
