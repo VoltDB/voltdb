@@ -73,28 +73,7 @@ public class TestClientInterface {
 
     @BeforeClass
     public static void setUpOnce() throws IOException {
-        /*
-         * Setup the mock objects so that they return expected objects in CI
-         * construction
-         */
-        VoltDB.replaceVoltDBInstanceForTest(m_volt);
-        doReturn(m_statsAgent).when(m_volt).getStatsAgent();
-        doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
-        doReturn(m_messenger).when(m_volt).getHostMessenger();
-        doReturn(mock(Configuration.class)).when(m_volt).getConfig();
-
-        AgreementSite agreementSite = mock(AgreementSite.class);
-        doReturn(AGREEMENT_SITE_ID).when(agreementSite).siteId();
-        doReturn(agreementSite).when(m_volt).getAgreementSite();
-
-        buildCatalog();
-    }
-
-    /**
-     * Builds a real catalog context
-     * @throws IOException
-     */
-    private static void buildCatalog() throws IOException {
+        // build a real catalog
         File cat = File.createTempFile("temp-log-reinitiator", "catalog");
         cat.deleteOnExit();
 
@@ -123,6 +102,20 @@ public class TestClientInterface {
 
     @Before
     public void setUp() {
+        /*
+         * Setup the mock objects so that they return expected objects in CI
+         * construction
+         */
+        VoltDB.replaceVoltDBInstanceForTest(m_volt);
+        doReturn(m_statsAgent).when(m_volt).getStatsAgent();
+        doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
+        doReturn(m_messenger).when(m_volt).getHostMessenger();
+        doReturn(mock(Configuration.class)).when(m_volt).getConfig();
+
+        AgreementSite agreementSite = mock(AgreementSite.class);
+        doReturn(AGREEMENT_SITE_ID).when(agreementSite).siteId();
+        doReturn(agreementSite).when(m_volt).getAgreementSite();
+
         // Set up CI with the mock objects.
         VoltNetwork network = mock(VoltNetwork.class);
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
@@ -137,6 +130,7 @@ public class TestClientInterface {
 
     @After
     public void tearDown() {
+        reset(m_volt);
         reset(m_messenger);
         reset(m_initiator);
         reset(m_handler);
@@ -348,12 +342,6 @@ public class TestClientInterface {
 
     @Test
     public void testUserProc() throws IOException, MessagingException {
-        when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
-                                           any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
-                                           any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong())).thenReturn(true);
-
         ByteBuffer msg = createMsg("hello", 1);
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "hello", 1, false, true, true, false);
@@ -388,5 +376,54 @@ public class TestClientInterface {
         table.addRow(1);
         ByteBuffer msg = createMsg("@LoadSinglepartitionTable", "a", table);
         readAndCheck(msg, "@LoadSinglepartitionTable", 1, false, false, true, false);
+    }
+
+    @Test
+    public void testPausedMode() throws IOException, MessagingException {
+        // pause the node
+        when(m_volt.getMode()).thenReturn(OperationMode.PAUSED);
+        ByteBuffer msg = createMsg("hello", 1);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNotNull(resp);
+        assertEquals(ClientResponseImpl.SERVER_UNAVAILABLE, resp.getStatus());
+    }
+
+    @Test
+    public void testInvalidProcedure() throws IOException {
+        ByteBuffer msg = createMsg("hellooooo", 1);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNotNull(resp);
+        assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
+    }
+
+    @Test
+    public void testAdminProcsOnNonAdminPort() throws IOException {
+        ByteBuffer msg = createMsg("@Pause");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNotNull(resp);
+        assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
+
+        msg = createMsg("@Resume");
+        resp = m_ci.handleRead(msg, m_handler, null);
+        assertNotNull(resp);
+        assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
+    }
+
+    @Test
+    public void testRejectDupInvocation() throws IOException {
+        // by default, the mock initiator returns false for createTransaction()
+        ByteBuffer msg = createMsg("hello", 12345l, 1);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNotNull(resp);
+        assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
+    }
+
+    @Test
+    public void testPolicyRejection() throws IOException {
+        // incorrect parameters to @AdHoc proc
+        ByteBuffer msg = createMsg("@AdHoc", 1, 3, 3);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNotNull(resp);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
     }
 }
