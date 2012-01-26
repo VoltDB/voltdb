@@ -136,18 +136,18 @@ public class TestClientInterface {
     }
 
     private static ByteBuffer createMsg(String name, final Object...params) throws IOException {
-        return createMsg(name, null, params);
+        return createMsg(null, name, params);
     }
 
     /**
      * Create a VoltMessage that can be fed into CI's handleRead() method.
-     * @param name The procedure name
      * @param origTxnId The original txnId if it's a replicated transaction
+     * @param name The procedure name
      * @param params Procedure parameters
      * @return
      * @throws IOException
      */
-    private static ByteBuffer createMsg(String name, Long origTxnId,
+    private static ByteBuffer createMsg(Long origTxnId, String name,
                                         final Object...params) throws IOException {
         FastSerializer fs = new FastSerializer();
         StoredProcedureInvocation proc = new StoredProcedureInvocation();
@@ -347,6 +347,14 @@ public class TestClientInterface {
         assertEquals(1, invocation.getParameterAtIndex(0));
     }
 
+    @Test
+    public void testSystemInformation() throws IOException, MessagingException {
+        ByteBuffer msg = createMsg("@SystemInformation");
+        StoredProcedureInvocation invocation =
+                readAndCheck(msg, "@SystemInformation", 1, false, true, false, false);
+        assertEquals("OVERVIEW", invocation.getParams().m_params[0]);
+    }
+
     /**
      * WAN stats is not a txn, it goes to the stats agent directly.
      * @throws Exception
@@ -412,7 +420,7 @@ public class TestClientInterface {
     @Test
     public void testRejectDupInvocation() throws IOException {
         // by default, the mock initiator returns false for createTransaction()
-        ByteBuffer msg = createMsg("hello", 12345l, 1);
+        ByteBuffer msg = createMsg(12345l, "hello", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNotNull(resp);
         assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
