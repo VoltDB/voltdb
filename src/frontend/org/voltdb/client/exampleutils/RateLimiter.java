@@ -133,7 +133,7 @@ public class RateLimiter implements IRateLimiter
             // Basically set a floor.
             if (0 == maxProcessPerSecond)
                 maxProcessPerSecond=1000;
-            
+
             // For rates below 1/ms we can sleep a while between each execution, which is the most efficient approach.
             this.SleepTime = (1000l/maxProcessPerSecond)-1l;
 
