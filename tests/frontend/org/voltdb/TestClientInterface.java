@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.junit.After;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -65,14 +64,43 @@ public class TestClientInterface {
     private static CatalogContext m_context = null;
 
     // real CI, but spied on using mockito
-    private ClientInterface m_ci = null;
+    private static ClientInterface m_ci = null;
     // the mailbox in CI
-    private Mailbox m_mb = null;
+    private static Mailbox m_mb = null;
 
-    private int[] m_allPartitions = new int[] {0, 1, 2};
+    private static int[] m_allPartitions = new int[] {0, 1, 2};
 
     @BeforeClass
     public static void setUpOnce() throws IOException {
+        buildCatalog();
+
+        /*
+         * Setup the mock objects so that they return expected objects in CI
+         * construction
+         */
+        VoltDB.replaceVoltDBInstanceForTest(m_volt);
+        doReturn(m_statsAgent).when(m_volt).getStatsAgent();
+        doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
+        doReturn(m_messenger).when(m_volt).getHostMessenger();
+        doReturn(mock(Configuration.class)).when(m_volt).getConfig();
+
+        AgreementSite agreementSite = mock(AgreementSite.class);
+        doReturn(AGREEMENT_SITE_ID).when(agreementSite).siteId();
+        doReturn(agreementSite).when(m_volt).getAgreementSite();
+
+        // Set up CI with the mock objects.
+        VoltNetwork network = mock(VoltNetwork.class);
+        m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
+                                       m_context, network, ReplicationRole.NONE,
+                                       100, m_initiator, m_allPartitions));
+        ArgumentCaptor<Mailbox> captor = ArgumentCaptor.forClass(Mailbox.class);
+        verify(m_messenger).createMailbox(eq(100), eq(VoltDB.CLIENT_INTERFACE_MAILBOX_ID),
+                                          captor.capture());
+        assertNotNull(captor.getValue());
+        m_mb = captor.getValue();
+    }
+
+    private static void buildCatalog() throws IOException {
         // build a real catalog
         File cat = File.createTempFile("temp-log-reinitiator", "catalog");
         cat.deleteOnExit();
@@ -100,37 +128,8 @@ public class TestClientInterface {
         TheHashinator.initialize(3);
     }
 
-    @Before
-    public void setUp() {
-        /*
-         * Setup the mock objects so that they return expected objects in CI
-         * construction
-         */
-        VoltDB.replaceVoltDBInstanceForTest(m_volt);
-        doReturn(m_statsAgent).when(m_volt).getStatsAgent();
-        doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
-        doReturn(m_messenger).when(m_volt).getHostMessenger();
-        doReturn(mock(Configuration.class)).when(m_volt).getConfig();
-
-        AgreementSite agreementSite = mock(AgreementSite.class);
-        doReturn(AGREEMENT_SITE_ID).when(agreementSite).siteId();
-        doReturn(agreementSite).when(m_volt).getAgreementSite();
-
-        // Set up CI with the mock objects.
-        VoltNetwork network = mock(VoltNetwork.class);
-        m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
-                                       m_context, network, ReplicationRole.NONE,
-                                       100, m_initiator, m_allPartitions));
-        ArgumentCaptor<Mailbox> captor = ArgumentCaptor.forClass(Mailbox.class);
-        verify(m_messenger).createMailbox(eq(100), eq(VoltDB.CLIENT_INTERFACE_MAILBOX_ID),
-                                          captor.capture());
-        assertNotNull(captor.getValue());
-        m_mb = captor.getValue();
-    }
-
     @After
     public void tearDown() {
-        reset(m_volt);
         reset(m_messenger);
         reset(m_initiator);
         reset(m_handler);
@@ -386,6 +385,7 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNotNull(resp);
         assertEquals(ClientResponseImpl.SERVER_UNAVAILABLE, resp.getStatus());
+        when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
     }
 
     @Test
