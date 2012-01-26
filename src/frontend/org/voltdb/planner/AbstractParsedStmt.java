@@ -237,18 +237,23 @@ public abstract class AbstractParsedStmt {
         if (elementName.equals("value")) {
             retval = parseValueExpression(root, attrs);
         }
-        if (elementName.equals("columnref")) {
+        else if (elementName.equals("columnref")) {
             retval = parseColumnRefExpression(root, attrs, db);
         }
-        if (elementName.equals("bool")) {
+        else if (elementName.equals("bool")) {
             retval = parseBooleanExpresion(root, attrs);
         }
-        if (elementName.equals("operation")) {
+        else if (elementName.equals("operation")) {
             retval = parseOperationExpression(root, attrs, db);
         }
-        if (elementName.equals("asterisk")) {
+        else if (elementName.equals("function")) {
+            retval = parseFunctionExpression(root, attrs);
+        }
+        else if (elementName.equals("asterisk")) {
             return null;
         }
+        else
+            throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
 
         return retval;
     }
@@ -416,6 +421,19 @@ public abstract class AbstractParsedStmt {
         }
 
         return expr;
+    }
+
+    /**
+     *
+     * @param exprNode
+     * @param attrs
+     * @return
+     */
+    AbstractExpression parseFunctionExpression(Node exprNode, NamedNodeMap attrs) {
+        String name = attrs.getNamedItem("name").getNodeValue().toLowerCase();
+
+        // we don't currently support ANY functions.
+        throw new PlanningErrorException("Function '" + name + "' is not supported");
     }
 
     /**
