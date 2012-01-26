@@ -1,6 +1,8 @@
 VoltDB Included Third-Party Software
 
-This list includes only software that is linked/compiled with VoltDB and/or distributed with VoltDB (i.e., included in the VoltDB repository). Additional tools may be needed to build and test VoltDB.
+This list includes only software that is linked/compiled with VoltDB and/or 
+distributed with VoltDB (i.e., included in the VoltDB repository). Additional 
+tools may be needed to build and test VoltDB.
 
 ================================================================================
 Linked with or Included in Core Clients or Server
@@ -586,7 +588,7 @@ Twitter4J includes software from JSON.org to parse JSON response from the Twitte
 See the JSON license included in this document.
 
 ================================================================================
-Build and Test System Only (VoltDB includes these jars or binaries in our svn repository)
+Build and Test System Only (VoltDB includes these jars or binaries in our git repository)
 ================================================================================
 
 ant_doxygen
@@ -808,6 +810,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
  */
 
+================================================================================
+Mockito
+/*
+ * Copyright (c) 2007 Mockito contributors
+ * This program is made available under the terms of the MIT License.
+ */
+ 
 ================================================================================
 Linked with or Included in VoltDB tools
 ================================================================================
