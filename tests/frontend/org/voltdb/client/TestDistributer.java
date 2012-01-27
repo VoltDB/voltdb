@@ -387,6 +387,7 @@ public class TestDistributer extends TestCase {
      * Wait for the connection timeout to kill the connection and
      * call the appropriate callbacks.
      */
+    @Test
     public void testResponseTimeout() throws Exception {
 
         final CountDownLatch latch = new CountDownLatch(2);
@@ -421,9 +422,7 @@ public class TestDistributer extends TestCase {
         assertTrue(volt.handler != null);
 
         // run fine for long enough to send some pings
-        Thread.sleep(4000);
-
-        // verify that a ping was sent
+        Thread.sleep(3000);
         assertTrue(volt.handler.gotPing);
 
         // tell the mock voltdb to stop responding
@@ -436,6 +435,63 @@ public class TestDistributer extends TestCase {
 
         // wait for both callbacks
         latch.await();
+
+        // clean up
+        dist.shutdown();
+        volt.shutdown.set(true);
+        volt.join();
+    }
+
+    /**
+     * Test that a connection actually times out when it should timeout,
+     * rather than sooner. Also check pings aren't sent super duper early.
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    @Test
+    public void testResponseNoEarlyTimeout() throws IOException, InterruptedException {
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        final long CONNECTION_TIMEOUT = 6000;
+
+        class TimeoutMonitorCSL extends ClientStatusListenerExt {
+            @Override
+            public void connectionLost(String hostname, int connectionsLeft) {
+                latch.countDown();
+            }
+        }
+
+        // create a fake server and connect to it.
+        MockVolt volt = new MockVolt(20000);
+        volt.start();
+
+        // create distributer and connect it to the client
+        Distributer dist = new Distributer(128, null, false, null,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                CONNECTION_TIMEOUT /* six second connection timeout */);
+        dist.addClientStatusListener(new TimeoutMonitorCSL());
+        long start = System.currentTimeMillis();
+        dist.createConnection("localhost", "", "", 20000);
+
+        // don't respond to pings
+        volt.handler.sendResponses.set(false);
+
+        // make sure it connected
+        assertTrue(volt.handler != null);
+
+        // make sure the ping takes more than 1s
+        Thread.sleep(1000);
+        assertFalse(volt.handler.gotPing);
+
+        // verify that a ping was sent after 4s
+        Thread.sleep(3000);
+        assertTrue(volt.handler.gotPing);
+
+        // wait for callback
+        latch.await();
+
+        long duration = System.currentTimeMillis() - start;
+        assertTrue(duration > CONNECTION_TIMEOUT);
 
         // clean up
         dist.shutdown();
