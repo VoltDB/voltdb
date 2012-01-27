@@ -26,8 +26,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -46,15 +45,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.voltdb.compiler.AdHocPlannerWork;
-import org.voltdb.compiler.CatalogChangeWork;
-
-import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
 
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -65,8 +55,10 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmt;
+import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.CatalogChangeResult;
+import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
@@ -75,7 +67,12 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.messaging.LocalObjectMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.network.InputHandler;
 import org.voltdb.network.NIOReadStream;
@@ -1046,7 +1043,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
 
-     ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
+    ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
         String sql = (String) params.m_params[0];
 
