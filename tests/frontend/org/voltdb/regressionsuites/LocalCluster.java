@@ -311,10 +311,13 @@ public class LocalCluster implements VoltServerConfig {
         if (m_replication < 1)
             m_failureState = FailureState.ALL_RUNNING;
 
-        String classPath = System.getProperty("java.class.path")+ ":" + m_buildDir + File.separator + m_jarFileName;
+        String classPath = System.getProperty("java.class.path") + ":" + m_buildDir + File.separator + m_jarFileName;
         classPath += ":" + m_buildDir + File.separator + "prod";
 
+        // for ant
         String log4j = System.getProperty("log4j.configuration");
+        // for eclipse
+        if (log4j == null) log4j = "file://" + System.getProperty("user.dir") + "/src/frontend/junit_log4j.properties";
 
         // processes of VoltDBs using the compiled jar file.
         m_pipes = new ArrayList<PipeToFile>();
