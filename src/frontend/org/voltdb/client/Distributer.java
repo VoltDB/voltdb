@@ -254,7 +254,7 @@ class Distributer {
         private int m_port;
         private boolean m_isConnected = true;
 
-        long m_lastResponseTime = 0;
+        long m_lastResponseTime = System.currentTimeMillis();
         boolean m_outstandingPing = false;
 
         private long m_invocationsCompleted = 0;
