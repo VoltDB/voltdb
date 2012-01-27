@@ -200,8 +200,8 @@ public class TestRejoinFuzz extends RejoinTestBase {
                         while (shouldContinue.get()) {
                             for (int ii = 0; ii < numTuples && shouldContinue.get(); ii++) {
                                     rateLimit.acquire();
-                                    int updateKey = r.nextInt(numTuples);
-                                    int updateValue = r.nextInt(numTuples);
+                                    final int updateKey = r.nextInt(numTuples);
+                                    final int updateValue = r.nextInt(numTuples);
                                     serverValues.set(updateKey, updateValue);
                                     clientRef.callProcedure( new ProcedureCallback() {
 
@@ -209,11 +209,15 @@ public class TestRejoinFuzz extends RejoinTestBase {
                                         public void clientCallback(ClientResponse clientResponse)
                                                 throws Exception {
                                             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                                                System.err.println(clientResponse.getStatusString());
+                                                System.err.println("Update failed for values ("
+                                                    + updateKey + "," + updateValue +
+                                                    ") " + clientResponse.getStatusString());
                                                 return;
                                             }
                                             if (clientResponse.getResults()[0].asScalarLong() != 1) {
-                                                System.err.println("Update didn't happen");
+                                                System.err.println("Update row count error for values ("
+                                                    + updateKey + "," + updateValue +
+                                                    ") ");
                                             }
                                             rateLimit.release();
                                         }

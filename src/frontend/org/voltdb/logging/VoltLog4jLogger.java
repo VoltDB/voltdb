@@ -19,10 +19,13 @@ package org.voltdb.logging;
 
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.MissingResourceException;
+import java.util.ResourceBundle;
 
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
+import org.voltdb.VoltDB;
 import org.voltdb.logging.VoltLogger.CoreVoltLogger;
 
 /**
@@ -30,6 +33,25 @@ import org.voltdb.logging.VoltLogger.CoreVoltLogger;
  * Log4j.
  */
 public class VoltLog4jLogger implements CoreVoltLogger {
+    static {
+        ResourceBundle rb = null;
+        try {
+            rb = ResourceBundle.getBundle("org/voltdb/utils/voltdb_logstrings");
+        } catch (MissingResourceException e) {
+            System.err.println("Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.");
+            e.printStackTrace(System.err);
+            VoltDB.crashVoltDB();
+        }
+        Logger.getRootLogger().setResourceBundle(rb);
+
+        Runtime.getRuntime().addShutdownHook(
+                new Thread() {
+                    @Override
+                    public void run() {
+                        LogManager.shutdown();
+                    }
+                });
+    }
 
     /*
      * Encoding for various log settings that will fit in 3 bits
@@ -69,7 +91,7 @@ public class VoltLog4jLogger implements CoreVoltLogger {
     }
 
     public VoltLog4jLogger(String className) {
-        m_logger = Logger.getLogger(className, VoltLoggerFactory.instance());
+        m_logger = Logger.getLogger(className);
     }
 
     @Override

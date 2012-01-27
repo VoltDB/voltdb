@@ -911,7 +911,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_config.m_internalPort);
         }
         catch (Exception e) {
-            hostLog.fatal("Problem connecting client: " + e.getMessage());
+            hostLog.fatal("Problem connecting client to " + m_config.m_selectedRejoinInterface + ":" +
+                   m_config.m_internalPort + ". " + e.getMessage());
             VoltDB.crashVoltDB();
         }
 

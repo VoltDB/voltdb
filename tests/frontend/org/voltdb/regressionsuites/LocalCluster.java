@@ -314,11 +314,13 @@ public class LocalCluster implements VoltServerConfig {
         String classPath = System.getProperty("java.class.path")+ ":" + m_buildDir + File.separator + m_jarFileName;
         classPath += ":" + m_buildDir + File.separator + "prod";
 
+        String log4j = System.getProperty("log4j.configuration");
+
         // processes of VoltDBs using the compiled jar file.
         m_pipes = new ArrayList<PipeToFile>();
         m_procBuilder = new ProcessBuilder("java",
                                            "-Djava.library.path=" + m_buildDir + "/nativelibs" + ":" + jzmq_dir,
-                                           "-Dlog4j.configuration=log4j.xml",
+                                           "-Dlog4j.configuration=" + log4j,
                                            "-DLOG_SEGMENT_SIZE=8",
                                            "-ea",
                                            "-XX:-ReduceInitialCardMarks",

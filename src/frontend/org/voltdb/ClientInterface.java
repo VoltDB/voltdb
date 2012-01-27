@@ -788,6 +788,39 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+
+    // Wrap API to SimpleDtxnInitiator - mostly for the future
+    public  boolean createTransaction(
+            final long connectionId,
+            final String connectionHostname,
+            final boolean adminConnection,
+            final StoredProcedureInvocation invocation,
+            final boolean isReadOnly,
+            final boolean isSinglePartition,
+            final boolean isEveryPartition,
+            final int partitions[],
+            final int numPartitions,
+            final Object clientData,
+            final int messageSize,
+            final long now)
+    {
+        return m_initiator.createTransaction(
+                connectionId,
+                connectionHostname,
+                adminConnection,
+                invocation,
+                isReadOnly,
+                isSinglePartition,
+                isEveryPartition,
+                partitions,
+                numPartitions,
+                clientData,
+                messageSize,
+                now);
+    }
+
+
+
     /**
      * Static factory method to easily create a ClientInterface with the default
      * settings.
@@ -1096,7 +1129,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     new VoltTable[0], e.getMessage(), task.clientHandle);
         }
         assert(involvedPartitions != null);
-        m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+        createTransaction(handler.connectionId(), handler.m_hostname,
                 handler.isAdmin(),
                 task,
                 false, // read only
@@ -1122,7 +1155,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         else {
             int[] involvedPartitions = m_allPartitions;
-            m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+            createTransaction(handler.connectionId(), handler.m_hostname,
                     handler.isAdmin(),
                     task,
                     sysProc.getReadonly(),
@@ -1238,7 +1271,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             // the shared dispatch for sysprocs
             int[] involvedPartitions = m_allPartitions;
-            m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+            createTransaction(handler.connectionId(), handler.m_hostname,
                     handler.isAdmin(),
                     task,
                     sysProc.getReadonly(),
@@ -1273,7 +1306,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
             boolean success =
-                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname,
+                createTransaction(handler.connectionId(), handler.m_hostname,
                         handler.isAdmin(),
                         task,
                         catProc.getReadonly(),
@@ -1384,11 +1417,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
 
                         // initiate the transaction
-                        m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
-                                                      plannedStmt.adminConnection,
-                                                      task, false, isSinglePartition, false, partitions,
-                                                      partitions.length, plannedStmt.clientData,
-                                                      0, EstTime.currentTimeMillis());
+                        createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
+                                plannedStmt.adminConnection,
+                                task, false, isSinglePartition, false, partitions,
+                                partitions.length, plannedStmt.clientData,
+                                0, EstTime.currentTimeMillis());
                     }
                 }
                 else if (result instanceof CatalogChangeResult) {
@@ -1430,11 +1463,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     // initiate the transaction. These hard-coded values from catalog
                     // procedure are horrible, horrible, horrible.
-                    m_initiator.createTransaction(changeResult.connectionId, changeResult.hostname,
-                                                  changeResult.adminConnection,
-                                                  task, false, true, true, m_allPartitions,
-                                                  m_allPartitions.length, changeResult.clientData, 0,
-                                                  EstTime.currentTimeMillis());
+                    createTransaction(changeResult.connectionId, changeResult.hostname,
+                            changeResult.adminConnection,
+                            task, false, true, true, m_allPartitions,
+                            m_allPartitions.length, changeResult.clientData, 0,
+                            EstTime.currentTimeMillis());
                 }
                 else {
                     throw new RuntimeException(
@@ -1579,7 +1612,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         });
         spi.clientHandle = clientData;
         // initiate the transaction
-        m_initiator.createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
+        createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
                 m_allPartitions, m_allPartitions.length,
