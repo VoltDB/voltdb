@@ -33,6 +33,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.sysprocs.SnapshotRestore;
@@ -133,7 +134,7 @@ public class RegressionSuite extends TestCase {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
-        ClientConfig config = new ClientConfig(m_username, m_password);
+        ClientConfig config = new ClientConfigForTest(m_username, m_password);
         final Client client = ClientFactory.createClient(config);
         client.createConnection(listener);
         m_clients.add(client);

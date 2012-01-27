@@ -40,6 +40,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.agreement.ZKUtil;
 import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
@@ -55,7 +56,7 @@ import org.voltdb_testprocs.rejoinfuzz.NonOrgVoltDBProc;
 public class RejoinTestBase extends TestCase {
     protected static final String m_username;
     protected static final String m_password;
-    protected static final ClientConfig m_cconfig = new ClientConfig("ry@nlikesthe", "y@nkees");
+    protected static final ClientConfig m_cconfig = new ClientConfigForTest("ry@nlikesthe", "y@nkees");
 
     static final Class<?>[] PROCEDURES = { NonOrgVoltDBProc.class };
 
