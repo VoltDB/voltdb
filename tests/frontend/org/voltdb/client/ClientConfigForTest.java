@@ -40,9 +40,10 @@ public class ClientConfigForTest extends ClientConfig {
          * @see org.voltdb.client.ClientStatusListenerExt#connectionLost(java.lang.String, int)
          */
         @Override
-        public void connectionLost(String hostname, int connectionsLeft) {
-            log.info(String.format("ClientConfigForTest reports connection lost at host %s with %d connections left",
-                    hostname, connectionsLeft));
+        public void connectionLost(String hostname, int port, int connectionsLeft,
+                ClientStatusListenerExt.DisconnectCause cause) {
+            log.info(String.format("ClientConfigForTest reports connection lost due to %s at host %s:%d with %d connections left",
+                    cause.toString(), hostname, port, connectionsLeft));
         }
 
         /* (non-Javadoc)

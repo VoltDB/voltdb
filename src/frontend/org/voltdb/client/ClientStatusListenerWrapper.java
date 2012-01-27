@@ -27,10 +27,11 @@ class ClientStatusListenerWrapper extends ClientStatusListenerExt {
     }
 
     /* (non-Javadoc)
-     * @see org.voltdb.client.ClientStatusListenerExt#connectionLost(java.lang.String, int)
+     * @see org.voltdb.client.ClientStatusListenerExt#connectionLost(java.lang.String, int, int, ClientStatusListenerExt.DisconnectCause)
      */
     @Override
-    public void connectionLost(String hostname, int connectionsLeft) {
+    public void connectionLost(String hostname, int port, int connectionsLeft,
+            ClientStatusListenerExt.DisconnectCause cause) {
         // TODO Auto-generated method stub
         m_csl.connectionLost(hostname, connectionsLeft);
     }

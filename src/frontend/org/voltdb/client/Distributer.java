@@ -36,6 +36,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -189,6 +190,8 @@ class Distributer {
 
                     // if outstanding ping and timeout, close the connection
                     if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutMS)) {
+                        // memoize why it's closing
+                        c.m_closeCause = DisconnectCause.TIMEOUT;
                         // this should trigger NodeConnection.stopping(..)
                         c.m_connection.unregister();
                     }
@@ -256,6 +259,7 @@ class Distributer {
 
         long m_lastResponseTime = System.currentTimeMillis();
         boolean m_outstandingPing = false;
+        ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
         private long m_invocationsCompleted = 0;
         private long m_lastInvocationsCompleted = 0;
@@ -439,7 +443,7 @@ class Distributer {
                     m_connections.remove(this);
                     //Notify listeners that a connection has been lost
                     for (ClientStatusListenerExt s : m_listeners) {
-                        s.connectionLost(m_hostname, m_connections.size());
+                        s.connectionLost(m_hostname, m_port, m_connections.size(), m_closeCause);
                     }
                 }
                 m_isConnected = false;

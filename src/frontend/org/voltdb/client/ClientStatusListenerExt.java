@@ -25,12 +25,21 @@ package org.voltdb.client;
  * object.
  */
 public class ClientStatusListenerExt {
+
+    public static enum DisconnectCause {
+        /** Connection timed out */
+        TIMEOUT,
+        /** Connection closed by other side */
+        CONNECTION_CLOSED
+    }
+
     /**
      * Notify listeners that a connection to a host was lost.
      * @param hostname Name of the host the connect was lost to
      * @param connectionsLeft Number of remaining connections this client has to the DB
+     * @param cause The reason why this callback is being called
      */
-    public void connectionLost(String hostname, int connectionsLeft) {}
+    public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {}
 
     /**
      * Called by the client API whenever backpressure starts/stops. Backpressure is a condition

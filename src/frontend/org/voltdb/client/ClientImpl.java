@@ -420,7 +420,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
 
         @Override
-        public void connectionLost(String hostname, int connectionsLeft) {
+        public void connectionLost(String hostname, int port, int connectionsLeft,
+                ClientStatusListenerExt.DisconnectCause cause) {
             if (connectionsLeft == 0) {
                 //Wake up client and let it attempt to queue work
                 //and then fail with a NoConnectionsException

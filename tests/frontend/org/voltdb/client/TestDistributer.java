@@ -246,16 +246,6 @@ public class TestDistributer extends TestCase {
                 ClientResponse r, Throwable e) {
             m_exceptionHandled = true;
         }
-        @Override
-        public void backpressure(boolean status) {
-            // TODO Auto-generated method stub
-
-        }
-        @Override
-        public void connectionLost(String hostname, int connectionsLeft) {
-            // TODO Auto-generated method stub
-
-        }
     }
 
     public class ProcCallback implements ProcedureCallback {
@@ -402,7 +392,8 @@ public class TestDistributer extends TestCase {
 
         class TimeoutMonitorCSL extends ClientStatusListenerExt {
             @Override
-            public void connectionLost(String hostname, int connectionsLeft) {
+            public void connectionLost(String hostname, int port, int connectionsLeft,
+                    ClientStatusListenerExt.DisconnectCause cause) {
                 latch.countDown();
             }
         }
@@ -456,7 +447,8 @@ public class TestDistributer extends TestCase {
 
         class TimeoutMonitorCSL extends ClientStatusListenerExt {
             @Override
-            public void connectionLost(String hostname, int connectionsLeft) {
+            public void connectionLost(String hostname, int port, int connectionsLeft,
+                    ClientStatusListenerExt.DisconnectCause cause) {
                 latch.countDown();
             }
         }
