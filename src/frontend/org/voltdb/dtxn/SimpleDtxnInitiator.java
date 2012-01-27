@@ -50,6 +50,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
@@ -69,15 +70,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final ExecutorTxnIdSafetyState m_safetyState;
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    /**
-     * Task to run when a backpressure condition starts
-     */
-    private final Runnable m_onBackPressure;
-
-    /**
-     * Task to run when a backpressure condition stops
-     */
-    private final Runnable m_offBackPressure;
+    private ClientInterface m_clientInterface;
+    public void setClientInterface(ClientInterface ci) {
+        m_clientInterface = ci;
+    }
 
     /**
      * Indicates if backpressure has been seen and reported
@@ -107,8 +103,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public SimpleDtxnInitiator(CatalogContext context,
                                Messenger messenger, int hostId, int siteId,
                                int initiatorId,
-                               Runnable onBackPressure,
-                               Runnable offBackPressure,
                                long timestampTestingSalt)
     {
         assert(messenger != null);
@@ -125,8 +119,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                     (org.voltdb.messaging.HostMessenger)messenger);
         messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, m_mailbox);
         m_mailbox.setInitiator(this);
-        m_onBackPressure = onBackPressure;
-        m_offBackPressure = offBackPressure;
     }
 
 
@@ -467,7 +459,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
             if (m_hadBackPressure.compareAndSet(false, true)) {
                 hostLog.trace("DTXN back pressure began");
-                m_onBackPressure.run();
+                m_clientInterface.onBackPressure();
             }
         }
     }
@@ -483,7 +475,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             if (m_hadBackPressure.compareAndSet(true, false))
             {
                 hostLog.trace("DTXN backpressure ended");
-                m_offBackPressure.run();
+                m_clientInterface.offBackPressure();
             }
         }
     }

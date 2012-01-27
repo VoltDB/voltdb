@@ -734,17 +734,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Invoked when DTXN backpressure starts
      *
      */
-    private static class OnDTXNBackPressure implements Runnable {
-        private ClientInterface m_ci;
-
-        @Override
-        final public void run() {
-            log.trace("Had back pressure disabling read selection");
-            synchronized (m_ci.m_connections) {
-                m_ci.m_hasDTXNBackPressure = true;
-                for (final Connection c : m_ci.m_connections) {
-                    c.disableReadSelection();
-                }
+    public void onBackPressure() {
+        log.trace("Had back pressure disabling read selection");
+        synchronized (m_connections) {
+            m_hasDTXNBackPressure = true;
+            for (final Connection c : m_connections) {
+                c.disableReadSelection();
             }
         }
     }
@@ -753,31 +748,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Invoked when DTXN backpressure stops
      *
      */
-    private static class OffDTXNBackPressure implements Runnable {
-        private ClientInterface m_ci;
-
-        @Override
-        final public void run() {
-            log.trace("No more back pressure attempting to enable read selection");
-            synchronized (m_ci.m_connections) {
-                m_ci.m_hasDTXNBackPressure = false;
-                if (m_ci.m_hasGlobalClientBackPressure) {
-                    return;
-                }
-                for (final Connection c : m_ci.m_connections) {
-                    if (!c.writeStream().hadBackPressure()) {
-                        /*
-                         * Also synchronize on the individual connection
-                         * so that enabling of read selection happens atomically
-                         * with the checking of client backpressure (client not reading responses)
-                         * in the write stream
-                         * so that this doesn't interleave incorrectly with
-                         * SimpleDTXNInitiator disabling read selection.
-                         */
-                        synchronized (c) {
-                            if (!c.writeStream().hadBackPressure()) {
-                                c.enableReadSelection();
-                            }
+    public void offBackPressure() {
+        log.trace("No more back pressure attempting to enable read selection");
+        synchronized (m_connections) {
+            m_hasDTXNBackPressure = false;
+            if (m_hasGlobalClientBackPressure) {
+                return;
+            }
+            for (final Connection c : m_connections) {
+                if (!c.writeStream().hadBackPressure()) {
+                    /*
+                     * Also synchronize on the individual connection
+                     * so that enabling of read selection happens atomically
+                     * with the checking of client backpressure (client not reading responses)
+                     * in the write stream
+                     * so that this doesn't interleave incorrectly with
+                     * SimpleDTXNInitiator disabling read selection.
+                     */
+                    synchronized (c) {
+                        if (!c.writeStream().hadBackPressure()) {
+                            c.enableReadSelection();
                         }
                     }
                 }
@@ -827,6 +817,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             Messenger messenger,
             CatalogContext context,
             ReplicationRole replicationRole,
+            SimpleDtxnInitiator initiator,
             int hostCount,
             int siteId,
             int initiatorId,
@@ -834,48 +825,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             int adminPort,
             long timestampTestingSalt) {
 
-        int myHostId = -1;
-
-        // create a topology for the initiator
-        // XXX-FAILURE this is a horrible way to figure out our host ID
-        // XXX-FAILURE also, can iterate through all sites because we might
-        // be the dead site.
-        for (Site site : context.sites) {
-            int aSiteId = Integer.parseInt(site.getTypeName());
-            int hostId = Integer.parseInt(site.getHost().getTypeName());
-
-            // if the current site is the local site, remember the host id
-            if (aSiteId == siteId)
-                myHostId = hostId;
-        }
-
         // create a list of all partitions
         int[] allPartitions = new int[context.numberOfPartitions];
         int index = 0;
-        for (Partition partition : context.cluster.getPartitions())
+        for (Partition partition : context.cluster.getPartitions()) {
             allPartitions[index++] = Integer.parseInt(partition.getTypeName());
+        }
         assert(index == context.numberOfPartitions);
 
-        // create the dtxn initiator
         /*
          * Construct the runnables so they have access to the list of connections
          */
-        final OnDTXNBackPressure onBackPressure = new OnDTXNBackPressure() ;
-        final OffDTXNBackPressure offBackPressure = new OffDTXNBackPressure();
-
-        SimpleDtxnInitiator initiator =
-            new SimpleDtxnInitiator(
-                    context,
-                    messenger, myHostId,
-                    siteId, initiatorId,
-                    onBackPressure, offBackPressure,
-                    timestampTestingSalt);
-
         final ClientInterface ci = new ClientInterface(
            port, adminPort, context, network, replicationRole, siteId, initiator, allPartitions);
-        onBackPressure.m_ci = ci;
-        offBackPressure.m_ci = ci;
 
+        initiator.setClientInterface(ci);
         return ci;
     }
 
@@ -1017,14 +981,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void notifyOfCatalogUpdate() {
         m_shouldUpdateCatalog.set(true);
-    }
-
-    /**
-     * Get the initiator for this client interface. Be careful with this.
-     * @return The initiator for this client interface.
-     */
-    TransactionInitiator getInitiator() {
-        return m_initiator;
     }
 
     private ClientResponseImpl errorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {

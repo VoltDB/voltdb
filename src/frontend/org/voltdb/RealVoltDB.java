@@ -67,6 +67,8 @@ import org.json_voltpatches.JSONStringer;
 
 import org.voltdb.compiler.AsyncCompilerAgent;
 
+import org.voltdb.dtxn.SimpleDtxnInitiator;
+
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
@@ -152,8 +154,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private String m_versionString = m_defaultVersionString;
     // fields accessed via the singleton
     HostMessenger m_messenger = null;
-    final ArrayList<ClientInterface> m_clientInterfaces =
-        new ArrayList<ClientInterface>();
+    final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
+    final ArrayList<SimpleDtxnInitiator> m_dtxns = new ArrayList<SimpleDtxnInitiator>();
     private Map<Integer, ExecutionSite> m_localSites;
     VoltNetwork m_network = null;
     AgreementSite m_agreementSite;
@@ -270,6 +272,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
             m_clientInterfaces.clear();
+            m_dtxns.clear();
             m_agreementSite = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
@@ -445,19 +448,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            // Create the client interfaces and associated dtxn initiators
+            // Create the client interface
             int portOffset = 0;
             for (Site site : m_catalogContext.siteTracker.getUpSites()) {
                 int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
                 int currSiteId = Integer.parseInt(site.getTypeName());
 
-                // create CI for each local non-EE site
+
+                // create DTXN and CI for each local non-EE site
                 if ((sitesHostId == m_myHostId) && (site.getIsexec() == false)) {
+                    SimpleDtxnInitiator initiator =
+                        new SimpleDtxnInitiator(
+                                m_catalogContext,
+                                m_messenger,
+                                m_myHostId,
+                                currSiteId,
+                                site.getInitiatorid(),
+                                m_config.m_timestampTestingSalt);
+
                     ClientInterface ci =
                         ClientInterface.create(m_network,
                                                m_messenger,
                                                m_catalogContext,
                                                m_replicationRole,
+                                               initiator,
                                                m_catalogContext.numberOfNodes,
                                                currSiteId,
                                                site.getInitiatorid(),
@@ -466,6 +480,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                m_config.m_timestampTestingSalt);
                     portOffset += 2;
                     m_clientInterfaces.add(ci);
+                    m_dtxns.add(initiator);
                 }
             }
 
@@ -531,7 +546,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             ci.initializeSnapshotDaemon();
 
             // set additional restore agent stuff
-            TransactionInitiator initiator = ci.getInitiator();
+            TransactionInitiator initiator = m_dtxns.get(0);
             if (m_restoreAgent != null) {
                 m_restoreAgent.setCatalogContext(m_catalogContext);
                 m_restoreAgent.setInitiator(initiator);
@@ -1428,9 +1443,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             clusterUpdate(catalogDiffCommands);
 
             // update the SafteyState in the initiators
-            for (ClientInterface ci : m_clientInterfaces) {
-                TransactionInitiator initiator = ci.getInitiator();
-                initiator.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
+            for (SimpleDtxnInitiator dtxn : m_dtxns) {
+                dtxn.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
             }
 
             //Notify the export manager the cluster topology has changed
@@ -1824,8 +1838,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          * Enable the initiator to send normal heartbeats and accept client
          * connections
          */
+        for (SimpleDtxnInitiator dtxn : m_dtxns) {
+            dtxn.setSendHeartbeats(true);
+        }
+
         for (ClientInterface ci : m_clientInterfaces) {
-            ci.getInitiator().setSendHeartbeats(true);
             try {
                 ci.startAcceptingConnections();
             } catch (IOException e) {
