@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import org.apache.commons.lang3.StringEscapeUtils;
+
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
@@ -244,8 +246,8 @@ public class View extends TableDerived {
         sb.append(indent).append("<table");
         // add table metadata
         sb.append(" name='").append(getName().name).append("'");
-        sb.append(" query='").append(statement).append("'");
-        sb.append(">\n");
+        sb.append(" query='").append(StringEscapeUtils.escapeXml(statement));
+        sb.append("'>\n");
 
         // read all the columns
         sb.append(indent + "  ").append("<columns>\n");
