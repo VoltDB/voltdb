@@ -408,6 +408,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/NullCallback.java" />
             <include name="src/frontend/org/voltdb/client/ProcCallException.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStatusListenerExt.java" />
             <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
             <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
             <include name="src/frontend/org/voltdb/client/exampleutils/*.java" />
