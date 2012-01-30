@@ -1628,6 +1628,7 @@ TEST CASES
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
+    <property name="log4j.configuration" location="voltdb/log4j.properties" />
     <property name="default_config" location="${test.example.dir}/config.py" />
     <property name="regression_config"
               location="${test.example.dir}/regression-config.py" />
@@ -1667,7 +1668,7 @@ TEST CASES
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -server -Xmx512m -XX:+AggressiveOpts -ea
+    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx512m -XX:+AggressiveOpts -ea
     org.voltdb.sqlgenerator.SimpleServer hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
     ${debug_output}' />
