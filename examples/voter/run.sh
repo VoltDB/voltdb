@@ -4,6 +4,7 @@ APPNAME="voter"
 CLASSPATH="`ls -x ../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../lib/*.jar | tr '[:space:]' ':'`"
 VOLTDB="../../bin/voltdb"
 VOLTCOMPILER="../../bin/voltcompiler"
+LOG4J="`pwd`/../../voltdb/log4j.xml"
 LICENSE="../../voltdb/license.xml"
 LEADER="localhost"
 
@@ -53,7 +54,8 @@ function async-benchmark-help() {
 
 function async-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voter.AsyncBenchmark \
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.AsyncBenchmark \
         --display-interval=5 \
         --duration=120 \
         --servers=localhost \
@@ -74,7 +76,8 @@ function sync-benchmark-help() {
 
 function sync-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voter.SyncBenchmark \
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.SyncBenchmark \
         --threads=40 \
         --display-interval=5 \
         --duration=120 \
@@ -93,7 +96,8 @@ function jdbc-benchmark-help() {
 
 function jdbc-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voter.JDBCBenchmark \
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.JDBCBenchmark \
         --threads=40 \
         --display-interval=5 \
         --duration=120 \

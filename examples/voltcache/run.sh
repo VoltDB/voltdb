@@ -4,6 +4,7 @@ APPNAME="voltcache"
 CLASSPATH="`ls -x ../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../lib/*.jar | tr '[:space:]' ':'`"
 VOLTDB="../../bin/voltdb"
 VOLTCOMPILER="../../bin/voltcompiler"
+LOG4J="`pwd`/../../voltdb/log4j.xml"
 LICENSE="../../voltdb/license.xml"
 LEADER="localhost"
 
@@ -56,7 +57,8 @@ function benchmark-help() {
 
 function benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltcache.Benchmark \
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltcache.Benchmark \
         --threads=40 \
         --display-interval=5 \
         --duration=120 \
