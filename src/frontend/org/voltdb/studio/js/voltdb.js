@@ -234,6 +234,7 @@ var IVoltDB = (function(){
             .BeginExecute('@Statistics', ['STARVATION',0], function(data) { connection.Metadata['siteCount'] = data.results[0].data.length; })
             .BeginExecute('@SystemCatalog', ['PROCEDURES'], function(data) { connection.Metadata['procedures'] = data.results[0]; })
             .BeginExecute('@SystemCatalog', ['PROCEDURECOLUMNS'], function(data) { connection.Metadata['procedurecolumns'] = data.results[0]; })
+            .BeginExecute('@SystemCatalog', ['COLUMNS'], function(data) { connection.Metadata['rawColumns'] = data.results[0]; })
             .End(function(state){
                 var tables = [];
                 var exports = [];
@@ -287,33 +288,40 @@ var IVoltDB = (function(){
                                                   , '@UpdateLogging': ['Configuration (xml)', 'Returns Table[]']
                                                   , '@Promote': ['Returns bit']
                                                   };
+
+                /*
+                 * Accumulate the column names for tables from the SystemCatalog COLUMNS values
+                 * c.Metadata[rawColumns] is the output from @SystemCatalog Columns.
+                 * Walk those rows and fill in table or view column name and type.
+                 */
+                for(var i = 0; i < connection.Metadata['rawColumns'].data.length; i++)
+                {
+                    var Type = 'tables';
+                    var TableName = connection.Metadata['rawColumns'].data[i][2].toUpperCase();
+                    if (connection.Metadata['tables'][TableName] != null) {
+                        if (connection.Metadata['tables'][TableName].columns == null) {
+                            connection.Metadata['tables'][TableName].columns = [];
+                        }
+                        connection.Metadata['tables'][TableName].columns[connection.Metadata['rawColumns'].data[i][3].toUpperCase()] =
+                            connection.Metadata['rawColumns'].data[i][3].toUpperCase() +
+                            ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
+                    }
+                    else if (connection.Metadata['views'][TableName] != null) {
+                        if (connection.Metadata['views'][TableName].columns == null) {
+                            connection.Metadata['views'][TableName].columns = [];
+                        }
+                        connection.Metadata['views'][TableName].columns[connection.Metadata['rawColumns'].data[i][3].toUpperCase()] =
+                            connection.Metadata['rawColumns'].data[i][3].toUpperCase() +
+                            ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
+                    }
+                }
+
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);
-                for(var table in connection.Metadata['tables'])
-                    childConnectionQueue.BeginExecute('@AdHoc', 'SELECT TOP 1 * FROM ' + table, (new OnGetSchema(connection, 'tables', table)).Callback);
-                for(var view in connection.Metadata['views'])
-                    childConnectionQueue.BeginExecute('@AdHoc', 'SELECT TOP 1 * FROM ' + view, (new OnGetSchema(connection, 'views', view)).Callback);
                 childConnectionQueue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection, state); }, null);
             }, null);
     }
 
-    var OnGetSchema = function(connection,type, name)
-    {
-        var Connection = connection;
-        var Type = type;
-        var Name = name;
-        this.Callback = function(tabledata)
-        {
-            if (tabledata.status == 1)
-            {
-                var DBType = { '3': 'tinyint', '4': 'smallint', '5': 'int', '6': 'bigint', '8': 'float', '9': 'varchar', '11': 'timestamp', '22': 'decimal', '23': 'decimal', '25': 'varbinary' };
-                var columns = [];
-                for (var j = 0; j < tabledata.results[0].schema.length; j++)
-                    columns[tabledata.results[0].schema[j].name] = tabledata.results[0].schema[j].name + ' (' + DBType[''+tabledata.results[0].schema[j].type] + ')';
-                Connection.Metadata[Type][Name].columns = columns;
-            }
-        }
-    }
 
     this.TestConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionTested)
     {
