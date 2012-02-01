@@ -29,10 +29,8 @@ import subprocess
 import cPickle
 import os.path
 import imp
-from base64 import encodestring
 from voltdbclient import *
 from optparse import OptionParser
-from xml2 import XMLGenerator
 from Query import VoltQueryClient
 from SQLCoverageReport import generate_html_reports, generate_summary
 from SQLGenerator import SQLGenerator
@@ -51,7 +49,7 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
-def run_once(name, command, statements):
+def run_once(name, command, statements_path, results_path):
     global normalize
     server = subprocess.Popen(command + " backend=" + name, shell = True)
     client = None
@@ -68,7 +66,14 @@ def run_once(name, command, statements):
     if client == None:
         return -1
 
-    for statement in statements:
+    statements_file = open(statements_path, "rb")
+    results_file = open(results_path, "wb")
+    while True:
+        try:
+            statement = cPickle.load(statements_file)
+        except EOFError:
+            break
+
         try:
             client.onecmd("adhoc " + statement["SQL"])
         except:
@@ -81,16 +86,16 @@ def run_once(name, command, statements):
                 print >> sys.stderr, \
                     "Failed to kill the server process %d" % (server.pid)
             break
+        tables = None
         if client.response.tables != None:
             tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
-            tablestr = cPickle.dumps(tables, cPickle.HIGHEST_PROTOCOL)
-        else:
-            tablestr = cPickle.dumps(None, cPickle.HIGHEST_PROTOCOL)
-        statement[name] = {"Status": client.response.status,
-                           "Info": client.response.statusString,
-                           "Result": encodestring(tablestr)}
-        if client.response.exception != None:
-            statement[name]["Exception"] = str(client.response.exception)
+        cPickle.dump({"Status": client.response.status,
+                      "Info": client.response.statusString,
+                      "Result": tables,
+                      "Exception": str(client.response.exception)},
+                     results_file)
+    results_file.close()
+    statements_file.close()
 
     client.onecmd("shutdown")
     server.communicate()
@@ -101,8 +106,12 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     for key in config.iterkeys():
         if not os.path.isabs(config[key]):
             config[key] = os.path.abspath(os.path.join(basedir, config[key]))
-    report_filename = "report.xml"
-    report_filename = os.path.abspath(os.path.join(output_dir, report_filename))
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    statements_path = os.path.abspath(os.path.join(output_dir, "statements.data"))
+    hsql_path = os.path.abspath(os.path.join(output_dir, "hsql.data"))
+    jni_path = os.path.abspath(os.path.join(output_dir, "jni.data"))
     template = config["template"]
 
     global normalize
@@ -118,15 +127,15 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     if "template-jni" in config:
         template = config["template-jni"]
     generator = SQLGenerator(config["schema"], template, True)
-    statements = []
     counter = 0
 
+    statements_file = open(statements_path, "wb")
     for i in generator.generate():
-        statements.append({"id": counter,
-                           "SQL": i})
+        cPickle.dump({"id": counter, "SQL": i}, statements_file)
         counter += 1
+    statements_file.close()
 
-    if run_once("jni", command, statements) != 0:
+    if run_once("jni", command, statements_path, jni_path) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
         exit(1)
 
@@ -141,23 +150,18 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     generator = SQLGenerator(config["schema"], template, False)
     counter = 0
 
+    statements_file = open(statements_path, "wb")
     for i in generator.generate():
-        statements[counter]["SQL"] = i
+        cPickle.dump({"id": counter, "SQL": i}, statements_file)
         counter += 1
+    statements_file.close()
 
-    if run_once("hsqldb", command, statements) != 0:
+    if run_once("hsqldb", command, statements_path, hsql_path) != 0:
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
         exit(1)
 
-    report_dict = {"Seed": random_seed, "Statements": statements}
-    report = XMLGenerator(report_dict)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    fd = open(report_filename, "w")
-    fd.write(report.toXML())
-    fd.close()
-
-    success = generate_html_reports(report_dict, output_dir, report_all)
+    success = generate_html_reports(random_seed, statements_path, hsql_path,
+                                    jni_path, output_dir, report_all)
     return success
 
 def usage():

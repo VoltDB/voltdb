@@ -1,7 +1,7 @@
 VoltDB Included Third-Party Software
 
-This list includes only software that is linked/compiled with VoltDB and/or 
-distributed with VoltDB (i.e., included in the VoltDB repository). Additional 
+This list includes only software that is linked/compiled with VoltDB and/or
+distributed with VoltDB (i.e., included in the VoltDB repository). Additional
 tools may be needed to build and test VoltDB.
 
 ================================================================================
@@ -290,29 +290,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-xml2 (python)
-# Copyright (C) 2009 by Ning Shi and Andy Pavlo
-# Brown University
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
-# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
-================================================================================
  Jetty Web Container
  Copyright 1995-2009 Mort Bay Consulting Pty Ltd
 
@@ -397,9 +374,9 @@ OpenCSV
  See the License for the specific language governing permissions and
  limitations under the License.
  */
- 
+
 ================================================================================
-0MQ (zeromq)  
+0MQ (zeromq)
 
 /*
 Copyright (c) 2007-2011 iMatix Corporation
@@ -475,7 +452,7 @@ Licensed as GNU LGPL (http://www.gnu.org/licenses/lgpl.html)
 
 ================================================================================
 Protobuf (protocol buffer encoding)
-License: New BSD License (http://www.opensource.org/licenses/bsd-license.php) 
+License: New BSD License (http://www.opensource.org/licenses/bsd-license.php)
 
 Copyright 2008, Google Inc.
 All rights reserved.
@@ -512,7 +489,7 @@ standalone and requires a support library to be linked with it.  This
 support library is itself covered by the above license.
 
 ================================================================================
-Node.js VoltDB client 
+Node.js VoltDB client
 (portions used in VoltDB Node.js client)
 Author Jacob Wright, MIT License (https://github.com/jacwright/voltjs/blob/master/LICENSE)
 
@@ -816,7 +793,7 @@ Mockito
  * Copyright (c) 2007 Mockito contributors
  * This program is made available under the terms of the MIT License.
  */
- 
+
 ================================================================================
 Linked with or Included in VoltDB tools
 ================================================================================
@@ -906,13 +883,13 @@ VoltDB Studio | Web uses the following open source components:
  * Version: 1.0.0b1_r746
  *
  * Copyright (c) 2009-2011 Chris Leonello
- * jqPlot is currently available for use in all personal or commercial projects 
- * under both the MIT (http://www.opensource.org/licenses/mit-license.php) and GPL 
- * version 2.0 (http://www.gnu.org/licenses/gpl-2.0.html) licenses. This means that you can 
- * choose the license that best suits your project and use it accordingly. 
+ * jqPlot is currently available for use in all personal or commercial projects
+ * under both the MIT (http://www.opensource.org/licenses/mit-license.php) and GPL
+ * version 2.0 (http://www.gnu.org/licenses/gpl-2.0.html) licenses. This means that you can
+ * choose the license that best suits your project and use it accordingly.
  *
- * Although not required, the author would appreciate an email letting him 
- * know of any substantial use of jqPlot.  You can reach the author at: 
+ * Although not required, the author would appreciate an email letting him
+ * know of any substantial use of jqPlot.  You can reach the author at:
  * chris at jqplot dot com or see http://www.jqplot.com/info.php .
  *
  * If you are feeling kind and generous, consider supporting the project by
@@ -926,7 +903,7 @@ VoltDB Studio | Web uses the following open source components:
  *     http://hexmen.com/js/sprintf.js
  *     The author (Ash Searle) has placed this code in the public domain:
  *     "This code is unrestricted: you are free to use it however you like."
- * 
+ *
  */
 --------------------------------------------------------------------------------
 + SortTable: http://www.kryogenix.org/code/browser/sorttable/
@@ -937,13 +914,13 @@ VoltDB Studio | Web uses the following open source components:
   version 2
   7th April 2007
   Stuart Langridge, http://www.kryogenix.org/code/browser/sorttable/
-  
+
   Instructions:
   Download this file
   Add <script src="sorttable.js"></script> to your HTML
   Add class="sortable" to any table you'd like to make sortable
   Click on the headers to sort
-  
+
   Thanks to many, many people for contributions and suggestions.
   Licenced as X11: http://www.kryogenix.org/code/browser/licence.html
   This basically means: do what you want with it.
@@ -953,10 +930,10 @@ VoltDB Studio | Web uses the following open source components:
 + bassistance.de's jQuery Treeview Plugin:
   http://bassistance.de/jquery-plugins/jquery-plugin-treeview/
   For the Object Explorer
-  
+
 /*
  * Treeview 1.5pre - jQuery plugin to hide and show branches of a tree
- * 
+ *
  * http://bassistance.de/jquery-plugins/jquery-plugin-treeview/
  * http://docs.jquery.com/Plugins/Treeview
  *
@@ -994,7 +971,7 @@ VoltDB Studio | Web uses the following open source components:
 + Binny V A's Shortcut script
   http://www.openjs.com/scripts/events/keyboard_shortcuts/
   For application keyboard shortcuts
-  
+
 /**
  * http://www.openjs.com/scripts/events/keyboard_shortcuts/
  * Version : 2.01.B

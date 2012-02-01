@@ -26,9 +26,7 @@ import sys
 import cgi
 import os
 import cPickle
-from base64 import decodestring
 from distutils.util import strtobool
-from xml2 import XMLParser
 from optparse import OptionParser
 from voltdbclient import VoltColumn, VoltTable
 
@@ -204,44 +202,59 @@ def is_different(x):
 
     return False
 
-def deserialize(x):
-    if "Result" in x["jni"]:
-        x["jni"]["Result"] = cPickle.loads(decodestring(x["jni"]["Result"]))
-
-    if "Result" in x["hsqldb"]:
-        x["hsqldb"]["Result"] = cPickle.loads(\
-            decodestring(x["hsqldb"]["Result"]))
-
 def usage(prog_name):
     print """
 Usage:
 \t%s report [-o output_dir] [-f true/false] [-a]
 
-Generates HTML reports based on the given XML report file. The generated reports
+Generates HTML reports based on the given report files. The generated reports
 contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
-def generate_html_reports(report, output_dir, report_all, is_matching = False):
-    """report: It can be the filename of the XML report, or the actual Python
-    object of the report.
-    """
-
-    if isinstance(report, basestring):
-        parser = XMLParser(report)
-        result = parser.get_data()
-    else:
-        result = report
-
-    # deserialize results
-    map(deserialize, result["Statements"])
-
+def generate_html_reports(seed, statements_path, hsql_path, jni_path,
+                          output_dir, report_all, is_matching = False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    statements_file = open(statements_path, "rb")
+    hsql_file = open(hsql_path, "rb")
+    jni_file = open(jni_path, "rb")
     failures = 0
-    for r in result["Statements"]:
-        if int(r["jni"]["Status"]) != 1:
+    count = 0
+    mismatches = []
+    all_results = []
+
+    while True:
+        try:
+            statement = cPickle.load(statements_file)
+        except EOFError:
+            break
+
+        try:
+            jni = cPickle.load(jni_file)
+            hsql = cPickle.load(hsql_file)
+        except EOFError as e:
+            raise IOError("Not enough results for generated statements: %s" %
+                          (str(e)))
+
+        count += 1
+        if int(jni["Status"]) != 1:
             failures += 1
+
+        statement["hsqldb"] = hsql
+        statement["jni"] = jni
+        if is_matching:
+            if not is_different(statement):
+                mismatches.append(statement)
+        else:
+            if is_different(statement):
+                mismatches.append(statement)
+        if report_all:
+            all_results.append(statement)
+
+    statements_file.close()
+    hsql_file.close()
+    jni_file.close()
 
     report = """
 <html>
@@ -258,13 +271,7 @@ Random seed: %s
 Total statements: %d
 <br/>
 Failed (*not* necessarily mismatched) statements: %d
-""" % (result["Seed"], len(result["Statements"]), failures)
-
-    is_same = lambda x: not is_different(x)
-    if is_matching:
-        mismatches = filter(is_same, result["Statements"])
-    else:
-        mismatches = filter(is_different, result["Statements"])
+""" % (seed, count, failures)
 
     def key(x):
         return int(x["id"])
@@ -274,8 +281,7 @@ Failed (*not* necessarily mismatched) statements: %d
                             mismatches, output_dir)
 
     if report_all:
-        report += print_section("Total Statements",
-                                result["Statements"], output_dir)
+        report += print_section("Total Statements", all_results, output_dir)
 
     report += """
 </body>
