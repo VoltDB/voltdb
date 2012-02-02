@@ -146,7 +146,6 @@ PRIMARY ENTRY POINTS
         <arg value="junit" />
         <arg value="distcheck" />
         <arg value="pythonfser" />
-        <arg value="ant_unit_tests" />
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
@@ -185,7 +184,6 @@ PRIMARY ENTRY POINTS
         <arg value="licensecheck" />
         <arg value="junit_quick" />
         <arg value="distcheck" />
-        <arg value="ant_unit_tests" />
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
