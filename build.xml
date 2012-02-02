@@ -124,84 +124,6 @@
     <not><isset property="workload.trace.ignore"/></not>
 </condition>
 
-<!-- cluster machine names -->
-<macrodef name="nexthosthelper">
-    <attribute name="h1" />
-    <attribute name="h2" />
-    <attribute name="p1" />
-    <attribute name="p2" />
-    <sequential>
-        <condition property="@{p2}" value="@{h2}">
-            <equals arg1="${@{p1}}" arg2="@{h1}" />
-        </condition>
-    </sequential>
-</macrodef>
-
-<macrodef name="nexthostprop">
-    <attribute name="prop" />
-    <attribute name="next" />
-    <sequential>
-        <nexthosthelper h1="volt3a" h2="volt3b" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3b" h2="volt3c" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3c" h2="volt3d" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3d" h2="volt3e" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3e" h2="volt3f" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3f" h2="volt3g" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3g" h2="volt3h" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3h" h2="volt3i" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3i" h2="volt3j" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3j" h2="volt3k" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt3k" h2="volt3l" p1="@{prop}" p2="@{next}" />
-
-        <nexthosthelper h1="volt4a" h2="volt4b" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt4b" h2="volt4c" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt4c" h2="volt2"  p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt2"  h2="volt1"  p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt1"  h2="volt5a"  p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt5a" h2="volt5b" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt5b" h2="volt5c" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt5c" h2="volt5d" p1="@{prop}" p2="@{next}" />
-        <nexthosthelper h1="volt5d" h2="volt5e" p1="@{prop}" p2="@{next}" />
-    </sequential>
-</macrodef>
-
-<envdefault prop="host1" var="FIRSTSERVER" default="volt3a" />
-<nexthostprop prop="host1"  next="host2"  />
-<nexthostprop prop="host2"  next="host3"  />
-<nexthostprop prop="host3"  next="host4"  />
-<nexthostprop prop="host4"  next="host5"  />
-<nexthostprop prop="host5"  next="host6"  />
-<nexthostprop prop="host6"  next="host7"  />
-<nexthostprop prop="host7"  next="host8"  />
-<nexthostprop prop="host8"  next="host9"  />
-<nexthostprop prop="host9"  next="host10" />
-<nexthostprop prop="host10" next="host11" />
-<nexthostprop prop="host11" next="host12" />
-
-<envdefault prop="clienthost1" var="FIRSTCLIENT" default="volt4a" />
-<nexthostprop prop="clienthost1" next="clienthost2" />
-<nexthostprop prop="clienthost2" next="clienthost3" />
-<nexthostprop prop="clienthost3" next="clienthost4" />
-<nexthostprop prop="clienthost4" next="clienthost5" />
-<nexthostprop prop="clienthost5" next="clienthost6" />
-<nexthostprop prop="clienthost6" next="clienthost7" />
-<nexthostprop prop="clienthost7" next="clienthost8" />
-<nexthostprop prop="clienthost8" next="clienthost9" />
-<nexthostprop prop="clienthost9" next="clienthost10" />
-
-<target name="testnexthostprop">
-    <fail>
-        <condition>
-            <not>
-                <and>
-                    <equals arg1="${host12}" arg2="volt3l" />
-                    <equals arg1="${clienthost5}" arg2="volt1" />
-                </and>
-            </not>
-        </condition>
-    </fail>
-</target>
-
 <!--
 ***************************************
 PRIMARY ENTRY POINTS
@@ -1058,11 +980,6 @@ TEST CASES
 ***************************************
 -->
 
-
-
-<!-- tests of build.xml itself -->
-<target name="ant_unit_tests" depends="testnexthostprop" />
-
 <target name="pythonfser" description="run python voltdbclient tests">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name='classpath' refid='project.classpath' />
@@ -1684,7 +1601,7 @@ TEST CASES
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/scripts' executable='python' failonerror='true'>
+    <exec dir='tests/scripts' executable='python2.6' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
         <arg line='sql_coverage_test.py' />
@@ -1730,153 +1647,6 @@ BENCHMARKS
         <param name="volt.server.memory" value="2048"/>
     </antcall>
 </target>
-
-<target name='benchmark'
-    description="Compile VoltDB and run a benchmark">
-    <java fork="true" failonerror="true"
-        classname="org.voltdb.benchmark.BenchmarkController">
-        <classpath refid='project.classpath' />
-        <jvmarg value="-Xmx512m" />
-        <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
-        <assertions><disable/></assertions>
-        <arg value="CLIENT=${client}" />
-        <arg value="PUSHFILES=${pushfiles}" />
-        <arg value="PROJECTBUILDERNAME=${projectbuilder}" />
-        <arg value="BACKEND=${backend}" />
-        <arg value="HOSTCOUNT=${hostcount}" />
-        <arg value="SITESPERHOST=${sitesperhost}"/>
-        <arg value="KFACTOR=${kfactor}"/>
-        <arg value="CLIENTCOUNT=${clientcount}" />
-        <arg value="PROCESSESPERCLIENT=${processesperclient}" />
-        <arg value="INTERVAL=${interval}" />
-        <arg value="DURATION=${duration}" />
-        <arg value="REMOTEPATH=${remotepath}" />
-        <arg value="REMOTEUSER=${remoteuser}"/>
-        <arg value="VOLTROOT=${voltroot}" />
-        <arg value="HOST=${manualhost1}" />
-        <arg value="HOST=${manualhost2}" />
-        <arg value="HOST=${manualhost3}" />
-        <arg value="HOST=${manualhost4}" />
-        <arg value="HOST=${manualhost5}" />
-        <arg value="HOST=${manualhost6}" />
-        <arg value="HOST=${host1}" />
-        <arg value="HOST=${host2}" />
-        <arg value="HOST=${host3}" />
-        <arg value="HOST=${host4}" />
-        <arg value="HOST=${host5}" />
-        <arg value="HOST=${host6}" />
-        <arg value="HOST=${host7}" />
-        <arg value="HOST=${host8}" />
-        <arg value="HOST=${host9}" />
-        <arg value="HOST=${host10}" />
-        <arg value="HOST=${host11}" />
-        <arg value="HOST=${host12}" />
-        <arg value="CLIENTHOST=${manualclient1}" />
-        <arg value="CLIENTHOST=${manualclient2}" />
-        <arg value="CLIENTHOST=${manualclient3}" />
-        <arg value="CLIENTHOST=${clienthost1}" />
-        <arg value="CLIENTHOST=${clienthost2}" />
-        <arg value="CLIENTHOST=${clienthost3}" />
-        <arg value="CLIENTHOST=${clienthost4}" />
-        <arg value="CLIENTHOST=${clienthost5}" />
-        <arg value="CLIENTHOST=${clienthost6}" />
-        <arg value="CLIENTHOST=${clienthost7}" />
-        <arg value="CLIENTHOST=${clienthost8}" />
-        <arg value="CLIENTHOST=${clienthost9}" />
-        <arg value="CLIENTHOST=${clienthost10}" />
-        <arg value="LISTENFORDEBUGGER=${debug}" />
-        <arg value="USEPROFILE=${useprofile}" />
-        <arg value="CHECKTRANSACTION=${checktransaction}" />
-        <arg value="CHECKTABLES=${checktables}" />
-        <arg value="CLIENTHEAP=${volt.client.memory}" />
-        <arg value="SERVERHEAP=${volt.server.memory}" />
-        <arg value="LOCAL=${local}" />
-        <!-- Actual TXN rate sent to cluster will be:
-            TXNRATE * CLIENTCOUNT * PROCESSESPERCLIENT -->
-        <arg value="TXNRATE=${txnrate}" />
-        <arg value="MAXOUTSTANDING=${maxoutstanding}" />
-        <!-- Actual number of connections opened to cluster will be:
-            NUMCONNECTIONS * CLIENTCOUNT * PROCESSESPERCLIENT * HOSTCOUNT -->
-        <arg value="NUMCONNECTIONS=${numconnections}" />
-        <arg value="STATSTAG=${statsTag}" />
-        <arg value="STATSDATABASEURL=${statsDatabaseURL}" />
-        <arg value="APPLICATIONNAME=${applicationName}" />
-        <arg value="SUBAPPLICATIONNAME=${subApplicationName}" />
-        <arg value="SHOWCONSOLEOUTPUT=${showConsoleOutput}" />
-
-        <!-- tpcc parameters -->
-        <arg value="warehouses=${warehouses}" />
-        <arg value="scalefactor=${sf}" />
-        <arg value="skewfactor=${skew}" />
-        <arg value="loadthreads=${loadthreads}" />
-
-        <!-- measureoverhead parameters -->
-        <arg value="transaction=${transaction}"/>
-
-        <!-- multisite parameters -->
-        <arg value="sf=${sf}"/>
-        <arg value="multipartition=${multipartition}"/>
-
-        <!-- workload xml file -->
-        <arg value="configfile=${configfile}"/>
-        <!-- workload name -->
-        <arg value="workload=${workload}"/>
-
-        <!-- automatic online snapshot parameters -->
-        <arg value="SNAPSHOTPATH=${snapshotPath}" />
-        <arg value="SNAPSHOTFREQUENCY=${snapshotFrequency}" />
-        <arg value="SNAPSHOTPREFIX=${snapshotPrefix}" />
-        <arg value="SNAPSHOTRETAIN=${snapshotRetain}" />
-
-        <!-- miscellaneous reporting parameters -->
-        <arg value="OS=${os}" />
-
-        <jvmarg value="-server" />
-        <jvmarg value="-Xmx2048m" />
-        <jvmarg value="-Xcheck:jni"/>
-    </java>
-</target>
-
-<target name="benchmarkenv" description="Run second cluster using parameters from the environment">
-    <antcall target="benchmark" inheritAll='true'>
-        <param name="local" value="false"/>
-        <param name="client" value="${env.BMCLIENT}"/>
-        <param name="remotepath" value="${env.VOLTBIN}"/>
-        <param name="voltroot" value="${env.VOLTROOT}"/>
-
-        <param name="hostcount" value="${env.BMHOSTCOUNT}"/>
-        <param name="sitesperhost" value="${env.BMSITESPERHOST}"/>
-        <!-- use env.FIRSTSERVER to override host1 from volt3a -->
-        <param name="manualhost1" value="${env.HOST1}"/>
-        <param name="manualhost2" value="${env.HOST2}"/>
-        <param name="manualhost3" value="${env.HOST3}"/>
-        <param name="manualhost4" value="${env.HOST4}"/>
-        <param name="manualhost5" value="${env.HOST5}"/>
-        <param name="manualhost6" value="${env.HOST6}"/>
-
-        <param name="clientcount" value="${env.BMCLIENTCOUNT}"/>
-        <param name="processesperclient" value="1"/>
-        <!-- use env.FIRSTCLIENT to override clienthost1 from volt4a -->
-        <param name="manualclient1" value="${env.CLIENT1}"/>
-        <param name="manualclient2" value="${env.CLIENT2}"/>
-        <param name="manualclient3" value="${env.CLIENT3}"/>
-
-        <param name="duration" value="${env.BMDURATION}000"/>
-        <param name="interval" value="${env.BMINTERVAL}000"/>
-        <param name="txnrate" value="${env.BMRATELIMIT}"/>
-        <param name="warehouses" value="${env.BMTPCCWAREHOUSES}"/>
-        <param name="volt.server.memory" value="2048"/>
-        <param name="kfactor" value="${env.BMKFACTOR}"/>
-        <param name="os" value="${env.MACHTYPE}"/>
-
-        <!-- all four of these have to be set for it to do anything -->
-        <param name="snapshotPath" value="/tmp"/>
-        <param name="snapshotFrequency" value="${env.BMSNAPSHOTFREQUENCY}"/>
-        <param name="snapshotPrefix" value="volt_snapshot"/>
-        <param name="snapshotRetain" value="${env.BMSNAPSHOTRETAIN}"/>
-    </antcall>
-</target>
-
 <target name='proccallmicrobench' depends='ee, compile'
     description="Run client-server stored procedure call overhead microbenchmark. [-Dclients={# clients}]">
     <java fork="true" failonerror="true"
