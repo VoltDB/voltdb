@@ -2383,4 +2383,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             }
         }
     }
+
+    public PartitionDRGateway getPartitionDRGateway() {
+        return m_partitionDRGateway;
+    }
 }

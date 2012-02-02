@@ -1906,7 +1906,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void setReplicationActive(boolean active)
     {
-        m_replicationActive = active;
+        if (m_replicationActive != active) {
+            m_replicationActive = active;
+            if (m_localSites != null) {
+                for (ExecutionSite s : m_localSites.values()) {
+                    s.getPartitionDRGateway().setActive(active);
+                }
+            }
+        }
     }
 
     @Override

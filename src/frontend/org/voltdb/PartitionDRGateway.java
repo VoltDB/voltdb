@@ -76,6 +76,8 @@ public class PartitionDRGateway {
                         File overflowDir) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
     public void tick(long txnId) {}
+    public void setActive(boolean active) {}
+    public boolean isActive() { return false; }
     public void shutdown() {}
 
 }
