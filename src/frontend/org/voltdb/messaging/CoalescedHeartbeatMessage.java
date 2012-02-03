@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.utils.DBBPool;
 
 public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
 
