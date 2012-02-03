@@ -18,9 +18,9 @@
 package org.voltdb.messaging;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.utils.DBBPool;
 
 public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 {
@@ -43,7 +43,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
      * @param requiresAck  Does the recipient need to respond to this message
      *                     with a CompleteTransactionResponseMessage?
      */
-    public CompleteTransactionMessage(int initiatorSiteId, int coordinatorSiteId,
+    public CompleteTransactionMessage(long initiatorSiteId, long coordinatorSiteId,
                                       long txnId, boolean isReadOnly,
                                       boolean isRollback, boolean requiresAck)
     {
@@ -63,36 +63,31 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     }
 
     @Override
-    protected void flattenToBuffer(DBBPool pool) throws IOException
+    public int getSerializedSize()
     {
-        int msgsize = super.getMessageByteCount();
-        // Add the bytes for isRollback and requiresAck
-        msgsize += 2;
-
-        if (m_buffer == null) {
-            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
-            m_buffer = m_container.b;
-        }
-        setBufferSize(msgsize + 1, pool);
-
-        m_buffer.position(HEADER_SIZE);
-        m_buffer.put(COMPLETE_TRANSACTION_ID);
-
-        super.writeToBuffer();
-
-        m_buffer.put(m_isRollback ? (byte) 1 : (byte) 0);
-        m_buffer.put(m_requiresAck ? (byte) 1 : (byte) 0);
-        m_buffer.limit(m_buffer.position());
+        int msgsize = super.getSerializedSize();
+        msgsize += 1 + 1;
+        return msgsize;
     }
 
     @Override
-    protected void initFromBuffer()
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        super.readFromBuffer();
+        buf.put(COMPLETE_TRANSACTION_ID);
+        super.flattenToBuffer(buf);
+        buf.put(m_isRollback ? (byte) 1 : (byte) 0);
+        buf.put(m_requiresAck ? (byte) 1 : (byte) 0);
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
+    }
 
-        m_isRollback = m_buffer.get() == 1;
-        m_requiresAck = m_buffer.get() == 1;
+    @Override
+    public void initFromBuffer(ByteBuffer buf)
+    {
+        super.initFromBuffer(buf);
+        m_isRollback = buf.get() == 1;
+        m_requiresAck = buf.get() == 1;
+        assert(buf.capacity() == buf.position());
     }
 
     @Override
@@ -100,7 +95,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         StringBuilder sb = new StringBuilder();
 
         sb.append("COMPLETE_TRANSACTION (FROM COORD: ");
-        sb.append(m_coordinatorSiteId);
+        sb.append(m_coordinatorHSId);
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 

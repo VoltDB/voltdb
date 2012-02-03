@@ -31,8 +31,8 @@ import java.nio.ByteBuffer;
 public abstract class TransactionInfoBaseMessage extends VoltMessage {
 
     long m_initiatorHSId;
-    long m_coordinatorHSId;
-    long m_txnId;
+    protected long m_coordinatorHSId;
+    protected long m_txnId;
     boolean m_isReadOnly;
 
     /** Empty constructor for de-serialization */
