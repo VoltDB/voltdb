@@ -40,7 +40,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
@@ -98,8 +97,6 @@ public class MockVoltDB implements VoltDBInterface
     private volatile String m_localMetadata;
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
-    final AgreementSite m_agreementSite;
-    private final ZooKeeper m_zk;
     boolean m_noLoadLib = false;
     public boolean shouldIgnoreCrashes = false;
     OperationMode m_startMode = OperationMode.RUNNING;
@@ -152,7 +149,8 @@ public class MockVoltDB implements VoltDBInterface
         MockMailbox.postoffice.get(VoltDB.STATS_MAILBOX_ID).put(1, mbox);
         MockMailbox mailbox = new MockMailbox();
         MockMailbox.registerMailbox(1, VoltDB.AGREEMENT_MAILBOX_ID, mailbox);
-        try {
+/*
+         try {
             m_agreementSite =
                 new AgreementSite(
                     1,
@@ -169,6 +167,7 @@ public class MockVoltDB implements VoltDBInterface
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        */
     }
 
     public Procedure addProcedureForTest(String name)
@@ -298,7 +297,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getBuildString()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
@@ -317,14 +315,12 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ArrayList<ClientInterface> getClientInterfaces()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public Configuration getConfig()
     {
-        // TODO Auto-generated method stub
         return new VoltDB.Configuration();
     }
 
@@ -358,14 +354,12 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Messenger getMessenger()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public VoltNetwork getNetwork()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
@@ -399,7 +393,6 @@ public class MockVoltDB implements VoltDBInterface
     public boolean ignoreCrash()
     {
         if (shouldIgnoreCrashes) {
-            // TODO Auto-generated method stub
             m_howManyCrashes++;
             return true;
         } else {
@@ -416,22 +409,17 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean isRunning()
     {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public void readBuildInfo(String editionTag)
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
     public void run()
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -441,15 +429,12 @@ public class MockVoltDB implements VoltDBInterface
         m_zk.close();
         m_es.shutdown();
         m_es.awaitTermination( 1, TimeUnit.DAYS);
-        m_agreementSite.shutdown();
         m_statsAgent.shutdown();
     }
 
     @Override
     public void startSampler()
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -480,27 +465,21 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void logUpdate(String xmlConfig, long currentTxnId)
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
     public String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public String doRejoinPrepare(long currentTxnId, int rejoinHostId,
             String rejoiningHostname, int portToConnect, Set<Integer> liveHosts) {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public void onExecutionSiteRecoveryCompletion(long transferred) {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -510,7 +489,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public boolean recovering() {
-        // TODO Auto-generated method stub
         return false;
     }
 
@@ -568,11 +546,6 @@ public class MockVoltDB implements VoltDBInterface
     public void onAgreementSiteRecoveryCompletion() {}
 
     @Override
-    public AgreementSite getAgreementSite() {
-        return m_agreementSite;
-    }
-
-    @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
     }
@@ -596,14 +569,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void setReplicationActive(boolean active)
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
     public boolean getReplicationActive()
     {
-        // TODO Auto-generated method stub
         return false;
     }
 }

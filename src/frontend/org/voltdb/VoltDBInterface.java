@@ -20,12 +20,10 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltdb.agreement.AgreementSite;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
@@ -33,9 +31,6 @@ import org.voltdb.network.VoltNetwork;
 
 public interface VoltDBInterface
 {
-
-    public AgreementSite getAgreementSite();
-
     public boolean recovering();
 
     /*

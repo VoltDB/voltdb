@@ -71,8 +71,6 @@ import org.voltdb.dtxn.SimpleDtxnInitiator;
 
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.VoltDB.START_ACTION;
-import org.voltdb.agreement.AgreementSite;
-import org.voltdb.agreement.ZKUtil;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -105,6 +103,13 @@ import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
+/**
+ * RealVoltDB initializes global server components, like the messaging
+ * layer, ExecutionSite(s), and ClientInterface. It provides accessors
+ * or references to those global objects. It is basically the global
+ * namespace. A lot of the global namespace is described by VoltDBInterface
+ * to allow test mocking.
+ */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
@@ -158,7 +163,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     final ArrayList<SimpleDtxnInitiator> m_dtxns = new ArrayList<SimpleDtxnInitiator>();
     private Map<Integer, ExecutionSite> m_localSites;
     VoltNetwork m_network = null;
-    AgreementSite m_agreementSite;
     HTTPAdminListener m_adminListener;
     private Map<Integer, Thread> m_siteThreads;
     private ArrayList<ExecutionSiteRunner> m_runners;
@@ -172,7 +176,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
     private StatsManager m_statsManager = null;
-    ZooKeeper m_zk;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
     int m_myHostId;
     long m_depCRC = -1;
@@ -273,7 +276,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // which reusue the process
             m_clientInterfaces.clear();
             m_dtxns.clear();
-            m_agreementSite = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
             m_deployment = null;
@@ -282,7 +284,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
             m_instanceId = null;
-            m_zk = null;
             m_snapshotCompletionMonitor = null;
             m_catalogContext = null;
             m_partitionCountStats = null;

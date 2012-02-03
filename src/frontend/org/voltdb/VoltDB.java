@@ -29,9 +29,7 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
 
 /**
- * <code>VoltDB</code> is the main class for VoltDB server.
- * It sets up global objects and then starts the individual threads
- * for the <code>ThreadManager</code>s.
+ * VoltDB provides main() for the VoltDB server
  */
 public class VoltDB {
 
@@ -42,19 +40,13 @@ public class VoltDB {
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
-
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
-
-    static final int INITIATOR_SITE_ID = 0;
+    public static final int INITIATOR_SITE_ID = 0;
     public static final int DTXN_MAILBOX_ID = 0;
     public static final int AGREEMENT_MAILBOX_ID = 1;
     public static final int STATS_MAILBOX_ID = 2;
     public static final int ASYNC_COMPILER_MAILBOX_ID = 3;
     public static final int CLIENT_INTERFACE_MAILBOX_ID = 4;
-
-    // temporary for single partition testing
-    static final int FIRST_SITE_ID = 1;
-
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
@@ -317,8 +309,9 @@ public class VoltDB {
         }
 
         /**
-         * Validates configuration settings and logs errors to the host log. You typically want to have the system exit
-         * when this fails, but this functionality is left outside of the method so that it is testable.
+         * Validates configuration settings and logs errors to the host log.
+         * You typically want to have the system exit when this fails, but
+         * this functionality is left outside of the method so that it is testable.
          * @return Returns true if all required configuration settings are present.
          */
         public boolean validate() {
@@ -362,14 +355,15 @@ public class VoltDB {
          * Prints a usage message as a fatal error.
          */
         public void usage() {
-            // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
-            // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
-            // GettingStarted.pdf).
-            hostLog.fatal("Usage: org.voltdb.VoltDB <action> leader <hostname> deployment <deployment.xml> license <license.xml> [catalog <catalog.jar>]");
-            hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
+            // This text is user visible. Make it match the documentation PDF
+            hostLog.fatal("Usage: org.voltdb.VoltDB start|recover|create leader|rejoinhost <hostname> " +
+                          "deployment <deployment.xml> license <license.xml> [catalog <catalog.jar>]");
+            hostLog.fatal("The _Getting Started With VoltDB_ book explains how " +
+                          "to run VoltDB from the command line.");
         }
 
-        /** Helper to set the path for compiled jar files.
+        /**
+         * Helper to set the path for compiled jar files.
          *  Could also live in VoltProjectBuilder but any code that creates
          *  a catalog will probably start VoltDB with a Configuration
          *  object. Perhaps this is more convenient?
@@ -379,6 +373,7 @@ public class VoltDB {
             m_pathToCatalog = getPathToCatalogForTest(jarname);
             return m_pathToCatalog;
         }
+
         public static String getPathToCatalogForTest(String jarname) {
             String answer = jarname;
 
@@ -420,8 +415,6 @@ public class VoltDB {
         }
     }
 
-    private static VoltDB.Configuration m_config = new VoltDB.Configuration();
-
     /* helper functions to access current configuration values */
     public static boolean getLoadLibVOLTDB() {
         return !(m_config.m_noLoadLibVOLTDB);
@@ -435,24 +428,16 @@ public class VoltDB {
         return m_config.m_useWatchdogs;
     }
 
-    public static boolean getQuietAdhoc()
-    {
-        return m_config.m_quietAdhoc;
-    }
-
     /**
      * Wrapper for crashLocalVoltDB() to keep compatibility with >100 calls.
+     * Prefer crashLocalVoltDB() in new code.
      */
-    @Deprecated
     public static void crashVoltDB() {
         crashLocalVoltDB("Unexpected crash", true, null);
     }
 
     /**
      * Exit the process with an error message, optionally with a stack trace.
-     *
-     * In the future it would be nice to notify any non-failed subsystems
-     * that the node is going down. For now, just die.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
         if (instance().ignoreCrash()) {
@@ -486,9 +471,6 @@ public class VoltDB {
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
-     *
-     * In the future it would be nice to notify any non-failed subsystems
-     * that the node is going down. For now, just die.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
         if (instance().ignoreCrash()) {
@@ -505,7 +487,6 @@ public class VoltDB {
 
     /**
      * Entry point for the VoltDB server process.
-     *
      * @param args Requires catalog and deployment file locations.
      */
     public static void main(String[] args) {
@@ -529,11 +510,9 @@ public class VoltDB {
 
     /**
      * Initialize the VoltDB server.
-     *
      * @param config  The VoltDB.Configuration to use to initialize the server.
      */
-    public static void initialize(VoltDB.Configuration config)
-    {
+    public static void initialize(VoltDB.Configuration config) {
         m_config = config;
         instance().initialize(config);
     }
@@ -556,8 +535,7 @@ public class VoltDB {
      * VoltDBInterface that is used for testing.
      *
      */
-    public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance)
-    {
+    public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance) {
         singleton = testInstance;
     }
 
@@ -565,6 +543,7 @@ public class VoltDB {
     public Object clone() throws CloneNotSupportedException {
         throw new CloneNotSupportedException();
     }
-    private static VoltDBInterface singleton = new RealVoltDB();
 
+    private static VoltDB.Configuration m_config = new VoltDB.Configuration();
+    private static VoltDBInterface singleton = new RealVoltDB();
 }
