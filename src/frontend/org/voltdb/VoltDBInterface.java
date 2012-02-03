@@ -24,8 +24,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.network.VoltNetwork;
 
