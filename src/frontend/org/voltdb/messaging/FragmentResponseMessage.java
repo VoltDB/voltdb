@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.utils.DBBPool;

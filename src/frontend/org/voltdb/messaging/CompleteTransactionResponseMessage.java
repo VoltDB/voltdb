@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
 
 public class CompleteTransactionResponseMessage extends VoltMessage

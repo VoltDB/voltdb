@@ -20,6 +20,8 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.utils.DBBPool;
 

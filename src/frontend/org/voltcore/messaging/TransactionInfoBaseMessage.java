@@ -36,11 +36,11 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     boolean m_isReadOnly;
 
     /** Empty constructor for de-serialization */
-    TransactionInfoBaseMessage() {
+    protected TransactionInfoBaseMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    TransactionInfoBaseMessage(long initiatorHSId,
+    protected TransactionInfoBaseMessage(long initiatorHSId,
                                       long coordinatorHSId,
                                       long txnId,
                                       boolean isReadOnly) {

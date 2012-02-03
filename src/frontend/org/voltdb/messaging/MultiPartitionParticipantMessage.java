@@ -17,6 +17,7 @@
 
 package org.voltdb.messaging;
 
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.utils.DBBPool;
 
 public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage {

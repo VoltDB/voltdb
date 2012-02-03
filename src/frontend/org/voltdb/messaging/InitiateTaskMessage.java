@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.utils.DBBPool;
 
