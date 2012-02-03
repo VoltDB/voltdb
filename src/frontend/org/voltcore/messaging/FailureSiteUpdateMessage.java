@@ -18,8 +18,6 @@
 
 package org.voltcore.messaging;
 
-import org.voltcore.utils.DBBPool;
-
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 

@@ -20,7 +20,6 @@ package org.voltcore.messaging;
 import java.nio.ByteBuffer;
 
 import org.voltcore.agreement.DtxnConstants;
-import org.voltcore.utils.DBBPool;
 
 public class HeartbeatResponseMessage extends VoltMessage {
 

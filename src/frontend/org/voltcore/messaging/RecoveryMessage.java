@@ -20,9 +20,6 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
-
 /**
  *  Message containing recovery data for a partition/table pair.
  *

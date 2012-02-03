@@ -20,7 +20,6 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.MiscUtils;
 
 public class HeartbeatMessage extends TransactionInfoBaseMessage {

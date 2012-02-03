@@ -19,11 +19,8 @@ package org.voltcore.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 
 import org.voltcore.VoltDB;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 public abstract class VoltMessage {
     // Identify each message

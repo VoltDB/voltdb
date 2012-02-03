@@ -19,8 +19,6 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltcore.utils.DBBPool;
-
 public final class LocalObjectMessage extends VoltMessage {
     public final Object payload;
 
