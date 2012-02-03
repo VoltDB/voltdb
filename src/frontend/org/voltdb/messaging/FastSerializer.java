@@ -46,7 +46,6 @@ public class FastSerializer implements DataOutput {
     public static final int INITIAL_ALLOCATION = 2048;
     private BBContainer buffer;
     private final BufferGrowCallback callback;
-    private final DBBPool m_pool;
     private final boolean isDirect;
 
     /**
@@ -102,15 +101,12 @@ public class FastSerializer implements DataOutput {
         assert(pool == null && isDirect || pool != null && !isDirect || pool == null && !isDirect);
         this.isDirect = isDirect;
         if (pool != null) {
-           m_pool = pool;
            buffer = pool.acquire(initialAllocation);
         } else if (isDirect) {
            assert(pool == null);
-           m_pool = null;
            buffer = DBBPool.allocateDirect(initialAllocation);
         } else {
            buffer = DBBPool.wrapBB(ByteBuffer.allocate(initialAllocation));
-           m_pool = null;
            assert(pool == null);
         }
         this.callback = callback;
@@ -141,8 +137,6 @@ public class FastSerializer implements DataOutput {
             BBContainer next;
             if (isDirect) {
                 next = DBBPool.allocateDirect(newCapacity);
-            } else if (m_pool != null) {
-                next = m_pool.acquire(newCapacity);
             } else {
                 next = DBBPool.wrapBB(ByteBuffer.allocate(newCapacity));
             }
@@ -207,7 +201,6 @@ public class FastSerializer implements DataOutput {
      * Only use this if using a non-direct ByteBuffer!
      */
     public ByteBuffer getBuffer() {
-        assert(m_pool == null);
         assert(isDirect == false);
         assert(buffer.b.hasArray());
         assert(!buffer.b.isDirect());
@@ -222,7 +215,6 @@ public class FastSerializer implements DataOutput {
      * to the shared buffer when the parameter buffer grows.
      */
     public BBContainer getContainerNoFlip() {
-        assert(m_pool == null);
         assert(isDirect == true);
         assert(buffer.b.isDirect());
         return buffer;

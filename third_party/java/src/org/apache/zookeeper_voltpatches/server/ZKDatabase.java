@@ -63,7 +63,7 @@ public class ZKDatabase {
      * all these members.
      */
     protected DataTree dataTree;
-    protected ConcurrentHashMap<Long, Integer> sessionsWithTimeouts;
+    protected ConcurrentHashMap<Long, Long> sessionsWithTimeouts;
 
     /**
      * the filetxnsnaplog that this zk database
@@ -73,7 +73,7 @@ public class ZKDatabase {
      */
     public ZKDatabase() {
         dataTree = new DataTree();
-        sessionsWithTimeouts = new ConcurrentHashMap<Long, Integer>();
+        sessionsWithTimeouts = new ConcurrentHashMap<Long, Long>();
     }
 
     /**
@@ -112,7 +112,7 @@ public class ZKDatabase {
      * get sessions with timeouts
      * @return the hashmap of sessions with timeouts
      */
-    public ConcurrentHashMap<Long, Integer> getSessionWithTimeOuts() {
+    public ConcurrentHashMap<Long, Long> getSessionWithTimeOuts() {
         return sessionsWithTimeouts;
     }
 

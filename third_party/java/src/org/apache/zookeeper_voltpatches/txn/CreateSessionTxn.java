@@ -19,31 +19,32 @@
 
 package org.apache.zookeeper_voltpatches.txn;
 
-import java.util.*;
 import org.apache.jute_voltpatches.*;
 import org.apache.zookeeper_voltpatches.txn.CreateSessionTxn;
 public class CreateSessionTxn implements Record {
-  private int timeOut;
+  private long timeOut;
   public CreateSessionTxn() {
   }
   public CreateSessionTxn(
-        int timeOut) {
+        long timeOut) {
     this.timeOut=timeOut;
   }
-  public int getTimeOut() {
+  public long getTimeOut() {
     return timeOut;
   }
-  public void setTimeOut(int m_) {
+  public void setTimeOut(long m_) {
     timeOut=m_;
   }
-  public void serialize(OutputArchive a_, String tag) throws java.io.IOException {
+  @Override
+public void serialize(OutputArchive a_, String tag) throws java.io.IOException {
     a_.startRecord(this,tag);
-    a_.writeInt(timeOut,"timeOut");
+    a_.writeLong(timeOut,"timeOut");
     a_.endRecord(this,tag);
   }
-  public void deserialize(InputArchive a_, String tag) throws java.io.IOException {
+  @Override
+public void deserialize(InputArchive a_, String tag) throws java.io.IOException {
     a_.startRecord(tag);
-    timeOut=a_.readInt("timeOut");
+    timeOut=a_.readLong("timeOut");
     a_.endRecord(tag);
 }
   @Override
@@ -54,7 +55,7 @@ public String toString() {
       CsvOutputArchive a_ =
         new CsvOutputArchive(s);
       a_.startRecord(this,"");
-    a_.writeInt(timeOut,"timeOut");
+    a_.writeLong(timeOut,"timeOut");
       a_.endRecord(this,"");
       return new String(s.toByteArray(), "UTF-8");
     } catch (Throwable ex) {
@@ -98,7 +99,7 @@ public boolean equals(Object peer_) {
 public int hashCode() {
     int result = 17;
     int ret;
-    ret = timeOut;
+    ret = new Long(timeOut).hashCode();
     result = 37*result + ret;
     return result;
   }

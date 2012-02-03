@@ -1357,7 +1357,49 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         }
     }
 
+    public int getSerializedSize() {
+        return m_buffer.limit() + 4;
+    }
+
+    public void flattenToBuffer(ByteBuffer buf) {
+        int startPosition = m_buffer.position();
+        buf.putInt(m_buffer.limit());
+        m_buffer.position(0);
+        buf.put(m_buffer);
+        m_buffer.position(startPosition);
+    }
+
+    void initFromBuffer(ByteBuffer buf) {
+        // Note: some of the snapshot and save/restore code makes assumptions
+        // about the binary layout of tables.
+
+        final int len = buf.getInt();
+        // smallest table is 4-bytes with zero value
+        // indicating rowcount is 0
+        assert(len >= 4);
+
+        int startLimit = buf.limit();
+        buf.limit(buf.position() + len);
+        m_buffer = buf.slice().asReadOnlyBuffer();
+        buf.limit(startLimit);
+        buf.position(buf.position() + len);
+
+        m_buffer.position(m_buffer.limit());
+
+        // rowstart represents and offset to the start of row data,
+        //  but the serialization is the non-inclusive length of the header,
+        //  so add two bytes.
+        m_rowStart = m_buffer.getInt(0) + 4;
+
+        m_colCount = m_buffer.getShort(5);
+        m_rowCount = m_buffer.getInt(m_rowStart);
+
+        assert(verifyTableInvariants());
+    }
+
     public ByteBuffer getBuffer() {
-        return m_buffer.asReadOnlyBuffer();
+        ByteBuffer buf = m_buffer.asReadOnlyBuffer();
+        buf.position(0);
+        return buf;
     }
 }

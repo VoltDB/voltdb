@@ -64,14 +64,14 @@ import org.apache.zookeeper_voltpatches.proto.RequestHeader;
 import org.apache.zookeeper_voltpatches.proto.WatcherEvent;
 import org.apache.zookeeper_voltpatches.server.auth.AuthenticationProvider;
 import org.apache.zookeeper_voltpatches.server.auth.ProviderRegistry;
-import org.voltdb.VoltDB;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class handles communication with clients using NIO. There is one per
  * client, but only one thread doing the communication.
  */
 public class NIOServerCnxn implements Watcher, ServerCnxn {
-    private static final Logger LOG = Logger.getLogger("ZK-SERVER");
+    private static final VoltLogger LOG = new VoltLogger("ZK-SERVER");
 
     private ConnectionBean jmxConnectionBean;
 
@@ -149,7 +149,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
                 ss.register(selector, SelectionKey.OP_ACCEPT);
             } catch (IOException e) {
                 LOG.fatal("Unable to bind to ZooKeeper client socket", e);
-                VoltDB.crashVoltDB();
+                org.voltcore.VoltDB.crashVoltDB();
             }
         }
 
@@ -372,7 +372,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
 
     private SocketChannel sock;
 
-    private SelectionKey sk;
+    private final SelectionKey sk;
 
     boolean initialized;
 
