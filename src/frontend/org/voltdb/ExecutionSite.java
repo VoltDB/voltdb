@@ -272,6 +272,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         long m_roadblockTransactionId;
+
+        @Override
+        protected void initFromBuffer(ByteBuffer buf)
+        {
+        }
+
+        @Override
+        public void flattenToBuffer(ByteBuffer buf) throws IOException
+        {
+        }
     }
 
     // This message is used locally to schedule a node failure event's
@@ -288,6 +298,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public byte getSubject() {
             return Subject.FAILURE.getId();
         }
+
+        @Override
+        protected void initFromBuffer(ByteBuffer buf)
+        {
+        }
+
+        @Override
+        public void flattenToBuffer(ByteBuffer buf) throws IOException
+        {
+        }
     }
 
     /**
@@ -300,6 +320,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public byte getSubject() {
             return Subject.DEFAULT.getId();
         }
+
+        @Override
+        protected void initFromBuffer(ByteBuffer buf)
+        {
+        }
+
+        @Override
+        public void flattenToBuffer(ByteBuffer buf) throws IOException
+        {
+        }
     }
 
     // This message is used locally to get the currently active TransactionState
@@ -311,6 +341,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         CheckTxnStateCompletionMessage(long txnId)
         {
             m_txnId = txnId;
+        }
+
+        @Override
+        protected void initFromBuffer(ByteBuffer buf)
+        {
+        }
+
+        @Override
+        public void flattenToBuffer(ByteBuffer buf) throws IOException
+        {
         }
     }
 
