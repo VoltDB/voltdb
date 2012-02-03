@@ -46,6 +46,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
+
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
@@ -69,10 +73,7 @@ import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.network.InputHandler;
 import org.voltdb.network.NIOReadStream;
@@ -852,17 +853,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
-
         m_siteId = siteId;
-
         m_acceptor = new ClientAcceptor(port, network, false);
-
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
-
         registerPolicies(replicationRole);
 
-        m_mailbox = new LocalMailbox(VoltDB.instance().getHostMessenger(), siteId) {
+        m_mailbox = new LocalMailbox(VoltDB.instance().getHostMessenger()) {
             LinkedBlockingDeque<VoltMessage> m_d = new LinkedBlockingDeque<VoltMessage>();
             @Override
             public void deliver(final VoltMessage message) {
@@ -873,8 +870,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return m_d.poll();
             }
         };
-        VoltDB.instance().getHostMessenger().
-            createMailbox(siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID, m_mailbox);
+        VoltDB.instance().getHostMessenger().createMailbox(null, m_mailbox);
     }
 
     private void registerPolicies(ReplicationRole replicationRole) {
@@ -1025,8 +1021,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sql, partitionParam));
 
         try {
-            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
-                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+            // XXX: need to know the async compiler mailbox id.
+            m_mailbox.send(Long.MIN_VALUE, work);
         } catch (MessagingException ex) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
@@ -1054,8 +1050,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString));
 
         try {
-            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
-                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+            // XXX: need to know the async compiler mailbox id.
+            m_mailbox.send(Long.MIN_VALUE, work);
         } catch (MessagingException ex) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
@@ -1313,8 +1309,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                     plannedStmt.sql, plannedStmt.partitionParam));
 
                         try {
-                            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
-                                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+                            // XXX: Need to know the async mailbox id.
+                            m_mailbox.send(Long.MIN_VALUE, work);
                         } catch (MessagingException ex) {
                             final ClientResponseImpl errorResponse =
                                 new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,

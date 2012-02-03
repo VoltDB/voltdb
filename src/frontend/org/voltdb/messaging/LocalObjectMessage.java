@@ -18,7 +18,10 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 
-import org.voltdb.utils.DBBPool;
+import java.nio.ByteBuffer;
+
+import org.voltcore.messaging.VoltMessage;
+
 
 public final class LocalObjectMessage extends VoltMessage {
     public final Object payload;
@@ -28,12 +31,12 @@ public final class LocalObjectMessage extends VoltMessage {
     }
 
     @Override
-    protected void initFromBuffer() {
+    protected void initFromBuffer(ByteBuffer buf) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    protected void flattenToBuffer(DBBPool pool) throws IOException {
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
         throw new UnsupportedOperationException();
     }
 
