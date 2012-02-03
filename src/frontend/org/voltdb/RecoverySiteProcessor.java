@@ -20,8 +20,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**

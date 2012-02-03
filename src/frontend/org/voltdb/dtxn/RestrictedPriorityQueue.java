@@ -22,11 +22,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.PriorityQueue;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HeartbeatResponseMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state

@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.messaging.MessagingException;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.StoredProcedureInvocation;
@@ -59,7 +60,6 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 

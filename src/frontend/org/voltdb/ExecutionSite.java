@@ -35,6 +35,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -82,13 +86,9 @@ import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
@@ -267,16 +267,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         @Override
-        protected void flattenToBuffer(DBBPool pool) {
-            // can be empty if only used locally
-        }
-
-        @Override
-        protected void initFromBuffer() {
-            // can be empty if only used locally
-        }
-
-        @Override
         public byte getSubject() {
             return Subject.FAILURE.getId();
         }
@@ -295,12 +285,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         @Override
-        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
-
-        @Override
-        protected void initFromBuffer() {} // can be empty if only used locally
-
-        @Override
         public byte getSubject() {
             return Subject.FAILURE.getId();
         }
@@ -312,11 +296,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      */
     static class PotentialSnapshotWorkMessage extends VoltMessage
     {
-        @Override
-        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
-        @Override
-        protected void initFromBuffer() {} // can be empty if only used locally
-
         @Override
         public byte getSubject() {
             return Subject.DEFAULT.getId();
@@ -333,11 +312,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         {
             m_txnId = txnId;
         }
-
-        @Override
-        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
-        @Override
-        protected void initFromBuffer() {} // can be empty if only used locally
     }
 
     private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler

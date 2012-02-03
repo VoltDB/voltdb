@@ -23,10 +23,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.VoltMessage;
 
 /**
  * <p>A <code>WorkUnit</code> represents some "work" to be done

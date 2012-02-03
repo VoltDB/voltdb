@@ -32,12 +32,12 @@ import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.HeartbeatResponseMessage;
-import org.voltdb.messaging.HostMessenger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.utils.ResponseSampler;
 

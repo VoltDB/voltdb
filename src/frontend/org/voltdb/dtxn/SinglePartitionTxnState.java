@@ -19,6 +19,8 @@ package org.voltdb.dtxn;
 
 import java.util.HashSet;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
@@ -27,8 +29,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 public class SinglePartitionTxnState extends TransactionState {

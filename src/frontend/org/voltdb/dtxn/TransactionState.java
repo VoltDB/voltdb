@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.messaging.Mailbox;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
@@ -29,7 +30,6 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 /**
