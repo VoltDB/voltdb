@@ -30,7 +30,7 @@ import java.nio.ByteBuffer;
  */
 public abstract class TransactionInfoBaseMessage extends VoltMessage {
 
-    long m_initiatorHSId;
+    protected long m_initiatorHSId;
     protected long m_coordinatorHSId;
     protected long m_txnId;
     boolean m_isReadOnly;

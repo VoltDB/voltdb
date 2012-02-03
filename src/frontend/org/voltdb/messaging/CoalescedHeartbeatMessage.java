@@ -17,13 +17,15 @@
 package org.voltdb.messaging;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
+import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.utils.DBBPool;
 
 public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
 
-    private final int m_destinationSiteIds[];
+    private final long m_destinationSiteIds[];
     private final long m_lastSafeTxnIds[];
 
     public CoalescedHeartbeatMessage() {
@@ -35,9 +37,12 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
      * Used when deserializing to construct the messages to deliver locally
      */
     private HeartbeatMessage m_messages[];
-    private int m_messageDestinations[];
+    private long m_messageDestinations[];
 
-    public CoalescedHeartbeatMessage(int initiatorSiteId, long txnId, int destinationSiteIds[], long lastSafeTxnIds[]) {
+    public CoalescedHeartbeatMessage(long initiatorSiteId, long txnId,
+                                     long destinationSiteIds[],
+                                     long lastSafeTxnIds[])
+    {
         super(initiatorSiteId, -1, txnId, true);
         m_destinationSiteIds = destinationSiteIds;
         m_lastSafeTxnIds = lastSafeTxnIds;
@@ -47,48 +52,44 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
         return m_messages;
     }
 
-    public int[] getHeartbeatDestinations() {
+    public long[] getHeartbeatDestinations() {
         return m_messageDestinations;
     }
 
     @Override
-    protected void initFromBuffer() {
-        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        super.readFromBuffer();
+    public int getSerializedSize()
+    {
+        int msgsize = super.getSerializedSize();
+        msgsize += 1 + // storage of count of heartbeat messages
+            m_destinationSiteIds.length * (8 + 8);  // Two longs per coalesced message
+        return msgsize;
+    }
 
-        final int numHeartbeats = m_buffer.get();
+    @Override
+    public void initFromBuffer(ByteBuffer buf) {
+        super.initFromBuffer(buf);
+        final int numHeartbeats = buf.get();
         m_messages = new HeartbeatMessage[numHeartbeats];
-        m_messageDestinations = new int[numHeartbeats];
+        m_messageDestinations = new long[numHeartbeats];
         for (int ii = 0; ii < numHeartbeats; ii++) {
-            m_messageDestinations[ii] = m_buffer.getInt();
-            m_messages[ii] = new HeartbeatMessage(super.m_initiatorSiteId, super.m_txnId, m_buffer.getLong());
+            m_messageDestinations[ii] = buf.getLong();
+            m_messages[ii] = new HeartbeatMessage(super.m_initiatorHSId,
+                                                  super.m_txnId,
+                                                  buf.getLong());
         }
     }
 
     @Override
-    protected void flattenToBuffer(DBBPool pool) throws IOException {
-        int msgsize = super.getMessageByteCount();
-        msgsize += (12 * m_destinationSiteIds.length) + 1;
-
-        if (m_buffer == null) {
-            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
-            m_buffer = m_container.b;
-        }
-        setBufferSize(msgsize + 1, pool);
-
-        m_buffer.position(HEADER_SIZE);
-        m_buffer.put(COALESCED_HEARTBEAT_ID);
-
-        super.writeToBuffer();
-
-        m_buffer.put((byte)m_destinationSiteIds.length);
-
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+        buf.put(COALESCED_HEARTBEAT_ID);
+        super.flattenToBuffer(buf);
+        buf.put((byte)m_destinationSiteIds.length);
         for (int ii = 0; ii < m_destinationSiteIds.length; ii++) {
-            m_buffer.putInt(m_destinationSiteIds[ii]);
-            m_buffer.putLong(m_lastSafeTxnIds[ii]);
+            buf.putLong(m_destinationSiteIds[ii]);
+            buf.putLong(m_lastSafeTxnIds[ii]);
         }
-
-        m_buffer.limit(m_buffer.position());
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
     }
 
 }
