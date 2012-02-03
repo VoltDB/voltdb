@@ -17,6 +17,8 @@
 
 package org.voltdb.messaging;
 
+import org.voltcore.messaging.Mailbox;
+
 /**
  * The interface to the global VoltDB messaging system.
  *
