@@ -76,8 +76,12 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         public int deadHostTimeout = 10000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
 
+        public Config(String coordIp, int coordPort) {
+            coordinatorIp = new InetSocketAddress(coordIp, coordPort);
+        }
+
         public Config() {
-            coordinatorIp = new InetSocketAddress("127.0.0.1", internalPort);
+            this("127.0.0.1", 3021);
         }
     }
 
