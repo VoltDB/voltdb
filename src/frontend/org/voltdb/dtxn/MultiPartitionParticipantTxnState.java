@@ -26,6 +26,7 @@ import java.util.Map;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
@@ -39,7 +40,6 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 public class MultiPartitionParticipantTxnState extends TransactionState {
 

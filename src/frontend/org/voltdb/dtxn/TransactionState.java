@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
@@ -30,7 +31,6 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 /**
  * Controls the state of a transaction. Encapsulates from the SimpleDTXNConnection
@@ -40,7 +40,7 @@ import org.voltdb.messaging.TransactionInfoBaseMessage;
  *
  */
 public abstract class TransactionState extends OrderableTransaction  {
-    public final int coordinatorSiteId;
+    public final long coordinatorSiteId;
     protected final boolean m_isReadOnly;
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
@@ -61,10 +61,10 @@ public abstract class TransactionState extends OrderableTransaction  {
                                ExecutionSite site,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getInitiatorSiteId());
+        super(notice.getTxnId(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = site;
-        coordinatorSiteId = notice.getCoordinatorSiteId();
+        coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
     }
