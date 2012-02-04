@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.utils.MiscUtils;
 
 public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 {
@@ -95,7 +96,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         StringBuilder sb = new StringBuilder();
 
         sb.append("COMPLETE_TRANSACTION (FROM COORD: ");
-        sb.append(m_coordinatorHSId);
+        sb.append(MiscUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 
