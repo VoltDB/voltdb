@@ -19,12 +19,12 @@ package org.voltdb.dtxn;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
 

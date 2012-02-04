@@ -126,7 +126,7 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract StoredProcedureInvocation getInvocation();
 
-    public void createFragmentWork(int[] partitions, FragmentTaskMessage task) {
+    public void createFragmentWork(long[] partitions, FragmentTaskMessage task) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support creating fragment tasks.";
         throw new UnsupportedOperationException(msg);
@@ -190,5 +190,5 @@ public abstract class TransactionState extends OrderableTransaction  {
      * @param globalCommitPoint greatest committed transaction id in the cluster
      * @param failedSites list of execution and initiator sites that have failed
      */
-    public abstract void handleSiteFaults(HashSet<Integer> failedSites);
+    public abstract void handleSiteFaults(HashSet<Long> failedSites);
 }
