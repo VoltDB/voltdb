@@ -17,6 +17,8 @@
 
 package org.voltcore.network;
 
+import java.util.concurrent.Future;
+
 public interface Connection {
     /**
      * Retrieve the write stream for this connection
@@ -43,14 +45,7 @@ public interface Connection {
     long connectionId();
 
     /**
-     * Schedule an action to be invoked in a network thread
-     * that has exclusive access to this connection
-     * @param r Runnable to execute
-     **/
-    void scheduleRunnable(Runnable r);
-
-    /**
      * Schedule the connection to be unregistered and closed
      */
-    void unregister();
+    Future<?> unregister();
 }

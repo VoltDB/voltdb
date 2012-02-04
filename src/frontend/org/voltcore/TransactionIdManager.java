@@ -42,8 +42,8 @@ public class TransactionIdManager {
     // note, these add up to 63 bits to make dealing with
     // signed / unsigned conversions easier.
     static final long TIMESTAMP_BITS = 40;
-    static final long COUNTER_BITS = 8;
-    static final long INITIATORID_BITS = 15;
+    static final long COUNTER_BITS = 6;
+    static final long INITIATORID_BITS = 17;
 
     // VOLT_EPOCH holds the time in millis since 1/1/2008 at 12am.
     // The current time - VOLT_EPOCH should fit nicely in 40 bits

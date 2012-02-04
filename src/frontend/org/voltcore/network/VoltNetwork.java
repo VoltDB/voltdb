@@ -70,9 +70,14 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -86,27 +91,16 @@ import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
-public class VoltNetwork implements Runnable
+class VoltNetwork implements Runnable
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
-    private final LinkedBlockingQueue<Runnable> m_taskQueues[];
-    // keep two lists and swap them in and out to minimize contention
-    private final ArrayDeque<VoltPort> m_selectorUpdates_1 = new ArrayDeque<VoltPort>();//Used as the lock for swapping lists
-    private final ArrayDeque<VoltPort> m_selectorUpdates_2 = new ArrayDeque<VoltPort>();
-    private ArrayDeque<VoltPort> m_activeUpdateList = m_selectorUpdates_1;
+    private final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<Runnable>();
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
-    private final CopyOnWriteArrayList<VoltPort> m_ports = new CopyOnWriteArrayList<VoltPort>();
-    private final AtomicLong m_nextWorkerSelection = new AtomicLong();
-    private final boolean m_useBlockingSelect;
-    private final boolean m_useExecutorService;
-    private final ArrayList<WeakReference<Thread>> m_networkThreads = new ArrayList<WeakReference<Thread>>();
-    private final ArrayList<NetworkDBBPool> m_poolsToClearOnShutdown = new ArrayList<NetworkDBBPool>();
-    public final int threadPoolSize;
-
-    private class TerminateThreadException extends RuntimeException {}
+    private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
+    private final NetworkDBBPool m_pool = new NetworkDBBPool();
 
     /*
      * Thread pool used for the reverse DNS lookup triggers. If not provided, it
@@ -114,11 +108,7 @@ public class VoltNetwork implements Runnable
      */
     private final ScheduledExecutorService m_es;
 
-    /**
-     * Synchronizes registration and unregistration of channels
-     */
-    private final ReentrantReadWriteLock m_registrationLock = new ReentrantReadWriteLock();
-
+    private final int m_networkId;
     /**
      * Start this VoltNetwork's thread;
      */
@@ -126,42 +116,16 @@ public class VoltNetwork implements Runnable
         m_thread.start();
     }
 
-    /** Used for test only! */
-    public VoltNetwork(Selector selector) {
-        m_thread = null;
-        m_selector = selector;
-        m_useBlockingSelect = true;
-        m_useExecutorService = false;
-        threadPoolSize = 1;
-        m_es = null;
-        m_taskQueues = null;
-    }
-
-    public VoltNetwork() {
-        this(true, true, null, null);
-    }
-
-    /**
-     * RealVoltDB calls this to pass the thread pool in so that VoltNetwork can
-     * use the same thread pool for the reverse DNS lookup triggers.
-     *
-     * @param es Thread pool
-     */
-    public VoltNetwork(ScheduledExecutorService es) {
-        this(true, true, null, es);
-    }
-
     /**
      * Initialize a m_selector and become ready to perform real work
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    @SuppressWarnings("unchecked")
-    public VoltNetwork(boolean useExecutorService, boolean blockingSelect, Integer threads,
+    VoltNetwork(int networkId,
                        ScheduledExecutorService es) {
-        m_thread = new Thread(this, "Volt Network");
+        m_thread = new Thread(this, "Volt Network - " + networkId);
+        m_networkId = networkId;
         m_thread.setDaemon(true);
-        m_useBlockingSelect = blockingSelect;
         m_es = es;
 
         try {
@@ -170,165 +134,15 @@ public class VoltNetwork implements Runnable
             m_logger.fatal(null, ex);
             throw new RuntimeException(ex);
         }
-
-        final int availableProcessors = Runtime.getRuntime().availableProcessors();
-        //Single thread is plenty for 4 cores.
-        if (availableProcessors <= 4) {
-            m_useExecutorService = false;
-        } else {
-            m_useExecutorService = useExecutorService;
-        }
-        if (!m_useExecutorService) {
-            threadPoolSize = 1;
-            m_taskQueues = null;
-            return;
-        }
-
-        // determine the number of threads to use
-        if (threads != null)
-            threadPoolSize = threads.intValue();
-        else if (availableProcessors <= 4)
-            threadPoolSize = 1;
-        else if (availableProcessors <= 8)
-            threadPoolSize = 2;
-        else if (availableProcessors > 8)
-            threadPoolSize = 2;
-        else
-            threadPoolSize = 1;
-
-        final ThreadFactory tf = new ThreadFactory() {
-            private final ThreadGroup group = new ThreadGroup(Thread.currentThread().getThreadGroup(), "Network threads");
-            private int threadIndex = 0;
-            @Override
-            public Thread newThread(final Runnable run) {
-                final Thread t = new Thread(group, run, "Network Thread - " + threadIndex++) {
-                    @Override
-                    public void run() {
-                        try {
-                            run.run();
-                        } finally {
-                            synchronized (m_poolsToClearOnShutdown) {
-                                m_poolsToClearOnShutdown.add(VoltPort.m_pools.get());
-                            }
-                        }
-                    };
-                };
-                synchronized (m_networkThreads) {
-                    m_networkThreads.add(new WeakReference<Thread>(t));
-                }
-                t.setDaemon(true);
-                return t;
-            }
-
-        };
-
-        m_taskQueues = new LinkedBlockingQueue[threadPoolSize];
-        for (int ii = 0; ii < threadPoolSize; ii++) {
-            @SuppressWarnings("rawtypes")
-            final LinkedBlockingQueue taskQueue = new LinkedBlockingQueue();
-            m_taskQueues[ii] = taskQueue;
-            tf.newThread(new Runnable() {
-                @Override
-                public void run() {
-                    while (true) {
-                        try {
-                            Runnable nextTask = (Runnable)taskQueue.take();
-                            nextTask.run();
-                        } catch (InterruptedException e) {
-                            return;
-                        } catch (TerminateThreadException e) {
-                            return;
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            networkLog.error(e);
-                        } catch (AssertionError e) {
-                            e.printStackTrace();
-                            throw e;
-                        }
-                    }
-                }
-            }).start();
-        }
-
-        //It is really handy to be able to uncomment this and print bandwidth usage. Hopefully
-        //management tools will replace it.
-        //        new Thread() {
-        //            @Override
-        //            public void run() {
-        //                long last = System.currentTimeMillis();
-        //                while (true) {
-        //                    try {
-        //                        Thread.sleep(10000);
-        //                    } catch (InterruptedException e) {
-        //                        // TODO Auto-generated catch block
-        //                        e.printStackTrace();
-        //                    }
-        //                    final long now = System.currentTimeMillis();
-        //                    long totalRead = 0;
-        //                    long totalMessagesRead = 0;
-        //                    long totalWritten = 0;
-        //                    long totalMessagesWritten = 0;
-        //                    synchronized (m_ports) {
-        //                        for (VoltPort p : m_ports) {
-        //                            final long read = p.readStream().getBytesRead(true);
-        //                            final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(true);
-        //                            final long messagesRead = p.getMessagesRead(true);
-        //                            totalRead += read;
-        //                            totalMessagesRead += messagesRead;
-        //                            totalWritten += writeInfo[0];
-        //                            totalMessagesWritten += writeInfo[1];
-        //                        }
-        //                    }
-        //                    double delta = (now - last) / 1000.0;
-        //                    double mbRead = totalRead / (1024.0 * 1024.0);
-        //                    double mbWritten = totalWritten / (1024.0 * 1024.0);
-        //                    System.out.printf("Transferred %.2f/%.2f (IN/OUT)/sec\n", mbRead / delta, mbWritten / delta);
-        //                    last = now;
-        //                }
-        //            }
-        //        }.start();
-    }
-
-
-    /**
-     * Lock that causes the selection thread to wait for all threads that
-     * are in the process of registering or unregistering channels to finish
-     */
-    private void waitForRegistrationLock() {
-        m_registrationLock.writeLock().lock();
-        m_registrationLock.writeLock().unlock();
-    }
-
-    /**
-     * Acquire a lock that stops the selection thread while a channel is being registered/unregistered
-     */
-    private void acquireRegistrationLock() {
-        m_registrationLock.readLock().lock();
-        m_selector.wakeup();
-    }
-
-    /**
-     * Release a lock that stops the selection thread while a channel is being registered/unregistered
-     */
-    private void releaseRegistrationLock() {
-        m_registrationLock.readLock().unlock();
     }
 
     /** Instruct the network to stop after the current loop */
     public void shutdown() throws InterruptedException {
+        m_shouldStop = true;
         if (m_thread != null) {
-            synchronized (this) {
-                m_shouldStop = true;
-                m_selector.wakeup();
-            }
+            m_selector.wakeup();
             m_thread.join();
-        } else {
-            m_shouldStop = true;
         }
-    }
-
-    public Connection registerChannel(SocketChannel channel, InputHandler handler) throws IOException {
-        return registerChannel(channel, handler, SelectionKey.OP_READ);
     }
 
     /**
@@ -338,114 +152,141 @@ public class VoltNetwork implements Runnable
      * @param handler
      * @throws IOException
      */
-    public Connection registerChannel(
-            SocketChannel channel,
-            InputHandler handler,
-            int interestOps) throws IOException {
+    Connection registerChannel(
+            final SocketChannel channel,
+            final InputHandler handler,
+            final int interestOps) throws IOException {
         channel.configureBlocking (false);
         channel.socket().setKeepAlive(true);
 
-        final VoltPort port =
-            new VoltPort(
-                    this,
-                    handler,
-                    handler.getExpectedOutgoingMessageSize(),
-                    channel.socket().getInetAddress().getHostAddress(),
-                    (int)(m_nextWorkerSelection.incrementAndGet() % threadPoolSize));
-        m_taskQueues[port.m_workerId].add(new Runnable() {
+        Callable<Connection> registerTask = new Callable<Connection>() {
+            @Override
+            public Connection call() throws Exception {
+                final VoltPort port =
+                        new VoltPort(
+                                VoltNetwork.this,
+                                handler,
+                                channel.socket().getInetAddress().getHostAddress(),
+                                m_pool);
+                port.registering();
+
+                /*
+                 * If no thread pool was given, VoltNetwork is probably used by client.
+                 * So trigger the reverse DNS lookup immediately. Otherwise, check if
+                 * the port is still alive 5 seconds later. If it is alive,start a
+                 * background thread to do reverse DNS lookup.
+                 */
+                if (m_es != null) {
+                    synchronized (m_es) {
+                        m_es.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                port.resolveHostname();
+                            }
+                        }, 5, TimeUnit.SECONDS);
+                    }
+                } else {
+                    /*
+                     * This means we are used by a client. No need to wait then, trigger
+                     * the reverse DNS lookup now.
+                     */
+                    port.resolveHostname();
+                }
+
+                try {
+                    SelectionKey key = channel.register (m_selector, interestOps, null);
+
+                    port.setKey (key);
+                    port.registered();
+
+                    //Fix a bug witnessed on the mini where the registration lock and the selector wakeup contained
+                    //within was not enough to prevent the selector from returning the port after it was registered,
+                    //but before setKey was called. Suspect a bug in the selector.wakeup() or register() implementation
+                    //on the mac.
+                    //The null check in invokeCallbacks will catch the null attachment, continue, and do the work
+                    //next time through the selection loop
+                    key.attach(port);
+
+                    return port;
+                } finally {
+                    m_ports.add(port);
+                }
+            }
+        };
+
+        FutureTask<Connection> ft = new FutureTask<Connection>(registerTask);
+        m_tasks.offer(ft);
+        m_selector.wakeup();
+
+        try {
+            return ft.get();
+        } catch (Exception e) {
+            throw new IOException(e);
+        }
+    }
+
+    private Runnable getUnregisterRunnable(final Connection c) {
+        return new Runnable() {
             @Override
             public void run() {
-                port.setPool();
-            }
-        });
-        port.registering();
+                VoltPort port = (VoltPort)c;
+                assert(c != null);
+                SelectionKey selectionKey = port.getKey();
 
-        /*
-         * If no thread pool was given, VoltNetwork is probably used by client.
-         * So trigger the reverse DNS lookup immediately. Otherwise, check if
-         * the port is still alive 5 seconds later. If it is alive,start a
-         * background thread to do reverse DNS lookup.
-         */
-        if (m_es != null) {
-            synchronized (m_es) {
-                m_es.schedule(new Runnable() {
-                    @Override
-                    public void run() {
-                        port.resolveHostname();
+                try {
+                    if (!m_ports.contains(port)) {
+                        return;
                     }
-                }, 5, TimeUnit.SECONDS);
+                    try {
+                        port.unregistering();
+                    } finally {
+                        try {
+                            selectionKey.attach(null);
+                            selectionKey.cancel();
+                        } finally {
+                            m_ports.remove(port);
+                        }
+                    }
+                } finally {
+                    port.unregistered();
+                }
             }
-        } else {
-            /*
-             * This means we are used by a client. No need to wait then, trigger
-             * the reverse DNS lookup now.
-             */
-            port.resolveHostname();
-        }
-
-        acquireRegistrationLock();
-        try {
-            SelectionKey key = channel.register (m_selector, interestOps, null);
-
-            port.setKey (key);
-            port.registered();
-
-            //Fix a bug witnessed on the mini where the registration lock and the selector wakeup contained
-            //within was not enough to prevent the selector from returning the port after it was registered,
-            //but before setKey was called. Suspect a bug in the selector.wakeup() or register() implementation
-            //on the mac.
-            //The null check in invokeCallbacks will catch the null attachment, continue, and do the work
-            //next time through the selection loop
-            key.attach(port);
-
-            return port;
-        } finally {
-            m_ports.add(port);
-            releaseRegistrationLock();
-        }
+        };
     }
 
     /**
      * Unregister a channel. The connections streams are not drained before finishing.
      * @param c
      */
-    void unregisterChannel (Connection c) {
-        VoltPort port = (VoltPort)c;
-        assert(c != null);
-        SelectionKey selectionKey = port.getKey();
+    Future<?> unregisterChannel (Connection c) {
+        FutureTask<Object> ft = new FutureTask<Object>(getUnregisterRunnable(c), null);
+        m_tasks.offer(ft);
+        m_selector.wakeup();
+        return ft;
+    }
 
-        try {
-            acquireRegistrationLock();
-            try {
-                if (!m_ports.contains(port)) {
-                    return;
-                }
-                try {
-                    port.unregistering();
-                } finally {
-                    try {
-                        selectionKey.attach(null);
-                        selectionKey.cancel();
-                    } finally {
-                        m_ports.remove(port);
-                    }
-                }
-            } finally {
-                releaseRegistrationLock();
-            }
-        } finally {
-            port.unregistered();
-        }
+    public void addToChangeList(final VoltPort port) {
+        addToChangeList( port, false);
     }
 
     /** Set interest registrations for a port */
-    public void addToChangeList(VoltPort port) {
-        synchronized (m_selectorUpdates_1) {
-            m_activeUpdateList.add(port);
+    public void addToChangeList(final VoltPort port, final boolean runFirst) {
+        if (runFirst) {
+            m_tasks.offer(new Runnable() {
+                @Override
+                public void run() {
+                    callPort(port);
+                }
+            });
+        } else {
+            m_tasks.offer(new Runnable() {
+                @Override
+                public void run() {
+                    installInterests(port);
+                }
+            });
         }
-        if (m_useBlockingSelect) {
-            m_selector.wakeup();
-        }
+        m_selector.wakeup();
     }
 
     @Override
@@ -454,143 +295,84 @@ public class VoltNetwork implements Runnable
             while (m_shouldStop == false) {
                 try {
                     while (m_shouldStop == false) {
-                        waitForRegistrationLock();
-                        if (m_useBlockingSelect) {
-                            m_selector.select(5);
+                        int readyKeys = 0;
+                        if (m_networkId == 0) {
+                            readyKeys = m_selector.select(5);
                         } else {
-                            m_selector.selectNow();
+                            readyKeys = m_selector.select();
                         }
-                        installInterests();
-                        invokeCallbacks();
-                        EstTimeUpdater.update(System.currentTimeMillis());
+
+                        Runnable task = null;
+                        while ((task = m_tasks.poll()) != null) {
+                            task.run();
+                        }
+
+                        if (readyKeys > 0) {
+                            invokeCallbacks();
+                        }
+
+                        if (m_networkId == 0) {
+                            EstTimeUpdater.update(System.currentTimeMillis());
+                        }
                     }
-                } catch (Exception ex) {
+                } catch (Throwable ex) {
+                    ex.printStackTrace();
                     m_logger.error(null, ex);
                 }
             }
+        } catch (Throwable t) {
+            t.printStackTrace();
         } finally {
-            p_shutdown();
+            try {
+                p_shutdown();
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
         }
     }
 
-    private synchronized void p_shutdown() {
-        //Synchronized so the interruption won't interrupt the network thread
-        //while it is waiting for the executor service to shutdown
+    private void p_shutdown() {
+        Set<SelectionKey> keys = m_selector.keys();
+
+        for (SelectionKey key : keys) {
+            VoltPort port = (VoltPort) key.attachment();
+            if (port != null) {
+                try {
+                    getUnregisterRunnable(port).run();
+                } catch (Exception e) {
+                    networkLog.error("Exception unregisering port " + port, e);
+                }
+            }
+        }
+
+        m_pool.clear();
+
         try {
-            try {
-                synchronized (m_networkThreads) {
-                    for (LinkedBlockingQueue<Runnable> q : m_taskQueues) {
-                        q.offer(new Runnable() {
-                            @Override
-                            public void run() {
-                                throw new TerminateThreadException();
-                            }
-                        });
-                    }
-                    for (final WeakReference<Thread> r : m_networkThreads) {
-                        final Thread t = r.get();
-                        if (t != null) {
-                            t.join();
-                        }
-                    }
-                }
-            } catch (InterruptedException e) {
-                m_logger.error(e);
-            }
-
-            Set<SelectionKey> keys = m_selector.keys();
-
-            for (SelectionKey key : keys) {
-                VoltPort port = (VoltPort) key.attachment();
-                if (port != null) {
-                    try {
-                        unregisterChannel (port);
-                    } catch (Exception e) {
-                        networkLog.error("Exception unregisering port " + port, e);
-                    }
-                }
-            }
-
-            synchronized (m_poolsToClearOnShutdown) {
-                for (NetworkDBBPool p : m_poolsToClearOnShutdown) {
-                    p.clear();
-                }
-                m_poolsToClearOnShutdown.clear();
-            }
-
-            try {
-                m_selector.close();
-            } catch (IOException e) {
-                m_logger.error(null, e);
-            }
-        } finally {
-            this.notifyAll();
+            m_selector.close();
+        } catch (IOException e) {
+            m_logger.error(null, e);
         }
     }
 
-    protected void installInterests() {
-        // swap the update lists to avoid contention while
-        // draining the requested values. also guarantees
-        // that the end of the list will be reached if code
-        // appends to the update list without bound.
-        ArrayDeque<VoltPort> oldlist;
-        synchronized(m_selectorUpdates_1) {
-            if (m_activeUpdateList == m_selectorUpdates_1) {
-                oldlist = m_selectorUpdates_1;
-                m_activeUpdateList = m_selectorUpdates_2;
+    void installInterests(VoltPort port) {
+        try {
+            if (port.isRunning()) {
+                assert(false); //Shouldn't be running since it is all single threaded now?
+                return;
             }
-            else {
-                oldlist = m_selectorUpdates_2;
-                m_activeUpdateList = m_selectorUpdates_1;
-            }
-        }
 
-        while (!oldlist.isEmpty()) {
-            final VoltPort port = oldlist.poll();
-            try {
-                if (port.isRunning()) {
-                    continue;
-                }
-                if (port.isDead()) {
-                    unregisterChannel(port);
-                    try {
-                        port.m_selectionKey.channel().close();
-                    } catch (IOException e) {}
-                } else if (port.hasQueuedRunnables()) {
-                    /*
-                     * Can get a cancelled key exception if the
-                     * connection closed remotely. Still want to run the remaining code
-                     * to completely disconnect it.
-                     */
-                    try {
-                        port.lockForHandlingWork();
-                        port.getKey().interestOps(0);
-                    } catch (java.nio.channels.CancelledKeyException e) {
-                        // only print out the stack trace in "trace" mode
-                        if (networkLog.isTraceEnabled()) {
-                            networkLog.trace("Had a cancelled key exception while processing queued runnables for port "
-                                            + port.m_remoteHost, e);
-                        }
-                        else {
-                            networkLog.warn("Had a cancelled key exception while processing queued runnables for port "
-                                    + port.m_remoteHost);
-                        }
-                    }
-                    m_selector.selectedKeys().remove(port.getKey());
-                    Runnable r = getPortCallRunnable(port);
-                    if (m_useExecutorService) {
-                        m_taskQueues[port.m_workerId].offer(getPortCallRunnable(port));
-                    } else {
-                        r.run();
-                    }
-                } else {
-                    resumeSelection(port);
-                }
-            } catch (java.nio.channels.CancelledKeyException e) {
-                networkLog.warn(
-                        "Had a cancelled key exception while processing queued runnables for port "
-                        + port.m_remoteHost, e);
+            if (port.isDead()) {
+                getUnregisterRunnable(port).run();
+                try {
+                    port.m_selectionKey.channel().close();
+                } catch (IOException e) {}
+            } else {
+                resumeSelection(port);
             }
+        } catch (java.nio.channels.CancelledKeyException e) {
+            networkLog.warn(
+                    "Had a cancelled key exception while processing queued runnables for port "
+                    + port.m_remoteHost, e);
         }
     }
 
@@ -604,25 +386,26 @@ public class VoltNetwork implements Runnable
         }
     }
 
-    private Runnable getPortCallRunnable(final VoltPort port) {
-        return new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    port.call();
-                } catch (Exception e) {
-                    port.die();
-                    if (e instanceof IOException) {
-                        m_logger.trace( "VoltPort died, probably of natural causes", e);
-                    } else {
-                        e.printStackTrace();
-                        networkLog.error( "VoltPort died due to an unexpected exception", e);
-                    }
-                } finally {
-                    addToChangeList (port);
-                }
+    private void callPort(final VoltPort port) {
+        try {
+            port.lockForHandlingWork();
+            port.getKey().interestOps(0);
+            port.run();
+        } catch (CancelledKeyException e) {
+            e.printStackTrace();
+            // no need to do anything here until
+            // shutdown makes more sense
+        } catch (Exception e) {
+            port.die();
+            if (e instanceof IOException) {
+                m_logger.trace( "VoltPort died, probably of natural causes", e);
+            } else {
+                e.printStackTrace();
+                networkLog.error( "VoltPort died due to an unexpected exception", e);
             }
-        };
+        } finally {
+            installInterests(port);
+        }
     }
 
     /** Set the selected interest set on the port and run it. */
@@ -634,72 +417,65 @@ public class VoltNetwork implements Runnable
                 continue;
             }
             final VoltPort port = (VoltPort) key.attachment();
-            try {
-                port.lockForHandlingWork();
-                key.interestOps(0);
-
-                final Runnable runner = getPortCallRunnable(port);
-
-                if (m_useExecutorService) {
-                    m_taskQueues[port.m_workerId].offer(runner);
-                } else {
-                    runner.run();
-                }
-            }
-            catch (CancelledKeyException e) {
-                e.printStackTrace();
-                // no need to do anything here until
-                // shutdown makes more sense
-            }
+            callPort(port);
         }
         selectedKeys.clear();
     }
 
-    public Map<Long, Pair<String, long[]>> getIOStats(boolean interval) {
+    private Map<Long, Pair<String, long[]>> getIOStatsImpl(boolean interval) {
         final HashMap<Long, Pair<String, long[]>> retval =
-            new HashMap<Long, Pair<String, long[]>>();
-        long totalRead = 0;
-        long totalMessagesRead = 0;
-        long totalWritten = 0;
-        long totalMessagesWritten = 0;
-        for (VoltPort p : m_ports) {
-            final long read = p.readStream().getBytesRead(interval);
-            final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(interval);
-            final long messagesRead = p.getMessagesRead(interval);
-            totalRead += read;
-            totalMessagesRead += messagesRead;
-            totalWritten += writeInfo[0];
-            totalMessagesWritten += writeInfo[1];
+                new HashMap<Long, Pair<String, long[]>>();
+            long totalRead = 0;
+            long totalMessagesRead = 0;
+            long totalWritten = 0;
+            long totalMessagesWritten = 0;
+            for (VoltPort p : m_ports) {
+                final long read = p.readStream().getBytesRead(interval);
+                final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(interval);
+                final long messagesRead = p.getMessagesRead(interval);
+                totalRead += read;
+                totalMessagesRead += messagesRead;
+                totalWritten += writeInfo[0];
+                totalMessagesWritten += writeInfo[1];
+                retval.put(
+                        p.connectionId(),
+                        Pair.of(
+                                p.m_remoteHost,
+                                new long[] {
+                                        read,
+                                        messagesRead,
+                                        writeInfo[0],
+                                        writeInfo[1] }));
+            }
             retval.put(
-                    p.connectionId(),
+                    -1L,
                     Pair.of(
-                            p.m_remoteHost,
+                            "GLOBAL",
                             new long[] {
-                                    read,
-                                    messagesRead,
-                                    writeInfo[0],
-                                    writeInfo[1] }));
-        }
-        retval.put(
-                -1L,
-                Pair.of(
-                        "GLOBAL",
-                        new long[] {
-                                totalRead,
-                                totalMessagesRead,
-                                totalWritten,
-                                totalMessagesWritten }));
-        return retval;
+                                    totalRead,
+                                    totalMessagesRead,
+                                    totalWritten,
+                                    totalMessagesWritten }));
+            return retval;
     }
 
-    public ArrayList<Long> getThreadIds() {
-        ArrayList<Long> ids = new ArrayList<Long>();
-        if (m_thread != null) {
-            ids.add(m_thread.getId());
-        }
-        for (WeakReference<Thread> ref : m_networkThreads) {
-            ids.add(ref.get().getId());
-        }
-        return ids;
+    Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
+        Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
+            @Override
+            public Map<Long, Pair<String, long[]>> call() throws Exception {
+                return getIOStatsImpl(interval);
+            }
+        };
+
+        FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<Map<Long, Pair<String, long[]>>>(task);
+
+        m_tasks.offer(ft);
+        m_selector.wakeup();
+
+        return ft;
+    }
+
+    public Long getThreadId() {
+        return m_thread.getId();
     }
 }

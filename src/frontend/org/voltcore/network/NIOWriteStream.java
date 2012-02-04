@@ -89,22 +89,19 @@ public class NIOWriteStream implements WriteStream {
      * Stats now use a separate lock and risk reading dirty data
      * rather than risk deadlock by acquiring the lock of the writestream.
      */
-    private final Object m_statsLock = new Object();
     private long m_lastBytesWritten = 0;
     private long m_lastMessagesWritten = 0;
 
     long[] getBytesAndMessagesWritten(boolean interval) {
-        synchronized (m_statsLock) {
-            if (interval) {
-                final long bytesWrittenThisTime = m_bytesWritten - m_lastBytesWritten;
-                m_lastBytesWritten = m_bytesWritten;
+        if (interval) {
+            final long bytesWrittenThisTime = m_bytesWritten - m_lastBytesWritten;
+            m_lastBytesWritten = m_bytesWritten;
 
-                final long messagesWrittenThisTime = m_messagesWritten - m_lastMessagesWritten;
-                m_lastMessagesWritten = m_messagesWritten;
-                return new long[] { bytesWrittenThisTime, messagesWrittenThisTime };
-            } else {
-                return new long[] {m_bytesWritten, m_messagesWritten};
-            }
+            final long messagesWrittenThisTime = m_messagesWritten - m_lastMessagesWritten;
+            m_lastMessagesWritten = m_messagesWritten;
+            return new long[] { bytesWrittenThisTime, messagesWrittenThisTime };
+        } else {
+            return new long[] {m_bytesWritten, m_messagesWritten};
         }
     }
 

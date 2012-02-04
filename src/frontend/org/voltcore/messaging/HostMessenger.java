@@ -51,7 +51,7 @@ import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.VoltNetwork;
+import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.MiscUtils;
@@ -94,7 +94,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
 
     private final Config m_config;
     private final SocketJoiner m_joiner;
-    private final VoltNetwork m_network;
+    private final VoltNetworkPool m_network;
 
     private volatile boolean m_localhostReady = false;
 
@@ -124,7 +124,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             Config config)
     {
         m_config = config;
-        m_network = new VoltNetwork(m_config.ses);
+        m_network = new VoltNetworkPool( Runtime.getRuntime().availableProcessors() / 2, m_config.ses);
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
@@ -198,7 +198,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
      * Tests, however, can create their own network object. ForeignHost
      * will query HostMessenger for the network to join.
      */
-    public VoltNetwork getNetwork() {
+    public VoltNetworkPool getNetwork() {
         return m_network;
     }
 
@@ -219,6 +219,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
             putForeignHost(hostId, fhost);
             fhost.register(this);
+            fhost.enabledRead();
         } catch (java.io.IOException e) {
             VoltDB.crashLocalVoltDB("", true, e);
         }
@@ -279,6 +280,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
             putForeignHost(hostId, fhost);
             fhost.register(this);
+            fhost.enabledRead();
             if (!m_agreementSite.requestJoin((AGREEMENT_SITE_ID << 32) + hostId).await(60, TimeUnit.SECONDS)) {
                 reportForeignHostFailed(hostId);
             }
@@ -343,6 +345,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         long agreementHSId = (AGREEMENT_SITE_ID << 32) + yourHostId;
         HashSet<Long> agreementSites = new HashSet<Long>();;
         agreementSites.add(agreementHSId);
+        m_network.start();//network must be running for register to work
         for (int ii = 0; ii < hosts.length; ii++) {
             System.out.println(yourHostId + " Notified of host " + hosts[ii]);
             agreementSites.add( (AGREEMENT_SITE_ID << 32) + hosts[ii] );
@@ -370,7 +373,13 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
                         m_config.zkInterface.split(":")[0],
                         Integer.parseInt(m_config.zkInterface.split(":")[1])),
                 m_config.backwardsTimeForgivenessWindow);
-        m_network.start();
+        /*
+         * Now that the agreement site mailbox has been created it is safe
+         * to enable read
+         */
+        for (ForeignHost fh : m_foreignHosts.get().values()) {
+            fh.enabledRead();
+        }
         m_agreementSite.start();
         m_agreementSite.waitForRecovery();
         m_zk = org.voltcore.agreement.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);

@@ -50,7 +50,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.ArrayDeque;
 
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
@@ -58,10 +57,6 @@ Provides a non-blocking stream-like interface on top of the Java NIO ReadableByt
 the underlying read() method only when needed.
 */
 public class NIOReadStream {
-
-    NIOReadStream() {
-        m_numReadStreams.incrementAndGet();
-    }
 
     /** @returns the number of bytes available to be read. */
     public int dataAvailable() {
@@ -112,10 +107,6 @@ public class NIOReadStream {
                 first.discard();
             }
         }
-
-        if (bytesCopied > 0) {
-            m_globalAvailable.addAndGet(0 - bytesCopied);
-        }
     }
 
     /**
@@ -160,8 +151,7 @@ public class NIOReadStream {
             }
         } finally {
             if (bytesRead > 0) {
-                m_globalAvailable.addAndGet(bytesRead);
-                m_bytesRead.addAndGet(bytesRead);
+                m_bytesRead += bytesRead;
                 m_totalAvailable += bytesRead;
             }
         }
@@ -178,24 +168,22 @@ public class NIOReadStream {
         }
         m_readBuffers.clear();
         m_writeBuffer = null;
-        m_numReadStreams.decrementAndGet();
     }
 
     private final ArrayDeque<BBContainer> m_readBuffers = new ArrayDeque<BBContainer>();
     private BBContainer m_writeBuffer = null;
     private int m_totalAvailable = 0;
-    private final AtomicInteger m_globalAvailable = new AtomicInteger(0);
-    private final AtomicInteger m_numReadStreams = new AtomicInteger(0);
-    private final AtomicLong m_bytesRead = new AtomicLong();
+    private long m_bytesRead = 0;
     private long m_lastBytesRead = 0;
+
     long getBytesRead(boolean interval) {
         if (interval) {
-            final long bytesRead = m_bytesRead.get();
+            final long bytesRead = m_bytesRead;
             final long bytesReadThisTime = bytesRead - m_lastBytesRead;
             m_lastBytesRead = bytesRead;
             return bytesReadThisTime;
         } else {
-            return m_bytesRead.get();
+            return m_bytesRead;
         }
     }
 }

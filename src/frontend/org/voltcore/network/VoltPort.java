@@ -26,6 +26,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -36,21 +37,14 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 /** Encapsulates a socket registration for a VoltNetwork */
-public class VoltPort implements Callable<VoltPort>, Connection
+public class VoltPort implements Connection
 {
     /** The network this port participates in */
     private final VoltNetwork m_network;
 
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
-    static final ThreadLocal<NetworkDBBPool> m_pools = new ThreadLocal<NetworkDBBPool>() {
-        @Override
-        protected NetworkDBBPool initialValue() {
-            return new NetworkDBBPool();
-        }
-    };
-
-    private NetworkDBBPool m_pool;
+    private final NetworkDBBPool m_pool;
 
     /*
      * Thread pool for doing reverse DNS lookups. It will create new threads on
@@ -100,9 +94,8 @@ public class VoltPort implements Callable<VoltPort>, Connection
 
     private NIOReadStream m_readStream;
     private NIOWriteStream m_writeStream;
-    private final AtomicLong m_messagesRead = new AtomicLong(0);
+    private long m_messagesRead = 0;
     private long m_lastMessagesRead = 0;
-    final int m_expectedOutgoingMessageSize;
 
     /*
      * This variable will be changed to the actual hostname some time later. It
@@ -114,20 +107,16 @@ public class VoltPort implements Callable<VoltPort>, Connection
     final String m_remoteIP;
     private String m_toString = null;
 
-    final int m_workerId;
-
     /** Wrap a socket with a VoltPort */
     public VoltPort(
             VoltNetwork network,
             InputHandler handler,
-            final int expectedOutgoingMessageSize,
             String remoteIP,
-            int workerId) {
+            NetworkDBBPool pool) {
         m_network = network;
         m_handler = handler;
-        m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_remoteIP = remoteIP;
-        m_workerId = workerId;
+        m_pool = pool;
     }
 
     /**
@@ -186,61 +175,39 @@ public class VoltPort implements Callable<VoltPort>, Connection
         }
     }
 
-    /** VoltNetwork invokes this to prepare and invoke run() */
-    @Override
-    public VoltPort call() throws IOException {
+    public void run() throws IOException {
         try {
-            try {
-                /*
-                 * Have the read stream fill from the network
-                 */
-                if (readyForRead()) {
-                    final int maxRead = m_handler.getMaxRead();
-                    if (maxRead > 0) {
-                        fillReadStream( maxRead);
-                        ByteBuffer message;
+            /*
+             * Have the read stream fill from the network
+             */
+            if (readyForRead()) {
+                final int maxRead = m_handler.getMaxRead();
+                if (maxRead > 0) {
+                    fillReadStream( maxRead);
+                    ByteBuffer message;
 
-                        /*
-                         * Process all the buffered bytes and retrieve as many messages as possible
-                         * and pass them off to the input handler.
-                         */
-                        while ((message = m_handler.retrieveNextMessage( this )) != null) {
-                            m_handler.handleMessage( message, this);
-                            m_messagesRead.incrementAndGet();
-                        }
-                    }
-                }
-
-                drainWriteStream();
-            } finally {
-
-                /*
-                 * m_lock is used to protect the m_scheduledRunnables structure and doesn't need to be held
-                 * while scheduled runnables are invoked. It can't be held because a scheduled runnable might
-                 * need to acquire other locks such as the NIOWriteStream's lock for shutdown.
-                 */
-                if (m_hasQueuedRunnables) {
-                    while (true) {
-                        Runnable r;
-                        synchronized (m_lock) {
-                            if (m_scheduledRunnables.isEmpty()) {
-                                m_hasQueuedRunnables = false;
-                                break;
-                            }
-                            r = m_scheduledRunnables.poll();
-                        }
-                        r.run();
+                    /*
+                     * Process all the buffered bytes and retrieve as many messages as possible
+                     * and pass them off to the input handler.
+                     */
+                    while ((message = m_handler.retrieveNextMessage( this )) != null) {
+                        m_handler.handleMessage( message, this);
+                        m_messagesRead++;
                     }
                 }
             }
+
+            /*
+             * On readiness selection, optimistically assume that write will succeed,
+             * in the common case it will
+             */
+            drainWriteStream();
         } finally {
             synchronized(m_lock) {
                 assert(m_running == true);
                 m_running = false;
             }
         }
-
-        return this;
     }
 
     private final int fillReadStream(int maxBytes) throws IOException {
@@ -336,7 +303,11 @@ public class VoltPort implements Callable<VoltPort>, Connection
             m_interestOps = (m_interestOps | opsToAdd) & (~opsToRemove);
 
             if (oldInterestOps != m_interestOps && !m_running) {
-                m_network.addToChangeList (this);
+                /*
+                 * If this is a write, optimistically assume the write
+                 * will succede and try it without using the selector
+                 */
+                m_network.addToChangeList(this, (opsToAdd & SelectionKey.OP_WRITE) != 0);
             }
         }
     }
@@ -436,14 +407,14 @@ public class VoltPort implements Callable<VoltPort>, Connection
         }
     }
 
-    public synchronized long getMessagesRead(boolean interval) {
+    long getMessagesRead(boolean interval) {
         if (interval) {
-            final long messagesRead = m_messagesRead.get();
+            final long messagesRead = m_messagesRead;
             final long messagesReadThisTime = messagesRead - m_lastMessagesRead;
             m_lastMessagesRead = messagesRead;
             return messagesReadThisTime;
         } else {
-            return m_messagesRead.get();
+            return m_messagesRead;
         }
     }
 
@@ -461,37 +432,9 @@ public class VoltPort implements Callable<VoltPort>, Connection
         return m_handler.connectionId();
     }
 
-    private volatile boolean m_hasQueuedRunnables = false;
-
-    public void setPool() {
-        m_pool = m_pools.get();
-    }
-    /**
-     * Has actions waiting to be executed
-     */
-    public boolean hasQueuedRunnables() {
-        return m_hasQueuedRunnables;
-    }
-
-    private final ArrayDeque<Runnable> m_scheduledRunnables = new ArrayDeque<Runnable>();
-
     @Override
-    public void scheduleRunnable(Runnable r) {
-        synchronized (m_lock) {
-            m_hasQueuedRunnables = true;
-            m_scheduledRunnables.offer(r);
-        }
-        m_network.addToChangeList(this);
-    }
-
-    @Override
-    public void unregister() {
-        scheduleRunnable(new Runnable() {
-            @Override
-            public void run() {
-                m_network.unregisterChannel(VoltPort.this);
-            }
-        });
+    public Future<?> unregister() {
+        return m_network.unregisterChannel(this);
     }
 
 }

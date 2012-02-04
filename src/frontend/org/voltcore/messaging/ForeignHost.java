@@ -63,11 +63,6 @@ public class ForeignHost {
         }
 
         @Override
-        public int getExpectedOutgoingMessageSize() {
-            return 2048;
-        }
-
-        @Override
         public void handleMessage(ByteBuffer message, Connection c) {
             handleRead(message, c);
         }
@@ -124,7 +119,11 @@ public class ForeignHost {
     }
 
     public void register(HostMessenger host) throws IOException {
-        m_connection = host.getNetwork().registerChannel( m_sc, m_handler);
+        m_connection = host.getNetwork().registerChannel( m_sc, m_handler, 0);
+    }
+
+    public void enableRead() {
+        m_connection.enableReadSelection();
     }
 
     synchronized void close()

@@ -29,14 +29,6 @@ public interface InputHandler {
     int getMaxRead();
 
     /**
-     * A number specify the expected size of the majority of outgoing messages.
-     * Used to determine the tipping point between where a heap byte buffer vs.
-     * direct byte buffer will be used. Only relevant if delegating fast
-     * serialization to the network pool.
-     */
-    int getExpectedOutgoingMessageSize();
-
-    /**
      * Retrieve the next message from the connection. Examine the connection's
      * read stream. If a discrete unit of work is available, copy those bytes
      * (via NIOReadStream.getBytes()) to a new byte buffer and return them.
