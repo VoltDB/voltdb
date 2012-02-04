@@ -35,28 +35,28 @@ public class ExecutorTxnIdSafetyState {
     }
 
     private class SiteState {
-        public int siteId;
+        public long hsId;
         public long newestConfirmedTxnId;
         @SuppressWarnings("unused")
         public long lastSentTxnId;
         public PartitionState partition;
     }
 
-    Map<Integer, SiteState> m_stateBySite = new LinkedHashMap<Integer, SiteState>();
+    Map<Long, SiteState> m_stateBySite = new LinkedHashMap<Long, SiteState>();
     Map<Integer, PartitionState> m_stateByPartition = new LinkedHashMap<Integer, PartitionState>();
 
     // kept across failures and rejoins to understand the unchanging maps of sites to partitions
-    Map<Integer, Integer> m_stateToPartitionMap = new HashMap<Integer, Integer>();
+    Map<Long, Integer> m_stateToPartitionMap = new HashMap<Long, Integer>();
 
-    final int m_siteId;
+    final long m_hsId;
 
-    public ExecutorTxnIdSafetyState(int mySiteId, int siteIds[]) {
-        m_siteId = mySiteId;
+    public ExecutorTxnIdSafetyState(long mySiteId, int siteIds[]) {
+        m_hsId = mySiteId;
         final int partitionId = 0;
-        for (int siteId : siteIds) {
+        for (long siteId : siteIds) {
             m_stateToPartitionMap.put( siteId, partitionId);
             SiteState ss = new SiteState();
-            ss.siteId = siteId;
+            ss.hsId = siteId;
             ss.newestConfirmedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
             ss.lastSentTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
             assert(m_stateBySite.get(siteId) == null);
@@ -77,7 +77,7 @@ public class ExecutorTxnIdSafetyState {
             assert(ps.partitionId == partitionId);
             for (SiteState state : ps.sites) {
                 assert(state != null);
-                assert(state.siteId != ss.siteId);
+                assert(state.hsId != ss.hsId);
             }
 
             // link the partition state and site state
@@ -86,11 +86,11 @@ public class ExecutorTxnIdSafetyState {
         }
     }
 
-    public ExecutorTxnIdSafetyState(int siteId, SiteTracker tracker) {
-        m_siteId = siteId;
+    public ExecutorTxnIdSafetyState(long hsId, SiteTracker tracker) {
+        m_hsId = hsId;
 
         Set<Integer> execSites = tracker.getExecutionSiteIds();
-        for (int id : execSites) {
+        for (long id : execSites) {
             Site s = tracker.getSiteForId(id);
 
             Partition p = s.getPartition();
@@ -104,7 +104,7 @@ public class ExecutorTxnIdSafetyState {
             if (!s.getIsup()) continue;
 
             SiteState ss = new SiteState();
-            ss.siteId = id;
+            ss.hsId = id;
             ss.newestConfirmedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
             ss.lastSentTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
             assert(m_stateBySite.get(id) == null);
@@ -125,7 +125,7 @@ public class ExecutorTxnIdSafetyState {
             assert(ps.partitionId == partitionId);
             for (SiteState state : ps.sites) {
                 assert(state != null);
-                assert(state.siteId != ss.siteId);
+                assert(state.hsId != ss.hsId);
             }
 
             // link the partition state and site state
@@ -134,7 +134,7 @@ public class ExecutorTxnIdSafetyState {
         }
     }
 
-    public long getNewestSafeTxnIdForExecutorBySiteId(int executorSiteId) {
+    public long getNewestSafeTxnIdForExecutorBySiteId(long executorSiteId) {
         SiteState ss = m_stateBySite.get(executorSiteId);
         // ss will be null if the node with this failed before we got here.
         // Just return DUMMY_LAST_SEEN_TXN_ID; any message generated for the
@@ -146,13 +146,13 @@ public class ExecutorTxnIdSafetyState {
         {
             return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
         }
-        assert(ss.siteId == executorSiteId);
+        assert(ss.hsId == executorSiteId);
         PartitionState ps = ss.partition;
         ss.lastSentTxnId = ps.newestConfirmedTxnId;
         return ps.newestConfirmedTxnId;
     }
 
-    public void updateLastSeenTxnIdFromExecutorBySiteId(int executorSiteId, long lastSeenTxnId, boolean shouldRespond) {
+    public void updateLastSeenTxnIdFromExecutorBySiteId(long executorSiteId, long lastSeenTxnId, boolean shouldRespond) {
         // ignore these by convention
         if (lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID)
             return;
@@ -162,7 +162,7 @@ public class ExecutorTxnIdSafetyState {
         // removed. So site state returned will be null.
         if (ss == null)
             return;
-        assert(ss.siteId == executorSiteId);
+        assert(ss.hsId == executorSiteId);
 
         // check if state needs changing
         if (ss.newestConfirmedTxnId < lastSeenTxnId) {
@@ -204,7 +204,7 @@ public class ExecutorTxnIdSafetyState {
         if (ss == null) return;
         PartitionState ps = ss.partition;
         for (SiteState s : ps.sites) {
-            if (s.siteId == ss.siteId) {
+            if (s.hsId == ss.hsId) {
                 ps.sites.remove(s);
                 break;
             }
@@ -218,13 +218,13 @@ public class ExecutorTxnIdSafetyState {
      * @param executorSiteId
      * @param partitionId
      */
-    public void addRejoinedState(int executorSiteId) {
+    public void addRejoinedState(long executorSiteId) {
         int partitionId = m_stateToPartitionMap.get(executorSiteId);
 
         SiteState ss = m_stateBySite.get(executorSiteId);
         if (ss != null) return;
         ss = new SiteState();
-        ss.siteId = executorSiteId;
+        ss.hsId = executorSiteId;
 
         PartitionState ps = m_stateByPartition.get(partitionId);
         assert(ps != null);
