@@ -362,9 +362,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         }
                     }
 
-                    if (ot.txnId <= m_minTxnIdAfterRecovery) {
+                    if (ot.txnId < m_minTxnIdAfterRecovery) {
                         String errMsg = "Transaction queue released a transaction from before this " +
-                                " node was recovered was complete";
+                                " node recovery was complete";
                         VoltDB.crashLocalVoltDB(errMsg, false, null);
                     }
                     m_transactionsById.remove(ot.txnId);
@@ -492,7 +492,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             }
         } else if (message instanceof AgreementTaskMessage) {
             AgreementTaskMessage atm = (AgreementTaskMessage)message;
-            if (!m_transactionsById.containsKey(atm.m_txnId) && atm.m_txnId > m_minTxnIdAfterRecovery) {
+            if (!m_transactionsById.containsKey(atm.m_txnId) && atm.m_txnId >= m_minTxnIdAfterRecovery) {
                 m_txnQueue.noteTransactionRecievedAndReturnLastSeen(atm.m_initiatorId,
                         atm.m_txnId,
                         false,
@@ -535,7 +535,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             Iterator<Map.Entry< Long, AgreementTransactionState>> iter = m_transactionsById.entrySet().iterator();
             while (iter.hasNext()) {
                 final Map.Entry< Long, AgreementTransactionState> entry = iter.next();
-                if (entry.getKey() <= m_minTxnIdAfterRecovery) {
+                if (entry.getKey() < m_minTxnIdAfterRecovery) {
                     m_txnQueue.faultTransaction(entry.getValue());
                     iter.remove();
                 }
