@@ -99,7 +99,7 @@ public class SystemInformation extends VoltSystemProcedure
             // Choose the lowest site ID on this host to do the info gathering
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
+            Long lowest_site_id =
                 VoltDB.instance().getCatalogContext().siteTracker.
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
@@ -126,7 +126,7 @@ public class SystemInformation extends VoltSystemProcedure
             // Choose the lowest site ID on this host to do the info gathering
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
+            Long lowest_site_id =
                 VoltDB.instance().getCatalogContext().siteTracker.
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
@@ -452,7 +452,7 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("adminstartup", adminstartup);
 
         String command_log_enabled = "false";
-        // XXX log name is MAGIC, you knoooow
+        // log name is MAGIC, you knoooow
         CommandLog command_log = context.getCluster().getLogconfig().get("log");
         if (command_log.getEnabled())
         {
