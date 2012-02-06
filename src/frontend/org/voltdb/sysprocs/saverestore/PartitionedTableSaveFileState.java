@@ -256,7 +256,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
     private SynthesizedPlanFragment
     constructDistributePartitionedTableFragment(
-            int distributorSiteId,
+            long distributorSiteId,
             int uncoveredPartitionsAtHost[],
             int originalHostsArray[])
     {

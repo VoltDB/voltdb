@@ -96,7 +96,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
-        public int siteId = -1;
+        public long siteId = -1;
         public long fragmentId = -1;
         public int outputDepId = -1;
         public int inputDepIds[] = null;
