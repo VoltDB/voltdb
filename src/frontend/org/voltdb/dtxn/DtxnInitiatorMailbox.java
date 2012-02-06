@@ -17,6 +17,7 @@
 
 package org.voltdb.dtxn;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -181,7 +182,8 @@ public class DtxnInitiatorMailbox implements Mailbox
                 delta,
                 response.getStatus());
         m_latencies.logTransactionCompleted(delta);
-        c.writeStream().enqueue(response);
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
+        c.writeStream().enqueue(response.flattenToBuffer(buf));
     }
 
     public void removeConnectionStats(long connectionId) {

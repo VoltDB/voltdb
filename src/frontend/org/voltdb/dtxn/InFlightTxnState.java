@@ -81,13 +81,13 @@ public class InFlightTxnState implements Serializable {
         return outstandingResponses;
     }
 
-    public ClientResponseImpl addResponse(int coordinatorId, ClientResponseImpl r) {
+    public ClientResponseImpl addResponse(long coordinatorHSId, ClientResponseImpl r) {
         // ensure response to send isn't null
         if (responseToSend == null) responseToSend = r;
 
         // remove this coordinator from the outstanding list
         if (outstandingCoordinators != null)
-            outstandingCoordinators.remove(coordinatorId);
+            outstandingCoordinators.remove(coordinatorHSId);
 
         outstandingResponses--;
 
@@ -104,7 +104,7 @@ public class InFlightTxnState implements Serializable {
             {
                 String msg = "Mismatched result count received for transaction ID: " + txnId;
                 msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                msg += "\n  from execution site: " + coordinatorId;
+                msg += "\n  from execution site: " + coordinatorHSId;
                 msg += "\n  Expected number of results: " + resultsForComparison.length;
                 msg += "\n  Mismatched number of results: " + curr_results.length;
                 // die die die
@@ -117,7 +117,7 @@ public class InFlightTxnState implements Serializable {
                 {
                     String msg = "Mismatched results received for transaction ID: " + txnId;
                     msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                    msg += "\n  from execution site: " + coordinatorId;
+                    msg += "\n  from execution site: " + coordinatorHSId;
                     msg += "\n  Expected results: " + resultsForComparison[i].toString();
                     msg += "\n  Mismatched results: " + curr_results[i].toString();
                     // die die die
