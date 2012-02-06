@@ -35,8 +35,13 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.messaging.FailureSiteUpdateMessage;
+import org.voltcore.messaging.HeartbeatMessage;
+import org.voltcore.messaging.HeartbeatResponseMessage;
+import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -1730,7 +1735,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 m_context.siteTracker.getPartitionForSite(fm.m_sourceSiteId);
 
             if (remotePartitionId == localPartitionId) {
-                Integer initiatorId = fm.m_initiatorForSafeTxnId;
+                Long initiatorId = fm.m_initiatorForSafeTxnId;
                 if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
                     initiatorSafeInitPoint.put(initiatorId, Long.MIN_VALUE);
                 }
