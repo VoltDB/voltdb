@@ -86,7 +86,7 @@ public class SinglePartitionTxnState extends TransactionState {
             }
 
             try {
-                m_mbox.send(initiatorHSId, 0, response);
+                m_mbox.send(initiatorHSId, response);
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
             }
@@ -109,7 +109,7 @@ public class SinglePartitionTxnState extends TransactionState {
             response.setRecovering(true);
 
             try {
-                m_mbox.send(initiatorHSId, 0, response);
+                m_mbox.send(initiatorHSId, response);
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
             }
