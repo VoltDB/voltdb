@@ -416,8 +416,8 @@ public class ConnectionUtil {
                }
                while (message.hasRemaining());
                message.flip();
-               FastDeserializer fds = new FastDeserializer(message);
-               ClientResponseImpl response = fds.readObject(ClientResponseImpl.class);
+               ClientResponseImpl response = new ClientResponseImpl();
+               response.initFromBuffer(message);
                return response;
            }
         });

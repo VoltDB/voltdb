@@ -356,12 +356,12 @@ class Distributer {
         @Override
         public void handleMessage(ByteBuffer buf, Connection c) {
             long now = System.currentTimeMillis();
-            ClientResponseImpl response = null;
-            FastDeserializer fds = new FastDeserializer(buf);
+            ClientResponseImpl response = new ClientResponseImpl();
             try {
-                response = fds.readObject(ClientResponseImpl.class);
-            } catch (IOException e) {
-                e.printStackTrace();
+                response.initFromBuffer(buf);
+            } catch (IOException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
             }
             ProcedureCallback cb = null;
             long callTime = 0;
