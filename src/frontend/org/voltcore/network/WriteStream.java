@@ -20,7 +20,6 @@ package org.voltcore.network;
 import java.nio.ByteBuffer;
 
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 public interface WriteStream {
     /**
@@ -45,6 +44,16 @@ public interface WriteStream {
      * @param b
      */
     public void enqueue(final ByteBuffer b[]);
+
+    /**
+     * Queue a ByteBuffer for writing to the network. If the ByteBuffer is not direct then it will
+     * be copied to a DirectByteBuffer if it is less then DBBPool.MAX_ALLOCATION_SIZE. This method
+     * is a backup for code that isn't able to defer its serialization to a network thread
+     * for whatever reason. It is reasonably efficient if a DirectByteBuffer is passed in,
+     * but it would be better to keep allocations of DirectByteBuffers inside the network pools.
+     * @param b
+     */
+    public void enqueue(final ByteBuffer b);
 
     /**
      * Calculate how long the oldest write has been waiting to go onto the wire. This allows dead connections

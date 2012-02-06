@@ -215,7 +215,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return msgsize;
     }
 
-    public void flattenToBuffer(ByteBuffer buf) {
+    /**
+     * @return buf to allow call chaining.
+     */
+    public ByteBuffer flattenToBuffer(ByteBuffer buf) {
         assert setProperly;
         buf.put((byte)0); //version
         buf.putLong(clientHandle);
@@ -250,6 +253,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         {
             vt.flattenToBuffer(buf);
         }
+        return buf;
     }
 
     @Override

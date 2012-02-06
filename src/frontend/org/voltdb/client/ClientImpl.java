@@ -26,7 +26,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastSerializer;

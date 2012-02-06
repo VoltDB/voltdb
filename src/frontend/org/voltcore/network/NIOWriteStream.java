@@ -266,6 +266,7 @@ public class NIOWriteStream implements WriteStream {
         return bytesWritten;
     }
 
+
     /**
      * Queue a message and defer the serialization of the message until later. This is the ideal mechanism
      * for serializing and queueing network writes. It allows the sender to define an efficient serialization
@@ -285,6 +286,11 @@ public class NIOWriteStream implements WriteStream {
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
         return;
+    }
+
+    @Override
+    public void enqueue(final ByteBuffer b) {
+        enqueue(new ByteBuffer[] { b });
     }
 
     /**

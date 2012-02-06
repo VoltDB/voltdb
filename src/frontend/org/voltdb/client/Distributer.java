@@ -32,6 +32,10 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.network.Connection;
+import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltNetwork;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -44,10 +48,6 @@ import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.network.Connection;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltNetwork;
-import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.MiscUtils;
 
 /**
