@@ -196,5 +196,5 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private final Set<Integer> m_hostsWithThisTable = new HashSet<Integer>();
-    private final Set<Integer> m_sitesWithThisTable = new HashSet<Integer>();
+    private final Set<Long> m_sitesWithThisTable = new HashSet<Long>();
 }

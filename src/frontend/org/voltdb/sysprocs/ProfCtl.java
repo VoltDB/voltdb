@@ -62,7 +62,7 @@ public class ProfCtl extends VoltSystemProcedure {
             else if (command.equalsIgnoreCase("GPERF_ENABLE") || command.equalsIgnoreCase("GPERF_DISABLE")) {
                 // Choose the lowest site ID on this host to do the work.
                 int host_id = context.getExecutionSite().getCorrespondingHostId();
-                Integer lowest_site_id =
+                Long lowest_site_id =
                     VoltDB.instance().getCatalogContext().siteTracker.
                     getLowestLiveExecSiteIdForHost(host_id);
                 if (context.getExecutionSite().getSiteId() != lowest_site_id)

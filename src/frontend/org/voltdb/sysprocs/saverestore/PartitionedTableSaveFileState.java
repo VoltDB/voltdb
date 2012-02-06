@@ -217,7 +217,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                     .get(host);
             ArrayList<Integer> originalHosts = hostsToOriginalHosts.get(host);
 
-            List<Integer> sitesAtHost = VoltDB.instance().getCatalogContext().siteTracker
+            List<Long> sitesAtHost = VoltDB.instance().getCatalogContext().siteTracker
                     .getLiveExecutionSitesForHost(host);
 
             int originalHostsArray[] = new int[originalHosts.size()];
@@ -244,7 +244,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
              * static synchronization in the procedure will ensure the work is
              * distributed across every ES in a meaningful way.
              */
-            for (Integer site : sitesAtHost) {
+            for (Long site : sitesAtHost) {
                 restorePlan.add(constructDistributePartitionedTableFragment(
                         site, uncoveredPartitionsAtHost, originalHostsArray));
             }

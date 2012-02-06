@@ -64,7 +64,7 @@ public class Pause extends VoltSystemProcedure
     {
         // Choose the lowest site ID on this host to actually flip the bit
         int host_id = ctx.getExecutionSite().getCorrespondingHostId();
-        Integer lowest_site_id =
+        Long lowest_site_id =
             VoltDB.instance().getCatalogContext().siteTracker.
             getLowestLiveExecSiteIdForHost(host_id);
         if (ctx.getExecutionSite().getSiteId() == lowest_site_id)

@@ -40,7 +40,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.messaging.HostMessenger;
 
 @ProcInfo(singlePartition = false)
 public class Rejoin extends VoltSystemProcedure {

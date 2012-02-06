@@ -1371,7 +1371,7 @@ public abstract class VoltProcedure {
         m_currentTxnState.setupProcedureResume(finalTask, depsToResume);
 
         // create all the local work for the transaction
-        FragmentTaskMessage localTask = new FragmentTaskMessage(m_currentTxnState.initiatorSiteId,
+        FragmentTaskMessage localTask = new FragmentTaskMessage(m_currentTxnState.initiatorHSId,
                                                   m_site.getCorrespondingSiteId(),
                                                   m_currentTxnState.txnId,
                                                   m_currentTxnState.isReadOnly(),
@@ -1388,7 +1388,7 @@ public abstract class VoltProcedure {
         m_currentTxnState.createLocalFragmentWork(localTask, localFragsAreNonTransactional && finalTask);
 
         // create and distribute work for all sites in the transaction
-        FragmentTaskMessage distributedTask = new FragmentTaskMessage(m_currentTxnState.initiatorSiteId,
+        FragmentTaskMessage distributedTask = new FragmentTaskMessage(m_currentTxnState.initiatorHSId,
                                                         m_site.getCorrespondingSiteId(),
                                                         m_currentTxnState.txnId,
                                                         m_currentTxnState.isReadOnly(),

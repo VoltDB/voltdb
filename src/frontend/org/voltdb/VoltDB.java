@@ -28,7 +28,6 @@ import java.util.TimeZone;
 import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.messaging.HostMessenger;
 
 /**
  * VoltDB provides main() for the VoltDB server

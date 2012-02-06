@@ -352,7 +352,7 @@ public class Statistics extends VoltSystemProcedure {
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
             int hostId = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowestSiteId =
+            Long lowestSiteId =
                 VoltDB.instance().getCatalogContext().siteTracker.
                 getLowestLiveExecSiteIdForHost(hostId);
             VoltTable result = new VoltTable(LiveClientStats.liveClientColumnInfo);

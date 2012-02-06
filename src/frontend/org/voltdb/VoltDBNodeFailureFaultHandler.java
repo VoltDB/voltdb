@@ -67,7 +67,7 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
     }
 
     private void handleNodeFailureFault(NodeFailureFault node_fault) {
-        ArrayList<Integer> dead_sites =
+        ArrayList<Long> dead_sites =
             VoltDB.instance().getCatalogContext().
             siteTracker.getAllSitesForHost(node_fault.getHostId());
         Collections.sort(dead_sites);
@@ -75,12 +75,12 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
                 " hostname: " + node_fault.getHostname());
         hostLog.error("  Removing sites from cluster: " + dead_sites);
         StringBuilder sb = new StringBuilder();
-        for (int site_id : dead_sites)
+        for (long site_id : dead_sites)
         {
             sb.append("set ");
             String site_path = VoltDB.instance().getCatalogContext().catalog.
                                getClusters().get("cluster").getSites().
-                               get(Integer.toString(site_id)).getPath();
+                               get(Long.toString(site_id)).getPath();
             sb.append(site_path).append(" ").append("isUp false");
             sb.append("\n");
         }
