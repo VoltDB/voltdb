@@ -33,14 +33,14 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.BinaryPayloadMessage;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
+import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.utils.CompressionService;
 
@@ -97,22 +97,22 @@ public class StatsAgent {
         handledSelectors.add(SysProcSelector.PROCEDURE);
     }
 
-    public Mailbox getMailbox(final HostMessenger hostMessenger, final int siteId) {
+    public Mailbox getMailbox(final HostMessenger hostMessenger, final long HSId) {
         m_mailbox = new Mailbox() {
 
             @Override
-            public void send(int siteId, int mailboxId, VoltMessage message)
+            public void send(long HSId, VoltMessage message)
                     throws MessagingException {
                 assert(message != null);
-                hostMessenger.send(siteId, mailboxId, message);
+                hostMessenger.send(HSId, message);
             }
 
             @Override
-            public void send(int[] siteIds, int mailboxId, VoltMessage message)
+            public void send(long[] HSIds, VoltMessage message)
                     throws MessagingException {
                 assert(message != null);
-                assert(siteIds != null);
-                hostMessenger.send(siteIds, mailboxId, message);
+                assert(HSIds != null);
+                hostMessenger.send(HSIds, message);
             }
 
             @Override
@@ -161,10 +161,14 @@ public class StatsAgent {
             }
 
             @Override
-            public int getSiteId() {
-                return siteId;
+            public long getHSId() {
+                return HSId;
             }
 
+            @Override
+            public void setHSId(long hsId) {
+                throw new UnsupportedOperationException();
+            }
         };
         return m_mailbox;
     }
@@ -291,14 +295,14 @@ public class StatsAgent {
 
         JSONObject obj = new JSONObject();
         obj.put("requestId", requestId);
-        obj.put("returnAddress", m_mailbox.getSiteId());
+        obj.put("returnAddress", m_mailbox.getHSId());
         obj.put("selector", "WANNODE");
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
         for (Integer host : st.getAllLiveHosts()) {
             psr.expectedStatsResponses++;
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
-            m_mailbox.send( st.getFirstNonExecSiteForHost(host), VoltDB.STATS_MAILBOX_ID, bpm);
+            m_mailbox.send(st.getFirstNonExecSiteForHost(host), bpm);
         }
     }
 
@@ -355,7 +359,7 @@ public class StatsAgent {
         List<Integer> catalogIds = Arrays.asList(new Integer[] { 0 });
         Long now = System.currentTimeMillis();
         long requestId = obj.getLong("requestId");
-        int returnAddress = obj.getInt("returnAddress");
+        long returnAddress = obj.getLong("returnAddress");
 
         VoltTable partitionStats = getStats(SysProcSelector.WANPARTITION, catalogIds, false, now);
         VoltTable nodeStats = getStats(SysProcSelector.WANNODE, catalogIds, false, now);
@@ -368,7 +372,7 @@ public class StatsAgent {
             responseBuffer.putLong(requestId);
             byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
             BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
-            m_mailbox.send( returnAddress, VoltDB.STATS_MAILBOX_ID, bpm);
+            m_mailbox.send(returnAddress, bpm);
             return;
         }
 
@@ -389,7 +393,7 @@ public class StatsAgent {
         byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
 
         BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
-        m_mailbox.send( returnAddress, VoltDB.STATS_MAILBOX_ID, bpm);
+        m_mailbox.send(returnAddress, bpm);
     }
 
     public synchronized void registerStatsSource(SysProcSelector selector, int catalogId, StatsSource source) {
