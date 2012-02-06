@@ -90,7 +90,6 @@ import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
@@ -371,22 +370,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * Now that the runners have been started and are doing setup of the other sites in parallel
              * this thread can set up its own execution site.
              */
-            int siteId = Integer.parseInt(siteForThisThread.getTypeName());
-            ExecutionSite siteObj =
-                new ExecutionSite(VoltDB.instance(),
-                                  VoltDB.instance().getMessenger().createMailbox(
+            try {
+                int siteId = Integer.parseInt(siteForThisThread.getTypeName());
+                ExecutionSite siteObj =
+                        new ExecutionSite(VoltDB.instance(),
+                                          VoltDB.instance().getMessenger().createMailbox(
+                                                   siteId,
+                                                   VoltDB.DTXN_MAILBOX_ID,
+                                                   true),
                                           siteId,
-                                          VoltDB.DTXN_MAILBOX_ID,
-                                          true),
-                                  siteId,
-                                  m_serializedCatalog,
-                                  null,
-                                  m_recovering,
-                                  m_replicationActive,
-                                  m_downHosts,
-                                  m_catalogContext.m_transactionId);
-            m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
-            m_currentThreadSite = siteObj;
+                                          m_serializedCatalog,
+                                          null,
+                                          m_recovering,
+                                          m_replicationActive,
+                                          m_downHosts,
+                                          m_catalogContext.m_transactionId);
+                m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
+                m_currentThreadSite = siteObj;
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
 
             /*
              * Stop and wait for the runners to finish setting up and then put

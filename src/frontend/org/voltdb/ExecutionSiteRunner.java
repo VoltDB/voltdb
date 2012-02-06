@@ -61,16 +61,20 @@ public class ExecutionSiteRunner implements Runnable {
         Mailbox mailbox = VoltDB.instance().getMessenger()
         .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, true);
 
-        m_siteObj =
-            new ExecutionSite(VoltDB.instance(),
-                              mailbox,
-                              m_siteId,
-                              m_serializedCatalog,
-                              null,
-                              m_recovering,
-                              m_replicationActive,
-                              m_failedHostIds,
-                              m_txnId);
+        try {
+            m_siteObj = new ExecutionSite(VoltDB.instance(),
+                                          mailbox,
+                                          m_siteId,
+                                          m_serializedCatalog,
+                                          null,
+                                          m_recovering,
+                                          m_replicationActive,
+                                          m_failedHostIds,
+                                          m_txnId);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+
         synchronized (this) {
             m_isSiteCreated = true;
             this.notifyAll();

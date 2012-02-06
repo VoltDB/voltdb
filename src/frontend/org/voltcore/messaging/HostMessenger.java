@@ -227,11 +227,13 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
 
+            createHierarchy();
+
             /*
              * This creates the ephemeral sequential node with host id 0 which
              * this node already used for itself. Just recording that fact.
              */
-            final int selectedHostId = selectNewHostId(m_config.coordinatorIp.toString(), true);
+            final int selectedHostId = selectNewHostId(m_config.coordinatorIp.toString());
             if (selectedHostId != 0) {
                 VoltDB.crashLocalVoltDB("Selected host id for coordinator was not 0, " + selectedHostId, false, null);
             }
@@ -240,11 +242,23 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
              * Store all the hosts and host ids here so that waitForGroupJoin
              * knows the size of the mesh. This part only registers this host
              */
-            m_zk.create("/hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             byte hostInfoBytes[] = m_config.coordinatorIp.toString().getBytes("UTF-8");
             m_zk.create("/hosts/host" + selectedHostId, hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
+    }
+
+    /**
+     * Creates the ZK directory nodes. Only the leader should do this.
+     */
+    private void createHierarchy() {
+        for (String node : VoltDB.ZK_HIERARCHY) {
+            try {
+                m_zk.create(node, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
+            }
+        }
     }
 
     //For test only
@@ -342,8 +356,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         /*
          * Generate the host id via creating an ephemeral sequential node
          */
-        Integer hostId = selectNewHostId(socket.socket().getInetAddress().getHostAddress(), false);
-
+        Integer hostId = selectNewHostId(socket.socket().getInetAddress().getHostAddress());
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
@@ -394,10 +407,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     /*
      * Generate a new host id by creating an ephemeral sequential node
      */
-    private Integer selectNewHostId(String address, boolean createPath) throws Exception {
-        if (createPath) {
-            m_zk.create("/hostids", null,  Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        }
+    private Integer selectNewHostId(String address) throws Exception {
         String node =
             m_zk.create(
                     "/hostids/host", address.getBytes("UTF-8"), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
@@ -695,11 +705,6 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     public void waitForAllHostsToBeReady(int expectedHosts) {
         m_localhostReady = true;
         try {
-            m_zk.create("/ready_hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (Exception e) {
-            //can fail
-        }
-        try {
             m_zk.create("/ready_hosts/host", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
@@ -712,7 +717,6 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
         }
     }
-
 
     public synchronized boolean isLocalHostReady() {
         return m_localhostReady;

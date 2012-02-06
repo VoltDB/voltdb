@@ -35,6 +35,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
@@ -691,12 +695,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                   boolean recovering,
                   boolean replicationActive,
                   HashSet<Integer> failedHostIds,
-                  final long txnId)
+                  final long txnId) throws Exception
     {
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
                 new Object[] { String.valueOf(siteId) }, null);
 
         m_siteId = siteId;
+        final int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
         m_recovering = recovering;
@@ -707,13 +712,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         m_handledFailedSites.addAll(m_knownFailedSites);
 
+        registerMailbox(voltdb.getHostMessenger().getZK(), partitionId);
+
         VoltDB.instance().getFaultDistributor().
         registerFaultHandler(NodeFailureFault.NODE_FAILURE_EXECUTION_SITE,
                              m_faultHandler,
                              FaultType.NODE_FAILURE);
 
         // initialize the DR gateway
-        int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
         File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "wan_overflow");
         m_partitionDRGateway =
             PartitionDRGateway.getInstance(partitionId, m_recovering,
@@ -774,6 +780,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                        Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
                                        m_indexStats);
 
+    }
+
+    /**
+     * Publishes the HSId of this execution site to ZK
+     * @param zk
+     * @param partitionId
+     * @throws Exception
+     */
+    private void registerMailbox(ZooKeeper zk, int partitionId) throws Exception {
+        JSONObject jsObj = new JSONObject();
+        jsObj.put("HSId", m_siteId);
+        jsObj.put("partitionId", partitionId);
+        byte[] payload = jsObj.toString(4).getBytes("UTF-8");
+        zk.create("/mailboxes/executionsites/site", payload,
+                  Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 
     private RestrictedPriorityQueue initializeTransactionQueue(final int siteId)
