@@ -17,9 +17,10 @@
 
 package org.voltdb;
 
-import org.voltdb.utils.DBBPool.BBContainer;
 import java.io.IOException;
 import java.util.concurrent.Future;
+
+import org.voltcore.utils.DBBPool.BBContainer;
 
 public interface SnapshotDataTarget {
     /**
