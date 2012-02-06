@@ -283,7 +283,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
                 CoalescedHeartbeatMessage heartbeat =
                     new CoalescedHeartbeatMessage(m_siteId, txnId, hostTargets,safeTxnIds);
-                m_mailbox.send(initiatorSiteId, VoltDB.DTXN_MAILBOX_ID, heartbeat);
+                m_mailbox.send(initiatorSiteId, heartbeat);
             }
 
             // loop over all the local sites that need a heartbeat and send each a message
@@ -292,7 +292,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 // tack on the last confirmed seen txn id for all sites with a particular partition
                 long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(siteId);
                 HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, newestSafeTxnId);
-                m_mailbox.send(siteId, VoltDB.DTXN_MAILBOX_ID, tickNotice);
+                m_mailbox.send(siteId, tickNotice);
             }
         } catch (MessagingException e) {
             throw new RuntimeException(e);
@@ -377,7 +377,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
                 m_siteId, txn.firstCoordinatorId, txn.txnId, txn.isReadOnly);
         try {
-            m_mailbox.send(txn.otherSiteIds, 0, notice);
+            m_mailbox.send(txn.otherSiteIds, notice);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
@@ -403,7 +403,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
          * a participant notice
          */
         try {
-            m_mailbox.send(txn.firstCoordinatorId, 0, workRequest);
+            m_mailbox.send(txn.firstCoordinatorId, workRequest);
             for (Long replica : txn.coordinatorReplicas) {
                 newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(replica);
                 workRequest = new InitiateTaskMessage(
@@ -414,7 +414,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                         txn.isSinglePartition,
                         txn.invocation,
                         newestSafeTxnId); // this will allow all transactions to run for now
-                m_mailbox.send(replica, 0, workRequest);
+                m_mailbox.send(replica, workRequest);
             }
         } catch (MessagingException e) {
             throw new RuntimeException(e);
@@ -445,7 +445,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 newestSafeTxnId); // this will allow all transactions to run for now
 
         try {
-            m_mailbox.send(coordinatorId, 0, workRequest);
+            m_mailbox.send(coordinatorId, workRequest);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
