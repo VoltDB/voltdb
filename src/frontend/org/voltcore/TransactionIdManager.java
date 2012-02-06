@@ -1,4 +1,3 @@
-package org.voltcore;
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2012 VoltDB Inc.
  *
@@ -16,7 +15,7 @@ package org.voltcore;
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
+package org.voltcore;
 
 import java.util.Calendar;
 import java.util.Date;

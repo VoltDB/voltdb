@@ -1,4 +1,3 @@
-package org.voltcore;
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2012 VoltDB Inc.
  *
@@ -16,18 +15,10 @@ package org.voltcore;
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+package org.voltcore;
 
-
-import java.io.File;
-import java.nio.charset.Charset;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
-
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
 
 /**
  * <code>VoltDB</code> is the main class for VoltDB server.
