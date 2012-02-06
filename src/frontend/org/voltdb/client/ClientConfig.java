@@ -25,33 +25,9 @@ public class ClientConfig {
     static final long DEFAULT_PROCEDURE_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
 
-    /**
-     * Clients may queue a wide variety of messages and a lot of them
-     * so give them a large max arena size.
-     */
-    private static final int m_defaultMaxArenaSize = 134217728;
-
     final String m_username;
     final String m_password;
     final ClientStatusListenerExt m_listener;
-    int m_expectedOutgoingMessageSize = 128;
-    int m_maxArenaSizes[] = new int[] {
-            m_defaultMaxArenaSize,//16
-            m_defaultMaxArenaSize,//32
-            m_defaultMaxArenaSize,//64
-            m_defaultMaxArenaSize,//128
-            m_defaultMaxArenaSize,//256
-            m_defaultMaxArenaSize,//512
-            m_defaultMaxArenaSize,//1024
-            m_defaultMaxArenaSize,//2048
-            m_defaultMaxArenaSize,//4096
-            m_defaultMaxArenaSize,//8192
-            m_defaultMaxArenaSize,//16384
-            m_defaultMaxArenaSize,//32768
-            m_defaultMaxArenaSize,//65536
-            m_defaultMaxArenaSize,//131072
-            m_defaultMaxArenaSize//262144
-    };
     boolean m_heavyweight = false;
     int m_maxOutstandingTxns = 3000;
     StatsUploaderSettings m_statsSettings = null;
@@ -154,29 +130,32 @@ public class ClientConfig {
     }
 
     /**
+     * Deprecated because memory pooling no longer uses arenas. Has no effect
      * Set the maximum size of memory pool arenas before falling back to using heap byte buffers.
      * @param maxArenaSizes
      */
+    @Deprecated
     public void setMaxArenaSizes(int maxArenaSizes[]) {
-        m_maxArenaSizes = maxArenaSizes;
     }
 
     /**
-     * Request a client with more threads. Useful when a client has multiple NICs or is using
-     * 10-gig E
+     * By default a single network thread is created and used to do IO and invoke callbacks.
+     * When set to true, Runtime.getRuntime().availableProcessors() / 2 threads are created.
+     * Multiple server connections are required for more threads to be involved, a connection
+     * is assigned exclusively to a connection.
      */
     public void setHeavyweight(boolean heavyweight) {
-        final int cores = Runtime.getRuntime().availableProcessors();
-        m_heavyweight = cores > 4 ? heavyweight : false;
+        m_heavyweight = heavyweight;
     }
 
     /**
+     * Deprecated and has no effect
      * Provide a hint indicating how large messages will be once serialized. Ensures
      * efficient message buffer allocation.
      * @param size
      */
+    @Deprecated
     public void setExpectedOutgoingMessageSize(int size) {
-        this.m_expectedOutgoingMessageSize = size;
     }
 
     /**

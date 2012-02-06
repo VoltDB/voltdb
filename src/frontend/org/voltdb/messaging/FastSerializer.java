@@ -551,4 +551,20 @@ public class FastSerializer implements DataOutput {
     public void setPosition(int pos) {
         buffer.b.position(pos);
     }
+
+    public static void writeString(byte[] m_procNameBytes, ByteBuffer buf) throws IOException {
+        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
+        final int NULL_STRING_INDICATOR = -1;
+        if (m_procNameBytes == null) {
+            buf.putInt(NULL_STRING_INDICATOR);
+            return;
+        }
+
+        if (m_procNameBytes.length > MAX_LENGTH) {
+            throw new IOException("String exceeds maximum length of "
+                                  + MAX_LENGTH + " bytes.");
+        }
+        buf.putInt(m_procNameBytes.length);
+        buf.put(m_procNameBytes);
+    }
 }

@@ -131,8 +131,14 @@ public class ClientStatsLoader {
                         }
 
                         final long startTime = System.currentTimeMillis();
-                        final VoltTable ioStats = m_distributer
-                                .getConnectionStats(true);
+                        VoltTable ioStats = null;
+                        try {
+                            ioStats = m_distributer
+                                    .getConnectionStats(true);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            continue;
+                        }
                         final VoltTable procedureStats = m_distributer
                                 .getProcedureStats(true);
 

@@ -367,16 +367,18 @@ public class ConnectionUtil {
                 final ProcedureInvocation invocation =
                     new ProcedureInvocation(handle, procName, parameters);
 
-                final FastSerializer fs = new FastSerializer();
-                final BBContainer c = fs.writeObjectForMessaging(invocation);
+                ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
+                buf.position(4);
+                invocation.flattenToBuffer(buf);
+                buf.putInt(0, buf.capacity() - 4);
+                buf.flip();
                 do {
-                    channel.write(c.b);
-                    if (c.b.hasRemaining()) {
+                    channel.write(buf);
+                    if (buf.hasRemaining()) {
                         Thread.yield();
                     }
                 }
-                while(c.b.hasRemaining());
-                c.discard();
+                while(buf.hasRemaining());
                 return handle;
             }
         });

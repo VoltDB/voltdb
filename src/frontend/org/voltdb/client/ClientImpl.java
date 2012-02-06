@@ -26,10 +26,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import org.voltcore.utils.DBBPool.BBContainer;
-
 import org.voltdb.VoltTable;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -40,8 +37,6 @@ import org.voltdb.utils.CatalogUtil;
 public final class ClientImpl implements Client, ReplicaProcCaller {
 
     private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
-
-    private final int m_expectedOutgoingMessageSize;
 
     /*
      * Username and password as set by createConnection. Used
@@ -87,10 +82,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
-        m_expectedOutgoingMessageSize = config.m_expectedOutgoingMessageSize;
         m_distributer = new Distributer(
-                config.m_expectedOutgoingMessageSize,
-                config.m_maxArenaSizes,
                 config.m_heavyweight,
                 config.m_statsSettings,
                 config.m_procedureCallTimeoutMS,
@@ -189,7 +181,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         m_distributer.queue(
                 invocation,
                 cb,
-                m_expectedOutgoingMessageSize,
                 true);
 
         try {
@@ -217,13 +208,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         if (m_isShutdown) {
             return false;
         }
-        return callProcedure(callback, m_expectedOutgoingMessageSize, procName, parameters);
+        return callProcedure(callback, procName, parameters);
     }
 
     /**
-     * Asynchronously invoke a replicated procedure. Does not guarantee that the
-     * invocation is actually queued. If there is backpressure on all
-     * connections to the cluster then the invocation will not be queued. Check
+     * Asynchronously invoke a replicated procedure. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check
      * the return value to determine if queuing actually took place.
      *
      * @param callback ProcedureCallback that will be invoked with procedure results.
@@ -245,7 +236,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         ProcedureInvocation invocation =
             new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(callback, m_expectedOutgoingMessageSize, invocation);
+        return callProcedure(callback, 0, invocation);
     }
 
     @Override
@@ -253,16 +244,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             Object... parameters) {
         final ProcedureInvocation invocation =
             new ProcedureInvocation(0, procName, parameters);
-        final FastSerializer fds = new FastSerializer();
-        int size = 0;
-        try {
-            final BBContainer c = fds.writeObjectForMessaging(invocation);
-            size = c.b.remaining();
-            c.discard();
-        } catch (final IOException e) {
-            throw new RuntimeException(e);
-        }
-        return size;
+        return invocation.getSerializedSize();
     }
 
     @Override
@@ -316,7 +298,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             while (!m_distributer.queue(
                     invocation,
                     callbackToReturnPermit,
-                    expectedSerializedSize,
                     isBlessed)) {
                 try {
                     backpressureBarrier();
@@ -329,7 +310,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.queue(
                     invocation,
                     callbackToReturnPermit,
-                    expectedSerializedSize,
                     isBlessed);
         }
     }
@@ -454,12 +434,20 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     @Override
     public VoltTable getIOStats() {
-        return m_distributer.getConnectionStats(false);
+        try {
+            return m_distributer.getConnectionStats(false);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public VoltTable getIOStatsInterval() {
-        return m_distributer.getConnectionStats(true);
+        try {
+            return m_distributer.getConnectionStats(true);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

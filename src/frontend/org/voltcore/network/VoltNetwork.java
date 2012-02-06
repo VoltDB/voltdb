@@ -91,7 +91,7 @@ import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
-public class VoltNetwork implements Runnable
+class VoltNetwork implements Runnable
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
@@ -112,7 +112,7 @@ public class VoltNetwork implements Runnable
     /**
      * Start this VoltNetwork's thread;
      */
-    public void start() {
+    void start() {
         m_thread.start();
     }
 
@@ -137,7 +137,7 @@ public class VoltNetwork implements Runnable
     }
 
     /** Instruct the network to stop after the current loop */
-    public void shutdown() throws InterruptedException {
+    void shutdown() throws InterruptedException {
         m_shouldStop = true;
         if (m_thread != null) {
             m_selector.wakeup();
@@ -152,7 +152,7 @@ public class VoltNetwork implements Runnable
      * @param handler
      * @throws IOException
      */
-    public Connection registerChannel(
+    Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
             final int interestOps) throws IOException {
@@ -265,12 +265,12 @@ public class VoltNetwork implements Runnable
         return ft;
     }
 
-    public void addToChangeList(final VoltPort port) {
+    void addToChangeList(final VoltPort port) {
         addToChangeList( port, false);
     }
 
     /** Set interest registrations for a port */
-    public void addToChangeList(final VoltPort port, final boolean runFirst) {
+    void addToChangeList(final VoltPort port, final boolean runFirst) {
         if (runFirst) {
             m_tasks.offer(new Runnable() {
                 @Override
@@ -475,7 +475,7 @@ public class VoltNetwork implements Runnable
         return ft;
     }
 
-    public Long getThreadId() {
+    Long getThreadId() {
         return m_thread.getId();
     }
 }
