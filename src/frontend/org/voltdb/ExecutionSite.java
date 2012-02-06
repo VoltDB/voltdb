@@ -1491,13 +1491,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         // an accurate topology to perform discovery.
         m_context = VoltDB.instance().getCatalogContext();
 
-        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
+        HashSet<Long> failedSiteIds = new HashSet<Long>();
         for (NodeFailureFault fault : failures) {
             failedSiteIds.addAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()));
         }
         m_knownFailedSites.addAll(failedSiteIds);
 
-        HashMap<Integer, Long> initiatorSafeInitPoint = new HashMap<Integer, Long>();
+        HashMap<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
         int expectedResponses = discoverGlobalFaultData_send();
         Long multiPartitionCommitPoint = discoverGlobalFaultData_rcv(expectedResponses, initiatorSafeInitPoint);
 
@@ -1511,7 +1511,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         // Do the work of patching up the execution site.
         // Do a little work to identify the newly failed site ids and only handle those
 
-        HashSet<Integer> newFailedSiteIds = new HashSet<Integer>(failedSiteIds);
+        HashSet<Long> newFailedSiteIds = new HashSet<Long>(failedSiteIds);
         newFailedSiteIds.removeAll(m_handledFailedSites);
 
         // Use this agreed new-fault set to make PPD decisions.
@@ -1557,9 +1557,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     /**
      * Store values from older failed nodes. They are repeated with every failure message
+     * Maps <hostid> to <siteid, txnid> (for each host, a hash of txnid to site).
      */
-    private final HashMap<Integer, HashMap<Integer, Long>> m_newestSafeTransactionForInitiatorLedger =
-        new HashMap<Integer, HashMap<Integer, Long>>();
+    private final HashMap<Integer, HashMap<Long, Long>> m_newestSafeTransactionForInitiatorLedger =
+        new HashMap<Integer, HashMap<Long, Long>>();
 
     /**
      * Send one message to each surviving execution site providing this site's
@@ -1582,9 +1583,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         try {
             for (Long site : m_knownFailedSites) {
                 Integer hostId = m_context.siteTracker.getHostForSite(site);
-                HashMap<Integer, Long> siteMap = m_newestSafeTransactionForInitiatorLedger.get(hostId);
+                HashMap<Long, Long> siteMap = m_newestSafeTransactionForInitiatorLedger.get(hostId);
                 if (siteMap == null) {
-                    siteMap = new HashMap<Integer, Long>();
+                    siteMap = new HashMap<Long, Long>();
                     m_newestSafeTransactionForInitiatorLedger.put(hostId, siteMap);
                 }
 
@@ -1616,7 +1617,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             }
         }
         catch (MessagingException e) {
-            // TODO: unsure what to do with this. maybe it implies concurrent failure?
+            // unsure what to do with this. maybe it implies concurrent failure?
             e.printStackTrace();
             VoltDB.crashVoltDB();
         }
@@ -1632,12 +1633,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Concurrent failures can be detected by additional reports from the FaultDistributor
      * or a mismatch in the set of failed hosts reported in a message from another site
      */
-    private Long discoverGlobalFaultData_rcv(int expectedResponses, Map<Integer, Long> initiatorSafeInitPoint)
+    private Long discoverGlobalFaultData_rcv(int expectedResponses, Map<Long, Long> initiatorSafeInitPoint)
     {
         final int localPartitionId =
             m_context.siteTracker.getPartitionForSite(m_siteId);
         int responses = 0;
-        int responsesFromSamePartition = 0;
         long commitPoint = Long.MIN_VALUE;
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
         do {
@@ -1660,7 +1660,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                  * that the process can restart.
                  */
                 HashSet<NodeFailureFault> faults = ((ExecutionSiteNodeFailureMessage)m).m_failedHosts;
-                HashSet<Integer> newFailedSiteIds = new HashSet<Integer>();
+                HashSet<Long> newFailedSiteIds = new HashSet<Long>();
                 for (NodeFailureFault fault : faults) {
                     newFailedSiteIds.addAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()));
                 }
@@ -1673,17 +1673,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             /*
              * If the other surviving host saw a different set of failures
              */
-            if (!m_knownFailedSites.equals(fm.m_failedSiteIds)) {
-                if (!m_knownFailedSites.containsAll(fm.m_failedSiteIds)) {
+            if (!m_knownFailedSites.equals(fm.m_failedHSIds)) {
+                if (!m_knownFailedSites.containsAll(fm.m_failedHSIds)) {
                     /*
                      * In this case there is a new failed site we didn't know about. Time to
                      * start the process again from square 1 with knowledge of the new failed hosts
                      * First fail all the ones we didn't know about.
                      */
-                    HashSet<Integer> difference = new HashSet<Integer>(fm.m_failedSiteIds);
+                    HashSet<Long> difference = new HashSet<Long>(fm.m_failedHSIds);
                     difference.removeAll(m_knownFailedSites);
                     Set<Integer> differenceHosts = new HashSet<Integer>();
-                    for (Integer siteId : difference) {
+                    for (Long siteId : difference) {
                         differenceHosts.add(m_context.siteTracker.getHostForSite(siteId));
                     }
                     for (Integer hostId : differenceHosts) {
@@ -1701,7 +1701,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                     hostname));
                     }
                     m_recoveryLog.info("Detected a concurrent failure from " +
-                            fm.m_sourceSiteId + " with new failed sites " + difference.toString());
+                            fm.m_sourceHSId + " with new failed sites " + difference.toString());
                     m_mailbox.deliver(m);
                     /*
                      * Return null and skip handling the fault for now. Will try again
@@ -1714,23 +1714,23 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                      * failed sites. Drop the message. The sender will detect the fault and resend
                      * the message later with the correct information.
                      */
-                    HashSet<Integer> difference = new HashSet<Integer>(m_knownFailedSites);
-                    difference.removeAll(fm.m_failedSiteIds);
+                    HashSet<Long> difference = new HashSet<Long>(m_knownFailedSites);
+                    difference.removeAll(fm.m_failedHSIds);
                     m_recoveryLog.info("Discarding failure message from " +
-                            fm.m_sourceSiteId + " because it was missing failed sites " + difference.toString());
+                            fm.m_sourceHSId + " because it was missing failed sites " + difference.toString());
                     continue;
                 }
             }
 
             ++responses;
             m_recoveryLog.info("Received failure message " + responses + " of " + expectedResponses
-                    + " from " + fm.m_sourceSiteId + " for failed sites " + fm.m_failedSiteIds +
+                    + " from " + fm.m_sourceHSId + " for failed sites " + fm.m_failedHSIds +
                     " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
             commitPoint =
                 Math.max(commitPoint, fm.m_committedTxnId);
 
             final int remotePartitionId =
-                m_context.siteTracker.getPartitionForSite(fm.m_sourceSiteId);
+                m_context.siteTracker.getPartitionForSite(fm.m_sourceHSId);
 
             if (remotePartitionId == localPartitionId) {
                 Long initiatorId = fm.m_initiatorForSafeTxnId;
@@ -1739,7 +1739,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
                 initiatorSafeInitPoint.put(
                         initiatorId, Math.max(initiatorSafeInitPoint.get(initiatorId), fm.m_safeTxnId));
-                responsesFromSamePartition++;
             }
         } while(responses < expectedResponses);
 
@@ -1757,19 +1756,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * handleNodeFault.
      * @param partitionDetected
      *
-     * @param siteIds Hashset<Integer> of host ids of failed nodes
+     * @param siteIds Hashset<Long> of host ids of failed nodes
      * @param globalCommitPoint the surviving cluster's greatest committed multi-partition transaction id
      * @param globalInitiationPoint the greatest transaction id acknowledged as globally
      * 2PC to any surviving cluster execution site by the failed initiator.
      *
      */
     void handleSiteFaults(boolean partitionDetected,
-            HashSet<Integer> failedSites,
+            HashSet<Long> failedSites,
             long globalMultiPartCommitPoint,
-            HashMap<Integer, Long> initiatorSafeInitiationPoint)
+            HashMap<Long, Long> initiatorSafeInitiationPoint)
     {
         HashSet<Integer> failedHosts = new HashSet<Integer>();
-        for (Integer siteId : failedSites) {
+        for (Long siteId : failedSites) {
             failedHosts.add(m_context.siteTracker.getHostForSite(siteId));
         }
 
@@ -1811,7 +1810,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
 
         // Fix safe transaction scoreboard in transaction queue
-        for (Integer i : failedSites)
+        for (Long i : failedSites)
         {
             if (m_context.siteTracker.getSiteForId(i).getIsexec() == false) {
                 m_transactionQueue.gotFaultForInitiator(i);
@@ -1836,9 +1835,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             ts.handleSiteFaults(failedSites);
 
             // Fault a transaction that was not globally initiated by a failed initiator
-            if (initiatorSafeInitiationPoint.containsKey(ts.initiatorSiteId) &&
-                    ts.txnId > initiatorSafeInitiationPoint.get(ts.initiatorSiteId) &&
-                failedSites.contains(ts.initiatorSiteId))
+            if (initiatorSafeInitiationPoint.containsKey(ts.initiatorHSId) &&
+                    ts.txnId > initiatorSafeInitiationPoint.get(ts.initiatorHSId) &&
+                failedSites.contains(ts.initiatorHSId))
             {
                 m_recoveryLog.info("Site " + m_siteId + " faulting non-globally initiated transaction " + ts.txnId);
                 it.remove();

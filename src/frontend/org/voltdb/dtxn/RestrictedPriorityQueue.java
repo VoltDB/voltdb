@@ -264,7 +264,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * and do not require heartbeats from that initiator to proceed.
      * @param initiatorId id of the failed initiator.
      */
-    public void gotFaultForInitiator(int initiatorId) {
+    public void gotFaultForInitiator(long initiatorId) {
         // calculate the next minimum transaction w/o our dead friend
         noteTransactionRecievedAndReturnLastSeen(initiatorId, Long.MAX_VALUE, true, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
 
