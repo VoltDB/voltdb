@@ -60,6 +60,8 @@ import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 
+import org.voltcore.utils.Pair;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.ClientMain;
@@ -68,7 +70,6 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.Pair;
 
 /** TPC-C database loader. Note: The methods order id parameters from "top level" to "low level"
 parameters. However, the insert stored procedures use the defined TPC-C table order, which goes from
@@ -604,7 +605,6 @@ public class MultiLoader extends ClientMain {
             }
 
             if (m_voltClient != null) {
-                // XXX
                 final int numPermits = 48;
                 final Semaphore maxOutstandingInvocations = new Semaphore(numPermits);
                 final int totalInvocations = customerNamesTables.size() * m_parameters.warehouses;
