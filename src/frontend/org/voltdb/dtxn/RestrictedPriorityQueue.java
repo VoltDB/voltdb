@@ -118,7 +118,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     long m_txnsPopped = 0;
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
-    private final int m_mailboxId;
     final boolean m_useSafetyDance;
 
     /**
@@ -129,7 +128,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     public RestrictedPriorityQueue(int[] initiatorHSIds, int siteId, Mailbox mbox, int mailboxId, boolean useSafetyDance) {
         m_siteId = siteId;
         m_mailbox = mbox;
-        m_mailboxId = mailboxId;
         for (long id : initiatorHSIds)
             m_initiatorData.put(id, new LastInitiatorData());
         m_useSafetyDance = useSafetyDance;
@@ -423,7 +421,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         HeartbeatResponseMessage hbr =
             new HeartbeatResponseMessage(m_siteId, lid.m_lastSeenTxnId, true);
         try {
-            m_mailbox.send(ts.initiatorHSId, m_mailboxId, hbr);
+            m_mailbox.send(ts.initiatorHSId, hbr);
         } catch (MessagingException e) {
             // I really hope this doesn't happen
             throw new RuntimeException(e);
