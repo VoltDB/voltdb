@@ -36,6 +36,7 @@ import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.messaging.VoltMessage;
+
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -83,7 +84,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
     /**
      * Encoded in acks to show where they came from
      */
-    private final int m_siteId;
+    private final long m_siteId;
 
     /**
      * What to do when data recovery is completed
@@ -254,9 +255,9 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         final int blockIndex = message.getInt(blockIndexOffset);
         final int tableId = message.getInt(tableIdOffset);
         ByteBuffer ackMessage = ByteBuffer.allocate(12);
-        ackMessage.putInt( 8);
-        ackMessage.putInt( m_siteId);
-        ackMessage.putInt( blockIndex);
+        ackMessage.putInt(12);
+        ackMessage.putLong(m_siteId);
+        ackMessage.putInt(blockIndex);
         ackMessage.flip();
         if (type == RecoveryMessageType.ScanTuples) {
             if (m_toggleProfiling.tryAcquire()) {
@@ -436,7 +437,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             HashMap<Pair<String, Integer>, Integer> tableToSourceSite,
             ExecutionEngine engine,
             Mailbox mailbox,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             Runnable onCompletion,
             MessageHandler messageHandler) {

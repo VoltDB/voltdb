@@ -278,7 +278,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         @Override
-        public void flattenToBuffer(ByteBuffer buf) throws IOException
+        public void flattenToBuffer(ByteBuffer buf)
         {
         }
     }
@@ -304,7 +304,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         @Override
-        public void flattenToBuffer(ByteBuffer buf) throws IOException
+        public void flattenToBuffer(ByteBuffer buf)
         {
         }
     }
@@ -326,7 +326,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         @Override
-        public void flattenToBuffer(ByteBuffer buf) throws IOException
+        public void flattenToBuffer(ByteBuffer buf)
         {
         }
     }
@@ -348,7 +348,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         @Override
-        public void flattenToBuffer(ByteBuffer buf) throws IOException
+        public void flattenToBuffer(ByteBuffer buf)
         {
         }
     }
@@ -482,7 +482,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         }
 
                         try {
-                            m_mailbox.send(response.getDestinationHSId(), response);
+                            m_mailbox.send(response.getDestinationSiteId(), response);
                         } catch (MessagingException e) {
                             throw new RuntimeException(e);
                         }
@@ -887,10 +887,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         // make sure the restricted priority queue knows about all of the up initiators
         // for most catalog changes this will do nothing
         // for rejoin, it will matter
-        int newInitiators = 0;
         for (Site s : m_context.catalog.getClusters().get("cluster").getSites()) {
             if (s.getIsexec() == false && s.getIsup()) {
-                newInitiators += m_transactionQueue.ensureInitiatorIsKnown(Integer.parseInt(s.getTypeName()));
+                m_transactionQueue.ensureInitiatorIsKnown(Integer.parseInt(s.getTypeName()));
             }
         }
 
@@ -978,7 +977,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 procClass = m_context.classForProcedure(className);
             }
             catch (final ClassNotFoundException e) {
-                // TODO: check community/pro condition here.
                 if (sysProc.commercial) {
                     continue;
                 }
