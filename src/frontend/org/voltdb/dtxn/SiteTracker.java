@@ -50,26 +50,26 @@ public class SiteTracker {
     CatalogMap<Site> m_sites;
 
     // a map of site ids (index) to partition ids (value)
-    Map<Integer, Integer> m_sitesToPartitions = new HashMap<Integer, Integer>();
+    Map<Long, Integer> m_sitesToPartitions = new HashMap<Long, Integer>();
 
-    Map<Integer, ArrayList<Integer>> m_partitionsToSites =
-        new HashMap<Integer, ArrayList<Integer>>();
+    Map<Integer, ArrayList<Long>> m_partitionsToSites =
+        new HashMap<Integer, ArrayList<Long>>();
 
-    Map<Integer, ArrayList<Integer>> m_partitionsToLiveSites =
-        new HashMap<Integer, ArrayList<Integer>>();
+    Map<Integer, ArrayList<Long>> m_partitionsToLiveSites =
+        new HashMap<Integer, ArrayList<Long>>();
 
-    Map<Integer, ArrayList<Integer>> m_hostsToSites =
-        new HashMap<Integer, ArrayList<Integer>>();
+    Map<Integer, ArrayList<Long>> m_hostsToSites =
+        new HashMap<Integer, ArrayList<Long>>();
 
-    Map<Integer, Integer> m_sitesToHost =
-        new HashMap<Integer, Integer>();
+    Map<Long, Integer> m_sitesToHost =
+        new HashMap<Long, Integer>();
 
-    Map<Integer, HashSet<Integer>> m_nonExecSitesForHost = new HashMap<Integer, HashSet<Integer>>();
+    Map<Integer, HashSet<Long>> m_nonExecSitesForHost = new HashMap<Integer, HashSet<Long>>();
 
-    // records the timestamp of the last message sent to each sites
-    HashMap<Integer, Long> m_lastHeartbeatTime = new HashMap<Integer, Long>();
+    // maps <site:timestamp> of the last message sent to each sites
+    HashMap<Long, Long> m_lastHeartbeatTime = new HashMap<Long, Long>();
 
-    Set<Integer> m_liveSiteIds = new TreeSet<Integer>();
+    Set<Long> m_liveSiteIds = new TreeSet<Long>();
 
     Set<Integer> m_liveHostIds = new TreeSet<Integer>();
 
@@ -77,18 +77,17 @@ public class SiteTracker {
 
     private final Site m_allSites[];
 
-    private final int[] m_firstNonExecSiteForHost;
+    private final long[] m_firstNonExecSiteForHost;
 
-    private final int[] m_localHeartbeatTargets;
+    private final long[] m_localHeartbeatTargets;
 
-    private final int[][] m_remoteHeartbeatTargets;
+    private final long[][] m_remoteHeartbeatTargets;
 
     // scratch value used to compute the out of date sites
-    // note: this makes
-    int[] m_tempOldSitesScratch = null;
+    long[] m_tempOldSitesScratch = null;
 
-    private final HashMap<Integer, int[]> m_upExecutionSitesExcludingSite =
-        new HashMap<Integer, int[]>();
+    private final HashMap<Long, long[]> m_upExecutionSitesExcludingSite =
+        new HashMap<Long, long[]>();
 
     /**
      * Given topology info, initialize all of this class's data structures.
@@ -101,17 +100,17 @@ public class SiteTracker {
         m_sites = clusterSites;
         for (Site site : clusterSites)
         {
-            int siteId = Integer.parseInt(site.getTypeName());
+            long siteId = Integer.parseInt(site.getTypeName());
             allSites.add(site);
             int hostId = Integer.parseInt(site.getHost().getTypeName());
             m_sitesToHost.put(siteId, hostId);
             if (!m_hostsToSites.containsKey(hostId))
             {
-                m_hostsToSites.put(hostId, new ArrayList<Integer>());
+                m_hostsToSites.put(hostId, new ArrayList<Long>());
             }
             m_hostsToSites.get(hostId).add(siteId);
             if (!m_nonExecSitesForHost.containsKey(hostId)) {
-                m_nonExecSitesForHost.put(hostId, new HashSet<Integer>());
+                m_nonExecSitesForHost.put(hostId, new HashSet<Long>());
             }
 
             // don't put non-exec (has ee) sites in the list.
@@ -135,14 +134,14 @@ public class SiteTracker {
                 if (!m_partitionsToSites.containsKey(partitionId))
                 {
                     m_partitionsToSites.put(partitionId,
-                                            new ArrayList<Integer>());
+                                            new ArrayList<Long>());
                 }
                 m_partitionsToSites.get(partitionId).add(siteId);
 
                 if (!m_partitionsToLiveSites.containsKey(partitionId))
                 {
                     m_partitionsToLiveSites.put(partitionId,
-                                                new ArrayList<Integer>());
+                                                new ArrayList<Long>());
                 }
                 if (site.getIsup() == true)
                 {
@@ -158,9 +157,9 @@ public class SiteTracker {
         for (int ii = 0; ii < m_allSites.length; ii++) {
             m_allSites[ii] = allSites.get(ii);
         }
-        m_tempOldSitesScratch = new int[m_sites.size()];
+        m_tempOldSitesScratch = new long[m_sites.size()];
 
-        for (int siteId : m_sitesToPartitions.keySet()) {
+        for (long siteId : m_sitesToPartitions.keySet()) {
             if (getSiteForId(siteId).getIsup()) {
                 m_lastHeartbeatTime.put(siteId, -1L);
             }
@@ -169,9 +168,9 @@ public class SiteTracker {
         /*
          *  Calculate exec sites for each up host, these will be the heartbeat targets
          */
-        HashMap<Integer, ArrayList<Integer>> upHostsToExecSites = new HashMap<Integer, ArrayList<Integer>>();
+        HashMap<Integer, ArrayList<Long>> upHostsToExecSites = new HashMap<Integer, ArrayList<Long>>();
         for (Integer host : m_liveHostIds) {
-            ArrayList<Integer> sites = new ArrayList<Integer>(m_hostsToSites.get(host));
+            ArrayList<Long> sites = new ArrayList<Long>(m_hostsToSites.get(host));
             sites.removeAll(m_nonExecSitesForHost.get(host));
             upHostsToExecSites.put( host, sites);
         }
@@ -189,20 +188,20 @@ public class SiteTracker {
         int ii = 0;
         int numHosts = upHostsToExecSites.size();
         if (numHosts < 2) {
-            m_remoteHeartbeatTargets = new int[0][];
+            m_remoteHeartbeatTargets = new long[0][];
         } else {
-            m_remoteHeartbeatTargets = new int[upHostsToExecSites.size() - 1][];
+            m_remoteHeartbeatTargets = new long[upHostsToExecSites.size() - 1][];
         }
-        int tempLocalHeartbeatTargets[] = new int[0];
-        for (Map.Entry<Integer, ArrayList<Integer>> entry : upHostsToExecSites.entrySet()) {
+        long tempLocalHeartbeatTargets[] = new long[0];
+        for (Map.Entry<Integer, ArrayList<Long>> entry : upHostsToExecSites.entrySet()) {
             if (entry.getKey() == myHostId) {
-                tempLocalHeartbeatTargets = intArrayListToArray(entry.getValue());
+                tempLocalHeartbeatTargets = longArrayListToArray(entry.getValue());
             } else {
-                m_remoteHeartbeatTargets[ii++] = intArrayListToArray(entry.getValue());
+                m_remoteHeartbeatTargets[ii++] = longArrayListToArray(entry.getValue());
             }
         }
         m_localHeartbeatTargets = tempLocalHeartbeatTargets;
-        m_firstNonExecSiteForHost = new int[m_hostsToSites.size()];
+        m_firstNonExecSiteForHost = new long[m_hostsToSites.size()];
         java.util.Arrays.fill(m_firstNonExecSiteForHost, -1);
         for (ii = 0; ii < m_firstNonExecSiteForHost.length; ii++) {
             HashSet<Integer> set = getNonExecSitesForHost(ii);
@@ -214,15 +213,15 @@ public class SiteTracker {
         }
     }
 
-    private int[] intArrayListToArray(ArrayList<Integer> ints) {
-        int retval[] = new int[ints.size()];
+    private long[] longArrayListToArray(ArrayList<Long> longs) {
+        long retval[] = new long[longs.size()];
         for (int ii = 0; ii < retval.length; ii++) {
-            retval[ii] = ints.get(ii);
+            retval[ii] = longs.get(ii);
         }
         return retval;
     }
 
-    public Set<Integer> getAllLiveSites() {
+    public Set<Long> getAllLiveSites() {
         return m_liveSiteIds;
     }
 
@@ -237,8 +236,8 @@ public class SiteTracker {
     /**
      * @return Site object for the corresponding siteId
      */
-    public Site getSiteForId(int siteId) {
-        return m_sites.get(Integer.toString(siteId));
+    public Site getSiteForId(long siteId) {
+        return m_sites.get(Long.toString(siteId));
     }
 
     /**
@@ -257,12 +256,12 @@ public class SiteTracker {
      * @return the lowest site ID across the live non-execution sites in the
      *         cluster
      */
-    public int getLowestLiveNonExecSiteId()
+    public long getLowestLiveNonExecSiteId()
     {
-        int lowestNonExecSiteId = Integer.MAX_VALUE;
+        long lowestNonExecSiteId = Long.MAX_VALUE;
         for (Site site : getUpSites()) {
             if (!site.getIsexec()) {
-                lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
+                lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Long.parseLong(site.getTypeName()));
             }
         }
         return lowestNonExecSiteId;
@@ -276,8 +275,8 @@ public class SiteTracker {
      * @return The id of a VoltDB site containing a copy of
      * the requested partition.
      */
-    public int getOneSiteForPartition(int partition) {
-        ArrayList<Integer> sites = m_partitionsToSites.get(partition);
+    public long getOneSiteForPartition(int partition) {
+        ArrayList<Long> sites = m_partitionsToSites.get(partition);
         assert(sites != null);
         return sites.get(0);
     }
@@ -289,8 +288,8 @@ public class SiteTracker {
      * @return The id of a VoltDB site containing a copy of
      * the requested partition.
      */
-    public int getOneLiveSiteForPartition(int partition) {
-        ArrayList<Integer> sites = m_partitionsToLiveSites.get(partition);
+    public long getOneLiveSiteForPartition(int partition) {
+        ArrayList<Long> sites = m_partitionsToLiveSites.get(partition);
         assert(sites != null);
         return sites.get(0);
     }
@@ -302,7 +301,7 @@ public class SiteTracker {
      * @param partition A VoltDB partition id.
      * @return An array of VoltDB site ids.
      */
-    public ArrayList<Integer> getAllSitesForPartition(int partition) {
+    public ArrayList<Long> getAllSitesForPartition(int partition) {
         assert (m_partitionsToSites.containsKey(partition));
         return m_partitionsToSites.get(partition);
     }
@@ -314,7 +313,7 @@ public class SiteTracker {
      * @param partition A VoltDB partition id.
      * @return An array of VoltDB site ids.
      */
-    public ArrayList<Integer> getLiveSitesForPartition(int partition) {
+    public ArrayList<Long> getLiveSitesForPartition(int partition) {
         assert (m_partitionsToLiveSites.containsKey(partition));
         return m_partitionsToLiveSites.get(partition);
     }
@@ -325,8 +324,8 @@ public class SiteTracker {
      * @param partitions A set of unique, non-null VoltDB
      * @return An array of VoltDB site ids.
      */
-    public int[] getOneSiteForEachPartition(int[] partitions) {
-        int[] retval = new int[partitions.length];
+    public long[] getOneSiteForEachPartition(int[] partitions) {
+        long[] retval = new long[partitions.length];
         int index = 0;
         for (int p : partitions)
             retval[index++] = getOneSiteForPartition(p);
@@ -341,17 +340,17 @@ public class SiteTracker {
      * partition ids.
      * @return An array of VoltDB site ids.
      */
-    public int[] getAllSitesForEachPartition(int[] partitions) {
-        ArrayList<Integer> all_sites = new ArrayList<Integer>();
+    public long[] getAllSitesForEachPartition(int[] partitions) {
+        ArrayList<Long> all_sites = new ArrayList<Long>();
         for (int p : partitions) {
-            ArrayList<Integer> sites = getAllSitesForPartition(p);
-            for (int site : sites)
+            ArrayList<Long> sites = getAllSitesForPartition(p);
+            for (long site : sites)
             {
                 all_sites.add(site);
             }
         }
 
-        int[] retval = new int[all_sites.size()];
+        long[] retval = new long[all_sites.size()];
         for (int i = 0; i < all_sites.size(); i++)
         {
             retval[i] = all_sites.get(i);
@@ -364,11 +363,11 @@ public class SiteTracker {
      * the given partitions.
      * @param partitions as ArrayList
      */
-    public ArrayList<Integer> getLiveSitesForEachPartitionAsList(int[]  partitions) {
-        ArrayList<Integer> all_sites = new ArrayList<Integer>();
+    public ArrayList<Long> getLiveSitesForEachPartitionAsList(int[]  partitions) {
+        ArrayList<Long> all_sites = new ArrayList<Long>();
         for (int p : partitions) {
-            ArrayList<Integer> sites = getLiveSitesForPartition(p);
-            for (int site : sites)
+            ArrayList<Long> sites = getLiveSitesForPartition(p);
+            for (long site : sites)
             {
                 all_sites.add(site);
             }
@@ -384,16 +383,16 @@ public class SiteTracker {
      * partition ids.
      * @return An array of VoltDB site ids.
      */
-    public int[] getLiveSitesForEachPartition(int[] partitions) {
-        ArrayList<Integer> all_sites = new ArrayList<Integer>();
+    public long[] getLiveSitesForEachPartition(int[] partitions) {
+        ArrayList<Long> all_sites = new ArrayList<Long>();
         for (int p : partitions) {
-            ArrayList<Integer> sites = getLiveSitesForPartition(p);
-            for (int site : sites)
+            ArrayList<Long> sites = getLiveSitesForPartition(p);
+            for (long site : sites)
             {
                 all_sites.add(site);
             }
         }
-        int[] retval = new int[all_sites.size()];
+        long[] retval = new long[all_sites.size()];
         for (int i = 0; i < all_sites.size(); i++)
         {
             retval[i] = all_sites.get(i);
@@ -406,7 +405,7 @@ public class SiteTracker {
      * @param hostId
      * @return An ArrayList of VoltDB site IDs.
      */
-    public ArrayList<Integer> getAllSitesForHost(int hostId)
+    public ArrayList<Long> getAllSitesForHost(int hostId)
     {
         if (!m_hostsToSites.containsKey(hostId)) {
             System.out.println("Couldn't find sites for host " + hostId);
@@ -430,14 +429,14 @@ public class SiteTracker {
      * Get the list of live execution site IDs on a specific host ID
      * @param hostId
      */
-    public ArrayList<Integer> getLiveExecutionSitesForHost(int hostId)
+    public ArrayList<Long> getLiveExecutionSitesForHost(int hostId)
     {
         assert m_hostsToSites.containsKey(hostId);
-        ArrayList<Integer> retval = new ArrayList<Integer>();
-        for (Integer site_id : m_hostsToSites.get(hostId))
+        ArrayList<Long> retval = new ArrayList<Long>();
+        for (Long site_id : m_hostsToSites.get(hostId))
         {
-            if (m_sites.get(Integer.toString(site_id)).getIsexec() &&
-                m_sites.get(Integer.toString(site_id)).getIsup())
+            if (m_sites.get(Long.toString(site_id)).getIsexec() &&
+                m_sites.get(Long.toString(site_id)).getIsup())
             {
                 retval.add(site_id);
             }
@@ -451,7 +450,7 @@ public class SiteTracker {
      * @param siteId The id of a VoltDB site.
      * @return The id of the partition stored at the given site.
      */
-    public int getPartitionForSite(int siteId)
+    public long getPartitionForSite(long siteId)
     {
         assert(m_sitesToPartitions.containsKey(siteId));
         return m_sitesToPartitions.get(siteId);
@@ -475,40 +474,40 @@ public class SiteTracker {
         return retval;
     }
 
-    public HashSet<Integer> getNonExecSitesForHost(int hostId) {
+    public HashSet<Long> getNonExecSitesForHost(int hostId) {
         return m_nonExecSitesForHost.get(hostId);
     }
 
     /**
      * @return An array containing siteds for all up, Isexec() sites.
      */
-    public int[] getUpExecutionSites()
+    public long[] getUpExecutionSites()
     {
-        ArrayDeque<Integer> tmplist = new ArrayDeque<Integer>();
+        ArrayDeque<Long> tmplist = new ArrayDeque<Long>();
         for  (Site site : m_sites) {
             if (site.getIsup() && site.getIsexec()) {
-                tmplist.add(Integer.parseInt(site.getTypeName()));
+                tmplist.add(Long.parseLong(site.getTypeName()));
             }
         }
-        int[] retval = new int[tmplist.size()];
+        long[] retval = new long[tmplist.size()];
         for (int i=0; i < retval.length; ++i) {
             retval[i] = tmplist.poll();
         }
         return retval;
     }
 
-    public int[] getUpExecutionSitesExcludingSite(int excludedSite) {
-        int sites[] = m_upExecutionSitesExcludingSite.get(excludedSite);
+    public long[] getUpExecutionSitesExcludingSite(long excludedSite) {
+        long sites[] = m_upExecutionSitesExcludingSite.get(excludedSite);
         if (sites == null) {
-            ArrayList<Integer> list = new ArrayList<Integer>();
-            for (Integer site : getUpExecutionSites()) {
-                if (site.intValue() != excludedSite) {
+            ArrayList<Long> list = new ArrayList<Long>();
+            for (Long site : getUpExecutionSites()) {
+                if (site.longValue() != excludedSite) {
                     list.add(site);
                 }
             }
-            sites = new int[list.size()];
+            sites = new long[list.size()];
             int ii = 0;
-            for (int site : list) {
+            for (long site : list) {
                 sites[ii++] = site;
             }
             m_upExecutionSitesExcludingSite.put( excludedSite, sites);
@@ -519,14 +518,14 @@ public class SiteTracker {
     /**
      * @return A Set of all the execution site IDs in the cluster.
      */
-    public Set<Integer> getExecutionSiteIds()
+    public Set<Long> getExecutionSiteIds()
     {
-        Set<Integer> exec_sites = new HashSet<Integer>(m_sites.size());
+        Set<Long> exec_sites = new HashSet<Long>(m_sites.size());
         for (Site site : m_sites)
         {
             if (site.getIsexec())
             {
-                exec_sites.add(Integer.parseInt(site.getTypeName()));
+                exec_sites.add(Long.parseLong(site.getTypeName()));
             }
         }
         return exec_sites;
@@ -553,9 +552,9 @@ public class SiteTracker {
      * @param hostId
      * @return the ID of the lowest execution site on the given hostId
      */
-    public Integer getLowestLiveExecSiteIdForHost(int hostId)
+    public Long getLowestLiveExecSiteIdForHost(int hostId)
     {
-        ArrayList<Integer> sites = getLiveExecutionSitesForHost(hostId);
+        ArrayList<Long> sites = getLiveExecutionSitesForHost(hostId);
         return Collections.min(sites);
     }
 
@@ -567,8 +566,8 @@ public class SiteTracker {
      * @param time The current system time in ms from epoch
      * @param siteIds A set of VoltDB site ids.
      */
-    void noteSentMessage(long time, int... siteIds) {
-        for (int id : siteIds)
+    void noteSentMessage(long time, long... siteIds) {
+        for (long id : siteIds)
             m_lastHeartbeatTime.put(id, time);
     }
 
@@ -580,15 +579,15 @@ public class SiteTracker {
      * @param timeout
      * @return An array of site ids.
      */
-    int[] getSitesWhichNeedAHeartbeat(long time, long timeout) {
+    long[] getSitesWhichNeedAHeartbeat(long time, long timeout) {
         int index = 0;
-        for (Entry<Integer, Long> e : m_lastHeartbeatTime.entrySet()) {
+        for (Entry<Long, Long> e : m_lastHeartbeatTime.entrySet()) {
             long siteTime = e.getValue();
             if ((time - siteTime) >= timeout)
                 m_tempOldSitesScratch[index++] = e.getKey();
         }
 
-        int[] retval = new int[index];
+        long[] retval = new long[index];
         for (int i = 0; i < index; i++)
             retval[i] = m_tempOldSitesScratch[i];
 
@@ -598,18 +597,18 @@ public class SiteTracker {
     /*
      * Get an array of local sites that need heartbeats. This will get individually generated heartbeats.
      */
-    public int[] getLocalHeartbeatTargets() {
+    public long[] getLocalHeartbeatTargets() {
         return m_localHeartbeatTargets;
     }
 
     /*
      * An array per up host, there will be no entry for this host
      */
-    public int[][] getRemoteHeartbeatTargets() {
+    public long[][] getRemoteHeartbeatTargets() {
         return m_remoteHeartbeatTargets;
     }
 
-    public int getFirstNonExecSiteForHost(int hostId) {
+    public long getFirstNonExecSiteForHost(int hostId) {
         return m_firstNonExecSiteForHost[hostId];
     }
 }
