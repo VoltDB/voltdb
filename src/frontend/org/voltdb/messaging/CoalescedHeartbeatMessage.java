@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltdb.messaging.VoltDbMessageFactory;
 
 public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
 
@@ -80,7 +81,7 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(COALESCED_HEARTBEAT_ID);
+        buf.put(VoltDbMessageFactory.COALESCED_HEARTBEAT_ID);
         super.flattenToBuffer(buf);
         buf.put((byte)m_destinationSiteIds.length);
         for (int ii = 0; ii < m_destinationSiteIds.length; ii++) {

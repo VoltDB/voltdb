@@ -224,23 +224,6 @@ public class ForeignHost {
             hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
-//        else
-//        {
-//            if (current_delta > 0)
-//            {
-//                m_histo[(int)(current_delta / 100)]++;
-//                m_deltas++;
-//                if (m_deltas > 200000)
-//                {
-//                    System.out.println("Delta histo to host: " + m_hostId);
-//                    for (int i = 0; i < 11; i++)
-//                    {
-//                        System.out.println("\t" + i + ": " + m_histo[i]);
-//                    }
-//                    m_deltas = 0;
-//                }
-//            }
-//        }
     }
 
 
@@ -283,7 +266,8 @@ public class ForeignHost {
             recvDests[i] = in.getLong();
         }
 
-        final VoltMessage message = VoltMessage.createMessageFromBuffer(in, sourceHSId);
+        final VoltMessage message =
+            m_hostMessenger.getMessageFactory().createMessageFromBuffer(in, sourceHSId);
 
         for (int i = 0; i < destCount; i++) {
             deliverMessage( recvDests[i], message);

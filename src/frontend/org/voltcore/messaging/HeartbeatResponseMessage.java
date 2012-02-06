@@ -60,7 +60,7 @@ public class HeartbeatResponseMessage extends VoltMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) {
-        buf.put(HEARTBEAT_RESPONSE_ID);
+        buf.put(VoltMessageFactory.HEARTBEAT_RESPONSE_ID);
 
         buf.putLong(m_execHSId);
         buf.putLong(m_lastReceivedTxnId);

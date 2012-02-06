@@ -84,7 +84,7 @@ public class RecoveryMessage extends VoltMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(RECOVERY_ID);
+        buf.put(VoltMessageFactory.RECOVERY_ID);
         buf.putLong( m_sourceHSId);
         buf.putLong( m_txnId);
         buf.putInt(m_address.length);

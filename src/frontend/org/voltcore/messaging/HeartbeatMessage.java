@@ -47,7 +47,7 @@ public class HeartbeatMessage extends TransactionInfoBaseMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(HEARTBEAT_ID);
+        buf.put(VoltMessageFactory.HEARTBEAT_ID);
         super.flattenToBuffer(buf);
 
         buf.putLong(m_lastSafeTxnId);

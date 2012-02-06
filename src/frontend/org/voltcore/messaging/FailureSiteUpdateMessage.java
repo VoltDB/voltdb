@@ -68,7 +68,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) {
-        buf.put(FAILURE_SITE_UPDATE_ID);
+        buf.put(VoltMessageFactory.FAILURE_SITE_UPDATE_ID);
         buf.putLong(m_sourceHSId);
         buf.putInt(m_failedHSIds.size());
         for (Long hostId : m_failedHSIds) {

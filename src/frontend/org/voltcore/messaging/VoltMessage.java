@@ -22,92 +22,14 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.VoltDB;
 
-public abstract class VoltMessage {
-    // Identify each message
-    final public static byte INITIATE_TASK_ID = 1;
-    final public static byte INITIATE_RESPONSE_ID = 2;
-    final public static byte FRAGMENT_TASK_ID = 3;
-    final public static byte FRAGMENT_RESPONSE_ID = 4;
-    final public static byte PARTICIPANT_NOTICE_ID = 5;
-    final public static byte HEARTBEAT_ID = 6;
-    final public static byte HEARTBEAT_RESPONSE_ID = 7;
-    final public static byte FAILURE_SITE_UPDATE_ID = 9;
-    final public static byte RECOVERY_ID = 10;
-    final public static byte COMPLETE_TRANSACTION_ID = 11;
-    final public static byte COMPLETE_TRANSACTION_RESPONSE_ID = 12;
-    final public static byte AGREEMENT_TASK_ID = 13;
-    final public static byte BINARY_PAYLOAD_ID = 14;
-    final public static byte COALESCED_HEARTBEAT_ID = 15;
-
+public abstract class VoltMessage
+{
     // place holder for destination site ids when using multi-cast
     final public static int SEND_TO_MANY = -2;
 
     public long m_sourceHSId = -1;
 
     protected byte m_subject;
-
-    public static VoltMessage createMessageFromBuffer(ByteBuffer buffer, long sourceHSId) {
-        byte type = buffer.get();
-
-        // instantiate a new message instance according to the id
-        VoltMessage message = instantiate(type);
-        message.m_sourceHSId = sourceHSId;
-        message.initFromBuffer(buffer.slice().asReadOnlyBuffer());
-        return message;
-    }
-
-    private static VoltMessage instantiate(byte messageType) {
-        // instantiate a new message instance according to the id
-        VoltMessage message = null;
-
-        switch (messageType) {
-//        case INITIATE_TASK_ID:
-//            message = new InitiateTaskMessage();
-//            break;
-//        case INITIATE_RESPONSE_ID:
-//            message = new InitiateResponseMessage();
-//            break;
-//        case FRAGMENT_TASK_ID:
-//            message = new FragmentTaskMessage();
-//            break;
-//        case FRAGMENT_RESPONSE_ID:
-//            message = new FragmentResponseMessage();
-//            break;
-//        case PARTICIPANT_NOTICE_ID:
-//            message = new MultiPartitionParticipantMessage();
-//            break;
-            case HEARTBEAT_ID:
-                message = new HeartbeatMessage();
-                break;
-//        case COALESCED_HEARTBEAT_ID:
-//            message = new CoalescedHeartbeatMessage();
-//            break;
-        case HEARTBEAT_RESPONSE_ID:
-            message = new HeartbeatResponseMessage();
-            break;
-        case FAILURE_SITE_UPDATE_ID:
-            message = new FailureSiteUpdateMessage();
-            break;
-        case RECOVERY_ID:
-            message = new RecoveryMessage();
-            break;
-//        case COMPLETE_TRANSACTION_ID:
-//            message = new CompleteTransactionMessage();
-//            break;
-//        case COMPLETE_TRANSACTION_RESPONSE_ID:
-//            message = new CompleteTransactionResponseMessage();
-//            break;
-        case AGREEMENT_TASK_ID:
-            message = new AgreementTaskMessage();
-            break;
-        case BINARY_PAYLOAD_ID:
-            message = new BinaryPayloadMessage();
-            break;
-        default:
-            VoltDB.crashLocalVoltDB("Unrecognized message type " + messageType, true, null);
-        }
-        return message;
-    }
 
     public int getSerializedSize() {
         return 1;

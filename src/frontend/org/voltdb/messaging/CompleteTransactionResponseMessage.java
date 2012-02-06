@@ -61,7 +61,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        buf.put(COMPLETE_TRANSACTION_RESPONSE_ID);
+        buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_RESPONSE_ID);
         int msgsize = 4 + 8;
 
         buf.putLong(m_executionSiteId);

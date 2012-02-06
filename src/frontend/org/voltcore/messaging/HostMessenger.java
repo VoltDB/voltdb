@@ -17,14 +17,10 @@
 
 package org.voltcore.messaging;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,35 +30,24 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.VoltDB;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.MiscUtils;
-import org.voltcore.utils.Pair;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONObject;
 
 public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, InterfaceToMessenger {
 
@@ -75,6 +60,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         public int internalPort = 3021;
         public int deadHostTimeout = 10000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
+        public VoltMessageFactory factory = new VoltMessageFactory();
 
         public Config(String coordIp, int coordPort) {
             coordinatorIp = new InetSocketAddress(coordIp, coordPort);
@@ -202,6 +188,11 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         return m_network;
     }
 
+    public VoltMessageFactory getMessageFactory()
+    {
+        return m_config.factory;
+    }
+
     /**
      * Wait until all the nodes have built a mesh.
      */
@@ -219,7 +210,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
             putForeignHost(hostId, fhost);
             fhost.register(this);
-            fhost.enabledRead();
+            fhost.enableRead();
         } catch (java.io.IOException e) {
             VoltDB.crashLocalVoltDB("", true, e);
         }
@@ -280,7 +271,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
             putForeignHost(hostId, fhost);
             fhost.register(this);
-            fhost.enabledRead();
+            fhost.enableRead();
             if (!m_agreementSite.requestJoin((AGREEMENT_SITE_ID << 32) + hostId).await(60, TimeUnit.SECONDS)) {
                 reportForeignHostFailed(hostId);
             }
@@ -378,7 +369,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
          * to enable read
          */
         for (ForeignHost fh : m_foreignHosts.get().values()) {
-            fh.enabledRead();
+            fh.enableRead();
         }
         m_agreementSite.start();
         m_agreementSite.waitForRecovery();

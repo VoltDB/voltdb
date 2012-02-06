@@ -74,7 +74,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        buf.put(COMPLETE_TRANSACTION_ID);
+        buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_ID);
         super.flattenToBuffer(buf);
         buf.put(m_isRollback ? (byte) 1 : (byte) 0);
         buf.put(m_requiresAck ? (byte) 1 : (byte) 0);

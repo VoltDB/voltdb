@@ -56,7 +56,7 @@ public class BinaryPayloadMessage extends VoltMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(BINARY_PAYLOAD_ID);
+        buf.put(VoltMessageFactory.BINARY_PAYLOAD_ID);
         buf.putShort((short)m_metadata.length);
         buf.put(m_metadata);
         if (m_payload == null) {

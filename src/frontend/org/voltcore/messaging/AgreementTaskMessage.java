@@ -123,7 +123,7 @@ public class AgreementTaskMessage extends VoltMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(AGREEMENT_TASK_ID);
+        buf.put(VoltMessageFactory.AGREEMENT_TASK_ID);
 
         buf.putLong(m_txnId);
         buf.putLong(m_initiatorHSId);

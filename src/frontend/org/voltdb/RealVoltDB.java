@@ -98,6 +98,7 @@ import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
@@ -733,10 +734,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             VoltDB.crashVoltDB();
         }
 
+        org.voltcore.messaging.HostMessenger.Config hmconfig =
+            new org.voltcore.messaging.HostMessenger.Config(
+                leader.getHostAddress(), m_config.m_internalPort);
+        hmconfig.factory = new VoltDbMessageFactory();
         m_messenger =
-            new org.voltcore.messaging.HostMessenger(
-                    new org.voltcore.messaging.HostMessenger.Config(
-                        leader.getHostAddress(), m_config.m_internalPort));
+            new org.voltcore.messaging.HostMessenger(hmconfig);
 
         hostLog.l7dlog( Level.TRACE, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { numberOfNodes, leader }, null);
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
