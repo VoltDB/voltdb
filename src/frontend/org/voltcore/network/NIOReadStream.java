@@ -46,8 +46,6 @@ package org.voltcore.network;
 
 import java.io.IOException;
 import java.nio.channels.ReadableByteChannel;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.ArrayDeque;
 
 import org.voltcore.utils.DBBPool.BBContainer;
