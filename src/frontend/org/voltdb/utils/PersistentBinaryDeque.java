@@ -32,7 +32,7 @@ import java.util.TreeMap;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * A deque that specializes in providing persistence of binary objects to disk. Any object placed

@@ -34,7 +34,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -69,7 +69,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * that rely on being able to serialize large results sets will get the same amount of storage
      * when using the IPC backend.
      **/
-    private final BBContainer deserializerBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+    private final BBContainer deserializerBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
     private FastDeserializer deserializer =
         new FastDeserializer(deserializerBufferOrigin.b);
 
@@ -79,7 +79,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     private ByteBuffer fallbackBuffer = null;
 
-    private final BBContainer exceptionBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
+    private final BBContainer exceptionBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
     private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b;
 
     /**

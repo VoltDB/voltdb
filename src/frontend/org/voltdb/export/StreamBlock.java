@@ -19,8 +19,8 @@ package org.voltdb.export;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 public class StreamBlock {
 

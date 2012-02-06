@@ -246,7 +246,7 @@ class Distributer {
         String name;
     }
 
-    class NodeConnection extends VoltProtocolHandler implements org.voltdb.network.QueueMonitor {
+    class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final HashMap<Long, CallbackBookeeping> m_callbacks;
         private final HashMap<String, ProcedureStats> m_stats

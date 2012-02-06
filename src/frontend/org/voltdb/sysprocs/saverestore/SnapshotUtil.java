@@ -58,8 +58,8 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltFile;
 
 public class SnapshotUtil {

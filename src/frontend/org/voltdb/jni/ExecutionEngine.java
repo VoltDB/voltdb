@@ -35,7 +35,7 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.LogKeys;
 
 /**

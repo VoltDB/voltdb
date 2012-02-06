@@ -44,7 +44,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 /**
  * Access the TABLE, PRCOEDURE, INITIATOR, IOSTATS, or PARTITIONCOUNT statistics.

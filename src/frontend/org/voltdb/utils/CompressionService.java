@@ -24,9 +24,9 @@ import java.nio.ByteBuffer;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.Base64;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.xerial.snappy.Snappy;
 
 public final class CompressionService {

@@ -23,7 +23,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 public class IOStats extends StatsSource {
     private Map<Long, Pair<String, long[]>> m_ioStats =

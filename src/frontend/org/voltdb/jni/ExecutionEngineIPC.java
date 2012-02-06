@@ -41,7 +41,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -549,7 +549,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_connection = new Connection(target, port);
 
         // voltdbipc assumes host byte order everywhere
-        m_dataNetworkOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+        m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
         m_dataNetwork = m_dataNetworkOrigin.b;
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();

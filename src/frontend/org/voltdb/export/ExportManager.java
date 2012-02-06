@@ -32,7 +32,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 

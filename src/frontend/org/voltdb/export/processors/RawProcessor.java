@@ -38,12 +38,12 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.network.Connection;
-import org.voltdb.network.InputHandler;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.network.Connection;
+import org.voltcore.network.InputHandler;
+import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.NotImplementedException;
 

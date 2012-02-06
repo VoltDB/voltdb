@@ -25,7 +25,7 @@ import org.voltdb.utils.PersistentBinaryDeque;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.VoltFile;
 
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

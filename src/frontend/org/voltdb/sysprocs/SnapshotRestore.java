@@ -65,12 +65,12 @@ import org.voltdb.sysprocs.saverestore.SavedTableConverter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.sysprocs.saverestore.TableSaveFileState;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
 import org.json_voltpatches.*;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 @ProcInfo (
         singlePartition = false
@@ -549,7 +549,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 {
                     VoltTable table = null;
 
-                    final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
+                    final org.voltcore.utils.DBBPool.BBContainer c = savefile.getNextChunk();
                     if (c == null) {
                         continue;//Should be equivalent to break
                     }
@@ -1311,7 +1311,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         try {
             while (savefile.hasMoreChunks())
             {
-                final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
+                final org.voltcore.utils.DBBPool.BBContainer c = savefile.getNextChunk();
                 if (c == null) {
                     continue;//Should be equivalent to break
                 }
@@ -1422,7 +1422,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 "SUCCESS", "NO DATA TO DISTRIBUTE");
         final Table new_catalog_table = getCatalogTable(tableName);
         Boolean needsConversion = null;
-        org.voltdb.utils.DBBPool.BBContainer c = null;
+        org.voltcore.utils.DBBPool.BBContainer c = null;
         try {
             while (hasMoreChunks())
             {

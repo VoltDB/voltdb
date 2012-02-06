@@ -39,7 +39,7 @@ import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.network.Connection;
+import org.voltcore.network.Connection;
 import org.voltdb.utils.ResponseSampler;
 
 /**

@@ -22,7 +22,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * InputStream implementation that can present data stored in ByteBuffers

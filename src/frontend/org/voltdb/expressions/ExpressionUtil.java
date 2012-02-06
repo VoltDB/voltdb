@@ -26,7 +26,7 @@ import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.NotImplementedException;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltTypeUtil;
 
 /**

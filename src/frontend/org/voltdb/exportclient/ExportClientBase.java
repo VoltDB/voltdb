@@ -32,7 +32,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.BandwidthMonitor;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 /**
  * Provides an extensible base class for writing Export clients

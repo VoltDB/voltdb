@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 
 

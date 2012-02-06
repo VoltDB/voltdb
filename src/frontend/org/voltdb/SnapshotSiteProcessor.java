@@ -31,9 +31,9 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Pair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 
 
@@ -180,7 +180,7 @@ public class SnapshotSiteProcessor {
     private long m_quietUntil = 0;
 
     private boolean inQuietPeriod() {
-        return org.voltdb.utils.EstTime.currentTimeMillis() < m_quietUntil;
+        return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
     }
 
     /**
@@ -226,11 +226,11 @@ public class SnapshotSiteProcessor {
 
     void initializeBufferPool() {
         for (int ii = 0; ii < SnapshotSiteProcessor.m_numSnapshotBuffers; ii++) {
-            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
+            final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
             m_snapshotBufferOrigins.add(origin);
             long snapshotBufferAddress = 0;
             if (VoltDB.getLoadLibVOLTDB()) {
-                snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+                snapshotBufferAddress = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
             }
             m_availableSnapshotBuffers.offer(new BBContainer(origin.b, snapshotBufferAddress) {
                 @Override

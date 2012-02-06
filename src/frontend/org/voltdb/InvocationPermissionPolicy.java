@@ -38,7 +38,7 @@ public class InvocationPermissionPolicy extends InvocationAcceptancePolicy {
      *
      * @see org.voltdb.InvocationAcceptancePolicy#shouldAccept(org.voltdb.AuthSystem.AuthUser,
      *      org.voltdb.StoredProcedureInvocation, org.voltdb.catalog.Procedure,
-     *      org.voltdb.network.WriteStream)
+     *      org.voltcore.network.WriteStream)
      */
     @Override
     public ClientResponseImpl shouldAccept(AuthUser user,
@@ -63,7 +63,7 @@ public class InvocationPermissionPolicy extends InvocationAcceptancePolicy {
      * @see org.voltdb.InvocationAcceptancePolicy#shouldAccept(org.voltdb.AuthSystem.AuthUser,
      *      org.voltdb.StoredProcedureInvocation,
      *      org.voltdb.SystemProcedureCatalog.Config,
-     *      org.voltdb.network.WriteStream)
+     *      org.voltcore.network.WriteStream)
      */
     @Override
     public ClientResponseImpl shouldAccept(AuthUser user,

@@ -34,7 +34,7 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 
 

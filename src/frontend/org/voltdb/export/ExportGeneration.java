@@ -24,14 +24,15 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool;
+
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.VoltFile;
 
 /**
