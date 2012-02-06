@@ -662,8 +662,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 final ClientResponseImpl error = handleRead(message, this, c);
                 if (error != null) {
                     ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize());
-                    error.flattenToBuffer(buf);
-                    c.writeStream().enqueue(new ByteBuffer[]{buf});
+                    c.writeStream().enqueue(error.flattenToBuffer(buf));
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -1630,15 +1629,33 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void enqueue(org.voltcore.utils.DeferredSerialization ds)
         {
-            // TODO Auto-generated method stub
+            throw new UnsupportedOperationException();
+        }
 
+        @Override
+        public void enqueue(ByteBuffer b)
+        {
+            ClientResponseImpl resp = new ClientResponseImpl();
+            try
+            {
+                resp.initFromBuffer(b);
+            }
+            catch (IOException ioe)
+            {
+                hostLog.error("Unable to deserialize ClientResponse from snapshot",
+                              ioe);
+                return;
+            }
+            m_snapshotDaemon.processClientResponse(resp,
+                                                   resp.getClientHandle());
         }
 
         @Override
         public void enqueue(ByteBuffer[] b)
         {
-            // TODO Auto-generated method stub
-
+            // Buffer chains are currently not used, just hand the first
+            // buffer to the single buffer handler
+            enqueue(b[0]);
         }
     }
 
