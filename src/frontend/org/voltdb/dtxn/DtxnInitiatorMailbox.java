@@ -222,16 +222,16 @@ public class DtxnInitiatorMailbox implements Mailbox
 
             state = m_pendingTxns.get(r.getTxnId());
 
-            assert(m_hsId == r.getInitiatorSiteId());
+            assert(m_hsId == r.getInitiatorHSId());
 
             // if this is a dummy response, make sure the m_pendingTxns list thinks
             // the site has been removed from the list
             if (r.isRecovering()) {
-                toSend = state.addFailedOrRecoveringResponse(r.getCoordinatorSiteId());
+                toSend = state.addFailedOrRecoveringResponse(r.getCoordinatorHSId());
             }
             // otherwise update the InFlightTxnState with the response
             else {
-                toSend = state.addResponse(r.getCoordinatorSiteId(), r.getClientResponseData());
+                toSend = state.addResponse(r.getCoordinatorHSId(), r.getClientResponseData());
             }
 
             if (state.hasAllResponses()) {

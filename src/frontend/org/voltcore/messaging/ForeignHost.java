@@ -18,7 +18,6 @@
 package org.voltcore.messaging;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -63,7 +62,7 @@ public class ForeignHost {
         }
 
         @Override
-        public void handleMessage(ByteBuffer message, Connection c) {
+        public void handleMessage(ByteBuffer message, Connection c) throws IOException {
             handleRead(message, c);
         }
 
@@ -253,8 +252,9 @@ public class ForeignHost {
 
     /** Read data from the network. Runs in the context of Port when
      * data is available.
+     * @throws IOException
      */
-    private void handleRead(ByteBuffer in, Connection c) {
+    private void handleRead(ByteBuffer in, Connection c) throws IOException {
         // port is locked by VoltNetwork when in valid use.
         // assert(m_port.m_lock.tryLock() == true);
         long recvDests[] = null;

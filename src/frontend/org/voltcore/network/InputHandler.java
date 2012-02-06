@@ -43,8 +43,9 @@ public interface InputHandler {
      *
      * @param message
      * @param channelFacade
+     * @throws IOException
      */
-    void handleMessage(ByteBuffer message, Connection c);
+    void handleMessage(ByteBuffer message, Connection c) throws IOException;
 
     /**
      * Notify the input handler that the Connection will start receiving work

@@ -1230,7 +1230,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             if (info instanceof HeartbeatMessage) {
                 // use the heartbeat to unclog the priority queue if clogged
                 long lastSeenTxnFromInitiator = m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(
-                        info.getInitiatorSiteId(), info.getTxnId(),
+                        info.getInitiatorHSId(), info.getTxnId(),
                         true, ((HeartbeatMessage) info).getLastSafeTxnId());
 
                 // respond to the initiator with the last seen transaction
@@ -1247,7 +1247,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 return;
             }
             else if (info instanceof InitiateTaskMessage) {
-                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorSiteId(),
+                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorHSId(),
                                                   info.getTxnId(),
                                                   false,
                                                   ((InitiateTaskMessage) info).getLastSafeTxnId());
@@ -1256,7 +1256,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             // and don't communicate any information about safe replication, hence DUMMY_LAST_SEEN_TXN_ID
             // it can be used for global ordering since it is a valid txnid from an initiator
             else if (info instanceof MultiPartitionParticipantMessage) {
-                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorSiteId(),
+                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorHSId(),
                                                   info.getTxnId(),
                                                   false,
                                                   DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
@@ -1470,7 +1470,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         if (notice instanceof InitiateTaskMessage) {
             InitiateTaskMessage task = (InitiateTaskMessage)notice;
-            assert (task.getInitiatorSiteId() != getSiteId());
+            assert (task.getInitiatorHSId() != getSiteId());
         }
     }
 
