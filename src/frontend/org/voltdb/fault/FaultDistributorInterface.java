@@ -83,5 +83,5 @@ public interface FaultDistributorInterface
      * @param newFailedSiteIds
      * @return
      */
-    public abstract PPDPolicyDecision makePPDPolicyDecisions(HashSet<Integer> newFailedSiteIds);
+    public abstract PPDPolicyDecision makePPDPolicyDecisions(HashSet<Long> newFailedSiteIds);
 }

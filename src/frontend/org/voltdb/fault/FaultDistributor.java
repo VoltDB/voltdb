@@ -408,7 +408,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     }
 
     @Override
-    public PPDPolicyDecision makePPDPolicyDecisions(HashSet<Integer> newFailedSiteIds)
+    public PPDPolicyDecision makePPDPolicyDecisions(HashSet<Long> newFailedSiteIds)
     {
         if (!m_partitionDetectionEnabled) {
             return PPDPolicyDecision.NodeFailure;
@@ -424,7 +424,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
 
         // collapse failed sites into failed hosts
         final HashSet<Integer> failedHosts = new HashSet<Integer>();
-        for (Integer siteId : newFailedSiteIds) {
+        for (Long siteId : newFailedSiteIds) {
             failedHosts.add(tracker.getHostForSite(siteId));
         }
 
