@@ -48,11 +48,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.network;
+package org.voltcore.network;
 
 import java.nio.channels.ReadableByteChannel;
 import java.nio.ByteBuffer;
-import org.voltdb.network.NIOReadStream;
+import org.voltcore.network.NIOReadStream;
 import junit.framework.TestCase;
 import java.io.IOException;
 import org.voltcore.utils.DBBPool;

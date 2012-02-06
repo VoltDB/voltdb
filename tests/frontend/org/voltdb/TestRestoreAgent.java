@@ -67,7 +67,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.TransactionInitiator;
-import org.voltdb.network.WriteStream;
+import org.voltcore.network.WriteStream;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.zk.ZKTestBase;

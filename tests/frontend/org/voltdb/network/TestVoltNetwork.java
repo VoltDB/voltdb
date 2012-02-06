@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.network;
+package org.voltcore.network;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

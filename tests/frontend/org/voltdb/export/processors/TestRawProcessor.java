@@ -38,14 +38,14 @@ import org.voltdb.export.*;
 import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltcore.messaging.MessagingException;
-import org.voltdb.network.WriteStream;
+import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.DeferredSerialization;
 
 public class TestRawProcessor extends TestCase {
 
-    static class MockWriteStream extends org.voltdb.network.MockWriteStream {
+    static class MockWriteStream extends org.voltcore.network.MockWriteStream {
         DBBPool pool = new DBBPool();
 
         LinkedBlockingDeque<ExportProtoMessage> writequeue =
@@ -68,7 +68,7 @@ public class TestRawProcessor extends TestCase {
         }
     }
 
-    static class MockConnection extends org.voltdb.network.MockConnection {
+    static class MockConnection extends org.voltcore.network.MockConnection {
         MockWriteStream m_writeStream = new MockWriteStream();
 
         @Override

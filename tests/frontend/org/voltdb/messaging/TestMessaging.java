@@ -41,7 +41,7 @@ import junit.framework.TestCase;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.network.VoltNetwork;
+import org.voltcore.network.VoltNetwork;
 import org.voltcore.utils.DBBPool;
 
 public class TestMessaging extends TestCase {

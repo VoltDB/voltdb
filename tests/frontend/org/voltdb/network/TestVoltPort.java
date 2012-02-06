@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.network;
+package org.voltcore.network;
 
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;

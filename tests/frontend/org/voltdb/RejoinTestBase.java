@@ -47,7 +47,7 @@ import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Mailbox;
-import org.voltdb.network.VoltNetwork;
+import org.voltcore.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;

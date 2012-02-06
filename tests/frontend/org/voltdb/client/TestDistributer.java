@@ -40,10 +40,10 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.network.Connection;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltNetwork;
-import org.voltdb.network.VoltProtocolHandler;
+import org.voltcore.network.Connection;
+import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltNetwork;
+import org.voltcore.network.VoltProtocolHandler;
 
 public class TestDistributer extends TestCase {
 

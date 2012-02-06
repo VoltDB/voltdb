@@ -56,7 +56,7 @@ import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MockMailbox;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.network.VoltNetwork;
+import org.voltcore.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
 {

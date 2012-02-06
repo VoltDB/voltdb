@@ -40,7 +40,7 @@ import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.network.WriteStream;
+import org.voltcore.network.WriteStream;
 import org.voltdb.utils.EstTime;
 
 public class TestDtxnInitiatorMailbox extends TestCase
@@ -51,7 +51,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
     MockVoltDB m_mockVolt = null;
 
-    class MockWriteStream extends org.voltdb.network.MockWriteStream
+    class MockWriteStream extends org.voltcore.network.MockWriteStream
     {
         boolean m_gotResponse;
 
@@ -83,7 +83,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
     };
 
-    class MockConnection extends org.voltdb.network.MockConnection
+    class MockConnection extends org.voltcore.network.MockConnection
     {
         MockWriteStream m_writeStream;
 

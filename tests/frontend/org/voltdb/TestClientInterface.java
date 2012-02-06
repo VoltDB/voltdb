@@ -49,8 +49,8 @@ import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.LocalObjectMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
-import org.voltdb.network.Connection;
-import org.voltdb.network.VoltNetwork;
+import org.voltcore.network.Connection;
+import org.voltcore.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
