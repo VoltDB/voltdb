@@ -21,10 +21,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 
-import org.voltdb.types.ConstraintType;
-import org.voltdb.*;
+import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
+import org.voltdb.types.ConstraintType;
 
 /**
  * Exception generated when a constraint is violated. Contains more information then a SQLException.
@@ -148,10 +149,11 @@ public class ConstraintFailureException extends SQLException {
     }
 
     @Override
-    protected void p_serializeToBuffer(ByteBuffer b) throws IOException {
+    protected void p_serializeToBuffer(ByteBuffer b) {
         super.p_serializeToBuffer(b);
         b.putInt(type.getValue());
-        FastSerializer.writeString(tableName, b);
+        b.putInt(tableName.length());
+        b.put(tableName.getBytes());
         b.putInt(buffer.capacity());
         buffer.rewind();
         b.put(buffer);
