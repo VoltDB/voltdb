@@ -36,9 +36,9 @@ public class InFlightTxnState implements Serializable {
 
     public InFlightTxnState(
             long txnId,
-            int firstCoordinatorId,
-            ArrayList<Integer> coordinatorReplicas,
-            int otherSiteIds[],
+            long firstCoordinatorId,
+            ArrayList<Long> coordinatorReplicas,
+            long otherSiteIds[],
             boolean isReadOnly,
             boolean isSinglePartition,
             StoredProcedureInvocation invocation,
@@ -66,12 +66,12 @@ public class InFlightTxnState implements Serializable {
         outstandingResponses = 1;
 
         if (isSinglePartition) {
-            outstandingCoordinators = new HashSet<Integer>();
+            outstandingCoordinators = new HashSet<Long>();
             outstandingCoordinators.add(firstCoordinatorId);
         }
     }
 
-    public void addCoordinator(int coordinatorId) {
+    public void addCoordinator(long coordinatorId) {
         assert(isSinglePartition);
         if (outstandingCoordinators.add(coordinatorId))
             outstandingResponses++;
@@ -203,7 +203,7 @@ public class InFlightTxnState implements Serializable {
         sb.append("IN_FLIGHT_TXN_STATE");
         sb.append("\n  TXN_ID: " + txnId);
         sb.append("\n  OUTSTANDING_COORDINATOR_IDS: ");
-        for (int id : outstandingCoordinators)
+        for (long id : outstandingCoordinators)
             sb.append(id).append(" ");
 
         sb.append("\n  OTHER_SITE_IDS: ");
@@ -228,7 +228,7 @@ public class InFlightTxnState implements Serializable {
     }
 
     public final long txnId;
-    public final int otherSiteIds[];
+    public final long otherSiteIds[];
     public final boolean isReadOnly;
     public final boolean isSinglePartition;
     transient public final StoredProcedureInvocation invocation;
@@ -244,9 +244,9 @@ public class InFlightTxnState implements Serializable {
     //    one coord goes here
     //    if k > 0: the complete set of coords is stored
     //        in the outstandingCoordinators set
-    public final int firstCoordinatorId;
+    public final long firstCoordinatorId;
 
-    public final ArrayList<Integer> coordinatorReplicas;
+    public final ArrayList<Long> coordinatorReplicas;
 
     protected int outstandingResponses = 1;
 
@@ -258,7 +258,7 @@ public class InFlightTxnState implements Serializable {
     //////////////////////////////////////////////////
 
     // list of coordinators that have not responded
-    Set<Integer> outstandingCoordinators = null;
+    Set<Long> outstandingCoordinators = null;
 
     // the response queued to be sent to the client
     // note, this is only needed for write transactions
