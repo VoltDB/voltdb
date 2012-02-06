@@ -62,7 +62,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public FragmentResponseMessage(FragmentTaskMessage task, int siteId) {
+    public FragmentResponseMessage(FragmentTaskMessage task, long siteId) {
         m_executorHSId = siteId;
         m_txnId = task.getTxnId();
         m_destinationHSId = task.getCoordinatorHSId();

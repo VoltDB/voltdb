@@ -270,7 +270,7 @@ class WorkUnit
         }
     }
 
-    void putDependency(int dependencyId, int siteId, VoltTable payload) {
+    void putDependency(int dependencyId, long siteId, VoltTable payload) {
         assert payload != null;
         assert m_dependencies != null;
         assert m_dependencies.containsKey(dependencyId);
@@ -305,7 +305,7 @@ class WorkUnit
     /**
      * Dependencies from recovering sites use this.
      */
-    void putDummyDependency(int dependencyId, int siteId) {
+    void putDummyDependency(int dependencyId, long siteId) {
         assert m_dependencies != null;
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
@@ -335,7 +335,7 @@ class WorkUnit
         return satisfied && (m_stackCount == 0);
     }
 
-    void removeSite(int siteId)
+    void removeSite(long siteId)
     {
         if (m_dependencies != null)
         {
