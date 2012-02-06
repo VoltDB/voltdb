@@ -93,7 +93,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals("database", s.getDatabase());
             assertEquals(table_name, s.getTableName());
             assertEquals(m_part, s.getPartitionId());
-            assertEquals(m_site, s.getSiteId());
+            assertEquals(m_site, s.getHSId());
             assertEquals(table.getSignature(), s.getSignature());
             // There are 6 additional Export columns added
             assertEquals(2 + 6, s.m_columnNames.size());

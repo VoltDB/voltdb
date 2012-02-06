@@ -36,8 +36,8 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.network.InputHandler;
 import org.voltdb.network.QueueMonitor;
@@ -334,12 +334,12 @@ public class RawProcessor implements ExportDataProcessor {
         }
 
         @Override
-        protected void flattenToBuffer(DBBPool pool) {
+        public void flattenToBuffer(ByteBuffer buf) {
             throw new NotImplementedException("Invalid serialization request.");
         }
 
         @Override
-        protected void initFromBuffer() {
+        protected void initFromBuffer(ByteBuffer buf) {
             throw new NotImplementedException("Invalid serialization request.");
         }
     }

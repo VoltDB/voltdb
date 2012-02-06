@@ -35,7 +35,7 @@ import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.MessagingException;
+import org.voltcore.messaging.MessagingException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -54,7 +54,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final String m_database;
     private final String m_tableName;
     private final String m_signature;
-    private final int m_siteId;
+    private final long m_HSId;
     private final long m_generation;
     private final int m_partitionId;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
@@ -72,14 +72,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param tableName
      * @param isReplicated
      * @param partitionId
-     * @param siteId
+     * @param HSId
      * @param tableId
      * @param catalogMap
      */
     public ExportDataSource(
             Runnable onDrain,
             String db, String tableName,
-            int partitionId, int siteId, String signature, long generation,
+            int partitionId, long HSId, String signature, long generation,
             CatalogMap<Column> catalogMap,
             String overflowPath) throws IOException
             {
@@ -88,7 +88,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_database = db;
         m_tableName = tableName;
 
-        String nonce = signature + "_" + siteId + "_" + partitionId;
+        String nonce = signature + "_" + HSId + "_" + partitionId;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
@@ -99,7 +99,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          */
         m_signature = signature;
         m_partitionId = partitionId;
-        m_siteId = siteId;
+        m_HSId = HSId;
 
         // Add the Export meta-data columns to the schema followed by the
         // catalog columns for this table.
@@ -131,7 +131,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         exportLog.info("Creating ad for " + nonce);
         assert(!adFile.exists());
         FastSerializer fs = new FastSerializer();
-        fs.writeInt(m_siteId);
+        fs.writeLong(m_HSId);
         fs.writeString(m_database);
         writeAdvertisementTo(fs);
         FileOutputStream fos = new FileOutputStream(adFile);
@@ -159,7 +159,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         FastDeserializer fds = new FastDeserializer(data);
 
-        m_siteId = fds.readInt();
+        m_HSId = fds.readLong();
         m_database = fds.readString();
         m_generation = fds.readLong();
         m_partitionId = fds.readInt();
@@ -173,7 +173,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_columnTypes.add(columnType);
         }
 
-        String nonce = m_signature + "_" + m_siteId + "_" + m_partitionId;
+        String nonce = m_signature + "_" + m_HSId + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
         // compute the number of bytes necessary to hold one bit per
@@ -341,8 +341,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_signature;
     }
 
-    public int getSiteId() {
-        return m_siteId;
+    public long getHSId() {
+        return m_HSId;
     }
 
     public int getPartitionId() {
@@ -382,7 +382,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return result;
         }
 
-        result = (m_siteId - o.m_siteId);
+        result = Long.signum(m_HSId - o.m_HSId);
         if (result != 0) {
             return result;
         }

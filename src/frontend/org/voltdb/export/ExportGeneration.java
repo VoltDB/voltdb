@@ -216,9 +216,9 @@ public class ExportGeneration {
             Table table, int hostId, CatalogContext catalogContext)
     {
         SiteTracker siteTracker = catalogContext.siteTracker;
-        ArrayList<Integer> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
+        ArrayList<Long> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
 
-        for (Integer site : sites) {
+        for (Long site : sites) {
             Integer partition = siteTracker.getPartitionForSite(site);
             /*
              * IOException can occur if there is a problem

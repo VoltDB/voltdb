@@ -37,14 +37,10 @@ import org.voltdb.VoltType;
 import org.voltdb.export.*;
 import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.network.Connection;
-import org.voltdb.network.NIOReadStream;
+import org.voltcore.messaging.MessagingException;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.VoltFile;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 
 public class TestRawProcessor extends TestCase {
