@@ -74,7 +74,7 @@ public abstract class RecoverySiteProcessor {
         public void handleMessage(VoltMessage message, long txnId);
     }
 
-    abstract public void handleSiteFaults(HashSet<Integer> failedSites, SiteTracker tracker);
+    abstract public void handleSiteFaults(HashSet<Long> failedSites, SiteTracker tracker);
     abstract public void doRecoveryWork(long currentTxnId);
     abstract public long bytesTransferred();
 

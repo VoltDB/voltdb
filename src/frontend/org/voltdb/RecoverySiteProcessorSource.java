@@ -33,15 +33,16 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.RecoveryMessage;
+import org.voltcore.messaging.RecoveryMessageType;
+import org.voltcore.messaging.VoltMessage;
+
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.RecoveryMessageType;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.DBBPool;
@@ -64,10 +65,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      * with the length prefix at the front
      */
     final int siteIdOffset = 4;
-    final int blockIndexOffset = siteIdOffset + 4;
+    final int blockIndexOffset = siteIdOffset + 8;
     final int messageTypeOffset = blockIndexOffset + 4;
-
-
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
@@ -97,7 +96,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     /**
      * Placed in each message as a return address for acks
      */
-    private final int m_siteId;
+    private final long m_siteId;
 
     /** Used to get a txn-specific version of the catalog */
     private final ExecutionSite m_site;
@@ -120,7 +119,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      */
     private long m_destinationStoppedBeforeTxnId = Long.MAX_VALUE;
 
-    private final int m_destinationSiteId;
+    private final long m_destinationSiteId;
 
     private final SocketChannel m_sc;
 
@@ -310,6 +309,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         }
 
 
+        @SuppressWarnings("unused")
         private synchronized boolean hasOutstanding() {
             if (m_ignoreAcks) {
                 return false;
@@ -347,15 +347,15 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
          * Destinations that the recovery data is supposed to go to.
          * Will be null if this partition is a recipient.
          */
-        final int m_destinationIds[];
+        final long m_destinationIds[];
 
-        public RecoveryTable(String tableName, int tableId, HashSet<Integer> destinations) {
+        public RecoveryTable(String tableName, int tableId, HashSet<Long> destinations) {
             assert(destinations.size() == 1);
             m_name = tableName;
             m_tableId = tableId;
-            m_destinationIds = new int[destinations.size()];
+            m_destinationIds = new long[destinations.size()];
             int ii = 0;
-            for (Integer destinationId : destinations) {
+            for (Long destinationId : destinations) {
                 m_destinationIds[ii++] = destinationId;
             }
             m_phase = RecoveryMessageType.ScanTuples;
@@ -367,8 +367,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      * Because doRecoveryWork is blocking this method will eventually return back to doRecoveryWork
      */
     @Override
-    public void handleSiteFaults(HashSet<Integer> failedSites, SiteTracker tracker) {
-        int destinationSite = 0;
+    public void handleSiteFaults(HashSet<Long> failedSites, SiteTracker tracker) {
+        long destinationSite = 0;
         for (RecoveryTable table : m_tablesToStream) {
             destinationSite = table.m_destinationIds[0];
         }
@@ -446,11 +446,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     public RecoverySiteProcessorSource(
             ExecutionSite site,
             long destinationTxnId,
-            int destinationSiteId,
-            HashMap<Pair<String, Integer>, HashSet<Integer>> tableToSites,
+            long destinationSiteId,
+            HashMap<Pair<String, Integer>, HashSet<Long>> tableToSites,
             ExecutionEngine engine,
             Mailbox mailbox,
-            final int siteId,
+            final long siteId,
             Runnable onCompletion,
             MessageHandler messageHandler,
             SocketChannel sc) throws IOException {
@@ -463,7 +463,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         m_destinationSiteId = destinationSiteId;
         m_destinationStoppedBeforeTxnId = destinationTxnId;
         m_messageHandler = messageHandler;
-        for (Map.Entry<Pair<String, Integer>, HashSet<Integer>> entry : tableToSites.entrySet()) {
+        for (Map.Entry<Pair<String, Integer>, HashSet<Long>> entry : tableToSites.entrySet()) {
             if (entry.getValue().isEmpty()) {
                 continue;
             }
@@ -500,8 +500,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     " at txnId " + currentTxnId + " to site " + m_destinationSiteId);
             ByteBuffer buf = ByteBuffer.allocate(21);
             BBContainer cont = DBBPool.wrapBB(buf);
-            buf.putInt(17);//Length prefix
-            buf.putInt(m_siteId);
+            buf.putInt(21);//Length prefix
+            buf.putLong(m_siteId);
             buf.put(kEXECUTE_PAST_TXN);
             buf.putLong(currentTxnId);
             buf.putInt(0); // placeholder for USO sync string
@@ -572,8 +572,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             // write the message
             ByteBuffer buf = ByteBuffer.allocate(21 + exportUSOBytes.length);
             BBContainer cont = DBBPool.wrapBB(buf);
-            buf.putInt(17 + exportUSOBytes.length); // length prefix
-            buf.putInt(m_siteId);
+            buf.putInt(21 + exportUSOBytes.length); // length prefix
+            buf.putLong(m_siteId);
             buf.put(kSTOP_AT_TXN);
             buf.putLong(m_stopBeforeTxnId);
             buf.putInt(exportUSOBytes.length);
@@ -613,7 +613,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                  */
                 buffer.clear();
                 buffer.position(4);
-                buffer.putInt(m_siteId);
+                buffer.putLong(m_siteId);
                 buffer.putInt(m_blockIndex++);
 
                 RecoveryTable table = m_tablesToStream.peek();
@@ -746,16 +746,16 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             SiteTracker tracker,
             ExecutionEngine engine,
             Mailbox mailbox,
-            final int siteId,
+            final long siteId,
             Runnable onCompletion,
             MessageHandler messageHandler) {
-        final int destinationSiteId = rm.sourceSite();
+        final long destinationSiteId = rm.sourceSite();
         /*
          * First make sure the recovering partition didn't go down before this message was received.
          * Return null so no recovery work is done.
          */
         boolean isUp = false;
-        for (int up : tracker.getUpExecutionSites()) {
+        for (long up : tracker.getUpExecutionSites()) {
             if (destinationSiteId == up) {
                 isUp = true;
             }
@@ -774,13 +774,13 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         }
 
         recoveryLog.info("Found " + tables.size() + " tables to recover");
-        HashMap<Pair<String, Integer>, HashSet<Integer>> tableToDestinationSite =
-            new HashMap<Pair<String, Integer>, HashSet<Integer>>();
+        HashMap<Pair<String, Integer>, HashSet<Long>> tableToDestinationSite =
+            new HashMap<Pair<String, Integer>, HashSet<Long>>();
         for (Pair<String, Integer> table : tables) {
             recoveryLog.info("Initiating recovery for table " + table.getFirst());
-            HashSet<Integer> destinations = tableToDestinationSite.get(table);
+            HashSet<Long> destinations = tableToDestinationSite.get(table);
             if (destinations == null) {
-                destinations = new HashSet<Integer>();
+                destinations = new HashSet<Long>();
                 tableToDestinationSite.put(table, destinations);
             }
             destinations.add(destinationSiteId);

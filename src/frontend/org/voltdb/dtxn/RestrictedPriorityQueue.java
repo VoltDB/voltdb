@@ -198,7 +198,8 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    public long noteTransactionRecievedAndReturnLastSeen(int initiatorHSId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
+    public long noteTransactionRecievedAndReturnLastSeen(long initiatorHSId, long txnId,
+            boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
         // System.out.printf("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d\n",
         //                   m_siteId, initiatorHSId, txnId, lastSafeTxnIdFromInitiator);

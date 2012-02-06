@@ -1303,7 +1303,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     m_transactionsById.put(ts.txnId, ts);
                 } else {
                     hostLog.info(
-                            "Dropping txn " + ts.txnId + " data from failed initiatorSiteId: " + ts.initiatorSiteId);
+                            "Dropping txn " + ts.txnId + " data from failed initiatorSiteId: " + ts.initiatorHSId);
                 }
             }
 
