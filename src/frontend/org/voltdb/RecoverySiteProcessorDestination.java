@@ -44,7 +44,6 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Pair;
 

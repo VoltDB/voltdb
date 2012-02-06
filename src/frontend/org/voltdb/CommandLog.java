@@ -51,7 +51,7 @@ public interface CommandLog {
      * @param faultedTxns
      * @return null if the logger is not initialized
      */
-    public abstract Semaphore logFault(Set<Integer> failedSites, Set<Long> faultedTxns);
+    public abstract Semaphore logFault(Set<Long> failedSites, Set<Long> faultedTxns);
 
     public abstract void logHeartbeat(final long txnId);
 
