@@ -36,7 +36,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.VoltFile;
@@ -78,7 +77,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
             // Choose the lowest site ID on this host to do the deletion.
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
+            Long lowest_site_id =
                 VoltDB.instance().getCatalogContext().siteTracker.
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
