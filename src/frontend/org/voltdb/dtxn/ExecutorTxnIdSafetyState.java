@@ -199,7 +199,7 @@ public class ExecutorTxnIdSafetyState {
      * Called from the DtxnInitiatorQueue's fault handler
      * @param executorSiteId The id of the site to remove
      */
-    public void removeState(int executorSiteId) {
+    public void removeState(long executorSiteId) {
         SiteState ss = m_stateBySite.get(executorSiteId);
         if (ss == null) return;
         PartitionState ps = ss.partition;

@@ -65,10 +65,10 @@ public class DtxnInitiatorMailbox implements Mailbox
                     if (fault instanceof NodeFailureFault)
                     {
                         NodeFailureFault node_fault = (NodeFailureFault)fault;
-                        ArrayList<Integer> dead_sites =
+                        ArrayList<Long> dead_sites =
                             VoltDB.instance().getCatalogContext().siteTracker.
                             getAllSitesForHost(node_fault.getHostId());
-                        for (Integer site_id : dead_sites)
+                        for (Long site_id : dead_sites)
                         {
                             removeSite(site_id);
                             m_safetyState.removeState(site_id);
@@ -132,7 +132,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         m_pendingTxns.put(txn.txnId, txn);
     }
 
-    public void removeSite(int siteId)
+    public void removeSite(long siteId)
     {
         ArrayList<Long> txnIdsToRemove = new ArrayList<Long>();
         for (InFlightTxnState state : m_pendingTxns.values())
