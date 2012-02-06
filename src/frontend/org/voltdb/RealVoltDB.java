@@ -64,17 +64,10 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.ZKUtil;
-
 import org.voltcore.messaging.HostMessenger;
-
-import org.voltdb.compiler.AsyncCompilerAgent;
-
-import org.voltdb.dtxn.SimpleDtxnInitiator;
-
-import org.voltdb.licensetool.LicenseApi;
+import org.voltcore.network.VoltNetwork;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -84,22 +77,21 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltDbMessageFactory;
-import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;

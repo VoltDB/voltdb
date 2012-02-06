@@ -20,7 +20,6 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.network.WriteStream;
 
 /**
  * An invocation acceptance policy targeting all types of invocations in
