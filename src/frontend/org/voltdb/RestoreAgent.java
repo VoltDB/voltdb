@@ -48,7 +48,7 @@ import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionInitiator;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializable;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;

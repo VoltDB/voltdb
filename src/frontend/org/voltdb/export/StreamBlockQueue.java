@@ -19,7 +19,7 @@ package org.voltdb.export;
 import java.util.ArrayDeque;
 import java.util.Iterator;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.PersistentBinaryDeque;
 import org.voltdb.utils.BinaryDeque;

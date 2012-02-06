@@ -20,7 +20,7 @@ package org.voltdb;
 import java.util.Calendar;
 import java.util.Date;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * <p>The TransactionIdManager creates Transaction ids that

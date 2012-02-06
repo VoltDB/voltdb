@@ -30,7 +30,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Pair;

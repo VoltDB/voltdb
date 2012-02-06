@@ -30,7 +30,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.BandwidthMonitor;
 import org.voltdb.utils.Pair;
 

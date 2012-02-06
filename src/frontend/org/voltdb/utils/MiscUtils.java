@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 import org.voltdb.ReplicationRole;
 

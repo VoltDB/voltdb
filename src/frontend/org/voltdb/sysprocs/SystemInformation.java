@@ -44,7 +44,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Access key/value tables of cluster info that correspond to the REST

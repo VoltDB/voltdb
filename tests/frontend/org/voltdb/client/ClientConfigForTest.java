@@ -24,7 +24,7 @@
 package org.voltdb.client;
 
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * {@link ClientStatusListenerExt} implementation that just logs the

@@ -20,7 +20,7 @@ package org.voltdb;
 import java.util.HashSet;
 
 import org.voltcore.messaging.Mailbox;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * A class that instantiates an ExecutionSite and then waits for notification before

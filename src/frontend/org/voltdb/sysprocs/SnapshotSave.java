@@ -29,7 +29,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.*;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 @ProcInfo(singlePartition = false)

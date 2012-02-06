@@ -38,7 +38,7 @@ import java.util.zip.CRC32;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 
 public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {

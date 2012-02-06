@@ -46,7 +46,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.HTTPAdminListener.RequestHandler;
 import org.voltdb.utils.HTTPAdminListener.StudioHander;
 

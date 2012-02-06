@@ -19,8 +19,8 @@ package org.voltdb;
 
 import java.io.UnsupportedEncodingException;
 
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.LogKeys;
 
 /**

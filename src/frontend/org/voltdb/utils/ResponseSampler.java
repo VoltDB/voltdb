@@ -39,7 +39,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public abstract class ResponseSampler {
 

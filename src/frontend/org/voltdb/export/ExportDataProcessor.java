@@ -18,8 +18,7 @@
 package org.voltdb.export;
 
 import org.voltcore.network.InputHandler;
-import org.voltdb.logging.VoltLogger;
-
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Interface ExportManager imposes on processors.

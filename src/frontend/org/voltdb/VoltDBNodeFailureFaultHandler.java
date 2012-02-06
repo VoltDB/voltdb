@@ -26,7 +26,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 class VoltDBNodeFailureFaultHandler implements FaultHandler {
 

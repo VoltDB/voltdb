@@ -24,7 +24,7 @@ import org.apache.zookeeper_voltpatches.*;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public class SnapshotCompletionMonitor {
     private static final VoltLogger LOG = new VoltLogger("LOGGING");

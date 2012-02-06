@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
 
 /**

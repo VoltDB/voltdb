@@ -31,7 +31,7 @@ import java.util.NoSuchElementException;
 import java.util.TreeMap;
 import java.util.Iterator;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**

@@ -30,7 +30,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.VoltFile;
 

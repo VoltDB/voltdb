@@ -28,7 +28,7 @@ import java.util.Queue;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.BandwidthMonitor;
 import org.voltdb.utils.Pair;

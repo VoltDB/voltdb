@@ -42,7 +42,7 @@ import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Table;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;

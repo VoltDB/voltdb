@@ -26,7 +26,7 @@ import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state

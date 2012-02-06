@@ -28,7 +28,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 

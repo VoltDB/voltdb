@@ -32,7 +32,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Pair;
 

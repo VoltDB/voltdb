@@ -26,8 +26,8 @@ import java.util.HashSet;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 

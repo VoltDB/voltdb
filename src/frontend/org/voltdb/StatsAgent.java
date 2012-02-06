@@ -28,6 +28,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
@@ -38,7 +39,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CompressionService;
 
 /**

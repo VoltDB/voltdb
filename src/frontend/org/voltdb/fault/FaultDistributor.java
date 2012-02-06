@@ -31,7 +31,7 @@ import org.voltdb.VoltDBInterface;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * FaultDistributor routes VoltFaults from reporters to entities that have
