@@ -645,7 +645,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     public Mailbox createMailbox() {
         final long siteId = m_nextSiteId.getAndIncrement();
         long hsId = getHostId() + (siteId << 32);
-        SiteMailbox sm = new SiteMailbox( this, siteId);
+        SiteMailbox sm = new SiteMailbox( this, hsId);
 
         while (true) {
             HashMap<Long, Mailbox> original = m_siteMailboxes.get();
