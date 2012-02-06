@@ -26,7 +26,7 @@ import java.nio.ByteBuffer;
 
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 public class MockWriteStream implements WriteStream {
 

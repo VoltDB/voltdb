@@ -42,7 +42,7 @@ import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.network.VoltNetwork;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.DBBPool;
 
 public class TestMessaging extends TestCase {
     public static class MsgTest extends VoltMessage {

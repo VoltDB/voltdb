@@ -45,9 +45,9 @@ import org.voltdb.messaging.MockMailbox;
 import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 
 /**
  * Tests native execution engine JNI interface.
@@ -156,7 +156,7 @@ public class TestExecutionEngine extends TestCase {
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
             origin.b.clear();
-            long address = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+            long address = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
             BBContainer container = new BBContainer(origin.b, address){
 
                 @Override

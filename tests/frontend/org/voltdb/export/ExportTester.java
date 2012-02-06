@@ -36,7 +36,7 @@ import java.util.Map.Entry;
 import org.voltdb.benchmark.ClientMain;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 public class ExportTester extends ClientMain {
 

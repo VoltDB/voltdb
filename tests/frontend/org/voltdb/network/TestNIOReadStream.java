@@ -55,7 +55,7 @@ import java.nio.ByteBuffer;
 import org.voltdb.network.NIOReadStream;
 import junit.framework.TestCase;
 import java.io.IOException;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.DBBPool;
 
 public class TestNIOReadStream extends TestCase {
     MockReadableByteChannel channel;

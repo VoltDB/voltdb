@@ -49,9 +49,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.StatsUploaderSettings;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltSampler;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * Base class for clients that will work with the multi-host multi-process

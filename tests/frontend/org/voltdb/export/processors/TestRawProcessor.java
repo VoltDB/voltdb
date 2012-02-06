@@ -39,7 +39,7 @@ import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltcore.messaging.MessagingException;
 import org.voltdb.network.WriteStream;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.DeferredSerialization;
 

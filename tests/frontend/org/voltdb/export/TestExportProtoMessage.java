@@ -30,8 +30,8 @@ import junit.framework.TestCase;
 
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 
 public class TestExportProtoMessage extends TestCase {

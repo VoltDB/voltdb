@@ -48,7 +48,7 @@ import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 /**
  * Some utility functions to compile SQL statements for plan generation tests.

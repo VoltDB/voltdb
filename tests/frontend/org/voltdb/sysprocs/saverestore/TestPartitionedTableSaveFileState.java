@@ -35,7 +35,7 @@ import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 
 public class TestPartitionedTableSaveFileState extends TestCase

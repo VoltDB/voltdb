@@ -38,7 +38,7 @@ import static org.junit.Assert.*;
 
 import org.voltdb.*;
 import org.voltdb.network.*;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.*;

@@ -50,7 +50,7 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.DBBPool;
 
 /**
  *

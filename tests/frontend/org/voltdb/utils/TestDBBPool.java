@@ -28,7 +28,7 @@ import java.util.ArrayList;
 import java.util.Random;
 import junit.framework.TestCase;
 
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 public class TestDBBPool extends TestCase {
 

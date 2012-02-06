@@ -57,8 +57,8 @@ import junit.framework.*;
 import java.nio.channels.SelectionKey;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.EstTimeUpdater;
 
@@ -276,7 +276,7 @@ public class TestNIOWriteStream extends TestCase {
         tmp2.put((byte)8);
         tmp2.flip();
         wstream.enqueue(tmp2);
-        org.voltdb.utils.DBBPool.BBContainer containers[] = wstream.swapAndSerializeQueuedWrites(pool);
+        org.voltcore.utils.DBBPool.BBContainer containers[] = wstream.swapAndSerializeQueuedWrites(pool);
         wrote += wstream.drainTo( channel, containers);
         assertFalse(wstream.isEmpty());
         // wrote half of half of the first buffer (note +=)

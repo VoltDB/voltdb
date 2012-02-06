@@ -34,7 +34,7 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.DBBPool;
 
 public class TestVoltMessageSerialization extends TestCase {
 

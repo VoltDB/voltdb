@@ -66,7 +66,7 @@ import org.voltdb.network.MockWriteStream;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.CommandLog;
 
 public class SimpleDtxnInitiatorTest extends TestCase {

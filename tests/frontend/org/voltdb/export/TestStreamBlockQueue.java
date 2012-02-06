@@ -33,7 +33,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.*;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.VoltFile;
 
 public class TestStreamBlockQueue {

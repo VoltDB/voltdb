@@ -37,9 +37,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.Pair;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * This test also provides pretty good coverage of DefaultSnapshotTarget
