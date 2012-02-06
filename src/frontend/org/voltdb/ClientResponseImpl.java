@@ -36,14 +36,16 @@ import org.voltdb.utils.ByteArrayUtils;
  * procedure response in one FastSerialziable object.
  *
  */
-public class ClientResponseImpl implements FastSerializable, ClientResponse, JSONString {
+public class ClientResponseImpl implements ClientResponse, JSONString {
     private static final int MAX_HASH_BYTES = 1024 * 10; // hash the first 10k
 
     private boolean setProperly = false;
     private byte status = 0;
     private String statusString = null;
+    private byte encodedStatusString[];
     private byte appStatus = Byte.MIN_VALUE;
     private String appStatusString = null;
+    private byte encodedAppStatusString[];
     private VoltTable[] results = new VoltTable[0];
 
     private int clusterRoundTripTime = 0;
@@ -163,8 +165,8 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         return m_exception;
     }
 
-    @Override
-    public void readExternal(FastDeserializer in) throws IOException {
+    public void initFromBuffer(ByteBuffer buf) throws IOException {
+        FastDeserializer in = new FastDeserializer(buf);
         in.readByte();//Skip version byte
         clientHandle = in.readLong();
         byte presentFields = in.readByte();
@@ -190,11 +192,33 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         setProperly = true;
     }
 
-    @Override
-    public void writeExternal(FastSerializer out) throws IOException {
+    public int getSerializedSize() {
+        int msgsize = 1 + 8 + 1 + 1 + 1 + 4 + 2;
+        try {
+            if (appStatusString != null) {
+                encodedAppStatusString = appStatusString.getBytes("UTF-8");
+                msgsize += encodedAppStatusString.length + 4;
+            }
+            if (statusString != null) {
+                encodedStatusString = statusString.getBytes("UTF-8");
+                msgsize += encodedStatusString.length + 4;
+            }
+            if (m_exception != null) {
+                msgsize += 4 + m_exception.getSerializedSize();
+            }
+            for (VoltTable vt : results) {
+                msgsize += vt.getSerializedSize();
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error serializing client response", false, e);
+        }
+        return msgsize;
+    }
+
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
         assert setProperly;
-        out.writeByte(0);//version
-        out.writeLong(clientHandle);
+        buf.put((byte)0);//version
+        buf.putLong(clientHandle);
         byte presentFields = 0;
         if (appStatusString != null) {
             presentFields |= 1 << 7;
@@ -205,22 +229,22 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         if (statusString != null) {
             presentFields |= 1 << 5;
         }
-        out.writeByte(presentFields);
-        out.write(status);
+        buf.put(presentFields);
+        buf.put(status);
         if (statusString != null) {
-            out.writeString(statusString);
+            FastSerializer.writeString(encodedStatusString, buf);
         }
-        out.write(appStatus);
+        buf.put(appStatus);
         if (appStatusString != null) {
-            out.writeString(appStatusString);
+            FastSerializer.writeString(encodedAppStatusString, buf);
         }
-        out.writeInt(clusterRoundTripTime);
+        buf.putInt(clusterRoundTripTime);
         if (m_exception != null) {
             final ByteBuffer b = ByteBuffer.allocate(m_exception.getSerializedSize());
             m_exception.serializeToBuffer(b);
-            out.write(b.array());
+            buf.put(b.array());
         }
-        out.writeArray(results);
+        FastSerializer.writeArray(results, buf);
     }
 
     @Override

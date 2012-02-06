@@ -1362,11 +1362,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     }
 
     public void flattenToBuffer(ByteBuffer buf) {
-        int startPosition = m_buffer.position();
-        buf.putInt(m_buffer.limit());
-        m_buffer.position(0);
-        buf.put(m_buffer);
-        m_buffer.position(startPosition);
+        ByteBuffer dup = m_buffer.duplicate();
+        buf.putInt(dup.limit());
+        dup.position(0);
+        buf.put(dup);
     }
 
     void initFromBuffer(ByteBuffer buf) {
