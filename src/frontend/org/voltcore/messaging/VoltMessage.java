@@ -34,7 +34,7 @@ public abstract class VoltMessage
     }
 
     protected abstract void initFromBuffer(ByteBuffer buf) throws IOException;
-    public abstract void flattenToBuffer(ByteBuffer buf);
+    protected abstract void flattenToBuffer(ByteBuffer buf) throws IOException;
 
     public byte getSubject() {
         return m_subject;

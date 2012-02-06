@@ -151,6 +151,79 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         }
     }
 
+    public int getSerializedSize()
+    {
+        int size = 1 // Version/type
+            + 4 // proc name string length
+            + procName.length()
+            + 8; // clientHandle
+
+        if (type == ProcedureInvocationType.REPLICATED)
+        {
+            size += 8; // original TXN ID for WAN replication procedures
+        }
+
+        if (unserializedParams != null)
+        {
+            size += unserializedParams.remaining();
+        }
+        else if (params != null)
+        {
+            size += getParams().getSerializedSize();
+        }
+
+        return size;
+    }
+
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
+    {
+        assert(!((params == null) && (unserializedParams == null)));
+        assert((params != null) || (unserializedParams != null));
+        buf.put(type.getValue()); //version and type, version is currently 0
+        if (type == ProcedureInvocationType.REPLICATED) {
+            buf.putLong(originalTxnId);
+        }
+        buf.putInt(procName.length());
+        buf.put(procName.getBytes());
+        buf.putLong(clientHandle);
+        if (unserializedParams != null)
+            buf.put(unserializedParams.array(),
+                    unserializedParams.position() + unserializedParams.arrayOffset(),
+                    unserializedParams.remaining());
+        else if (params != null) {
+            getParams().flattenToBuffer(buf);
+        }
+    }
+
+    public void initFromBuffer(ByteBuffer buf) throws IOException
+    {
+        FastDeserializer in = new FastDeserializer(buf);
+        byte version = in.readByte();// version number also embeds the type
+        type = ProcedureInvocationType.typeFromByte(version);
+
+        /*
+         * If it's a replicated invocation, there should be two txn IDs
+         * following the version byte. The first txn ID is the new txn ID, the
+         * second one is the original txn ID.
+         */
+        if (type == ProcedureInvocationType.REPLICATED) {
+            originalTxnId = in.readLong();
+        }
+
+        procName = in.readString();
+        clientHandle = in.readLong();
+        // do not deserialize parameters in ClientInterface context
+        unserializedParams = in.remainder();
+        final ByteBuffer duplicate = unserializedParams.duplicate();
+        params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+            @Override
+            public ParameterSet call() throws Exception {
+                FastDeserializer fds = new FastDeserializer(duplicate);
+                return fds.readObject(ParameterSet.class);
+            }
+        });
+    }
+
     @Override
     public void readExternal(FastDeserializer in) throws IOException {
         byte version = in.readByte();// version number also embeds the type

@@ -16,6 +16,7 @@
  */
 package org.voltdb.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.HeartbeatMessage;
@@ -64,7 +65,7 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) {
+    public void initFromBuffer(ByteBuffer buf) throws IOException {
         super.initFromBuffer(buf);
         final int numHeartbeats = buf.get();
         m_messages = new HeartbeatMessage[numHeartbeats];
@@ -78,7 +79,7 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) {
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.COALESCED_HEARTBEAT_ID);
         super.flattenToBuffer(buf);
         buf.put((byte)m_destinationHSIds.length);

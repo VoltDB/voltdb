@@ -212,7 +212,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf)
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.FRAGMENT_TASK_ID);
         super.flattenToBuffer(buf);
@@ -265,7 +265,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf)
+    public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         super.initFromBuffer(buf);
 

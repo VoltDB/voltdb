@@ -17,6 +17,7 @@
 
 package org.voltcore.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 
@@ -79,7 +80,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) {
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.putLong(m_initiatorHSId);
         buf.putLong(m_coordinatorHSId);
         buf.putLong(m_txnId);
@@ -87,7 +88,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) {
+    public void initFromBuffer(ByteBuffer buf) throws IOException {
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
         m_txnId = buf.getLong();

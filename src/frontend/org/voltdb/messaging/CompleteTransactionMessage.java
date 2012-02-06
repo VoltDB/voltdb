@@ -17,6 +17,7 @@
 
 package org.voltdb.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -71,7 +72,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf)
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_ID);
         super.flattenToBuffer(buf);
@@ -82,7 +83,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf)
+    public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         super.initFromBuffer(buf);
         m_isRollback = buf.get() == 1;
