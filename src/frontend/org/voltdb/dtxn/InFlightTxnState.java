@@ -157,7 +157,7 @@ public class InFlightTxnState implements Serializable {
         return null;
     }
 
-    public ClientResponseImpl addFailedOrRecoveringResponse(int coordinatorId) {
+    public ClientResponseImpl addFailedOrRecoveringResponse(long coordinatorId) {
         // verify this transaction has the right coordinator
         if (outstandingCoordinators != null) {
             boolean success = outstandingCoordinators.remove(coordinatorId);
@@ -187,7 +187,7 @@ public class InFlightTxnState implements Serializable {
         return outstandingResponses == 0;
     }
 
-    public boolean siteIsCoordinator(int coordinatorId) {
+    public boolean siteIsCoordinator(long coordinatorId) {
         // for single-partition txns
         if (outstandingCoordinators != null)
             return outstandingCoordinators.contains(coordinatorId);
