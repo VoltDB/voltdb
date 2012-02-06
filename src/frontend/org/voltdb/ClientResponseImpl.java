@@ -27,8 +27,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.ByteArrayUtils;
 
 /**
@@ -341,7 +339,6 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             byte[] digest = md.digest();
             return ByteArrayUtils.bytesToInt(digest, 0);
         } catch (NoSuchAlgorithmException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             return 0;
         }
