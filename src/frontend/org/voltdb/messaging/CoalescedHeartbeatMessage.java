@@ -16,20 +16,18 @@
  */
 package org.voltdb.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.messaging.VoltDbMessageFactory;
 
 public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
 
-    private final long m_destinationSiteIds[];
+    private final long m_destinationHSIds[];
     private final long m_lastSafeTxnIds[];
 
     public CoalescedHeartbeatMessage() {
-        m_destinationSiteIds = null;
+        m_destinationHSIds = null;
         m_lastSafeTxnIds = null;
     }
 
@@ -39,12 +37,12 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
     private HeartbeatMessage m_messages[];
     private long m_messageDestinations[];
 
-    public CoalescedHeartbeatMessage(long initiatorSiteId, long txnId,
-                                     long destinationSiteIds[],
+    public CoalescedHeartbeatMessage(long initiatorHSId, long txnId,
+                                     long destinationHSIds[],
                                      long lastSafeTxnIds[])
     {
-        super(initiatorSiteId, -1, txnId, true);
-        m_destinationSiteIds = destinationSiteIds;
+        super(initiatorHSId, -1, txnId, true);
+        m_destinationHSIds = destinationHSIds;
         m_lastSafeTxnIds = lastSafeTxnIds;
     }
 
@@ -61,7 +59,7 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
     {
         int msgsize = super.getSerializedSize();
         msgsize += 1 + // storage of count of heartbeat messages
-            m_destinationSiteIds.length * (8 + 8);  // Two longs per coalesced message
+            m_destinationHSIds.length * (8 + 8);  // Two longs per coalesced message
         return msgsize;
     }
 
@@ -80,12 +78,12 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+    public void flattenToBuffer(ByteBuffer buf) {
         buf.put(VoltDbMessageFactory.COALESCED_HEARTBEAT_ID);
         super.flattenToBuffer(buf);
-        buf.put((byte)m_destinationSiteIds.length);
-        for (int ii = 0; ii < m_destinationSiteIds.length; ii++) {
-            buf.putLong(m_destinationSiteIds[ii]);
+        buf.put((byte)m_destinationHSIds.length);
+        for (int ii = 0; ii < m_destinationHSIds.length; ii++) {
+            buf.putLong(m_destinationHSIds[ii]);
             buf.putLong(m_lastSafeTxnIds[ii]);
         }
         assert(buf.capacity() == buf.position());

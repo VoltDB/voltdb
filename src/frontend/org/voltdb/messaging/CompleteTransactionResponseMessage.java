@@ -17,7 +17,6 @@
 
 package org.voltdb.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
@@ -25,7 +24,7 @@ import org.voltcore.utils.MiscUtils;
 
 public class CompleteTransactionResponseMessage extends VoltMessage
 {
-    long m_executionSiteId;
+    long m_executionHSId;
     long m_txnId;
 
     /** Empty constructor for de-serialization */
@@ -36,7 +35,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public CompleteTransactionResponseMessage(CompleteTransactionMessage msg,
                                               long siteId)
     {
-        m_executionSiteId = siteId;
+        m_executionHSId = siteId;
         m_txnId = msg.getTxnId();
     }
 
@@ -47,7 +46,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
 
     public long getExecutionSiteId()
     {
-        return m_executionSiteId;
+        return m_executionHSId;
     }
 
     @Override
@@ -59,12 +58,10 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException
+    public void flattenToBuffer(ByteBuffer buf)
     {
         buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_RESPONSE_ID);
-        int msgsize = 4 + 8;
-
-        buf.putLong(m_executionSiteId);
+        buf.putLong(m_executionHSId);
         buf.putLong(m_txnId);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -73,7 +70,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     @Override
     protected void initFromBuffer(ByteBuffer buf)
     {
-        m_executionSiteId = buf.getLong();
+        m_executionHSId = buf.getLong();
         m_txnId = buf.getLong();
         assert(buf.capacity() == buf.position());
     }
@@ -84,7 +81,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
 
         sb.append("COMPLETE_TRANSACTION_RESPONSE");
         sb.append(" (FROM EXEC SITE: ");
-        sb.append(MiscUtils.hsIdToString(m_executionSiteId));
+        sb.append(MiscUtils.hsIdToString(m_executionHSId));
         sb.append(") FOR TXN ID: ");
         sb.append(m_txnId);
 

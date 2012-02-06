@@ -17,7 +17,6 @@
 
 package org.voltdb.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -35,8 +34,8 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
     /**
      * These four args needed for base class
-     * @param initiatorSiteId
-     * @param coordinatorSiteId
+     * @param initiatorHSId
+     * @param coordinatorHSId
      * @param txnId
      * @param isReadOnly
      *
@@ -44,11 +43,11 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
      * @param requiresAck  Does the recipient need to respond to this message
      *                     with a CompleteTransactionResponseMessage?
      */
-    public CompleteTransactionMessage(long initiatorSiteId, long coordinatorSiteId,
+    public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId,
                                       long txnId, boolean isReadOnly,
                                       boolean isRollback, boolean requiresAck)
     {
-        super(initiatorSiteId, coordinatorSiteId, txnId, isReadOnly);
+        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
         m_isRollback = isRollback;
         m_requiresAck = requiresAck;
     }
@@ -72,7 +71,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException
+    public void flattenToBuffer(ByteBuffer buf)
     {
         buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_ID);
         super.flattenToBuffer(buf);
