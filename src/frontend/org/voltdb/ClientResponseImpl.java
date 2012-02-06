@@ -215,9 +215,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return msgsize;
     }
 
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+    public void flattenToBuffer(ByteBuffer buf) {
         assert setProperly;
-        buf.put((byte)0);//version
+        buf.put((byte)0); //version
         buf.putLong(clientHandle);
         byte presentFields = 0;
         if (appStatusString != null) {
@@ -232,11 +232,13 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         buf.put(presentFields);
         buf.put(status);
         if (statusString != null) {
-            FastSerializer.writeString(encodedStatusString, buf);
+            buf.putInt(encodedStatusString.length);
+            buf.put(encodedStatusString);
         }
         buf.put(appStatus);
         if (appStatusString != null) {
-            FastSerializer.writeString(encodedAppStatusString, buf);
+            buf.putInt(encodedAppStatusString.length);
+            buf.put(encodedAppStatusString);
         }
         buf.putInt(clusterRoundTripTime);
         if (m_exception != null) {
@@ -244,7 +246,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             m_exception.serializeToBuffer(b);
             buf.put(b.array());
         }
-        FastSerializer.writeArray(results, buf);
+        for (VoltTable vt : results)
+        {
+            vt.flattenToBuffer(buf);
+        }
     }
 
     @Override

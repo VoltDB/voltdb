@@ -145,7 +145,12 @@ public class ConstraintFailureException extends SQLException {
     @Override
     protected int p_getSerializedSize() {
         // ... + 8 + string prefix + string length + ...
-        return super.p_getSerializedSize() + 8 + 4 + tableName.length() + buffer.capacity();
+        return super.p_getSerializedSize()
+            + 4 // constraint type
+            + 4 // table name string length
+            + tableName.length()
+            + 4 // buffer length
+            + buffer.capacity();
     }
 
     @Override

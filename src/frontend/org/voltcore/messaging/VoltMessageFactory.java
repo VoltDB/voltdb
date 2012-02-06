@@ -17,6 +17,7 @@
 
 package org.voltcore.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.VoltDB;
@@ -35,7 +36,9 @@ public class VoltMessageFactory {
     // will be sad, and I will have no sympathy. --izzy
     final public static byte VOLTCORE_MESSAGE_ID_MAX = 6;
 
-    public VoltMessage createMessageFromBuffer(ByteBuffer buffer, long sourceHSId) {
+    public VoltMessage createMessageFromBuffer(ByteBuffer buffer, long sourceHSId)
+    throws IOException
+    {
         byte type = buffer.get();
 
         // instantiate a new message instance according to the id
