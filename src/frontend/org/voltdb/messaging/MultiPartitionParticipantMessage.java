@@ -17,8 +17,11 @@
 
 package org.voltdb.messaging;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.utils.DBBPool;
+import org.voltcore.utils.MiscUtils;
 
 public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage {
 
@@ -26,35 +29,32 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
         super();
     }
 
-    public MultiPartitionParticipantMessage(int initiatorSiteId,
-                                           int coordinatorSiteId,
-                                           long txnId,
-                                           boolean isReadOnly) {
-        super(initiatorSiteId, coordinatorSiteId, txnId, isReadOnly);
+    public MultiPartitionParticipantMessage(long initiatorHSId,
+                                            long coordinatorHSId,
+                                            long txnId,
+                                            boolean isReadOnly) {
+        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
     }
 
     @Override
-    protected void flattenToBuffer(DBBPool pool) {
-        int msgsize = super.getMessageByteCount();
-
-        if (m_buffer == null) {
-            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
-            m_buffer = m_container.b;
-        }
-        setBufferSize(msgsize + 1, pool);
-
-        m_buffer.position(HEADER_SIZE);
-        m_buffer.put(PARTICIPANT_NOTICE_ID);
-
-        super.writeToBuffer();
-
-        m_buffer.limit(m_buffer.position());
+    public int getSerializedSize()
+    {
+        int msgsize = super.getSerializedSize();
+        return msgsize;
     }
 
     @Override
-    protected void initFromBuffer() {
-        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        super.readFromBuffer();
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
+    {
+        buf.put(VoltDbMessageFactory.PARTICIPANT_NOTICE_ID);
+        super.flattenToBuffer(buf);
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
+    }
+
+    @Override
+    public void initFromBuffer(ByteBuffer buf) throws IOException {
+        super.initFromBuffer(buf);
     }
 
     @Override
@@ -62,9 +62,7 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
         StringBuilder sb = new StringBuilder();
 
         sb.append("MULTI_PARTITION_PARTICIPANT (FROM ");
-        sb.append(m_coordinatorSiteId);
-        sb.append(" TO ");
-        sb.append(receivedFromSiteId);
+        sb.append(MiscUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 
