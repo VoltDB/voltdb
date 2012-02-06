@@ -78,17 +78,12 @@ import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
-import org.voltdb.messaging.FailureSiteUpdateMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.HeartbeatMessage;
-import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.LocalObjectMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
@@ -464,7 +459,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                             new CompleteTransactionResponseMessage(complete, m_siteId);
                         try
                         {
-                            m_mailbox.send(complete.getCoordinatorHSId(), 0, ctrm);
+                            m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
                         }
                         catch (MessagingException e) {
                             throw new RuntimeException(e);
@@ -482,7 +477,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         }
 
                         try {
-                            m_mailbox.send(response.getDestinationHSId(), 0, response);
+                            m_mailbox.send(response.getDestinationHSId(), response);
                         } catch (MessagingException e) {
                             throw new RuntimeException(e);
                         }
@@ -1238,7 +1233,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         m_siteId, lastSeenTxnFromInitiator,
                         m_transactionQueue.getQueueState() == QueueState.BLOCKED_SAFETY);
                 try {
-                    m_mailbox.send(info.getInitiatorSiteId(), VoltDB.DTXN_MAILBOX_ID, response);
+                    m_mailbox.send(info.getInitiatorHSId(), response);
                 } catch (MessagingException e) {
                     // hope this never happens... it doesn't right?
                     throw new RuntimeException(e);
@@ -1284,7 +1279,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                             new CompleteTransactionResponseMessage(complete, m_siteId);
                         try
                         {
-                            m_mailbox.send(complete.getCoordinatorSiteId(), 0, ctrm);
+                            m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
                         }
                         catch (MessagingException e) {
                             throw new RuntimeException(e);
@@ -1612,7 +1607,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                      //txnId,
                                                      lastKnownGloballyCommitedMultiPartTxnId);
 
-                    m_mailbox.send(survivors, 0, srcmsg);
+                    m_mailbox.send(survivors, srcmsg);
                     expectedResponses += (survivors.length);
                 }
             }
