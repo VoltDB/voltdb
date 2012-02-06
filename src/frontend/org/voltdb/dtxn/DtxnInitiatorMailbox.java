@@ -29,6 +29,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.messaging.HostMessenger;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
@@ -37,7 +38,6 @@ import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
-import org.voltcore.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.utils.ResponseSampler;

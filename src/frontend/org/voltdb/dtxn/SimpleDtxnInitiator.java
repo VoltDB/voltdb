@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.Messenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.StoredProcedureInvocation;
@@ -60,7 +61,6 @@ import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
@@ -116,7 +116,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             new DtxnInitiatorMailbox(
                     siteId,
                     m_safetyState,
-                    (org.voltdb.messaging.HostMessenger)messenger);
+                    (org.voltcore.messaging.HostMessenger)messenger);
         messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, m_mailbox);
         m_mailbox.setInitiator(this);
     }
