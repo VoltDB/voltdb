@@ -37,17 +37,17 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.agreement.AgreementSite;
-import org.voltdb.agreement.ZKUtil;
+import org.voltcore.agreement.AgreementSite;
+import org.voltcore.agreement.ZKUtil;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.Mailbox;
-import org.voltcore.network.VoltNetwork;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -170,7 +170,7 @@ public class RejoinTestBase extends TestCase {
         // start the fake HostMessenger
         InMemoryJarfile jarFile = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar"));
         retval.catalogCRC = jarFile.getCRC();
-        VoltNetwork network2 = new VoltNetwork();
+        VoltNetworkPool network2 = new VoltNetworkPool();
         InetAddress leader = InetAddress.getByName("localhost");
         HostMessenger host2 = new HostMessenger(network2, leader, 2, 0, deploymentCRC, null);
 

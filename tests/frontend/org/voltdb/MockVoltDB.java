@@ -50,13 +50,13 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Messenger;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.Messenger;
 import org.voltdb.messaging.MockMailbox;
-import org.voltdb.messaging.VoltMessage;
-import org.voltcore.network.VoltNetwork;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.VoltNetworkPool;
 
 public class MockVoltDB implements VoltDBInterface
 {
@@ -358,7 +358,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public VoltNetwork getNetwork()
+    public VoltNetworkPool getNetwork()
     {
         return null;
     }

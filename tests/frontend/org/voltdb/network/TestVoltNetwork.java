@@ -37,7 +37,7 @@ public class TestVoltNetwork extends TestCase {
 
 
     private static class MockVoltPort extends VoltPort {
-        MockVoltPort(VoltNetwork vn, InputHandler handler) {
+        MockVoltPort(VoltNetworkPool vn, InputHandler handler) {
             super (vn, handler, handler.getExpectedOutgoingMessageSize(), "");
         }
 
@@ -238,7 +238,7 @@ public class TestVoltNetwork extends TestCase {
 
     public void testInstallInterests() throws InterruptedException {
         new MockSelector();
-        VoltNetwork vn = new VoltNetwork();
+        VoltNetworkPool vn = new VoltNetworkPool();
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
         MockSelectionKey selectionKey = new MockSelectionKey();
         vp.m_selectionKey = selectionKey;
@@ -265,7 +265,7 @@ public class TestVoltNetwork extends TestCase {
 
     public void testInvokeCallbacks() throws InterruptedException{
         MockSelector selector = new MockSelector();
-        VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
+        VoltNetworkPool vn = new VoltNetworkPool(selector);               // network with fake selector
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
         MockSelectionKey selectionKey = new MockSelectionKey();   // fake selection key
 

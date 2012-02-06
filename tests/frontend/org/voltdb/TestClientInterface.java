@@ -45,12 +45,12 @@ import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
 import org.voltcore.network.Connection;
-import org.voltcore.network.VoltNetwork;
+import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -96,7 +96,7 @@ public class TestClientInterface {
         doReturn(agreementSite).when(m_volt).getAgreementSite();
 
         // Set up CI with the mock objects.
-        VoltNetwork network = mock(VoltNetwork.class);
+        VoltNetworkPool network = mock(VoltNetworkPool.class);
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
                                        m_context, network, ReplicationRole.NONE,
                                        100, m_initiator, m_allPartitions));

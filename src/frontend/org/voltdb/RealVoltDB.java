@@ -68,7 +68,7 @@ import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.ZKUtil;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.network.VoltNetwork;
+import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -1535,7 +1535,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public VoltNetwork getNetwork() {
+    public VoltNetworkPool getNetwork() {
         return m_network;
     }
 

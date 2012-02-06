@@ -41,7 +41,7 @@ import org.voltcore.messaging.MessagingException;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.VoltFile;
-import org.voltdb.utils.DeferredSerialization;
+import org.voltcore.utils.DeferredSerialization;
 
 public class TestRawProcessor extends TestCase {
 

@@ -55,7 +55,7 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
-import org.voltcore.network.VoltNetwork;
+import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.EstTime;
@@ -215,7 +215,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public class ClientAcceptor implements Runnable {
         private final int m_port;
         private final ServerSocketChannel m_serverSocket;
-        private final VoltNetwork m_network;
+        private final VoltNetworkPool m_network;
         private volatile boolean m_running = true;
         private Thread m_thread = null;
         private final boolean m_isAdmin;
@@ -234,7 +234,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         });
 
-        ClientAcceptor(int port, VoltNetwork network, boolean isAdmin)
+        ClientAcceptor(int port, VoltNetworkPool network, boolean isAdmin)
         {
             m_network = network;
             m_port = port;
@@ -805,7 +805,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * settings.
      */
     public static ClientInterface create(
-            VoltNetwork network,
+            VoltNetworkPool network,
             Messenger messenger,
             CatalogContext context,
             ReplicationRole replicationRole,
@@ -835,7 +835,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return ci;
     }
 
-    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network,
+    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetworkPool network,
                     ReplicationRole replicationRole, int siteId, TransactionInitiator initiator,
                     int[] allPartitions)
     {

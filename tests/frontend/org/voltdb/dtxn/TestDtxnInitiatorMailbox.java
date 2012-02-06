@@ -37,11 +37,11 @@ import org.voltdb.VoltType;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.HostMessenger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltcore.network.WriteStream;
-import org.voltdb.utils.EstTime;
+import org.voltcore.utils.EstTime;
 
 public class TestDtxnInitiatorMailbox extends TestCase
 {

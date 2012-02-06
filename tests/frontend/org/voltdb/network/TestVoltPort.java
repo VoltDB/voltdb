@@ -36,7 +36,7 @@ import junit.framework.*;
 public class TestVoltPort extends TestCase {
 
     // stub some addToChangeList for test
-    private static class MockVoltNetwork extends VoltNetwork {
+    private static class MockVoltNetwork extends VoltNetworkPool {
 
         public MockVoltNetwork() {
             super();

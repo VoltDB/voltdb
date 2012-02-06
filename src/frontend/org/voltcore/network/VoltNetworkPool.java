@@ -40,6 +40,10 @@ public class VoltNetworkPool {
     private final VoltNetwork m_networks[];
     private final AtomicLong m_nextWorkerSelection = new AtomicLong();
 
+    public VoltNetworkPool() {
+        this(1, null);
+    }
+
     public VoltNetworkPool(int numThreads, ScheduledExecutorService ses) {
         m_networks = new VoltNetwork[numThreads];
         for (int ii = 0; ii < numThreads; ii++) {

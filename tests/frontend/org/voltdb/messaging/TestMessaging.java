@@ -41,8 +41,8 @@ import junit.framework.TestCase;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
-import org.voltcore.network.VoltNetwork;
-import org.voltcore.utils.DBBPool;
+import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.messaging.VoltMessage;
 
 public class TestMessaging extends TestCase {
     public static class MsgTest extends VoltMessage {
@@ -103,7 +103,7 @@ public class TestMessaging extends TestCase {
         static final int msgCount = 1024;
         static final int hostCount = 3;
         static final int mailboxCount = 5;
-        static VoltNetwork network = new VoltNetwork();
+        static VoltNetworkPool network = new VoltNetworkPool();
 
         static Lock hostMessengerLock = new ReentrantLock();
         static Messenger[] messengers = new HostMessenger[hostCount];
@@ -347,7 +347,7 @@ public class TestMessaging extends TestCase {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        VoltNetwork network = new VoltNetwork();
+        VoltNetworkPool network = new VoltNetworkPool();
         network.start();
         HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
         Thread.sleep(20);
@@ -414,7 +414,7 @@ public class TestMessaging extends TestCase {
     }
 
     public void testMultiMailbox() throws MessagingException, UnknownHostException, InterruptedException {
-        VoltNetwork network = new VoltNetwork();
+        VoltNetworkPool network = new VoltNetworkPool();
         network.start();
         HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
         Thread.sleep(20);
@@ -562,7 +562,7 @@ public class TestMessaging extends TestCase {
                 ServerSocketChannel listener = ServerSocketChannel.open();
                 listener.socket().bind(new InetSocketAddress(m_port));
 
-                VoltNetwork network = new VoltNetwork();
+                VoltNetworkPool network = new VoltNetworkPool();
                 network.start();
                 HostMessenger msg = new HostMessenger(network, listener, 2, 0, 0, null);
                 m_ready.set(true);
@@ -587,7 +587,7 @@ public class TestMessaging extends TestCase {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        VoltNetwork network = new VoltNetwork();
+        VoltNetworkPool network = new VoltNetworkPool();
         network.start();
         HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
         Thread.sleep(20);

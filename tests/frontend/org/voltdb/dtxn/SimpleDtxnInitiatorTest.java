@@ -57,15 +57,15 @@ import junit.framework.TestCase;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.Messenger;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.Messenger;
 import org.voltdb.messaging.MockMailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.network.MockConnection;
 import org.voltcore.network.MockWriteStream;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
-import org.voltdb.utils.DeferredSerialization;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.CommandLog;
 
