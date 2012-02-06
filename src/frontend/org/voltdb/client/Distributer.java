@@ -303,7 +303,7 @@ class Distributer {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            m_connection.writeStream().enqueue(c);
+            m_connection.writeStream().enqueue(buf);
             m_outstandingPing = true;
         }
 

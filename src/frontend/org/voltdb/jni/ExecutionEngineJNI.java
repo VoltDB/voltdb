@@ -128,7 +128,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                         exceptionBuffer, exceptionBuffer.capacity());
                 checkErrorCode(code);
             }
-        }, null);
+        });
 
         errorCode = nativeSetBuffers(pointer, fsForParameterSet.getContainerNoFlip().b,
                 fsForParameterSet.getContainerNoFlip().b.capacity(),
