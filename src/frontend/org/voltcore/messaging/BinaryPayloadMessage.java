@@ -16,7 +16,6 @@
  */
 package org.voltcore.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class BinaryPayloadMessage extends VoltMessage {
@@ -55,7 +54,7 @@ public class BinaryPayloadMessage extends VoltMessage {
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+    public void flattenToBuffer(ByteBuffer buf) {
         buf.put(VoltMessageFactory.BINARY_PAYLOAD_ID);
         buf.putShort((short)m_metadata.length);
         buf.put(m_metadata);

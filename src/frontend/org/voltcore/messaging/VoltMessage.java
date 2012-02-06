@@ -17,10 +17,7 @@
 
 package org.voltcore.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-
-import org.voltcore.VoltDB;
 
 public abstract class VoltMessage
 {
@@ -36,7 +33,7 @@ public abstract class VoltMessage
     }
 
     protected abstract void initFromBuffer(ByteBuffer buf);
-    public abstract void flattenToBuffer(ByteBuffer buf) throws IOException;
+    public abstract void flattenToBuffer(ByteBuffer buf);
 
     public byte getSubject() {
         return m_subject;

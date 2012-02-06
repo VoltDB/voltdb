@@ -16,16 +16,15 @@
  */
 package org.voltcore.messaging;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
-import org.voltcore.VoltDB;
-
 import org.apache.zookeeper_voltpatches.data.Id;
 import org.apache.zookeeper_voltpatches.server.Request;
+import org.voltcore.VoltDB;
+
 public class AgreementTaskMessage extends VoltMessage {
 
     public Request m_request;
@@ -122,7 +121,7 @@ public class AgreementTaskMessage extends VoltMessage {
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+    public void flattenToBuffer(ByteBuffer buf) {
         buf.put(VoltMessageFactory.AGREEMENT_TASK_ID);
 
         buf.putLong(m_txnId);

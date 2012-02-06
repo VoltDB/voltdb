@@ -17,7 +17,6 @@
 
 package org.voltcore.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
@@ -83,7 +82,7 @@ public class RecoveryMessage extends VoltMessage {
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+    public void flattenToBuffer(ByteBuffer buf) {
         buf.put(VoltMessageFactory.RECOVERY_ID);
         buf.putLong( m_sourceHSId);
         buf.putLong( m_txnId);

@@ -17,7 +17,6 @@
 
 package org.voltcore.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.utils.MiscUtils;
@@ -46,7 +45,7 @@ public class HeartbeatMessage extends TransactionInfoBaseMessage {
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+    public void flattenToBuffer(ByteBuffer buf) {
         buf.put(VoltMessageFactory.HEARTBEAT_ID);
         super.flattenToBuffer(buf);
 

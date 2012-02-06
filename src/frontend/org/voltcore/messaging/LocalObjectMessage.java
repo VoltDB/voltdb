@@ -16,7 +16,6 @@
  */
 package org.voltcore.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public final class LocalObjectMessage extends VoltMessage {
@@ -37,7 +36,7 @@ public final class LocalObjectMessage extends VoltMessage {
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+    public void flattenToBuffer(ByteBuffer buf) {
         throw new UnsupportedOperationException();
     }
 
