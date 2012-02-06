@@ -24,13 +24,13 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Encoder;
-
 
 /**
  * <code>DataInputStream</code> subclass to write objects that implement

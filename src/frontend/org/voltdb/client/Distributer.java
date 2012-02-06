@@ -32,6 +32,10 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
+
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -44,10 +48,7 @@ import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.Pair;
 
 /**
  *   De/multiplexes transactions across a cluster

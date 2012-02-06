@@ -40,11 +40,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.utils.DBBPool.BBContainer;
+
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * A utility class for opening a connection to a Volt server and authenticating as well

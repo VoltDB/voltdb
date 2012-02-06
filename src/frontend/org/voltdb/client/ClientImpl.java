@@ -26,10 +26,11 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.DBBPool;
+
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
