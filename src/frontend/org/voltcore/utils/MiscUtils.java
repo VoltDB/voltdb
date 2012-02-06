@@ -404,6 +404,12 @@ public class MiscUtils {
         }
     }
 
+    public static long getHSIdFromHostAndSite(int host, int site) {
+        long HSId = site;
+        HSId = (HSId << 32) + host;
+        return HSId;
+    }
+
     public static String hsIdToString(long hsId) {
         return Integer.toString((int)hsId) + ":" + Integer.toString((int)(hsId >> 32));
     }

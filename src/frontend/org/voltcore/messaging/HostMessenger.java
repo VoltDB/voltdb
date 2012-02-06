@@ -89,7 +89,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     private static final VoltLogger m_logger = new VoltLogger("org.voltdb.messaging.impl.HostMessenger");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    public static final long AGREEMENT_SITE_ID = -1;
+    public static final int AGREEMENT_SITE_ID = -1;
 
     int m_localHostId;
 
@@ -157,7 +157,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             return;
         }
         m_knownFailedHosts.add(hostId);
-        long initiatorSiteId = (AGREEMENT_SITE_ID << 32) + hostId;
+        long initiatorSiteId = MiscUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         removeForeignHost(hostId);
         m_agreementSite.reportFault(initiatorSiteId);
     }
@@ -191,7 +191,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             /*
              * m_localHostId is 0 of course.
              */
-            long agreementHSId = (AGREEMENT_SITE_ID << 32) + m_localHostId;
+            long agreementHSId = getHSIdForLocalSite(AGREEMENT_SITE_ID);
 
             /*
              * A set containing just the leader (this node)
@@ -396,7 +396,8 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
              * This node is the one to create the txn that will add the new host to the list of hosts
              * with agreement sites across the cluster.
              */
-            if (!m_agreementSite.requestJoin((AGREEMENT_SITE_ID << 32) + hostId).await(60, TimeUnit.SECONDS)) {
+            long hsId = MiscUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
+            if (!m_agreementSite.requestJoin(hsId).await(60, TimeUnit.SECONDS)) {
                 reportForeignHostFailed(hostId);
             }
         } catch (Throwable e) {
@@ -475,7 +476,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             SocketChannel[] sockets,
             InetSocketAddress listeningAddresses[]) throws Exception {
         m_localHostId = yourHostId;
-        long agreementHSId = (AGREEMENT_SITE_ID << 32) + yourHostId;
+        long agreementHSId = getHSIdForLocalSite(AGREEMENT_SITE_ID);
 
         /*
          * Construct the set of agreement sites based on all the hosts that are connected
@@ -487,7 +488,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
 
         for (int ii = 0; ii < hosts.length; ii++) {
             System.out.println(yourHostId + " Notified of host " + hosts[ii]);
-            agreementSites.add( (AGREEMENT_SITE_ID << 32) + hosts[ii] );
+            agreementSites.add(MiscUtils.getHSIdFromHostAndSite(hosts[ii], AGREEMENT_SITE_ID));
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;
             try {
@@ -574,6 +575,10 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         return m_localHostId;
     }
 
+    public long getHSIdForLocalSite(int site) {
+        return MiscUtils.getHSIdFromHostAndSite(getHostId(), site);
+    }
+
     public String getHostname() {
         String hostname = org.voltcore.utils.MiscUtils.getHostnameOrAddress();
         return hostname;
@@ -643,8 +648,8 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
      */
     @Override
     public Mailbox createMailbox() {
-        final long siteId = m_nextSiteId.getAndIncrement();
-        long hsId = getHostId() + (siteId << 32);
+        final int siteId = m_nextSiteId.getAndIncrement();
+        long hsId = getHSIdForLocalSite(siteId);
         SiteMailbox sm = new SiteMailbox( this, hsId);
 
         while (true) {
@@ -752,7 +757,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             }
             hsId = proposedHSId;
         } else {
-            hsId = getHostId() + (((long)m_nextSiteId.getAndIncrement()) << 32);
+            hsId = getHSIdForLocalSite(m_nextSiteId.getAndIncrement());
             mailbox.setHSId(hsId);
         }
 
