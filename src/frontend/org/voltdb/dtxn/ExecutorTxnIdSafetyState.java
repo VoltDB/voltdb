@@ -89,7 +89,7 @@ public class ExecutorTxnIdSafetyState {
     public ExecutorTxnIdSafetyState(long hsId, SiteTracker tracker) {
         m_hsId = hsId;
 
-        Set<Integer> execSites = tracker.getExecutionSiteIds();
+        Set<Long> execSites = tracker.getExecutionSiteIds();
         for (long id : execSites) {
             Site s = tracker.getSiteForId(id);
 
