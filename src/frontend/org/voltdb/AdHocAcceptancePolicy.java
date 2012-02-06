@@ -18,7 +18,6 @@ package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.network.WriteStream;
 
 /**
  * Check ad hoc query parameters.

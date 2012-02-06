@@ -91,7 +91,7 @@ import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
-class VoltNetwork implements Runnable
+public class VoltNetwork implements Runnable
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
@@ -152,7 +152,7 @@ class VoltNetwork implements Runnable
      * @param handler
      * @throws IOException
      */
-    Connection registerChannel(
+    public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
             final int interestOps) throws IOException {

@@ -55,16 +55,11 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltNetwork;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
-
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-
-import org.voltdb.network.VoltNetwork;
-
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
@@ -83,7 +78,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
@@ -660,11 +654,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             } else {
                 return Math.max( MAX_READ, getNextMessageLength());
             }
-        }
-
-        @Override
-        public int getExpectedOutgoingMessageSize() {
-            return FastSerializer.INITIAL_ALLOCATION;
         }
 
         @Override
@@ -1603,35 +1592,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public boolean enqueue(BBContainer c) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean enqueue(FastSerializable f) {
-            m_snapshotDaemon.processClientResponse((ClientResponseImpl) f,
-                    ((ClientResponseImpl) f).getClientHandle());
-            return true;
-        }
-
-        @Override
-        public boolean enqueue(FastSerializable f, int expectedSize) {
-            m_snapshotDaemon.processClientResponse((ClientResponseImpl) f,
-                    ((ClientResponseImpl) f).getClientHandle());
-            return true;
-        }
-
-        @Override
-        public boolean enqueue(DeferredSerialization ds) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean enqueue(ByteBuffer b) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
         public boolean hadBackPressure() {
             throw new UnsupportedOperationException();
         }
@@ -1647,11 +1607,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public void scheduleRunnable(Runnable r) {
-        }
-
-        @Override
-        public void unregister() {
+        public Future<?> unregister() {
+            return null;
         }
 
         @Override
@@ -1664,6 +1621,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public int getOutstandingMessageCount()
         {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void enqueue(org.voltcore.utils.DeferredSerialization ds)
+        {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void enqueue(ByteBuffer[] b)
+        {
+            // TODO Auto-generated method stub
+
         }
     }
 

@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltcore.network.InputHandler;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
@@ -31,7 +32,6 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.network.InputHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;

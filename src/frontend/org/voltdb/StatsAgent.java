@@ -24,15 +24,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONObject;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
@@ -40,8 +35,10 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.messaging.Messenger;
-import org.voltdb.network.Connection;
+import org.voltcore.network.Connection;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CompressionService;
 
 /**
