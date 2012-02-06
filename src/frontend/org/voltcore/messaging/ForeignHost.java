@@ -233,6 +233,10 @@ public class ForeignHost {
     /** Deliver a deserialized message from the network to a local mailbox */
     private void deliverMessage(long destinationHSId, VoltMessage message) {
         Mailbox mailbox = m_hostMessenger.getMailbox(destinationHSId);
+        /*
+         * At this point we are OK with messages going to sites that don't exist
+         * because we are saying that things can come and go
+         */
         if (mailbox == null) {
             System.err.printf("Message (%s) sent to unknown site id: %s @ (%s) at " +
                     m_hostMessenger.getHostId() + " from " + MiscUtils.hsIdToString(message.m_sourceHSId) + "\n",

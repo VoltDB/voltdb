@@ -49,8 +49,23 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.MiscUtils;
 
+/**
+ * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
+ * that are addressable from anywhere within that mesh. Host messenger also provides
+ * a ZooKeeper instance that is maintained within the mesh that can be used for distributed coordination
+ * and failure detection.
+ */
 public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, InterfaceToMessenger {
 
+    /**
+     * Configuration for a host messenger. The leader binds to the coordinator ip and
+     * not the internal interface or port. Nodes that fail to become the leader will
+     * connect to the leader using any interface, and will then advertise using the specified
+     * internal interface/port.
+     *
+     * By default all interfaces are used, if one is specified then only that interface will be used.
+     *
+     */
     public static class Config {
         public InetSocketAddress coordinatorIp;
         public String zkInterface = "127.0.0.1:2181";
@@ -84,16 +99,29 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
 
     private volatile boolean m_localhostReady = false;
 
+    /*
+     * References to other hosts in the mesh.
+     * Updates via COW
+     */
     final AtomicReference<HashMap<Integer, ForeignHost>> m_foreignHosts =
         new AtomicReference<HashMap<Integer, ForeignHost>>(new HashMap<Integer, ForeignHost>());
+    /*
+     * References to all the local mailboxes
+     * Updates via COW
+     */
     final AtomicReference<HashMap<Long, Mailbox>> m_siteMailboxes =
         new AtomicReference<HashMap<Long, Mailbox>>(new HashMap<Long, Mailbox>());
 
+    /*
+     * All failed hosts that have ever been seen.
+     * Used to dedupe failures so that they are only processed once.
+     */
     private final Set<Integer> m_knownFailedHosts = Collections.synchronizedSet(new HashSet<Integer>());
 
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
+
     public Mailbox getMailbox(long hsId) {
         return m_siteMailboxes.get().get(hsId);
     }
@@ -119,6 +147,10 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
                 this);
     }
 
+    /**
+     * Synchronization protects m_knownFailedHosts and ensures that every failed host is only reported
+     * once
+     */
     @Override
     public synchronized void reportForeignHostFailed(int hostId) {
         if (m_knownFailedHosts.contains(hostId)) {
@@ -130,7 +162,15 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         m_agreementSite.reportFault(initiatorSiteId);
     }
 
+    /**
+     * Start the host messenger and connect to the leader, or become the leader
+     * if necessary.
+     */
     public void start() throws Exception {
+        /*
+         * SJ uses this barrier if this node becomes the leader to know when ZooKeeper
+         * has been finished bootstrapping.
+         */
         CountDownLatch zkInitBarrier = new CountDownLatch(1);
 
         /*
@@ -139,13 +179,36 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
          */
         if(m_joiner.start(zkInitBarrier)) {
             m_network.start();
+
+            /*
+             * Override the supplied and default config values on the leader to reflect
+             * that SJ actually bound to the coordinator ip and nothing else. Not necessarily
+             * the right thing but it is expedient
+             */
             m_config.internalInterface = m_config.coordinatorIp.getAddress().getHostAddress();
             m_config.internalPort = m_config.coordinatorIp.getPort();
+
+            /*
+             * m_localHostId is 0 of course.
+             */
             long agreementHSId = (AGREEMENT_SITE_ID << 32) + m_localHostId;
+
+            /*
+             * A set containing just the leader (this node)
+             */
             HashSet<Long> agreementSites = new HashSet<Long>();
             agreementSites.add(agreementHSId);
+
+            /*
+             * A basic site mailbox for the agreement site
+             */
             SiteMailbox sm = new SiteMailbox(this, agreementHSId);
             createMailbox(agreementHSId, sm);
+
+
+            /*
+             * Construct the site with just this node
+             */
             m_agreementSite =
                 new AgreementSite(
                     this,
@@ -164,10 +227,19 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
 
+            /*
+             * This creates the ephemeral sequential node with host id 0 which
+             * this node already used for itself. Just recording that fact.
+             */
             final int selectedHostId = selectNewHostId(m_config.coordinatorIp.toString(), true);
             if (selectedHostId != 0) {
                 VoltDB.crashLocalVoltDB("Selected host id for coordinator was not 0, " + selectedHostId, false, null);
             }
+
+            /*
+             * Store all the hosts and host ids here so that waitForGroupJoin
+             * knows the size of the mesh. This part only registers this host
+             */
             m_zk.create("/hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             byte hostInfoBytes[] = m_config.coordinatorIp.toString().getBytes("UTF-8");
             m_zk.create("/hosts/host" + selectedHostId, hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -180,9 +252,8 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         this(new Config());
     }
 
-    /* In production, this is always the network created by VoltDB.
-     * Tests, however, can create their own network object. ForeignHost
-     * will query HostMessenger for the network to join.
+    /*
+     * The network is only available after start() finishes
      */
     public VoltNetworkPool getNetwork() {
         return m_network;
@@ -201,6 +272,10 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     }
 
 
+    /*
+     * Take the new connection (member of the mesh) and create a foreign host for it
+     * and put it in the map of foreign hosts
+     */
     @Override
     public void notifyOfJoin(int hostId, SocketChannel socket, InetSocketAddress listeningAddress) {
         System.out.println(getHostId() + " notified of " + hostId);
@@ -216,6 +291,9 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         }
     }
 
+    /*
+     * Set all the default options for sockets
+     */
     private void prepSocketChannel(SocketChannel sc) {
         try {
             sc.socket().setSendBufferSize(1024*1024*2);
@@ -225,6 +303,9 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         }
     }
 
+    /*
+     * Convenience method for doing the verbose COW insert into the map
+     */
     private void putForeignHost(int hostId, ForeignHost fh) {
         while (true) {
             HashMap<Integer, ForeignHost> original = m_foreignHosts.get();
@@ -236,6 +317,9 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         }
     }
 
+    /*
+     * Convenience method for doing the verbose COW remove from the map
+     */
     private void removeForeignHost(int hostId) {
         while (true) {
             HashMap<Integer, ForeignHost> original = m_foreignHosts.get();
@@ -249,13 +333,30 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         }
     }
 
+    /*
+     * Any node can serve a request to join. The coordination of generating a new host id
+     * is done via ZK
+     */
     @Override
     public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress) throws Exception {
+        /*
+         * Generate the host id via creating an ephemeral sequential node
+         */
         Integer hostId = selectNewHostId(socket.socket().getInetAddress().getHostAddress(), false);
+
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
+            /*
+             * Write the response that advertises the cluster topology
+             */
             writeRequestJoinResponse( hostId, socket);
+
+            /*
+             * Wait for the a response from the joining node saying that it connected
+             * to all the nodes we just advertised. Use a timeout so that the cluster can't be stuck
+             * on failed joins.
+             */
             ByteBuffer finishedJoining = ByteBuffer.allocate(1);
             socket.configureBlocking(false);
             long start = System.currentTimeMillis();
@@ -268,10 +369,20 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
                     Thread.sleep(5);
                 }
             }
+
+            /*
+             * Now add the host to the mailbox system
+             */
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
             putForeignHost(hostId, fhost);
             fhost.register(this);
             fhost.enableRead();
+
+            /*
+             * And the last step is to wait for the new node to join ZooKeeper.
+             * This node is the one to create the txn that will add the new host to the list of hosts
+             * with agreement sites across the cluster.
+             */
             if (!m_agreementSite.requestJoin((AGREEMENT_SITE_ID << 32) + hostId).await(60, TimeUnit.SECONDS)) {
                 reportForeignHostFailed(hostId);
             }
@@ -281,7 +392,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     }
 
     /*
-     * Acquire a lock on allocating new host ids, find the next ID to allocate, allocate it
+     * Generate a new host id by creating an ephemeral sequential node
      */
     private Integer selectNewHostId(String address, boolean createPath) throws Exception {
         if (createPath) {
@@ -294,11 +405,28 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         return Integer.valueOf(node.substring(node.length() - 10));
     }
 
+    /*
+     * Advertise to a newly connecting node the topology of the cluster so that it can connect to
+     * the rest of the nodes
+     */
     private void writeRequestJoinResponse(int hostId, SocketChannel socket) throws Exception {
         JSONObject jsObj = new JSONObject();
+
+        /*
+         * Tell the new node what its host id is
+         */
         jsObj.put("newHostId", hostId);
+
+        /*
+         * Echo back the address that the node connected from
+         */
         jsObj.put("reportedAddress",
                 ((InetSocketAddress)socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
+
+        /*
+         * Create an array containing an ad for every node including this one
+         * even though the connection has already been made
+         */
         JSONArray jsArray = new JSONArray();
         JSONObject hostObj = new JSONObject();
         hostObj.put("hostId", getHostId());
@@ -326,6 +454,10 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         }
     }
 
+    /*
+     * SJ invokes this method after a node finishes connecting to the entire cluster.
+     * This method constructs all the hosts and puts them in the map
+     */
     @Override
     public void notifyOfHosts(
             int yourHostId,
@@ -334,9 +466,15 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             InetSocketAddress listeningAddresses[]) throws Exception {
         m_localHostId = yourHostId;
         long agreementHSId = (AGREEMENT_SITE_ID << 32) + yourHostId;
-        HashSet<Long> agreementSites = new HashSet<Long>();;
+
+        /*
+         * Construct the set of agreement sites based on all the hosts that are connected
+         */
+        HashSet<Long> agreementSites = new HashSet<Long>();
         agreementSites.add(agreementHSId);
+
         m_network.start();//network must be running for register to work
+
         for (int ii = 0; ii < hosts.length; ii++) {
             System.out.println(yourHostId + " Notified of host " + hosts[ii]);
             agreementSites.add( (AGREEMENT_SITE_ID << 32) + hosts[ii] );
@@ -351,6 +489,10 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             }
         }
 
+        /*
+         * Create the local agreement site. It knows that it is recovering because the number of
+         * prexisting sites is > 0
+         */
         SiteMailbox sm = new SiteMailbox(this, agreementHSId);
         createMailbox(agreementHSId, sm);
         m_agreementSite =
@@ -364,6 +506,7 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
                         m_config.zkInterface.split(":")[0],
                         Integer.parseInt(m_config.zkInterface.split(":")[1])),
                 m_config.backwardsTimeForgivenessWindow);
+
         /*
          * Now that the agreement site mailbox has been created it is safe
          * to enable read
@@ -372,11 +515,21 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
             fh.enableRead();
         }
         m_agreementSite.start();
+
+        /*
+         * Do the usual thing of waiting for the agreement site
+         * to join the cluster and creating the client
+         */
         m_agreementSite.waitForRecovery();
         m_zk = org.voltcore.agreement.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);
         if (m_zk == null) {
             throw new Exception("Timed out trying to connect local ZooKeeper instance");
         }
+
+        /*
+         * Publish the address of this node to ZK as seen by the leader
+         * Also allows waitForGroupJoin to know the number of nodes in the cluster
+         */
         byte hostInfoBytes[];
         if (m_config.internalInterface.isEmpty()) {
             InetAddress intf = InetAddress.getByName(m_joiner.m_reportedInternalInterface);
@@ -475,6 +628,9 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         return fhost;
     }
 
+    /*
+     * Create a site mailbox with a generated host id
+     */
     @Override
     public Mailbox createMailbox() {
         final long siteId = m_nextSiteId.getAndIncrement();
@@ -562,39 +718,6 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         return m_localhostReady;
     }
 
-    /**
-     * Initiate the addition of a replacement foreign host.
-     *
-     * @param hostId The id of the failed host to replace.
-     * @param sock A network connection to that host.
-     * @throws Exception Throws exceptions on failure.
-     */
-    public void rejoinForeignHostPrepare(int hostId,
-                                         InetSocketAddress addr,
-                                         long catalogCRC,
-                                         long deploymentCRC,
-                                         Set<Integer> liveHosts,
-                                         long faultSequenceNumber,
-                                         int catalogVersionNumber,
-                                         long catalogTxnId,
-                                         byte[] catalogBytes) throws Exception {
-        if (hostId < 0)
-            throw new Exception("Rejoin HostId can be negative.");
-//        if (m_foreignHosts.length <= hostId)
-//            throw new Exception("Rejoin HostId out of expexted range.");
-//        SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
-//        if (m_foreignHosts[hostId] != null && st.getAllLiveHosts().contains(hostId))
-//            throw new Exception("Rejoin HostId is not a failed host.");
-
-//        SocketChannel sock = SocketJoiner.connect(
-//                m_localHostId, hostId, addr, catalogCRC, deploymentCRC,
-//                liveHosts, faultSequenceNumber, catalogVersionNumber,
-//                catalogTxnId, catalogBytes);
-//
-//        m_tempNewFH = new ForeignHost(this, hostId, sock);
-//        m_tempNewFH.sendReadyMessage();
-//        m_tempNewHostId = hostId;
-    }
 
     public void shutdown() throws InterruptedException
     {
@@ -611,6 +734,9 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
         m_joiner.shutdown();
     }
 
+    /*
+     * Register a custom mailbox, optinally specifying what the hsid should be.
+     */
     @Override
     public void createMailbox(Long proposedHSId, Mailbox mailbox) {
         long hsId = 0;

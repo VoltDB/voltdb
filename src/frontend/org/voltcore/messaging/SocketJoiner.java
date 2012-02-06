@@ -50,19 +50,26 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
-/** SocketJoiner runs at startup to create a fully meshed cluster.
- * The primary (aka: leader, coordinater) node listens on BASE_PORT.
- * All non-primary nodes connect to BASE_PORT and read a 4 byte host
- * id. They then listen on BASE_PORT + host_id.  When the configured
- * number of nodes are joined, the primary instructs each non-primary
- * host to connect to the other non-primary hosts, passing the
- * requisite host ids.
+/**
+ * SocketJoiner runs all the time listening for new nodes in the cluster. Since it is a dedicated thread
+ * it is able to block while a new node joins without disrupting other activities.
+ *
+ * At startup socket joiner will connect to the rest of the cluster in the start method if it fails
+ * to bind to the leader address.
+ *
+ * If it binds to the leader address and becomes the leader the start method returns immediately and runPrimary
+ * is run from a separate thread. runPrimary will wait for the countdown latch for bootstrapping zk to count down
+ * before accepting new connections
  */
 public class SocketJoiner {
 
+    /**
+     * Interface into host messenger to notify it of new connections.
+     *
+     */
     public interface JoinHandler {
         /*
-         * Notify that a specific host has joined with the specified host id
+         * Notify that a specific host has joined with the specified host id.
          */
         public void notifyOfJoin(int hostId, SocketChannel socket, InetSocketAddress listeningAddress);
 
@@ -72,7 +79,8 @@ public class SocketJoiner {
         public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress ) throws Exception;
 
         /*
-         * A connection has been made to all of the specified hosts
+         * A connection has been made to all of the specified hosts. Invoked by
+         * nodes connected to the cluster
          */
         public void notifyOfHosts(
                 int yourLocalHostId,
@@ -87,8 +95,6 @@ public class SocketJoiner {
     private final ExecutorService m_es = Executors.newSingleThreadExecutor(
             org.voltcore.utils.MiscUtils.getThreadFactory("Socket Joiner", 1024 * 128));
 
-    static final byte REQUEST_HOSTID = 0;
-    static final byte PUBLISH_HOSTID = 0;
     InetSocketAddress m_coordIp = null;
     int m_localHostId = 0;
     Map<Integer, SocketChannel> m_sockets = new HashMap<Integer, SocketChannel>();
@@ -136,7 +142,7 @@ public class SocketJoiner {
             /*
              * Need to wait for external initialization to complete before
              * accepting new connections. This is slang for the leader
-             * creating an agreement site that agress with itself
+             * creating an agreement site that agrees with itself
              */
             m_es.submit(new Callable<Object>() {
                 @Override
@@ -153,8 +159,8 @@ public class SocketJoiner {
             }
             /*
              * Not a leader, need to connect to the primary to join the cluster.
-             * Once connectToPrimary is invoked this node will be physically connected
-             * to all nodes
+             * Once connectToPrimary is finishes this node will be physically connected
+             * to all nodes with a working agreement site
              */
             connectToPrimary();
         }
@@ -162,7 +168,7 @@ public class SocketJoiner {
         /*
          * Submit a task to start the main run loop,
          * will wait for agreement to be initialized if this
-         * is the leader which can do unilateral agreement
+         * is the leader using the previously queued runnable
          */
         m_es.submit(new Runnable() {
             @Override
@@ -203,6 +209,10 @@ public class SocketJoiner {
         m_internalPort = internalPort;
     }
 
+    /*
+     * Bind to the internal interface if one was specified,
+     * otherwise bind on all interfaces. The leader won't invoke this.
+     */
     private void doBind() throws Exception {
         LOG.debug("Creating listener socket");
         m_listenerSocket = ServerSocketChannel.open();
@@ -219,6 +229,11 @@ public class SocketJoiner {
         }
     }
 
+    /*
+     * After startup everything is a primary and can accept
+     * new nodes into the cluster. This loop accepts the new socket
+     * and passes it off the HostMessenger via the JoinHandler interface
+     */
     private void runPrimary() throws Exception {
         try {
             // start the server socket on the right interface
@@ -232,6 +247,10 @@ public class SocketJoiner {
                     sc.socket().setTcpNoDelay(true);
                     sc.socket().setPerformancePreferences(0, 2, 1);
                     final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
+
+                    /*
+                     * Read a length prefixed JSON message
+                     */
                     ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
 
                     while (lengthBuffer.remaining() > 0) {
@@ -253,7 +272,17 @@ public class SocketJoiner {
 
                     JSONObject jsObj = new JSONObject(new String(messageBytes.array(), "UTF-8"));
 
+                    /*
+                     * The type of connection, it can be a new request to join the cluster
+                     * or a node that is connecting to the rest of the cluster and publishing its
+                     * host id and such
+                     */
                     String type = jsObj.getString("type");
+
+                    /*
+                     * The new connection may specify the address it is listening on,
+                     * or it can be derived from the connection itself
+                     */
                     InetSocketAddress listeningAddress;
                     if (jsObj.has("address")) {
                         listeningAddress = new InetSocketAddress(
@@ -292,6 +321,11 @@ public class SocketJoiner {
         }
     }
 
+    /*
+     * If this node failed to bind to the leader address
+     * it must connect to the leader which will generate a host id and
+     * advertise the rest of the cluster so that connectToPrimary can connect to it
+     */
     private void connectToPrimary() {
         SocketChannel socket = null;
         try {
@@ -317,7 +351,17 @@ public class SocketJoiner {
 
             JSONObject jsObj = new JSONObject();
             jsObj.put("type", "REQUEST_HOSTID");
+
+            /*
+             * Advertise the port we are going to listen on based on
+             * config
+             */
             jsObj.put("port", m_internalPort);
+
+            /*
+             * If config specified an internal interface use that.
+             * Otherwise the leader will echo back what we connected on
+             */
             if (!m_internalInterface.isEmpty()) {
                 jsObj.put("address", m_internalInterface);
             }
@@ -347,9 +391,17 @@ public class SocketJoiner {
             String jsonString = new String(responseBuffer.array(), "UTF-8");
             JSONObject jsonObj = new JSONObject(jsonString);
 
+            /*
+             * Get the generated host id, and the interface we connected on
+             * that was echoed back
+             */
             m_localHostId = jsonObj.getInt("newHostId");
             m_reportedInternalInterface = jsonObj.getString("reportedAddress");
 
+            /*
+             * Loop over all the hosts and create a connection (except for the first entry, that is the leader)
+             * and publish the host id that was generated. This finishes creating the mesh
+             */
             JSONArray otherHosts = jsonObj.getJSONArray("hosts");
             int hostIds[] = new int[otherHosts.length()];
             SocketChannel hostSockets[] = new SocketChannel[hostIds.length];
@@ -406,10 +458,19 @@ public class SocketJoiner {
                 listeningAddresses[ii] = hostAddr;
             }
 
+            /*
+             * Notify the leader that we connected to the entire cluster, it will then go
+             * and queue a txn for our agreement site to join the lcuster
+             */
             ByteBuffer joinCompleteBuffer = ByteBuffer.allocate(1);
             while (joinCompleteBuffer.hasRemaining()) {
                 hostSockets[0].write(joinCompleteBuffer);
             }
+
+            /*
+             * Let host messenger know about the connections.
+             * It will init the agreement site and then we are done.
+             */
             m_joinHandler.notifyOfHosts( m_localHostId, hostIds, hostSockets, listeningAddresses);
         } catch (ClosedByInterruptException e) {
             //This is how shutdown is done
