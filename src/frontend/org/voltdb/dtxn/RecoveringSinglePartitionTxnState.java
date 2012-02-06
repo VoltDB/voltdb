@@ -30,7 +30,6 @@ public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
 
     private RecoveringSinglePartitionTxnState(Mailbox mbox, ExecutionSite site, TransactionInfoBaseMessage task) {
         super(mbox, site, task);
-        // TODO Auto-generated constructor stub
     }
 
     @Override
