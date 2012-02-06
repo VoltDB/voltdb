@@ -23,8 +23,8 @@ import java.util.ArrayList;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.ParameterSet;
-import org.voltdb.utils.DBBPool;
 
 /**
  * Message from a stored procedure coordinator to an execution site
@@ -55,8 +55,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     /**
      *
-     * @param initiatorSiteId
-     * @param coordinatorSiteId
+     * @param initiatorHSId
+     * @param coordinatorHSId
      * @param txnId
      * @param isReadOnly
      * @param fragmentIds
@@ -64,15 +64,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * @param parameterSets
      * @param isFinal
      */
-    public FragmentTaskMessage(int initiatorSiteId,
-                        int coordinatorSiteId,
+    public FragmentTaskMessage(long initiatorHSId,
+                        long coordinatorHSId,
                         long txnId,
                         boolean isReadOnly,
                         long[] fragmentIds,
                         int[] outputDepIds,
                         ByteBuffer[] parameterSets,
                         boolean isFinal) {
-        super(initiatorSiteId, coordinatorSiteId, txnId, isReadOnly);
+        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
 
         assert(fragmentIds != null);
         assert(parameterSets != null);
@@ -176,15 +176,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     @Override
-    protected void flattenToBuffer(final DBBPool pool) {
-        int msgsize = super.getMessageByteCount();
+    public int getSerializedSize()
+    {
+        int msgsize = super.getSerializedSize();
 
+        // Fixed length components:
         // m_fragmentIds count (2)
         // m_outputDepIds count (2)
         // m_inputDepIds count (2)
         // m_isFinal (1)
         // m_taskType (1)
         // m_shouldUndo (1)
+
+        // Plus a long (8) per fragment ID
+        //    plus an int for the length of the params for a fragment ID
+        //    plus the actual length of the params
+        // Plus an int (4) per input and output dependency ID
 
         msgsize += 2 + 2 + 2 + 1 + 1 + 1;
         if (m_fragmentIds != null) {
@@ -201,100 +208,99 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             msgsize += 4 * m_outputDepIds.length;
         }
 
-        if (m_buffer == null) {
-            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
-            m_buffer = m_container.b;
-        }
-        setBufferSize(msgsize + 1, pool);
+        return msgsize;
+    }
 
-        m_buffer.position(HEADER_SIZE);
-        m_buffer.put(FRAGMENT_TASK_ID);
-
-        super.writeToBuffer();
+    @Override
+    public void flattenToBuffer(ByteBuffer buf)
+    {
+        buf.put(VoltDbMessageFactory.FRAGMENT_TASK_ID);
+        super.flattenToBuffer(buf);
 
         if (m_fragmentIds == null) {
-            m_buffer.putShort((short) 0);
+            buf.putShort((short) 0);
         }
         else {
-            m_buffer.putShort((short) m_fragmentIds.length);
+            buf.putShort((short) m_fragmentIds.length);
             for (int i = 0; i < m_fragmentIds.length; i++) {
-                m_buffer.putLong(m_fragmentIds[i]);
+                buf.putLong(m_fragmentIds[i]);
             }
             for (int i = 0; i < m_fragmentIds.length; i++) {
-                m_buffer.putInt(m_parameterSets[i].remaining());
+                buf.putInt(m_parameterSets[i].remaining());
                 //Duplicate because the parameter set might be used locally also
-                m_buffer.put(m_parameterSets[i].duplicate());
+                buf.put(m_parameterSets[i].duplicate());
             }
         }
 
         if (m_outputDepIds == null) {
-            m_buffer.putShort((short) 0);
+            buf.putShort((short) 0);
         }
         else {
-            m_buffer.putShort((short) m_outputDepIds.length);
+            buf.putShort((short) m_outputDepIds.length);
             for (int i = 0; i < m_outputDepIds.length; i++) {
-                m_buffer.putInt(m_outputDepIds[i]);
+                buf.putInt(m_outputDepIds[i]);
             }
         }
 
         if (m_inputDepIds == null) {
-            m_buffer.putShort((short) 0);
+            buf.putShort((short) 0);
         }
         else {
-            m_buffer.putShort((short) m_inputDepIds.length);
+            buf.putShort((short) m_inputDepIds.length);
             for (int i = 0; i < m_inputDepIds.length; i++) {
                 @SuppressWarnings("unchecked")
                 ArrayList<Integer> l = (ArrayList<Integer>) m_inputDepIds[i];
-                m_buffer.putShort((short) l.size());
+                buf.putShort((short) l.size());
                 for (int depId : l)
-                    m_buffer.putInt(depId);
+                    buf.putInt(depId);
             }
         }
 
-        m_buffer.put(m_isFinal ? (byte) 1 : (byte) 0);
-        m_buffer.put(m_taskType);
-        m_buffer.put(m_shouldUndo ? (byte) 1 : (byte) 0);
+        buf.put(m_isFinal ? (byte) 1 : (byte) 0);
+        buf.put(m_taskType);
+        buf.put(m_shouldUndo ? (byte) 1 : (byte) 0);
 
-        m_buffer.limit(m_buffer.position());
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
     }
 
     @Override
-    protected void initFromBuffer() {
-        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        super.readFromBuffer();
+    public void initFromBuffer(ByteBuffer buf)
+    {
+        super.initFromBuffer(buf);
 
-        short fragCount = m_buffer.getShort();
+        short fragCount = buf.getShort();
         if (fragCount > 0) {
             m_fragmentIds = new long[fragCount];
             for (int i = 0; i < fragCount; i++)
-                m_fragmentIds[i] = m_buffer.getLong();
+                m_fragmentIds[i] = buf.getLong();
             m_parameterSets = new ByteBuffer[fragCount];
             for (int i = 0; i < fragCount; i++) {
-                int paramsbytecount = m_buffer.getInt();
+                int paramsbytecount = buf.getInt();
                 m_parameterSets[i] = ByteBuffer.allocate(paramsbytecount);
-                int cachedLimit = m_buffer.limit();
-                m_buffer.limit(m_buffer.position() + m_parameterSets[i].remaining());
-                m_parameterSets[i].put(m_buffer);
+                int cachedLimit = buf.limit();
+                buf.limit(buf.position() + m_parameterSets[i].remaining());
+                m_parameterSets[i].put(buf);
                 m_parameterSets[i].flip();
-                m_buffer.limit(cachedLimit);
+                buf.limit(cachedLimit);
             }
         }
-        short expectedDepCount = m_buffer.getShort();
+        short expectedDepCount = buf.getShort();
         if (expectedDepCount > 0) {
             m_outputDepIds = new int[expectedDepCount];
             for (int i = 0; i < expectedDepCount; i++)
-                m_outputDepIds[i] = m_buffer.getInt();
+                m_outputDepIds[i] = buf.getInt();
         }
 
-        short inputDepCount = m_buffer.getShort();
+        short inputDepCount = buf.getShort();
         if (inputDepCount > 0) {
             m_inputDepIds = new ArrayList<?>[inputDepCount];
             for (int i = 0; i < inputDepCount; i++) {
-                short count = m_buffer.getShort();
+                short count = buf.getShort();
                 if (count > 0) {
                     ArrayList<Integer> l = new ArrayList<Integer>();
                     for (int j = 0; j < count; j++) {
-                        l.add(m_buffer.getInt());
+                        l.add(buf.getInt());
                         m_inputDepCount++;
                     }
                     m_inputDepIds[i] = l;
@@ -302,9 +308,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
-        m_isFinal = m_buffer.get() == 1;
-        m_taskType = m_buffer.get();
-        m_shouldUndo = m_buffer.get() == 1;
+        m_isFinal = buf.get() == 1;
+        m_taskType = buf.get();
+        m_shouldUndo = buf.get() == 1;
     }
 
     @Override
@@ -312,9 +318,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         StringBuilder sb = new StringBuilder();
 
         sb.append("FRAGMENT_TASK (FROM ");
-        sb.append(m_coordinatorSiteId);
-        sb.append(" TO ");
-        sb.append(receivedFromSiteId);
+        sb.append(MiscUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 
@@ -323,7 +327,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             sb.append("  READ, COORD ");
         else
             sb.append("  WRITE, COORD ");
-        sb.append(m_coordinatorSiteId);
+        sb.append(MiscUtils.hsIdToString(m_coordinatorHSId));
 
         if ((m_fragmentIds != null) && (m_fragmentIds.length > 0)) {
             sb.append("\n");

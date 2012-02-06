@@ -32,7 +32,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected long m_initiatorHSId;
     protected long m_coordinatorHSId;
     protected long m_txnId;
-    boolean m_isReadOnly;
+    protected boolean m_isReadOnly;
 
     /** Empty constructor for de-serialization */
     protected TransactionInfoBaseMessage() {
