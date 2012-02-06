@@ -47,7 +47,7 @@ public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
             response.setRecovering(true);
 
             try {
-                m_mbox.send(initiatorSiteId, 0, response);
+                m_mbox.send(initiatorHSId, 0, response);
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
             }

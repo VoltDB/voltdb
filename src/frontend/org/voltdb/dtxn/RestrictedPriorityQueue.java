@@ -22,11 +22,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.PriorityQueue;
 
+import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.HeartbeatResponseMessage;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state
@@ -41,7 +41,6 @@ import org.voltdb.messaging.HeartbeatResponseMessage;
  * <p>This class manages all that state.</p>
  */
 public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final long serialVersionUID = 1L;
     private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
 
@@ -127,11 +126,11 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * are later referenced that aren't in this list, trip
      * an assertion.
      */
-    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId, Mailbox mbox, int mailboxId, boolean useSafetyDance) {
+    public RestrictedPriorityQueue(int[] initiatorHSIds, int siteId, Mailbox mbox, int mailboxId, boolean useSafetyDance) {
         m_siteId = siteId;
         m_mailbox = mbox;
         m_mailboxId = mailboxId;
-        for (int id : initiatorSiteIds)
+        for (int id : initiatorHSIds)
             m_initiatorData.put(id, new LastInitiatorData());
         m_useSafetyDance = useSafetyDance;
     }
@@ -179,7 +178,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      */
     @Override
     public boolean add(OrderableTransaction txnState) {
-        if (m_initiatorData.containsKey(txnState.initiatorSiteId) == false) {
+        if (m_initiatorData.containsKey(txnState.initiatorHSId) == false) {
             return false;
         }
         boolean retval = super.add(txnState);
@@ -199,22 +198,22 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    public long noteTransactionRecievedAndReturnLastSeen(int initiatorSiteId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
+    public long noteTransactionRecievedAndReturnLastSeen(int initiatorHSId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
         // System.out.printf("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d\n",
-        //                   m_siteId, initiatorSiteId, txnId, lastSafeTxnIdFromInitiator);
+        //                   m_siteId, initiatorHSId, txnId, lastSafeTxnIdFromInitiator);
 
         // this doesn't exclude dummy txnid but is also a sanity check
         assert(txnId != 0);
 
         // Drop old data from already-failed initiators.
-        if (m_initiatorData.containsKey(initiatorSiteId) == false) {
-            //hostLog.info("Dropping txn " + txnId + " data from failed initiatorSiteId: " + initiatorSiteId);
+        if (m_initiatorData.containsKey(initiatorHSId) == false) {
+            //hostLog.info("Dropping txn " + txnId + " data from failed initiatorHSId: " + initiatorSiteId);
             return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
         }
 
         // update the latest transaction for the specified initiator
-        LastInitiatorData lid = m_initiatorData.get(initiatorSiteId);
+        LastInitiatorData lid = m_initiatorData.get(initiatorHSId);
         if (lid.m_lastSeenTxnId < txnId)
             lid.m_lastSeenTxnId = txnId;
         if (lid.m_lastSafeTxnId < lastSafeTxnIdFromInitiator)
@@ -370,7 +369,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         assert (newState == QueueState.UNBLOCKED);
 
         // Remember, an 'in recovery' response satisfies the safety dance
-        lid = m_initiatorData.get(ts.initiatorSiteId);
+        lid = m_initiatorData.get(ts.initiatorHSId);
         if (lid == null) {
             // what does this mean???
         }
@@ -423,7 +422,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         HeartbeatResponseMessage hbr =
             new HeartbeatResponseMessage(m_siteId, lid.m_lastSeenTxnId, true);
         try {
-            m_mailbox.send(ts.initiatorSiteId, m_mailboxId, hbr);
+            m_mailbox.send(ts.initiatorHSId, m_mailboxId, hbr);
         } catch (MessagingException e) {
             // I really hope this doesn't happen
             throw new RuntimeException(e);
