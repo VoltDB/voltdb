@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.HashSet;
 
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.Messenger;
 import org.voltcore.logging.VoltLogger;
 
 /**
@@ -30,7 +31,7 @@ import org.voltcore.logging.VoltLogger;
 public class ExecutionSiteRunner implements Runnable {
 
     volatile boolean m_isSiteCreated = false;
-    final int m_siteId;
+    long m_siteId;
     private final String m_serializedCatalog;
     volatile ExecutionSite m_siteObj;
     private final boolean m_recovering;
@@ -40,14 +41,12 @@ public class ExecutionSiteRunner implements Runnable {
     private final VoltLogger m_hostLog;
 
     public ExecutionSiteRunner(
-            final int siteId,
             final CatalogContext context,
             final String serializedCatalog,
             boolean recovering,
             boolean replicationActive,
             HashSet<Integer> failedHostIds,
             VoltLogger hostLog) {
-        m_siteId = siteId;
         m_serializedCatalog = serializedCatalog;
         m_recovering = recovering;
         m_replicationActive = replicationActive;
@@ -58,13 +57,13 @@ public class ExecutionSiteRunner implements Runnable {
 
     @Override
     public void run() {
-        Mailbox mailbox = VoltDB.instance().getMessenger()
-        .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, true);
+        Messenger messenger = VoltDB.instance().getMessenger();
+        Mailbox mailbox = messenger.createMailbox();
+        m_siteId = mailbox.getHSId();
 
         try {
             m_siteObj = new ExecutionSite(VoltDB.instance(),
                                           mailbox,
-                                          m_siteId,
                                           m_serializedCatalog,
                                           null,
                                           m_recovering,

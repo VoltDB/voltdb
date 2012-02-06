@@ -690,17 +690,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
-                  final int siteId, String serializedCatalog,
+                  String serializedCatalog,
                   RestrictedPriorityQueue transactionQueue,
                   boolean recovering,
                   boolean replicationActive,
                   HashSet<Integer> failedHostIds,
                   final long txnId) throws Exception
     {
+        m_siteId = mailbox.getHSId();
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
                 new Object[] { String.valueOf(siteId) }, null);
 
-        m_siteId = siteId;
         final int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
