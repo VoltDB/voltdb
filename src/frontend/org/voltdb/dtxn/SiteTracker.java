@@ -204,7 +204,7 @@ public class SiteTracker {
         m_firstNonExecSiteForHost = new long[m_hostsToSites.size()];
         java.util.Arrays.fill(m_firstNonExecSiteForHost, -1);
         for (ii = 0; ii < m_firstNonExecSiteForHost.length; ii++) {
-            HashSet<Integer> set = getNonExecSitesForHost(ii);
+            HashSet<Long> set = getNonExecSitesForHost(ii);
             if (set != null) {
                 if (set.iterator().hasNext()) {
                     m_firstNonExecSiteForHost[ii] = set.iterator().next();

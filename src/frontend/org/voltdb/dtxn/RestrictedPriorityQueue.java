@@ -62,7 +62,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         long m_lastSafeTxnId;
     }
 
-    final LinkedHashMap<Integer, LastInitiatorData> m_initiatorData = new LinkedHashMap<Integer, LastInitiatorData>();
+    final LinkedHashMap<Long, LastInitiatorData> m_initiatorData = new LinkedHashMap<Long, LastInitiatorData>();
     final LinkedList<RoadBlock> m_roadblocks = new LinkedList<RoadBlock>();
 
     /**
@@ -130,7 +130,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         m_siteId = siteId;
         m_mailbox = mbox;
         m_mailboxId = mailboxId;
-        for (int id : initiatorHSIds)
+        for (long id : initiatorHSIds)
             m_initiatorData.put(id, new LastInitiatorData());
         m_useSafetyDance = useSafetyDance;
     }
@@ -282,7 +282,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * @param initiatorId Initiator present in the catalog.
      * @return The number of initiators that weren't known
      */
-    public int ensureInitiatorIsKnown(int initiatorId) {
+    public int ensureInitiatorIsKnown(long initiatorId) {
         int newInitiatorCount = 0;
         if (m_initiatorData.get(initiatorId) == null) {
             m_initiatorData.put(initiatorId, new LastInitiatorData());
@@ -303,7 +303,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * Used to figure out what to do after an initiator fails.
      * @param initiatorId The id of the initiator that has failed.
      */
-    public Long getNewestSafeTransactionForInitiator(int initiatorId) {
+    public Long getNewestSafeTransactionForInitiator(long initiatorId) {
         LastInitiatorData lid = m_initiatorData.get(initiatorId);
         if (lid == null) {
             return null;

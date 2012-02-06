@@ -464,7 +464,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                             new CompleteTransactionResponseMessage(complete, m_siteId);
                         try
                         {
-                            m_mailbox.send(complete.getCoordinatorSiteId(), 0, ctrm);
+                            m_mailbox.send(complete.getCoordinatorHSId(), 0, ctrm);
                         }
                         catch (MessagingException e) {
                             throw new RuntimeException(e);
@@ -482,7 +482,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         }
 
                         try {
-                            m_mailbox.send(response.getDestinationSiteId(), 0, response);
+                            m_mailbox.send(response.getDestinationHSId(), 0, response);
                         } catch (MessagingException e) {
                             throw new RuntimeException(e);
                         }
@@ -1550,12 +1550,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * The list of failed sites we know about. Included with all failure messages
      * to identify what the information was used to generate commit points
      */
-    private final HashSet<Integer> m_knownFailedSites = new HashSet<Integer>();
+    private final HashSet<Long> m_knownFailedSites = new HashSet<Long>();
 
     /**
      * Failed sites for which agreement has been reached.
      */
-    private final HashSet<Integer> m_handledFailedSites = new HashSet<Integer>();
+    private final HashSet<Long> m_handledFailedSites = new HashSet<Long>();
 
     /**
      * Store values from older failed nodes. They are repeated with every failure message
@@ -1573,16 +1573,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private int discoverGlobalFaultData_send()
     {
         int expectedResponses = 0;
-        int[] survivors = m_context.siteTracker.getUpExecutionSites();
-        HashSet<Integer> survivorSet = new HashSet<Integer>();
-        for (int survivor : survivors) {
+        long[] survivors = m_context.siteTracker.getUpExecutionSites();
+        HashSet<Long> survivorSet = new HashSet<Long>();
+        for (long survivor : survivors) {
             survivorSet.add(survivor);
         }
         m_recoveryLog.info("Sending fault data " + m_knownFailedSites.toString() + " to "
                 + survivorSet.toString() + " survivors with lastKnownGloballyCommitedMultiPartTxnId "
                 + lastKnownGloballyCommitedMultiPartTxnId);
         try {
-            for (Integer site : m_knownFailedSites) {
+            for (Long site : m_knownFailedSites) {
                 Integer hostId = m_context.siteTracker.getHostForSite(site);
                 HashMap<Integer, Long> siteMap = m_newestSafeTransactionForInitiatorLedger.get(hostId);
                 if (siteMap == null) {
