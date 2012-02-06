@@ -37,6 +37,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -45,9 +48,6 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
 
 /**
  * Encapsulates the state managing the activities related to streaming recovery data
@@ -375,11 +375,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         if (failedSites.contains(destinationSite)) {
             recoveryLog.error("Failing recovery of " + destinationSite + " at source site " + m_siteId);
             m_ackTracker.ignoreAcks();
-            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_bufferLength);
+            final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_bufferLength);
             try {
                 long bufferAddress = 0;
                 if (VoltDB.getLoadLibVOLTDB()) {
-                    bufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+                    bufferAddress = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
                 }
                 final BBContainer buffer = new BBContainer(origin.b, bufferAddress) {
                     @Override

@@ -56,11 +56,12 @@ import org.voltcore.network.WriteStream;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.EstTime;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.Pair;
+
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
 
 /**
  * An agent responsible for the whole restore process when the cluster starts

@@ -36,6 +36,8 @@ import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -44,8 +46,6 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
 
 /**
  * Manages recovery of a partition. By sending messages via the mailbox system and interacting with
