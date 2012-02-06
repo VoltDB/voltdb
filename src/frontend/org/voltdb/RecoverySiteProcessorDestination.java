@@ -477,14 +477,12 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         ssc.socket().bind(sockAddr);
         final int port = ssc.socket().getLocalPort();
         final byte address[] = ssc.socket().getInetAddress().getAddress();
-        ByteBuffer buf = ByteBuffer.allocate(2048);
-        BBContainer container = DBBPool.wrapBB(buf);
-        RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, txnId, address, port);
+        RecoveryMessage recoveryMessage = new RecoveryMessage(m_siteId, txnId, address, port);
         recoveryLog.trace(
                 "Sending recovery initiate request before txnid " + txnId +
                 " from site " + m_siteId + " to " + m_sourceSiteId);
         try {
-            m_mailbox.send( m_sourceSiteId, 0, recoveryMessage);
+            m_mailbox.send( m_sourceSiteId, recoveryMessage);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
