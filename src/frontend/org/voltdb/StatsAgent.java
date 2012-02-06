@@ -267,7 +267,8 @@ public class StatsAgent {
                 final ClientResponseImpl errorResponse =
                     new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                                          new VoltTable[0], "Too many pending stat requests", clientHandle);
-                c.writeStream().enqueue(errorResponse);
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+                c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
                 return;
             }
         }
@@ -317,7 +318,8 @@ public class StatsAgent {
                     null,
                     new VoltTable[0], "Stats request hit sixty second timeout before all responses were received");
         response.setClientHandle(psr.clientData);
-        psr.c.writeStream().enqueue(response);
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
+        psr.c.writeStream().enqueue(response.flattenToBuffer(buf));
     }
 
     private void sendStatsResponse(PendingStatsRequest request) throws Exception {
@@ -341,7 +343,8 @@ public class StatsAgent {
         ClientResponseImpl response =
             new ClientResponseImpl(statusCode, Byte.MIN_VALUE, null, responseTables, statusString);
         response.setClientHandle(request.clientData);
-        request.c.writeStream().enqueue(response);
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
+        request.c.writeStream().enqueue(response.flattenToBuffer(buf));
     }
 
     private void handleJSONMessage(JSONObject obj) throws Exception {
