@@ -1653,9 +1653,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void enqueue(ByteBuffer[] b)
         {
-            // Buffer chains are currently not used, just hand the first
-            // buffer to the single buffer handler
-            enqueue(b[0]);
+            if (b.length == 1)
+            {
+                // Buffer chains are currently not used, just hand the first
+                // buffer to the single buffer handler
+                enqueue(b[0]);
+            }
+            else
+            {
+                log.error("Something is using buffer chains with enqueue");
+            }
         }
     }
 

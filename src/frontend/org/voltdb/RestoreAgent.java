@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -43,25 +44,22 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionInitiator;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.messaging.FastSerializable;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 import org.voltdb.utils.MiscUtils;
-
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.Pair;
 
 /**
  * An agent responsible for the whole restore process when the cluster starts
@@ -252,29 +250,36 @@ SnapshotCompletionInterest {
         }
 
         @Override
-        public boolean enqueue(BBContainer c) {
+        public void enqueue(DeferredSerialization ds) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public boolean enqueue(FastSerializable f) {
-            handleResponse((ClientResponse) f);
-            return true;
+        public void enqueue(ByteBuffer b) {
+            ClientResponseImpl resp = new ClientResponseImpl();
+            try
+            {
+                resp.initFromBuffer(b);
+            }
+            catch (IOException ioe)
+            {
+                LOG.error("Unable to deserialize ClientResponse from snapshot",
+                          ioe);
+                return;
+            }
+            handleResponse((ClientResponse) resp);
         }
 
         @Override
-        public boolean enqueue(FastSerializable f, int expectedSize) {
-            return enqueue(f);
-        }
-
-        @Override
-        public boolean enqueue(DeferredSerialization ds) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean enqueue(ByteBuffer b) {
-            throw new UnsupportedOperationException();
+        public void enqueue(ByteBuffer[] b) {
+            if (b.length == 1)
+            {
+                enqueue(b[0]);
+            }
+            else
+            {
+                throw new UnsupportedOperationException();
+            }
         }
 
         @Override
@@ -323,11 +328,8 @@ SnapshotCompletionInterest {
         }
 
         @Override
-        public void scheduleRunnable(Runnable r) {
-        }
-
-        @Override
-        public void unregister() {
+        public Future<?> unregister() {
+            return null;
         }
     }
 
