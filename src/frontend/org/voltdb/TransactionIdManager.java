@@ -91,7 +91,7 @@ public class TransactionIdManager {
      * @param initiatorId The siteId of the current site.
      * @param timestampTestingSalt Value of the salt used to skew a clock in testing.
      */
-    public TransactionIdManager(int initiatorId, long timestampTestingSalt) {
+    public TransactionIdManager(long initiatorId, long timestampTestingSalt) {
         this.initiatorId = initiatorId;
 
         m_timestampTestingSalt = timestampTestingSalt;

@@ -106,7 +106,7 @@ public class DtxnInitiatorMailbox implements Mailbox
      * Construct a new DtxnInitiatorQueue
      * @param siteId  The mailbox siteId for this initiator
      */
-    public DtxnInitiatorMailbox(int siteId, ExecutorTxnIdSafetyState safetyState, HostMessenger hostMessenger)
+    public DtxnInitiatorMailbox(long siteId, ExecutorTxnIdSafetyState safetyState, HostMessenger hostMessenger)
     {
         assert(safetyState != null);
         assert(hostMessenger != null);

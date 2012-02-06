@@ -47,10 +47,10 @@ class WorkUnit
         HashMap<Integer, VoltTable> m_results;
         int m_depId;
         int m_expectedDeps;
-        HashSet<Integer> m_expectedSites;
+        HashSet<Long> m_expectedSites;
 
         DependencyTracker(int depId, int expectedDeps,
-                          HashSet<Integer> expectedSites)
+                          HashSet<Long> expectedSites)
         {
             m_depId = depId;
             m_results = new HashMap<Integer, VoltTable>();
@@ -58,7 +58,7 @@ class WorkUnit
             m_expectedSites = expectedSites;
         }
 
-        boolean addResult(int siteId, int mapId, VoltTable result)
+        boolean addResult(long siteId, int mapId, VoltTable result)
         {
             boolean retval = true;
             if (!(m_results.containsKey(mapId)))
@@ -80,12 +80,12 @@ class WorkUnit
         /**
          * Dependencies from recovering sites use this.
          */
-        void addDummyResult(int siteId, int mapId) {
+        void addDummyResult(long siteId, int mapId) {
             m_expectedSites.remove(siteId);
             m_expectedDeps--;
         }
 
-        void removeSite(int siteId)
+        void removeSite(long siteId)
         {
             // This is a really horrible hack to work around the fact that
             // we don't know the set of remote sites from which to expect
@@ -238,8 +238,8 @@ class WorkUnit
     }
 
     WorkUnit(SiteTracker siteTracker, VoltMessage payload,
-             int[] dependencyIds, int siteId,
-             int[] nonCoordinatingSiteIds,
+             int[] dependencyIds, long siteId,
+             long[] nonCoordinatingSiteIds,
              boolean shouldResumeProcedure)
     {
         this.m_payload = payload;
@@ -253,11 +253,11 @@ class WorkUnit
             m_dependencies = new HashMap<Integer, DependencyTracker>();
             for (int dependency : dependencyIds) {
                 int depsToExpect = 1;
-                HashSet<Integer> expected_sites = new HashSet<Integer>();
+                HashSet<Long> expected_sites = new HashSet<Long>();
                 expected_sites.add(siteId);
                 if ((dependency & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0) {
                     depsToExpect = siteTracker.getLiveSiteCount();
-                    for (Integer site_id : nonCoordinatingSiteIds)
+                    for (Long site_id : nonCoordinatingSiteIds)
                     {
                         expected_sites.add(site_id);
                     }

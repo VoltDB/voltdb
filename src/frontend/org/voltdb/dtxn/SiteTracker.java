@@ -420,7 +420,7 @@ public class SiteTracker {
      * @param siteid
      * @return Integer host id for that site
      */
-    public Integer getHostForSite(Integer siteId) {
+    public Integer getHostForSite(Long siteId) {
         assert m_sitesToHost.containsKey(siteId);
         return m_sitesToHost.get(siteId);
     }
@@ -450,7 +450,7 @@ public class SiteTracker {
      * @param siteId The id of a VoltDB site.
      * @return The id of the partition stored at the given site.
      */
-    public long getPartitionForSite(long siteId)
+    public int getPartitionForSite(long siteId)
     {
         assert(m_sitesToPartitions.containsKey(siteId));
         return m_sitesToPartitions.get(siteId);

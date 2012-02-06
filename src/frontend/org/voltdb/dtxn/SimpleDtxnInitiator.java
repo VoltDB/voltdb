@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.MessagingException;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -58,7 +59,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
-import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -96,13 +96,13 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private long m_pendingTxnBytes = 0;
     private int m_pendingTxnCount = 0;
     private final DtxnInitiatorMailbox m_mailbox;
-    private final int m_siteId;
+    private final long m_siteId;
     private final int m_hostId;
     private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
     public SimpleDtxnInitiator(CatalogContext context,
-                               Messenger messenger, int hostId, int siteId,
-                               int initiatorId,
+                               Messenger messenger, int hostId, long siteId,
+                               long initiatorId,
                                long timestampTestingSalt)
     {
         assert(messenger != null);
@@ -195,21 +195,21 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         else
         {
             SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
-            ArrayList<Integer> sitesOnThisHost =
+            ArrayList<Long> sitesOnThisHost =
                 tracker.getLiveExecutionSitesForHost(m_hostId);
-            int coordinatorId = sitesOnThisHost.get(0);
-            ArrayList<Integer> replicaIds = new ArrayList<Integer>();
-            for (Integer replica : tracker.getAllSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
+            long coordinatorId = sitesOnThisHost.get(0);
+            ArrayList<Long> replicaIds = new ArrayList<Long>();
+            for (Long replica : tracker.getAllSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
                 if (replica != coordinatorId && tracker.getAllLiveSites().contains(replica)) {
                     replicaIds.add(replica);
                 }
             }
 
-            ArrayList<Integer> otherSiteIds = new ArrayList<Integer>();
+            ArrayList<Long> otherSiteIds = new ArrayList<Long>();
 
             // store only partitions that are NOT the coordinator or coordinator replica
             // this is a bit too slow
-            int[] allSiteIds =
+            long[] allSiteIds =
                 VoltDB.instance().getCatalogContext().
                 siteTracker.getLiveSitesForEachPartition(partitions);
 
@@ -222,9 +222,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 }
             }
 
-            int otherSiteIdsArr[] = new int[otherSiteIds.size()];
+            long otherSiteIdsArr[] = new long[otherSiteIds.size()];
             int ii = 0;
-            for (Integer otherSiteId : otherSiteIds) {
+            for (Long otherSiteId : otherSiteIds) {
                 otherSiteIdsArr[ii++] = otherSiteId;
             }
 
@@ -264,8 +264,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     @Override
     public void sendHeartbeat(final long txnId) {
         final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
-        int remoteHeartbeatTargets[][] = st.getRemoteHeartbeatTargets();
-        int localHeartbeatTargets[] = st.getLocalHeartbeatTargets();
+        long remoteHeartbeatTargets[][] = st.getRemoteHeartbeatTargets();
+        long localHeartbeatTargets[] = st.getLocalHeartbeatTargets();
 
         try {
             /*
@@ -273,9 +273,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
              * site. Then coalesce them into a single heartbeat message to send to the
              * initiator on that host who will then demux the heartbeats
              */
-            for (int hostTargets[] : remoteHeartbeatTargets) {
-                final int initiatorSiteId = st.getFirstNonExecSiteForHost(st.getHostForSite(hostTargets[0]));
-                assert(initiatorSiteId != 1);//uninitialized value
+            for (long hostTargets[] : remoteHeartbeatTargets) {
+                final long initiatorSiteId = st.getFirstNonExecSiteForHost(st.getHostForSite(hostTargets[0]));
+                assert(initiatorSiteId != 1L);//uninitialized value
                 long safeTxnIds[] = new long[hostTargets.length];
                 for (int ii = 0; ii < safeTxnIds.length; ii++) {
                     safeTxnIds[ii] = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(hostTargets[ii]);
@@ -288,7 +288,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
             // loop over all the local sites that need a heartbeat and send each a message
             // no coalescing here
-            for (int siteId : localHeartbeatTargets) {
+            for (long siteId : localHeartbeatTargets) {
                 // tack on the last confirmed seen txn id for all sites with a particular partition
                 long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(siteId);
                 HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, newestSafeTxnId);
@@ -316,7 +316,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              int messageSize,
                              long now)
     {
-        ArrayList<Integer> siteIds;
+        ArrayList<Long> siteIds;
 
         // Special case the common 1 partition case -- cheap via SiteTracker
         if (partitions.length == 1) {
@@ -351,12 +351,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                  connectionHostname,
                                  adminConnection);
 
-        for (int siteId : siteIds) {
+        for (long siteId : siteIds) {
             state.addCoordinator(siteId);
         }
         m_mailbox.addPendingTxn(state);
 
-        for (int coordId : state.outstandingCoordinators) {
+        for (long coordId : state.outstandingCoordinators) {
             sendTransactionToCoordinator(state, coordId);
         }
     }
@@ -404,7 +404,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
          */
         try {
             m_mailbox.send(txn.firstCoordinatorId, 0, workRequest);
-            for (Integer replica : txn.coordinatorReplicas) {
+            for (Long replica : txn.coordinatorReplicas) {
                 newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(replica);
                 workRequest = new InitiateTaskMessage(
                         m_siteId,
@@ -429,7 +429,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      *
      * @param txn Information about the transaction to send.
      */
-    private void sendTransactionToCoordinator(InFlightTxnState txn, int coordinatorId)
+    private void sendTransactionToCoordinator(InFlightTxnState txn, long coordinatorId)
     {
         // figure out what the newest txnid seen by ALL partitions for this execution
         //  site id is and tack it on to this message
@@ -481,8 +481,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     }
 
     @Override
-    public synchronized void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds) {
-        for (int executorSiteId : executorSiteIds) {
+    public synchronized void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
+        for (long executorSiteId : executorSiteIds) {
             m_safetyState.addRejoinedState(executorSiteId);
         }
     }

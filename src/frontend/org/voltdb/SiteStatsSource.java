@@ -27,9 +27,9 @@ public abstract class SiteStatsSource extends StatsSource {
     /**
      * CatalogId of the site this source is associated with
      */
-    private final int m_siteId;
+    private final long m_siteId;
 
-    public SiteStatsSource(int siteId, boolean isEE) {
+    public SiteStatsSource(long siteId, boolean isEE) {
         super(isEE);
         this.m_siteId = siteId;
     }
@@ -42,7 +42,7 @@ public abstract class SiteStatsSource extends StatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = Integer.valueOf(m_siteId);
+        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = Long.valueOf(m_siteId);
         super.updateStatsRow(rowKey, rowValues);
     }
 }
