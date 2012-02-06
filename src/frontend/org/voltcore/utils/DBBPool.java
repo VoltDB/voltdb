@@ -20,10 +20,8 @@ package org.voltcore.utils;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.VoltDB;
 import org.voltcore.logging.VoltLogger;
 
 /**
