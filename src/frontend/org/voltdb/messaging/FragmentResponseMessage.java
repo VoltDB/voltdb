@@ -26,7 +26,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.MiscUtils;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.utils.DBBPool;
 
 /**
  * Message from an execution site which is participating in a transaction
@@ -62,8 +61,8 @@ public class FragmentResponseMessage extends VoltMessage {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public FragmentResponseMessage(FragmentTaskMessage task, long siteId) {
-        m_executorHSId = siteId;
+    public FragmentResponseMessage(FragmentTaskMessage task, long HSId) {
+        m_executorHSId = HSId;
         m_txnId = task.getTxnId();
         m_destinationHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
