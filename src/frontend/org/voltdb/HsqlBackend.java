@@ -55,7 +55,7 @@ public class HsqlBackend {
 
     Connection dbconn;
 
-    public HsqlBackend(int siteId) {
+    public HsqlBackend(long siteId) {
         try {
             Class.forName("org.hsqldb_voltpatches.jdbcDriver" );
         } catch (Exception e) {
