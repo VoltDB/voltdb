@@ -55,7 +55,7 @@ import org.voltcore.utils.MiscUtils;
  * a ZooKeeper instance that is maintained within the mesh that can be used for distributed coordination
  * and failure detection.
  */
-public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, InterfaceToMessenger {
+public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMessenger {
 
     /**
      * Configuration for a host messenger. The leader binds to the coordinator ip and
@@ -90,6 +90,8 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final int AGREEMENT_SITE_ID = -1;
+    public static final int STATS_SITE_ID = -2;
+    public static final int ASYNC_COMPILER_SITE_ID = -3;
 
     int m_localHostId;
 
@@ -646,7 +648,6 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     /*
      * Create a site mailbox with a generated host id
      */
-    @Override
     public Mailbox createMailbox() {
         final int siteId = m_nextSiteId.getAndIncrement();
         long hsId = getHSIdForLocalSite(siteId);
@@ -746,7 +747,6 @@ public class HostMessenger implements Messenger, SocketJoiner.JoinHandler, Inter
     /*
      * Register a custom mailbox, optinally specifying what the hsid should be.
      */
-    @Override
     public void createMailbox(Long proposedHSId, Mailbox mailbox) {
         long hsId = 0;
         if (proposedHSId != null) {

@@ -430,8 +430,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                 m_config.m_timestampTestingSalt);
 
                     ClientInterface ci =
-                        ClientInterface.create(m_network,
-                                               m_messenger,
+                        ClientInterface.create(m_messenger,
                                                m_catalogContext,
                                                m_replicationRole,
                                                initiator,
@@ -465,12 +464,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_statsManager.initialize(new ArrayList<Integer>(m_localSites.keySet()));
             } catch (Exception e) {}
 
-            // in most cases, this work will already be done in inits code,
-            // but not for rejoin, so double-make-sure it's done here
-            startNetworkAndCreateZKClient();
-
             try {
-                m_snapshotCompletionMonitor.init(m_zk);
+                m_snapshotCompletionMonitor.init(m_messenger.getZK());
             } catch (Exception e) {
                 hostLog.fatal("Error initializing snapshot completion monitor", e);
                 VoltDB.crashVoltDB();
@@ -683,29 +678,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
     }
 
-    void startNetworkAndCreateZKClient() {
-        // don't set this up twice
-        if (m_zk != null)
-            return;
-
-        // Start running the socket handlers
-        hostLog.l7dlog(Level.INFO,
-                       LogKeys.host_VoltDB_StartingNetwork.name(),
-                       new Object[] { m_network.threadPoolSize },
-                       null);
-        m_network.start();
-        try {
-            m_agreementSite.waitForRecovery();
-            m_zk = org.voltdb.agreement.ZKUtil.getClient(m_config.m_zkInterface, 60 * 1000);
-            if (m_zk == null) {
-                throw new Exception("Timed out trying to connect local ZooKeeper instance");
-            }
-        } catch (Exception e) {
-            hostLog.fatal("Unable to create a ZK client", e);
-            VoltDB.crashVoltDB();
-        }
-    }
-
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -752,133 +724,134 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     HashSet<Integer> rejoinExistingMesh(int numberOfNodes, long deploymentCRC) {
-        // sensible defaults (sorta)
-        String rejoinHostCredentialString = null;
-        String rejoinHostAddressString = null;
-
-        //Client interface port of node that will receive @Rejoin invocation
-        int rejoinPort = m_config.m_port;
-        String rejoinHost = null;
-        String rejoinUser = null;
-        String rejoinPass = null;
-
-        // this will cause the ExecutionSites to start in recovering mode
-        m_recovering = true;
-
-        // split a "user:pass@host:port" string into "user:pass" and "host:port"
-        int atSignIndex = m_config.m_rejoinToHostAndPort.indexOf('@');
-        if (atSignIndex == -1) {
-            rejoinHostAddressString = m_config.m_rejoinToHostAndPort;
-        }
-        else {
-            rejoinHostCredentialString = m_config.m_rejoinToHostAndPort.substring(0, atSignIndex).trim();
-            rejoinHostAddressString = m_config.m_rejoinToHostAndPort.substring(atSignIndex + 1).trim();
-        }
-
-        int colonIndex = -1;
-        // split a "user:pass" string into "user" and "pass"
-        if (rejoinHostCredentialString != null) {
-            colonIndex = rejoinHostCredentialString.indexOf(':');
-            if (colonIndex == -1) {
-                rejoinUser = rejoinHostCredentialString.trim();
-                System.out.print("password: ");
-                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-                try {
-                    rejoinPass = br.readLine();
-                } catch (IOException e) {
-                    hostLog.error("Unable to read passord for rejoining credentials from console.");
-                    System.exit(-1);
-                }
-            }
-            else {
-                rejoinUser = rejoinHostCredentialString.substring(0, colonIndex).trim();
-                rejoinPass = rejoinHostCredentialString.substring(colonIndex + 1).trim();
-            }
-        }
-
-        // split a "host:port" string into "host" and "port"
-        colonIndex = rejoinHostAddressString.indexOf(':');
-        if (colonIndex == -1) {
-            rejoinHost = rejoinHostAddressString.trim();
-            // note rejoinPort has a default
-        }
-        else {
-            rejoinHost = rejoinHostAddressString.substring(0, colonIndex).trim();
-            rejoinPort = Integer.parseInt(rejoinHostAddressString.substring(colonIndex + 1).trim());
-        }
-
-        hostLog.info(String.format("Inter-node communication will use port %d.", m_config.m_internalPort));
-        ServerSocketChannel listener = null;
-        try {
-            listener = ServerSocketChannel.open();
-            listener.socket().bind(new InetSocketAddress(m_config.m_internalPort));
-        } catch (IOException e) {
-            hostLog.error("Problem opening listening rejoin socket: " + e.getMessage());
-            System.exit(-1);
-        }
-        m_messenger = new HostMessenger(m_network, listener, numberOfNodes, 0, deploymentCRC, hostLog);
-
-        // make empty strings null
-        if ((rejoinUser != null) && (rejoinUser.length() == 0)) rejoinUser = null;
-        if ((rejoinPass != null) && (rejoinPass.length() == 0)) rejoinPass = null;
-
-        // URL Decode so usernames/passwords can contain weird stuff
-        try {
-            if (rejoinUser != null) rejoinUser = URLDecoder.decode(rejoinUser, "UTF-8");
-            if (rejoinPass != null) rejoinPass = URLDecoder.decode(rejoinPass, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            hostLog.error("Problem URL-decoding credentials for rejoin authentication: " + e.getMessage());
-            System.exit(-1);
-        }
-
-        ClientConfig clientConfig = new ClientConfig(rejoinUser, rejoinPass);
-        Client client = ClientFactory.createClient(clientConfig);
-        ClientResponse response = null;
-        RejoinCallback rcb = new RejoinCallback() {
-
-        };
-        try {
-            client.createConnection(rejoinHost, rejoinPort);
-            InetSocketAddress inetsockaddr = new InetSocketAddress(rejoinHost, rejoinPort);
-            SocketChannel socket = SocketChannel.open(inetsockaddr);
-            String ip_addr = socket.socket().getLocalAddress().getHostAddress();
-            socket.close();
-            m_config.m_selectedRejoinInterface =
-                m_config.m_internalInterface.isEmpty() ? ip_addr : m_config.m_internalInterface;
-            client.callProcedure(
-                    rcb,
-                    "@Rejoin",
-                    m_config.m_selectedRejoinInterface,
-                    m_config.m_internalPort);
-        }
-        catch (Exception e) {
-            hostLog.fatal("Problem connecting client to " + m_config.m_selectedRejoinInterface + ":" +
-                   m_config.m_internalPort + ". " + e.getMessage());
-            VoltDB.crashVoltDB();
-        }
-
-        Object retval[] = m_messenger.waitForGroupJoin(60 * 1000);
-
-        m_instanceId = new Object[] { retval[0], retval[1] };
-
-        @SuppressWarnings("unchecked")
-        HashSet<Integer> downHosts = (HashSet<Integer>)retval[2];
-        hostLog.info("Down hosts are " + downHosts.toString());
-
-        try {
-            //Callback validates response asynchronously. Just wait for the response before continuing.
-            //Timeout because a failure might result in the response not coming.
-            response = rcb.waitForResponse(3000);
-            if (response == null) {
-                hostLog.fatal("Recovering node timed out rejoining");
-                VoltDB.crashVoltDB();
-            }
-        }
-        catch (InterruptedException e) {
-            hostLog.fatal("Interrupted while attempting to rejoin cluster");
-            VoltDB.crashVoltDB();
-        }
-        return downHosts;
+        throw new UnsupportedOperationException();
+//        // sensible defaults (sorta)
+//        String rejoinHostCredentialString = null;
+//        String rejoinHostAddressString = null;
+//
+//        //Client interface port of node that will receive @Rejoin invocation
+//        int rejoinPort = m_config.m_port;
+//        String rejoinHost = null;
+//        String rejoinUser = null;
+//        String rejoinPass = null;
+//
+//        // this will cause the ExecutionSites to start in recovering mode
+//        m_recovering = true;
+//
+//        // split a "user:pass@host:port" string into "user:pass" and "host:port"
+//        int atSignIndex = m_config.m_rejoinToHostAndPort.indexOf('@');
+//        if (atSignIndex == -1) {
+//            rejoinHostAddressString = m_config.m_rejoinToHostAndPort;
+//        }
+//        else {
+//            rejoinHostCredentialString = m_config.m_rejoinToHostAndPort.substring(0, atSignIndex).trim();
+//            rejoinHostAddressString = m_config.m_rejoinToHostAndPort.substring(atSignIndex + 1).trim();
+//        }
+//
+//        int colonIndex = -1;
+//        // split a "user:pass" string into "user" and "pass"
+//        if (rejoinHostCredentialString != null) {
+//            colonIndex = rejoinHostCredentialString.indexOf(':');
+//            if (colonIndex == -1) {
+//                rejoinUser = rejoinHostCredentialString.trim();
+//                System.out.print("password: ");
+//                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+//                try {
+//                    rejoinPass = br.readLine();
+//                } catch (IOException e) {
+//                    hostLog.error("Unable to read passord for rejoining credentials from console.");
+//                    System.exit(-1);
+//                }
+//            }
+//            else {
+//                rejoinUser = rejoinHostCredentialString.substring(0, colonIndex).trim();
+//                rejoinPass = rejoinHostCredentialString.substring(colonIndex + 1).trim();
+//            }
+//        }
+//
+//        // split a "host:port" string into "host" and "port"
+//        colonIndex = rejoinHostAddressString.indexOf(':');
+//        if (colonIndex == -1) {
+//            rejoinHost = rejoinHostAddressString.trim();
+//            // note rejoinPort has a default
+//        }
+//        else {
+//            rejoinHost = rejoinHostAddressString.substring(0, colonIndex).trim();
+//            rejoinPort = Integer.parseInt(rejoinHostAddressString.substring(colonIndex + 1).trim());
+//        }
+//
+//        hostLog.info(String.format("Inter-node communication will use port %d.", m_config.m_internalPort));
+//        ServerSocketChannel listener = null;
+//        try {
+//            listener = ServerSocketChannel.open();
+//            listener.socket().bind(new InetSocketAddress(m_config.m_internalPort));
+//        } catch (IOException e) {
+//            hostLog.error("Problem opening listening rejoin socket: " + e.getMessage());
+//            System.exit(-1);
+//        }
+//        m_messenger = new HostMessenger(m_network, listener, numberOfNodes, 0, deploymentCRC, hostLog);
+//
+//        // make empty strings null
+//        if ((rejoinUser != null) && (rejoinUser.length() == 0)) rejoinUser = null;
+//        if ((rejoinPass != null) && (rejoinPass.length() == 0)) rejoinPass = null;
+//
+//        // URL Decode so usernames/passwords can contain weird stuff
+//        try {
+//            if (rejoinUser != null) rejoinUser = URLDecoder.decode(rejoinUser, "UTF-8");
+//            if (rejoinPass != null) rejoinPass = URLDecoder.decode(rejoinPass, "UTF-8");
+//        } catch (UnsupportedEncodingException e) {
+//            hostLog.error("Problem URL-decoding credentials for rejoin authentication: " + e.getMessage());
+//            System.exit(-1);
+//        }
+//
+//        ClientConfig clientConfig = new ClientConfig(rejoinUser, rejoinPass);
+//        Client client = ClientFactory.createClient(clientConfig);
+//        ClientResponse response = null;
+//        RejoinCallback rcb = new RejoinCallback() {
+//
+//        };
+//        try {
+//            client.createConnection(rejoinHost, rejoinPort);
+//            InetSocketAddress inetsockaddr = new InetSocketAddress(rejoinHost, rejoinPort);
+//            SocketChannel socket = SocketChannel.open(inetsockaddr);
+//            String ip_addr = socket.socket().getLocalAddress().getHostAddress();
+//            socket.close();
+//            m_config.m_selectedRejoinInterface =
+//                m_config.m_internalInterface.isEmpty() ? ip_addr : m_config.m_internalInterface;
+//            client.callProcedure(
+//                    rcb,
+//                    "@Rejoin",
+//                    m_config.m_selectedRejoinInterface,
+//                    m_config.m_internalPort);
+//        }
+//        catch (Exception e) {
+//            hostLog.fatal("Problem connecting client to " + m_config.m_selectedRejoinInterface + ":" +
+//                   m_config.m_internalPort + ". " + e.getMessage());
+//            VoltDB.crashVoltDB();
+//        }
+//
+//        Object retval[] = m_messenger.waitForGroupJoin(60 * 1000);
+//
+//        m_instanceId = new Object[] { retval[0], retval[1] };
+//
+//        @SuppressWarnings("unchecked")
+//        HashSet<Integer> downHosts = (HashSet<Integer>)retval[2];
+//        hostLog.info("Down hosts are " + downHosts.toString());
+//
+//        try {
+//            //Callback validates response asynchronously. Just wait for the response before continuing.
+//            //Timeout because a failure might result in the response not coming.
+//            response = rcb.waitForResponse(3000);
+//            if (response == null) {
+//                hostLog.fatal("Recovering node timed out rejoining");
+//                VoltDB.crashVoltDB();
+//            }
+//        }
+//        catch (InterruptedException e) {
+//            hostLog.fatal("Interrupted while attempting to rejoin cluster");
+//            VoltDB.crashVoltDB();
+//        }
+//        return downHosts;
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -941,19 +914,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info(line.trim());
         }
 
+        final ZooKeeper zk = m_messenger.getZK();
         /*
          * Publish our cluster metadata, and then retrieve the metadata
          * for the rest of the cluster
          */
         try {
-            m_zk.create(
+            zk.create(
                     "/cluster_metadata",
                     null,
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT,
                     new ZKUtil.StringCallback(),
                     null);
-            m_zk.create(
+            zk.create(
                     "/cluster_metadata/" + m_messenger.getHostId(),
                     getLocalMetadata().getBytes("UTF-8"),
                     Ids.OPEN_ACL_UNSAFE,
@@ -973,7 +947,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Map<Integer, ZKUtil.ByteArrayCallback> callbacks = new HashMap<Integer, ZKUtil.ByteArrayCallback>();
             for (Integer hostId : metadataToRetrieve) {
                 ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
-                m_zk.getData("/cluster_metadata/" + hostId, false, cb, null);
+                zk.getData("/cluster_metadata/" + hostId, false, cb, null);
                 callbacks.put(hostId, cb);
             }
 
@@ -1187,20 +1161,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_currentThreadSite = null;
             m_siteThreads = null;
             m_runners = null;
-            Thread t = new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        m_zk.close();
-                    } catch (InterruptedException e) {
-                    }
-                }
-            };
-            t.start();
-            m_agreementSite.shutdown();
-            t.join();
 
-            m_agreementSite = null;
             // shut down the network/messaging stuff
             // Close the host messenger first, which should close down all of
             // the ForeignHost sockets cleanly
@@ -1208,14 +1169,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             {
                 m_messenger.shutdown();
             }
-            if (m_network != null) {
-                //Synchronized so the interruption won't interrupt the network thread
-                //while it is waiting for the executor service to shutdown
-                m_network.shutdown();
-            }
-
             m_messenger = null;
-            m_network = null;
 
             //Also for test code that expects a fresh stats agent
             if (m_statsAgent != null) {
@@ -1300,90 +1254,91 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private static Long lastNodeRejoinFinish_txnId = 0L;
     @Override
     public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
-        if (m_recovering) {
-            recoveryLog.fatal("Concurrent rejoins are not supported");
-            VoltDB.crashVoltDB();
-        }
-        // another site already did this work.
-        if (currentTxnId == lastNodeRejoinFinish_txnId) {
-            return null;
-        }
-        else if (currentTxnId < lastNodeRejoinFinish_txnId) {
-            throw new RuntimeException("Trying to rejoin (commit/rollback) with an old transaction.");
-        }
-        recoveryLog.info("Rejoining commit node with txnid: " + currentTxnId +
-                         " lastNodeRejoinFinish_txnId: " + lastNodeRejoinFinish_txnId);
-        HostMessenger messenger = getHostMessenger();
-        if (commit) {
-            // put the foreign host into the set of active ones
-            HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
-            m_faultManager.reportFaultCleared(
-                    new NodeFailureFault(
-                            joinNodeInfo.hostId,
-                            m_catalogContext.siteTracker.getNonExecSitesForHost(joinNodeInfo.hostId),
-                            joinNodeInfo.hostName));
-            try {
-                m_faultHandler.m_waitForFaultClear.acquire();
-            } catch (InterruptedException e) {
-                VoltDB.crashVoltDB();//shouldn't happen
-            }
-
-            ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
-            ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
-            Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
-            for (Site site : cluster.getSites()) {
-                int siteId = Integer.parseInt(site.getTypeName());
-                int hostId = Integer.parseInt(site.getHost().getTypeName());
-                if (hostId == joinNodeInfo.hostId) {
-                    assert(site.getIsup() == false);
-                    rejoiningSiteIds.add(siteId);
-                    if (site.getIsexec() == true) {
-                        rejoiningExecSiteIds.add(siteId);
-                    }
-                }
-            }
-            assert(rejoiningSiteIds.size() > 0);
-
-            // get a string list of all the new sites
-            StringBuilder newIds = new StringBuilder();
-            for (int siteId : rejoiningSiteIds) {
-                newIds.append(siteId).append(",");
-            }
-            // trim the last comma
-            newIds.setLength(newIds.length() - 1);
-
-            // change the catalog to reflect this change
-            hostLog.info("Host joined, host id: " + joinNodeInfo.hostId + " hostname: " + joinNodeInfo.hostName);
-            hostLog.info("  Adding sites to cluster: " + newIds);
-            StringBuilder sb = new StringBuilder();
-            for (int siteId : rejoiningSiteIds)
-            {
-                sb.append("set ");
-                String site_path = VoltDB.instance().getCatalogContext().catalog.
-                                   getClusters().get("cluster").getSites().
-                                   get(Integer.toString(siteId)).getPath();
-                sb.append(site_path).append(" ").append("isUp true");
-                sb.append("\n");
-            }
-            String catalogDiffCommands = sb.toString();
-            clusterUpdate(catalogDiffCommands);
-
-            // update the SafteyState in the initiators
-            for (SimpleDtxnInitiator dtxn : m_dtxns) {
-                dtxn.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
-            }
-
-            //Notify the export manager the cluster topology has changed
-            ExportManager.instance().notifyOfClusterTopologyChange();
-        }
-        else {
-            // clean up any connections made
-            messenger.rejoinForeignHostRollback();
-        }
-        recoveryLog.info("Setting lastNodeRejoinFinish_txnId to: " + currentTxnId);
-        lastNodeRejoinFinish_txnId = currentTxnId;
-
-        return null;
+        throw new UnsupportedOperationException();
+//        if (m_recovering) {
+//            recoveryLog.fatal("Concurrent rejoins are not supported");
+//            VoltDB.crashVoltDB();
+//        }
+//        // another site already did this work.
+//        if (currentTxnId == lastNodeRejoinFinish_txnId) {
+//            return null;
+//        }
+//        else if (currentTxnId < lastNodeRejoinFinish_txnId) {
+//            throw new RuntimeException("Trying to rejoin (commit/rollback) with an old transaction.");
+//        }
+//        recoveryLog.info("Rejoining commit node with txnid: " + currentTxnId +
+//                         " lastNodeRejoinFinish_txnId: " + lastNodeRejoinFinish_txnId);
+//        HostMessenger messenger = getHostMessenger();
+//        if (commit) {
+//            // put the foreign host into the set of active ones
+//            HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
+//            m_faultManager.reportFaultCleared(
+//                    new NodeFailureFault(
+//                            joinNodeInfo.hostId,
+//                            m_catalogContext.siteTracker.getNonExecSitesForHost(joinNodeInfo.hostId),
+//                            joinNodeInfo.hostName));
+//            try {
+//                m_faultHandler.m_waitForFaultClear.acquire();
+//            } catch (InterruptedException e) {
+//                VoltDB.crashVoltDB();//shouldn't happen
+//            }
+//
+//            ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
+//            ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
+//            Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
+//            for (Site site : cluster.getSites()) {
+//                int siteId = Integer.parseInt(site.getTypeName());
+//                int hostId = Integer.parseInt(site.getHost().getTypeName());
+//                if (hostId == joinNodeInfo.hostId) {
+//                    assert(site.getIsup() == false);
+//                    rejoiningSiteIds.add(siteId);
+//                    if (site.getIsexec() == true) {
+//                        rejoiningExecSiteIds.add(siteId);
+//                    }
+//                }
+//            }
+//            assert(rejoiningSiteIds.size() > 0);
+//
+//            // get a string list of all the new sites
+//            StringBuilder newIds = new StringBuilder();
+//            for (int siteId : rejoiningSiteIds) {
+//                newIds.append(siteId).append(",");
+//            }
+//            // trim the last comma
+//            newIds.setLength(newIds.length() - 1);
+//
+//            // change the catalog to reflect this change
+//            hostLog.info("Host joined, host id: " + joinNodeInfo.hostId + " hostname: " + joinNodeInfo.hostName);
+//            hostLog.info("  Adding sites to cluster: " + newIds);
+//            StringBuilder sb = new StringBuilder();
+//            for (int siteId : rejoiningSiteIds)
+//            {
+//                sb.append("set ");
+//                String site_path = VoltDB.instance().getCatalogContext().catalog.
+//                                   getClusters().get("cluster").getSites().
+//                                   get(Integer.toString(siteId)).getPath();
+//                sb.append(site_path).append(" ").append("isUp true");
+//                sb.append("\n");
+//            }
+//            String catalogDiffCommands = sb.toString();
+//            clusterUpdate(catalogDiffCommands);
+//
+//            // update the SafteyState in the initiators
+//            for (SimpleDtxnInitiator dtxn : m_dtxns) {
+//                dtxn.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
+//            }
+//
+//            //Notify the export manager the cluster topology has changed
+//            ExportManager.instance().notifyOfClusterTopologyChange();
+//        }
+//        else {
+//            // clean up any connections made
+//            messenger.rejoinForeignHostRollback();
+//        }
+//        recoveryLog.info("Setting lastNodeRejoinFinish_txnId to: " + currentTxnId);
+//        lastNodeRejoinFinish_txnId = currentTxnId;
+//
+//        return null;
     }
 
     /** Last transaction ID at which the logging config updated.
@@ -1495,11 +1450,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public ZooKeeper getZK() {
-        return m_zk;
-    }
-
-    @Override
     public VoltDB.Configuration getConfig() {
         return m_config;
     }
@@ -1515,7 +1465,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public Messenger getMessenger() {
+    public HostMessenger getMessenger() {
         return m_messenger;
     }
 
@@ -1532,11 +1482,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public Map<Integer, ExecutionSite> getLocalSites() {
         return m_localSites;
-    }
-
-    @Override
-    public VoltNetworkPool getNetwork() {
-        return m_network;
     }
 
     @Override
@@ -1637,20 +1582,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
         try {
+            final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
             try {
-                m_zk.create("/unfaulted_hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                zk.create("/unfaulted_hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } catch (KeeperException.NodeExistsException e) {}
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
                 try {
-                    m_zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 } catch (KeeperException.NodeExistsException e) {}
             } else {
                 logRecoveryCompleted = true;
             }
             ByteBuffer txnIdBuffer = ByteBuffer.allocate(8);
             txnIdBuffer.putLong(TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
-            m_zk.create(
+            zk.create(
                     "/unfaulted_hosts/" + m_messenger.getHostId(),
                     txnIdBuffer.array(),
                     Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -1792,11 +1738,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public synchronized void onAgreementSiteRecoveryCompletion() {
         m_agreementSiteRecovered = true;
         onRecoveryCompletion();
-    }
-
-    @Override
-    public AgreementSite getAgreementSite() {
-        return m_agreementSite;
     }
 
     @Override

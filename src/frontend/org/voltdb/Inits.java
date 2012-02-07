@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
 import org.voltcore.agreement.AgreementSite;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
@@ -229,7 +230,7 @@ public class Inits {
 
     class DistributeCatalog extends InitWork {
         DistributeCatalog() {
-            dependsOn(InitAgreementSiteAndStatsAgent.class);
+            dependsOn(InitStatsAgent.class);
             dependsOn(CreateRestoreAgentAndPlan.class);
         }
 
@@ -530,41 +531,12 @@ public class Inits {
         }
     }
 
-    class InitAgreementSiteAndStatsAgent extends InitWork {
-        InitAgreementSiteAndStatsAgent() {
+    class InitStatsAgent extends InitWork {
+        InitStatsAgent() {
         }
 
         @Override
         public void run() {
-            /*
-             * Initialize the agreement site with the same site id as the CI/SDTXN,
-             * but a different mailbox.
-             */
-            int myAgreementSiteId = -1;
-            HashSet<Integer> agreementSiteIds = new HashSet<Integer>();
-            int myAgreementInitiatorId = 0;
-            for (Site site : m_rvdb.m_catalogContext.siteTracker.getAllSites()) {
-                int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-                int currSiteId = Integer.parseInt(site.getTypeName());
-
-                if (sitesHostId == m_rvdb.m_myHostId) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { currSiteId }, null);
-                    m_rvdb.m_messenger.createLocalSite(currSiteId);
-                }
-                // Create an agreement site for every initiator
-                if (site.getIsexec() == false) {
-                    agreementSiteIds.add(currSiteId);
-                    if (sitesHostId == m_rvdb.m_myHostId) {
-                        myAgreementSiteId = currSiteId;
-                        myAgreementInitiatorId = site.getInitiatorid();
-                    }
-                }
-            }
-
-            assert(m_rvdb.m_agreementSite == null);
-            assert(myAgreementSiteId != -1);
-            Mailbox agreementMailbox =
-                    m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.AGREEMENT_MAILBOX_ID, false);
             try {
 
                 // Hack in the construction of stats and async compiler mailboxes.
@@ -572,26 +544,18 @@ public class Inits {
                 // sanitized. Note that the agents (not the mailboxes) are owned
                 // by RealVoltDB
                 Mailbox statsMailbox =
-                    m_rvdb.getStatsAgent().getMailbox(VoltDB.instance().getHostMessenger(), myAgreementSiteId);
-                m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.STATS_MAILBOX_ID, statsMailbox);
+                    m_rvdb.getStatsAgent().getMailbox(
+                            VoltDB.instance().getHostMessenger(), HostMessenger.STATS_SITE_ID);
+                m_rvdb.m_messenger.createMailbox(
+                        m_rvdb.m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID),
+                        statsMailbox);
 
                 Mailbox asyncCompilerMailbox =
-                    m_rvdb.getAsyncCompilerAgent().createMailbox(VoltDB.instance().getHostMessenger(), myAgreementSiteId);
-                m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.ASYNC_COMPILER_MAILBOX_ID, asyncCompilerMailbox);
-
-                m_rvdb.m_agreementSite =
-                    new AgreementSite(
-                            myAgreementSiteId,
-                            agreementSiteIds,
-                            myAgreementInitiatorId,
-                            m_rvdb.m_downNonExecSites,
-                            agreementMailbox,
-                            new InetSocketAddress(
-                                    m_config.m_zkInterface.split(":")[0],
-                                    Integer.parseInt(m_config.m_zkInterface.split(":")[1])),
-                            m_rvdb.m_faultManager,
-                            m_rvdb.m_recovering);
-                m_rvdb.m_agreementSite.start();
+                    m_rvdb.getAsyncCompilerAgent().createMailbox(
+                            VoltDB.instance().getHostMessenger(), HostMessenger.ASYNC_COMPILER_SITE_ID);
+                m_rvdb.m_messenger.createMailbox(
+                        m_rvdb.m_messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID),
+                        asyncCompilerMailbox);
             } catch (Exception e) {
                 hostLog.fatal(null, e);
                 System.exit(-1);
@@ -601,14 +565,12 @@ public class Inits {
 
     class CreateRestoreAgentAndPlan extends InitWork {
         public CreateRestoreAgentAndPlan() {
-            dependsOn(InitAgreementSiteAndStatsAgent.class);
+            dependsOn(InitStatsAgent.class);
         }
 
         @Override
         public void run() {
             if (!m_isRejoin && !m_config.m_isRejoinTest) {
-                m_rvdb.startNetworkAndCreateZKClient();
-
                 String snapshotPath = null;
                 if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
@@ -627,7 +589,7 @@ public class Inits {
 
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
-                                                      m_rvdb.m_zk,
+                                                      m_rvdb.m_messenger.getZK(),
                                                       m_rvdb.getSnapshotCompletionMonitor(),
                                                       m_rvdb,
                                                       m_rvdb.m_myHostId,

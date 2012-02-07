@@ -46,10 +46,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
-import org.voltcore.messaging.Messenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
@@ -806,7 +806,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public static ClientInterface create(
             VoltNetworkPool network,
-            Messenger messenger,
+            HostMessenger messenger,
             CatalogContext context,
             ReplicationRole replicationRole,
             SimpleDtxnInitiator initiator,

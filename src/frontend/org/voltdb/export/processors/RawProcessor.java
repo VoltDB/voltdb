@@ -44,7 +44,7 @@ import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.utils.NotImplementedException;
 
 /**
@@ -178,6 +178,7 @@ public class RawProcessor implements ExportDataProcessor {
             closeConnection();
         }
 
+        @Override
         public void event(final ExportProtoMessage m)
         {
             if (m.isError()) {

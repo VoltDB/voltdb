@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.util.HashSet;
 
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Messenger;
 import org.voltcore.logging.VoltLogger;
@@ -57,7 +58,7 @@ public class ExecutionSiteRunner implements Runnable {
 
     @Override
     public void run() {
-        Messenger messenger = VoltDB.instance().getMessenger();
+        HostMessenger messenger = VoltDB.instance().getMessenger();
         Mailbox mailbox = messenger.createMailbox();
         m_siteId = mailbox.getHSId();
 

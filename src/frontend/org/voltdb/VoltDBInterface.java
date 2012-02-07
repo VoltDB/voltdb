@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.Messenger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.fault.FaultDistributorInterface;
 
@@ -72,7 +71,7 @@ public interface VoltDBInterface
     public String getBuildString();
     public String getVersionString();
     public Object[] getInstanceId();
-    public Messenger getMessenger();
+    public HostMessenger getMessenger();
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
     public Map<Integer, ExecutionSite> getLocalSites();

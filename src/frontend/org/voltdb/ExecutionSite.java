@@ -141,11 +141,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     // Catalog
     public CatalogContext m_context;
     Site getCatalogSite() {
-        return m_context.cluster.getSites().get(Integer.toString(getSiteId()));
+        return m_context.cluster.getSites().get(Long.toString(getSiteId()));
     }
 
-    final int m_siteId;
-    public final int getSiteId() {
+    final long m_siteId;
+    public final long getSiteId() {
         return m_siteId;
     }
 
@@ -190,59 +190,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private final TableStats m_tableStats;
     private final IndexStats m_indexStats;
     private final StarvationTracker m_starvationTracker;
-    private final Watchdog m_watchdog;
-    private class Watchdog extends Thread {
-        private volatile boolean m_shouldContinue = true;
-        private volatile boolean m_petted = false;
-        private final int m_siteIndex;
-        private final int m_siteId;
-        private Thread m_watchThread = null;
-        public Watchdog(final int siteIndex, final int siteId) {
-            super(null, null, "ExecutionSite " + siteIndex + " siteId: " + siteId + " watchdog ", 262144);
-            m_siteIndex = siteIndex;
-            m_siteId = siteId;
-        }
-
-        public void pet() {
-            m_petted = true;
-        }
-
-        @Override
-        public void run() {
-            if (m_watchThread == null) {
-                throw new RuntimeException("Use start(Thread watchThread) not Thread.start()");
-            }
-            try {
-                Thread.sleep(30000);
-            } catch (final InterruptedException e) {
-                return;
-            }
-            while (m_shouldContinue) {
-                try {
-                    Thread.sleep(5000);
-                } catch (final InterruptedException e) {
-                    return;
-                }
-                if (!m_petted) {
-                    final StackTraceElement trace[] = m_watchThread.getStackTrace();
-                    final Throwable throwable = new Throwable();
-                    throwable.setStackTrace(trace);
-                    log.l7dlog( Level.WARN, LogKeys.org_voltdb_ExecutionSite_Watchdog_possibleHang.name(), new Object[]{ m_siteIndex, m_siteId}, throwable);
-                }
-                m_petted = false;
-            }
-        }
-
-        @Override
-        public void start() {
-            throw new UnsupportedOperationException("Use start(Thread watchThread)");
-        }
-
-        public void start(final Thread thread) {
-            m_watchThread = thread;
-            super.start();
-        }
-    }
 
     // This message is used to start a local snapshot. The snapshot
     // is *not* automatically coordinated across the full node set.
@@ -675,7 +622,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     ExecutionSite(int siteId) {
         m_siteId = siteId;
         m_systemProcedureContext = new SystemProcedureContext();
-        m_watchdog = null;
         ee = null;
         hsql = null;
         m_snapshotter = null;
@@ -699,7 +645,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     {
         m_siteId = mailbox.getHSId();
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
-                new Object[] { String.valueOf(siteId) }, null);
+                new Object[] { String.valueOf(m_siteId) }, null);
 
         final int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
@@ -741,15 +687,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog, txnId);
         }
 
-        // Should pass in the watchdog class to allow sleepy dogs..
-        m_watchdog = new Watchdog(siteId, siteIndex);
-
         m_systemProcedureContext = new SystemProcedureContext();
         m_mailbox = mailbox;
 
         // allow dependency injection of the transaction queue implementation
         m_transactionQueue =
-            (transactionQueue != null) ? transactionQueue : initializeTransactionQueue(siteId);
+            (transactionQueue != null) ? transactionQueue : initializeTransactionQueue(m_siteId);
 
         loadProcedures(voltdb.getBackendTargetType());
 
@@ -797,7 +740,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                   Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 
-    private RestrictedPriorityQueue initializeTransactionQueue(final int siteId)
+    private RestrictedPriorityQueue initializeTransactionQueue(final long siteId)
     {
         // build an array of all the initiators
         int initiatorCount = 0;

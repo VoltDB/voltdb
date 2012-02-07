@@ -50,8 +50,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.HeartbeatMessage;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.MessagingException;
-import org.voltcore.messaging.Messenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.StoredProcedureInvocation;
@@ -101,7 +101,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
     public SimpleDtxnInitiator(CatalogContext context,
-                               Messenger messenger, int hostId, long siteId,
+                               HostMessenger messenger, int hostId, long siteId,
                                long initiatorId,
                                long timestampTestingSalt)
     {
