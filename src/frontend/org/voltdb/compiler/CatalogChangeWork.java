@@ -24,7 +24,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
     final String deploymentString;
 
     public CatalogChangeWork(
-            int replySiteId,
+            long replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
             Object clientData, byte[] catalogBytes, String deploymentString)
     {

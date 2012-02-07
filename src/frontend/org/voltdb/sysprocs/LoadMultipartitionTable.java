@@ -36,7 +36,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
@@ -261,20 +260,16 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             int num_exec_sites = VoltDB.instance().getCatalogContext().siteTracker.getLiveSiteCount();
             pfs = new SynthesizedPlanFragment[num_exec_sites + 1];
             int site_index = 0;
-            for (Site site : VoltDB.instance().getCatalogContext().siteTracker.getUpSites()) {
-                if (!site.getIsexec()) {
-                    continue;
-                }
+            for (long site : VoltDB.instance().getCatalogContext().siteTracker.getAllLiveSites()) {
                 ParameterSet params = new ParameterSet();
-                int site_id = Integer.valueOf(site.getTypeName());
-                int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(site_id);
+                int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(site);
                 params.setParameters(tableName, partitionedTables[partition]);
                 pfs[site_index] = new SynthesizedPlanFragment();
                 pfs[site_index].fragmentId = SysProcFragmentId.PF_distribute;
                 pfs[site_index].outputDepId = DEP_distribute;
                 pfs[site_index].inputDepIds = new int[] {};
                 pfs[site_index].multipartition = false;
-                pfs[site_index].siteId = Integer.valueOf(site.getTypeName());
+                pfs[site_index].siteId = site;
                 pfs[site_index].parameters = params;
                 site_index++;
             }

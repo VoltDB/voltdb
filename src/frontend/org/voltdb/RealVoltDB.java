@@ -32,6 +32,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -60,12 +61,13 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.ZKUtil;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.Mailbox;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Site;
 import org.voltdb.compiler.AsyncCompilerAgent;
+import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -290,6 +292,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
 
+            ArrayDeque<Mailbox> siteMailboxes = null;
+            // start mailbox tracker since all the
+            try {
+                siteMailboxes = createMailboxesForSites();
+                m_catalogContext.siteTracker.setMailboxTracker(new MailboxTracker(m_messenger.getZK()));
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+
             // do the many init tasks in the Inits class
             Inits inits = new Inits(this, 1);
             inits.doInitializationWork();
@@ -301,9 +312,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             if (config.m_backend.isIPC) {
                 int eeCount = 0;
-                for (Site site : m_catalogContext.siteTracker.getUpSites()) {
-                    if (site.getIsexec() &&
-                            m_myHostId == Integer.parseInt(site.getHost().getTypeName())) {
+                for (long site : m_catalogContext.siteTracker.getAllLiveSites()) {
+                    if (m_myHostId == MailboxTracker.getHostForHSId(site)) {
                         eeCount++;
                     }
                 }
@@ -322,32 +332,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * This allows the sites to be set up in the thread that will end up running them.
              * Cache the first Site from the catalog and only do the setup once the other threads have been started.
              */
-            Site siteForThisThread = null;
+            Long siteForThisThread = null;
             m_currentThreadSite = null;
-            for (Site site : m_catalogContext.siteTracker.getUpSites()) {
-                int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-                long siteId = Long.parseLong(site.getTypeName());
+            for (long site : m_catalogContext.siteTracker.getAllLiveSites()) {
+                int sitesHostId = MailboxTracker.getHostForHSId(site);
 
                 // start a local site
                 if (sitesHostId == m_myHostId) {
-                    if (site.getIsexec()) {
-                        if (siteForThisThread == null) {
-                            siteForThisThread = site;
-                        } else {
-                            ExecutionSiteRunner runner =
-                                new ExecutionSiteRunner(
-                                        m_catalogContext,
-                                        m_serializedCatalog,
-                                        m_recovering,
-                                        m_replicationActive,
-                                        m_downHosts,
-                                        hostLog);
-                            m_runners.add(runner);
-                            Thread runnerThread = new Thread(runner, "Site " + siteId);
-                            runnerThread.start();
-                            log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { siteId }, null);
-                            m_siteThreads.put(siteId, runnerThread);
-                        }
+                    if (siteForThisThread == null) {
+                        siteForThisThread = site;
+                    } else {
+                        ExecutionSiteRunner runner =
+                                new ExecutionSiteRunner(siteMailboxes.poll(),
+                                                        m_catalogContext,
+                                                        m_serializedCatalog,
+                                                        m_recovering,
+                                                        m_replicationActive,
+                                                        m_downHosts,
+                                                        hostLog);
+                        m_runners.add(runner);
+                        Thread runnerThread = new Thread(runner, "Site " + site);
+                        runnerThread.start();
+                        log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
+                        m_siteThreads.put(site, runnerThread);
                     }
                 }
             }
@@ -357,17 +364,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * this thread can set up its own execution site.
              */
             try {
-                int siteId = Integer.parseInt(siteForThisThread.getTypeName());
+                long siteId = siteForThisThread;
                 ExecutionSite siteObj =
                         new ExecutionSite(VoltDB.instance(),
-                                          VoltDB.instance().getMessenger().createMailbox(),
+                                          siteMailboxes.poll(),
                                           m_serializedCatalog,
                                           null,
                                           m_recovering,
                                           m_replicationActive,
                                           m_downHosts,
                                           m_catalogContext.m_transactionId);
-                m_localSites.put(Long.parseLong(siteForThisThread.getTypeName()), siteObj);
+                m_localSites.put(siteId, siteObj);
                 m_currentThreadSite = siteObj;
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
@@ -390,28 +397,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            // start mailbox tracker since all the
-            try {
-                m_catalogContext.siteTracker.setMailboxTracker(new MailboxTracker(m_messenger.getZK()));
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
-
             // Create the client interface
             int portOffset = 0;
-            for (Site site : m_catalogContext.siteTracker.getUpSites()) {
-                int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-                int currSiteId = Integer.parseInt(site.getTypeName());
-
+            for (long site : m_catalogContext.siteTracker.getMailboxTracker().getAllInitiators()) {
+                int siteHostId = MailboxTracker.getHostForHSId(site);
 
                 // create DTXN and CI for each local non-EE site
-                if ((sitesHostId == m_myHostId) && (site.getIsexec() == false)) {
+                if ((siteHostId == m_myHostId)) {
                     SimpleDtxnInitiator initiator =
                         new SimpleDtxnInitiator(
                                 m_catalogContext,
                                 m_messenger,
                                 m_myHostId,
-                                site.getInitiatorid(),
+                                siteHostId,
                                 m_config.m_timestampTestingSalt);
 
                     try {
@@ -421,8 +419,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                        m_replicationRole,
                                                        initiator,
                                                        m_catalogContext.numberOfNodes,
-                                                       currSiteId,
-                                                       site.getInitiatorid(),
                                                        config.m_port + portOffset,
                                                        config.m_adminPort + portOffset,
                                                        m_config.m_timestampTestingSalt);
@@ -498,6 +494,37 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_restoreAgent.setInitiator(initiator);
             }
         }
+    }
+
+    private ArrayDeque<Mailbox> createMailboxesForSites() throws Exception {
+        ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
+        int sitesperhost = m_deployment.getCluster().getSitesperhost();
+        int hostcount = m_deployment.getCluster().getHostcount();
+        int kfactor = m_deployment.getCluster().getKfactor();
+        ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+        int partitionCounter = 0;
+        for (int i = 0; i < sitesperhost; i++) {
+            Mailbox mailbox = m_messenger.createMailbox();
+            mailboxes.add(mailbox);
+            registerExecutionSiteMailbox(mailbox.getHSId(), (partitionCounter % clusterConfig.getPartitionCount()));
+            partitionCounter++;
+        }
+        return mailboxes;
+    }
+
+    /**
+     * Publishes the HSId of this execution site to ZK
+     * @param zk
+     * @param partitionId
+     * @throws Exception
+     */
+    private void registerExecutionSiteMailbox(long HSId, int partitionId) throws Exception {
+        JSONObject jsObj = new JSONObject();
+        jsObj.put("HSId", HSId);
+        jsObj.put("partitionId", partitionId);
+        byte[] payload = jsObj.toString(4).getBytes("UTF-8");
+        m_messenger.getZK().create("/mailboxes/executionsites/site", payload,
+                                   Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 
     /**

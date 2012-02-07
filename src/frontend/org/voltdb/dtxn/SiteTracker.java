@@ -17,14 +17,12 @@
 
 package org.voltdb.dtxn;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -76,8 +74,6 @@ public class SiteTracker {
     private final Site m_allSites[];
 
     private final long[] m_firstNonExecSiteForHost;
-
-    private final long[] m_localHeartbeatTargets;
 
     private final long[][] m_remoteHeartbeatTargets;
 
@@ -187,19 +183,16 @@ public class SiteTracker {
         } else {
             m_remoteHeartbeatTargets = new long[upHostsToExecSites.size() - 1][];
         }
-        long tempLocalHeartbeatTargets[] = new long[0];
         for (Map.Entry<Integer, ArrayList<Long>> entry : upHostsToExecSites.entrySet()) {
             if (entry.getKey() == myHostId) {
-                tempLocalHeartbeatTargets = longArrayListToArray(entry.getValue());
             } else {
-                m_remoteHeartbeatTargets[ii++] = longArrayListToArray(entry.getValue());
+                m_remoteHeartbeatTargets[ii++] = longListToArray(entry.getValue());
             }
         }
-        m_localHeartbeatTargets = tempLocalHeartbeatTargets;
         m_firstNonExecSiteForHost = new long[m_hostsToSites.size()];
         java.util.Arrays.fill(m_firstNonExecSiteForHost, -1);
         for (ii = 0; ii < m_firstNonExecSiteForHost.length; ii++) {
-            HashSet<Long> set = getNonExecSitesForHost(ii);
+            List<Long> set = getNonExecSitesForHost(ii);
             if (set != null) {
                 if (set.iterator().hasNext()) {
                     m_firstNonExecSiteForHost[ii] = set.iterator().next();
@@ -208,7 +201,7 @@ public class SiteTracker {
         }
     }
 
-    private long[] longArrayListToArray(ArrayList<Long> longs) {
+    private long[] longListToArray(List<Long> longs) {
         long retval[] = new long[longs.size()];
         for (int ii = 0; ii < retval.length; ii++) {
             retval[ii] = longs.get(ii);
@@ -243,10 +236,6 @@ public class SiteTracker {
         return m_mailboxTracker.getAllSites().size();
     }
 
-    public Site[] getAllSites() {
-        return m_allSites;
-    }
-
     /**
      * @return the lowest site ID across the live non-execution sites in the
      *         cluster
@@ -262,45 +251,6 @@ public class SiteTracker {
     }
 
     /**
-     * Get a site that contains a copy of the given partition.  The site ID
-     * returned may correspond to a site that is currently down.
-     *
-     * @param partition The id of a VoltDB partition.
-     * @return The id of a VoltDB site containing a copy of
-     * the requested partition.
-     */
-    public long getOneSiteForPartition(int partition) {
-        ArrayList<Long> sites = m_partitionsToSites.get(partition);
-        assert(sites != null);
-        return sites.get(0);
-    }
-
-    /**
-     * Get a live site that contains a copy of the given partition.
-     *
-     * @param partition The id of a VoltDB partition.
-     * @return The id of a VoltDB site containing a copy of
-     * the requested partition.
-     */
-    public long getOneLiveSiteForPartition(int partition) {
-        List<Long> sites = m_mailboxTracker.getSitesForPartition(partition);
-        assert(sites != null);
-        return sites.get(0);
-    }
-
-    /**
-     * Get the ids of all sites that contain a copy of the
-     * partition specified.  The list will include sites that are down.
-     *
-     * @param partition A VoltDB partition id.
-     * @return An array of VoltDB site ids.
-     */
-    public ArrayList<Long> getAllSitesForPartition(int partition) {
-        assert (m_partitionsToSites.containsKey(partition));
-        return m_partitionsToSites.get(partition);
-    }
-
-    /**
      * Get the ids of all live sites that contain a copy of the
      * partition specified.
      *
@@ -309,46 +259,6 @@ public class SiteTracker {
      */
     public List<Long> getLiveSitesForPartition(int partition) {
         return m_mailboxTracker.getSitesForPartition(partition);
-    }
-
-    /**
-     * Get one site id for each of the partition ids given.
-     *
-     * @param partitions A set of unique, non-null VoltDB
-     * @return An array of VoltDB site ids.
-     */
-    public long[] getOneSiteForEachPartition(int[] partitions) {
-        long[] retval = new long[partitions.length];
-        int index = 0;
-        for (int p : partitions)
-            retval[index++] = getOneSiteForPartition(p);
-        return retval;
-    }
-
-    /**
-     * Get the ids of all sites that contain a copy of ANY of
-     * the given partitions.
-     *
-     * @param partitions A set of unique, non-null VoltDB
-     * partition ids.
-     * @return An array of VoltDB site ids.
-     */
-    public long[] getAllSitesForEachPartition(int[] partitions) {
-        ArrayList<Long> all_sites = new ArrayList<Long>();
-        for (int p : partitions) {
-            ArrayList<Long> sites = getAllSitesForPartition(p);
-            for (long site : sites)
-            {
-                all_sites.add(site);
-            }
-        }
-
-        long[] retval = new long[all_sites.size()];
-        for (int i = 0; i < all_sites.size(); i++)
-        {
-            retval[i] = all_sites.get(i);
-        }
-        return retval;
     }
 
     /**
@@ -398,14 +308,10 @@ public class SiteTracker {
      * @param hostId
      * @return An ArrayList of VoltDB site IDs.
      */
-    public ArrayList<Long> getAllSitesForHost(int hostId)
+    public List<Long> getAllSitesForHost(int hostId)
     {
-        if (!m_hostsToSites.containsKey(hostId)) {
-            System.out.println("Couldn't find sites for host " + hostId);
-            assert m_hostsToSites.containsKey(hostId);
-        }
-
-        return m_hostsToSites.get(hostId);
+        // TODO: used to return all sites, now only returns exec sites
+        return m_mailboxTracker.getSitesForHost(hostId);
     }
 
     /**
@@ -434,30 +340,11 @@ public class SiteTracker {
      */
     public int getPartitionForSite(long siteId)
     {
-        assert(m_sitesToPartitions.containsKey(siteId));
-        return m_sitesToPartitions.get(siteId);
+        return m_mailboxTracker.getPartitionForSite(siteId);
     }
 
-    /**
-     * @return An ArrayDeque containing references for the catalog Site
-     *         objects which are currrently up.  This includes both
-     *         execution sites and non-execution sites (initiators, basically)
-     */
-    public ArrayDeque<Site> getUpSites()
-    {
-        ArrayDeque<Site> retval = new ArrayDeque<Site>();
-        for (Site site : m_sites)
-        {
-            if (site.getIsup())
-            {
-                retval.add(site);
-            }
-        }
-        return retval;
-    }
-
-    public HashSet<Long> getNonExecSitesForHost(int hostId) {
-        return m_nonExecSitesForHost.get(hostId);
+    public List<Long> getNonExecSitesForHost(int hostId) {
+        return m_mailboxTracker.getInitiatorForHost(hostId);
     }
 
     /**
@@ -475,22 +362,18 @@ public class SiteTracker {
     }
 
     public long[] getUpExecutionSitesExcludingSite(long excludedSite) {
-        long sites[] = m_upExecutionSitesExcludingSite.get(excludedSite);
-        if (sites == null) {
-            ArrayList<Long> list = new ArrayList<Long>();
-            for (Long site : getUpExecutionSites()) {
-                if (site.longValue() != excludedSite) {
-                    list.add(site);
-                }
-            }
-            sites = new long[list.size()];
-            int ii = 0;
-            for (long site : list) {
-                sites[ii++] = site;
-            }
-            m_upExecutionSitesExcludingSite.put( excludedSite, sites);
+        Set<Long> tmplist = m_mailboxTracker.getAllSites();
+        int size = tmplist.size();
+        if (tmplist.contains(excludedSite))
+            size--;
+        long[] retval = new long[size];
+        int i = 0;
+        for (long id : tmplist) {
+            if (id != excludedSite)
+                retval[i++] = id;
         }
-        return sites;
+
+        return retval;
     }
 
     /**
@@ -498,18 +381,11 @@ public class SiteTracker {
      */
     public Set<Long> getExecutionSiteIds()
     {
-        Set<Long> exec_sites = new HashSet<Long>(m_sites.size());
-        for (Site site : m_sites)
-        {
-            if (site.getIsexec())
-            {
-                exec_sites.add(Long.parseLong(site.getTypeName()));
-            }
-        }
-        return exec_sites;
+        return m_mailboxTracker.getAllSites();
     }
 
     /**
+     * TODO: needs work
      * @return A list containing the partition IDs of any partitions
      * which are not currently present on any live execution sites
      */
@@ -536,58 +412,37 @@ public class SiteTracker {
         return Collections.min(sites);
     }
 
-    /**
-     * Inform the SiteTracker that a message was sent to a site or
-     * to a set of sites. This will reset the heart-beat timer on
-     * those sites
-     *
-     * @param time The current system time in ms from epoch
-     * @param siteIds A set of VoltDB site ids.
-     */
-    void noteSentMessage(long time, long... siteIds) {
-        for (long id : siteIds)
-            m_lastHeartbeatTime.put(id, time);
-    }
-
-    /**
-     * Get a list of sites which haven't been sent a message in
-     * X ms, where X is the acceptable time between messages.
-     *
-     * @param time
-     * @param timeout
-     * @return An array of site ids.
-     */
-    long[] getSitesWhichNeedAHeartbeat(long time, long timeout) {
-        int index = 0;
-        for (Entry<Long, Long> e : m_lastHeartbeatTime.entrySet()) {
-            long siteTime = e.getValue();
-            if ((time - siteTime) >= timeout)
-                m_tempOldSitesScratch[index++] = e.getKey();
-        }
-
-        long[] retval = new long[index];
-        for (int i = 0; i < index; i++)
-            retval[i] = m_tempOldSitesScratch[i];
-
-        return retval;
-    }
-
     /*
      * Get an array of local sites that need heartbeats. This will get individually generated heartbeats.
      */
     public long[] getLocalHeartbeatTargets() {
-        return m_localHeartbeatTargets;
+        int hostId = VoltDB.instance().getHostMessenger().getHostId();
+        return longListToArray(m_mailboxTracker.getSitesForHost(hostId));
     }
 
     /*
      * An array per up host, there will be no entry for this host
      */
     public long[][] getRemoteHeartbeatTargets() {
-        return m_remoteHeartbeatTargets;
+        int localhost = VoltDB.instance().getHostMessenger().getHostId();
+        Set<Integer> hosts = m_mailboxTracker.getAllHosts();
+        long[][] retval = new long[hosts.size() - 1][];
+        int i = 0;
+        for (int host : hosts) {
+            if (host != localhost) {
+                retval[i++] = longListToArray(m_mailboxTracker.getSitesForHost(host));
+            }
+        }
+        return retval;
     }
 
     public long getFirstNonExecSiteForHost(int hostId) {
-        return m_firstNonExecSiteForHost[hostId];
+        List<Long> initiators = m_mailboxTracker.getInitiatorForHost(hostId);
+        return initiators.get(0);
+    }
+
+    public Set<Long> getLiveNonExecSites() {
+        return m_mailboxTracker.getAllInitiators();
     }
 
     public void setMailboxTracker(MailboxTracker mailboxTracker) {

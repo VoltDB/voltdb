@@ -16,7 +16,7 @@
  */
 package org.voltdb.fault;
 
-import java.util.Set;
+import java.util.List;
 
 public class NodeFailureFault extends VoltFault
 {
@@ -25,7 +25,7 @@ public class NodeFailureFault extends VoltFault
     public static int NODE_FAILURE_INITIATOR = 2;
     public static int NODE_FAILURE_EXECUTION_SITE = 3;
 
-    public NodeFailureFault(int hostId, Set<Long> failedNonExecSites, String hostname)
+    public NodeFailureFault(int hostId, List<Long> failedNonExecSites, String hostname)
     {
         super(FaultType.NODE_FAILURE);
         assert(hostname != null);
@@ -39,7 +39,7 @@ public class NodeFailureFault extends VoltFault
         return m_hostId;
     }
 
-    public Set<Long> getFailedNonExecSites() {
+    public List<Long> getFailedNonExecSites() {
         return m_failedNonExecSites;
     }
 
@@ -77,6 +77,6 @@ public class NodeFailureFault extends VoltFault
     }
 
     private int m_hostId;
-    private Set<Long> m_failedNonExecSites;
+    private List<Long> m_failedNonExecSites;
     private String m_hostname;
 }

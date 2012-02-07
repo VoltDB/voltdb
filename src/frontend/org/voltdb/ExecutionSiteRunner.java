@@ -19,7 +19,6 @@ package org.voltdb;
 
 import java.util.HashSet;
 
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.logging.VoltLogger;
 
@@ -39,14 +38,17 @@ public class ExecutionSiteRunner implements Runnable {
     private final HashSet<Integer> m_failedHostIds;
     private final long m_txnId;
     private final VoltLogger m_hostLog;
+    private final Mailbox m_mailbox;
 
     public ExecutionSiteRunner(
+            Mailbox mailbox,
             final CatalogContext context,
             final String serializedCatalog,
             boolean recovering,
             boolean replicationActive,
             HashSet<Integer> failedHostIds,
             VoltLogger hostLog) {
+        m_mailbox = mailbox;
         m_serializedCatalog = serializedCatalog;
         m_recovering = recovering;
         m_replicationActive = replicationActive;
@@ -57,13 +59,11 @@ public class ExecutionSiteRunner implements Runnable {
 
     @Override
     public void run() {
-        HostMessenger messenger = VoltDB.instance().getMessenger();
-        Mailbox mailbox = messenger.createMailbox();
-        m_siteId = mailbox.getHSId();
+        m_siteId = m_mailbox.getHSId();
 
         try {
             m_siteObj = new ExecutionSite(VoltDB.instance(),
-                                          mailbox,
+                                          m_mailbox,
                                           m_serializedCatalog,
                                           null,
                                           m_recovering,

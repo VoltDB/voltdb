@@ -22,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -121,7 +122,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final String tableName,
             final int numPartitions,
             final boolean isReplicated,
-            final int partitionIds[],
+            final List<Integer> partitionIds,
             final VoltTable schemaTable,
             final long txnId) throws IOException {
         this(
@@ -146,7 +147,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final String tableName,
             final int numPartitions,
             final boolean isReplicated,
-            final int partitionIds[],
+            final List<Integer> partitionIds,
             final VoltTable schemaTable,
             final long txnId,
             int version[]

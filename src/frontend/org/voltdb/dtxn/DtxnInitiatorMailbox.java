@@ -66,9 +66,10 @@ public class DtxnInitiatorMailbox implements Mailbox
                     if (fault instanceof NodeFailureFault)
                     {
                         NodeFailureFault node_fault = (NodeFailureFault)fault;
-                        ArrayList<Long> dead_sites =
-                            VoltDB.instance().getCatalogContext().siteTracker.
-                            getAllSitesForHost(node_fault.getHostId());
+                        ArrayList<Long> dead_sites = new ArrayList<Long>();
+                        // TODO: fix
+//                            VoltDB.instance().getCatalogContext().siteTracker.
+//                            getAllSitesForHost(node_fault.getHostId());
                         for (Long site_id : dead_sites)
                         {
                             removeSite(site_id);

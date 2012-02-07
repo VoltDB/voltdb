@@ -199,7 +199,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 tracker.getLiveExecutionSitesForHost(m_hostId);
             long coordinatorId = sitesOnThisHost.get(0);
             ArrayList<Long> replicaIds = new ArrayList<Long>();
-            for (Long replica : tracker.getAllSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
+            for (Long replica : tracker.getLiveSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
                 if (replica != coordinatorId && tracker.getAllLiveSites().contains(replica)) {
                     replicaIds.add(replica);
                 }

@@ -22,7 +22,7 @@ import java.io.Serializable;
 public class AsyncCompilerWork implements Serializable {
     private static final long serialVersionUID = 6588086204761949082L;
 
-    final int replySiteId;
+    final long replySiteId;
 
     final boolean shouldShutdown;
     final long clientHandle;
@@ -31,7 +31,7 @@ public class AsyncCompilerWork implements Serializable {
     final boolean adminConnection;
     final transient public Object clientData;
 
-    public AsyncCompilerWork(int replySiteId, boolean shouldShutdown, long clientHandle,
+    public AsyncCompilerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection,
             Object clientData)
     {

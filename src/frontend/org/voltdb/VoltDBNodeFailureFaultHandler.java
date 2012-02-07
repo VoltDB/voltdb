@@ -67,9 +67,10 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
     }
 
     private void handleNodeFailureFault(NodeFailureFault node_fault) {
-        ArrayList<Long> dead_sites =
-            VoltDB.instance().getCatalogContext().
-            siteTracker.getAllSitesForHost(node_fault.getHostId());
+        ArrayList<Long> dead_sites = new ArrayList<Long>();
+        // TODO: fix
+//            VoltDB.instance().getCatalogContext().
+//            siteTracker.getAllSitesForHost(node_fault.getHostId());
         Collections.sort(dead_sites);
         hostLog.error("Host failed, host id: " + node_fault.getHostId() +
                 " hostname: " + node_fault.getHostname());

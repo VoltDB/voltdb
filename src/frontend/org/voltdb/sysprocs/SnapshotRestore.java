@@ -53,7 +53,6 @@ import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
@@ -1386,16 +1385,12 @@ public class SnapshotRestore extends VoltSystemProcedure
         String hostname = ConnectionUtil.getHostnameOrAddress();
         // XXX This is all very similar to the splitting code in
         // LoadMultipartitionTable.  Consider ways to consolidate later
-        Map<Integer, Integer> sites_to_partitions =
-                new HashMap<Integer, Integer>();
-        for (Site site : VoltDB.instance().getCatalogContext().siteTracker.getUpSites())
+        Map<Long, Integer> sites_to_partitions =
+                new HashMap<Long, Integer>();
+        for (long site : VoltDB.instance().getCatalogContext().siteTracker.getAllLiveSites())
         {
-            if (site.getPartition() != null)
-            {
-                sites_to_partitions.put(Integer.parseInt(site.getTypeName()),
-                        Integer.parseInt(site.getPartition().
-                                getTypeName()));
-            }
+            Integer partitionId = VoltDB.instance().getCatalogContext().siteTracker.getMailboxTracker().getPartitionForSite(site);
+            sites_to_partitions.put(site, partitionId);
         }
 
         try
@@ -1457,7 +1452,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 SynthesizedPlanFragment[] pfs =
                         new SynthesizedPlanFragment[sites_to_partitions.size() + 1];
                 int pfs_index = 0;
-                for (int site_id : sites_to_partitions.keySet())
+                for (long site_id : sites_to_partitions.keySet())
                 {
                     int partition_id = sites_to_partitions.get(site_id);
                     dependencyIds[pfs_index] =

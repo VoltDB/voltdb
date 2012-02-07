@@ -136,7 +136,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     static final int POKE_INTERVAL = 1000;
 
     private final int m_allPartitions[];
-    final int m_siteId;
+    final long m_siteId;
 
     final Mailbox m_mailbox;
 
@@ -815,8 +815,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ReplicationRole replicationRole,
             SimpleDtxnInitiator initiator,
             int hostCount,
-            int siteId,
-            int initiatorId,
             int port,
             int adminPort,
             long timestampTestingSalt) throws Exception {
@@ -833,14 +831,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, messenger.getNetwork(), replicationRole, siteId, initiator, allPartitions);
+           port, adminPort, context, messenger.getNetwork(), replicationRole, initiator, allPartitions);
 
         initiator.setClientInterface(ci);
         return ci;
     }
 
     ClientInterface(int port, int adminPort, CatalogContext context, VoltNetworkPool network,
-                    ReplicationRole replicationRole, int siteId, TransactionInitiator initiator,
+                    ReplicationRole replicationRole, TransactionInitiator initiator,
                     int[] allPartitions) throws Exception
     {
         m_catalogContext.set(context);
@@ -848,7 +846,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
-        m_siteId = siteId;
         m_acceptor = new ClientAcceptor(port, network, false);
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
@@ -867,6 +864,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         };
         VoltDB.instance().getHostMessenger().createMailbox(null, m_mailbox);
         registerMailbox();
+        m_siteId = m_mailbox.getHSId();
     }
 
     /**

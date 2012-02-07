@@ -23,7 +23,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     final String sql;
     final Object partitionParam;
 
-    public AdHocPlannerWork(int replySiteId, boolean shouldShutdown, long clientHandle,
+    public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection,
             Object clientData, String sql, Object partitionParam)
     {

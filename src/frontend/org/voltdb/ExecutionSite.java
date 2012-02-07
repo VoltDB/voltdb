@@ -35,10 +35,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
@@ -651,8 +647,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         m_handledFailedSites.addAll(m_knownFailedSites);
 
-        registerMailbox(voltdb.getHostMessenger().getZK(), partitionId);
-
         VoltDB.instance().getFaultDistributor().
         registerFaultHandler(NodeFailureFault.NODE_FAILURE_EXECUTION_SITE,
                              m_faultHandler,
@@ -718,33 +712,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     }
 
-    /**
-     * Publishes the HSId of this execution site to ZK
-     * @param zk
-     * @param partitionId
-     * @throws Exception
-     */
-    private void registerMailbox(ZooKeeper zk, int partitionId) throws Exception {
-        JSONObject jsObj = new JSONObject();
-        jsObj.put("HSId", m_siteId);
-        jsObj.put("partitionId", partitionId);
-        byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-        zk.create("/mailboxes/executionsites/site", payload,
-                  Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-    }
-
     private RestrictedPriorityQueue initializeTransactionQueue(final long siteId)
     {
         // build an array of all the initiators
-        int initiatorCount = 0;
-        for (final Site s : m_context.siteTracker.getUpSites())
-            if (s.getIsexec() == false)
-                initiatorCount++;
+        int initiatorCount = m_context.siteTracker.getLiveNonExecSites().size();
         final long[] initiatorIds = new long[initiatorCount];
         int index = 0;
-        for (final Site s : m_context.siteTracker.getUpSites())
-            if (s.getIsexec() == false)
-                initiatorIds[index++] = Integer.parseInt(s.getTypeName());
+        for (long s : m_context.siteTracker.getLiveNonExecSites())
+            initiatorIds[index++] = m_context.siteTracker.getMailboxTracker().getPartitionForInitiator(s);
 
         // turn off the safety dance for single-node voltdb
         boolean useSafetyDance = m_context.numberOfNodes > 1;
