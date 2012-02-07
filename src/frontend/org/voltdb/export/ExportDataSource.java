@@ -239,8 +239,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     try {
                         releaseExportBytes(message.getAckOffset(), blocksToDelete);
                     } catch (IOException e) {
-                        exportLog.error("Error attempting to release export bytes", e);
-                        VoltDB.crashVoltDB();
+                        VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                         return;
                     }
                 }
@@ -289,8 +288,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 } catch (RuntimeException e) {
                     if (e.getCause() instanceof IOException) {
-                        exportLog.error("Error attempting to find unpolled export data", e);
-                        VoltDB.crashVoltDB();
+                        VoltDB.crashLocalVoltDB("Error attempting to find unpolled export data", true, e);
                     } else {
                         throw e;
                     }
@@ -494,8 +492,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         } catch (IOException e) {
-            exportLog.fatal(e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 

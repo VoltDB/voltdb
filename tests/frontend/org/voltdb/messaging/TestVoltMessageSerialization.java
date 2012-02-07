@@ -127,12 +127,12 @@ public class TestVoltMessageSerialization extends TestCase {
     public void testFragmentTaskWithTwoFrags() throws IOException {
         DBBPool pool = new DBBPool();
 
-        Object[] params1 = {(Integer)10, (Double)10.1};
-        Object[] params2 = {(Integer)20, (Double)20.2};
+        Object[] params1 = {10, 10.1};
+        Object[] params2 = {20, 20.2};
 
-        ParameterSet param_set1 = new ParameterSet(true);
+        ParameterSet param_set1 = new ParameterSet();
         param_set1.setParameters(params1);
-        ParameterSet param_set2 = new ParameterSet(true);
+        ParameterSet param_set2 = new ParameterSet();
         param_set2.setParameters(params2);
 
         FastSerializer param1_fs = new FastSerializer();

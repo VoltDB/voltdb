@@ -16,17 +16,25 @@
  */
 package org.voltdb;
 
-import java.nio.ByteBuffer;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.LinkedList;
+import java.util.TreeSet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.zookeeper_voltpatches.*;
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.logging.VoltLogger;
 
 public class SnapshotCompletionMonitor {
+    @SuppressWarnings("unused")
     private static final VoltLogger LOG = new VoltLogger("LOGGING");
     final LinkedList<SnapshotCompletionInterest> m_interests = new LinkedList<SnapshotCompletionInterest>();
     private ZooKeeper m_zk;
@@ -93,8 +101,7 @@ public class SnapshotCompletionMonitor {
                 }
             }
         } catch (Exception e) {
-            LOG.fatal("Exception in snapshot completion monitor", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Exception in snapshot completion monitor", true, e);
         }
     }
 
@@ -121,8 +128,7 @@ public class SnapshotCompletionMonitor {
             processSnapshotData(data);
         } catch (NoNodeException e) {
         } catch (Exception e) {
-            LOG.fatal("Exception in snapshot completion monitor", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Exception in snapshot completion monitor", true, e);
         }
     }
 
@@ -179,8 +185,7 @@ public class SnapshotCompletionMonitor {
                     m_lastKnownSnapshots =
                         new TreeSet<String>(m_zk.getChildren("/completed_snapshots", m_newSnapshotWatcher));
                 } catch (Exception e) {
-                    LOG.fatal("Error initializing snapshot completion monitor", e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("Error initializing snapshot completion monitor", true, e);
                 }
             }
         });

@@ -41,16 +41,6 @@ import org.voltdb.types.VoltDecimalHelper;
 
     static final byte ARRAY = -99;
 
-    private final boolean m_serializingToEE;
-
-    public ParameterSet() {
-        m_serializingToEE = false;
-    }
-
-    public ParameterSet(boolean serializingToEE) {
-        m_serializingToEE = serializingToEE;
-    }
-
     static Object limitType(Object o) {
         Class<?> ctype = o.getClass();
         if (ctype == Integer.class) {

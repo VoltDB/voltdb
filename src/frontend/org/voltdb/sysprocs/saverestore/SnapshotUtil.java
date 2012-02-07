@@ -49,7 +49,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Host;

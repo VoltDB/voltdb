@@ -184,14 +184,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             if (dependencies == null) {
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotFound.name(),
                                new Object[] { dependencyId }, null);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No additional info.", false, null);
             }
             for (final Object dependency : dependencies) {
                 if (dependency == null) {
                     hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyContainedNull.name(),
                                    new Object[] { dependencyId },
                             null);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("No additional info.", false, null);
                 }
                 if (log.isTraceEnabled()) {
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
@@ -201,7 +201,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 if (!(dependency instanceof VoltTable)) {
                     hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotVoltTable.name(),
                                    new Object[] { dependencyId }, null);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("No additional info.", false, null);
                 }
             }
 
@@ -228,7 +228,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 System.err.println(trace);
             }
         }
-        VoltDB.crashVoltDB();
+        VoltDB.crashLocalVoltDB("No additional info.", false, null);
     }
 
     /**

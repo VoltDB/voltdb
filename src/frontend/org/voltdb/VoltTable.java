@@ -36,7 +36,6 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Encoder;
 
 /*

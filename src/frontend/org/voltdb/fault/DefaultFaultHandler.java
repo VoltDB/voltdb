@@ -16,8 +16,9 @@
  */
 package org.voltdb.fault;
 
-import org.voltdb.VoltDB;
 import java.util.Set;
+
+import org.voltdb.VoltDB;
 
 public class DefaultFaultHandler implements FaultHandler
 {
@@ -31,7 +32,7 @@ public class DefaultFaultHandler implements FaultHandler
         for (VoltFault fault : faults) {
             System.err.println("Unrecoverable fault occured: " + fault.toString());
         }
-        VoltDB.crashVoltDB();
+        VoltDB.crashLocalVoltDB("No additional info", false, null);
     }
 
     @Override

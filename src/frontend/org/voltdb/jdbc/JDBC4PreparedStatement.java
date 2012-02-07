@@ -17,20 +17,28 @@
 
 package org.voltdb.jdbc;
 
-import java.sql.*;
-import java.lang.*;
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.Reader;
-import java.io.StringReader;
-import java.util.Calendar;
-import java.util.Map;
-import java.net.URL;
-import javax.sql.rowset.serial.SerialBlob;
-import javax.sql.rowset.serial.SerialClob;
 import java.math.BigDecimal;
-import org.voltdb.*;
-import org.voltdb.client.*;
+import java.net.URL;
+import java.sql.Array;
+import java.sql.Blob;
+import java.sql.Clob;
+import java.sql.Date;
+import java.sql.NClob;
+import java.sql.ParameterMetaData;
+import java.sql.Ref;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.RowId;
+import java.sql.SQLException;
+import java.sql.SQLXML;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.sql.Types;
+import java.util.Calendar;
+
+import org.voltdb.VoltType;
 
 public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.PreparedStatement
 {

@@ -41,6 +41,7 @@ import org.voltdb.messaging.VoltMessage;
  * <p>This class manages all that state.</p>
  */
 public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> {
+    @SuppressWarnings("unused")
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final long serialVersionUID = 1L;
     private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");

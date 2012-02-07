@@ -22,26 +22,26 @@
  */
 package org.voltdb;
 
-import java.nio.ByteBuffer;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
-
-import org.voltdb.*;
-import org.voltdb.network.*;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.messaging.*;
+import org.voltdb.messaging.FastSerializable;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MockMailbox;
+import org.voltdb.network.Connection;
+import org.voltdb.network.MockConnection;
+import org.voltdb.network.MockWriteStream;
+import org.voltdb.network.WriteStream;
 
 public class TestStatsAgent {
 

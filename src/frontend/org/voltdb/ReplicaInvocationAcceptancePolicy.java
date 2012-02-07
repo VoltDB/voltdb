@@ -14,13 +14,13 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.network.WriteStream;
 
 /**
  * An invocation acceptance policy targeting all types of invocations in

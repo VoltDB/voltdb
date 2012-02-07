@@ -311,20 +311,17 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
 //            }
 
         } else {
-            recoveryLog.fatal("Received an unexpect message of type " + type);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Received an unexpect message of type " + type, false, null);
         }
         while(ackMessage.hasRemaining()) {
             int written = 0;
             try {
                 written = m_sc.write(ackMessage);
             } catch (IOException e) {
-                recoveryLog.fatal("Unable to write ack message", e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Unable to write ack message", true, e);
             }
             if (written == -1) {
-                recoveryLog.fatal("Unable to write ack message");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Unable to write ack message", false, null);
             }
         }
         recoveryLog.trace("Writing ack for block " + blockIndex + " from " + m_siteId);
@@ -341,8 +338,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             try {
                 sendInitiateMessage(txnId);
             } catch (IOException e) {
-                recoveryLog.fatal("Error sending initiate message", e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Error sending initiate message", true, e);
             }
         }
 
@@ -360,8 +356,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 try {
                     processNextInitiateResponse(txnId);
                 } catch (IOException e) {
-                    recoveryLog.fatal("Error process a second initiate response", e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("Error process a second initiate response", true, e);
                 }
             }
         }
@@ -501,8 +496,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             Thread.yield();
         }
         if (m_sc == null) {
-            recoveryLog.fatal("Timed out waiting for connection from source partition");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Timed out waiting for connection from source partition", false, null);
         }
         ssc.close();
         m_sc.configureBlocking(true);
@@ -532,13 +526,12 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             Thread.yield();
         }
         if (m_incoming.peek() == null) {
-            recoveryLog.fatal("Timed out waiting to read recovery initiate ack message");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Timed out waiting to read recovery initiate ack message", false, null);
         }
         if (m_iodaemon.m_lastException != null) {
-            recoveryLog.fatal(
-                    "There was an error while reading the recovery initiate ack message", m_iodaemon.m_lastException);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(
+                    "There was an error while reading the recovery initiate ack message",
+                    true, m_iodaemon.m_lastException);
         }
 
         BBContainer ackMessageContainer = m_incoming.poll();
@@ -590,10 +583,9 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             SiteTracker tracker) {
         for (Map.Entry<Integer, RecoveryTable> entry : m_tables.entrySet()) {
             if (failedSites.contains(entry.getValue().m_sourceSiteId)) {
-                recoveryLog.fatal("Node fault during recovery of Site " + m_siteId +
+                VoltDB.crashLocalVoltDB("Node fault during recovery of Site " + m_siteId +
                         " resulted in source Site " + entry.getValue().m_sourceSiteId +
-                        " becoming unavailable. Failing recovering node.");
-                VoltDB.crashVoltDB();
+                        " becoming unavailable. Failing recovering node.", false, null);
             }
         }
     }
@@ -619,8 +611,8 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         sourceSites.remove(new Integer(siteId));
 
         if (sourceSites.isEmpty()) {
-            recoveryLog.fatal("Could not find a source site for siteId " + siteId + " partition id " + partitionId);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Could not find a source site for siteId " + siteId +
+                    " partition id " + partitionId, false, null);
         }
 
         HashMap<Pair<String, Integer>, Integer> tableToSourceSite =

@@ -249,13 +249,11 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         while (!handledFaults.isEmpty()) {
             HandledFault hf = handledFaults.poll();
             if (!m_faultHandlersData.containsKey(hf.m_handler)) {
-                hostLog.fatal("A handled fault was reported for a handler that is not registered");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("A handled fault was reported for a handler that is not registered", false, null);
             }
             boolean removed = m_faultHandlersData.get(hf.m_handler).m_handlersPendingFaults.remove(hf.m_fault);
             if (!removed) {
-                hostLog.fatal("A handled fault was reported that was not pending for the provided handler");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("A handled fault was reported that was not pending for the provided handler", false, null);
             }
         }
     }
@@ -402,8 +400,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             }
         } catch (Exception e) {
             e.printStackTrace();
-            hostLog.fatal("", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 

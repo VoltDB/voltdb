@@ -67,8 +67,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     final int blockIndexOffset = siteIdOffset + 4;
     final int messageTypeOffset = blockIndexOffset + 4;
 
-
-
+    @SuppressWarnings("unused")
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
@@ -309,7 +308,6 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             m_ignoreAcks = true;
         }
 
-
         private synchronized boolean hasOutstanding() {
             if (m_ignoreAcks) {
                 return false;
@@ -422,7 +420,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                  * written if a table is asked for more data when the recovery stream is not active
                  * or complete (same thing really).
                  */
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Error in recovery stream", false, null);
             } else {
                 //Position should be unchanged from when tableStreamSerializeMore was called.
                 //Set the limit based on how much data the EE serialized past that position.
@@ -476,9 +474,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         m_onCompletion = onCompletion;
         RecoveryTable table = m_tablesToStream.peek();
         if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY )) {
-            hostLog.error("Attempted to activate recovery stream for table "
-                    + table.m_name + " and failed");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
+                    + table.m_name + " and failed", false, null);
         }
         m_outThread.start();
         m_inThread.start();
@@ -634,7 +631,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                      * written if a table is asked for more data when the recovery stream is not active
                      * or complete (same thing really).
                      */
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("Recovery stream error", false, null);
                 } else {
                     //Position should be unchanged from when tableStreamSerializeMore was called.
                     //Set the limit based on how much data the EE serialized past that position.
@@ -657,9 +654,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     RecoveryTable nextTable = m_tablesToStream.peek();
                     if (nextTable != null) {
                         if (!m_engine.activateTableStream(nextTable.m_tableId, TableStreamType.RECOVERY )) {
-                            hostLog.error("Attempted to activate recovery stream for table "
-                                    + nextTable.m_name + " and failed");
-                            VoltDB.crashVoltDB();
+                            VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
+                                    + nextTable.m_name + " and failed", false, null);
                         }
                     }
                 }

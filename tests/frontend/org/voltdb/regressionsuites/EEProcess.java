@@ -96,8 +96,7 @@ public class EEProcess {
                 }
             });
         } catch (final IOException e) {
-            e.printStackTrace();
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
         final BufferedReader stderr = new BufferedReader(new InputStreamReader(
@@ -163,10 +162,9 @@ public class EEProcess {
                         // TODO Auto-generated catch block
                         e.printStackTrace();
                     }
-                    System.out.println("[ipc=" + m_eePID
-                                       + "] Returned end of stream and exit value "
-                                       + m_eeProcess.exitValue());
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("[ipc=" + m_eePID
+                            + "] Returned end of stream and exit value "
+                            + m_eeProcess.exitValue(), false, null);
                 }
             }
         } catch (final IOException e) {

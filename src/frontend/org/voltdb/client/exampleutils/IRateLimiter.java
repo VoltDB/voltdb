@@ -16,8 +16,6 @@
  */
 package org.voltdb.client.exampleutils;
 
-import java.util.ArrayList;
-
 /**
  * Defines the generic interface for a transaction rate limiter.
  * Rate limiters are useful for asynchronous applications that want to ensure

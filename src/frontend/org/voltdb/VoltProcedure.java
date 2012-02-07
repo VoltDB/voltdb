@@ -988,7 +988,7 @@ public abstract class VoltProcedure {
                  " can not be converted to NULL representation for arg " + ii + " for SQL stmt " + stmt.getText());
         }
 
-        final ParameterSet params = new ParameterSet(true);
+        final ParameterSet params = new ParameterSet();
         params.setParameters(args);
         return params;
     }

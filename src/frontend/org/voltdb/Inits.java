@@ -95,8 +95,7 @@ public class Inits {
                     iw = m_readyJobs.take();
                 }
                 catch (InterruptedException e) {
-                    e.printStackTrace();
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
                 if (iw instanceof COMPLETION_WORK)
                     return;
@@ -129,8 +128,7 @@ public class Inits {
                     Constructor<?> constructor = cls.getDeclaredConstructor(Inits.class);
                     instance = (InitWork) constructor.newInstance(this);
                 } catch (Exception e) {
-                    hostLog.fatal("Critical error loading class " + cls.getName(), e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("Critical error loading class " + cls.getName(), true, e);
                 }
                 m_jobs.put(instance.getClass(), instance);
             }
@@ -287,8 +285,7 @@ public class Inits {
             try {
                 m_rvdb.m_hasCatalog.await();
             } catch (InterruptedException e1) {
-                hostLog.fatal("System was interrupted while waiting for a catalog.");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("System was interrupted while waiting for a catalog.", false, e1);
             }
 
             // Initialize the catalog and some common shortcuts
@@ -304,12 +301,11 @@ public class Inits {
             try {
                 catalogBytes = CatalogUtil.toBytes(new File(m_config.m_pathToCatalog));
             } catch (IOException e) {
-                hostLog.fatal("Failed to read catalog: " + e.getMessage());
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Failed to read catalog: " + e.getMessage(), false, e);
             }
             m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
@@ -398,11 +394,9 @@ public class Inits {
                             m_rvdb.m_commandLog = (CommandLog)loggerClass.newInstance();
                         }
                     } catch (InstantiationException e) {
-                        hostLog.fatal("Unable to instantiate command log", e);
-                        VoltDB.crashVoltDB();
+                        VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
                     } catch (IllegalAccessException e) {
-                        hostLog.fatal("Unable to instantiate command log", e);
-                        VoltDB.crashVoltDB();
+                        VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
                     }
                 }
             }
@@ -641,9 +635,8 @@ public class Inits {
                                                       allPartitions,
                                                       m_rvdb.m_catalogContext.siteTracker.getAllLiveHosts());
                 } catch (IOException e) {
-                    hostLog.fatal("Unable to establish a ZooKeeper connection: " +
-                                  e.getMessage());
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("Unable to establish a ZooKeeper connection: " +
+                            e.getMessage(), false, e);
                 }
 
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);

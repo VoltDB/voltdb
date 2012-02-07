@@ -50,7 +50,6 @@ import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -1365,8 +1364,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task = new StoredProcedureInvocation();
                             task.readExternal(fds);
                         } catch (Exception e) {
-                            hostLog.fatal(e);
-                            VoltDB.crashVoltDB();
+                            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                         }
 
                         // initiate the transaction
@@ -1411,7 +1409,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         task.readExternal(fds);
                     } catch (Exception e) {
                         hostLog.fatal(e);
-                        VoltDB.crashVoltDB();
+                        VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                     }
 
                     // initiate the transaction. These hard-coded values from catalog

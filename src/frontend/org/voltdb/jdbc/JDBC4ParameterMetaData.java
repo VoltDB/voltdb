@@ -17,11 +17,8 @@
 
 package org.voltdb.jdbc;
 
-import java.sql.*;
-import java.util.*;
-import java.util.regex.*;
-import org.voltdb.*;
-import org.voltdb.client.*;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 public class JDBC4ParameterMetaData implements java.sql.ParameterMetaData
 {

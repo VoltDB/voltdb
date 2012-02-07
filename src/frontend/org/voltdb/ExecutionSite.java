@@ -809,7 +809,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         catch (final Exception ex) {
             hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
                             new Object[] { getSiteId(), siteIndex }, ex);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
         }
         return hsqlTemp;
     }
@@ -861,7 +861,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         catch (final Exception ex) {
             hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
                             new Object[] { getSiteId(), siteIndex }, ex);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
         }
         return eeTemp;
     }
@@ -928,7 +928,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                             LogKeys.host_ExecutionSite_GenericException.name(),
                             new Object[] { getSiteId(), siteIndex },
                             e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
                 try {
                     wrapper = (VoltProcedure) procClass.newInstance();
@@ -974,7 +974,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         LogKeys.host_ExecutionSite_GenericException.name(),
                         new Object[] { getSiteId(), siteIndex },
                         e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
             try {
@@ -1404,9 +1404,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                       ConnectionUtil.getHostnameOrAddress());
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
                 snapshotMsg.crash) {
-                hostLog.info("Executing local snapshot. Finished final snapshot. Shutting down. " +
-                        "Result: " + startSnapshotting.toString());
-                VoltDB.crashVoltDB();
+                String msg = "Executing local snapshot. Finished final snapshot. Shutting down. " +
+                        "Result: " + startSnapshotting.toString();
+                VoltDB.crashLocalVoltDB(msg, false, null);
             }
         } else if (message instanceof LocalObjectMessage) {
               LocalObjectMessage lom = (LocalObjectMessage)message;
@@ -1414,7 +1414,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         } else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),
                            new Object[] { message.getClass().getName() }, null);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("No additional info.", false, null);
         }
     }
 
@@ -1451,8 +1451,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 msg.append("New notice is for new or completed transaction.\n");
             }
             msg.append("New notice of type: " + notice.getClass().getName());
-            log.fatal(msg.toString());
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(msg.toString(), false, null);
         }
 
         if (notice instanceof InitiateTaskMessage) {
@@ -1471,8 +1470,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     {
         //Keep it simple and don't try to recover on the recovering node.
         if (m_recovering) {
-            m_recoveryLog.fatal("Aborting recovery due to a remote node failure. Retry again.");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Aborting recovery due to a remote node failure. Retry again.", false, null);
         }
         HashSet<NodeFailureFault> failures = message.m_failedHosts;
 
@@ -1606,8 +1604,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         catch (MessagingException e) {
             // TODO: unsure what to do with this. maybe it implies concurrent failure?
-            e.printStackTrace();
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         m_recoveryLog.info("Sent fault data. Expecting " + expectedResponses + " responses.");
         return expectedResponses;
@@ -1899,8 +1896,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             //Log it and acquire the completion permit from the semaphore
             VoltDB.instance().getCommandLog().logFault( failedSites, faultedTxns).acquire();
         } catch (InterruptedException e) {
-            hostLog.fatal("Interrupted while attempting to log a fault", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Interrupted while attempting to log a fault", true, e);
         }
     }
 
@@ -2228,7 +2224,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 catch (final IOException e) {
                     hostLog.l7dlog( Level.FATAL,
                                     LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
             }
             else {
@@ -2346,7 +2342,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 // and converted them to error responses. Java errors are re-thrown, and not caught by this
                 // exception clause. A truly unexpected exception reached this point. Crash. It's a defect.
                 hostLog.l7dlog( Level.ERROR, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
         }
         log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);

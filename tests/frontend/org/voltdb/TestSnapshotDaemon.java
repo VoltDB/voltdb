@@ -23,27 +23,23 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
-import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.concurrent.Future;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
-import org.junit.*;
-
-import org.voltdb.SnapshotDaemon;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.sysprocs.SnapshotScan;
 import org.voltdb.sysprocs.SnapshotSave;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.sysprocs.SnapshotScan;
 
 public class TestSnapshotDaemon {
 

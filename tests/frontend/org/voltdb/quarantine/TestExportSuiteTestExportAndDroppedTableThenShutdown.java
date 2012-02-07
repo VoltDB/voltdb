@@ -36,7 +36,6 @@ import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.exportclient.ExportClientException;
-import org.voltdb.quarantine.TestExportSuite;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;

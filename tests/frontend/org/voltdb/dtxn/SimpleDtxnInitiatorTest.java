@@ -60,14 +60,9 @@ import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MockMailbox;
-import org.voltdb.network.Connection;
 import org.voltdb.network.MockConnection;
 import org.voltdb.network.MockWriteStream;
-import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
-import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.CommandLog;
 
 public class SimpleDtxnInitiatorTest extends TestCase {
     MockMessenger m_messenger;

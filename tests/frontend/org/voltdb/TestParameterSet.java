@@ -82,7 +82,7 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testStringsAsByteArray() {
-        params = new ParameterSet(true);
+        params = new ParameterSet();
         params.setParameters(new Object[]{new byte[]{'f', 'o', 'o'}});
         ParameterSet out = FastSerializableTestUtil.roundTrip(params);
         assertEquals(1, out.toArray().length);
@@ -92,7 +92,7 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testFloatsInsteadOfDouble() {
-        params = new ParameterSet(true);
+        params = new ParameterSet();
         params.setParameters(5.5f);
         ParameterSet out = FastSerializableTestUtil.roundTrip(params);
         Object value = out.toArray()[0];
@@ -101,7 +101,7 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testJSONEncodesBinary() throws JSONException, IOException {
-        params = new ParameterSet(true);
+        params = new ParameterSet();
         params.setParameters(new Object[]{ 123,
                                            12345,
                                            1234567,

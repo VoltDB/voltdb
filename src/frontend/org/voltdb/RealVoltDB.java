@@ -64,12 +64,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
-import org.voltdb.compiler.AsyncCompilerAgent;
-
-import org.voltdb.dtxn.SimpleDtxnInitiator;
-
-import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.agreement.ZKUtil;
@@ -82,15 +76,18 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
@@ -120,7 +117,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             response = clientResponse;
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 hostLog.fatal(response.getStatusString());
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB(response.getStatusString(), false, null);
             }
             VoltTable results[] = clientResponse.getResults();
             if (results.length > 0) {
@@ -128,7 +125,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 while (errors.advanceRow()) {
                     hostLog.fatal("Host " + errors.getLong(0) + " error: " + errors.getString(1));
                 }
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No additional info.", false, null);
             }
             this.notify();
         }
@@ -509,8 +506,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 m_snapshotCompletionMonitor.init(m_zk);
             } catch (Exception e) {
-                hostLog.fatal("Error initializing snapshot completion monitor", e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Error initializing snapshot completion monitor", true, e);
             }
 
             if (m_commandLog != null && isRejoin) {
@@ -595,8 +591,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         m_deployment = CatalogUtil.parseDeployment(m_config.m_pathToDeployment);
         // wasn't a valid xml deployment file
         if (m_deployment == null) {
-            hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment, false, null);
         }
 
         // note the heatbeats are specified in seconds in xml, but ms internally
@@ -738,8 +733,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
         } catch (Exception e) {
-            hostLog.fatal("Unable to create a ZK client", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Unable to create a ZK client", true, e);
         }
     }
 
@@ -753,7 +747,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 FaultType.NODE_FAILURE);
         if (!m_faultManager.testPartitionDetectionDirectory(
                 m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("No additional info", false, null);
         }
 
         // Prepare the network socket manager for work
@@ -771,13 +765,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             } catch (UnknownHostException ex) {
                 hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(),
                         new Object[] { leaderAddress }, null);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No additional info", false, null);
             }
             // ensure at least one host (catalog compiler should check this too
             if (numberOfNodes <= 0) {
                 hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(),
                         new Object[] { numberOfNodes }, null);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No additional info", false, null);
             }
 
             hostLog.l7dlog( Level.TRACE, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { numberOfNodes, leader }, null);
@@ -814,7 +808,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 m_faultHandler.m_waitForFaultReported.acquire(m_downHosts.size());
             } catch (InterruptedException e) {
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
             ExecutionSite.recoveringSiteCount.set(
                     m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size());
@@ -926,9 +920,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_config.m_internalPort);
         }
         catch (Exception e) {
-            hostLog.fatal("Problem connecting client to " + m_config.m_selectedRejoinInterface + ":" +
-                   m_config.m_internalPort + ". " + e.getMessage());
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Problem connecting client to " + m_config.m_selectedRejoinInterface + ":" +
+                    m_config.m_internalPort + ". " + e.getMessage(), false, e);
         }
 
         Object retval[] = m_messenger.waitForGroupJoin(60 * 1000);
@@ -944,13 +937,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             //Timeout because a failure might result in the response not coming.
             response = rcb.waitForResponse(3000);
             if (response == null) {
-                hostLog.fatal("Recovering node timed out rejoining");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Recovering node timed out rejoining", false, null);
             }
         }
         catch (InterruptedException e) {
-            hostLog.fatal("Interrupted while attempting to rejoin cluster");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Interrupted while attempting to rejoin cluster", false, e);
         }
         return downHosts;
     }
@@ -1103,8 +1094,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             fos.close();
             m_config.m_pathToCatalog = catalogFile.getCanonicalPath();
         } catch (IOException e) {
-            m_messenger.sendPoisonPill("Failed to write a temp catalog.");
-            VoltDB.crashVoltDB();
+            VoltDB.crashGlobalVoltDB("Failed to write a temp catalog.", true, e);
         }
 
         // anyone waiting for a catalog can now zoom zoom
@@ -1185,10 +1175,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             String errmsg = "ExecutionSite: " + m_currentThreadSite.m_siteId +
             " encountered an " +
             "unexpected error and will die, taking this VoltDB node down.";
-            System.err.println(errmsg);
-            t.printStackTrace();
-            hostLog.fatal(errmsg, t);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
     }
 
@@ -1375,8 +1362,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
         if (m_recovering) {
-            recoveryLog.fatal("Concurrent rejoins are not supported");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Concurrent rejoins are not supported", false, null);
         }
         // another site already did this work.
         if (currentTxnId == lastNodeRejoinFinish_txnId) {
@@ -1399,7 +1385,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 m_faultHandler.m_waitForFaultClear.acquire();
             } catch (InterruptedException e) {
-                VoltDB.crashVoltDB();//shouldn't happen
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);//shouldn't happen
             }
 
             ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
@@ -1733,8 +1719,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.info("Node recovery completed");
             }
         } catch (Exception e) {
-            hostLog.fatal("Unable to log host recovery completion to ZK", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Unable to log host recovery completion to ZK", true, e);
         }
         hostLog.info("Logging host recovery completion to ZK");
     }
@@ -1849,7 +1834,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.l7dlog(Level.FATAL,
                                LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
                                e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No additional info", false, null);
             }
         }
 

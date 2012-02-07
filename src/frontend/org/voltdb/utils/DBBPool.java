@@ -649,8 +649,7 @@ public final class DBBPool {
             final BBContainer container = DBBPool.allocateDirect( bufferSize);
             return container;
         } catch (java.lang.OutOfMemoryError e) {
-            m_logger.fatal("Total bytes allocated globally before OOM is " + bytesAllocatedGlobally.get(), e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Total bytes allocated globally before OOM is " + bytesAllocatedGlobally.get(), true, e);
         }
         return null;
     }

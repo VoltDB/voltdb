@@ -24,8 +24,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -38,7 +36,6 @@ import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.LocalObjectMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;

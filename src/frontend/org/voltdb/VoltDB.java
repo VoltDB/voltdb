@@ -441,14 +441,6 @@ public class VoltDB {
     }
 
     /**
-     * Wrapper for crashLocalVoltDB() to keep compatibility with >100 calls.
-     */
-    @Deprecated
-    public static void crashVoltDB() {
-        crashLocalVoltDB("Unexpected crash", true, null);
-    }
-
-    /**
      * Exit the process with an error message, optionally with a stack trace.
      *
      * In the future it would be nice to notify any non-failed subsystems

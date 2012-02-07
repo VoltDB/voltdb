@@ -30,9 +30,8 @@ public class VoltUncaughtExceptionHandler implements UncaughtExceptionHandler {
     public void uncaughtException(Thread t, Throwable e) {
         final String stringRep = e.toString();
         log.fatal(stringRep);
-        log.fatal("VoltDB has encountered an unrecoverable error and is exiting.");
-        log.fatal("The log may contain additional information.");
-        VoltDB.crashVoltDB();
+        VoltDB.crashLocalVoltDB("VoltDB has encountered an unrecoverable error and is exiting."
+                + "\nThe log may contain additional information.", false, null);
     }
 
 }

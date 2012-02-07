@@ -24,14 +24,11 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.zip.CRC32;
-
 
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.CompressionService;

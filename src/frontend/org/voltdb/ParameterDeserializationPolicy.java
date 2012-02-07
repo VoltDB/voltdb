@@ -22,7 +22,6 @@ import java.io.Writer;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.network.WriteStream;
 
 /**
  * Check if the parameters of the sysproc can be deserialized successfully.

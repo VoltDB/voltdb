@@ -20,29 +20,34 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package org.voltdb.zk;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
-import org.voltdb.MockVoltDB;
-import org.voltdb.VoltDB;
-import org.voltdb.agreement.AgreementSite;
-import org.voltdb.fault.NodeFailureFault;
-import org.apache.zookeeper_voltpatches.*;
-import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
-import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.data.Stat;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.net.InetSocketAddress;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.voltdb.agreement.AgreementSite;
+import org.voltdb.fault.NodeFailureFault;
 
 public class TestZK extends ZKTestBase {
 

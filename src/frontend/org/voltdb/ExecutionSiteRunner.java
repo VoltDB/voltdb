@@ -37,7 +37,6 @@ public class ExecutionSiteRunner implements Runnable {
     private final boolean m_replicationActive;
     private final HashSet<Integer> m_failedHostIds;
     private final long m_txnId;
-    private final VoltLogger m_hostLog;
 
     public ExecutionSiteRunner(
             final int siteId,
@@ -53,7 +52,6 @@ public class ExecutionSiteRunner implements Runnable {
         m_replicationActive = replicationActive;
         m_failedHostIds = failedHostIds;
         m_txnId = context.m_transactionId;
-        m_hostLog = hostLog;
     }
 
     @Override
@@ -92,17 +90,13 @@ public class ExecutionSiteRunner implements Runnable {
 
             String errmsg = "ExecutionSite: " + m_siteId + " ran out of Java memory. " +
                 "This node will shut down.";
-            m_hostLog.fatal(errmsg, e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(errmsg, true, e);
         }
         catch (Throwable t)
         {
             String errmsg = "ExecutionSite: " + m_siteId + " encountered an " +
                 "unexpected error and will die, taking this VoltDB node down.";
-            System.err.println(errmsg);
-            t.printStackTrace();
-            m_hostLog.fatal(errmsg, t);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
     }
 

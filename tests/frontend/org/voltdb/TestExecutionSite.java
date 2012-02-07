@@ -599,7 +599,7 @@ public class TestExecutionSite extends TestCase {
 
         /** Helper to turn object list into parameter set buffer */
         private ByteBuffer createParametersBuffer(Object... paramList) {
-            ParameterSet paramSet = new ParameterSet(true);
+            ParameterSet paramSet = new ParameterSet();
             paramSet.setParameters(paramList);
             FastSerializer fs = new FastSerializer();
             try {

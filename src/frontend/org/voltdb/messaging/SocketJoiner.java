@@ -381,7 +381,7 @@ public class SocketJoiner extends Thread {
                     m_hostLog.error("Deployment file checksums do not match across cluster");
             }
             if (errors != 0) {
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Errors found", false, null);
             }
 
         }
@@ -525,7 +525,7 @@ public class SocketJoiner extends Thread {
                     if (m_hostLog != null)
                         m_hostLog.error("Catalog checksums do not match across cluster");
                 }
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No additional info", false, null);
             }
             assert(command == COMMAND_COMPLETE);
         }
@@ -578,8 +578,7 @@ public class SocketJoiner extends Thread {
                     m_expectedHosts = hostsFound.size() + 1;
                     recoveryLog.info("Hosts found: " + hostsFound.toString());
                 } else if (!hostsFound.equals(hosts)) {
-                    recoveryLog.fatal("Inconsistent live host set during rejoin");
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("Inconsistent live host set during rejoin", false, null);
                 }
                 // set the admin mode here, not in the local deployment file for rejoining nodes
                 VoltDB.instance().setStartMode(OperationMode.get((byte) in.read()));
@@ -762,7 +761,7 @@ public class SocketJoiner extends Thread {
             }
 
             if (errors != 0) {
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Errors found.", false, null);
             }
         }
         catch (IOException e) {

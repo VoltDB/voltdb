@@ -190,7 +190,7 @@ public class SnapshotSaveAPI
         } catch (NodeExistsException e) {
             HOST_LOG.warn("Didn't expect the snapshot node to already exist", e);
         } catch (Exception e) {
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
         String nextTruncationNonce = null;
@@ -207,8 +207,7 @@ public class SnapshotSaveAPI
             }
         } catch (KeeperException.NoNodeException e) {}
         catch (Exception e) {
-            HOST_LOG.error("Getting the nonce should never fail with anything other than no node", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Getting the nonce should never fail with anything other than no node", true, e);
         }
         if (nextTruncationNonce == null) {
             isTruncation = false;
@@ -231,7 +230,7 @@ public class SnapshotSaveAPI
         } catch (NodeExistsException e) {
             HOST_LOG.warn("Didn't expect the snapshot node to already exist", e);
         } catch (Exception e) {
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 
@@ -282,8 +281,7 @@ public class SnapshotSaveAPI
             cb.get();
         } catch (KeeperException.NodeExistsException e) {
         } catch (Exception e) {
-            HOST_LOG.fatal("Unexpected exception logging snapshot completion to ZK", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Unexpected exception logging snapshot completion to ZK", true, e);
         }
     }
 
