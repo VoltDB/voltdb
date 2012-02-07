@@ -210,7 +210,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
                 msgsize += m_exception.getSerializedSize();
             }
             for (VoltTable vt : results) {
-                msgsize += vt.getSerializedSize();
+                msgsize += vt.getSerializedSize() + 2; // we need to add the array length, short
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error serializing client response", false, e);
@@ -252,6 +252,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             m_exception.serializeToBuffer(b);
             buf.put(b.array());
         }
+        buf.putShort((short)results.length);
         for (VoltTable vt : results)
         {
             vt.flattenToBuffer(buf);
