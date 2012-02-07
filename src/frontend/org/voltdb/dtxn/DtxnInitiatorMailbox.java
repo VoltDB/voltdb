@@ -97,25 +97,21 @@ public class DtxnInitiatorMailbox implements Mailbox
     /**
      * Storage for initiator statistics
      */
-    final InitiatorStats m_stats;
+    InitiatorStats m_stats = null;
     /**
      * Latency distribution, stored in buckets.
      */
-    final LatencyStats m_latencies;
+    LatencyStats m_latencies = null;
 
     /**
      * Construct a new DtxnInitiatorQueue
-     * @param siteId  The mailbox siteId for this initiator
      */
-    public DtxnInitiatorMailbox(long siteId, ExecutorTxnIdSafetyState safetyState, HostMessenger hostMessenger)
+    public DtxnInitiatorMailbox(ExecutorTxnIdSafetyState safetyState, HostMessenger hostMessenger)
     {
         assert(safetyState != null);
         assert(hostMessenger != null);
         m_hostMessenger = hostMessenger;
-        m_hsId = siteId;
         m_safetyState = safetyState;
-        m_stats = new InitiatorStats(siteId);
-        m_latencies = new LatencyStats(siteId);
         VoltDB.instance().getFaultDistributor().
         // For Node failure, the initiators need to be ordered after the catalog
         // but before everything else (to prevent any new work for bad sites)
@@ -326,6 +322,8 @@ public class DtxnInitiatorMailbox implements Mailbox
     @Override
     public void setHSId(long hsId) {
         this.m_hsId = hsId;
+        m_stats = new InitiatorStats(m_hsId);
+        m_latencies = new LatencyStats(m_hsId);
     }
 
     Map<Long, long[]> getOutstandingTxnStats()

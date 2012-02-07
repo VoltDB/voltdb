@@ -101,23 +101,23 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
     public SimpleDtxnInitiator(CatalogContext context,
-                               HostMessenger messenger, int hostId, long siteId,
+                               HostMessenger messenger, int hostId,
                                long initiatorId,
                                long timestampTestingSalt)
     {
         assert(messenger != null);
-        hostLog.info("Initializing initiator ID: " + initiatorId  + ", SiteID: " + siteId);
+
+        m_safetyState = new ExecutorTxnIdSafetyState(context.siteTracker);
+        m_mailbox = new DtxnInitiatorMailbox(
+                        m_safetyState,
+                        (org.voltcore.messaging.HostMessenger)messenger);
+        messenger.createMailbox(null, m_mailbox);
+        m_siteId = m_mailbox.getHSId();
+        m_safetyState.setHSId(m_siteId);
+        hostLog.info("Initializing initiator ID: " + initiatorId  + ", SiteID: " + m_siteId);
 
         m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);
         m_hostId = hostId;
-        m_siteId = siteId;
-        m_safetyState = new ExecutorTxnIdSafetyState(siteId, context.siteTracker);
-        m_mailbox =
-            new DtxnInitiatorMailbox(
-                    siteId,
-                    m_safetyState,
-                    (org.voltcore.messaging.HostMessenger)messenger);
-        messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, m_mailbox);
         m_mailbox.setInitiator(this);
     }
 
@@ -195,7 +195,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         else
         {
             SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
-            ArrayList<Long> sitesOnThisHost =
+            List<Long> sitesOnThisHost =
                 tracker.getLiveExecutionSitesForHost(m_hostId);
             long coordinatorId = sitesOnThisHost.get(0);
             ArrayList<Long> replicaIds = new ArrayList<Long>();
@@ -316,7 +316,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              int messageSize,
                              long now)
     {
-        ArrayList<Long> siteIds;
+        List<Long> siteIds;
 
         // Special case the common 1 partition case -- cheap via SiteTracker
         if (partitions.length == 1) {

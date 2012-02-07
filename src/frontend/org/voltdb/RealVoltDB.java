@@ -17,13 +17,9 @@
 
 package org.voltdb;
 
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 
@@ -32,14 +28,10 @@ import java.lang.management.ManagementFactory;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -50,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
@@ -66,30 +57,24 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.ZKUtil;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Site;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.dtxn.MailboxTracker;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -405,6 +390,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
+            // start mailbox tracker since all the
+            try {
+                m_catalogContext.siteTracker.setMailboxTracker(new MailboxTracker(m_messenger.getZK()));
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+
             // Create the client interface
             int portOffset = 0;
             for (Site site : m_catalogContext.siteTracker.getUpSites()) {
@@ -419,23 +411,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                 m_catalogContext,
                                 m_messenger,
                                 m_myHostId,
-                                currSiteId,
                                 site.getInitiatorid(),
                                 m_config.m_timestampTestingSalt);
 
-                    ClientInterface ci =
-                        ClientInterface.create(m_messenger,
-                                               m_catalogContext,
-                                               m_replicationRole,
-                                               initiator,
-                                               m_catalogContext.numberOfNodes,
-                                               currSiteId,
-                                               site.getInitiatorid(),
-                                               config.m_port + portOffset,
-                                               config.m_adminPort + portOffset,
-                                               m_config.m_timestampTestingSalt);
+                    try {
+                        ClientInterface ci =
+                                ClientInterface.create(m_messenger,
+                                                       m_catalogContext,
+                                                       m_replicationRole,
+                                                       initiator,
+                                                       m_catalogContext.numberOfNodes,
+                                                       currSiteId,
+                                                       site.getInitiatorid(),
+                                                       config.m_port + portOffset,
+                                                       config.m_adminPort + portOffset,
+                                                       m_config.m_timestampTestingSalt);
+                        m_clientInterfaces.add(ci);
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                    }
                     portOffset += 2;
-                    m_clientInterfaces.add(ci);
                     m_dtxns.add(initiator);
                 }
             }
@@ -737,9 +732,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      */
     void createPersistentZKNodes() {
         String[] pnodes = new String[] {
+            "/readyhosts",
             "/mailboxes",
             "/mailboxes/executionsites",
-            "/readyhosts"
+            "/mailboxes/initiators",
+            "/mailboxes/asyncplanners",
+            "/mailboxes/clientinterfaces",
         };
 
         for (int i=0; i < pnodes.length; i++) {

@@ -48,7 +48,7 @@ public class ExecutorTxnIdSafetyState {
     // kept across failures and rejoins to understand the unchanging maps of sites to partitions
     Map<Long, Integer> m_stateToPartitionMap = new HashMap<Long, Integer>();
 
-    final long m_hsId;
+    long m_hsId = -1;
 
     public ExecutorTxnIdSafetyState(long mySiteId, int siteIds[]) {
         m_hsId = mySiteId;
@@ -86,9 +86,7 @@ public class ExecutorTxnIdSafetyState {
         }
     }
 
-    public ExecutorTxnIdSafetyState(long hsId, SiteTracker tracker) {
-        m_hsId = hsId;
-
+    public ExecutorTxnIdSafetyState(SiteTracker tracker) {
         Set<Long> execSites = tracker.getExecutionSiteIds();
         for (long id : execSites) {
             Site s = tracker.getSiteForId(id);
@@ -235,5 +233,9 @@ public class ExecutorTxnIdSafetyState {
         ss.lastSentTxnId = ps.newestConfirmedTxnId;
 
         m_stateBySite.put(executorSiteId, ss);
+    }
+
+    public void setHSId(long hsId) {
+        m_hsId = hsId;
     }
 }

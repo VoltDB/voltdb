@@ -46,6 +46,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -803,6 +807,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Static factory method to easily create a ClientInterface with the default
      * settings.
+     * @throws Exception
      */
     public static ClientInterface create(
             HostMessenger messenger,
@@ -814,7 +819,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             int initiatorId,
             int port,
             int adminPort,
-            long timestampTestingSalt) {
+            long timestampTestingSalt) throws Exception {
 
         // create a list of all partitions
         int[] allPartitions = new int[context.numberOfPartitions];
@@ -836,7 +841,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     ClientInterface(int port, int adminPort, CatalogContext context, VoltNetworkPool network,
                     ReplicationRole replicationRole, int siteId, TransactionInitiator initiator,
-                    int[] allPartitions)
+                    int[] allPartitions) throws Exception
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
@@ -861,6 +866,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         };
         VoltDB.instance().getHostMessenger().createMailbox(null, m_mailbox);
+        registerMailbox();
+    }
+
+    /**
+     * Publishes the HSId of this execution site to ZK
+     * @param zk
+     * @param partitionId
+     * @throws Exception
+     */
+    private void registerMailbox() throws Exception {
+        JSONObject jsObj = new JSONObject();
+        jsObj.put("HSId", m_mailbox.getHSId());
+        byte[] payload = jsObj.toString(4).getBytes("UTF-8");
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        zk.create("/mailboxes/clientinterfaces/ci", payload,
+                  Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 
     private void registerPolicies(ReplicationRole replicationRole) {

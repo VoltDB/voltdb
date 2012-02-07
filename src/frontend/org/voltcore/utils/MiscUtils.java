@@ -410,6 +410,10 @@ public class MiscUtils {
         return HSId;
     }
 
+    public static int getHostIdFromHSId(long HSId) {
+        return (int) (HSId & 0xffffffff);
+    }
+
     public static String hsIdToString(long hsId) {
         return Integer.toString((int)hsId) + ":" + Integer.toString((int)(hsId >> 32));
     }

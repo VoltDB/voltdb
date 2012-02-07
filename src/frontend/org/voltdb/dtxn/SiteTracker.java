@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -42,6 +43,8 @@ import org.voltdb.catalog.Site;
  * catalog changes, but for now it is static.
  */
 public class SiteTracker {
+
+    MailboxTracker m_mailboxTracker = null;
 
     int m_liveSiteCount = 0;
     int m_liveInitiatorCount = 0;
@@ -222,7 +225,7 @@ public class SiteTracker {
     }
 
     public Set<Long> getAllLiveSites() {
-        return m_liveSiteIds;
+        return m_mailboxTracker.getAllSites();
     }
 
     public Set<Integer> getAllLiveHosts() {
@@ -245,7 +248,7 @@ public class SiteTracker {
      */
     public int getLiveSiteCount()
     {
-        return m_liveSiteCount;
+        return m_mailboxTracker.getAllSites().size();
     }
 
     public Site[] getAllSites() {
@@ -259,10 +262,9 @@ public class SiteTracker {
     public long getLowestLiveNonExecSiteId()
     {
         long lowestNonExecSiteId = Long.MAX_VALUE;
-        for (Site site : getUpSites()) {
-            if (!site.getIsexec()) {
-                lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Long.parseLong(site.getTypeName()));
-            }
+        Set<Long> initiators = m_mailboxTracker.getAllInitiators();
+        for (long initiator : initiators) {
+            lowestNonExecSiteId = Math.min(lowestNonExecSiteId, initiator);
         }
         return lowestNonExecSiteId;
     }
@@ -289,7 +291,7 @@ public class SiteTracker {
      * the requested partition.
      */
     public long getOneLiveSiteForPartition(int partition) {
-        ArrayList<Long> sites = m_partitionsToLiveSites.get(partition);
+        List<Long> sites = m_mailboxTracker.getSitesForPartition(partition);
         assert(sites != null);
         return sites.get(0);
     }
@@ -313,9 +315,8 @@ public class SiteTracker {
      * @param partition A VoltDB partition id.
      * @return An array of VoltDB site ids.
      */
-    public ArrayList<Long> getLiveSitesForPartition(int partition) {
-        assert (m_partitionsToLiveSites.containsKey(partition));
-        return m_partitionsToLiveSites.get(partition);
+    public List<Long> getLiveSitesForPartition(int partition) {
+        return m_mailboxTracker.getSitesForPartition(partition);
     }
 
     /**
@@ -366,7 +367,7 @@ public class SiteTracker {
     public ArrayList<Long> getLiveSitesForEachPartitionAsList(int[]  partitions) {
         ArrayList<Long> all_sites = new ArrayList<Long>();
         for (int p : partitions) {
-            ArrayList<Long> sites = getLiveSitesForPartition(p);
+            List<Long> sites = getLiveSitesForPartition(p);
             for (long site : sites)
             {
                 all_sites.add(site);
@@ -386,7 +387,7 @@ public class SiteTracker {
     public long[] getLiveSitesForEachPartition(int[] partitions) {
         ArrayList<Long> all_sites = new ArrayList<Long>();
         for (int p : partitions) {
-            ArrayList<Long> sites = getLiveSitesForPartition(p);
+            List<Long> sites = getLiveSitesForPartition(p);
             for (long site : sites)
             {
                 all_sites.add(site);
@@ -421,27 +422,16 @@ public class SiteTracker {
      * @return Integer host id for that site
      */
     public Integer getHostForSite(Long siteId) {
-        assert m_sitesToHost.containsKey(siteId);
-        return m_sitesToHost.get(siteId);
+        return MailboxTracker.getHostForHSId(siteId);
     }
 
     /**
      * Get the list of live execution site IDs on a specific host ID
      * @param hostId
      */
-    public ArrayList<Long> getLiveExecutionSitesForHost(int hostId)
+    public List<Long> getLiveExecutionSitesForHost(int hostId)
     {
-        assert m_hostsToSites.containsKey(hostId);
-        ArrayList<Long> retval = new ArrayList<Long>();
-        for (Long site_id : m_hostsToSites.get(hostId))
-        {
-            if (m_sites.get(Long.toString(site_id)).getIsexec() &&
-                m_sites.get(Long.toString(site_id)).getIsup())
-            {
-                retval.add(site_id);
-            }
-        }
-        return retval;
+        return m_mailboxTracker.getSitesForHost(hostId);
     }
 
     /**
@@ -483,15 +473,11 @@ public class SiteTracker {
      */
     public long[] getUpExecutionSites()
     {
-        ArrayDeque<Long> tmplist = new ArrayDeque<Long>();
-        for  (Site site : m_sites) {
-            if (site.getIsup() && site.getIsexec()) {
-                tmplist.add(Long.parseLong(site.getTypeName()));
-            }
-        }
+        Set<Long> tmplist = m_mailboxTracker.getAllSites();
         long[] retval = new long[tmplist.size()];
-        for (int i=0; i < retval.length; ++i) {
-            retval[i] = tmplist.poll();
+        int i = 0;
+        for (long id : tmplist) {
+            retval[i++] = id;
         }
         return retval;
     }
@@ -554,7 +540,7 @@ public class SiteTracker {
      */
     public Long getLowestLiveExecSiteIdForHost(int hostId)
     {
-        ArrayList<Long> sites = getLiveExecutionSitesForHost(hostId);
+        List<Long> sites = getLiveExecutionSitesForHost(hostId);
         return Collections.min(sites);
     }
 
@@ -610,5 +596,9 @@ public class SiteTracker {
 
     public long getFirstNonExecSiteForHost(int hostId) {
         return m_firstNonExecSiteForHost[hostId];
+    }
+
+    public void setMailboxTracker(MailboxTracker mailboxTracker) {
+        m_mailboxTracker = mailboxTracker;
     }
 }

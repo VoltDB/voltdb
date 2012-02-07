@@ -19,9 +19,9 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
@@ -217,7 +217,7 @@ public class ExportGeneration {
             Table table, int hostId, CatalogContext catalogContext)
     {
         SiteTracker siteTracker = catalogContext.siteTracker;
-        ArrayList<Long> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
+        List<Long> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
 
         for (Long site : sites) {
             Integer partition = siteTracker.getPartitionForSite(site);
