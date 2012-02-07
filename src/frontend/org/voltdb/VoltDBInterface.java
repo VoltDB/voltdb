@@ -186,14 +186,6 @@ public interface VoltDBInterface
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
 
     /**
-     * Takes bytes, presumably received over the network, and
-     * write them to to a temp file so it can be used.
-     *
-     * @param catalogBytes The raw bytes of the catalog.
-     */
-    public void writeNetworkCatalogToTmp(byte[] catalogBytes);
-
-    /**
      * Schedule a work to be performed once or periodically.
      *
      * @param work

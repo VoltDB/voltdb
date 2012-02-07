@@ -35,6 +35,11 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException.*;
+import org.apache.zookeeper_voltpatches.ZooDefs;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -266,10 +271,20 @@ public class Inits {
                     }
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
-                    m_rvdb.m_messenger.sendCatalog(catalogBytes);
+
+                    // publish the catalog bytes to ZK
+                    m_rvdb.getMessenger().getZK().create("/catalogbytes",
+                            catalogBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
+                }
+                catch (org.apache.zookeeper_voltpatches.KeeperException e) {
+                    VoltDB.crashGlobalVoltDB("Unable to publish catalog.", false, e);
+                }
+                catch (InterruptedException e) {
+                    VoltDB.crashGlobalVoltDB("Interrupted while publishing catalog.", false, e);
                 }
             }
         }
@@ -282,30 +297,19 @@ public class Inits {
 
         @Override
         public void run() {
-            // wait till RealVoltDB says a catalog has been found
-            try {
-                m_rvdb.m_hasCatalog.await();
-            } catch (InterruptedException e1) {
-                hostLog.fatal("System was interrupted while waiting for a catalog.");
-                VoltDB.crashVoltDB();
-            }
-
-            // Initialize the catalog and some common shortcuts
-            if (m_config.m_pathToCatalog.startsWith("http")) {
-                hostLog.info("Loading application catalog jarfile from " + m_config.m_pathToCatalog);
-            }
-            else {
-                File f = new File(m_config.m_pathToCatalog);
-                hostLog.info("Loading application catalog jarfile from " + f.getAbsolutePath());
-            }
-
             byte[] catalogBytes = null;
-            try {
-                catalogBytes = CatalogUtil.toBytes(new File(m_config.m_pathToCatalog));
-            } catch (IOException e) {
-                hostLog.fatal("Failed to read catalog: " + e.getMessage());
-                VoltDB.crashVoltDB();
-            }
+            do {
+                try {
+                    catalogBytes = m_rvdb.getMessenger().getZK().getData("/catalogbytes", false, null);
+                }
+                catch (org.apache.zookeeper_voltpatches.KeeperException.NoNodeException e) {
+                }
+                catch (Exception e) {
+                    hostLog.fatal("System was interrupted while waiting for a catalog.");
+                    VoltDB.crashVoltDB();
+                }
+            } while (catalogBytes == null);
+
             m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
                 VoltDB.crashVoltDB();
@@ -334,7 +338,8 @@ public class Inits {
 
             // if the dummy catalog doesn't have a 0 txnid (like from a rejoin), use that one
             long existingCatalogTxnId = m_rvdb.m_catalogContext.m_transactionId;
-            int existingCatalogVersion = m_rvdb.m_messenger.getDiscoveredCatalogVersion();
+            // IV2 XXX Fix this - port catalog version syncing.
+            int existingCatalogVersion = 0; // m_rvdb.m_messenger.getDiscoveredCatalogVersion();
 
             m_rvdb.m_serializedCatalog = catalog.serialize();
             m_rvdb.m_catalogContext = new CatalogContext(

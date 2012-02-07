@@ -62,7 +62,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
@@ -147,7 +146,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     String m_serializedCatalog;
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
-    CountDownLatch m_hasCatalog;
     DeploymentType m_deployment;
     final HashSet<Integer> m_downHosts = new HashSet<Integer>();
     final Set<Integer> m_downNonExecSites = new HashSet<Integer>();
@@ -251,7 +249,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_memoryStats = null;
             m_statsManager = null;
             m_restoreAgent = null;
-            m_hasCatalog = new CountDownLatch(1);
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
 
@@ -733,8 +730,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     void createPersistentZKNodes() {
         String[] pnodes = new String[] {
             "/mailboxes",
-            "/mailboxes/executionsites",
-            "/catalogbytes"
+            "/mailboxes/executionsites"
         };
 
         for (int i=0; i < pnodes.length; i++) {
@@ -1011,30 +1007,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
     }
 
-    @Override
-    public void writeNetworkCatalogToTmp(byte[] catalogBytes) {
-        hostLog.debug("Got a catalog!");
-
-        hostLog.debug(String.format("Got %d catalog bytes", catalogBytes.length));
-
-        String prefix = String.format("catalog-host%d-", m_myHostId);
-
-        try {
-            File catalogFile = File.createTempFile(prefix, ".jar");
-            catalogFile.deleteOnExit();
-            FileOutputStream fos = new FileOutputStream(catalogFile);
-            fos.write(catalogBytes);
-            fos.flush();
-            fos.close();
-            m_config.m_pathToCatalog = catalogFile.getCanonicalPath();
-        } catch (IOException e) {
-            m_messenger.sendPoisonPill("Failed to write a temp catalog.");
-            VoltDB.crashVoltDB();
-        }
-
-        // anyone waiting for a catalog can now zoom zoom
-        m_hasCatalog.countDown();
-    }
 
     public static String[] extractBuildInfo() {
         StringBuilder sb = new StringBuilder(64);
