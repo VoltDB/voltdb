@@ -363,12 +363,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         boolean finished = false;
         while (!finished) {
             try {
-                if (m_watchdog.isAlive()) {
-                    m_watchdog.m_shouldContinue = false;
-                    m_watchdog.interrupt();
-                    m_watchdog.join();
-                }
-
                 m_transactionQueue.shutdown();
                 m_partitionDRGateway.shutdown();
 
@@ -501,7 +495,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // do other periodic work
         m_snapshotter.doSnapshotWork(ee, false);
-        m_watchdog.pet();
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -984,12 +977,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         if (getSiteId() < 1000) name += "0";
         name += String.valueOf(getSiteId());
         Thread.currentThread().setName(name);
-
-        // Commenting this out when making logging more abstrace (is that ok?)
-        //NDC.push("ExecutionSite - " + getSiteId() + " index " + siteIndex);
-        if (VoltDB.getUseWatchdogs()) {
-            m_watchdog.start(Thread.currentThread());
-        }
 
         try {
             // Only poll messaging layer if necessary. Allow the poll

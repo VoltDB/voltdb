@@ -165,11 +165,8 @@ public class RawProcessor implements ExportDataProcessor {
             m_c.writeStream().enqueue(
                 new DeferredSerialization() {
                     @Override
-                    public BBContainer serialize(DBBPool p) throws IOException {
-                        // Must account for length prefix - thus "+4",
-                        FastSerializer fs = new FastSerializer(p, r.serializableBytes() + 4);
-                        r.writeToFastSerializer(fs);
-                        return fs.getBBContainer();
+                    public ByteBuffer[] serialize() throws IOException {
+                        return new ByteBuffer[] { r.toBuffer() };
                     }
                     @Override
                     public void cancel() {

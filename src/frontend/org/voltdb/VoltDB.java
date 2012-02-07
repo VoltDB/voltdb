@@ -75,9 +75,6 @@ public class VoltDB {
 
         private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-        /** Whether to enable watchdogs to check for possible deadlocks **/
-        public boolean m_useWatchdogs = false;
-
         /** use normal JNI backend or optional IPC or HSQLDB backends */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
@@ -288,8 +285,6 @@ public class VoltDB {
                     m_pathToDeployment = args[++i];
                 } else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("useWatchdogs")) {
-                    m_useWatchdogs = true;
                 } else if (arg.equalsIgnoreCase("ipcports")) {
                     String portList = args[++i];
                     String ports[] = portList.split(",");
@@ -423,10 +418,6 @@ public class VoltDB {
 
     public static BackendTarget getEEBackendType() {
         return m_config.m_backend;
-    }
-
-    public static boolean getUseWatchdogs() {
-        return m_config.m_useWatchdogs;
     }
 
     /**
