@@ -150,18 +150,6 @@ public class FastSerializer implements DataOutput {
         return out.getBBContainer().b.array();
     }
 
-    public BBContainer writeObjectForMessaging(FastSerializable object) throws IOException {
-        final int startPosition = buffer.b.position();
-        buffer.b.putInt(0);
-        object.writeExternal(this);
-        final int len = buffer.b.position() - (4 + startPosition);
-        buffer.b.rewind();
-        buffer.b.putInt(len);
-        buffer.b.position(len + 4);
-        buffer.b.flip();
-        return buffer;
-    }
-
     /** @return a reference to the underlying ByteBuffer. */
     public BBContainer getBBContainer() {
         buffer.b.flip();
