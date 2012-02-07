@@ -47,7 +47,7 @@ public interface SiteProcedureConnection {
     /**
      * Get the catalog site id for the corresponding SiteProcedureConnection
      */
-    public int getCorrespondingSiteId();
+    public long getCorrespondingSiteId();
 
     /**
      * Get the partition id for the corresponding SiteProcedureConnection

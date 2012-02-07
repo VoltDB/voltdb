@@ -1956,7 +1956,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     }
 
     @Override
-    public int getCorrespondingSiteId() {
+    public long getCorrespondingSiteId() {
         return m_siteId;
     }
 
