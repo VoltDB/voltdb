@@ -20,7 +20,6 @@ package org.voltdb.sysprocs;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -1562,7 +1561,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
     private Cluster m_cluster;
     private Database m_database;
-    private int m_siteId;
+    private long m_siteId;
     private int m_hostId;
     private static volatile String m_filePath;
     private static volatile String m_fileNonce;

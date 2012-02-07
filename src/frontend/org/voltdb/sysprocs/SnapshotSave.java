@@ -186,7 +186,7 @@ public class SnapshotSave extends VoltSystemProcedure
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
+            Long lowest_site_id =
                 VoltDB.instance().getCatalogContext().siteTracker.
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
