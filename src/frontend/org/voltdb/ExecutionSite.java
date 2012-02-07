@@ -740,7 +740,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         for (final Site s : m_context.siteTracker.getUpSites())
             if (s.getIsexec() == false)
                 initiatorCount++;
-        final int[] initiatorIds = new int[initiatorCount];
+        final long[] initiatorIds = new long[initiatorCount];
         int index = 0;
         for (final Site s : m_context.siteTracker.getUpSites())
             if (s.getIsexec() == false)

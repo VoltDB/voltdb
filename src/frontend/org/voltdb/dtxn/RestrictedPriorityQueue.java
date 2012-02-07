@@ -114,7 +114,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     }
 
     long m_newestCandidateTransaction = -1;
-    final int m_siteId;
+    final long m_siteId;
     long m_txnsPopped = 0;
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
@@ -125,7 +125,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * are later referenced that aren't in this list, trip
      * an assertion.
      */
-    public RestrictedPriorityQueue(int[] initiatorHSIds, int siteId, Mailbox mbox, int mailboxId, boolean useSafetyDance) {
+    public RestrictedPriorityQueue(long[] initiatorHSIds, long siteId, Mailbox mbox, int mailboxId, boolean useSafetyDance) {
         m_siteId = siteId;
         m_mailbox = mbox;
         for (long id : initiatorHSIds)
