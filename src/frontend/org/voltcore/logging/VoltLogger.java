@@ -130,7 +130,7 @@ public class VoltLogger {
      */
     public static void configure(String xmlConfig) {
         try {
-            Class<?> loggerClz = Class.forName("org.voltdb.logging.VoltLog4jLogger");
+            Class<?> loggerClz = Class.forName("org.voltcore.logging.VoltLog4jLogger");
             assert(loggerClz != null);
             Method configureMethod = loggerClz.getMethod("configure", String.class);
             configureMethod.invoke(null, xmlConfig);
@@ -150,7 +150,7 @@ public class VoltLogger {
         // try to load the Log4j logger without importing it
         // any exception thrown will just keep going
         try {
-            Class<?> loggerClz = Class.forName("org.voltdb.logging.VoltLog4jLogger");
+            Class<?> loggerClz = Class.forName("org.voltcore.logging.VoltLog4jLogger");
             assert(loggerClz != null);
 
             Constructor<?> constructor = loggerClz.getConstructor(String.class);
