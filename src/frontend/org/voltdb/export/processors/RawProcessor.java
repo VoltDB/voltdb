@@ -251,11 +251,8 @@ public class RawProcessor implements ExportDataProcessor {
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override
-                        public BBContainer serialize(DBBPool p) throws IOException {
-                            // Must account for length prefix - thus "+4",
-                            FastSerializer fs = new FastSerializer(p, r.serializableBytes() + 4);
-                            r.writeToFastSerializer(fs);
-                            return fs.getBBContainer();
+                        public ByteBuffer[] serialize() throws IOException {
+                            return new ByteBuffer[] { r.toBuffer() };
                         }
                         @Override
                         public void cancel() {
@@ -298,11 +295,8 @@ public class RawProcessor implements ExportDataProcessor {
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override
-                        public BBContainer serialize(DBBPool p) throws IOException {
-                            // remember +4 longsword of length prefixing.
-                            FastSerializer fs = new FastSerializer(p, m.serializableBytes() + 4);
-                            m.writeToFastSerializer(fs);
-                            return fs.getBBContainer();
+                        public ByteBuffer[] serialize() throws IOException {
+                            return new ByteBuffer[] { m.toBuffer() };
                         }
                         @Override
                         public void cancel() {
@@ -386,12 +380,6 @@ public class RawProcessor implements ExportDataProcessor {
                     m_sb.closeConnection();
                 }
             });
-        }
-
-        @Override
-        public int getExpectedOutgoingMessageSize() {
-            // roughly 2MB plus the message metadata
-            return (1024 * 1024 * 2) + 128;
         }
 
         @Override
