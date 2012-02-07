@@ -51,8 +51,7 @@ public class VoltDB {
     public static final String[] ZK_HIERARCHY =
         {"/hosts",
          "/hostids",
-         "/ready_hosts",
-         "/mailboxes", "/mailboxes/executionsites"};
+         "/ready_hosts"};
 
     /**
      * Wrapper for crashLocalVoltDB() to keep compatibility with >100 calls.

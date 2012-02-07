@@ -26,6 +26,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+
+import java.lang.Exception;
 import java.lang.management.ManagementFactory;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -59,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -707,7 +710,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         hostLog.l7dlog( Level.TRACE, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { numberOfNodes, leader }, null);
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
-        m_messenger.start();
+
+        try {
+            m_messenger.start();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+
+        createPersistentZKNodes();
 
         if (!isRejoin) {
             m_messenger.waitForGroupJoin(numberOfNodes);
@@ -715,6 +725,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
+    }
+
+    /**
+     * Race to create the persistent nodes.
+     */
+    void createPersistentZKNodes() {
+        String[] pnodes = new String[] {
+            "/mailboxes",
+            "/mailboxes/executionsites",
+            "/catalogbytes"
+        };
+
+        for (int i=0; i < pnodes.length; i++) {
+            try {
+                m_messenger.getZK().create(pnodes[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            } catch (org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException e) {
+                // this is an expected race.
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+        }
     }
 
     HashSet<Integer> rejoinExistingMesh(int numberOfNodes, long deploymentCRC) {

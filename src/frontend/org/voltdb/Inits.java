@@ -208,11 +208,10 @@ public class Inits {
         SetupAdminMode
         StartHTTPServer
         InitHashinator
-        InitAgreementSiteAndStatsAgent
+        InitStatsAgent
         SetupReplicationRole
-
-        CreateRestoreAgentAndPlan <- InitAgreementSiteAndStatsAgent
-        DistributeCatalog <- InitAgreementSiteAndStatsAgent, CreateRestoreAgentAndPlan
+        CreateRestoreAgentAndPlan
+        DistributeCatalog <- CreateRestoreAgentAndPlan
         EnforceLicensing <- CreateRestoreAgentAndPlan, SetupReplicationRole
         LoadCatalog <- DistributeCatalog
         SetupCommandLogging <- LoadCatalog
@@ -230,7 +229,6 @@ public class Inits {
 
     class DistributeCatalog extends InitWork {
         DistributeCatalog() {
-            dependsOn(InitStatsAgent.class);
             dependsOn(CreateRestoreAgentAndPlan.class);
         }
 
@@ -565,7 +563,6 @@ public class Inits {
 
     class CreateRestoreAgentAndPlan extends InitWork {
         public CreateRestoreAgentAndPlan() {
-            dependsOn(InitStatsAgent.class);
         }
 
         @Override
