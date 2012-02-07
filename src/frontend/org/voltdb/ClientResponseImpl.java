@@ -191,7 +191,12 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     }
 
     public int getSerializedSize() {
-        int msgsize = 1 + 8 + 1 + 1 + 1 + 4 + 2;
+        int msgsize = 1 // version
+            + 8 // clientHandle
+            + 1 // present fields
+            + 1 // status
+            + 1 // app status
+            + 4; // cluster roundtrip time
         try {
             if (appStatusString != null) {
                 encodedAppStatusString = appStatusString.getBytes("UTF-8");
@@ -202,7 +207,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
                 msgsize += encodedStatusString.length + 4;
             }
             if (m_exception != null) {
-                msgsize += 4 + m_exception.getSerializedSize();
+                msgsize += m_exception.getSerializedSize();
             }
             for (VoltTable vt : results) {
                 msgsize += vt.getSerializedSize();
