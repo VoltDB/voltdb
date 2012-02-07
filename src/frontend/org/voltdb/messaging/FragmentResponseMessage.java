@@ -195,7 +195,6 @@ public class FragmentResponseMessage extends VoltMessage {
         m_dirty = buf.get() == 0 ? false : true;
         m_recovering = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
-        //assert(m_dependencyCount <= 50);
         for (int i = 0; i < m_dependencyCount; i++)
             m_dependencyIds.add(buf.getInt());
         for (int i = 0; i < m_dependencyCount; i++) {
