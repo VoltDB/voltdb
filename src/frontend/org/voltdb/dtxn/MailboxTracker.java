@@ -77,7 +77,7 @@ public class MailboxTracker {
         Map<Integer, ArrayList<Long>> partitionsToSites = new HashMap<Integer, ArrayList<Long>>();
         Map<Long, Integer> sitesToPartitions = new HashMap<Long, Integer>();
         for (String child : children) {
-            byte[] data = m_zk.getData(child, false, null);
+            byte[] data = m_zk.getData("/mailboxes/executionsites/" + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
             try {
                 long HSId = jsObj.getLong("HSId");
@@ -117,7 +117,7 @@ public class MailboxTracker {
 
         Map<Integer, Long> hostsToPlanners = new HashMap<Integer, Long>();
         for (String child : children) {
-            byte[] data = m_zk.getData(child, false, null);
+            byte[] data = m_zk.getData("/mailboxes/asyncplanners/" + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
             try {
                 long HSId = jsObj.getLong("HSId");
@@ -146,7 +146,7 @@ public class MailboxTracker {
         Map<Integer, ArrayList<Long>> partitionsToInitiators = new HashMap<Integer, ArrayList<Long>>();
         Map<Long, Integer> initiatorsToPartitions = new HashMap<Long, Integer>();
         for (String child : children) {
-            byte[] data = m_zk.getData(child, false, null);
+            byte[] data = m_zk.getData("/mailboxes/initiators/" + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
             try {
                 long HSId = jsObj.getLong("HSId");

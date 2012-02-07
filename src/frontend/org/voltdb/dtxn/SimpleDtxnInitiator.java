@@ -121,7 +121,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_mailbox.setInitiator(this);
     }
 
-
     @Override
     public synchronized boolean createTransaction(
                                   final long connectionId,

@@ -44,6 +44,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Site;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.dtxn.MailboxTracker;
 import org.voltdb.export.ExportManager;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -337,9 +338,11 @@ public class Inits {
             int existingCatalogVersion = 0; // m_rvdb.m_messenger.getDiscoveredCatalogVersion();
 
             m_rvdb.m_serializedCatalog = catalog.serialize();
+            MailboxTracker mailboxTracker = m_rvdb.m_catalogContext.siteTracker.getMailboxTracker();
             m_rvdb.m_catalogContext = new CatalogContext(
                     existingCatalogTxnId,
                     catalog, catalogBytes, m_rvdb.m_depCRC, existingCatalogVersion, -1);
+            m_rvdb.m_catalogContext.siteTracker.setMailboxTracker(mailboxTracker);
         }
     }
 

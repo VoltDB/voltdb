@@ -1001,26 +1001,6 @@ bool VoltDBEngine::initCluster() {
     catalog::Cluster* catalogCluster =
       m_catalog->clusters().get("cluster");
 
-    // Find the partition id for this execution site.
-    map<string, catalog::Site*>::const_iterator site_it;
-    for (site_it = catalogCluster->sites().begin();
-         site_it != catalogCluster->sites().end();
-         site_it++)
-    {
-        catalog::Site *site = site_it->second;
-        assert (site);
-        string sname = site->name();
-        if (atol(sname.c_str()) == m_siteId) {
-            assert(site->partition());
-            string pname = site->partition()->name();
-            m_partitionId = atoi(pname.c_str());
-            break;
-        }
-    }
-
-    // need to update executor context as partitionId wasn't
-    // available when the structure was initially created.
-    m_executorContext->m_partitionId = m_partitionId;
     m_totalPartitions = catalogCluster->partitions().size();
 
     // deal with the epoch

@@ -94,7 +94,7 @@ public class CatalogContext {
         procedures = database.getProcedures();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         sites = cluster.getSites();
-        siteTracker = new SiteTracker(cluster.getSites());
+        siteTracker = new SiteTracker();
         this.deploymentCRC = deploymentCRC;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
 

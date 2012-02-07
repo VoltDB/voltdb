@@ -60,6 +60,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.MailboxTracker;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
@@ -636,11 +637,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
                 new Object[] { String.valueOf(m_siteId) }, null);
 
+        m_context = voltdb.getCatalogContext();
         final int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
         m_recovering = recovering;
-        m_context = voltdb.getCatalogContext();
         //lastCommittedTxnId = txnId;
         for (Integer failedHostId : failedHostIds) {
             m_knownFailedSites.addAll(m_context.siteTracker.getAllSitesForHost(failedHostId));
@@ -762,18 +763,18 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     initializeEE(BackendTarget target, String serializedCatalog, final long txnId)
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
+        MailboxTracker mailboxTracker = VoltDB.instance().getCatalogContext().siteTracker.getMailboxTracker();
 
         ExecutionEngine eeTemp = null;
         try {
             if (target == BackendTarget.NATIVE_EE_JNI) {
-                Site site = getCatalogSite();
                 eeTemp =
                     new ExecutionEngineJNI(
                         this,
                         m_context.cluster.getRelativeIndex(),
                         getSiteId(),
-                        Integer.valueOf(site.getPartition().getTypeName()),
-                        Integer.valueOf(site.getHost().getTypeName()),
+                        mailboxTracker.getPartitionForSite(getSiteId()),
+                        MailboxTracker.getHostForHSId(getSiteId()),
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize());
@@ -783,14 +784,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             }
             else {
                 // set up the EE over IPC
-                Site site = getCatalogSite();
                 eeTemp =
                     new ExecutionEngineIPC(
                             this,
                             m_context.cluster.getRelativeIndex(),
                             getSiteId(),
-                            Integer.valueOf(site.getPartition().getTypeName()),
-                            Integer.valueOf(site.getHost().getTypeName()),
+                            mailboxTracker.getPartitionForSite(getSiteId()),
+                            MailboxTracker.getHostForHSId(getSiteId()),
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),

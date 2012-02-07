@@ -102,7 +102,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
@@ -300,6 +299,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
+            m_faultManager = new FaultDistributor(this);
 
             // do the many init tasks in the Inits class
             Inits inits = new Inits(this, 1);
@@ -334,7 +334,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              */
             Long siteForThisThread = null;
             m_currentThreadSite = null;
-            for (long site : m_catalogContext.siteTracker.getAllLiveSites()) {
+            Mailbox localThreadMailbox = siteMailboxes.poll();
+            for (Mailbox mailbox : siteMailboxes) {
+                long site = mailbox.getHSId();
                 int sitesHostId = MailboxTracker.getHostForHSId(site);
 
                 // start a local site
@@ -343,7 +345,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         siteForThisThread = site;
                     } else {
                         ExecutionSiteRunner runner =
-                                new ExecutionSiteRunner(siteMailboxes.poll(),
+                                new ExecutionSiteRunner(mailbox,
                                                         m_catalogContext,
                                                         m_serializedCatalog,
                                                         m_recovering,
@@ -367,7 +369,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 long siteId = siteForThisThread;
                 ExecutionSite siteObj =
                         new ExecutionSite(VoltDB.instance(),
-                                          siteMailboxes.poll(),
+                                          localThreadMailbox,
                                           m_serializedCatalog,
                                           null,
                                           m_recovering,
@@ -399,36 +401,34 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Create the client interface
             int portOffset = 0;
-            for (long site : m_catalogContext.siteTracker.getMailboxTracker().getAllInitiators()) {
-                int siteHostId = MailboxTracker.getHostForHSId(site);
-
+            // TODO: fix
+            //for (long site : m_catalogContext.siteTracker.getMailboxTracker().getAllInitiators()) {
+            for (int i = 0; i < 1; i++) {
                 // create DTXN and CI for each local non-EE site
-                if ((siteHostId == m_myHostId)) {
-                    SimpleDtxnInitiator initiator =
+                SimpleDtxnInitiator initiator =
                         new SimpleDtxnInitiator(
-                                m_catalogContext,
-                                m_messenger,
-                                m_myHostId,
-                                siteHostId,
-                                m_config.m_timestampTestingSalt);
+                                                m_catalogContext,
+                                                m_messenger,
+                                                m_myHostId,
+                                                m_myHostId, // fake initiator ID
+                                                m_config.m_timestampTestingSalt);
 
-                    try {
-                        ClientInterface ci =
-                                ClientInterface.create(m_messenger,
-                                                       m_catalogContext,
-                                                       m_replicationRole,
-                                                       initiator,
-                                                       m_catalogContext.numberOfNodes,
-                                                       config.m_port + portOffset,
-                                                       config.m_adminPort + portOffset,
-                                                       m_config.m_timestampTestingSalt);
-                        m_clientInterfaces.add(ci);
-                    } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                    }
-                    portOffset += 2;
-                    m_dtxns.add(initiator);
+                try {
+                    ClientInterface ci =
+                            ClientInterface.create(m_messenger,
+                                                   m_catalogContext,
+                                                   m_replicationRole,
+                                                   initiator,
+                                                   m_catalogContext.numberOfNodes,
+                                                   config.m_port + portOffset,
+                                                   config.m_adminPort + portOffset,
+                                                   m_config.m_timestampTestingSalt);
+                    m_clientInterfaces.add(ci);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
+                portOffset += 2;
+                m_dtxns.add(initiator);
             }
 
             m_partitionCountStats = new PartitionCountStats( m_catalogContext.numberOfPartitions);

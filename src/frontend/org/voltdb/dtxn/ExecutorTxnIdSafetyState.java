@@ -23,9 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Site;
-
 public class ExecutorTxnIdSafetyState {
 
     private class PartitionState {
@@ -89,17 +86,10 @@ public class ExecutorTxnIdSafetyState {
     public ExecutorTxnIdSafetyState(SiteTracker tracker) {
         Set<Long> execSites = tracker.getExecutionSiteIds();
         for (long id : execSites) {
-            Site s = tracker.getSiteForId(id);
-
-            Partition p = s.getPartition();
-            assert(p != null);
-            int partitionId = Integer.parseInt(p.getTypeName());
+            int partitionId = tracker.getMailboxTracker().getPartitionForSite(id);
 
             // note the site to partition mapping, even if down
             m_stateToPartitionMap.put(id, partitionId);
-
-            // ignore down sites
-            if (!s.getIsup()) continue;
 
             SiteState ss = new SiteState();
             ss.hsId = id;

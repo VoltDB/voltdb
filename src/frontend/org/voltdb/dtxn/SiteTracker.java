@@ -71,134 +71,14 @@ public class SiteTracker {
 
     Set<Integer> m_downHostIds = new TreeSet<Integer>();
 
-    private final Site m_allSites[];
-
-    private final long[] m_firstNonExecSiteForHost;
-
-    private final long[][] m_remoteHeartbeatTargets;
-
-    // scratch value used to compute the out of date sites
-    long[] m_tempOldSitesScratch = null;
-
-    private final HashMap<Long, long[]> m_upExecutionSitesExcludingSite =
-        new HashMap<Long, long[]>();
-
     /**
      * Given topology info, initialize all of this class's data structures.
      *
      * @param clusterSites a CatalogMap containing all the sites in the cluster
      */
-    public SiteTracker(CatalogMap<Site> clusterSites)
+    public SiteTracker()
     {
-        ArrayList<Site> allSites = new ArrayList<Site>();
-        m_sites = clusterSites;
-        for (Site site : clusterSites)
-        {
-            long siteId = Integer.parseInt(site.getTypeName());
-            allSites.add(site);
-            int hostId = Integer.parseInt(site.getHost().getTypeName());
-            if (!m_hostsToSites.containsKey(hostId))
-            {
-                m_hostsToSites.put(hostId, new ArrayList<Long>());
-            }
-            m_hostsToSites.get(hostId).add(siteId);
-            if (!m_nonExecSitesForHost.containsKey(hostId)) {
-                m_nonExecSitesForHost.put(hostId, new HashSet<Long>());
-            }
 
-            // don't put non-exec (has ee) sites in the list.
-            if (site.getIsexec() == false)
-            {
-                m_nonExecSitesForHost.get(hostId).add(siteId);
-                if (site.getIsup())
-                {
-                    m_liveHostIds.add(hostId);
-                    m_liveInitiatorCount++;
-                } else {
-                    m_downHostIds.add(hostId);
-                }
-            }
-            else
-            {
-                int partitionId = Integer.parseInt(site.getPartition().getTypeName());
-
-                m_sitesToPartitions.put(siteId, partitionId);
-                if (!m_partitionsToSites.containsKey(partitionId))
-                {
-                    m_partitionsToSites.put(partitionId,
-                                            new ArrayList<Long>());
-                }
-                m_partitionsToSites.get(partitionId).add(siteId);
-
-                if (!m_partitionsToLiveSites.containsKey(partitionId))
-                {
-                    m_partitionsToLiveSites.put(partitionId,
-                                                new ArrayList<Long>());
-                }
-                if (site.getIsup() == true)
-                {
-                    m_liveSiteCount++;
-                    m_partitionsToLiveSites.get(partitionId).add(siteId);
-                } else {
-                    m_downHostIds.add(hostId);
-                }
-            }
-        }
-        m_allSites = new Site[allSites.size()];
-        for (int ii = 0; ii < m_allSites.length; ii++) {
-            m_allSites[ii] = allSites.get(ii);
-        }
-        m_tempOldSitesScratch = new long[m_sites.size()];
-
-        for (long siteId : m_sitesToPartitions.keySet()) {
-            if (getSiteForId(siteId).getIsup()) {
-                m_lastHeartbeatTime.put(siteId, -1L);
-            }
-        }
-
-        /*
-         *  Calculate exec sites for each up host, these will be the heartbeat targets
-         */
-        HashMap<Integer, ArrayList<Long>> upHostsToExecSites = new HashMap<Integer, ArrayList<Long>>();
-        for (Integer host : m_liveHostIds) {
-            ArrayList<Long> sites = new ArrayList<Long>(m_hostsToSites.get(host));
-            sites.removeAll(m_nonExecSitesForHost.get(host));
-            upHostsToExecSites.put( host, sites);
-        }
-
-        /*
-         * Local heartbeat targets go in a separate array, get individual messages delivery locally
-         */
-        int myHostId = 0;
-        if (VoltDB.instance() != null) {
-            if (VoltDB.instance().getMessenger() != null) {
-                myHostId = VoltDB.instance().getHostMessenger().getHostId();
-            }
-        }
-
-        int ii = 0;
-        int numHosts = upHostsToExecSites.size();
-        if (numHosts < 2) {
-            m_remoteHeartbeatTargets = new long[0][];
-        } else {
-            m_remoteHeartbeatTargets = new long[upHostsToExecSites.size() - 1][];
-        }
-        for (Map.Entry<Integer, ArrayList<Long>> entry : upHostsToExecSites.entrySet()) {
-            if (entry.getKey() == myHostId) {
-            } else {
-                m_remoteHeartbeatTargets[ii++] = longListToArray(entry.getValue());
-            }
-        }
-        m_firstNonExecSiteForHost = new long[m_hostsToSites.size()];
-        java.util.Arrays.fill(m_firstNonExecSiteForHost, -1);
-        for (ii = 0; ii < m_firstNonExecSiteForHost.length; ii++) {
-            List<Long> set = getNonExecSitesForHost(ii);
-            if (set != null) {
-                if (set.iterator().hasNext()) {
-                    m_firstNonExecSiteForHost[ii] = set.iterator().next();
-                }
-            }
-        }
     }
 
     private long[] longListToArray(List<Long> longs) {

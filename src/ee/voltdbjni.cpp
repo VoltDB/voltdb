@@ -93,7 +93,7 @@
 #include <jni.h>
 
 #include "org_voltdb_jni_ExecutionEngine.h" // the header file output by javah
-#include "org_voltdb_utils_DBBPool.h" //Utility method for DBBContainer
+#include "org_voltcore_utils_DBBPool.h" //Utility method for DBBContainer
 
 #include "boost/shared_ptr.hpp"
 #include "boost/scoped_array.hpp"
@@ -715,7 +715,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
 }
 
 /*
- * Class:     org_voltdb_utils_DBBPool
+ * Class:     org_voltcore_utils_DBBPool
  * Method:    getBufferAddress
  * Signature: (Ljava/nio/ByteBuffer;)J
  *
@@ -725,7 +725,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
  * @param buffer DirectByteBuffer
  * @return Native address of the DirectByteBuffer as a long
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_DBBPool_getBufferAddress
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getBufferAddress
   (JNIEnv *env, jclass clazz, jobject buffer)
 {
     void *address = env->GetDirectBufferAddress(buffer);
@@ -738,11 +738,11 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_DBBPool_getBufferAddress
 }
 
 /*
- * Class:     org_voltdb_utils_DBBPool
+ * Class:     org_voltcore_utils_DBBPool
  * Method:    getBufferCRC32
  * Signature: (Ljava/nio/ByteBuffer;II)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getBufferCRC32
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32
   (JNIEnv *env, jclass clazz, jobject buffer, jint offset, jint length) {
     char *address = reinterpret_cast<char*>(env->GetDirectBufferAddress(buffer));
     if (env->ExceptionCheck()) {
@@ -756,11 +756,11 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getBufferCRC32
 }
 
 /*
- * Class:     org_voltdb_utils_DBBPool
+ * Class:     org_voltcore_utils_DBBPool
  * Method:    getBufferCRC32
  * Signature: (Ljava/nio/ByteBuffer;II)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getCRC32
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32
   (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
     char *address = reinterpret_cast<char*>(ptr);
     assert(address);
@@ -1212,11 +1212,11 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetR
 }
 
 /*
- * Class:     org_voltdb_utils_DBBPool
+ * Class:     org_voltcore_utils_DBBPool
  * Method:    deleteCharArrayMemory
  * Signature: (J)V
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_utils_DBBPool_deleteCharArrayMemory
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_deleteCharArrayMemory
   (JNIEnv *env, jclass clazz, jlong ptr) {
     delete[] reinterpret_cast<char*>(ptr);
 }
