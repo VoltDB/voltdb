@@ -270,10 +270,10 @@ public class SnapshotRestore extends VoltSystemProcedure
 
             // Choose the lowest site ID on this host to truncate export data
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
+            Long lowest_hs_id =
                     VoltDB.instance().getCatalogContext().siteTracker.
                     getLowestLiveExecSiteIdForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
                 ExportManager.instance().
                 truncateExportToTxnId(snapshotTxnId);
@@ -357,10 +357,10 @@ public class SnapshotRestore extends VoltSystemProcedure
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
+            Long lowest_hs_id =
                     VoltDB.instance().getCatalogContext().siteTracker.
                     getLowestLiveExecSiteIdForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
                 try {
                     // implicitly synchronized by the way restore operates.
@@ -416,10 +416,10 @@ public class SnapshotRestore extends VoltSystemProcedure
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
+            Long lowest_hs_id =
                     VoltDB.instance().getCatalogContext().siteTracker.
                     getLowestLiveExecSiteIdForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
                 // implicitly synchronized by the way restore operates.
                 // this scan must complete on every site and return results
