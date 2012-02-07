@@ -469,7 +469,7 @@ public class VoltDB {
             return;
         }
         try {
-            ((HostMessenger) instance().getMessenger()).sendPoisonPill(errMsg);
+            // ((HostMessenger) instance().getMessenger()).sendPoisonPill(errMsg);
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -468,17 +468,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (m_commandLog != null && isRejoin) {
                 m_commandLog.initForRejoin(
                         m_catalogContext, Long.MIN_VALUE,
-                        m_messenger.getDiscoveredFaultSequenceNumber(),
+                        0,
+                        // m_messenger.getDiscoveredFaultSequenceNumber(),
                         m_downSites);
             }
 
-            // tell other booting nodes that this node is ready. Primary purpose is to publish a hostname
-            m_messenger.sendReadyMessage();
+            try {
+                // announce that this node has completed initialization.
+                m_messenger.getZK().create("/readyhosts/host", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
 
-            // only needs to be done if this is an initial cluster startup, not a rejoin
-            if (config.m_rejoinToHostAndPort == null) {
-                // wait for all nodes to be ready
-                m_messenger.waitForAllHostsToBeReady();
+                // only needs to be done if this is an initial cluster startup, not a rejoin
+                if (config.m_rejoinToHostAndPort == null) {
+                    List<String> readyhosts = null;
+                    do {
+                        readyhosts = m_messenger.getZK().getChildren("/readyhosts", false);
+                    } while (readyhosts.size() < m_deployment.getCluster().getHostcount());
+                }
+            } catch (Exception e) {
+                hostLog.fatal("Failed to announce ready state.");
+                VoltDB.crashVoltDB();
             }
 
             heartbeatThread = new HeartbeatThread(m_clientInterfaces);
@@ -730,7 +738,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     void createPersistentZKNodes() {
         String[] pnodes = new String[] {
             "/mailboxes",
-            "/mailboxes/executionsites"
+            "/mailboxes/executionsites",
+            "/readyhosts"
         };
 
         for (int i=0; i < pnodes.length; i++) {
@@ -1205,50 +1214,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             int portToConnect,
             Set<Integer> liveHosts)
     {
-        // another site already did this work.
-        if (currentTxnId == lastNodeRejoinPrepare_txnId) {
-            return null;
-        }
-        else if (currentTxnId < lastNodeRejoinPrepare_txnId) {
-            throw new RuntimeException("Trying to rejoin (prepare) with an old transaction.");
-        }
-
-        // get the contents of the catalog for the rejoining node
-        byte[] catalogBytes = null;
-        try {
-            catalogBytes = m_catalogContext.getCatalogJarBytes();
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        // connect to the joining node, build a foreign host
-        InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
-        String ipAddr = addr.getAddress().toString();
-
-        recoveryLog.info("Rejoining node with host id: " + rejoinHostId +
-                         ", hostname: " + ipAddr +
-                         " at txnid: " + currentTxnId);
-        lastNodeRejoinPrepare_txnId = currentTxnId;
-
-        HostMessenger messenger = getHostMessenger();
-
-        // connect to the joining node, build a foreign host
-        try {
-            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, 0,
-                    m_catalogContext.deploymentCRC, liveHosts, m_commandLog.getFaultSequenceNumber(),
-                    m_catalogContext.catalogVersion, m_catalogContext.m_transactionId, catalogBytes);
-            return null;
-        } catch (Exception e) {
-            //e.printStackTrace();
-            return e.getMessage() == null ? e.getClass().getName() : e.getMessage();
-        }
+        return lastNodeRejoinPrepare_txnId.toString();
     }
 
     /** Last transaction ID at which the rejoin commit took place.
      * Also, use the intrinsic lock to safeguard access from multiple
      * execution site threads */
-    private static Long lastNodeRejoinFinish_txnId = 0L;
+    // private static Long lastNodeRejoinFinish_txnId = 0L;
     @Override
     public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
         throw new UnsupportedOperationException();
