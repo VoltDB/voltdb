@@ -88,7 +88,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public ExecutionEngineJNI(
             final ExecutionSite site,
             final int clusterIndex,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             final int hostId,
             final String hostname,

@@ -38,7 +38,7 @@ class TupleStreamWrapper {
 public:
     enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId);
+    TupleStreamWrapper(CatalogId partitionId, int64_t siteId);
 
     ~TupleStreamWrapper() {
         cleanupManagedBuffers();

@@ -157,7 +157,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
 
 bool
 VoltDBEngine::initialize(int32_t clusterIndex,
-                         int32_t siteId,
+                         int64_t siteId,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
@@ -1010,7 +1010,7 @@ bool VoltDBEngine::initCluster() {
         catalog::Site *site = site_it->second;
         assert (site);
         string sname = site->name();
-        if (atoi(sname.c_str()) == m_siteId) {
+        if (atol(sname.c_str()) == m_siteId) {
             assert(site->partition());
             string pname = site->partition()->name();
             m_partitionId = atoi(pname.c_str());

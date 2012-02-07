@@ -250,7 +250,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     JNIEnv *env, jobject obj,
     jlong enginePtr,
     jint clusterIndex,
-    jint siteId,
+    jlong siteId,
     jint partitionId,
     jint hostId,
     jstring hostname,

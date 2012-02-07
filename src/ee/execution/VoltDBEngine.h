@@ -140,7 +140,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }
-        inline int32_t getSiteId() const { return m_siteId; }
+        inline int64_t getSiteId() const { return m_siteId; }
 
         // ------------------------------------------------------------------
         // OBJECT ACCESS FUNCTIONS
@@ -424,7 +424,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
-        int32_t m_siteId;
+        int64_t m_siteId;
         int32_t m_partitionId;
         int32_t m_clusterIndex;
         int m_totalPartitions;

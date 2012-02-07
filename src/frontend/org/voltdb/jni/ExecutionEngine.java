@@ -424,7 +424,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native int nativeInitialize(
             long pointer,
             int clusterIndex,
-            int siteId,
+            long siteId,
             int partitionId,
             int hostId,
             String hostname,
