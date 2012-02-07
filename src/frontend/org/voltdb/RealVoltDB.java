@@ -469,16 +469,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             try {
-                // announce that this node has completed initialization.
-                m_messenger.getZK().create("/readyhosts/host", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-
-                // only needs to be done if this is an initial cluster startup, not a rejoin
-                if (config.m_rejoinToHostAndPort == null) {
-                    List<String> readyhosts = null;
-                    do {
-                        readyhosts = m_messenger.getZK().getChildren("/readyhosts", false);
-                    } while (readyhosts.size() < m_deployment.getCluster().getHostcount());
-                }
+                m_messenger.waitForAllHostsToBeReady(m_deployment.getCluster().getHostcount());
             } catch (Exception e) {
                 hostLog.fatal("Failed to announce ready state.");
                 VoltDB.crashVoltDB();
