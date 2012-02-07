@@ -135,6 +135,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
         m_lastSafeTxnID = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
+        m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
     }
 
