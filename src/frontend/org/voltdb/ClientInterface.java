@@ -805,7 +805,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * settings.
      */
     public static ClientInterface create(
-            VoltNetworkPool network,
             HostMessenger messenger,
             CatalogContext context,
             ReplicationRole replicationRole,
@@ -829,7 +828,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, network, replicationRole, siteId, initiator, allPartitions);
+           port, adminPort, context, messenger.getNetwork(), replicationRole, siteId, initiator, allPartitions);
 
         initiator.setClientInterface(ci);
         return ci;
@@ -938,7 +937,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
     public void initializeSnapshotDaemon() {
-        m_snapshotDaemon.init(this, VoltDB.instance().getZK());
+        m_snapshotDaemon.init(this, VoltDB.instance().getMessenger().getZK());
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID

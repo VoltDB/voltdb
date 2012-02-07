@@ -21,7 +21,6 @@ import java.util.HashSet;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.Messenger;
 import org.voltcore.logging.VoltLogger;
 
 /**

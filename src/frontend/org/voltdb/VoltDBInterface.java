@@ -75,7 +75,6 @@ public interface VoltDBInterface
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
     public Map<Integer, ExecutionSite> getLocalSites();
-    public VoltNetworkPool getNetwork();
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
     public FaultDistributorInterface getFaultDistributor();
@@ -184,8 +183,6 @@ public interface VoltDBInterface
      * @return The operational mode this server is in
      */
     public OperationMode getMode();
-
-    ZooKeeper getZK();
 
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
 

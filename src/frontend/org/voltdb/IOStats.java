@@ -88,7 +88,11 @@ public class IOStats extends StatsSource {
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        m_ioStats = VoltDB.instance().getNetwork().getIOStats(interval);
+        try {
+            m_ioStats = VoltDB.instance().getMessenger().getNetwork().getIOStats(interval);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         return new DummyIterator(m_ioStats.keySet().iterator());
     }
 }

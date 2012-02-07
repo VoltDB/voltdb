@@ -316,25 +316,29 @@ public class Statistics extends VoltSystemProcedure {
                 final boolean interval =
                     ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
                 final Long now = (Long)params.toArray()[1];
-                final Map<Long, Pair<String,long[]>> stats =
-                    VoltDB.instance().getNetwork().getIOStats(interval);
+                try {
+                    final Map<Long, Pair<String,long[]>> stats =
+                        VoltDB.instance().getMessenger().getNetwork().getIOStats(interval);
 
-                final Integer hostId = VoltDB.instance().getHostMessenger().getHostId();
-                final String hostname = VoltDB.instance().getHostMessenger().getHostname();
-                for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {
-                    final Long connectionId = e.getKey();
-                    final String remoteHostname = e.getValue().getFirst();
-                    final long counters[] = e.getValue().getSecond();
-                    result.addRow(
-                                  now,
-                                  hostId,
-                                  hostname,
-                                  connectionId,
-                                  remoteHostname,
-                                  counters[0],
-                                  counters[1],
-                                  counters[2],
-                                  counters[3]);
+                    final Integer hostId = VoltDB.instance().getHostMessenger().getHostId();
+                    final String hostname = VoltDB.instance().getHostMessenger().getHostname();
+                    for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {
+                        final Long connectionId = e.getKey();
+                        final String remoteHostname = e.getValue().getFirst();
+                        final long counters[] = e.getValue().getSecond();
+                        result.addRow(
+                                      now,
+                                      hostId,
+                                      hostname,
+                                      connectionId,
+                                      remoteHostname,
+                                      counters[0],
+                                      counters[1],
+                                      counters[2],
+                                      counters[3]);
+                    }
+                } catch (Exception e) {
+                    HOST_LOG.warn("Error retrieving stats", e);
                 }
             }
             return new DependencyPair(DEP_ioData, result);

@@ -91,7 +91,6 @@ import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.Messenger;
 
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.CatalogUtil;

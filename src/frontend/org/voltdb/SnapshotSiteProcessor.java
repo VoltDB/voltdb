@@ -451,7 +451,7 @@ public class SnapshotSiteProcessor {
 
 
     private static void logSnapshotCompleteToZK(long txnId, int numHosts, boolean snapshotSuccess) {
-        ZooKeeper zk = VoltDB.instance().getZK();
+        ZooKeeper zk = VoltDB.instance().getMessenger().getZK();
 
         final String snapshotPath = "/completed_snapshots/" + txnId;
         boolean success = false;
@@ -519,7 +519,7 @@ public class SnapshotSiteProcessor {
         }
 
         try {
-            VoltDB.instance().getZK().delete(
+            VoltDB.instance().getMessenger().getZK().delete(
                     "/nodes_currently_snapshotting/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
         } catch (NoNodeException e) {
             hostLog.warn("Expect the snapshot node to already exist during deletion", e);
