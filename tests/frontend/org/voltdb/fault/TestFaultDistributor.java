@@ -243,9 +243,9 @@ public class TestFaultDistributor extends TestCase
         voltdb.killSite(100);
         voltdb.killSite(1000);
 
-        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
-        failedSiteIds.add(100);
-        failedSiteIds.add(1000);
+        HashSet<Long> failedSiteIds = new HashSet<Long>();
+        failedSiteIds.add(100l);
+        failedSiteIds.add(1000l);
 
         // should get a PPD now.
         PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
@@ -277,9 +277,9 @@ public class TestFaultDistributor extends TestCase
         voltdb.killSite(101);
         voltdb.killSite(1010);
 
-        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
-        failedSiteIds.add(101);
-        failedSiteIds.add(1010);
+        HashSet<Long> failedSiteIds = new HashSet<Long>();
+        failedSiteIds.add(101l);
+        failedSiteIds.add(1010l);
 
         // should get a PPD now.
         PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
