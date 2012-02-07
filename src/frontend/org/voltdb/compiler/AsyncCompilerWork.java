@@ -23,7 +23,6 @@ public class AsyncCompilerWork implements Serializable {
     private static final long serialVersionUID = 6588086204761949082L;
 
     final int replySiteId;
-    final int replyMailboxId;
 
     final boolean shouldShutdown;
     final long clientHandle;
@@ -32,13 +31,11 @@ public class AsyncCompilerWork implements Serializable {
     final boolean adminConnection;
     final transient public Object clientData;
 
-    public AsyncCompilerWork(int replySiteId, int replyMailboxId,
-            boolean shouldShutdown, long clientHandle,
+    public AsyncCompilerWork(int replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection,
             Object clientData)
     {
         this.replySiteId = replySiteId;
-        this.replyMailboxId = replyMailboxId;
         this.shouldShutdown = shouldShutdown;
         this.clientHandle = clientHandle;
         this.connectionId = connectionId;

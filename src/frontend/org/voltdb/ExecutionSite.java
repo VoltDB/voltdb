@@ -754,7 +754,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 initiatorIds,
                 siteId,
                 m_mailbox,
-                VoltDB.DTXN_MAILBOX_ID,
                 useSafetyDance);
         return retval;
     }

@@ -17,12 +17,10 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
-import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -36,11 +34,8 @@ import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException.*;
-import org.apache.zookeeper_voltpatches.ZooDefs;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 
-import org.voltcore.agreement.AgreementSite;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;

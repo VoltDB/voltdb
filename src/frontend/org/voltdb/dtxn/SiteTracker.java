@@ -64,15 +64,10 @@ public class SiteTracker {
     Map<Integer, ArrayList<Long>> m_hostsToSites =
         new HashMap<Integer, ArrayList<Long>>();
 
-    Map<Long, Integer> m_sitesToHost =
-        new HashMap<Long, Integer>();
-
     Map<Integer, HashSet<Long>> m_nonExecSitesForHost = new HashMap<Integer, HashSet<Long>>();
 
     // maps <site:timestamp> of the last message sent to each sites
     HashMap<Long, Long> m_lastHeartbeatTime = new HashMap<Long, Long>();
-
-    Set<Long> m_liveSiteIds = new TreeSet<Long>();
 
     Set<Integer> m_liveHostIds = new TreeSet<Integer>();
 
@@ -106,7 +101,6 @@ public class SiteTracker {
             long siteId = Integer.parseInt(site.getTypeName());
             allSites.add(site);
             int hostId = Integer.parseInt(site.getHost().getTypeName());
-            m_sitesToHost.put(siteId, hostId);
             if (!m_hostsToSites.containsKey(hostId))
             {
                 m_hostsToSites.put(hostId, new ArrayList<Long>());
@@ -122,7 +116,6 @@ public class SiteTracker {
                 m_nonExecSitesForHost.get(hostId).add(siteId);
                 if (site.getIsup())
                 {
-                    m_liveSiteIds.add(siteId);
                     m_liveHostIds.add(hostId);
                     m_liveInitiatorCount++;
                 } else {
@@ -149,7 +142,6 @@ public class SiteTracker {
                 if (site.getIsup() == true)
                 {
                     m_liveSiteCount++;
-                    m_liveSiteIds.add(siteId);
                     m_partitionsToLiveSites.get(partitionId).add(siteId);
                 } else {
                     m_downHostIds.add(hostId);
@@ -229,7 +221,7 @@ public class SiteTracker {
     }
 
     public Set<Integer> getAllLiveHosts() {
-        return m_liveHostIds;
+        return m_mailboxTracker.getAllHosts();
     }
 
     public Set<Integer> getAllDownHosts() {
@@ -600,5 +592,9 @@ public class SiteTracker {
 
     public void setMailboxTracker(MailboxTracker mailboxTracker) {
         m_mailboxTracker = mailboxTracker;
+    }
+
+    public MailboxTracker getMailboxTracker() {
+        return m_mailboxTracker;
     }
 }

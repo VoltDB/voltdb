@@ -125,7 +125,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * are later referenced that aren't in this list, trip
      * an assertion.
      */
-    public RestrictedPriorityQueue(long[] initiatorHSIds, long siteId, Mailbox mbox, int mailboxId, boolean useSafetyDance) {
+    public RestrictedPriorityQueue(long[] initiatorHSIds, long siteId, Mailbox mbox, boolean useSafetyDance) {
         m_siteId = siteId;
         m_mailbox = mbox;
         for (long id : initiatorHSIds)

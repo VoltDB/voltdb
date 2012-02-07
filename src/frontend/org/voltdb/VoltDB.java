@@ -27,8 +27,6 @@ import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
 
-import org.voltcore.messaging.HostMessenger;
-
 /**
  * VoltDB provides main() for the VoltDB server
  */
@@ -43,11 +41,6 @@ public class VoltDB {
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
     public static final int INITIATOR_SITE_ID = 0;
-    public static final int DTXN_MAILBOX_ID = 0;
-    public static final int AGREEMENT_MAILBOX_ID = 1;
-    public static final int STATS_MAILBOX_ID = 2;
-    public static final int ASYNC_COMPILER_MAILBOX_ID = 3;
-    public static final int CLIENT_INTERFACE_MAILBOX_ID = 4;
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 

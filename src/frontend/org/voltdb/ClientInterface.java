@@ -1026,7 +1026,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         LocalObjectMessage work = new LocalObjectMessage(
                 new AdHocPlannerWork(
-                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                    m_siteId,
                     false, task.clientHandle, handler.connectionId(),
                     handler.m_hostname, handler.isAdmin(), ccxn,
                     sql, partitionParam));
@@ -1056,7 +1056,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
-                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                    m_siteId,
                     task.clientHandle, handler.connectionId(), handler.m_hostname,
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString));
 
@@ -1314,7 +1314,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         LocalObjectMessage work = new LocalObjectMessage(
                                 new AdHocPlannerWork(
-                                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                                    m_siteId,
                                     false, plannedStmt.clientHandle, plannedStmt.connectionId,
                                     plannedStmt.hostname, plannedStmt.adminConnection, plannedStmt.clientData,
                                     plannedStmt.sql, plannedStmt.partitionParam));

@@ -185,6 +185,12 @@ public class MailboxTracker {
         return m_partitionsToInitiators.get(partitionId);
     }
 
+    public Set<Integer> getAllHosts() {
+        HashSet<Integer> hosts = new HashSet<Integer>();
+        hosts.addAll(m_hostsToSites.keySet());
+        return hosts;
+    }
+
     public Set<Long> getAllSites() {
         HashSet<Long> sites = new HashSet<Long>();
         for (Collection<Long> values : m_hostsToSites.values()) {

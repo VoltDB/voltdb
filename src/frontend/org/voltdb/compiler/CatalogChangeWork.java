@@ -24,13 +24,12 @@ public class CatalogChangeWork extends AsyncCompilerWork {
     final String deploymentString;
 
     public CatalogChangeWork(
-            int replySiteId, int replyMailboxId,
+            int replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
             Object clientData, byte[] catalogBytes, String deploymentString)
     {
-        super(replySiteId, replyMailboxId,
-                false, clientHandle, connectionId, hostname,
-                adminConnection, clientData);
+        super(replySiteId, false, clientHandle, connectionId, hostname,
+              adminConnection, clientData);
         this.catalogBytes = catalogBytes.clone();
         this.deploymentString = deploymentString;
     }
