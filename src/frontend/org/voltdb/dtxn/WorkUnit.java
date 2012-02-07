@@ -44,7 +44,7 @@ class WorkUnit
 {
     class DependencyTracker
     {
-        HashMap<Integer, VoltTable> m_results;
+        HashMap<Long, VoltTable> m_results;
         int m_depId;
         int m_expectedDeps;
         HashSet<Long> m_expectedSites;
@@ -53,12 +53,12 @@ class WorkUnit
                           HashSet<Long> expectedSites)
         {
             m_depId = depId;
-            m_results = new HashMap<Integer, VoltTable>();
+            m_results = new HashMap<Long, VoltTable>();
             m_expectedDeps = expectedDeps;
             m_expectedSites = expectedSites;
         }
 
-        boolean addResult(long siteId, int mapId, VoltTable result)
+        boolean addResult(long HSId, long mapId, VoltTable result)
         {
             boolean retval = true;
             if (!(m_results.containsKey(mapId)))
@@ -72,7 +72,7 @@ class WorkUnit
                     retval = false;
                 }
             }
-            m_expectedSites.remove(siteId);
+            m_expectedSites.remove(HSId);
             m_expectedDeps--;
             return retval;
         }
@@ -80,12 +80,12 @@ class WorkUnit
         /**
          * Dependencies from recovering sites use this.
          */
-        void addDummyResult(long siteId, int mapId) {
-            m_expectedSites.remove(siteId);
+        void addDummyResult(long HSId) {
+            m_expectedSites.remove(HSId);
             m_expectedDeps--;
         }
 
-        void removeSite(long siteId)
+        void removeSite(long HSId)
         {
             // This is a really horrible hack to work around the fact that
             // we don't know the set of remote sites from which to expect
@@ -97,9 +97,9 @@ class WorkUnit
             // not handle site failures (yet).
             if ((m_depId & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0)
             {
-                if (m_expectedSites.contains(siteId))
+                if (m_expectedSites.contains(HSId))
                 {
-                    m_expectedSites.remove(siteId);
+                    m_expectedSites.remove(HSId);
                 }
             }
         }
@@ -121,7 +121,7 @@ class WorkUnit
             }
         }
 
-        VoltTable getResult(int mapId)
+        VoltTable getResult(long mapId)
         {
             return m_results.get(mapId);
         }
@@ -238,8 +238,8 @@ class WorkUnit
     }
 
     WorkUnit(SiteTracker siteTracker, VoltMessage payload,
-             int[] dependencyIds, long siteId,
-             long[] nonCoordinatingSiteIds,
+             int[] dependencyIds, long HSId,
+             long[] nonCoordinatingHSIds,
              boolean shouldResumeProcedure)
     {
         this.m_payload = payload;
@@ -254,12 +254,12 @@ class WorkUnit
             for (int dependency : dependencyIds) {
                 int depsToExpect = 1;
                 HashSet<Long> expected_sites = new HashSet<Long>();
-                expected_sites.add(siteId);
+                expected_sites.add(HSId);
                 if ((dependency & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0) {
                     depsToExpect = siteTracker.getLiveSiteCount();
-                    for (Long site_id : nonCoordinatingSiteIds)
+                    for (Long hs_id : nonCoordinatingHSIds)
                     {
-                        expected_sites.add(site_id);
+                        expected_sites.add(hs_id);
                     }
                 }
                 m_dependencies.put(dependency,
@@ -270,17 +270,17 @@ class WorkUnit
         }
     }
 
-    void putDependency(int dependencyId, long siteId, VoltTable payload) {
+    void putDependency(int dependencyId, long HSId, VoltTable payload) {
         assert payload != null;
         assert m_dependencies != null;
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
 
-        int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(siteId);
-        int map_id = partition;
+        int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(HSId);
+        long map_id = partition;
         if (m_taskType == FragmentTaskMessage.SYS_PROC_PER_SITE)
         {
-            map_id = siteId;
+            map_id = HSId;
         }
 
         // Check that the replica fragments are the same (non-deterministic SQL)
@@ -289,11 +289,11 @@ class WorkUnit
         // In all seriousness, we have no valid way to recover from a non-deterministic event
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
         boolean duplicate_okay =
-            m_dependencies.get(dependencyId).addResult(siteId, map_id, payload);
+            m_dependencies.get(dependencyId).addResult(HSId, map_id, payload);
         if (!duplicate_okay)
         {
             String msg = "Mismatched results received for partition: " + partition;
-            msg += "\n  from execution site: " + siteId;
+            msg += "\n  from execution site: " + HSId;
             msg += "\n  Original results: " + m_dependencies.get(dependencyId).getResult(map_id).toString();
             msg += "\n  Mismatched results: " + payload.toString();
             // die die die (German: the the the)
@@ -305,19 +305,12 @@ class WorkUnit
     /**
      * Dependencies from recovering sites use this.
      */
-    void putDummyDependency(int dependencyId, long siteId) {
+    void putDummyDependency(int dependencyId, long HSId) {
         assert m_dependencies != null;
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
 
-        int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(siteId);
-        int map_id = partition;
-        if (m_taskType == FragmentTaskMessage.SYS_PROC_PER_SITE)
-        {
-            map_id = siteId;
-        }
-
-        m_dependencies.get(dependencyId).addDummyResult(siteId, map_id);
+        m_dependencies.get(dependencyId).addDummyResult(HSId);
     }
 
     boolean allDependenciesSatisfied() {
@@ -335,13 +328,13 @@ class WorkUnit
         return satisfied && (m_stackCount == 0);
     }
 
-    void removeSite(long siteId)
+    void removeSite(long HSId)
     {
         if (m_dependencies != null)
         {
             for (DependencyTracker tracker : m_dependencies.values())
             {
-                tracker.removeSite(siteId);
+                tracker.removeSite(HSId);
             }
         }
     }
