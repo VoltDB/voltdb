@@ -104,7 +104,6 @@ public class InitiateResponseMessage extends VoltMessage {
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-
         msgsize += 8 // txnId
             + 8 // initiator HSId
             + 8 // coordinator HSId
@@ -135,7 +134,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
         m_recovering = buf.get() == 1;
-
+        m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
     }
