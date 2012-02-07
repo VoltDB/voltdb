@@ -375,11 +375,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 int siteId = Integer.parseInt(siteForThisThread.getTypeName());
                 ExecutionSite siteObj =
                         new ExecutionSite(VoltDB.instance(),
-                                          VoltDB.instance().getMessenger().createMailbox(
-                                                   siteId,
-                                                   VoltDB.DTXN_MAILBOX_ID,
-                                                   true),
-                                          siteId,
+                                          VoltDB.instance().getMessenger().createMailbox(),
                                           m_serializedCatalog,
                                           null,
                                           m_recovering,
