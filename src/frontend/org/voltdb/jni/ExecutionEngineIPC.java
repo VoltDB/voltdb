@@ -141,7 +141,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 try {
                     System.in.read();
                 } catch (final IOException e1) {
-                    // TODO Auto-generated catch block
                     e1.printStackTrace();
                 }
             }
@@ -516,7 +515,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** Local m_data */
     private final int m_clusterIndex;
-    private final int m_siteId;
+    private final long m_siteId;
     private final int m_partitionId;
     private final int m_hostId;
     private final String m_hostname;
@@ -531,7 +530,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public ExecutionEngineIPC(
             final ExecutionSite site,
             final int clusterIndex,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             final int hostId,
             final String hostname,
@@ -582,7 +581,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
      */
     public void initialize(
             final int clusterIndex,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             final int hostId,
             final String hostname,
@@ -596,7 +595,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.clear();
         m_data.putInt(Commands.Initialize.m_id);
         m_data.putInt(clusterIndex);
-        m_data.putInt(siteId);
+        m_data.putLong(siteId);
         m_data.putInt(partitionId);
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());

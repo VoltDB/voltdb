@@ -417,7 +417,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     struct initialize {
         struct ipc_command cmd;
         int clusterId;
-        int siteId;
+        long siteId;
         int partitionId;
         int hostId;
         int64_t logLevels;
