@@ -164,7 +164,7 @@ private:
      */
     voltdb::CatalogId m_partitionId;
 
-    voltdb::CatalogId m_siteId;
+    int64_t m_siteId;
     voltdb::CatalogId m_hostId;
 
     voltdb::NValue m_hostname;

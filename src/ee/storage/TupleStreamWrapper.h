@@ -105,7 +105,7 @@ public:
 
     // cached catalog values
     const CatalogId m_partitionId;
-    const CatalogId m_siteId;
+    const int64_t m_siteId;
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;

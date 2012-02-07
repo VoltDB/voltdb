@@ -132,7 +132,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         VoltDBEngine(Topend *topend, LogProxy *logProxy);
         bool initialize(int32_t clusterIndex,
-                        int32_t siteId,
+                        int64_t siteId,
                         int32_t partitionId,
                         int32_t hostId,
                         std::string hostname,
