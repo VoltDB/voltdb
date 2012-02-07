@@ -77,7 +77,7 @@ class ProcedureInvocation {
         return size;
     }
 
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+    public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(m_type.getValue());//Version
         if (m_type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(m_originalTxnId);
@@ -85,5 +85,6 @@ class ProcedureInvocation {
         FastSerializer.writeString(m_procNameBytes, buf);
         buf.putLong(m_clientHandle);
         m_parameters.flattenToBuffer(buf);
+        return buf;
     }
 }
