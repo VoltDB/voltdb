@@ -438,7 +438,7 @@ import org.voltdb.types.VoltDecimalHelper;
     }
 
     public int getSerializedSize() {
-        int size = 2 + m_params.length;
+        int size = 2;
 
         for (int ii = 0; ii < m_params.length; ii++) {
             Object obj = m_params[ii];
