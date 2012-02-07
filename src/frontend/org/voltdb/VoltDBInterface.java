@@ -23,9 +23,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.network.VoltNetworkPool;
+
 import org.voltdb.fault.FaultDistributorInterface;
 
 public interface VoltDBInterface
@@ -74,7 +73,7 @@ public interface VoltDBInterface
     public HostMessenger getMessenger();
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
-    public Map<Integer, ExecutionSite> getLocalSites();
+    public Map<Long, ExecutionSite> getLocalSites();
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
     public FaultDistributorInterface getFaultDistributor();

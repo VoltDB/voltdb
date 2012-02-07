@@ -124,9 +124,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
     final ArrayList<SimpleDtxnInitiator> m_dtxns = new ArrayList<SimpleDtxnInitiator>();
-    private Map<Integer, ExecutionSite> m_localSites;
+    private Map<Long, ExecutionSite> m_localSites;
     HTTPAdminListener m_adminListener;
-    private Map<Integer, Thread> m_siteThreads;
+    private Map<Long, Thread> m_siteThreads;
     private ArrayList<ExecutionSiteRunner> m_runners;
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
@@ -310,8 +310,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             inits.doInitializationWork();
 
             // set up site structure
-            m_localSites = Collections.synchronizedMap(new HashMap<Integer, ExecutionSite>());
-            m_siteThreads = Collections.synchronizedMap(new HashMap<Integer, Thread>());
+            m_localSites = Collections.synchronizedMap(new HashMap<Long, ExecutionSite>());
+            m_siteThreads = Collections.synchronizedMap(new HashMap<Long, Thread>());
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
             if (config.m_backend.isIPC) {
@@ -341,7 +341,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_currentThreadSite = null;
             for (Site site : m_catalogContext.siteTracker.getUpSites()) {
                 int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-                int siteId = Integer.parseInt(site.getTypeName());
+                long siteId = Long.parseLong(site.getTypeName());
 
                 // start a local site
                 if (sitesHostId == m_myHostId) {
@@ -351,7 +351,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         } else {
                             ExecutionSiteRunner runner =
                                 new ExecutionSiteRunner(
-                                        siteId,
                                         m_catalogContext,
                                         m_serializedCatalog,
                                         m_recovering,
@@ -387,7 +386,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                           m_replicationActive,
                                           m_downHosts,
                                           m_catalogContext.m_transactionId);
-                m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
+                m_localSites.put(Long.parseLong(siteForThisThread.getTypeName()), siteObj);
                 m_currentThreadSite = siteObj;
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
@@ -460,7 +459,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 final Class<?> statsManagerClass =
                     Class.forName("org.voltdb.management.JMXStatsManager");
                 m_statsManager = (StatsManager)statsManagerClass.newInstance();
-                m_statsManager.initialize(new ArrayList<Integer>(m_localSites.keySet()));
+                m_statsManager.initialize(new ArrayList<Long>(m_localSites.keySet()));
             } catch (Exception e) {}
 
             try {
@@ -1479,7 +1478,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public Map<Integer, ExecutionSite> getLocalSites() {
+    public Map<Long, ExecutionSite> getLocalSites() {
         return m_localSites;
     }
 
