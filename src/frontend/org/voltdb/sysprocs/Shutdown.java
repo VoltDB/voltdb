@@ -64,7 +64,7 @@ public class Shutdown extends VoltSystemProcedure {
             // Choose the lowest site ID on this host to do the global
             // shutdown.  all other sites should just bail out (for now)
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
+            Long lowest_site_id =
                 VoltDB.instance().getCatalogContext().siteTracker.
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() != lowest_site_id)
