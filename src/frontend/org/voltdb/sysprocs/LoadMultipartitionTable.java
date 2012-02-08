@@ -87,7 +87,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             VoltTable toInsert = (VoltTable) params.toArray()[1];
 
             // add the partition id
-            long currentPartition = Long.parseLong(context.getSite().getPartition().getTypeName());
+            long currentPartition = context.getPartitionId();
             result.addRow(currentPartition);
 
             try {

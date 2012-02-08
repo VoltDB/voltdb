@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 
@@ -37,12 +36,6 @@ public interface SiteProcedureConnection {
      * @param proc
      */
     public void registerPlanFragment(final long pfId, final VoltSystemProcedure proc);
-
-    /**
-     * Get the catalog site entry for the corresponding SiteProcedureConnection
-     * @return catalog site.
-     */
-    public Site getCorrespondingCatalogSite();
 
     /**
      * Get the catalog site id for the corresponding SiteProcedureConnection

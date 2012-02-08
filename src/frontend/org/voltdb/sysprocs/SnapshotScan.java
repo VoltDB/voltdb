@@ -111,7 +111,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                 List<File> relevantFiles = retrieveRelevantFiles(path);
                 if (relevantFiles == null) {
                     results.addRow(
-                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                   context.getHostId(),
                                    hostname,
                                    "",
                                    "",
@@ -151,7 +151,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                                     }
 
                                     results.addRow(
-                                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                                   context.getHostId(),
                                                    hostname,
                                                    f.getParent(),
                                                    f.getName(),
@@ -178,7 +178,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                             }
                         } else {
                             results.addRow(
-                                           Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                           context.getHostId(),
                                            hostname,
                                            f.getParent(),
                                            f.getName(),
@@ -231,7 +231,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                 List<File> relevantFiles = retrieveRelevantFiles(path);
                 if (relevantFiles == null) {
                     results.addRow(
-                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                   context.getHostId(),
                                    "",
                                    "",
                                    "",
@@ -258,7 +258,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                                     }
                                     ii++;
                                 }
-                                results.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                results.addRow(context.getHostId(),
                                                path,
                                                f.getName(),
                                                sw.toString(),
@@ -308,7 +308,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                     final long total = dir.getTotalSpace();
                     final long used = total - free;
                     results.addRow(
-                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                   context.getHostId(),
                                    hostname,
                                    path,
                                    total,
@@ -318,7 +318,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                     "");
                 } else {
                     results.addRow(
-                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                   context.getHostId(),
                                    hostname,
                                    path,
                                    0,

@@ -193,8 +193,8 @@ public class Statistics extends VoltSystemProcedure {
             final boolean interval =
                 ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             final Long now = (Long)params.toArray()[1];
-            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            catalogIds.add(Integer.parseInt(context.getSite().getTypeName()));
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(context.getSiteId());
             VoltTable result = VoltDB.instance().
                     getStatsAgent().getStats(
                             SysProcSelector.PROCEDURE,
@@ -215,8 +215,8 @@ public class Statistics extends VoltSystemProcedure {
             final boolean interval =
                 ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             final Long now = (Long)params.toArray()[1];
-            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            catalogIds.add(Integer.parseInt(context.getSite().getTypeName()));
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(context.getSiteId());
             VoltTable result = VoltDB.instance().
                     getStatsAgent().getStats(
                             SysProcSelector.STARVATION,
@@ -237,8 +237,8 @@ public class Statistics extends VoltSystemProcedure {
             final boolean interval =
                 ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             final Long now = (Long)params.toArray()[1];
-            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            catalogIds.add(0);
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(0L);
             VoltTable result = VoltDB.instance().
             getStatsAgent().getStats(
                                      SysProcSelector.INITIATOR,
@@ -268,8 +268,8 @@ public class Statistics extends VoltSystemProcedure {
             final boolean interval =
                 ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             final Long now = (Long)params.toArray()[1];
-            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            catalogIds.add(0);
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(0L);
             VoltTable result =
                 VoltDB.instance().getStatsAgent().getStats(SysProcSelector.MEMORY,
                                                            catalogIds,

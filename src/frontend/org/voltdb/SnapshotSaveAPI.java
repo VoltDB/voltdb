@@ -96,7 +96,8 @@ public class SnapshotSaveAPI
                 SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.acquire();
             } catch (InterruptedException e) {
-                result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                result.addRow(
+                        context.getHostId(),
                         hostname,
                         "",
                         "FAILURE",
@@ -144,9 +145,9 @@ public class SnapshotSaveAPI
 
             if (failures.isEmpty()) {
                 blockingResult.addRow(
-                        Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        context.getHostId(),
                         hostname,
-                        Integer.parseInt(context.getSite().getTypeName()),
+                        context.getSiteId(),
                         status,
                         err);
             } else {
@@ -155,9 +156,9 @@ public class SnapshotSaveAPI
                     err = e.toString();
                 }
                 blockingResult.addRow(
-                        Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        context.getHostId(),
                         hostname,
-                        Integer.parseInt(context.getSite().getTypeName()),
+                        context.getSiteId(),
                         status,
                         err);
             }
@@ -337,7 +338,7 @@ public class SnapshotSaveAPI
                     String err_msg = "";
                     final File saveFilePath =
                         SnapshotUtil.constructFileForTable(table, file_path, file_nonce,
-                                              context.getSite().getHost().getTypeName());
+                                              context.getHostId());
                     SnapshotDataTarget sdt = null;
                     try {
                         sdt =
@@ -345,7 +346,7 @@ public class SnapshotSaveAPI
                                     context,
                                     saveFilePath,
                                     table,
-                                    context.getSite().getHost(),
+                                    context.getHostId(),
                                     context.getCluster().getPartitions().size(),
                                     txnId);
                         targets.add(sdt);
@@ -416,7 +417,7 @@ public class SnapshotSaveAPI
                         "RESULTED IN IOException: \n" + sw.toString();
                     }
 
-                    result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                    result.addRow(context.getHostId(),
                             hostname,
                             table.getTypeName(),
                             canSnapshot,
@@ -469,7 +470,7 @@ public class SnapshotSaveAPI
                 ex.printStackTrace(pw);
                 pw.flush();
                 result.addRow(
-                        Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        context.getHostId(),
                         hostname,
                         "",
                         "FAILURE",
@@ -488,7 +489,7 @@ public class SnapshotSaveAPI
         try {
             SnapshotSiteProcessor.m_snapshotPermits.acquire();
         } catch (Exception e) {
-            result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+            result.addRow(context.getHostId(),
                     hostname,
                     "",
                     "FAILURE",
@@ -503,19 +504,19 @@ public class SnapshotSaveAPI
             SystemProcedureExecutionContext context,
             File f,
             Table table,
-            Host h,
+            int hostId,
             int numPartitions,
             long txnId)
     throws IOException
     {
         return new DefaultSnapshotDataTarget(f,
-                                             Integer.parseInt(h.getTypeName()),
+                                             hostId,
                                              context.getCluster().getTypeName(),
                                              context.getDatabase().getTypeName(),
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             SnapshotUtil.getPartitionsOnHost(context, h),
+                                             SnapshotUtil.getPartitionsOnHost(context, hostId),
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

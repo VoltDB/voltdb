@@ -137,9 +137,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     // Catalog
     public CatalogContext m_context;
-    Site getCatalogSite() {
-        return m_context.cluster.getSites().get(Long.toString(getSiteId()));
-    }
 
     final long m_siteId;
     public final long getSiteId() {
@@ -573,13 +570,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public interface SystemProcedureExecutionContext {
         public Database getDatabase();
         public Cluster getCluster();
-        public Site getSite();
         public ExecutionEngine getExecutionEngine();
         public long getLastCommittedTxnId();
         public long getCurrentTxnId();
         public long getNextUndo();
         public ExecutionSite getExecutionSite();
         public HashMap<String, VoltProcedure> getProcedures();
+        public long getSiteId();
+        public int getHostId();
+        public int getPartitionId();
     }
 
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
@@ -587,8 +586,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public Database getDatabase()                         { return m_context.database; }
         @Override
         public Cluster getCluster()                           { return m_context.cluster; }
-        @Override
-        public Site getSite()                                 { return getCatalogSite(); }
         @Override
         public ExecutionEngine getExecutionEngine()           { return ee; }
         @Override
@@ -601,6 +598,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public ExecutionSite getExecutionSite()               { return ExecutionSite.this; }
         @Override
         public HashMap<String, VoltProcedure> getProcedures() { return procs; }
+        @Override
+        public long getSiteId()                               { return m_siteId; }
+        @Override
+        public int getHostId()                                { return MailboxTracker.getHostForHSId(m_siteId); }
+        @Override
+        public int getPartitionId()                           { return m_context.siteTracker.getPartitionForSite(m_siteId); }
     }
 
     SystemProcedureContext m_systemProcedureContext;
@@ -700,15 +703,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         m_starvationTracker = new StarvationTracker( getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.STARVATION,
-                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       MailboxTracker.getHostForHSId(m_siteId),
                                        m_starvationTracker);
         m_tableStats = new TableStats( getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.TABLE,
-                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       MailboxTracker.getHostForHSId(m_siteId),
                                        m_tableStats);
         m_indexStats = new IndexStats(getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.INDEX,
-                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       MailboxTracker.getHostForHSId(m_siteId),
                                        m_indexStats);
 
     }
@@ -1925,24 +1928,20 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     }
 
     @Override
-    public Site getCorrespondingCatalogSite() {
-        return getCatalogSite();
-    }
-
-    @Override
     public long getCorrespondingSiteId() {
         return m_siteId;
     }
 
     @Override
     public int getCorrespondingPartitionId() {
-        return Integer.valueOf(getCatalogSite().getPartition().getTypeName());
+        return m_context.siteTracker.getPartitionForSite(m_siteId);
     }
 
     @Override
     public int getCorrespondingHostId() {
-        return Integer.valueOf(getCatalogSite().getHost().getTypeName());
+        return MailboxTracker.getHostForHSId(m_siteId);
     }
+
 
     @Override
     public void loadTable(

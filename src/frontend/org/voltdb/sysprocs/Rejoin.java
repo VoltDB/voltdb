@@ -156,7 +156,7 @@ public class Rejoin extends VoltSystemProcedure {
 
     VoltTable phaseThreeCommit(int rejoinHostId, SystemProcedureExecutionContext context) {
         VoltTable retval = new VoltTable(
-                new ColumnInfo("HostId", VoltType.INTEGER),
+                new ColumnInfo("HostId", VoltType.BIGINT),
                 new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
         );
 
@@ -199,7 +199,7 @@ public class Rejoin extends VoltSystemProcedure {
         String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), true);
         context.getExecutionSite().updateClusterState(catalogDiffCommands);
 
-        retval.addRow(Integer.parseInt(context.getSite().getTypeName()), error);
+        retval.addRow(context.getSiteId(), error);
 
         if (debugFlag) {
             try {

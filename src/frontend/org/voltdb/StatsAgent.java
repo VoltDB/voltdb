@@ -359,7 +359,7 @@ public class StatsAgent {
     }
 
     private void collectWANStats(JSONObject obj) throws Exception {
-        List<Integer> catalogIds = Arrays.asList(new Integer[] { 0 });
+        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         long requestId = obj.getLong("requestId");
         long returnAddress = obj.getLong("returnAddress");
@@ -414,7 +414,7 @@ public class StatsAgent {
 
     public synchronized VoltTable getStats(
             final SysProcSelector selector,
-            final List<Integer> catalogIds,
+            final List<Long> catalogIds,
             final boolean interval,
             final Long now) {
         assert selector != null;
@@ -452,7 +452,7 @@ public class StatsAgent {
         }
         final VoltTable resultTable = new VoltTable(columns);
 
-        for (Integer catalogId : catalogIds) {
+        for (Long catalogId : catalogIds) {
             statsSources = catalogIdToStatsSources.get(catalogId);
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {

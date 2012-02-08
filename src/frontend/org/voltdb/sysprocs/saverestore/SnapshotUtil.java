@@ -728,7 +728,7 @@ public class SnapshotUtil {
      */
     public static final String constructFilenameForTable(Table table,
                                                          String fileNonce,
-                                                         String hostId)
+                                                         int hostId)
     {
         StringBuilder filename_builder = new StringBuilder(fileNonce);
         filename_builder.append("-");
@@ -745,7 +745,7 @@ public class SnapshotUtil {
     public static final File constructFileForTable(Table table,
             String filePath,
             String fileNonce,
-            String hostId)
+            int hostId)
     {
         return new VoltFile(filePath, SnapshotUtil.constructFilenameForTable(
             table, fileNonce, hostId));
@@ -786,8 +786,7 @@ public class SnapshotUtil {
     }
 
     public static final List<Integer> getPartitionsOnHost(
-            SystemProcedureExecutionContext c, Host h) {
-        int host = Integer.parseInt(h.getTypeName());
+            SystemProcedureExecutionContext c, int host) {
         final ArrayList<Integer> results = new ArrayList<Integer>();
         for (long s : VoltDB.instance().getCatalogContext().siteTracker.getAllLiveSites()) {
             int hostId = MailboxTracker.getHostForHSId(s);
