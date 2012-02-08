@@ -53,6 +53,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AdHocPlannedStmt;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
@@ -113,6 +114,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
+
+    // cache of adhoc plans
+    AdHocCompilerCache m_adhocCache = new AdHocCompilerCache();
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
@@ -1016,6 +1020,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
+        // try the cache
+        AdHocPlannedStmt plan = m_adhocCache.get(sql, partitionParam != null);
+        if (plan != null) {
+            // check catalog version
+            if (plan.catalogVersion == m_catalogContext.get().catalogVersion) {
+                plan.adminConnection = handler.isAdmin();
+                plan.clientData = ccxn;
+                plan.partitionParam = partitionParam;
+                plan.clientHandle = task.clientHandle;
+                plan.hostname = handler.m_hostname;
+                plan.connectionId = handler.connectionId();
+
+                createAdHocTransaction(plan);
+                return null;
+            }
+        }
+
         LocalObjectMessage work = new LocalObjectMessage(
                 new AdHocPlannerWork(
                     m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
@@ -1281,6 +1302,63 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
+    void createAdHocTransaction(final AdHocPlannedStmt plannedStmt) {
+        // create the execution site task
+        StoredProcedureInvocation task = new StoredProcedureInvocation();
+        // pick the sysproc based on the presence of partition info
+        boolean isSinglePartition = (plannedStmt.partitionParam != null);
+        int partitions[] = null;
+
+        if (isSinglePartition) {
+            task.procName = "@AdHocSP";
+            partitions = new int[] { TheHashinator.hashToPartition(plannedStmt.partitionParam) };
+        }
+        else {
+            task.procName = "@AdHoc";
+            partitions = m_allPartitions;
+        }
+
+        task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+            @Override
+            public ParameterSet call() {
+                ParameterSet params = new ParameterSet();
+                params.m_params = new Object[] {
+                        plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                        plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0};
+                return params;
+            }
+        });
+        task.clientHandle = plannedStmt.clientHandle;
+
+        /*
+         * Round trip the invocation to initialize it for command logging
+         */
+        FastSerializer fs = new FastSerializer();
+        try {
+            fs.writeObject(task);
+            ByteBuffer source = fs.getBuffer();
+            ByteBuffer copy = ByteBuffer.allocate(source.remaining());
+            copy.put(source);
+            copy.flip();
+            FastDeserializer fds = new FastDeserializer(copy);
+            task = new StoredProcedureInvocation();
+            task.readExternal(fds);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+
+        // initiate the transaction
+        createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
+                plannedStmt.adminConnection,
+                task, false, isSinglePartition, false, partitions,
+                partitions.length, plannedStmt.clientData,
+                0, EstTime.currentTimeMillis());
+
+        // cache this plan, but don't hold onto the connection object
+        plannedStmt.clientData = null;
+        m_adhocCache.put(plannedStmt);
+    }
+
     final void checkForFinishedCompilerWork() {
         VoltMessage message;
         while ((message = m_mailbox.recv()) != null) {
@@ -1323,56 +1401,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     }
                     else {
-                        // create the execution site task
-                        StoredProcedureInvocation task = new StoredProcedureInvocation();
-                        // pick the sysproc based on the presence of partition info
-                        boolean isSinglePartition = (plannedStmt.partitionParam != null);
-                        int partitions[] = null;
-
-                        if (isSinglePartition) {
-                            task.procName = "@AdHocSP";
-                            partitions = new int[] { TheHashinator.hashToPartition(plannedStmt.partitionParam) };
-                        }
-                        else {
-                            task.procName = "@AdHoc";
-                            partitions = m_allPartitions;
-                        }
-
-                        task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-                            @Override
-                            public ParameterSet call() {
-                                ParameterSet params = new ParameterSet();
-                                params.m_params = new Object[] {
-                                        plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                                        plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0};
-                                return params;
-                            }
-                        });
-                        task.clientHandle = plannedStmt.clientHandle;
-
-                        /*
-                         * Round trip the invocation to initialize it for command logging
-                         */
-                        FastSerializer fs = new FastSerializer();
-                        try {
-                            fs.writeObject(task);
-                            ByteBuffer source = fs.getBuffer();
-                            ByteBuffer copy = ByteBuffer.allocate(source.remaining());
-                            copy.put(source);
-                            copy.flip();
-                            FastDeserializer fds = new FastDeserializer(copy);
-                            task = new StoredProcedureInvocation();
-                            task.readExternal(fds);
-                        } catch (Exception e) {
-                            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                        }
-
-                        // initiate the transaction
-                        createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
-                                plannedStmt.adminConnection,
-                                task, false, isSinglePartition, false, partitions,
-                                partitions.length, plannedStmt.clientData,
-                                0, EstTime.currentTimeMillis());
+                        createAdHocTransaction(plannedStmt);
                     }
                 }
                 else if (result instanceof CatalogChangeResult) {
