@@ -53,8 +53,8 @@ package org.voltcore.messaging;
 import java.util.*;
 
 import org.voltdb.VoltDB;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
 
 public class MockMailbox implements Mailbox {
 
@@ -78,19 +78,19 @@ public class MockMailbox implements Mailbox {
     }
 
     @Override
-    public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
-        outgoingMessages.add(new Message(siteId, mailboxId, message));
+    public void send(long HSId, VoltMessage message) throws MessagingException {
+        outgoingMessages.add(new Message(HSId, message));
 
-        Mailbox dest = postoffice.get(mailboxId).get(siteId);
+        Mailbox dest = postoffice.get(mailboxId).get(HSId);
         if (dest != null) {
             dest.deliver(message);
         }
     }
 
     @Override
-    public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
-        for (int i=0; siteIds != null && i < siteIds.length; ++i) {
-            Mailbox dest = postoffice.get(mailboxId).get(siteIds[i]);
+    public void send(long[] HSIds, VoltMessage message) throws MessagingException {
+        for (int i=0; HSIds != null && i < HSIds.length; ++i) {
+            Mailbox dest = postoffice.get(mailboxId).get(HSIds[i]);
             if (dest != null) {
                 dest.deliver(message);
             }
@@ -184,12 +184,12 @@ public class MockMailbox implements Mailbox {
         return outgoingMessages.isEmpty();
     }
 
-    public boolean lastEquals(int siteId, int mailboxId) {
+    public boolean lastEquals(long HSId) {
         Message last = outgoingMessages.peekLast();
-        return last.siteId == siteId && last.mailboxId == mailboxId;
+        return last.HSId == HSId;
     }
-    public boolean lastEquals(int siteId, int mailboxId, Object contents) {
-        return lastEquals(siteId, mailboxId) && outgoingMessages.peekLast().contents == contents;
+    public boolean lastEquals(long siteId, Object contents) {
+        return lastEquals(siteId) && outgoingMessages.peekLast().contents == contents;
     }
 
     @Override
@@ -217,14 +217,12 @@ public class MockMailbox implements Mailbox {
     public VoltMessage next;
 
     private static class Message {
-        public Message(int siteId, int mailboxId, VoltMessage contents) {
-            this.siteId = siteId;
-            this.mailboxId = mailboxId;
+        public Message(long HSId, VoltMessage contents) {
+            this.HSId = HSId;
             this.contents = contents;
         }
 
-        public final int siteId;
-        public final int mailboxId;
+        public final long HSId;
         public final VoltMessage contents;
     }
 
@@ -233,7 +231,12 @@ public class MockMailbox implements Mailbox {
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 
     @Override
-    public int getSiteId() {
+    public void setHSId(long hsid)
+    {
+    }
+
+    @Override
+    public long getHSId() {
         // TODO Auto-generated method stub
         return 0;
     }
