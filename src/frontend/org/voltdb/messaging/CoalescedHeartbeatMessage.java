@@ -76,6 +76,7 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
                                                   super.m_txnId,
                                                   buf.getLong());
         }
+        assert(buf.capacity() == buf.position());
     }
 
     @Override

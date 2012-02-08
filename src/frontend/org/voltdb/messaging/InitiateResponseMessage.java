@@ -137,6 +137,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
+        assert(buf.capacity() == buf.position());
     }
 
     @Override

@@ -311,6 +311,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_isFinal = buf.get() == 1;
         m_taskType = buf.get();
         m_shouldUndo = buf.get() == 1;
+        assert(buf.capacity() == buf.position());
     }
 
     @Override

@@ -207,6 +207,7 @@ public class FragmentResponseMessage extends VoltMessage {
             }
         }
         m_exception = SerializableException.deserializeFromBuffer(buf);
+        assert(buf.capacity() == buf.position());
     }
 
     @Override
