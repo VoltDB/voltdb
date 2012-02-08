@@ -37,6 +37,8 @@ import java.io.*;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
+
+import org.voltdb.dtxn.MailboxTracker;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
@@ -242,9 +244,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 this);
         m_cluster = cluster;
         m_siteId = site.getCorrespondingSiteId();
-        m_hostId =
-                Integer.valueOf(m_cluster.getSites().get(String.valueOf(m_siteId)).
-                        getHost().getTypeName());
+        m_hostId = MailboxTracker.getHostForHSId(m_siteId);
         // XXX HACK GIANT HACK given the current assumption that there is
         // only one database per cluster, I'm asserting this and then
         // skirting around the need to have the database name in order to get
