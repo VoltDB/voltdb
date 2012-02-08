@@ -70,7 +70,6 @@ public interface VoltDBInterface
     public String getBuildString();
     public String getVersionString();
     public Object[] getInstanceId();
-    public HostMessenger getMessenger();
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
     public Map<Long, ExecutionSite> getLocalSites();

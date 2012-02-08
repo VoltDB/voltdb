@@ -243,7 +243,7 @@ public class Rejoin extends VoltSystemProcedure {
             HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
 
-        HostMessenger messenger = (HostMessenger) VoltDB.instance().getMessenger();
+        HostMessenger messenger = (HostMessenger) VoltDB.instance().getHostMessenger();
         int hostId = messenger.getHostId();
         Object[] oparams = params.toArray();
         VoltTable depResult = null;

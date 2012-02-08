@@ -269,7 +269,7 @@ public class Inits {
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
                     // publish the catalog bytes to ZK
-                    m_rvdb.getMessenger().getZK().create("/catalogbytes",
+                    m_rvdb.getHostMessenger().getZK().create("/catalogbytes",
                             catalogBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
                 }
@@ -296,7 +296,7 @@ public class Inits {
             byte[] catalogBytes = null;
             do {
                 try {
-                    catalogBytes = m_rvdb.getMessenger().getZK().getData("/catalogbytes", false, null);
+                    catalogBytes = m_rvdb.getHostMessenger().getZK().getData("/catalogbytes", false, null);
                 }
                 catch (org.apache.zookeeper_voltpatches.KeeperException.NoNodeException e) {
                 }

@@ -958,7 +958,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
     public void initializeSnapshotDaemon() {
-        m_snapshotDaemon.init(this, VoltDB.instance().getMessenger().getZK());
+        m_snapshotDaemon.init(this, VoltDB.instance().getHostMessenger().getZK());
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID

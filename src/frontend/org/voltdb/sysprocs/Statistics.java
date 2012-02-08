@@ -318,7 +318,7 @@ public class Statistics extends VoltSystemProcedure {
                 final Long now = (Long)params.toArray()[1];
                 try {
                     final Map<Long, Pair<String,long[]>> stats =
-                        VoltDB.instance().getMessenger().getNetwork().getIOStats(interval);
+                        VoltDB.instance().getHostMessenger().getNetwork().getIOStats(interval);
 
                     final Integer hostId = VoltDB.instance().getHostMessenger().getHostId();
                     final String hostname = VoltDB.instance().getHostMessenger().getHostname();

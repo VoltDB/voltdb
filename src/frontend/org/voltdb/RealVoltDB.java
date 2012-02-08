@@ -1470,11 +1470,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public HostMessenger getMessenger() {
-        return m_messenger;
-    }
-
-    @Override
     public HostMessenger getHostMessenger() {
         return m_messenger;
     }
