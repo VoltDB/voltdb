@@ -153,13 +153,12 @@ public class MailboxTracker {
                 long HSId = jsObj.getLong("HSId");
                 int hostId = MiscUtils.getHostIdFromHSId(HSId);
 
-                ArrayList<Long> initiators = new ArrayList<Long>();
-                hostsToInitiators.put(hostId, initiators);
+                ArrayList<Long> initiators = hostsToInitiators.get(hostId);
+                if (initiators == null) {
+                    initiators = new ArrayList<Long>();
+                    hostsToInitiators.put(hostId, initiators);
+                }
                 initiators.add(HSId);
-
-                initiators = new ArrayList<Long>();
-                initiators.add(HSId);
-
                 // TODO: needs to determine if it's the master or replica
             } catch (JSONException e) {
                 log.error(e.getMessage());
