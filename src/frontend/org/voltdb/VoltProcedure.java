@@ -226,7 +226,7 @@ public abstract class VoltProcedure {
         m_statsCollector = new ProcedureStatsCollector();
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 SysProcSelector.PROCEDURE,
-                Integer.parseInt(site.getCorrespondingCatalogSite().getTypeName()),
+                site.getCorrespondingSiteId(),
                 m_statsCollector);
 
         // this is a stupid hack to make the EE happy

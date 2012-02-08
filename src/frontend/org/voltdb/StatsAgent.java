@@ -58,8 +58,8 @@ public class StatsAgent {
     private final ScheduledThreadPoolExecutor m_es =
         org.voltdb.utils.MiscUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, 1024 * 128);
 
-    private final HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>> registeredStatsSources =
-        new HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>>();
+    private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
+        new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();
 
     private final HashSet<SysProcSelector> handledSelectors = new HashSet<SysProcSelector>();
 
@@ -89,7 +89,7 @@ public class StatsAgent {
     public StatsAgent() {
         SysProcSelector selectors[] = SysProcSelector.values();
         for (int ii = 0; ii < selectors.length; ii++) {
-            registeredStatsSources.put(selectors[ii], new HashMap<Integer, ArrayList<StatsSource>>());
+            registeredStatsSources.put(selectors[ii], new HashMap<Long, ArrayList<StatsSource>>());
         }
         handledSelectors.add(SysProcSelector.PROCEDURE);
     }
@@ -399,10 +399,10 @@ public class StatsAgent {
         m_mailbox.send(returnAddress, bpm);
     }
 
-    public synchronized void registerStatsSource(SysProcSelector selector, int catalogId, StatsSource source) {
+    public synchronized void registerStatsSource(SysProcSelector selector, long catalogId, StatsSource source) {
         assert selector != null;
         assert source != null;
-        final HashMap<Integer, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
+        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
         assert catalogIdToStatsSources != null;
         ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogId);
         if (statsSources == null) {
@@ -420,7 +420,7 @@ public class StatsAgent {
         assert selector != null;
         assert catalogIds != null;
         assert catalogIds.size() > 0;
-        final HashMap<Integer, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
+        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
         assert catalogIdToStatsSources != null;
 
         ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogIds.get(0));
