@@ -547,18 +547,6 @@ public class VoltCompiler {
             }
         }
 
-        String msg = "Database \"" + databaseName + "\" ";
-        // TODO: schema allows 0 procedures. Testbase relies on this.
-        if (procedures.size() == 0) {
-            msg += "needs at least one \"procedure\" element " +
-                    "(currently has " + String.valueOf(procedures.size()) + ")";
-            throw new VoltCompilerException(msg);
-        }
-        if (procedures.size() < 1) {
-            msg += "is missing the \"procedures\" element";
-            throw new VoltCompilerException(msg);
-        }
-
         // shutdown and make a new hsqldb
         m_hsql = HSQLInterface.loadHsqldb();
 
@@ -600,7 +588,7 @@ public class VoltCompiler {
 
         // Actually parse and handle all the partitions
         // this needs to happen before procedures are compiled
-        msg = "In database \"" + databaseName + "\", ";
+        String msg = "In database \"" + databaseName + "\", ";
         final CatalogMap<Table> tables = db.getTables();
         for (final String[] partition : partitions) {
             final String tableName = partition[0];

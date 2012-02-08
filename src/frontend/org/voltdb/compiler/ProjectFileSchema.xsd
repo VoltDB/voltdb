@@ -58,7 +58,7 @@
       <!-- elements of an all group may appear in any order at most once. -->
       <xsd:element name="groups" type="groupsType" minOccurs="0"/>
       <xsd:element name="schemas" type="schemasType"/>
-      <xsd:element name="procedures" type="proceduresType"/>
+      <xsd:element name="procedures" type="proceduresType" minOccurs="0"/>
       <xsd:element name="partitions" type="partitionsType" minOccurs="0"/>
       <xsd:element name="classdependencies" type="classdependenciesType" minOccurs="0"/>
       <xsd:element name="export" type="exportType" minOccurs="0"/>
