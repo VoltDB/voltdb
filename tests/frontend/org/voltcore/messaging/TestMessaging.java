@@ -42,6 +42,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import junit.framework.TestCase;
 
 import org.mockito.ArgumentCaptor;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
@@ -52,9 +54,6 @@ import static org.mockito.Mockito.*;
 
 public class TestMessaging extends TestCase {
     public static class MsgTest extends VoltMessage {
-
-        public static final byte MSG_TEST_ID = 127;
-
         static byte[] globalValue;
         byte[] m_localValue;
         int m_length;
@@ -67,6 +66,11 @@ public class TestMessaging extends TestCase {
         }
 
         @Override
+        public int getSerializedSize() {
+            return super.getSerializedSize() + m_localValue.length;
+        }
+
+        @Override
         public void initFromBuffer(ByteBuffer buf) {
             m_length = buf.limit() - buf.position();
             m_localValue = new byte[m_length];
@@ -74,9 +78,10 @@ public class TestMessaging extends TestCase {
         }
 
         @Override
-        protected void flattenToBuffer(ByteBuffer buf) {
-            buf.put(MSG_TEST_ID);
+        public void flattenToBuffer(ByteBuffer buf) {
+            buf.put(MessageFactory.DUMMY_ID);
             buf.put(m_localValue);
+            assert(buf.position() == buf.capacity());
         }
 
         public void setValues() {
@@ -182,7 +187,7 @@ public class TestMessaging extends TestCase {
             hostMessengerLock.unlock();
 
             HostMessenger messenger = currentMessenger;
-            messenger.waitForGroupJoin();
+            messenger.waitForGroupJoin(hostCount);
             // create the mailboxes
             for (int i = 0; i < mailboxCount; i++) {
                 mbox[i] = currentMessenger.createMailbox();
@@ -236,71 +241,114 @@ public class TestMessaging extends TestCase {
         }
     }
 
-    public void testJoiner() {
-        try {
-            JoinHandler jh1 = mock(JoinHandler.class);
-            SocketJoiner joiner1 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3212, null, jh1);
-            JoinHandler jh2 = mock(JoinHandler.class);
-            SocketJoiner joiner2 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3213, null, jh2);
-            JoinHandler jh3 = mock(JoinHandler.class);
-            SocketJoiner joiner3 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3214, null, jh3);
+    /*
+     * Socket joiner isn't easily unit testable. It's interaction with host messenger is too complex.
+     */
+//    public void testJoiner() throws Exception {
+//        try {
+//            final JoinHandler jh1 = mock(JoinHandler.class);
+//            final SocketJoiner joiner1 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3212, null, jh1);
+//            doAnswer( new Answer() {
+//                private final int m_count = 0;
+//                @Override
+//                public Object answer(InvocationOnMock invocation) {
+//                    Object[] args = invocation.getArguments();
+//                    SocketChannel sc = (SocketChannel)args[0];
+//                    InetSocketAddress address = (InetSocketAddress)args[1];
+//                    Object mock = invocation.getMock();
+//                    return null;
+//                }
+//            }).when(jh1).requestJoin(any(SocketChannel.class), any(InetSocketAddress.class));
+//            final JoinHandler jh2 = mock(JoinHandler.class);
+//            final SocketJoiner joiner2 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3213, null, jh2);
+//            final JoinHandler jh3 = mock(JoinHandler.class);
+//            final SocketJoiner joiner3 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3214, null, jh3);
+//
+//            CountDownLatch cdl = new CountDownLatch(1);
+//            joiner1.start(cdl);
+//            Thread t1 = new Thread() {
+//                @Override
+//                public void run() {
+//                    try {
+//                        joiner2.start(null);
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            };
+//            t1.start();
+//            Thread.sleep(10);
+//            verify(jh1, never()).requestJoin(any(SocketChannel.class), any(InetSocketAddress.class));
+//            verify(jh2, never()).notifyOfHosts(
+//                    anyInt(), any(int[].class), any(SocketChannel[].class), any(InetSocketAddress[].class));
+//            verify(jh3, never()).notifyOfHosts(
+//                    anyInt(), any(int[].class), any(SocketChannel[].class), any(InetSocketAddress[].class));
+//            cdl.countDown();
+//            verify(jh1, timeout(1000)).requestJoin(
+//                    isNotNull(SocketChannel.class),
+//                    eq(new InetSocketAddress("127.0.0.1", 3213)));
+//            verify(jh2, timeout(1000)).notifyOfHosts(
+//                    eq(1), any(int[].class),
+//                    any(SocketChannel[].class),
+//                    eq(new InetSocketAddress[] { new InetSocketAddress("127.0.0.1", 3212) }));
+//            verify(jh3, never()).notifyOfHosts(
+//                    anyInt(), any(int[].class), any(SocketChannel[].class), any(InetSocketAddress[].class));
+//            joiner3.start(null);
+//            verify(jh1, timeout(1000)).requestJoin(
+//                    isNotNull(SocketChannel.class),
+//                    eq(new InetSocketAddress("127.0.0.1", 3214)));
+//            verify(jh2, timeout(1000)).notifyOfJoin(
+//                    eq(2), any(SocketChannel.class), new InetSocketAddress("127.0.0.1", 3214));
+//            verify(jh3, never()).notifyOfHosts(
+//                    anyInt(), any(int[].class), any(SocketChannel[].class),
+//                    eq(new InetSocketAddress[] {
+//                        new InetSocketAddress("127.0.0.1", 3212), new InetSocketAddress("127.0.0.1", 3213) }));
+//
+//            joiner1.shutdown();
+//            joiner2.shutdown();
+//            joiner3.shutdown();
+//            assertTrue(true);
+//            return;
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+//        assertTrue(false);
+//    }
 
-            CountDownLatch cdl = new CountDownLatch(1);
-            joiner1.start(cdl);
-            joiner2.start(null);
-            verify(jh1, never()).requestJoin(any(SocketChannel.class), any(InetSocketAddress.class));
-            verify(jh1).requestJoin(isNotNull(SocketChannel.class), eq(new InetSocketAddress("127.0.0.1", 3213)));
-            joiner3.start(null);
-
-            cdl.countDown();
-            jh1.
-
-
-            joiner1.shutdown();
-            joiner2.shutdown();
-            joiner3.shutdown();
-            assertTrue(true);
-            return;
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        assertTrue(false);
+    private static HostMessenger.Config getConfig(int index) {
+        HostMessenger.Config config = new HostMessenger.Config();
+        config.factory = new MessageFactory();
+        config.internalPort += index;
+        config.zkInterface = "127.0.0.1:" + (2181 + index);
+        return config;
     }
 
-    public void testSimple() throws MessagingException, UnknownHostException, InterruptedException {
-        try {
-            Selector.open();
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
-        VoltNetworkPool network = new VoltNetworkPool();
-        network.start();
-        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
-        Thread.sleep(20);
-        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
+    public void testSimple() throws Exception {
+        HostMessenger msg1 = new HostMessenger(getConfig(0));
+        msg1.start();
+        HostMessenger msg2 = new HostMessenger(getConfig(1));
+        msg2.start();
 
         System.out.println("Waiting for socketjoiners...");
-        msg1.waitForGroupJoin();
+        msg1.waitForGroupJoin(2);
         System.out.println("Finished socket joiner for msg1");
-        msg2.waitForGroupJoin();
+        msg2.waitForGroupJoin(2);
         System.out.println("Finished socket joiner for msg2");
 
         assertEquals(msg1.getHostId(), 0);
         assertEquals(msg2.getHostId(), 1);
 
-        int siteId1 = msg1.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 1;
-        int siteId2 = msg2.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 2;
 
-        msg1.createLocalSite(siteId1);
-        msg2.createLocalSite(siteId2);
+        Mailbox mb1 = msg1.createMailbox();
+        Mailbox mb2 = msg2.createMailbox();
 
-        Mailbox mb1 = msg1.createMailbox(siteId1, 1, false);
-        Mailbox mb2 = msg2.createMailbox(siteId2, 1, false);
+        long siteId1 = mb1.getHSId();
+        long siteId2 = mb2.getHSId();
 
         MsgTest.initWithSize(16);
-        MsgTest mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);
+        MsgTest mt = new MsgTest();
         mt.setValues();
-        mb1.send(siteId2, 1, mt);
+        mb1.send(siteId2, mt);
         MsgTest mt2 = null;
         while (mt2 == null) {
             mt2 = (MsgTest) mb2.recv();
@@ -309,9 +357,9 @@ public class TestMessaging extends TestCase {
 
         // Do it again
         MsgTest.initWithSize(32);
-        mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);
+        mt = new MsgTest();
         mt.setValues();
-        mb1.send(siteId2, 1, mt);
+        mb1.send(siteId2, mt);
         mt2 = null;
         while (mt2 == null) {
             mt2 = (MsgTest) mb2.recv();
@@ -325,9 +373,9 @@ public class TestMessaging extends TestCase {
             System.out.println("running iteration: " + i);
 
             MsgTest.initWithSize(4280034);
-            mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);
+            mt = new MsgTest();
             mt.setValues();
-            mb1.send(siteId2, 1, mt);
+            mb1.send(siteId2, mt);
             mt2 = null;
             while (mt2 == null) {
                 mt2 = (MsgTest) mb2.recv();
@@ -336,56 +384,51 @@ public class TestMessaging extends TestCase {
         }
         msg1.shutdown();
         msg2.shutdown();
-        network.shutdown();
     }
 
-    public void testMultiMailbox() throws MessagingException, UnknownHostException, InterruptedException {
-        VoltNetworkPool network = new VoltNetworkPool();
-        network.start();
-        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
-        Thread.sleep(20);
-        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
-        Thread.sleep(20);
-        HostMessenger msg3 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
+    public void testMultiMailbox() throws Exception {
+        HostMessenger msg1 = new HostMessenger(getConfig(0));
+        msg1.start();
+        HostMessenger msg2 = new HostMessenger(getConfig(1));
+        msg2.start();
+        HostMessenger msg3 = new HostMessenger(getConfig(2));
+        msg3.start();
 
         System.out.println("Waiting for socketjoiners...");
-        msg1.waitForGroupJoin();
+        msg1.waitForGroupJoin(3);
         System.out.println("Finished socket joiner for msg1");
-        msg2.waitForGroupJoin();
+        msg2.waitForGroupJoin(3);
         System.out.println("Finished socket joiner for msg2");
-        msg3.waitForGroupJoin();
+        msg3.waitForGroupJoin(3);
         System.out.println("Finished socket joiner for msg3");
 
         assertTrue(msg1.getHostId() != msg2.getHostId() && msg2.getHostId() != msg3.getHostId());
         //assertTrue(msg2.getHostId() == 1);
         //assertTrue(msg3.getHostId() == 2);
 
-        int siteId1 = msg1.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 1;
-        int siteId5 = msg1.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 5;
-        msg1.createLocalSite(siteId1);
-        msg1.createLocalSite(siteId5);
+        Mailbox mb1 = msg1.createMailbox();
+        Mailbox mb2 = msg2.createMailbox();
+        Mailbox mb3 = msg3.createMailbox();
+        Mailbox mb4 = msg3.createMailbox();
+        Mailbox mb5 = msg1.createMailbox();
 
-        int siteId2 = msg2.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 2;
-        msg2.createLocalSite(siteId2);
+        long siteId1 = mb1.getHSId();
+        long siteId5 = mb5.getHSId();
 
-        int siteId3 = msg3.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 3;
-        int siteId4 = msg3.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 4;
-        msg3.createLocalSite(siteId3);
-        msg3.createLocalSite(siteId4);
+        long siteId2 = mb2.getHSId();
 
-        Mailbox mb1 = msg1.createMailbox(siteId1, 1, false);
-        Mailbox mb2 = msg2.createMailbox(siteId2, 1, false);
-        Mailbox mb3 = msg3.createMailbox(siteId3, 1, false);
-        Mailbox mb4 = msg3.createMailbox(siteId4, 1, false);
-        Mailbox mb5 = msg1.createMailbox(siteId5, 1, false);
+        long siteId3 = mb3.getHSId();
+        long siteId4 = mb4.getHSId();
+
+
 
         MsgTest.initWithSize(16);
-        MsgTest mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);
+        MsgTest mt = new MsgTest();
         mt.setValues();
 
         int msgCount = 0;
 
-        mb1.send(new int[] {siteId2,siteId3,siteId5,siteId4}, 1, mt);
+        mb1.send(new long[] {siteId2,siteId3,siteId5,siteId4}, mt);
         long now = System.currentTimeMillis();
         MsgTest mt2 = null, mt3 = null, mt4 = null, mt5 = null;
 
@@ -426,7 +469,7 @@ public class TestMessaging extends TestCase {
             }
         }
 
-        mb3.send(new int[] {siteId5}, 1, mt);
+        mb3.send(new long[] {siteId5}, mt);
 
         assertEquals(((SiteMailbox)mb2).getWaitingCount(), 0);
         assertEquals(((SiteMailbox)mb3).getWaitingCount(), 0);
@@ -445,7 +488,6 @@ public class TestMessaging extends TestCase {
         msg1.shutdown();
         msg2.shutdown();
         msg3.shutdown();
-        network.shutdown();
     }
 
     /*public void testForStress1() {
@@ -470,12 +512,7 @@ public class TestMessaging extends TestCase {
     }*/
 
     class MockNewNode extends Thread {
-        final int m_port;
         AtomicBoolean m_ready = new AtomicBoolean(false);
-
-        MockNewNode(int port) {
-            m_port = port;
-        }
 
         void waitUntilReady() {
             while (!m_ready.get())
@@ -485,15 +522,13 @@ public class TestMessaging extends TestCase {
         @Override
         public void run() {
             try {
-                ServerSocketChannel listener = ServerSocketChannel.open();
-                listener.socket().bind(new InetSocketAddress(m_port));
-
-                VoltNetworkPool network = new VoltNetworkPool();
-                network.start();
-                HostMessenger msg = new HostMessenger(network, listener, 2, 0, 0, null);
+                HostMessenger.Config config = new HostMessenger.Config();
+                config.internalPort += 1;
+                config.zkInterface = "127.0.0.1:" + 2182;
+                HostMessenger msg = new HostMessenger(config);
+                msg.start();
                 m_ready.set(true);
-                msg.waitForGroupJoin();
-
+                msg.waitForGroupJoin(2);
             } catch (Exception e) {
                 e.printStackTrace();
                 throw new RuntimeException(e);
@@ -502,35 +537,24 @@ public class TestMessaging extends TestCase {
     }
 
     public void testFailAndRejoin() throws Exception {
-        MockVoltDB mockvolt = new MockVoltDB();
-        VoltDB.replaceVoltDBInstanceForTest(mockvolt);
-
-        // get config info (mostly the port)
-        int internalPort = new VoltDB.Configuration().m_internalPort;
-
         try {
             Selector.open();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        VoltNetworkPool network = new VoltNetworkPool();
-        network.start();
-        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
-        Thread.sleep(20);
-        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
 
+
+        HostMessenger msg1 = new HostMessenger(getConfig(0));
+        msg1.start();
+        HostMessenger msg2 = new HostMessenger(getConfig(1));
+        msg2.start();
         System.out.println("Waiting for socketjoiners...");
-        msg1.waitForGroupJoin();
+        msg1.waitForGroupJoin(2);
         System.out.println("Finished socket joiner for msg1");
-        msg2.waitForGroupJoin();
+        msg2.waitForGroupJoin(2);
         System.out.println("Finished socket joiner for msg2");
 
-        int siteId1 = msg1.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 1;
-        int siteId2 = msg2.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 2;
-        int msg2hostId = msg2.getHostId();
-
-        msg1.createLocalSite(siteId1);
-        msg2.createLocalSite(siteId2);
+        final int msg2hostId = msg2.getHostId();
 
         // kill host #2
         // triggers the fault manager
@@ -547,24 +571,16 @@ public class TestMessaging extends TestCase {
         assertEquals(0, msg1.countForeignHosts());
 
         // rejoin the network in a new thread
-        MockNewNode newnode = new MockNewNode(internalPort);
+        MockNewNode newnode = new MockNewNode();
         newnode.start();
         newnode.waitUntilReady();
         // this is just for extra safety
         Thread.sleep(50);
-
-        HashSet<Integer> liveHosts = new HashSet<Integer>();
-        liveHosts.add(msg1.getHostId());
-        // the last byte array below is the bytes of a dummy catalog
-        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), 0, 0, liveHosts, 0, 1, 0, new byte[] { 'a' });
-        msg1.rejoinForeignHostCommit();
 
         // this timeout is rather lousy, but neither is it exception safe!
         newnode.join(1000);
         if (newnode.isAlive()) fail();
 
         msg1.shutdown();
-        network.shutdown();
-        mockvolt.shutdown(null);
     }
 }

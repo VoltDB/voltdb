@@ -69,8 +69,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static class Config {
         public InetSocketAddress coordinatorIp;
         public String zkInterface = "127.0.0.1:2181";
-        public ScheduledExecutorService ses =
-            MiscUtils.getScheduledThreadPoolExecutor("HostMessenger SES", 1, 1024 * 128);
+        public ScheduledExecutorService ses = null;
         public String internalInterface = "";
         public int internalPort = 3021;
         public int deadHostTimeout = 10000;
@@ -279,14 +278,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     {
         return m_config.factory;
     }
-
-    /**
-     * Wait until all the nodes have built a mesh.
-     */
-    public void waitForGroupJoin() {
-         waitForGroupJoin(Integer.MAX_VALUE);
-    }
-
 
     /*
      * Take the new connection (member of the mesh) and create a foreign host for it
@@ -624,7 +615,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (fhost == null)
         {
             if (!m_knownFailedHosts.contains(hostId)) {
-                throw new MessagingException(
+                hostLog.warn(
                         "Attempted to send a message to foreign host with id " +
                         hostId + " but there is no such host.");
             }
@@ -742,6 +733,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
         }
         m_joiner.shutdown();
+        m_network.shutdown();
     }
 
     /*
@@ -789,10 +781,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public void closeForeignHostSocket(int hostId) {
         ForeignHost fh = m_foreignHosts.get().get(hostId);
-        putForeignHost(hostId, null);
         if (fh != null && fh.isUp()) {
             fh.killSocket();
         }
+        reportForeignHostFailed(hostId);
     }
 
     public ZooKeeper getZK() {
