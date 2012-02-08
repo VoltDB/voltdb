@@ -29,7 +29,6 @@ import org.voltcore.utils.DBBPool.BBContainer;
 
 public class TestDBBPool extends TestCase {
 
-    final int NUM_BUFFERS = 10;
     final int SIZE1 = 8096;
     final int SIZE2 = 1337;
 
@@ -49,6 +48,9 @@ public class TestDBBPool extends TestCase {
         container1.discard();
         assertEquals(SIZE1 + SIZE2, DBBPool.getBytesAllocatedGlobally());
         container1 = DBBPool.allocateDirect(SIZE2);
+        assertEquals(SIZE1 + SIZE2, DBBPool.getBytesAllocatedGlobally());
+        container1.discard();
+        container2.discard();
         assertEquals(SIZE1 + SIZE2, DBBPool.getBytesAllocatedGlobally());
     }
 }
