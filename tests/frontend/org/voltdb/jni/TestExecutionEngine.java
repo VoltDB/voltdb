@@ -30,6 +30,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
 
+import org.voltcore.messaging.MockMailbox;
+import org.voltcore.messaging.RecoveryMessage;
+import org.voltcore.messaging.RecoveryMessageType;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.RecoverySiteProcessorDestination;
 import org.voltdb.RecoverySiteProcessorSource;
@@ -41,13 +48,6 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.messaging.MockMailbox;
-import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.RecoveryMessageType;
-import org.voltdb.messaging.VoltMessage;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.Pair;
 
 /**
  * Tests native execution engine JNI interface.
@@ -194,8 +194,8 @@ public class TestExecutionEngine extends TestCase {
     }
 
     public void testRecoveryProcessors() throws Exception {
-        final int sourceId = 0;
-        final int destinationId = 32;
+        final long sourceId = 0;
+        final long destinationId = 32;
         final AtomicReference<Boolean> sourceCompleted = new AtomicReference<Boolean>(false);
         final AtomicReference<Boolean> destinationCompleted = new AtomicReference<Boolean>(false);
         final String serializedCatalog = m_catalog.serialize();
@@ -203,15 +203,15 @@ public class TestExecutionEngine extends TestCase {
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
 
-        final HashMap<Pair<String, Integer>, HashSet<Integer>> tablesAndDestinations =
-            new HashMap<Pair<String, Integer>, HashSet<Integer>>();
-        HashSet<Integer> destinations = new HashSet<Integer>();
+        final HashMap<Pair<String, Integer>, HashSet<Long>> tablesAndDestinations =
+            new HashMap<Pair<String, Integer>, HashSet<Long>>();
+        HashSet<Long> destinations = new HashSet<Long>();
         destinations.add(destinationId);
         tablesAndDestinations.put(Pair.of( "STOCK", STOCK_TABLEID), destinations);
         tablesAndDestinations.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), destinations);
 
         final MockMailbox sourceMailbox = new MockMailbox();
-        MockMailbox.registerMailbox( sourceId, VoltDB.DTXN_MAILBOX_ID, sourceMailbox);
+        MockMailbox.registerMailbox(sourceId, sourceMailbox);
 
         final Runnable onSourceCompletion = new Runnable() {
             @Override
@@ -235,7 +235,9 @@ public class TestExecutionEngine extends TestCase {
             public void run() {
                 try {
                     final ExecutionEngine sourceEngine =
-                        new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, sourceId, sourceId, "", 100);
+                        new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID,
+                                               (int)sourceId, (int)sourceId,
+                                               "", 100);
                     sourceReference.set(sourceEngine);
                     sourceEngine.loadCatalog( 0, serializedCatalog);
 
@@ -272,13 +274,13 @@ public class TestExecutionEngine extends TestCase {
         };
         sourceThread.start();
 
-        final HashMap<Pair<String, Integer>, Integer> tablesAndSources =
-            new HashMap<Pair<String, Integer>, Integer>();
+        final HashMap<Pair<String, Integer>, Long> tablesAndSources =
+            new HashMap<Pair<String, Integer>, Long>();
         tablesAndSources.put(Pair.of( "STOCK", STOCK_TABLEID), sourceId);
         tablesAndSources.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), sourceId);
 
         final MockMailbox destinationMailbox = new MockMailbox();
-        MockMailbox.registerMailbox( destinationId, VoltDB.DTXN_MAILBOX_ID, destinationMailbox);
+        MockMailbox.registerMailbox(destinationId, destinationMailbox);
 
         final Runnable onDestinationCompletion = new Runnable() {
             @Override
@@ -293,7 +295,8 @@ public class TestExecutionEngine extends TestCase {
             @Override
             public void run() {
                 final ExecutionEngine destinationEngine =
-                    new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "", 100);
+                    new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, (int)destinationId,
+                                           (int)destinationId, "", 100);
                 destinationReference.set(destinationEngine);
                 destinationEngine.loadCatalog( 0, serializedCatalog);
                 RecoverySiteProcessorDestination destinationProcess =
@@ -356,7 +359,7 @@ public class TestExecutionEngine extends TestCase {
 
     private ExecutionEngine sourceEngine;
     private static final int CLUSTER_ID = 2;
-    private static final int NODE_ID = 1;
+    private static final long NODE_ID = 1;
 
     TPCCProjectBuilder m_project;
     Catalog m_catalog;
