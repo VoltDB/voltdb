@@ -234,4 +234,30 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(mn.getLastReceivedTxnId(), mn2.getLastReceivedTxnId());
         assertEquals(mn.isBlocked(), mn2.isBlocked());
     }
+
+    public void testCompleteTransactionMessage() throws IOException
+    {
+        CompleteTransactionMessage ctm =
+            new CompleteTransactionMessage(12345, 54321, 67890, false, false,
+                                           true);
+
+        CompleteTransactionMessage ctm2 = (CompleteTransactionMessage) checkVoltMessage(ctm);
+        assertEquals(ctm.m_isRollback, ctm2.m_isRollback);
+        assertEquals(ctm.m_requiresAck, ctm2.m_requiresAck);
+    }
+
+    public void testCompleteTransactionResponseMessage() throws IOException
+    {
+        CompleteTransactionMessage ctm =
+            new CompleteTransactionMessage(12345, 54321, 67890, false, false,
+                                           true);
+
+        CompleteTransactionResponseMessage ctrm =
+            new CompleteTransactionResponseMessage(ctm, Long.MAX_VALUE - 4);
+
+        CompleteTransactionResponseMessage ctrm2 =
+            (CompleteTransactionResponseMessage) checkVoltMessage(ctrm);
+        assertEquals(ctrm.getExecutionSiteId(), ctrm.getExecutionSiteId());
+        assertEquals(ctrm.getTxnId(), ctrm2.getTxnId());
+    }
 }
