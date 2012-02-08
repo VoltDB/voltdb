@@ -80,12 +80,19 @@ public class MailboxTracker {
                 int partitionId = jsObj.getInt("partitionId");
                 int hostId = MiscUtils.getHostIdFromHSId(HSId);
 
-                ArrayList<Long> sites = new ArrayList<Long>();
-                hostsToSites.put(hostId, sites);
+                ArrayList<Long> sites = hostsToSites.get(hostId);
+                if (sites == null)
+                {
+                    sites = new ArrayList<Long>();
+                    hostsToSites.put(hostId, sites);
+                }
                 sites.add(HSId);
 
-                sites = new ArrayList<Long>();
-                partitionsToSites.put(partitionId, sites);
+                sites = partitionsToSites.get(partitionId);
+                if (sites == null) {
+                    sites = new ArrayList<Long>();
+                    partitionsToSites.put(partitionId, sites);
+                }
                 sites.add(HSId);
 
                 sitesToPartitions.put(HSId, partitionId);
