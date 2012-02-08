@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.utils;
+package org.voltcore.utils;
 
 import java.io.IOException;
 import java.util.ArrayList;
