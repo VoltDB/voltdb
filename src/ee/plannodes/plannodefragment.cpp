@@ -89,18 +89,15 @@ PlanNodeFragment::~PlanNodeFragment() {
 }
 
 PlanNodeFragment *
-PlanNodeFragment::createFromCatalog(const string hex_string)
+PlanNodeFragment::createFromCatalog(const string value)
 {
-    //cout << "PlanNodeFragment::createFromCatalog: hex_string.size() == " << hex_string.size() << endl;
-    assert (hex_string.size() % 2 == 0);
-    int buffer_length = (int)hex_string.size() / 2 + 1;
-    boost::shared_array<char> buffer(new char[buffer_length]);
-    catalog::Catalog::hexDecodeString(hex_string, buffer.get());
-    std::string bufferString( buffer.get() );
-    json_spirit::Value value;
-    json_spirit::read( bufferString, value );
+    //cout << "PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
 
-    return PlanNodeFragment::fromJSONObject(value.get_obj());
+    json_spirit::Value jValue;
+    json_spirit::read( value, jValue );
+
+    PlanNodeFragment *retval = PlanNodeFragment::fromJSONObject(jValue.get_obj());
+    return retval;
 }
 
 PlanNodeFragment *
