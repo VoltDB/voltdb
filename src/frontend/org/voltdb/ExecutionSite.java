@@ -922,13 +922,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     procClass = m_context.classForProcedure(className);
                 }
                 catch (final ClassNotFoundException e) {
-
-                    hostLog.l7dlog(
-                            Level.WARN,
-                            LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { getSiteId(), siteIndex },
-                            e);
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                    if (className.startsWith("org.voltdb.")) {
+                        VoltDB.crashLocalVoltDB("VoltDB does not support procedures with package names " +
+                                                        "that are prefixed with \"org.voltdb\". Please use a different " +
+                                                        "package name and retry.", false, null);
+                    }
+                    else {
+                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure it expected to be in the " +
+                                                "catalog jarfile and will now exit.", false, null);
+                    }
                 }
                 try {
                     wrapper = (VoltProcedure) procClass.newInstance();
