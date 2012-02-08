@@ -75,6 +75,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public int deadHostTimeout = 10000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
+        public int networkThreads =  Runtime.getRuntime().availableProcessors() / 2;
 
         public Config(String coordIp, int coordPort) {
             coordinatorIp = new InetSocketAddress(coordIp, coordPort);
@@ -139,7 +140,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             Config config)
     {
         m_config = config;
-        m_network = new VoltNetworkPool( Runtime.getRuntime().availableProcessors() / 2, m_config.ses);
+        m_network = new VoltNetworkPool( m_config.networkThreads, m_config.ses);
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
@@ -504,7 +505,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 this,
                 agreementHSId,
                 agreementSites,
-                0,
+                yourHostId,
                 sm,
                 new InetSocketAddress(
                         m_config.zkInterface.split(":")[0],

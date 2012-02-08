@@ -70,7 +70,7 @@ import org.voltdb.dtxn.TransactionInitiator;
 import org.voltcore.network.WriteStream;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
-import org.voltdb.zk.ZKTestBase;
+import org.voltcore.zk.ZKTestBase;
 
 @RunWith(Parameterized.class)
 public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callback {

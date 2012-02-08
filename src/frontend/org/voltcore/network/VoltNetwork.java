@@ -383,6 +383,7 @@ class VoltNetwork implements Runnable
             port.getKey().interestOps(0);
             port.run();
         } catch (CancelledKeyException e) {
+            port.m_running = false;
             e.printStackTrace();
             // no need to do anything here until
             // shutdown makes more sense

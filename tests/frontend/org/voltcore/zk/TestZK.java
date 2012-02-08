@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.voltdb.zk;
+package org.voltcore.zk;
 
 import static org.junit.Assert.*;
 
@@ -28,9 +28,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
-import org.voltdb.agreement.AgreementSite;
 import org.voltdb.fault.NodeFailureFault;
 import org.apache.zookeeper_voltpatches.*;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
@@ -59,52 +59,19 @@ public class TestZK extends ZKTestBase {
     }
 
     public void failSite(int site) throws Exception {
-        m_agreementSites.get(site).shutdown();
-        m_agreementSites.set(site, null);
-        m_mailboxes.set(site, null);
-        m_faultDistributor.m_faults.remove(m_faultDistributor.m_faultHandlers.get(site));
-        m_faultDistributor.m_faultHandlers.set(site, null);
-        m_faultDistributor.reportFault(
-                new NodeFailureFault(
-                        site,
-                        new HashSet<Integer>(Arrays.asList(site)),
-                        Integer.toString(site)));
+        m_messengers.get(site).shutdown();
+        m_messengers.set(site, null);
     }
 
     public void recoverSite(int site) throws Exception {
-        HashSet<Integer> failedSites = new HashSet<Integer>();
-        HashSet<Integer> agreementSiteIds = new HashSet<Integer>();
-        int zz = 0;
-        for (MockMailbox mailbox : m_mailboxes) {
-            agreementSiteIds.add(zz);
-            if (mailbox == null && zz != site) {
-                failedSites.add(zz);
-            }
-            zz++;
-        }
-        m_mailboxes.set( site, new MockMailbox());
-        m_faultDistributor.reportFaultCleared(
-                new NodeFailureFault(
-                        site,
-                        new HashSet<Integer>(Arrays.asList(site)),
-                        Integer.toString(site)));
-        m_faultDistributor.m_expectedHandler = site;
-        m_agreementSites.set(site, new AgreementSite(
-                    site,
-                    agreementSiteIds,
-                    site,
-                    failedSites,
-                    m_mailboxes.get(site),
-                    new InetSocketAddress(2182 + site),
-                    m_faultDistributor,
-                    true));
-        m_agreementSites.get(site).start();
-        for (int ii = 0; ii < m_agreementSites.size(); ii++) {
-            if (ii == site) {
-                continue;
-            }
-            m_agreementSites.get(ii).clearFault(site);
-        }
+        HostMessenger.Config config = new HostMessenger.Config();
+        config.internalPort += site;
+        config.zkInterface = "127.0.0.1:" + (2182 + site);
+        config.networkThreads = 1;
+        config.coordinatorIp = new InetSocketAddress("127.0.0.1", config.internalPort + NUM_AGREEMENT_SITES - 1);
+        HostMessenger hm = new HostMessenger(config);
+        hm.start();
+        m_messengers.set(site, hm);
     }
 
     @Test
@@ -126,24 +93,30 @@ public class TestZK extends ZKTestBase {
         ZooKeeper zk3 = getClient(2);
         List<String> children = zk3.getChildren("/", false);
         System.out.println(children);
-        assertEquals(3, children.size());
+        assertEquals(6, children.size());
         assertTrue(children.contains("zookeeper"));
-        assertTrue(children.contains("bar0000000002"));
-        assertTrue(children.contains("bar0000000003"));
+        assertTrue(children.contains("bar0000000005"));
+        assertTrue(children.contains("bar0000000006"));
+        assertTrue(children.contains("hosts"));
+        assertTrue(children.contains("hostids"));
+        assertTrue(children.contains("ready_hosts"));
 
         zk.close();
         zk2.close();
         m_clients.clear(); m_clients.add(zk3);
 
         children = zk3.getChildren("/", false);
-        assertEquals(1, children.size());
-        assertTrue(children.contains("zookeeper"));
         System.out.println(children);
+        assertEquals(4, children.size());
+        assertTrue(children.contains("zookeeper"));
+        assertTrue(children.contains("hosts"));
+        assertTrue(children.contains("hostids"));
+        assertTrue(children.contains("ready_hosts"));
     }
 
     @Test
     public void testFailure() throws Exception {
-        ZooKeeper zk = getClient(2);
+        ZooKeeper zk = getClient(1);
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         assertEquals(zk.getData("/foo", false, null).length, 0);
         System.out.println("Created node");
@@ -172,8 +145,10 @@ public class TestZK extends ZKTestBase {
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         failSite(0);
         zk.close();
-        zk = getClient(1);
-        assertEquals(zk.getData("/foo", false, null).length, 0);
+        for (int ii = 1; ii < NUM_AGREEMENT_SITES; ii++) {
+            zk = getClient(ii);
+            assertEquals(zk.getData("/foo", false, null).length, 0);
+        }
         recoverSite(0);
         assertEquals(zk.getData("/foo", false, null).length, 0);
         zk = getClient(0);
@@ -228,7 +203,6 @@ public class TestZK extends ZKTestBase {
         zk.create("/foo", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         failSite(1);
         recoverSite(1);
-        m_agreementSites.get(1).waitForRecovery();
         for (int ii = 2; ii < 8; ii++) {
             failSite(ii);
         }
@@ -236,7 +210,7 @@ public class TestZK extends ZKTestBase {
         zk = getClient(1);
         assertNull(zk.exists("/foo", false));
     }
-//
+
 //    @Test
 //    public void testMassiveNode() throws Exception {
 //        ZooKeeper zk = getClient(0);

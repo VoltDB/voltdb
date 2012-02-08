@@ -450,7 +450,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 }
             } else {
                 m_recoveryLog.info("Agreement, discarding duplicate txn during recovery, txnid is " + atm.m_txnId +
-                        " this should only occur during recovery.");
+                        " this should only occur during recovery. minTxnIdAfterRecovery " +
+                        m_minTxnIdAfterRecovery + " and  dup is " + m_transactionsById.containsKey(atm.m_txnId));
             }
         } else if (message instanceof BinaryPayloadMessage) {
             BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;

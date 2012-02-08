@@ -36,6 +36,14 @@ public abstract class VoltMessage
     protected abstract void initFromBuffer(ByteBuffer buf) throws IOException;
     public abstract void flattenToBuffer(ByteBuffer buf) throws IOException;
 
+    public static ByteBuffer toBuffer(VoltMessage message) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(message.getSerializedSize());
+        message.flattenToBuffer(buf);
+        assert(buf.capacity() == buf.position());
+        buf.flip();
+        return buf;
+    }
+
     public byte getSubject() {
         return m_subject;
     }
