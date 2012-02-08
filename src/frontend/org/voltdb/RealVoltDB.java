@@ -337,32 +337,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * This allows the sites to be set up in the thread that will end up running them.
              * Cache the first Site from the catalog and only do the setup once the other threads have been started.
              */
-            Long siteForThisThread = null;
-            m_currentThreadSite = null;
             Mailbox localThreadMailbox = siteMailboxes.poll();
+            m_currentThreadSite = null;
             for (Mailbox mailbox : siteMailboxes) {
                 long site = mailbox.getHSId();
                 int sitesHostId = MailboxTracker.getHostForHSId(site);
 
                 // start a local site
                 if (sitesHostId == m_myHostId) {
-                    if (siteForThisThread == null) {
-                        siteForThisThread = site;
-                    } else {
-                        ExecutionSiteRunner runner =
-                                new ExecutionSiteRunner(mailbox,
-                                                        m_catalogContext,
-                                                        m_serializedCatalog,
-                                                        m_recovering,
-                                                        m_replicationActive,
-                                                        m_downHosts,
-                                                        hostLog);
-                        m_runners.add(runner);
-                        Thread runnerThread = new Thread(runner, "Site " + site);
-                        runnerThread.start();
-                        log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
-                        m_siteThreads.put(site, runnerThread);
-                    }
+                    ExecutionSiteRunner runner =
+                            new ExecutionSiteRunner(mailbox,
+                                                    m_catalogContext,
+                                                    m_serializedCatalog,
+                                                    m_recovering,
+                                                    m_replicationActive,
+                                                    m_downHosts,
+                                                    hostLog);
+                    m_runners.add(runner);
+                    Thread runnerThread = new Thread(runner, "Site " + site);
+                    runnerThread.start();
+                    log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
+                    m_siteThreads.put(site, runnerThread);
                 }
             }
 
@@ -371,7 +366,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * this thread can set up its own execution site.
              */
             try {
-                long siteId = siteForThisThread;
                 ExecutionSite siteObj =
                         new ExecutionSite(VoltDB.instance(),
                                           localThreadMailbox,
@@ -381,7 +375,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                           m_replicationActive,
                                           m_downHosts,
                                           m_catalogContext.m_transactionId);
-                m_localSites.put(siteId, siteObj);
+                m_localSites.put(localThreadMailbox.getHSId(), siteObj);
                 m_currentThreadSite = siteObj;
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
