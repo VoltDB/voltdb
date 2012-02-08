@@ -121,7 +121,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     FaultDistributor m_faultManager;
-    Object m_instanceId[] = new Object[]{new Long(0), new Long(9)};
+    // IV2 XXX Need to make these real and publish through ZK
+    Object m_instanceId[] = new Object[]{new Long(0), new Integer(9)};
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;

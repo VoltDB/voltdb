@@ -300,6 +300,7 @@ class Distributer {
             buf.putInt(buf.capacity() - 4);
             try {
                 invocation.flattenToBuffer(buf);
+                buf.flip();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -682,6 +683,7 @@ class Distributer {
             buf.putInt(buf.capacity() - 4);
             try {
                 invocation.flattenToBuffer(buf);
+                buf.flip();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
