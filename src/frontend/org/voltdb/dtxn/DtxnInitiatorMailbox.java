@@ -121,6 +121,10 @@ public class DtxnInitiatorMailbox implements Mailbox
                              FaultType.NODE_FAILURE);
     }
 
+    public ExecutorTxnIdSafetyState getSafetyState() {
+        return m_safetyState;
+    }
+
     public void setInitiator(TransactionInitiator initiator) {
         m_initiator = initiator;
     }
@@ -179,8 +183,10 @@ public class DtxnInitiatorMailbox implements Mailbox
                 delta,
                 response.getStatus());
         m_latencies.logTransactionCompleted(delta);
+        System.out.println(response.toJSONString());
         ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
-        c.writeStream().enqueue(response.flattenToBuffer(buf));
+        response.flattenToBuffer(buf).flip();
+        c.writeStream().enqueue(buf);
     }
 
     public void removeConnectionStats(long connectionId) {

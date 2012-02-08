@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
+import java.util.Map.Entry;
 
 public class ExecutorTxnIdSafetyState {
 
@@ -83,10 +83,10 @@ public class ExecutorTxnIdSafetyState {
         }
     }
 
-    public ExecutorTxnIdSafetyState(SiteTracker tracker) {
-        Set<Long> execSites = tracker.getExecutionSiteIds();
-        for (long id : execSites) {
-            int partitionId = tracker.getMailboxTracker().getPartitionForSite(id);
+    public ExecutorTxnIdSafetyState(Map<Long, Integer> siteMap) {
+        for (Entry<Long, Integer> e : siteMap.entrySet()) {
+            long id = e.getKey();
+            int partitionId = e.getValue();
 
             // note the site to partition mapping, even if down
             m_stateToPartitionMap.put(id, partitionId);

@@ -71,6 +71,8 @@ import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.dtxn.DtxnInitiatorMailbox;
+import org.voltdb.dtxn.ExecutorTxnIdSafetyState;
 import org.voltdb.dtxn.MailboxTracker;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
@@ -293,14 +295,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
 
             ArrayDeque<Mailbox> siteMailboxes = null;
+            DtxnInitiatorMailbox initiatorMailbox = null;
             // start mailbox tracker since all the
+            m_faultManager = new FaultDistributor(this);
             try {
                 siteMailboxes = createMailboxesForSites();
                 m_catalogContext.siteTracker.setMailboxTracker(new MailboxTracker(m_messenger.getZK()));
+                initiatorMailbox = createInitiatorMailbox();
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
-            m_faultManager = new FaultDistributor(this);
 
             // do the many init tasks in the Inits class
             Inits inits = new Inits(this, 1);
@@ -407,7 +411,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             for (int i = 0; i < 1; i++) {
                 // create DTXN and CI for each local non-EE site
                 SimpleDtxnInitiator initiator =
-                        new SimpleDtxnInitiator(
+                        new SimpleDtxnInitiator(initiatorMailbox,
                                                 m_catalogContext,
                                                 m_messenger,
                                                 m_myHostId,
@@ -525,6 +529,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         jsObj.put("partitionId", partitionId);
         byte[] payload = jsObj.toString(4).getBytes("UTF-8");
         m_messenger.getZK().create("/mailboxes/executionsites/site", payload,
+                                   Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+    }
+
+    private DtxnInitiatorMailbox createInitiatorMailbox() throws Exception {
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_catalogContext.siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_catalogContext.siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox mailbox = new DtxnInitiatorMailbox(safetyState, m_messenger);
+        m_messenger.createMailbox(null, mailbox);
+        registerInitiatorMailbox(mailbox.getHSId());
+        return mailbox;
+    }
+
+    private void registerInitiatorMailbox(long HSId) throws Exception {
+        JSONObject jsObj = new JSONObject();
+        jsObj.put("HSId", HSId);
+        byte[] payload = jsObj.toString(4).getBytes("UTF-8");
+        m_messenger.getZK().create("/mailboxes/initiators/initiator", payload,
                                    Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 

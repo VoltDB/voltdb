@@ -48,10 +48,6 @@ public class MailboxTracker {
             new HashMap<Integer, Long>();
     private volatile Map<Integer, ArrayList<Long>> m_hostsToInitiators =
             new HashMap<Integer, ArrayList<Long>>();
-    private volatile Map<Integer, ArrayList<Long>> m_partitionsToInitiators =
-            new HashMap<Integer, ArrayList<Long>>();
-    private volatile Map<Long, Integer> m_initiatorsToPartitions =
-            new HashMap<Long, Integer>();
 
     public MailboxTracker(ZooKeeper zk) throws Exception {
         m_zk = zk;
@@ -143,14 +139,11 @@ public class MailboxTracker {
         });
 
         Map<Integer, ArrayList<Long>> hostsToInitiators = new HashMap<Integer, ArrayList<Long>>();
-        Map<Integer, ArrayList<Long>> partitionsToInitiators = new HashMap<Integer, ArrayList<Long>>();
-        Map<Long, Integer> initiatorsToPartitions = new HashMap<Long, Integer>();
         for (String child : children) {
             byte[] data = m_zk.getData("/mailboxes/initiators/" + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
             try {
                 long HSId = jsObj.getLong("HSId");
-                int partitionId = jsObj.getInt("partitionId");
                 int hostId = MiscUtils.getHostIdFromHSId(HSId);
 
                 ArrayList<Long> initiators = new ArrayList<Long>();
@@ -158,10 +151,8 @@ public class MailboxTracker {
                 initiators.add(HSId);
 
                 initiators = new ArrayList<Long>();
-                partitionsToInitiators.put(partitionId, initiators);
                 initiators.add(HSId);
 
-                initiatorsToPartitions.put(HSId, partitionId);
                 // TODO: needs to determine if it's the master or replica
             } catch (JSONException e) {
                 log.error(e.getMessage());
@@ -169,8 +160,6 @@ public class MailboxTracker {
         }
 
         m_hostsToInitiators = hostsToInitiators;
-        m_partitionsToInitiators = partitionsToInitiators;
-        m_initiatorsToPartitions = initiatorsToPartitions;
     }
 
     public static int getHostForHSId(long HSId) {
@@ -195,14 +184,6 @@ public class MailboxTracker {
 
     public List<Long> getInitiatorForHost(int hostId) {
         return m_hostsToInitiators.get(hostId);
-    }
-
-    public List<Long> getInitiatorForPartition(int partitionId) {
-        return m_partitionsToInitiators.get(partitionId);
-    }
-
-    public Integer getPartitionForInitiator(long hsId) {
-        return m_initiatorsToPartitions.get(hsId);
     }
 
     public Set<Integer> getAllHosts() {

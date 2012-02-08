@@ -196,7 +196,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             + 1 // present fields
             + 1 // status
             + 1 // app status
-            + 4; // cluster roundtrip time
+            + 4 // cluster roundtrip time
+            + 2; // number of result tables
         try {
             if (appStatusString != null) {
                 encodedAppStatusString = appStatusString.getBytes("UTF-8");
@@ -210,7 +211,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
                 msgsize += m_exception.getSerializedSize();
             }
             for (VoltTable vt : results) {
-                msgsize += vt.getSerializedSize() + 2; // we need to add the array length, short
+                msgsize += vt.getSerializedSize();
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error serializing client response", false, e);

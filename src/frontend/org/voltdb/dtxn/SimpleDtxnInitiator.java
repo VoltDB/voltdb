@@ -100,18 +100,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final int m_hostId;
     private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
-    public SimpleDtxnInitiator(CatalogContext context,
+    public SimpleDtxnInitiator(DtxnInitiatorMailbox mailbox,
+                               CatalogContext context,
                                HostMessenger messenger, int hostId,
                                long initiatorId,
                                long timestampTestingSalt)
     {
         assert(messenger != null);
 
-        m_safetyState = new ExecutorTxnIdSafetyState(context.siteTracker);
-        m_mailbox = new DtxnInitiatorMailbox(
-                        m_safetyState,
-                        (org.voltcore.messaging.HostMessenger)messenger);
-        messenger.createMailbox(null, m_mailbox);
+        m_mailbox = mailbox;
+        m_safetyState = m_mailbox.getSafetyState();
         m_siteId = m_mailbox.getHSId();
         m_safetyState.setHSId(m_siteId);
         hostLog.info("Initializing initiator ID: " + initiatorId  + ", SiteID: " + m_siteId);

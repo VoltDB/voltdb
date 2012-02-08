@@ -720,7 +720,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         final long[] initiatorIds = new long[initiatorCount];
         int index = 0;
         for (long s : m_context.siteTracker.getLiveNonExecSites())
-            initiatorIds[index++] = m_context.siteTracker.getMailboxTracker().getPartitionForInitiator(s);
+            initiatorIds[index++] = s;
 
         // turn off the safety dance for single-node voltdb
         boolean useSafetyDance = m_context.numberOfNodes > 1;
