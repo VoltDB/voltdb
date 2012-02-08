@@ -208,7 +208,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         if (m_isShutdown) {
             return false;
         }
-        return callProcedure(callback, procName, parameters);
+        return callProcedure(callback, 0, procName, parameters);
     }
 
     /**
@@ -236,7 +236,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         ProcedureInvocation invocation =
             new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(callback, 0, invocation);
+        return private_callProcedure(callback, 0, invocation);
     }
 
     @Override
@@ -259,10 +259,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(callback, expectedSerializedSize, invocation);
+        return private_callProcedure(callback, expectedSerializedSize, invocation);
     }
 
-    private final boolean callProcedure(
+    private final boolean private_callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
             ProcedureInvocation invocation)
