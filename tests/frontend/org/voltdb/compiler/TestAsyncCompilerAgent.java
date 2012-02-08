@@ -91,7 +91,7 @@ public class TestAsyncCompilerAgent {
          */
         for (int i = 0; i < AsyncCompilerAgent.MAX_QUEUE_DEPTH + 2; ++i) {
             AdHocPlannerWork work =
-                    new AdHocPlannerWork(100, 0, false, 0, 0, "localhost", false, null,
+                    new AdHocPlannerWork(100l, false, 0, 0, "localhost", false, null,
                                          "select * from a", 0);
             LocalObjectMessage msg = new LocalObjectMessage(work);
             m_agent.m_mailbox.deliver(msg);
