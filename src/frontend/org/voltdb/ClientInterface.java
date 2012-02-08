@@ -667,7 +667,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 final ClientResponseImpl error = handleRead(message, this, c);
                 if (error != null) {
                     ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize());
-                    c.writeStream().enqueue(error.flattenToBuffer(buf));
+                    error.flattenToBuffer(buf).flip();
+                    c.writeStream().enqueue(buf);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
