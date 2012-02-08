@@ -76,12 +76,10 @@ public class ZKTestBase {
 
     protected void tearDownZK() throws Exception {
         for (ZooKeeper keeper : m_clients) {
-            System.out.println("Shutting down client " + keeper);
             keeper.close();
         }
         m_clients.clear();
         for (HostMessenger hm : m_messengers) {
-            System.out.println("Shutting down messenger " + hm);
             if (hm != null) {
                 hm.shutdown();
             }
