@@ -82,6 +82,11 @@ public final class DBBPool {
      */
     private static AtomicLong bytesAllocatedGlobally = new AtomicLong(0);
 
+    static long getBytesAllocatedGlobally()
+    {
+        return bytesAllocatedGlobally.get();
+    }
+
     private static final VoltLogger m_logger = new VoltLogger(DBBPool.class.getName());
 
     /**
