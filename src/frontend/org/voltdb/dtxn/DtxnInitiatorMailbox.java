@@ -184,7 +184,8 @@ public class DtxnInitiatorMailbox implements Mailbox
                 response.getStatus());
         m_latencies.logTransactionCompleted(delta);
         System.out.println(response.toJSONString());
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
         response.flattenToBuffer(buf).flip();
         c.writeStream().enqueue(buf);
     }
