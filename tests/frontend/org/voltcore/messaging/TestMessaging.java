@@ -21,16 +21,19 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.messaging;
+package org.voltcore.messaging;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.HashSet;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -38,20 +41,19 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase;
 
+import org.mockito.ArgumentCaptor;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.messaging.SocketJoiner.JoinHandler;
+import static org.mockito.Mockito.*;
 
 public class TestMessaging extends TestCase {
     public static class MsgTest extends VoltMessage {
 
         public static final byte MSG_TEST_ID = 127;
-
-        static {
-            VoltMessage.externals.put(MSG_TEST_ID, MsgTest.class);
-        }
 
         static byte[] globalValue;
         byte[] m_localValue;
@@ -65,19 +67,16 @@ public class TestMessaging extends TestCase {
         }
 
         @Override
-        protected void initFromBuffer() {
-            m_buffer.position(HEADER_SIZE + 1); // ignore msg type
-            m_length = m_buffer.limit() - m_buffer.position();
+        public void initFromBuffer(ByteBuffer buf) {
+            m_length = buf.limit() - buf.position();
             m_localValue = new byte[m_length];
-            m_buffer.get(m_localValue);
+            buf.get(m_localValue);
         }
 
         @Override
-        protected void flattenToBuffer(final DBBPool pool) {
-            m_buffer.position(HEADER_SIZE);
-            setBufferSize(1 + m_localValue.length, pool);
-            m_buffer.put(MSG_TEST_ID);
-            m_buffer.put(m_localValue);
+        protected void flattenToBuffer(ByteBuffer buf) {
+            buf.put(MSG_TEST_ID);
+            buf.put(m_localValue);
         }
 
         public void setValues() {
@@ -99,14 +98,31 @@ public class TestMessaging extends TestCase {
         }
     }
 
+    public static class MessageFactory extends org.voltcore.messaging.VoltMessageFactory {
+        final public static byte DUMMY_ID = VOLTCORE_MESSAGE_ID_MAX + 1;
+
+        @Override
+        protected VoltMessage instantiate_local(byte messageType)
+        {
+            // instantiate a new message instance according to the id
+            VoltMessage message = null;
+
+            switch (messageType) {
+            case DUMMY_ID:
+               message = new MsgTest();
+               break;
+            }
+            return message;
+        }
+    }
+
     public static class MsgTestEndpoint extends Thread {
         static final int msgCount = 1024;
         static final int hostCount = 3;
-        static final int mailboxCount = 5;
-        static VoltNetworkPool network = new VoltNetworkPool();
+        static final long mailboxCount = 5;
 
         static Lock hostMessengerLock = new ReentrantLock();
-        static Messenger[] messengers = new HostMessenger[hostCount];
+        static HostMessenger[] messengers = new HostMessenger[hostCount];
         static AtomicInteger sitesDone = new AtomicInteger(0);
 
         static AtomicInteger sentCount = new AtomicInteger(0);
@@ -125,8 +141,8 @@ public class TestMessaging extends TestCase {
             // create a site
             int hostId = mySiteId % hostCount;
             InetAddress leader = null;
-            Messenger currentMessenger = null;
-            Mailbox[] mbox = new Mailbox[mailboxCount];
+            HostMessenger currentMessenger = null;
+            Mailbox[] mbox = new Mailbox[(int)mailboxCount];
 
             System.out.printf("Starting up host: %d, site: %d\n", hostId, mySiteId);
 
@@ -144,22 +160,32 @@ public class TestMessaging extends TestCase {
                         leader = ConnectionUtil.getLocalAddress();
                     }
                     System.out.printf("Host/Site %d/%d is creating a new HostMessenger.\n", hostId, mySiteId);
-                    HostMessenger messenger = new HostMessenger(network, leader, hostCount, 0, 0, null);
+                    HostMessenger.Config config = new HostMessenger.Config();
+                    config.internalPort += mySiteId;
+                    final HostMessenger messenger = new HostMessenger(config);
                     currentMessenger = messenger;
                     messengers[hostId] = currentMessenger;
+                    new Thread() {
+                        @Override
+                        public void run() {
+                            try {
+                                messenger.start();
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    };
                 }
                 else
                     System.out.printf("Host/Site %d/%d found existing HostMessenger.\n", hostId, mySiteId);
             }
             hostMessengerLock.unlock();
 
-            HostMessenger messenger = (HostMessenger) currentMessenger;
+            HostMessenger messenger = currentMessenger;
             messenger.waitForGroupJoin();
-            // create the site
-            messenger.createLocalSite(mySiteId);
             // create the mailboxes
             for (int i = 0; i < mailboxCount; i++) {
-                mbox[i] = currentMessenger.createMailbox(mySiteId, i, true);
+                mbox[i] = currentMessenger.createMailbox();
             }
             // claim this site is done
             sitesDone.incrementAndGet();
@@ -179,13 +205,13 @@ public class TestMessaging extends TestCase {
                 // send a message
                 if (msgIndex < msgCount) {
                     int siteId = rand.nextInt(siteCount.get());
-                    int mailboxId = rand.nextInt(mailboxCount);
+                    long mailboxId = rand.nextLong() % mailboxCount;
                     System.out.printf("Host/Site %d/%d is sending message %d/%d to site/mailbox %d/%d.\n",
                             hostId, mySiteId, msgIndex, msgCount, siteId, mailboxId);
                     MsgTest mt = new MsgTest();
                     mt.setValues();
                     try {
-                        ((HostMessenger) currentMessenger).send(siteId, mailboxId, mt);
+                        (currentMessenger).send((mailboxCount << 32) + siteId, mt);
                     } catch (MessagingException e) {
                         e.printStackTrace();
                     }
@@ -202,143 +228,43 @@ public class TestMessaging extends TestCase {
                     }
                 }
             }
-            messenger.shutdown();
             try {
-                network.shutdown();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                messenger.shutdown();
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
             }
         }
     }
 
-    /*public void testSerialization() {
-        final int REPEAT = 1024 * 1024 * 5;
-
-        try {
-            FastSerializer fout;
-            FastDeserializer fin;
-
-            MsgTest mt = new MsgTest();
-
-            long t1 = new Date().getTime();
-
-            for (int i = 0; i < REPEAT; i++) {
-                fout = new FastSerializer();
-                fout.writeObject(mt);
-                byte[] buf = fout.getBytes();
-                fin = new FastDeserializer(buf);
-                mt = fin.readObject(mt.getClass());
-            }
-
-            long t2 = new Date().getTime();
-
-            double time = (t2 - t1) / 1000.0;
-            long throughput = (long)(REPEAT / time);
-            System.out.printf("S/D pairs per sec: %d\n", throughput);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        try {
-            ByteArrayOutputStream baos;
-            ByteArrayInputStream bais;
-            ObjectOutputStream out;
-            ObjectInputStream in;
-
-            MsgTest mt = new MsgTest();
-
-            long t1 = new Date().getTime();
-
-            for (int i = 0; i < REPEAT; i++) {
-                baos = new ByteArrayOutputStream();
-                out = new ObjectOutputStream(baos);
-                out.writeObject(mt);
-                byte[] buf = baos.toByteArray();
-                bais = new ByteArrayInputStream(buf);
-                in = new ObjectInputStream(bais);
-                mt = (MsgTest) in.readObject();
-            }
-
-            long t2 = new Date().getTime();
-
-            double time = (t2 - t1) / 1000.0;
-            long throughput = (long)(REPEAT / time);
-            System.out.printf("S/D pairs per sec: %d\n", throughput);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-    }*/
-
     public void testJoiner() {
         try {
-            SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
-            SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
-            SocketJoiner joiner3 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
+            JoinHandler jh1 = mock(JoinHandler.class);
+            SocketJoiner joiner1 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3212, null, jh1);
+            JoinHandler jh2 = mock(JoinHandler.class);
+            SocketJoiner joiner2 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3213, null, jh2);
+            JoinHandler jh3 = mock(JoinHandler.class);
+            SocketJoiner joiner3 = new SocketJoiner(new InetSocketAddress("127.0.0.1", 3212), "", 3214, null, jh3);
 
-            joiner1.start();
-            joiner2.start();
-            joiner3.start();
+            CountDownLatch cdl = new CountDownLatch(1);
+            joiner1.start(cdl);
+            joiner2.start(null);
+            verify(jh1, never()).requestJoin(any(SocketChannel.class), any(InetSocketAddress.class));
+            verify(jh1).requestJoin(isNotNull(SocketChannel.class), eq(new InetSocketAddress("127.0.0.1", 3213)));
+            joiner3.start(null);
 
-            joiner1.join();
-            joiner2.join();
-            joiner3.join();
+            cdl.countDown();
+            jh1.
 
+
+            joiner1.shutdown();
+            joiner2.shutdown();
+            joiner3.shutdown();
             assertTrue(true);
             return;
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
         assertTrue(false);
-    }
-
-    public void testJoinerBadCRC() {
-        MockVoltDB mockVoltDB = new MockVoltDB();
-        mockVoltDB.shouldIgnoreCrashes = true;
-        VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
-
-        // test catalog crcs
-        try {
-            SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
-            SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
-            SocketJoiner joiner3 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 1, 0, null);
-
-            joiner1.start();
-            joiner2.start();
-            joiner3.start();
-
-            joiner1.join();
-            joiner2.join();
-            joiner3.join();
-
-            assertTrue(mockVoltDB.getCrashCount() > 0);
-        } catch (InterruptedException e) {
-            fail();
-        }
-
-        // test deployment crcs
-        try {
-            SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
-            SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
-            SocketJoiner joiner3 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 1, null);
-
-            joiner1.start();
-            joiner2.start();
-            joiner3.start();
-
-            joiner1.join();
-            joiner2.join();
-            joiner3.join();
-
-            assertTrue(mockVoltDB.getCrashCount() > 0);
-            mockVoltDB.shutdown(null);
-            return;
-        } catch (InterruptedException e) {
-            fail();
-        }
-        fail();
     }
 
     public void testSimple() throws MessagingException, UnknownHostException, InterruptedException {

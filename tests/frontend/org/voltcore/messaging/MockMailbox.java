@@ -48,7 +48,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.messaging;
+package org.voltcore.messaging;
 
 import java.util.*;
 
