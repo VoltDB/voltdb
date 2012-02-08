@@ -22,12 +22,9 @@
  */
 package org.voltdb;
 
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
@@ -36,9 +33,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -50,13 +47,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.fault.FaultDistributorInterface;
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
-import org.voltcore.messaging.Messenger;
-import org.voltdb.messaging.MockMailbox;
-import org.voltcore.messaging.VoltMessage;
-import org.voltcore.network.VoltNetworkPool;
 
 public class MockVoltDB implements VoltDBInterface
 {
@@ -67,32 +57,33 @@ public class MockVoltDB implements VoltDBInterface
     StatsAgent m_statsAgent = null;
     int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
-    HostMessenger m_hostMessenger = new HostMessenger() {
-        @Override
-        public void send(final int siteId, final int mailboxId, final VoltMessage message)
-            throws MessagingException {
-            Mailbox mailbox = MockMailbox.postoffice.get(mailboxId).get(siteId);
-            if (mailbox != null) {
-                mailbox.deliver(message);
-            }
-        }
-
-        @Override
-        public void send(int[] siteIds, int mailboxId, final VoltMessage message)
-            throws MessagingException {
-            for (int i : siteIds) {
-                Mailbox mailbox = MockMailbox.postoffice.get(mailboxId).get(i);
-                if (mailbox != null) {
-                    mailbox.deliver(message);
-                }
-            }
-        }
-
-        @Override
-        public int getHostId() {
-            return 1;
-        }
-    };
+    HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config());
+//    {
+//        @Override
+//        public void send(final int siteId, final int mailboxId, final VoltMessage message)
+//            throws MessagingException {
+//            Mailbox mailbox = MockMailbox.postoffice.get(mailboxId).get(siteId);
+//            if (mailbox != null) {
+//                mailbox.deliver(message);
+//            }
+//        }
+//
+//        @Override
+//        public void send(int[] siteIds, int mailboxId, final VoltMessage message)
+//            throws MessagingException {
+//            for (int i : siteIds) {
+//                Mailbox mailbox = MockMailbox.postoffice.get(mailboxId).get(i);
+//                if (mailbox != null) {
+//                    mailbox.deliver(message);
+//                }
+//            }
+//        }
+//
+//        @Override
+//        public int getHostId() {
+//            return 1;
+//        }
+//    };
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
@@ -145,10 +136,10 @@ public class MockVoltDB implements VoltDBInterface
         execSite.setPartition(partition);*/
 
         m_statsAgent = new StatsAgent();
-        Mailbox mbox = m_statsAgent.getMailbox(m_hostMessenger, 1);
-        MockMailbox.postoffice.get(VoltDB.STATS_MAILBOX_ID).put(1, mbox);
-        MockMailbox mailbox = new MockMailbox();
-        MockMailbox.registerMailbox(1, VoltDB.AGREEMENT_MAILBOX_ID, mailbox);
+//        Mailbox mbox = m_statsAgent.getMailbox(m_hostMessenger, 1);
+//        MockMailbox.postoffice.get(VoltDB.STATS_MAILBOX_ID).put(1, mbox);
+//        MockMailbox mailbox = new MockMailbox();
+//        MockMailbox.registerMailbox(1, VoltDB.AGREEMENT_MAILBOX_ID, mailbox);
 /*
          try {
             m_agreementSite =
@@ -190,14 +181,15 @@ public class MockVoltDB implements VoltDBInterface
         getCluster().getPartitions().add(Integer.toString(partitionId));
     }
 
-    private final Hashtable<Integer, ExecutionSite> m_localSites = new Hashtable<Integer, ExecutionSite>();
+    private final Hashtable<Long, ExecutionSite> m_localSites =
+        new Hashtable<Long, ExecutionSite>();
 
-    public void addSite(int siteId, int hostId, int partitionId, boolean isExec)
+    public void addSite(long siteId, int hostId, int partitionId, boolean isExec)
     {
         if (hostId == 0) {
             m_localSites.put(siteId, new ExecutionSite(partitionId));
         }
-        getCluster().getSites().add(Integer.toString(siteId));
+        getCluster().getSites().add(Long.toString(siteId));
         getSite(siteId).setHost(getHost(hostId));
         getSite(siteId).setIsexec(isExec);
         if (isExec)
@@ -289,7 +281,7 @@ public class MockVoltDB implements VoltDBInterface
         return getCluster().getPartitions().get(String.valueOf(partitionId));
     }
 
-    public Site getSite(int siteId)
+    public Site getSite(long siteId)
     {
         return getCluster().getSites().get(String.valueOf(siteId));
     }
@@ -346,21 +338,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Hashtable<Integer, ExecutionSite> getLocalSites()
+    public Hashtable<Long, ExecutionSite> getLocalSites()
     {
         return m_localSites;
-    }
-
-    @Override
-    public Messenger getMessenger()
-    {
-        return null;
-    }
-
-    @Override
-    public VoltNetworkPool getNetwork()
-    {
-        return null;
     }
 
     public void setStatsAgent(StatsAgent agent)
@@ -426,7 +406,6 @@ public class MockVoltDB implements VoltDBInterface
     public void shutdown(Thread mainSiteThread) throws InterruptedException
     {
         m_snapshotCompletionMonitor.shutdown();
-        m_zk.close();
         m_es.shutdown();
         m_es.awaitTermination( 1, TimeUnit.DAYS);
         m_statsAgent.shutdown();
@@ -538,11 +517,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public ZooKeeper getZK() {
-        return m_zk;
-    }
-
-    @Override
     public void onAgreementSiteRecoveryCompletion() {}
 
     @Override
@@ -552,9 +526,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void recoveryComplete() {}
-
-    @Override
-    public void writeNetworkCatalogToTmp(byte[] catalogBytes) {}
 
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay, TimeUnit unit) {

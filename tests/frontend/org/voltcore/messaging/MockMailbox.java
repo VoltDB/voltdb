@@ -52,23 +52,16 @@ package org.voltcore.messaging;
 
 import java.util.*;
 
-import org.voltdb.VoltDB;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 
 public class MockMailbox implements Mailbox {
 
-    public static HashMap<Integer, HashMap<Integer, Mailbox>> postoffice =
-        new HashMap<Integer, HashMap<Integer, Mailbox>>();
+    public static HashMap<Long, Mailbox> postoffice =
+        new HashMap<Long, Mailbox>();
 
-    static {
-        postoffice.put(VoltDB.DTXN_MAILBOX_ID, new HashMap<Integer, Mailbox>());
-        postoffice.put(VoltDB.AGREEMENT_MAILBOX_ID, new HashMap<Integer, Mailbox>());
-        postoffice.put(VoltDB.STATS_MAILBOX_ID, new HashMap<Integer, Mailbox>());
-    }
-
-    public static void registerMailbox(int siteId, int mailboxId, MockMailbox mbox) {
-        postoffice.get(mailboxId).put(siteId, mbox);
+    public static void registerMailbox(long siteId, Mailbox mbox) {
+        postoffice.put(siteId, mbox);
     }
 
     public MockMailbox() {
@@ -81,7 +74,7 @@ public class MockMailbox implements Mailbox {
     public void send(long HSId, VoltMessage message) throws MessagingException {
         outgoingMessages.add(new Message(HSId, message));
 
-        Mailbox dest = postoffice.get(mailboxId).get(HSId);
+        Mailbox dest = postoffice.get(HSId);
         if (dest != null) {
             dest.deliver(message);
         }
@@ -90,7 +83,7 @@ public class MockMailbox implements Mailbox {
     @Override
     public void send(long[] HSIds, VoltMessage message) throws MessagingException {
         for (int i=0; HSIds != null && i < HSIds.length; ++i) {
-            Mailbox dest = postoffice.get(mailboxId).get(HSIds[i]);
+            Mailbox dest = postoffice.get(HSIds[i]);
             if (dest != null) {
                 dest.deliver(message);
             }
