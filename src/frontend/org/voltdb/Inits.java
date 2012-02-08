@@ -576,8 +576,7 @@ public class Inits {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
                 }
 
-                long lowestSite = m_rvdb.m_catalogContext.siteTracker.getLowestLiveNonExecSiteId();
-                int lowestHostId = m_rvdb.m_catalogContext.siteTracker.getHostForSite(lowestSite);
+                int lowestHostId = m_rvdb.m_catalogContext.siteTracker.getLowestHostId();
 
                 int[] allPartitions = new int[m_rvdb.m_catalogContext.numberOfPartitions];
                 int i = 0;

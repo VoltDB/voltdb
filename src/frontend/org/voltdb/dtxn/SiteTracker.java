@@ -116,18 +116,14 @@ public class SiteTracker {
         return m_mailboxTracker.getAllSites().size();
     }
 
-    /**
-     * @return the lowest site ID across the live non-execution sites in the
-     *         cluster
-     */
-    public long getLowestLiveNonExecSiteId()
+    public int getLowestHostId()
     {
-        long lowestNonExecSiteId = Long.MAX_VALUE;
-        Set<Long> initiators = m_mailboxTracker.getAllInitiators();
-        for (long initiator : initiators) {
-            lowestNonExecSiteId = Math.min(lowestNonExecSiteId, initiator);
+        Set<Integer> hosts = m_mailboxTracker.getAllHosts();
+        int lowestHost = Integer.MAX_VALUE;
+        for (int host : hosts) {
+            lowestHost = Math.min(lowestHost, host);
         }
-        return lowestNonExecSiteId;
+        return lowestHost;
     }
 
     /**

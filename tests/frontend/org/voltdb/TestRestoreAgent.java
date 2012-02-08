@@ -430,8 +430,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             snapshotPath = context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
         }
 
-        int lowestSite = context.siteTracker.getLowestLiveNonExecSiteId();
-        int lowestHostId = context.siteTracker.getHostForSite(lowestSite);
+        int lowestHostId = context.siteTracker.getLowestHostId();
 
         int[] allPartitions = new int[context.numberOfPartitions];
         int i = 0;
