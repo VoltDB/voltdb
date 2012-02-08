@@ -1328,7 +1328,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
                                         plannedStmt.clientHandle);
                             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-                            ((Connection)(plannedStmt.clientData)).writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+                            errorResponse.flattenToBuffer(buf);
+                            buf.flip();
+                            ((Connection)(plannedStmt.clientData)).writeStream().enqueue(buf);
                         }
                     }
                     else {
@@ -1443,7 +1445,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             result.clientHandle);
                 final Connection c = (Connection) result.clientData;
                 ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-                c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+                errorResponse.flattenToBuffer(buf);
+                buf.flip();
+                c.writeStream().enqueue(buf);
             }
         }
     }

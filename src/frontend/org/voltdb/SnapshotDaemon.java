@@ -1308,7 +1308,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave requires 3 parameters. Path, nonce, and blocking",
                                        invocation.clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-            c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1319,7 +1320,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave path is null",
                                        invocation.clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-            c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1330,7 +1332,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave nonce is null",
                                        invocation.clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-            c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1341,7 +1344,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave blocking is null",
                                        invocation.clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-            c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1353,7 +1357,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                            " and should be a java.lang.String",
                                        invocation.clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-            c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1365,7 +1370,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                            " and should be a java.lang.String",
                                        invocation.clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-            c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1380,7 +1386,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                            " and should be a java.lang.[Byte|Short|Integer|Long]",
                                        invocation.clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-            c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1416,7 +1423,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "A request to perform a user snapshot already exists",
                                        invocation.clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
-            c.writeStream().enqueue(errorResponse.flattenToBuffer(buf));
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
     }
@@ -1482,7 +1490,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         response.setClientHandle(invocation.clientHandle);
         // Not sure if we need to preserve the original byte buffer here, playing it safe
         ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize());
-        c.writeStream().enqueue(response.flattenToBuffer(buf2));
+        response.flattenToBuffer(buf2).flip();
+        c.writeStream().enqueue(buf2);
     }
 
     @Override

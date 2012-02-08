@@ -197,6 +197,7 @@ public class ForeignHost {
                         buf.putLong(destinations.get(ii));
                     }
                     message.flattenToBuffer(buf);
+                    buf.flip();
                     return new ByteBuffer[] { buf };
                 }
 
