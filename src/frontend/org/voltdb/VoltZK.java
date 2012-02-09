@@ -22,6 +22,7 @@ package org.voltdb;
  * ZooKeeper paths.
  */
 public class VoltZK {
+    private static final String root = "/db";
 
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String unfaulted_hosts = "/db/unfaulted_hosts";
@@ -54,6 +55,7 @@ public class VoltZK {
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
+            root,
             mailboxes,
             mailboxes_executionsites,
             mailboxes_initiators,

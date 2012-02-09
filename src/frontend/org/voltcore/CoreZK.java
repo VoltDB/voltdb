@@ -22,6 +22,7 @@ package org.voltcore;
  * ZooKeeper paths.
  */
 public class CoreZK {
+    private static final String root = "/core";
 
     // hosts in the current system (ephemeral)
     public static final String hosts = "/core/hosts";
@@ -35,7 +36,7 @@ public class CoreZK {
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
-        hosts, readyhosts, hostids
+        root, hosts, readyhosts, hostids
     };
 
 }
