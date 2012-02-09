@@ -36,21 +36,17 @@ import junit.framework.*;
 public class TestVoltPort extends TestCase {
 
     // stub some addToChangeList for test
-    private static class MockVoltNetwork extends VoltNetworkPool {
+    private static class MockVoltNetwork extends VoltNetwork {
 
         public MockVoltNetwork() {
-            super();
-        }
-
-        @Override
-        public void addToChangeList(VoltPort port) {
+            super(0, null);
         }
     }
 
     // implement abstract run() method.
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, Channel channel) {
-            super (vn, null, 2048, "");
+            super (vn, null, "", vn.m_pool );
         }
     }
 
