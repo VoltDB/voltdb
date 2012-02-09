@@ -301,14 +301,9 @@ public class ZKUtil {
             public int compare(String o1, String o2) {
                 int len1 = o1.length();
                 int len2 = o2.length();
-                try {
-                    int seq1 = Integer.parseInt(o1.substring(len1 - 10, len1));
-                    int seq2 = Integer.parseInt(o2.substring(len2 - 10, len2));
-                    return Integer.signum(seq1 - seq2);
-                } catch (StringIndexOutOfBoundsException e) {
-                    System.err.println("");
-                    return 0;
-                }
+                int seq1 = Integer.parseInt(o1.substring(len1 - 10, len1));
+                int seq2 = Integer.parseInt(o2.substring(len2 - 10, len2));
+                return Integer.signum(seq1 - seq2);
             }
         });
     }
