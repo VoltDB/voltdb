@@ -22,6 +22,8 @@
  */
 package org.voltcore.network;
 
+import java.util.concurrent.Future;
+
 public class MockConnection implements Connection {
 
     @Override
@@ -55,12 +57,7 @@ public class MockConnection implements Connection {
     }
 
     @Override
-    public void scheduleRunnable(Runnable r) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void unregister() {
+    public Future<?> unregister() {
         throw new UnsupportedOperationException();
     }
 

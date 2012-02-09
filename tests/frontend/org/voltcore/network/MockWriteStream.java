@@ -24,9 +24,7 @@ package org.voltcore.network;
 
 import java.nio.ByteBuffer;
 
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.utils.DeferredSerialization;
-import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
 
 public class MockWriteStream implements WriteStream {
 
@@ -36,27 +34,12 @@ public class MockWriteStream implements WriteStream {
     }
 
     @Override
-    public boolean enqueue(BBContainer c) {
+    public void enqueue(DeferredSerialization ds) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean enqueue(FastSerializable f) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean enqueue(FastSerializable f, int expectedSize) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean enqueue(DeferredSerialization ds) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean enqueue(ByteBuffer b) {
+    public void enqueue(ByteBuffer b) {
         throw new UnsupportedOperationException();
     }
 
@@ -73,6 +56,12 @@ public class MockWriteStream implements WriteStream {
     @Override
     public int getOutstandingMessageCount() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void enqueue(ByteBuffer[] b) {
+        // TODO Auto-generated method stub
+
     }
 
 }

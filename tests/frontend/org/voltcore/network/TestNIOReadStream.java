@@ -55,14 +55,14 @@ import java.nio.ByteBuffer;
 import org.voltcore.network.NIOReadStream;
 import junit.framework.TestCase;
 import java.io.IOException;
-import org.voltcore.utils.DBBPool;
 
 public class TestNIOReadStream extends TestCase {
     MockReadableByteChannel channel;
     NIOReadStream stream;
-    DBBPool pool;
+    NetworkDBBPool pool;
 
     private static class MockReadableByteChannel implements ReadableByteChannel {
+        @Override
         public int read(ByteBuffer buffer) {
             if (nextRead == null) {
                 if (end) return -1;
@@ -86,7 +86,9 @@ public class TestNIOReadStream extends TestCase {
             return length;
         }
 
+        @Override
         public boolean isOpen() { return !closed; }
+        @Override
         public void close() {
             assert !closed;
             closed = true;
@@ -102,13 +104,13 @@ public class TestNIOReadStream extends TestCase {
     public void setUp() {
         channel = new MockReadableByteChannel();
         stream = new NIOReadStream();
-        pool = new DBBPool();
+        pool = new NetworkDBBPool();
     }
 
     @Override
     public void tearDown() {
         stream.shutdown();
-        pool.clear();
+
     }
 
     public void testZeroLength() {
@@ -175,8 +177,8 @@ public class TestNIOReadStream extends TestCase {
 
     public void testIncompleteReads() throws IOException {
         channel.nextRead = new byte[17408];
-        assertEquals(NIOReadStream.BUFFER_SIZE, stream.read(channel, 1500, pool));
-        assertEquals(NIOReadStream.BUFFER_SIZE, stream.dataAvailable());
+        assertEquals(1024 * 32, stream.read(channel, 1500, pool));
+        assertEquals(1024 * 32, stream.dataAvailable());
         channel.nextRead = new byte[500];
         assertEquals(500, stream.read(channel, 1500, pool));
         assertEquals(8692, stream.dataAvailable());

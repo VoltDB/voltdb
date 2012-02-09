@@ -59,12 +59,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.EstTime;
-import org.voltdb.utils.EstTimeUpdater;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.EstTimeUpdater;
 
 public class TestNIOWriteStream extends TestCase {
 
-    private static class MockPort extends VoltPort {
+    private class MockPort extends VoltPort {
 
         @Override
         public String toString() {
@@ -72,7 +72,7 @@ public class TestNIOWriteStream extends TestCase {
         }
 
         public MockPort() {
-            super(null, null, 2048, "");
+            super(null, null, "", pool);
         }
 
         @Override
@@ -91,11 +91,11 @@ public class TestNIOWriteStream extends TestCase {
         int opsToAdd;
     }
 
-    DBBPool pool;
+    NetworkDBBPool pool;
 
     @Override
     public void setUp() {
-        pool = new DBBPool();
+        pool = new NetworkDBBPool();
     }
 
     @Override
@@ -125,7 +125,7 @@ public class TestNIOWriteStream extends TestCase {
             }
 
             if (!src.isDirect()) {
-                if (src.remaining() > NIOWriteStream.MAX_GATHERING_WRITE) {
+                if (src.remaining() > 1024 * 256) {
                     didOversizeWrite = true;
                 }
             }
@@ -208,14 +208,15 @@ public class TestNIOWriteStream extends TestCase {
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
 
-        ByteBuffer tmp = ByteBuffer.allocate(5);
+        ByteBuffer tmp = ByteBuffer.allocate(2);
         tmp.put((byte) 1);
         tmp.put((byte) 2);
         tmp.flip();
-        assertTrue(wstream.enqueue(tmp));
+        wstream.enqueue(tmp);
         assertTrue(port.checkWriteSet());
         assertEquals(1, wstream.getOutstandingMessageCount());
-        assertEquals(2, wstream.drainTo(channel, wstream.swapAndSerializeQueuedWrites(pool)));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        assertEquals(2, wstream.drainTo(channel));
         assertTrue(wstream.isEmpty());
         assertEquals(0, wstream.getOutstandingMessageCount());
         wstream.shutdown();
@@ -228,21 +229,22 @@ public class TestNIOWriteStream extends TestCase {
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
 
-        ByteBuffer tmp = ByteBuffer.allocate(5);
+        ByteBuffer tmp = ByteBuffer.allocate(4);
         tmp.put((byte)1);
         tmp.put((byte)2);
         tmp.put((byte)3);
         tmp.put((byte)4);
         tmp.flip();
-        assertTrue(wstream.enqueue(tmp));
+        wstream.enqueue(tmp);
         assertTrue(port.checkWriteSet());
         assertEquals(1, wstream.getOutstandingMessageCount());
-        assertEquals(0, wstream.drainTo(channel, wstream.swapAndSerializeQueuedWrites(pool)));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        wstream.drainTo(channel);
         assertFalse(wstream.isEmpty());
-        assertEquals(1, wstream.getOutstandingMessageCount());
 
         channel.m_behavior = MockChannel.SINK;
-        int wrote = wstream.drainTo(channel, wstream.swapAndSerializeQueuedWrites(pool));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        int wrote = wstream.drainTo(channel);
         assertEquals(4, wrote);
         assertTrue(wstream.isEmpty());
         assertEquals(0, wstream.getOutstandingMessageCount());
@@ -255,15 +257,16 @@ public class TestNIOWriteStream extends TestCase {
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
 
-        ByteBuffer tmp = ByteBuffer.allocate(5);
+        ByteBuffer tmp = ByteBuffer.allocate(4);
         tmp.put((byte)1);
         tmp.put((byte)2);
         tmp.put((byte)3);
         tmp.put((byte)4);
         tmp.flip();
-        assertTrue(wstream.enqueue(tmp));
+        wstream.enqueue(tmp);
         assertTrue(port.checkWriteSet());
-        int wrote = wstream.drainTo(channel, wstream.swapAndSerializeQueuedWrites(pool));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        int wrote = wstream.drainTo(channel);
         assertFalse(wstream.isEmpty());
         assertEquals(2, wrote);
 
@@ -276,14 +279,15 @@ public class TestNIOWriteStream extends TestCase {
         tmp2.put((byte)8);
         tmp2.flip();
         wstream.enqueue(tmp2);
-        org.voltcore.utils.DBBPool.BBContainer containers[] = wstream.swapAndSerializeQueuedWrites(pool);
-        wrote += wstream.drainTo( channel, containers);
+        wstream.swapAndSerializeQueuedWrites(pool);
+        wrote += wstream.drainTo( channel);
         assertFalse(wstream.isEmpty());
         // wrote half of half of the first buffer (note +=)
         assertEquals(3, wrote);
 
         channel.m_behavior = MockChannel.SINK;
-        wrote += wstream.drainTo( channel, wstream.swapAndSerializeQueuedWrites(pool));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        wrote += wstream.drainTo( channel);
         assertEquals(8, wrote);
         assertTrue(wstream.isEmpty());
         wstream.shutdown();
@@ -294,22 +298,24 @@ public class TestNIOWriteStream extends TestCase {
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
 
-        ByteBuffer tmp = ByteBuffer.allocate(5);
+        ByteBuffer tmp = ByteBuffer.allocate(4);
         tmp.put((byte)1);
         tmp.put((byte)2);
         tmp.put((byte)3);
         tmp.put((byte)4);
         tmp.flip();
-        assertTrue(wstream.enqueue(tmp));
+        wstream.enqueue(tmp);
         assertTrue(port.checkWriteSet());
-        int closed = wstream.drainTo(channel, wstream.swapAndSerializeQueuedWrites(pool));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        int closed = wstream.drainTo(channel);
         assertEquals(closed, 0);
 
         channel.m_open = false;
 
         boolean threwException = false;
         try {
-            assertEquals( -1, wstream.drainTo( channel, wstream.swapAndSerializeQueuedWrites(pool)));
+            wstream.swapAndSerializeQueuedWrites(pool);
+            assertEquals( -1, wstream.drainTo( channel));
         } catch (IOException e) {
             threwException = true;
         }
@@ -323,21 +329,13 @@ public class TestNIOWriteStream extends TestCase {
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
 
-        ByteBuffer tmp = ByteBuffer.allocate(NIOWriteStream.MAX_GATHERING_WRITE * 3);
-        final AtomicInteger discardCount = new AtomicInteger(0);
-        BBContainer bbc = new BBContainer(tmp, 0L) {
-            @Override
-            public void discard() {
-                discardCount.addAndGet(1);
-            }
-        };
-
-        assertTrue(wstream.enqueue(bbc));
+        ByteBuffer tmp = ByteBuffer.allocate(262144 * 3);
+        wstream.enqueue(tmp);
         assertTrue(port.checkWriteSet());
-        int written = wstream.drainTo( channel, wstream.swapAndSerializeQueuedWrites(pool));
-        assertEquals( NIOWriteStream.MAX_GATHERING_WRITE * 3, written);
+        wstream.swapAndSerializeQueuedWrites(pool);
+        int written = wstream.drainTo( channel);
+        assertEquals( 262144 * 3, written);
         assertFalse(channel.didOversizeWrite);
-        assertTrue(discardCount.get() == 1);
         wstream.shutdown();
     }
 
@@ -356,7 +354,8 @@ public class TestNIOWriteStream extends TestCase {
         final ByteBuffer b = ByteBuffer.allocate(5);
         wstream.enqueue(b.duplicate());
         assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        wstream.drainTo( channel, wstream.swapAndSerializeQueuedWrites(pool));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        wstream.drainTo( channel);
         assertEquals( 0, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
 
         Thread.sleep(20);
@@ -367,7 +366,8 @@ public class TestNIOWriteStream extends TestCase {
         wstream.enqueue(b.duplicate());
         assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
         channel.m_behavior = MockChannel.PARTIAL;
-        wstream.drainTo( channel, wstream.swapAndSerializeQueuedWrites(pool));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        wstream.drainTo( channel );
         assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
 
         wstream.shutdown();

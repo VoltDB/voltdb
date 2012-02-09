@@ -140,7 +140,7 @@ public class NIOWriteStream implements WriteStream {
     @Override
     synchronized public boolean isEmpty()
     {
-        return m_queuedBuffers.isEmpty() && m_queuedWrites.isEmpty();
+        return m_queuedBuffers.isEmpty() && m_queuedWrites.isEmpty() && m_currentWriteBuffer == null;
     }
 
     /**
@@ -188,11 +188,6 @@ public class NIOWriteStream implements WriteStream {
      * Does this need to be volatile?
      */
     private volatile boolean m_hadBackPressure = false;
-
-    /**
-     * The maximum amount that the stream will attempt to write to the channel under any circumstances
-     */
-    static final int MAX_GATHERING_WRITE = 262144;
 
     /**
      * Does the work of queueing addititional buffers that have been serialized
