@@ -41,6 +41,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.CoreZK;
 import org.voltcore.VoltDB;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
@@ -245,7 +246,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * knows the size of the mesh. This part only registers this host
              */
             byte hostInfoBytes[] = m_config.coordinatorIp.toString().getBytes("UTF-8");
-            m_zk.create("/hosts/host" + selectedHostId, hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
     }
@@ -254,7 +255,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Creates the ZK directory nodes. Only the leader should do this.
      */
     private void createHierarchy() {
-        for (String node : VoltDB.ZK_HIERARCHY) {
+        for (String node : CoreZK.ZK_HIERARCHY) {
             try {
                 m_zk.create(node, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } catch (Exception e) {
@@ -400,12 +401,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     /*
-     * Generate a new host id by creating an ephemeral sequential node
+     * Generate a new host id by creating a persistent sequential node
      */
     private Integer selectNewHostId(String address) throws Exception {
         String node =
-            m_zk.create(
-                    "/hostids/host", address.getBytes("UTF-8"), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+            m_zk.create(CoreZK.hostids_host,
+                    address.getBytes("UTF-8"), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
 
         return Integer.valueOf(node.substring(node.length() - 10));
     }
@@ -545,7 +546,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             InetSocketAddress addr = new InetSocketAddress(intf, m_config.internalPort);
             hostInfoBytes = addr.toString().getBytes("UTF-8");
         }
-        m_zk.create("/hosts/host" + getHostId(), hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        m_zk.create(CoreZK.hosts_host + getHostId(), hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
     }
 
     /**
@@ -555,7 +556,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         try {
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                if (m_zk.getChildren("/hosts", fw).size() == expectedHosts) {
+                if (m_zk.getChildren(CoreZK.hosts, fw).size() == expectedHosts) {
                     break;
                 }
                 fw.get();
@@ -703,10 +704,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void waitForAllHostsToBeReady(int expectedHosts) {
         m_localhostReady = true;
         try {
-            m_zk.create("/ready_hosts/host", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+            m_zk.create(CoreZK.readyhosts_host, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                if (m_zk.getChildren("/ready_hosts", fw).size() == expectedHosts) {
+                if (m_zk.getChildren(CoreZK.readyhosts, fw).size() == expectedHosts) {
                     break;
                 }
                 fw.get();

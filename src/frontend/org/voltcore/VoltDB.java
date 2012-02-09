@@ -47,12 +47,6 @@ public class VoltDB {
 
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
-    // Persistent nodes (mostly directories) that need to be created on startup
-    public static final String[] ZK_HIERARCHY =
-        {"/hosts",
-         "/hostids",
-         "/ready_hosts"};
-
     /**
      * Wrapper for crashLocalVoltDB() to keep compatibility with >100 calls.
      */
