@@ -37,14 +37,13 @@ public class TestVoltNetwork extends TestCase {
 
 
     private static class MockVoltPort extends VoltPort {
-        MockVoltPort(VoltNetworkPool vn, InputHandler handler) {
-            super (vn, handler, handler.getExpectedOutgoingMessageSize(), "");
+        MockVoltPort(VoltNetwork vn, InputHandler handler) {
+            super (vn, handler, "", vn.m_pool);
         }
 
         @Override
-        public VoltPort call() {
+        public void run() {
             m_running = false;
-            return null;
         }
     }
 
@@ -90,11 +89,6 @@ public class TestVoltNetwork extends TestCase {
         public void stopping(Connection c) {
             // TODO Auto-generated method stub
 
-        }
-
-        @Override
-        public int getExpectedOutgoingMessageSize() {
-            return 2048;
         }
 
         @Override
@@ -238,7 +232,7 @@ public class TestVoltNetwork extends TestCase {
 
     public void testInstallInterests() throws InterruptedException {
         new MockSelector();
-        VoltNetworkPool vn = new VoltNetworkPool();
+        VoltNetwork vn = new VoltNetwork( 0, null);
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
         MockSelectionKey selectionKey = new MockSelectionKey();
         vp.m_selectionKey = selectionKey;
@@ -246,7 +240,7 @@ public class TestVoltNetwork extends TestCase {
         // add the port to the changelist set and run install interests.
         // the ports desired ops should be set to the selection key.
         vn.addToChangeList(vp);
-        vn.installInterests();
+        vn.installInterests(vp);
         assertEquals(selectionKey.interestOps(), vp.interestOps());
 
         // should be able to wash, rinse and repeat this a few times.
@@ -254,18 +248,18 @@ public class TestVoltNetwork extends TestCase {
         // the covers.
         vp.setInterests(SelectionKey.OP_WRITE, 0);
         vn.addToChangeList(vp);
-        vn.installInterests();
+        vn.installInterests(vp);
         assertEquals(selectionKey.interestOps(), SelectionKey.OP_WRITE);
 
         vp.setInterests(SelectionKey.OP_WRITE | SelectionKey.OP_READ, 0);
         vn.addToChangeList(vp);
-        vn.installInterests();
+        vn.installInterests(vp);
         assertEquals(selectionKey.interestOps(), vp.interestOps());
     }
 
     public void testInvokeCallbacks() throws InterruptedException{
         MockSelector selector = new MockSelector();
-        VoltNetworkPool vn = new VoltNetworkPool(selector);               // network with fake selector
+        VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
         MockSelectionKey selectionKey = new MockSelectionKey();   // fake selection key
 
@@ -284,7 +278,7 @@ public class TestVoltNetwork extends TestCase {
         // and another time through, should have the new interests selected
         vp.setInterests(SelectionKey.OP_ACCEPT, 0);
         selectionKey.readyOps(SelectionKey.OP_ACCEPT);
-        vn.installInterests();
+        vn.installInterests(vp);
         vn.invokeCallbacks();
         vn.shutdown();
         assertEquals(SelectionKey.OP_ACCEPT, vp.readyOps());

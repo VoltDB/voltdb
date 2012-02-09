@@ -91,7 +91,7 @@ class VoltNetwork implements Runnable
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
-    private final NetworkDBBPool m_pool = new NetworkDBBPool();
+    final NetworkDBBPool m_pool = new NetworkDBBPool();
 
     /*
      * Thread pool used for the reverse DNS lookup triggers. If not provided, it
@@ -125,6 +125,13 @@ class VoltNetwork implements Runnable
             m_logger.fatal(null, ex);
             throw new RuntimeException(ex);
         }
+    }
+
+    VoltNetwork( Selector s) {
+        m_thread = null;
+        m_networkId = 0;
+        m_es = null;
+        m_selector = s;
     }
 
     /** Instruct the network to stop after the current loop */
