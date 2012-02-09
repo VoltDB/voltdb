@@ -832,13 +832,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, messenger.getNetwork(), replicationRole, initiator, allPartitions);
+           port, adminPort, context, messenger, replicationRole, initiator, allPartitions);
 
         initiator.setClientInterface(ci);
         return ci;
     }
 
-    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetworkPool network,
+    ClientInterface(int port, int adminPort, CatalogContext context, HostMessenger messenger,
                     ReplicationRole replicationRole, TransactionInitiator initiator,
                     int[] allPartitions) throws Exception
     {
@@ -847,9 +847,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
-        m_acceptor = new ClientAcceptor(port, network, false);
+        m_acceptor = new ClientAcceptor(port, messenger.getNetwork(), false);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
+        m_adminAcceptor = new ClientAcceptor(adminPort, messenger.getNetwork(), true);
         registerPolicies(replicationRole);
 
         m_mailbox = new LocalMailbox(VoltDB.instance().getHostMessenger()) {
@@ -863,8 +863,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return m_d.poll();
             }
         };
-        VoltDB.instance().getHostMessenger().createMailbox(null, m_mailbox);
-        registerMailbox();
+        messenger.createMailbox(null, m_mailbox);
+        registerMailbox(messenger.getZK());
         m_siteId = m_mailbox.getHSId();
     }
 
@@ -874,11 +874,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param partitionId
      * @throws Exception
      */
-    private void registerMailbox() throws Exception {
+    private void registerMailbox(ZooKeeper zk) throws Exception {
         JSONObject jsObj = new JSONObject();
         jsObj.put("HSId", m_mailbox.getHSId());
         byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         zk.create(VoltZK.mailboxes_clientinterfaces_ci, payload,
                   Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
@@ -956,8 +955,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
-    public void initializeSnapshotDaemon() {
-        m_snapshotDaemon.init(this, VoltDB.instance().getHostMessenger().getZK());
+    public void initializeSnapshotDaemon(ZooKeeper zk) {
+        m_snapshotDaemon.init(this, zk);
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID
