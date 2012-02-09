@@ -95,8 +95,8 @@ public class TestZK extends ZKTestBase {
         System.out.println(children);
         assertEquals(4, children.size());
         assertTrue(children.contains("zookeeper"));
-        assertTrue(children.contains("bar0000000005"));
-        assertTrue(children.contains("bar0000000006"));
+        assertTrue(children.contains("bar0000000003"));
+        assertTrue(children.contains("bar0000000004"));
         assertTrue(children.contains("core"));
 
         zk.close();
