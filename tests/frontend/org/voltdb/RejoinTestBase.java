@@ -170,17 +170,16 @@ public class RejoinTestBase extends TestCase {
         // start the fake HostMessenger
         InMemoryJarfile jarFile = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar"));
         retval.catalogCRC = jarFile.getCRC();
-        VoltNetworkPool network2 = new VoltNetworkPool();
-        InetAddress leader = InetAddress.getByName("localhost");
-        HostMessenger host2 = new HostMessenger(network2, leader, 2, 0, deploymentCRC, null);
+        HostMessenger.Config config2 = new HostMessenger.Config();
+        config2.internalPort++;
+        HostMessenger host2 = new HostMessenger(config2);
 
         retval.localServer.start();
-        host2.waitForGroupJoin();
+        host2.waitForGroupJoin(2);
         // whomever is host zero has to send the catalog out,
         //  so check and fufil this duty if needed
         if (host2.getHostId() == 0)
             host2.sendCatalog(jarFile.getFullJarBytes());
-        network2.start();
 
         int myHostId = host2.getHostId() * 100;
         host2.createLocalSite(myHostId);
