@@ -28,9 +28,12 @@ import static org.junit.Assert.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import org.voltcore.CoreZK;
 import org.voltcore.messaging.HostMessenger;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+
 public class TestHostMessenger {
 
     private static final ArrayList<HostMessenger> createdMessengers = new ArrayList<HostMessenger>();
@@ -118,7 +121,7 @@ public class TestHostMessenger {
         hm2Start.start();
         hm3Start.start();
         hm2Start.join();
-        System.out.println(hm2.getZK().getChildren("/hostids", false ));
+        System.out.println(hm2.getZK().getChildren(CoreZK.hostids, false ));
         hm3Start.join();
 
         if (exception.get() != null) {
@@ -134,9 +137,9 @@ public class TestHostMessenger {
         assertTrue(root1.equals(root2));
         assertTrue(root2.equals(root3));
 
-        List<String> hostids1 = hm1.getZK().getChildren("/hostids", false );
-        List<String> hostids2 = hm2.getZK().getChildren("/hostids", false );
-        List<String> hostids3 = hm3.getZK().getChildren("/hostids", false );
+        List<String> hostids1 = hm1.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids2 = hm2.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids3 = hm3.getZK().getChildren(CoreZK.hostids, false );
         System.out.println(hostids1);
         System.out.println(hostids2);
         System.out.println(hostids3);
@@ -148,8 +151,8 @@ public class TestHostMessenger {
         hm2.shutdown();
         boolean success = false;
         for (int ii = 0; ii < (200 / 5); ii++) {
-            hosts3 = hm3.getZK().getChildren("/hosts", false );
-            hosts1 = hm1.getZK().getChildren("/hosts", false );
+            hosts3 = hm3.getZK().getChildren(CoreZK.hosts, false );
+            hosts1 = hm1.getZK().getChildren(CoreZK.hosts, false );
             if (hosts3.size() == 2 && hosts1.size() == 2 && hosts1.equals(hosts3)) {
                 success = true;
                 break;

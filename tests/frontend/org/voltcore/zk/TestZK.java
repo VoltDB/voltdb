@@ -93,13 +93,11 @@ public class TestZK extends ZKTestBase {
         ZooKeeper zk3 = getClient(2);
         List<String> children = zk3.getChildren("/", false);
         System.out.println(children);
-        assertEquals(6, children.size());
+        assertEquals(4, children.size());
         assertTrue(children.contains("zookeeper"));
         assertTrue(children.contains("bar0000000005"));
         assertTrue(children.contains("bar0000000006"));
-        assertTrue(children.contains("hosts"));
-        assertTrue(children.contains("hostids"));
-        assertTrue(children.contains("ready_hosts"));
+        assertTrue(children.contains("core"));
 
         zk.close();
         zk2.close();
@@ -107,11 +105,9 @@ public class TestZK extends ZKTestBase {
 
         children = zk3.getChildren("/", false);
         System.out.println(children);
-        assertEquals(4, children.size());
+        assertEquals(2, children.size());
         assertTrue(children.contains("zookeeper"));
-        assertTrue(children.contains("hosts"));
-        assertTrue(children.contains("hostids"));
-        assertTrue(children.contains("ready_hosts"));
+        assertTrue(children.contains("core"));
     }
 
     @Test
