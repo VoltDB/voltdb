@@ -576,8 +576,6 @@ public class Inits {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
                 }
 
-                int lowestHostId = m_rvdb.m_catalogContext.siteTracker.getLowestHostId();
-
                 int[] allPartitions = new int[m_rvdb.m_catalogContext.numberOfPartitions];
                 int i = 0;
                 for (Partition p : m_rvdb.m_catalogContext.cluster.getPartitions()) {
@@ -598,7 +596,6 @@ public class Inits {
                                                       cl.getLogpath(),
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
-                                                      lowestHostId,
                                                       allPartitions,
                                                       m_rvdb.m_catalogContext.siteTracker.getAllLiveHosts());
                 } catch (IOException e) {

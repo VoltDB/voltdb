@@ -71,16 +71,6 @@ public class SiteTracker {
 
     Set<Integer> m_downHostIds = new TreeSet<Integer>();
 
-    /**
-     * Given topology info, initialize all of this class's data structures.
-     *
-     * @param clusterSites a CatalogMap containing all the sites in the cluster
-     */
-    public SiteTracker()
-    {
-
-    }
-
     private long[] longListToArray(List<Long> longs) {
         long retval[] = new long[longs.size()];
         for (int ii = 0; ii < retval.length; ii++) {
@@ -116,16 +106,6 @@ public class SiteTracker {
         return m_mailboxTracker.getAllSites().size();
     }
 
-    public int getLowestHostId()
-    {
-        Set<Integer> hosts = m_mailboxTracker.getAllHosts();
-        int lowestHost = Integer.MAX_VALUE;
-        for (int host : hosts) {
-            lowestHost = Math.min(lowestHost, host);
-        }
-        return lowestHost;
-    }
-
     /**
      * Get the ids of all live sites that contain a copy of the
      * partition specified.
@@ -152,6 +132,17 @@ public class SiteTracker {
             }
         }
         return all_sites;
+    }
+
+    /**
+     * Whether we are the leader. It doesn't mean that we have the lowest host
+     * ID, it just guarantees that there is only one node in the cluster that is
+     * the leader.
+     *
+     * @return
+     */
+    public boolean isLeader() {
+        return m_mailboxTracker.isLeader();
     }
 
     /**

@@ -28,17 +28,17 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.voltcore.agreement.ZKUtil;
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.MockVoltDB;
-import org.voltdb.VoltDB;
-import org.voltdb.fault.NodeFailureFault;
+import org.voltcore.utils.Pair;
 import org.apache.zookeeper_voltpatches.*;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.data.Stat;
-import java.util.Arrays;
-import java.util.HashSet;
+
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Semaphore;
@@ -205,6 +205,43 @@ public class TestZK extends ZKTestBase {
         failSite(0);
         zk = getClient(1);
         assertNull(zk.exists("/foo", false));
+    }
+
+    @Test
+    public void testSortSequentialNodes() {
+        ArrayList<String> nodes = new ArrayList<String>();
+        nodes.add("/a/b/node0000012345");
+        nodes.add("/a/b/node0000000000");
+        nodes.add("/a/b/node0000010234");
+        nodes.add("/a/b/node0000000234");
+        ZKUtil.sortSequentialNodes(nodes);
+
+        Iterator<String> iter = nodes.iterator();
+        assertEquals("/a/b/node0000000000", iter.next());
+        assertEquals("/a/b/node0000000234", iter.next());
+        assertEquals("/a/b/node0000010234", iter.next());
+        assertEquals("/a/b/node0000012345", iter.next());
+    }
+
+    @Test
+    public void testLeaderElection() throws Exception {
+        ZooKeeper zk = getClient(0);
+        ZooKeeper zk2 = getClient(1);
+        ZooKeeper zk3 = getClient(2);
+
+        zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        Pair<String, Boolean> result1 = ZKUtil.createAndElectLeader(zk, "/election", new byte[0], null);
+        Pair<String, Boolean> result2 = ZKUtil.createAndElectLeader(zk2, "/election", new byte[0], null);
+        Pair<String, Boolean> result3 = ZKUtil.createAndElectLeader(zk3, "/election", new byte[0], null);
+
+        assertTrue(result1.getSecond());
+        assertFalse(result2.getSecond());
+        assertFalse(result3.getSecond());
+
+        zk.close();
+        zk2.close();
+        zk3.close();
     }
 
 //    @Test

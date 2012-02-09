@@ -30,6 +30,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.MiscUtils;
 
@@ -40,6 +41,7 @@ public class MailboxTracker {
 
     private final ZooKeeper m_zk;
 
+    private final boolean m_isLeader;
     private volatile Map<Integer, ArrayList<Long>> m_hostsToSites =
             new HashMap<Integer, ArrayList<Long>>();
     private volatile Map<Integer, ArrayList<Long>> m_partitionsToSites =
@@ -51,15 +53,19 @@ public class MailboxTracker {
     private volatile Map<Integer, ArrayList<Long>> m_hostsToInitiators =
             new HashMap<Integer, ArrayList<Long>>();
 
-    public MailboxTracker(ZooKeeper zk) throws Exception {
+    public MailboxTracker(ZooKeeper zk, int hostId) throws Exception {
         m_zk = zk;
 
-        getAndWatchSites();
+        m_isLeader = (getAndWatchSites() == hostId);
         getAndWatchPlanners();
         getAndWatchInitiators();
     }
 
-    private void getAndWatchSites() throws Exception {
+    /**
+     * @return the host ID of the first host that registered the mailboxes
+     * @throws Exception
+     */
+    private int getAndWatchSites() throws Exception {
         List<String> children = m_zk.getChildren(VoltZK.mailboxes_executionsites, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
@@ -70,9 +76,11 @@ public class MailboxTracker {
                 }
             }
         });
+        ZKUtil.sortSequentialNodes(children);
 
         log.info("Mailboxtracker getAndWatchSites() triggered.");
 
+        int firstHostId = -1;
         Map<Integer, ArrayList<Long>> hostsToSites = new HashMap<Integer, ArrayList<Long>>();
         Map<Integer, ArrayList<Long>> partitionsToSites = new HashMap<Integer, ArrayList<Long>>();
         Map<Long, Integer> sitesToPartitions = new HashMap<Long, Integer>();
@@ -86,6 +94,10 @@ public class MailboxTracker {
                 long HSId = jsObj.getLong("HSId");
                 int partitionId = jsObj.getInt("partitionId");
                 int hostId = MiscUtils.getHostIdFromHSId(HSId);
+
+                if (firstHostId == -1) {
+                    firstHostId = hostId;
+                }
 
                 ArrayList<Long> hostSiteList = hostsToSites.get(hostId);
                 if (hostSiteList == null)
@@ -111,6 +123,8 @@ public class MailboxTracker {
         m_hostsToSites = hostsToSites;
         m_partitionsToSites = partitionsToSites;
         m_sitesToPartitions = sitesToPartitions;
+
+        return firstHostId;
     }
 
     private void getAndWatchPlanners() throws Exception {
@@ -219,5 +233,9 @@ public class MailboxTracker {
             initiators.addAll(values);
         }
         return initiators;
+    }
+
+    public boolean isLeader() {
+        return m_isLeader;
     }
 }

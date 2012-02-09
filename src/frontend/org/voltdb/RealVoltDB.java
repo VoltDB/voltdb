@@ -300,7 +300,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_faultManager = new FaultDistributor(this);
             try {
                 siteMailboxes = createMailboxesForSites();
-                m_catalogContext.siteTracker.setMailboxTracker(new MailboxTracker(m_messenger.getZK()));
+                MailboxTracker mailboxTracker = new MailboxTracker(m_messenger.getZK(), m_messenger.getHostId());
+                m_catalogContext.siteTracker.setMailboxTracker(mailboxTracker);
                 initiatorMailbox = createInitiatorMailbox();
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);

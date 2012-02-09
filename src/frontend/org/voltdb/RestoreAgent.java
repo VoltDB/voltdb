@@ -44,6 +44,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
@@ -93,7 +94,7 @@ SnapshotCompletionInterest {
     private final static String RESTORE = VoltZK.restore;
     private final static String RESTORE_BARRIER = VoltZK.restore_barrier;
     private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
-    private final String zkBarrierNode;
+    private String m_zkBarrierNode = null;
 
     // Transaction ID of the restore sysproc
     private final static long RESTORE_TXNID = 1l;
@@ -108,7 +109,8 @@ SnapshotCompletionInterest {
     private final String m_clPath;
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
-    private final int m_lowestHostId;
+    private boolean m_planned = false;
+    private boolean m_isLeader = false;
 
     private TransactionInitiator m_initiator;
 
@@ -196,22 +198,17 @@ SnapshotCompletionInterest {
     private final Runnable m_restorePlanner = new Runnable() {
         @Override
         public void run() {
-            boolean planned = false;
-            try {
-                planned = m_zk.exists(zkBarrierNode, false) != null;
-            } catch (Exception e) {}
-
             /*
              * In case the plans aren't generated yet, generate them now.
              */
-            if (!planned) {
+            if (!m_planned) {
                 findRestoreCatalog();
             }
 
             /*
-             * If this has the lowest host ID, initiate the snapshot restore
+             * If this is the leader, initiate the snapshot restore
              */
-            if (isLowestHost()) {
+            if (m_isLeader) {
                 long txnId = 0;
                 if (m_snapshotToRestore != null) {
                     txnId = m_snapshotToRestore.txnId;
@@ -230,7 +227,7 @@ SnapshotCompletionInterest {
 
             m_restoreHeartbeatThread.start();
 
-            if (!isLowestHost() || m_snapshotToRestore == null) {
+            if (!m_isLeader || m_snapshotToRestore == null) {
                 /*
                  * Hosts that are not initiating the restore should change
                  * state immediately
@@ -403,7 +400,7 @@ SnapshotCompletionInterest {
                         Callback callback, int hostId, START_ACTION action,
                         int partitionCount, boolean clEnabled,
                         String clPath, String clSnapshotPath,
-                        String snapshotPath, int lowestHostId, int[] allPartitions,
+                        String snapshotPath, int[] allPartitions,
                         Set<Integer> liveHosts)
     throws IOException {
         m_hostId = hostId;
@@ -417,11 +414,8 @@ SnapshotCompletionInterest {
         m_clPath = clPath;
         m_clSnapshotPath = clSnapshotPath;
         m_snapshotPath = snapshotPath;
-        m_lowestHostId = lowestHostId;
         m_allPartitions = allPartitions;
         m_liveHosts = liveHosts;
-
-        zkBarrierNode = RESTORE_BARRIER + "/" + m_hostId;
 
         initialize();
     }
@@ -504,8 +498,10 @@ SnapshotCompletionInterest {
      */
     void enterRestore() {
         try {
-            m_zk.create(zkBarrierNode, new byte[0],
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            Pair<String, Boolean> result =
+                    ZKUtil.createAndElectLeader(m_zk, RESTORE_BARRIER, new byte[0], null);
+            m_zkBarrierNode = result.getFirst();
+            m_isLeader = result.getSecond();
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
                                      false, e);
@@ -518,7 +514,7 @@ SnapshotCompletionInterest {
      */
     private void exitRestore() {
         try {
-            m_zk.delete(zkBarrierNode, -1);
+            m_zk.delete(m_zkBarrierNode, -1);
         } catch (Exception ignore) {}
 
         LOG.debug("Waiting for all hosts to complete restore");
@@ -669,6 +665,7 @@ SnapshotCompletionInterest {
             m_replayAgent.generateReplayPlan();
         }
 
+        m_planned = true;
         return infoWithMinHostId;
     }
 
@@ -1152,7 +1149,7 @@ SnapshotCompletionInterest {
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs
              */
-            if (isLowestHost()) {
+            if (m_isLeader) {
                 try {
                     try {
                         m_zk.create(VoltZK.truncation_snapshot_path,
@@ -1169,15 +1166,6 @@ SnapshotCompletionInterest {
                                              false, e);
                 }
             }
-        }
-    }
-
-    private boolean isLowestHost() {
-        // If this is null, it must be running test
-        if (m_hostId != null) {
-            return m_hostId == m_lowestHostId;
-        } else {
-            return false;
         }
     }
 
