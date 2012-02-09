@@ -69,31 +69,36 @@ public class MailboxTracker {
             }
         });
 
+        log.info("Mailboxtracker getAndWatchSites() triggered.");
+
         Map<Integer, ArrayList<Long>> hostsToSites = new HashMap<Integer, ArrayList<Long>>();
         Map<Integer, ArrayList<Long>> partitionsToSites = new HashMap<Integer, ArrayList<Long>>();
         Map<Long, Integer> sitesToPartitions = new HashMap<Long, Integer>();
         for (String child : children) {
             byte[] data = m_zk.getData("/mailboxes/executionsites/" + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
+
+            log.info("Mailboxtracker getAndWatchSites processing: " + jsObj.toString(2));
+
             try {
                 long HSId = jsObj.getLong("HSId");
                 int partitionId = jsObj.getInt("partitionId");
                 int hostId = MiscUtils.getHostIdFromHSId(HSId);
 
-                ArrayList<Long> sites = hostsToSites.get(hostId);
-                if (sites == null)
+                ArrayList<Long> hostSiteList = hostsToSites.get(hostId);
+                if (hostSiteList == null)
                 {
-                    sites = new ArrayList<Long>();
-                    hostsToSites.put(hostId, sites);
+                    hostSiteList = new ArrayList<Long>();
+                    hostsToSites.put(hostId, hostSiteList);
                 }
-                sites.add(HSId);
+                hostSiteList.add(HSId);
 
-                sites = partitionsToSites.get(partitionId);
-                if (sites == null) {
-                    sites = new ArrayList<Long>();
-                    partitionsToSites.put(partitionId, sites);
+                ArrayList<Long> partSiteList = partitionsToSites.get(partitionId);
+                if (partSiteList == null) {
+                    partSiteList = new ArrayList<Long>();
+                    partitionsToSites.put(partitionId, partSiteList);
                 }
-                sites.add(HSId);
+                partSiteList.add(HSId);
 
                 sitesToPartitions.put(HSId, partitionId);
             } catch (JSONException e) {
