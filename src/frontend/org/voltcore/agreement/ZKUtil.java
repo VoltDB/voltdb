@@ -256,6 +256,12 @@ public class ZKUtil {
             };
         }
 
+        /*
+         * Iterate through the sorted list of children and find the given node,
+         * then setup a watcher on the previous node if it exists, otherwise the
+         * previous of the previous...until we reach the beginning, then we are
+         * the lowest node.
+         */
         List<String> children = zk.getChildren(path, false);
         sortSequentialNodes(children);
         String lowest = null;
