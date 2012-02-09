@@ -33,6 +33,8 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.MiscUtils;
 
+import org.voltdb.VoltZK;
+
 public class MailboxTracker {
     private static final VoltLogger log = new VoltLogger("HOST");
 
@@ -58,7 +60,7 @@ public class MailboxTracker {
     }
 
     private void getAndWatchSites() throws Exception {
-        List<String> children = m_zk.getChildren("/mailboxes/executionsites", new Watcher() {
+        List<String> children = m_zk.getChildren(VoltZK.mailboxes_executionsites, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
                 try {
@@ -75,7 +77,7 @@ public class MailboxTracker {
         Map<Integer, ArrayList<Long>> partitionsToSites = new HashMap<Integer, ArrayList<Long>>();
         Map<Long, Integer> sitesToPartitions = new HashMap<Long, Integer>();
         for (String child : children) {
-            byte[] data = m_zk.getData("/mailboxes/executionsites/" + child, false, null);
+            byte[] data = m_zk.getData(VoltZK.mailboxes_executionsites + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
 
             log.info("Mailboxtracker getAndWatchSites processing: " + jsObj.toString(2));
@@ -112,7 +114,7 @@ public class MailboxTracker {
     }
 
     private void getAndWatchPlanners() throws Exception {
-        List<String> children = m_zk.getChildren("/mailboxes/asyncplanners", new Watcher() {
+        List<String> children = m_zk.getChildren(VoltZK.mailboxes_asyncplanners, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
                 try {
@@ -125,7 +127,7 @@ public class MailboxTracker {
 
         Map<Integer, Long> hostsToPlanners = new HashMap<Integer, Long>();
         for (String child : children) {
-            byte[] data = m_zk.getData("/mailboxes/asyncplanners/" + child, false, null);
+            byte[] data = m_zk.getData(VoltZK.mailboxes_asyncplanners + "/" + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
             try {
                 long HSId = jsObj.getLong("HSId");
@@ -139,7 +141,7 @@ public class MailboxTracker {
     }
 
     private void getAndWatchInitiators() throws Exception {
-        List<String> children = m_zk.getChildren("/mailboxes/initiators", new Watcher() {
+        List<String> children = m_zk.getChildren(VoltZK.mailboxes_initiators, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
                 try {
@@ -152,7 +154,7 @@ public class MailboxTracker {
 
         Map<Integer, ArrayList<Long>> hostsToInitiators = new HashMap<Integer, ArrayList<Long>>();
         for (String child : children) {
-            byte[] data = m_zk.getData("/mailboxes/initiators/" + child, false, null);
+            byte[] data = m_zk.getData(VoltZK.mailboxes_initiators + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
             try {
                 long HSId = jsObj.getLong("HSId");

@@ -88,10 +88,11 @@ SnapshotCompletionInterest {
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
 
-    // ZK stuff
-    final static String RESTORE = "/restore";
-    final static String RESTORE_BARRIER = "/restore_barrier";
-    private final static String SNAPSHOT_ID = "/restore/snapshot_id";
+    // ZK stuff (while converting bare strings to VoltZK, map these
+    // to the previously used symbols.)
+    private final static String RESTORE = VoltZK.restore;
+    private final static String RESTORE_BARRIER = VoltZK.restore_barrier;
+    private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
     private final String zkBarrierNode;
 
     // Transaction ID of the restore sysproc
@@ -1154,12 +1155,12 @@ SnapshotCompletionInterest {
             if (isLowestHost()) {
                 try {
                     try {
-                        m_zk.create("/truncation_snapshot_path",
+                        m_zk.create(VoltZK.truncation_snapshot_path,
                                     m_clSnapshotPath.getBytes(),
                                     Ids.OPEN_ACL_UNSAFE,
                                     CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
-                    m_zk.create("/request_truncation_snapshot", null,
+                    m_zk.create(VoltZK.request_truncation_snapshot, null,
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                 } catch (Exception e) {

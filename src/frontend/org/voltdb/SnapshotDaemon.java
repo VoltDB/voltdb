@@ -200,10 +200,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_zk = zk;
 
         try {
-            zk.create("/nodes_currently_snapshotting", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zk.create(VoltZK.nodes_currently_snapshotting, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
         try {
-            zk.create("/completed_snapshots", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
 
         // Really shouldn't leak this from a constructor, and twice to boot
@@ -224,7 +224,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private void scanTruncationSnapshots() {
         if (m_truncationSnapshotPath == null) {
             try {
-                m_truncationSnapshotPath = new String(m_zk.getData("/test_scan_path", false, null), "UTF-8");
+                m_truncationSnapshotPath = new String(m_zk.getData(VoltZK.test_scan_path, false, null), "UTF-8");
             } catch (Exception e) {
                 return;
             }
@@ -351,7 +351,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         loggingLog.info("Starting leader election for snapshot truncation daemon");
         try {
             while (true) {
-                Stat stat = m_zk.exists("/snapshot_truncation_master", new Watcher() {
+                Stat stat = m_zk.exists(VoltZK.snapshot_truncation_master, new Watcher() {
                     @Override
                     public void process(WatchedEvent event) {
                         switch(event.getType()) {
@@ -371,7 +371,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 });
                 if (stat == null) {
                     try {
-                        m_zk.create("/snapshot_truncation_master", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                        m_zk.create(VoltZK.snapshot_truncation_master, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                         loggingLog.info("This node was selected as the leader for snapshot truncation");
                         m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
                             @Override
@@ -428,7 +428,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         loggingLog.info("Snapshot truncation leader received snapshot truncation request");
         String snapshotPathTemp;
         try {
-            snapshotPathTemp = new String(m_zk.getData("/truncation_snapshot_path", false, null), "UTF-8");
+            snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
         } catch (Exception e) {
             loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
             return;
@@ -443,7 +443,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             ByteBuffer payload = ByteBuffer.allocate(8);
             payload.putLong(0, now);
-            m_zk.setData("/request_truncation_snapshot", payload.array(), -1);
+            m_zk.setData(VoltZK.request_truncation_snapshot, payload.array(), -1);
         } catch (Exception e) {
             loggingLog.error("Setting data on the truncation snapshot request in ZK should never fail", e);
             //Cause a cascading failure?
@@ -512,7 +512,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     int hosts = VoltDB.instance().getCatalogContext().siteTracker
                                       .getAllLiveHosts().size();
                     try {
-                        m_zk.delete("/request_truncation_snapshot", -1);
+                        m_zk.delete(VoltZK.request_truncation_snapshot, -1);
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB(
                                 "Unexpected error deleting truncation snapshot request", true, e);
@@ -624,7 +624,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
                         ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
                         m_zk.create(
-                                "/user_snapshot_response_" + requestId,
+                                VoltZK.user_snapshot_response + requestId,
                                 rimpl.flattenToBuffer(buf).array(),
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
@@ -644,7 +644,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
                         ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
                         m_zk.create(
-                                "/user_snapshot_response_" + requestId,
+                                VoltZK.user_snapshot_response + requestId,
                                 rimpl.flattenToBuffer(buf).array(),
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
@@ -697,7 +697,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                          "is in progress. It was queued for execution",
                                        0);
             ByteBuffer buf = ByteBuffer.allocate(queuedResponse.getSerializedSize());
-            m_zk.create("/user_snapshot_response_" + requestId,
+            m_zk.create(VoltZK.user_snapshot_response + requestId,
                         queuedResponse.flattenToBuffer(buf).array(),
                         Ids.OPEN_ACL_UNSAFE,
                         CreateMode.PERSISTENT);
@@ -828,11 +828,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * for a truncation snapshot
      */
     void truncationRequestExistenceCheck() throws KeeperException, InterruptedException {
-        if (m_zk.exists("/request_truncation_snapshot", m_truncationRequestExistenceWatcher) != null) {
+        if (m_zk.exists(VoltZK.request_truncation_snapshot, m_truncationRequestExistenceWatcher) != null) {
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
-                    "/snapshot_truncation_master"));
+                    VoltZK.snapshot_truncation_master));
         }
     }
 
@@ -841,12 +841,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * request for a snapshot
      */
     void userSnapshotRequestExistenceCheck() throws Exception {
-        m_zk.delete("/user_snapshot_request", -1, null, null);
-        if (m_zk.exists("/user_snapshot_request", m_userSnapshotRequestExistenceWatcher) != null) {
+        m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
+        if (m_zk.exists(VoltZK.user_snapshot_request, m_userSnapshotRequestExistenceWatcher) != null) {
             processUserSnapshotRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
-                    "/user_snapshot_request"));
+                    VoltZK.user_snapshot_request));
         }
     }
 
@@ -1402,7 +1402,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("requestId", requestId);
             String zkString = jsObj.toString(4);
             byte zkBytes[] = zkString.getBytes("UTF-8");
-            m_zk.create("/user_snapshot_request", zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             registerUserSnapshotResponseWatch(requestId, invocation, c);
         } catch (KeeperException.NodeExistsException e) {
             requestExists = true;
@@ -1434,7 +1434,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final StoredProcedureInvocation invocation,
             final Connection c
             ) throws Exception {
-        final String responseNode = "/user_snapshot_response_" + requestId;
+        final String responseNode = VoltZK.user_snapshot_response + requestId;
         Stat exists = m_zk.exists(responseNode, new Watcher() {
             @Override
             public void process(final WatchedEvent event) {

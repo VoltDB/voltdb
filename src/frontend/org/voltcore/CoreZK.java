@@ -23,10 +23,13 @@ package org.voltcore;
  */
 public class CoreZK {
 
+    // hosts in the current system (ephemeral)
     public static final String hosts = "/core/hosts";
     public static final String hosts_host = "/core/hosts/host";
     public static final String readyhosts = "/core/readyhosts";
     public static final String readyhosts_host = "/core/readyhosts/host";
+
+    // hosts since beginning of time (persistent)
     public static final String hostids = "/core/hostids";
     public static final String hostids_host = "/core/hostids/host";
 

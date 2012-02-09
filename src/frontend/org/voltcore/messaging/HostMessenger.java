@@ -704,7 +704,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void waitForAllHostsToBeReady(int expectedHosts) {
         m_localhostReady = true;
         try {
-            m_zk.create(CoreZK.readyhosts_host, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+            m_zk.create(CoreZK.readyhosts_host, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
                 if (m_zk.getChildren(CoreZK.readyhosts, fw).size() == expectedHosts) {

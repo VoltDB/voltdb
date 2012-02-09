@@ -522,7 +522,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         jsObj.put("HSId", HSId);
         jsObj.put("partitionId", partitionId);
         byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-        m_messenger.getZK().create("/mailboxes/executionsites/site", payload,
+        m_messenger.getZK().create(VoltZK.mailboxes_executionsites_site, payload,
                                    Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 
@@ -543,7 +543,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         JSONObject jsObj = new JSONObject();
         jsObj.put("HSId", HSId);
         byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-        m_messenger.getZK().create("/mailboxes/initiators/initiator", payload,
+        m_messenger.getZK().create(VoltZK.mailboxes_initiators_initiator, payload,
                                    Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 
@@ -769,18 +769,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      * Race to create the persistent nodes.
      */
     void createPersistentZKNodes() {
-        String[] pnodes = new String[] {
-            "/readyhosts",
-            "/mailboxes",
-            "/mailboxes/executionsites",
-            "/mailboxes/initiators",
-            "/mailboxes/asyncplanners",
-            "/mailboxes/clientinterfaces",
-        };
 
-        for (int i=0; i < pnodes.length; i++) {
+        for (int i=0; i < VoltZK.ZK_HIERARCHY.length; i++) {
             try {
-                m_messenger.getZK().create(pnodes[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                m_messenger.getZK().create(VoltZK.ZK_HIERARCHY[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } catch (org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException e) {
                 // this is an expected race.
             } catch (Exception e) {
@@ -987,14 +979,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          */
         try {
             zk.create(
-                    "/cluster_metadata",
+                    VoltZK.cluster_metadata,
                     null,
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT,
                     new ZKUtil.StringCallback(),
                     null);
             zk.create(
-                    "/cluster_metadata/" + m_messenger.getHostId(),
+                    VoltZK.cluster_metadata + m_messenger.getHostId(),
                     getLocalMetadata().getBytes("UTF-8"),
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.EPHEMERAL,
@@ -1013,7 +1005,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Map<Integer, ZKUtil.ByteArrayCallback> callbacks = new HashMap<Integer, ZKUtil.ByteArrayCallback>();
             for (Integer hostId : metadataToRetrieve) {
                 ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
-                zk.getData("/cluster_metadata/" + hostId, false, cb, null);
+                zk.getData(VoltZK.cluster_metadata + hostId, false, cb, null);
                 callbacks.put(hostId, cb);
             }
 
@@ -1585,11 +1577,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
             try {
-                zk.create("/unfaulted_hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                zk.create(VoltZK.unfaulted_hosts, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } catch (KeeperException.NodeExistsException e) {}
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
                 try {
-                    zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    zk.create(VoltZK.request_truncation_snapshot, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 } catch (KeeperException.NodeExistsException e) {}
             } else {
                 logRecoveryCompleted = true;
@@ -1597,7 +1589,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             ByteBuffer txnIdBuffer = ByteBuffer.allocate(8);
             txnIdBuffer.putLong(TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
             zk.create(
-                    "/unfaulted_hosts/" + m_messenger.getHostId(),
+                    VoltZK.unfaulted_hosts + m_messenger.getHostId(),
                     txnIdBuffer.array(),
                     Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
             if (logRecoveryCompleted) {

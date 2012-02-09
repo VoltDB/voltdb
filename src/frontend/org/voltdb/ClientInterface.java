@@ -880,7 +880,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         jsObj.put("HSId", m_mailbox.getHSId());
         byte[] payload = jsObj.toString(4).getBytes("UTF-8");
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        zk.create("/mailboxes/clientinterfaces/ci", payload,
+        zk.create(VoltZK.mailboxes_clientinterfaces_ci, payload,
                   Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 
