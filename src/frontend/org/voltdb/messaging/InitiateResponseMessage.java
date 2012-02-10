@@ -39,7 +39,7 @@ public class InitiateResponseMessage extends VoltMessage {
     private ClientResponseImpl m_response;
 
     /** Empty constructor for de-serialization */
-    InitiateResponseMessage()
+    public InitiateResponseMessage()
     {
         m_initiatorHSId = -1;
         m_coordinatorHSId = -1;
