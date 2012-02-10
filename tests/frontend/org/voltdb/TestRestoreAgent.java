@@ -32,6 +32,7 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -206,7 +207,10 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             VoltTable[] results = new VoltTable[] {result};
             ClientResponseImpl response = new ClientResponseImpl(ClientResponse.SUCCESS,
                                                                  results, null);
-            ((WriteStream) clientData).enqueue(response);
+            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            response.flattenToBuffer(buf);
+            ((WriteStream) clientData).enqueue(buf);
             return true;
         }
 
@@ -221,7 +225,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         }
 
         @Override
-        public void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds) {
+        public void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
             throw new UnsupportedOperationException();
         }
 
@@ -430,8 +434,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             snapshotPath = context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
         }
 
-        int lowestHostId = context.siteTracker.getLowestHostId();
-
         int[] allPartitions = new int[context.numberOfPartitions];
         int i = 0;
         for (Partition p : context.cluster.getPartitions()) {
@@ -448,7 +450,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                      cl.getLogpath(),
                                                      cl.getInternalsnapshotpath(),
                                                      snapshotPath,
-                                                     lowestHostId,
                                                      allPartitions,
                                                      context.siteTracker.getAllLiveHosts());
         restoreAgent.setCatalogContext(context);
@@ -464,8 +465,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         MockInitiator initiator = new MockInitiator(null);
         RestoreAgent restoreAgent = getRestoreAgent(initiator, 0);
-        restoreAgent.createZKDirectory(RestoreAgent.RESTORE);
-        restoreAgent.createZKDirectory(RestoreAgent.RESTORE_BARRIER);
+        restoreAgent.createZKDirectory(VoltZK.restore);
+        restoreAgent.createZKDirectory(VoltZK.restore_barrier);
         restoreAgent.enterRestore();
         assertNull(restoreAgent.generatePlans());
     }
@@ -487,8 +488,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             ex.submit(new Runnable() {
                 @Override
                 public void run() {
-                    agent.createZKDirectory(RestoreAgent.RESTORE);
-                    agent.createZKDirectory(RestoreAgent.RESTORE_BARRIER);
+                    agent.createZKDirectory(VoltZK.restore);
+                    agent.createZKDirectory(VoltZK.restore_barrier);
 
                     agent.enterRestore();
 

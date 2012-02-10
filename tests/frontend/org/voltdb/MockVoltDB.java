@@ -159,6 +159,11 @@ public class MockVoltDB implements VoltDBInterface
             throw new RuntimeException(e);
         }
         */
+        try {
+            m_hostMessenger.start();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public Procedure addProcedureForTest(String name)
@@ -199,7 +204,7 @@ public class MockVoltDB implements VoltDBInterface
         getSite(siteId).setIsup(true);
     }
 
-    public synchronized void killSite(int siteId) {
+    public synchronized void killSite(long siteId) {
         m_catalog = m_catalog.deepCopy();
         getSite(siteId).setIsup(false);
     }
@@ -409,6 +414,7 @@ public class MockVoltDB implements VoltDBInterface
         m_es.shutdown();
         m_es.awaitTermination( 1, TimeUnit.DAYS);
         m_statsAgent.shutdown();
+        m_hostMessenger.shutdown();
     }
 
     @Override

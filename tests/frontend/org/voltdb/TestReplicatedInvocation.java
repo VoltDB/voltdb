@@ -52,13 +52,6 @@ public class TestReplicatedInvocation {
     File root;
     ReplicationRole role = ReplicationRole.REPLICA;
 
-    static class MockWriteStream extends org.voltcore.network.MockWriteStream {
-        @Override
-        public boolean enqueue(FastSerializable f) {
-            return true;
-        }
-    }
-
     @Before
     public void setUp() throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
