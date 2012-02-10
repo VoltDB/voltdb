@@ -502,14 +502,41 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         int hostcount = m_deployment.getCluster().getHostcount();
         int kfactor = m_deployment.getCluster().getKfactor();
         ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
-        int partitionCounter = 0;
-        for (int i = 0; i < sitesperhost; i++) {
+        JSONObject topo = registerClusterConfig(clusterConfig);
+        List<Integer> partitions =
+            ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
+        assert(partitions.size() == sitesperhost);
+        for (Integer partition : partitions)
+        {
             Mailbox mailbox = m_messenger.createMailbox();
             mailboxes.add(mailbox);
-            registerExecutionSiteMailbox(mailbox.getHSId(), (partitionCounter % clusterConfig.getPartitionCount()));
-            partitionCounter++;
+            registerExecutionSiteMailbox(mailbox.getHSId(), partition);
         }
         return mailboxes;
+    }
+
+    private JSONObject registerClusterConfig(ClusterConfig config)
+    {
+        JSONObject topo = null;
+        try
+        {
+            topo = config.getTopology(m_messenger.getLiveHostIds());
+            byte[] payload = topo.toString(4).getBytes("UTF-8");
+            m_messenger.getZK().create(VoltZK.topology, payload,
+                                       Ids.OPEN_ACL_UNSAFE,
+                                       CreateMode.PERSISTENT);
+            byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, null);
+            topo = new JSONObject(new String(data, "UTF-8"));
+        }
+        catch (KeeperException.NodeExistsException nee)
+        {
+        }
+        catch (Exception e)
+        {
+            VoltDB.crashLocalVoltDB("Unable to write topology to ZK, dying",
+                                    true, e);
+        }
+        return topo;
     }
 
     /**

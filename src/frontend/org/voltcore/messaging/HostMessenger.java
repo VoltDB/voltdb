@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
@@ -577,6 +579,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public String getHostname() {
         String hostname = org.voltcore.utils.MiscUtils.getHostnameOrAddress();
         return hostname;
+    }
+
+    public List<Integer> getLiveHostIds() throws KeeperException, InterruptedException
+    {
+        List<Integer> hostids = new ArrayList<Integer>();
+
+        for (String host : m_zk.getChildren(CoreZK.hosts, false, null))
+        {
+            hostids.add(Integer.parseInt(host.substring(host.indexOf("host") + "host".length())));
+        }
+        return hostids;
     }
 
     /**

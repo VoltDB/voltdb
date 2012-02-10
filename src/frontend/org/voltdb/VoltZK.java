@@ -25,6 +25,7 @@ public class VoltZK {
     private static final String root = "/db";
 
     public static final String catalogbytes = "/db/catalogbytes";
+    public static final String topology = "/db/topology";
     public static final String unfaulted_hosts = "/db/unfaulted_hosts";
 
     // configuration (ports, interfaces, ...)

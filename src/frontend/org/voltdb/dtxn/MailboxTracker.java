@@ -85,7 +85,7 @@ public class MailboxTracker {
         Map<Integer, ArrayList<Long>> partitionsToSites = new HashMap<Integer, ArrayList<Long>>();
         Map<Long, Integer> sitesToPartitions = new HashMap<Long, Integer>();
         for (String child : children) {
-            byte[] data = m_zk.getData(VoltZK.mailboxes_executionsites + child, false, null);
+            byte[] data = m_zk.getData(VoltZK.mailboxes_executionsites + "/" + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
 
             log.info("Mailboxtracker getAndWatchSites processing: " + jsObj.toString(2));
@@ -168,7 +168,7 @@ public class MailboxTracker {
 
         Map<Integer, ArrayList<Long>> hostsToInitiators = new HashMap<Integer, ArrayList<Long>>();
         for (String child : children) {
-            byte[] data = m_zk.getData(VoltZK.mailboxes_initiators + child, false, null);
+            byte[] data = m_zk.getData(VoltZK.mailboxes_initiators + "/" + child, false, null);
             JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
             try {
                 long HSId = jsObj.getLong("HSId");
