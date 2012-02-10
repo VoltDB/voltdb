@@ -29,10 +29,7 @@ import java.nio.ByteBuffer;
 import junit.framework.TestCase;
 
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
+import org.voltcore.utils.DeferredSerialization;
 
 public class TestExportProtoMessage extends TestCase {
 
@@ -189,22 +186,19 @@ public class TestExportProtoMessage extends TestCase {
         data.putInt(200);
         data.flip();
         r.pollResponse(1000, data);
-        final DBBPool p = new DBBPool();
-        BBContainer bb =
+        ByteBuffer b =
             new DeferredSerialization() {
                 @Override
-                public BBContainer serialize(DBBPool p) throws IOException {
-                    FastSerializer fs = new FastSerializer(p, r.serializableBytes() + 4);
-                    r.writeToFastSerializer(fs);
-                    return fs.getBBContainer();
+                public ByteBuffer[] serialize() throws IOException {
+                    ByteBuffer buf = ByteBuffer.allocate(r.serializableBytes() + 4);
+                    r.flattenToBuffer(buf);
+                    return new ByteBuffer[] { buf };
                 }
                 @Override
                 public void cancel() {
-                    // TODO Auto-generated method stub
                 }
-            }.serialize(p);
-
-        ByteBuffer b = bb.b;
+            }.serialize()[0];
+        b.flip();
         assertEquals(39, b.getInt());
         FastDeserializer fds = new FastDeserializer(b);
         ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
