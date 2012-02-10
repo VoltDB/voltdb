@@ -171,7 +171,7 @@ public class ExportProtoMessage
 
     /**
      * Total bytes that would be used if serialized in its current state.
-     * Does not include the 4 byte length prefix or the variable length signature!
+     * Does not include 4 byte length prefix that flattenToBuffer adds
      * @return byte count.
      */
     public int serializableBytes() {
