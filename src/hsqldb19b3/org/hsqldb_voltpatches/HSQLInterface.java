@@ -149,11 +149,11 @@ public class HSQLInterface {
      * Any question-marks (?) in the statement will be considered parameters.
      *
      * @param sql SQL statement to be compiled against the current schema.
-     * @return XML representation of the compiled statement.
+     * @return Pseudo XML representation of the compiled statement.
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
      */
-    public String getXMLCompiledStatement(String sql) throws HSQLParseException
+    public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
         Statement cs = null;
 
@@ -172,14 +172,13 @@ public class HSQLInterface {
         if (result.mode == ResultConstants.ERROR)
             throw new HSQLParseException(result.getMainString());
 
-        String xml = null;
-        xml = cs.voltGetXML(sessionProxy, HSQLInterface.XML_INDENT);
+        VoltXMLElement xml = null;
+        xml = cs.voltGetXML(sessionProxy);
 
-        String retval = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-        retval += DTDSource.getCompiledStatementDTD();
-        retval += "<statement>\n" + xml + "\n</statement>\n";
+        VoltXMLElement statement = new VoltXMLElement("statement");
+        statement.children.add(xml);
 
-        return retval;
+        return statement;
     }
 
     /**
@@ -208,31 +207,12 @@ public class HSQLInterface {
 
     /**
      * Get an serialized XML representation of the current schema/catalog.
-     * The output will include the DTD
      *
-     * @return The XML representing a catalog
-     * @throws HSQLParseException
-     */
-    public String getXMLFromCatalog() throws HSQLParseException {
-        return (getXMLFromCatalog(true));
-    }
-
-    /**
-     * Get an serialized XML representation of the current schema/catalog.
-     *
-     * @param include_dtd if true, the output will include the XML's DTD embedded
      * @return The XML representing the catalog.
      * @throws HSQLParseException
      */
-    public String getXMLFromCatalog(boolean include_dtd) throws HSQLParseException {
-        StringBuilder sb = new StringBuilder();
-
-        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        if (include_dtd) {
-            sb.append(DTDSource.getCatalogDTD());
-        }
-
-        sb.append("<databaseschema>\n");
+    public VoltXMLElement getXMLFromCatalog() throws HSQLParseException {
+        VoltXMLElement xml = new VoltXMLElement("databaseschema");
 
         String schemaName = null;
         try {
@@ -246,11 +226,9 @@ public class HSQLInterface {
         HashMappedList hsqlTables = schemaManager.getTables(schemaName);
         for (int i = 0; i < hsqlTables.size(); i++) {
             Table table = (Table) hsqlTables.get(i);
-            sb.append(table.voltGetXML(sessionProxy, "  "));
+            xml.children.add(table.voltGetXML(sessionProxy));
         }
 
-        sb.append("</databaseschema>\n");
-
-        return sb.toString();
+        return xml;
     }
 }

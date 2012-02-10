@@ -34,6 +34,7 @@ import junit.framework.TestCase;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -55,7 +56,7 @@ public class TestDDLCompiler extends TestCase {
 
         hsql.runDDLCommand(ddl1);
 
-        String xml = hsql.getXMLFromCatalog();
+        VoltXMLElement xml = hsql.getXMLFromCatalog();
         System.out.println(xml);
         assertTrue(xml != null);
 
@@ -101,7 +102,7 @@ public class TestDDLCompiler extends TestCase {
 
         hsql.runDDLCommand(ddl1);
 
-        String xml = hsql.getXMLFromCatalog();
+        VoltXMLElement xml = hsql.getXMLFromCatalog();
         System.out.println(xml);
         assertTrue(xml != null);
 
@@ -121,7 +122,7 @@ public class TestDDLCompiler extends TestCase {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
 
         hsql.runDDLCommand(schema);
-        String xml = hsql.getXMLFromCatalog();
+        VoltXMLElement xml = hsql.getXMLFromCatalog();
         System.out.println(xml);
         assertTrue(xml != null);
 
@@ -140,7 +141,7 @@ public class TestDDLCompiler extends TestCase {
         String view = "create view v (name , user ) as select name , user from tmc where name = 'name';";
         hsql.runDDLCommand(view);
 
-        String xml = hsql.getXMLFromCatalog();
+        VoltXMLElement xml = hsql.getXMLFromCatalog();
         System.out.println(xml);
         assertTrue(xml != null);
 

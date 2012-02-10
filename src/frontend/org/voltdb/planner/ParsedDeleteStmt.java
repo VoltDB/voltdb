@@ -17,12 +17,11 @@
 
 package org.voltdb.planner;
 
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
 
 /**
  *
@@ -32,26 +31,22 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     Table table = null;
 
     @Override
-    void parse(Node stmtNode, Database db) {
-        NamedNodeMap attrs = stmtNode.getAttributes();
-        Node node = attrs.getNamedItem("table");
-        assert(node != null);
-        String tableName = node.getNodeValue().trim();
+    void parse(VoltXMLElement stmtNode, Database db) {
+        String tableName = stmtNode.attributes.get("table");
+        assert(tableName != null);
+        tableName = tableName.trim();
         table = db.getTables().getIgnoreCase(tableName);
         tableList.add(table);
 
-        for (Node child = stmtNode.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child.getNodeType() != Node.ELEMENT_NODE)
-                continue;
-            else if (child.getNodeName().equalsIgnoreCase("condition"))
+        for (VoltXMLElement child : stmtNode.children) {
+            if (child.name.equalsIgnoreCase("condition"))
                 parseCondition(child, db);
         }
     }
 
-    void parseCondition(Node conditionNode, Database db) {
+    void parseCondition(VoltXMLElement conditionNode, Database db) {
         AbstractExpression tempWhere = null;
-        for (Node exprNode = conditionNode.getFirstChild(); exprNode != null; exprNode = exprNode.getNextSibling()) {
-            if (exprNode.getNodeType() != Node.ELEMENT_NODE) continue;
+        for (VoltXMLElement exprNode : conditionNode.children) {
             if (tempWhere == null) {
                 tempWhere = parseExpressionTree(exprNode, db);
             }

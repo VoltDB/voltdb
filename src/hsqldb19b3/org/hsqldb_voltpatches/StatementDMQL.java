@@ -818,17 +818,14 @@ public abstract class StatementDMQL extends Statement {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-     String voltGetXML(Session session, String orig_indent)
+     VoltXMLElement voltGetXML(Session session)
      throws HSQLParseException {
          // XXX this seems, how you say, dumb.  leaving it though until I track
          // down that nobody cares
-         StringBuffer sb;
-         sb = new StringBuffer();
-         return sb.toString();
+         assert(false);
+         return null;
     }
 }

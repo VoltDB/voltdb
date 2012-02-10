@@ -439,8 +439,8 @@ public class ExpressionOp extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -512,12 +512,10 @@ public class ExpressionOp extends Expression {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
         switch (opType) {
@@ -548,19 +546,18 @@ public class ExpressionOp extends Expression {
                                          String.valueOf(opType));
         }
 
-        StringBuffer sb = new StringBuffer();
+        VoltXMLElement exp = new VoltXMLElement("operation");
+        // We want to keep track of which expressions are the same in the XML output
+        exp.attributes.put("id", getUniqueId());
 
-        sb.append(indent).append("<operation id=\"").append(this.getUniqueId()).append("\"");
-        sb.append(" type=\"").append(element).append("\"");
+        exp.attributes.put("type", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {
-            sb.append(" alias='" + getAlias() + "'");
+            exp.attributes.put("alias", getAlias());
         }
-        sb.append(">\n");
         for (Expression expr : nodes) {
-            sb.append(expr.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append('\n');
+            exp.children.add(expr.voltGetXML(session));
         }
-        sb.append(indent).append("</operation>");
 
-        return sb.toString();
+        return exp;
     }
 }

@@ -405,8 +405,8 @@ public class ExpressionArithmetic extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -447,36 +447,32 @@ public class ExpressionArithmetic extends Expression {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        StringBuffer sb = new StringBuffer();
+        VoltXMLElement exp = new VoltXMLElement("unset");
 
-        //
         // We want to keep track of which expressions are the same in the XML output
-        //
-        String include = "id=\"" + this.getUniqueId() + "\" ";
+        exp.attributes.put("id", getUniqueId());
 
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
-            sb.append(indent).append("<value ").append(include);
-            sb.append("type=\"").append(Types.getTypeName(dataType.typeCode)).append("\" ");
+            exp.name = "value";
+            exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
 
             if (isParam) {
-                sb.append("isparam=\"true\" ");
-            } else {
+                exp.attributes.put("isparam", "true");
+            }
+            else {
                 String value = "NULL";
                 if (valueData != null)
                     value = valueData.toString();
-                sb.append("value=\"").append(value).append("\" ");
+                exp.attributes.put("value", value);
             }
 
-            sb.append("/>");
-            return sb.toString();
+            return exp;
         }
 
         String element = null;
@@ -508,17 +504,15 @@ public class ExpressionArithmetic extends Expression {
                                          String.valueOf(opType));
         }
 
-        sb.append(indent).append("<operation id=\"").append(this.getUniqueId()).append("\"");
-        sb.append(" type=\"").append(element).append("\"");
+        exp.name = "operation";
+        exp.attributes.put("type", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {
-            sb.append(" alias='" + getAlias() + "'");
+            exp.attributes.put("alias", getAlias());
         }
-        sb.append(">\n");
         for (Expression expr : nodes) {
-            sb.append(expr.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append('\n');
+            exp.children.add(expr.voltGetXML(session));
         }
-        sb.append(indent).append("</operation>");
 
-        return sb.toString();
+        return exp;
     }
 }

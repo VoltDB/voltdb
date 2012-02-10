@@ -1133,26 +1133,21 @@ final class RangeVariable {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String orig_indent)
+    VoltXMLElement voltGetXML(Session session)
     throws HSQLParseException
     {
-        StringBuffer sb;
         Index        index;
         Index        primaryIndex;
         int[]        primaryKey;
         boolean      isSeqScan;
 
-        sb           = new StringBuffer();
         index        = rangeIndex;
         primaryIndex = rangeTable.getPrimaryIndex();
         primaryKey   = rangeTable.getPrimaryKey();
         isSeqScan    = indexCondition == null;
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
 
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
@@ -1163,23 +1158,30 @@ final class RangeVariable {
         if (index == primaryIndex && primaryKey.length == 0)
             isSeqScan = true;
 
-        // output open tag + metadata
-        sb.append(orig_indent + "<tablescan type=\"");
-        if (isSeqScan) sb.append("sequential\" ");
-        else sb.append("index\" ");
-        sb.append("table=\"").append(rangeTable.getName().name).append("\"");
+        // output open tag
+        VoltXMLElement scan = new VoltXMLElement("tablescan");
+
+        // output metadata
+        if (isSeqScan)
+            scan.attributes.put("type", "sequential");
+        else
+            scan.attributes.put("type", "index");
+
+        scan.attributes.put("table", rangeTable.getName().name);
+
         if ((index != null) && (isSeqScan == false)) {
             String indexName = (index.getName() == null ? "UNNAMED" : index.getName().name);
-            sb.append(" index=\"").append(indexName).append("\"");
+            scan.attributes.put("index", indexName);
         }
-        if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias))
-            sb.append(" alias=\"").append(tableAlias).append("\"");
+
+        if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
+            scan.attributes.put("alias", tableAlias.name);
+        }
 
         // note if this is an outer join
         if (isLeftJoin || isRightJoin) {
-            sb.append(" isouterjoin=\"true\"");
+            scan.attributes.put("isouterjoin", "true");
         }
-        sb.append(">\n");
 
         // start with the indexCondition
         Expression cond = indexCondition;
@@ -1212,13 +1214,11 @@ final class RangeVariable {
         // END EXPRESSION
         //
         if (indexEndCondition != null) {
-            sb.append(indent + "<postexp>\n");
-            sb.append(cond.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-            sb.append(indent + "</postexp>\n");
+            VoltXMLElement postexp = new VoltXMLElement("postexp");
+            scan.children.add(postexp);
+            postexp.children.add(cond.voltGetXML(session));
         }
 
-        sb.append(orig_indent + "</tablescan>");
-
-        return sb.toString();
+        return scan;
     }
 }

@@ -35,7 +35,6 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.NumberType;
 
 /**
  * Implementation of aggregate operations
@@ -287,12 +286,10 @@ public class ExpressionAggregate extends Expression {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
         switch (opType) {
@@ -324,22 +321,20 @@ public class ExpressionAggregate extends Expression {
                                          String.valueOf(opType));
         }
 
-        StringBuffer sb = new StringBuffer();
+        VoltXMLElement exp = new VoltXMLElement("operation");
 
-        sb.append(indent).append("<operation id=\"").append(getUniqueId()).append("\"");
-        sb.append(" type=\"").append(element).append("\"");
+        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("type", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {
-            sb.append(" alias='" + getAlias() + "'");
+            exp.attributes.put("alias", getAlias());
         }
         if (this.isDistinctAggregate) {
-            sb.append(" distinct='true'");
+            exp.attributes.put("distinct", "true");
         }
-        sb.append(">\n");
         for (Expression expr : nodes) {
-            sb.append(expr.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append('\n');
+            exp.children.add(expr.voltGetXML(session));
         }
-        sb.append(indent).append("</operation>");
 
-        return sb.toString();
+        return exp;
     }
 }

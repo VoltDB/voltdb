@@ -111,32 +111,28 @@ public class ExpressionValue extends Expression {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      */
     @Override
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        StringBuffer sb = new StringBuffer();
-
-        //
+        VoltXMLElement exp = new VoltXMLElement("unset");
         // We want to keep track of which expressions are the same in the XML output
-        //
-        String include = "id=\"" + this.getUniqueId() + "\" ";
+        exp.attributes.put("id", getUniqueId());
 
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
+            exp.name = "value";
+
             if (dataType == null) {
-                sb.append(indent).append("<value type=\"NULL\" ");
-                sb.append(include).append("value=\"NULL\"/>");
+                exp.attributes.put("type", "NULL");
+                exp.attributes.put("value", "NULL");
             }
             else {
-                sb.append(indent).append("<value ").append(include);
-                sb.append("type=\"").append(Types.getTypeName(dataType.typeCode)).append("\" ");
+                exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
 
                 if (isParam) {
-                    sb.append("isparam=\"true\" ");
+                    exp.attributes.put("isparam", "true");
                 } else {
                     String value = "NULL";
                     if (valueData != null)
@@ -165,10 +161,8 @@ public class ExpressionValue extends Expression {
                             value = valueData.toString();
                         }
                     }
-                    sb.append("value=\"").append(value).append("\" ");
+                    exp.attributes.put("value", value);
                 }
-
-                sb.append("/>");
             }
         }
         else if (getType() == OpTypes.COLUMN) {
@@ -176,17 +170,17 @@ public class ExpressionValue extends Expression {
             assert(false);
         }
         else if (getType() == OpTypes.ASTERISK) {
-            sb.append(indent).append("<asterisk/>");
+            exp.name = "asterisk";
         }
 
         // catch unexpected types
         else {
             // XXX Should we throw HSQLParseException here instead?
             System.err.println("UNSUPPORTED EXPR TYPE: " + String.valueOf(getType()));
-            sb.append("unknown");
+            exp.name = "unknown";
         }
 
-        return sb.toString();
+        return exp;
     }
 
     private static final int caseDiff = ('a' - 'A');

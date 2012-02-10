@@ -19,14 +19,13 @@ package org.voltdb.planner;
 
 import java.util.LinkedHashMap;
 
-import org.voltdb.catalog.Database;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
 
 /**
  *
@@ -41,43 +40,35 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         new LinkedHashMap<Column, AbstractExpression>();
 
     @Override
-    void parse(Node stmtNode, Database db) {
-        NamedNodeMap attrs = stmtNode.getAttributes();
-        Node node = attrs.getNamedItem("table");
-        assert(node != null);
-        String tableName = node.getNodeValue().trim();
+    void parse(VoltXMLElement stmtNode, Database db) {
+        String tableName = stmtNode.attributes.get("table");
+        assert(tableName != null);
+        tableName = tableName.trim();
         table = db.getTables().getIgnoreCase(tableName);
         tableList.add(table);
 
-        for (Node child = stmtNode.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child.getNodeType() != Node.ELEMENT_NODE)
-                continue;
-            if (child.getNodeName().equalsIgnoreCase("columns"))
+        for (VoltXMLElement child : stmtNode.children) {
+            if (child.name.equalsIgnoreCase("columns"))
                 parseColumns(child, db);
-            else if (child.getNodeName().equalsIgnoreCase("condition"))
+            else if (child.name.equalsIgnoreCase("condition"))
                 parseCondition(child, db);
         }
     }
 
-    void parseColumns(Node columnsNode, Database db) {
-        for (Node child = columnsNode.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child.getNodeType() != Node.ELEMENT_NODE)
-                continue;
-            assert(child.getNodeName().equals("column"));
+    void parseColumns(VoltXMLElement columnsNode, Database db) {
+        for (VoltXMLElement child : columnsNode.children) {
+            assert(child.name.equals("column"));
 
             Column col = null;
-            NamedNodeMap attrs = child.getAttributes();
-            Node node = attrs.getNamedItem("table");
-            assert(node != null);
-            assert(node.getNodeValue().equalsIgnoreCase(table.getTypeName()));
-            node = attrs.getNamedItem("name");
-            assert(node != null);
-            col = table.getColumns().getIgnoreCase(node.getNodeValue().trim());
+            String tableName = child.attributes.get("table");
+            assert(tableName != null);
+            assert(tableName.equalsIgnoreCase(table.getTypeName()));
+            String name = child.attributes.get("name");
+            assert(name != null);
+            col = table.getColumns().getIgnoreCase(name.trim());
 
             AbstractExpression expr = null;
-            for (Node subChild = child.getFirstChild(); subChild != null; subChild = subChild.getNextSibling()) {
-                if (subChild.getNodeType() != Node.ELEMENT_NODE)
-                    continue;
+            for (VoltXMLElement subChild : child.children) {
                 expr = parseExpressionTree(subChild, db);
                 ExpressionUtil.assignLiteralConstantTypesRecursively(expr, VoltType.get((byte)col.getType()));
                 ExpressionUtil.assignOutputValueTypesRecursively(expr);
@@ -87,12 +78,10 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         }
     }
 
-    void parseCondition(Node conditionNode, Database db) {
-        Node exprNode = conditionNode.getFirstChild();
-        while ((exprNode != null) && (exprNode.getNodeType() != Node.ELEMENT_NODE))
-            exprNode = exprNode.getNextSibling();
-        if (exprNode == null)
+    void parseCondition(VoltXMLElement conditionNode, Database db) {
+        if (conditionNode.children.size() == 0)
             return;
+        VoltXMLElement exprNode = conditionNode.children.get(0);
         where = parseExpressionTree(exprNode, db);
         ExpressionUtil.assignLiteralConstantTypesRecursively(where);
         ExpressionUtil.assignOutputValueTypesRecursively(where);

@@ -174,16 +174,11 @@ public class StatementQuery extends StatementDMQL {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
-     * @param params The parameters (if any) to this compiled SELECT
-     * statement. These are not available to this object, so they are
-     * hackily passed to this method here.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
     @Override
-    String voltGetXML(Session session, String orig_indent)
+    VoltXMLElement voltGetXML(Session session)
     throws HSQLParseException
     {
         QuerySpecification select = (QuerySpecification) queryExpression;
@@ -200,17 +195,14 @@ public class StatementQuery extends StatementDMQL {
             // XXX coward.
         }
 
-        StringBuffer sb = new StringBuffer();
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
-
         // select
-        sb.append(orig_indent).append("<select");
+        VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
-            sb.append(" distinct=\"true\"");
+            query.attributes.put("distinct", "true");
         if (select.isGrouped)
-            sb.append(" grouped=\"true\"");
+            query.attributes.put("grouped", "true");
         if (select.isAggregated)
-            sb.append(" aggregated=\"true\"");
+            query.attributes.put("aggregated", "true");
 
         // limit
         if ((select.sortAndSlice != null) && (select.sortAndSlice.limitCondition != null)) {
@@ -223,20 +215,20 @@ public class StatementQuery extends StatementDMQL {
                 if (limitCondition.nodes[0].isParam() == false) {
                     Integer offset = (Integer)limitCondition.nodes[0].getValue(session);
                     if (offset > 0) {
-                        sb.append(" offset=\"" + offset + "\"");
+                        query.attributes.put("offset", offset.toString());
                     }
                 }
                 else {
-                    sb.append(" offset_paramid=\"" + limitCondition.nodes[0].getUniqueId() + "\"");
+                    query.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId());
                 }
 
                 // read limit. it may be a parameter token.
                 if (limitCondition.nodes[1].isParam() == false) {
                     Integer limit = (Integer)limitCondition.nodes[1].getValue(session);
-                    sb.append(" limit=\"" + limit + "\"");
+                    query.attributes.put("limit", limit.toString());
                 }
                 else {
-                    sb.append(" limit_paramid=\"" + limitCondition.nodes[1].getUniqueId() + "\"");
+                    query.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId());
                 }
             } catch (HsqlException ex) {
                 // XXX really?
@@ -244,10 +236,10 @@ public class StatementQuery extends StatementDMQL {
             }
         }
 
-        sb.append(">\n");
-
         // columns that need to be output by the scans
-        sb.append(indent + "<scan_columns>\n");
+        VoltXMLElement scanCols = new VoltXMLElement("scan_columns");
+        query.children.add(scanCols);
+
         // Just gather a mish-mash of every possible relevant expression
         // and uniq them later
         HsqlList col_list = new HsqlArrayList();
@@ -298,12 +290,12 @@ public class StatementQuery extends StatementDMQL {
         }
         for (int i = 0; i < uniq_col_list.size(); i++)
         {
-            sb.append(((Expression)uniq_col_list.get(i)).voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+            scanCols.children.add(((Expression)uniq_col_list.get(i)).voltGetXML(session));
         }
-        sb.append(indent + "</scan_columns>\n");
 
         // columns
-        sb.append(indent + "<columns>\n");
+        VoltXMLElement cols = new VoltXMLElement("columns");
+        query.children.add(cols);
 
         ArrayList<Expression> orderByCols = new ArrayList<Expression>();
         ArrayList<Expression> groupByCols = new ArrayList<Expression>();
@@ -416,7 +408,7 @@ public class StatementQuery extends StatementDMQL {
                              (otherCol.columnIndex == expr.columnIndex))
                     {
                         // serialize the column this simple column stands-in for
-                        sb.append(otherCol.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+                        cols.children.add(otherCol.voltGetXML(session));
                         // null-out otherCol to not serialize it twice
                         displayCols.set(ii, null);
                         // quit seeking simple_column's replacement
@@ -425,34 +417,36 @@ public class StatementQuery extends StatementDMQL {
                 }
             }
             else {
-                sb.append(expr.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+                cols.children.add(expr.voltGetXML(session));
             }
         }
 
-        sb.append(indent + "</columns>\n");
-
         // parameters
-        sb.append(indent + "<parameters>\n");
+        VoltXMLElement params = new VoltXMLElement("parameters");
+        query.children.add(params);
+
         for (int i = 0; i < parameters.length; i++) {
-            sb.append(indent + HSQLInterface.XML_INDENT + "<parameter index='").append(i).append("'");
+            VoltXMLElement parameter = new VoltXMLElement("parameter");
+            params.children.add(parameter);
+
+            parameter.attributes.put("index", String.valueOf(i));
             ExpressionColumn param = parameters[i];
-            sb.append(" id='").append(param.getUniqueId()).append("'");
-            sb.append(" type='").append(Types.getTypeName(param.getDataType().typeCode)).append("'");
-            sb.append(" />\n");
+            parameter.attributes.put("id", param.getUniqueId());
+            parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
         }
-        sb.append(indent + "</parameters>\n");
 
         // scans
-        sb.append(indent + "<tablescans>\n");
+        VoltXMLElement scans = new VoltXMLElement("tablescans");
+        query.children.add(scans);
+
         for (RangeVariable rangeVariable : rangeVariables)
-            sb.append(rangeVariable.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-        sb.append(indent + "</tablescans>\n");
+            scans.children.add(rangeVariable.voltGetXML(session));
 
         // conditions
         if (select.queryCondition != null) {
-            sb.append(indent).append("<querycondition>\n");
-            sb.append(select.queryCondition.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-            sb.append(indent).append("</querycondition>\n");
+            VoltXMLElement condition = new VoltXMLElement("querycondition");
+            query.children.add(condition);
+            condition.children.add(select.queryCondition.voltGetXML(session));
         }
         else {
             // look for inner joins expressed on range variables
@@ -488,37 +482,36 @@ public class StatementQuery extends StatementDMQL {
                 }
             }
             if (cond != null) {
-                sb.append(indent).append("<querycondition>\n");
-                sb.append(cond.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-                sb.append(indent).append("</querycondition>\n");
+                VoltXMLElement condition = new VoltXMLElement("querycondition");
+                query.children.add(condition);
+                condition.children.add(cond.voltGetXML(session));
             }
         }
 
         // having
         if (select.havingCondition != null) {
-            sb.append(indent).append("<havingcondition>\n");
-            sb.append(select.havingCondition.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-            sb.append(indent).append("</havingcondition>\n");
+            VoltXMLElement condition = new VoltXMLElement("havingcondition");
+            query.children.add(condition);
+            condition.children.add(select.havingCondition.voltGetXML(session));
         }
 
         // groupby
         if (select.isGrouped) {
-            sb.append(indent + "<groupcolumns>\n");
+            VoltXMLElement groupCols = new VoltXMLElement("groupcolumns");
+            query.children.add(groupCols);
             for (Expression groupByCol : groupByCols) {
-                sb.append(groupByCol.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+                groupCols.children.add(groupByCol.voltGetXML(session));
             }
-            sb.append(indent + "</groupcolumns>\n");
         }
         // orderby
         if (orderByCols.size() > 0) {
-            sb.append(indent + "<ordercolumns>\n");
-            for (Expression orderByCol : orderByCols)
-                sb.append(orderByCol.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-            sb.append(indent + "</ordercolumns>\n");
+            VoltXMLElement orderCols = new VoltXMLElement("ordercolumns");
+            query.children.add(orderCols);
+            for (Expression orderByCol : orderByCols) {
+                orderCols.children.add(orderByCol.voltGetXML(session));
+            }
         }
 
-        sb.append(orig_indent).append("</select>");
-
-        return sb.toString();
+        return query;
     }
 }

@@ -413,9 +413,9 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangeVariable.rangePosition]
-                        .getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangeVariable.rangePosition]
+                    .getCurrent();
                 Object value   = data[columnIndex];
                 Type   colType = column.getDataType();
 
@@ -427,8 +427,8 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -812,37 +812,30 @@ public class ExpressionColumn extends Expression {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        StringBuffer sb = new StringBuffer();
-
-        //
+        VoltXMLElement exp = new VoltXMLElement("unset");
         // We want to keep track of which expressions are the same in the XML output
-        //
-        String include = "id=\"" + this.getUniqueId() + "\" ";
+        exp.attributes.put("id", this.getUniqueId());
 
         if (opType == OpTypes.ASTERISK) {
-            sb.append(indent).append("<asterisk/>");
+            exp.name = "asterisk";
         }
         else if (isParam) {
-            sb.append(indent).append("<value ").append(include);
-            sb.append("type=\"").append(Types.getTypeName(dataType.typeCode)).append("\" ");
-            sb.append("isparam=\"true\" ");
-            sb.append("/>");
+            exp.name = "value";
+            exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
+            exp.attributes.put("isparam", "true");
         }
         else {
-            sb.append(indent).append("<columnref ").append(include);
+            exp.name = "columnref";
             if (tableName != null)
-                sb.append("table=\"").append(tableName).append("\" ");
-            sb.append("column=\"").append(columnName).append("\" ");
-            sb.append("alias=\"").append((this.alias != null) && (getAlias().length() > 0) ? getAlias() : columnName).append("\" ");
-            sb.append("/>");
+                exp.attributes.put("table", tableName);
+            exp.attributes.put("column", columnName);
+            exp.attributes.put("alias", (this.alias != null) && (getAlias().length() > 0) ? getAlias() : columnName);
         }
 
-        return sb.toString();
+        return exp;
     }
 }

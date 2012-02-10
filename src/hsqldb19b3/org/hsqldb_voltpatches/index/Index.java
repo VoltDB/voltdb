@@ -69,6 +69,7 @@ package org.hsqldb_voltpatches.index;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.types.Type;
@@ -266,15 +267,13 @@ public interface Index extends SchemaObject {
      */
     public int compareRowNonUnique(Object[] a, Object[] b,
                                    int fieldcount);
-    
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve 
+     * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      */
-    public String voltGetXML(Session session, String indent);
+    public VoltXMLElement voltGetXML(Session session);
 }

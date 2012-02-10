@@ -191,7 +191,7 @@ public class TestHSQLDB extends TestCase {
         }
 
         String sql = "SELECT * FROM BT;";
-        String xml = null;
+        VoltXMLElement xml = null;
         try {
             xml = hsql.getXMLCompiledStatement(sql);
         } catch (HSQLParseException e1) {

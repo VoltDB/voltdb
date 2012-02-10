@@ -1435,51 +1435,47 @@ public class Expression {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        StringBuffer sb = new StringBuffer();
+        VoltXMLElement exp = new VoltXMLElement("unset");
 
-        //
         // We want to keep track of which expressions are the same in the XML output
-        //
-        String include = "id=\"" + this.getUniqueId() + "\" ";
+        exp.attributes.put("id", getUniqueId());
 
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
-            sb.append(indent).append("<value ").append(include);
-            sb.append("type=\"").append(Types.getTypeName(dataType.typeCode)).append("\" ");
+            exp.name = "value";
+            exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
 
             if (isParam) {
-                sb.append("isparam=\"true\" ");
+                exp.attributes.put("isparam", "true");
             } else {
                 String value = "NULL";
                 if (valueData != null)
                     value = valueData.toString();
-                sb.append("value=\"").append(value).append("\" ");
+                exp.attributes.put("value", value);
             }
-
-            sb.append("/>");
         }
         else if (getType() == OpTypes.COLUMN) {
             // XXX Can bad SQL get us here or does HSQL barf before that?
             assert(false);
         }
         else if (getType() == OpTypes.ASTERISK) {
-            sb.append(indent).append("<asterisk/>");
+            VoltXMLElement asterisk = new VoltXMLElement("asterisk");
+            exp.children.add(asterisk);
         }
         // catch unexpected types
         // XXX Should this throw HSQLParseException instead?
         else {
             System.err.println("UNSUPPORTED EXPR TYPE: " + String.valueOf(getType()));
-            sb.append("unknown");
+            VoltXMLElement unknown = new VoltXMLElement("unknown");
+            exp.children.add(unknown);
         }
 
-        return sb.toString();
+        return exp;
     }
 
     protected String cached_id = null;

@@ -66,14 +66,13 @@
 
 package org.hsqldb_voltpatches.index;
 
-import java.util.NoSuchElementException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlNameManager;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.OpTypes;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.RowAVL;
@@ -82,7 +81,7 @@ import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.navigator.RowIterator;
@@ -1579,9 +1578,9 @@ public class IndexAVL implements Index {
             return nextnode.getPos();
         }
     }
-    
+
     /*************** VOLTDB *********************/
-    
+
     String getColumnNameList() {
 
         String columnNameList = "";
@@ -1598,28 +1597,22 @@ public class IndexAVL implements Index {
 
         return columnNameList;
     }
-    
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve 
+     * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      */
     @Override
-    public String voltGetXML(Session session, String indent) {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(indent).append("<index");
-        sb.append(" name='").append(getName().name).append("'");
-        sb.append(" columns='").append(getColumnNameList()).append("'");
-        sb.append(" unique='").append(isUnique() ? "true" : "false").append("'");
-        sb.append(">\n");
-    
-        sb.append(indent).append("</index>\n");
-        
-        return sb.toString();
+    public VoltXMLElement voltGetXML(Session session) {
+        VoltXMLElement index = new VoltXMLElement("index");
+
+        index.attributes.put("name", getName().name);
+        index.attributes.put("columns", getColumnNameList());
+        index.attributes.put("unique", isUnique() ? "true" : "false");
+
+        return index;
     }
 }

@@ -538,7 +538,7 @@ public class StatementDML extends StatementDMQL {
         newData.beforeFirst();
 
         while (newData.hasNext()) {
-            Object[] data = (Object[]) newData.getNext();
+            Object[] data = newData.getNext();
 
             baseTable.insertRow(session, store, data);
 
@@ -1248,122 +1248,97 @@ public class StatementDML extends StatementDMQL {
 
     /*************** VOLTDB *********************/
 
-    private StringBuffer voltAppendInsertColumns(Session session,
-                                                 StringBuffer sb,
-                                                 String orig_indent)
+    private void voltAppendInsertColumns(Session session, VoltXMLElement xml)
     throws HSQLParseException
     {
-        sb.append(orig_indent).append("<columns>\n");
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
-
+        VoltXMLElement columns = new VoltXMLElement("columns");
+        xml.children.add(columns);
 
         for (int i = 0; i < insertColumnMap.length; i++)
         {
-            sb.append(indent).append("<column table=\"").append(targetTable.tableName.name);
-            sb.append("\" name=\"").append(targetTable.getColumn(insertColumnMap[i]).getName().name);
-            sb.append("\">\n");
-            sb.append(insertExpression.nodes[0].nodes[i].voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-            sb.append(indent).append("</column>\n");
+            VoltXMLElement column = new VoltXMLElement("column");
+            columns.children.add(column);
+            column.attributes.put("table", targetTable.tableName.name);
+            column.attributes.put("name", targetTable.getColumn(insertColumnMap[i]).getName().name);
+            column.children.add(insertExpression.nodes[0].nodes[i].voltGetXML(session));
         }
-        sb.append(orig_indent).append("</columns>");
-
-        return sb;
     }
 
-    private StringBuffer voltAppendUpdateColumns(Session session,
-                                                 StringBuffer sb,
-                                                 String orig_indent)
+    private void voltAppendUpdateColumns(Session session, VoltXMLElement xml)
     throws HSQLParseException
     {
-        sb.append(orig_indent).append("<columns>\n");
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
+        VoltXMLElement columns = new VoltXMLElement("columns");
+        xml.children.add(columns);
+
         for (int i = 0; i < updateColumnMap.length; i++)
         {
-            sb.append(indent).append("<column table=\"").append(targetTable.tableName.name);
-            sb.append("\" name=\"").append(targetTable.getColumn(updateColumnMap[i]).getName().name);
-            sb.append("\">\n");
-            sb.append(updateExpressions[i].voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-            sb.append(indent).append("</column>\n");
+            VoltXMLElement column = new VoltXMLElement("column");
+            columns.children.add(column);
+            column.attributes.put("table", targetTable.tableName.name);
+            column.attributes.put("name", targetTable.getColumn(updateColumnMap[i]).getName().name);
+            column.children.add(updateExpressions[i].voltGetXML(session));
         }
-        sb.append(orig_indent).append("</columns>");
-
-        return sb;
     }
 
-    private StringBuffer voltAppendParameters(Session session, StringBuffer sb, String orig_indent) {
-        sb.append(orig_indent).append("<parameters>\n");
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
+    private void voltAppendParameters(Session session, VoltXMLElement xml) {
+
+        VoltXMLElement parameterXML = new VoltXMLElement("parameters");
+        xml.children.add(parameterXML);
+
         for (int i = 0; i < parameters.length; i++) {
-            sb.append(indent).append("<parameter index='").append(i).append("'");
+            VoltXMLElement parameter = new VoltXMLElement("parameter");
+            parameterXML.children.add(parameter);
+            parameter.attributes.put("index", String.valueOf(i));
             Expression param = parameters[i];
-            sb.append(" id='").append(param.getUniqueId()).append("'");
-            sb.append(" type='").append(Types.getTypeName(param.getDataType().typeCode)).append("'");
-            sb.append(" />\n");
+            parameter.attributes.put("id", param.getUniqueId());
+            parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
         }
-
-        sb.append(orig_indent).append("</parameters>");
-
-        return sb;
     }
 
-    private StringBuffer voltAppendUpdateCondition(Session session,
-                                                   StringBuffer sb,
-                                                   String orig_indent)
+    private void voltAppendUpdateCondition(Session session, VoltXMLElement xml)
     throws HSQLParseException
     {
         assert(targetRangeVariables.length > 0);
         RangeVariable rv = targetRangeVariables[0];
 
-        sb.append(orig_indent).append("<condition>\n");
+        VoltXMLElement condition = new VoltXMLElement("condition");
+        xml.children.add(condition);
 
         // AND together all of the WHERE conditions that HSQL spits out
         // The parser will currently redo all of the index start/end
         // smarts that HSQL tried to do
         Expression cond = rv.indexCondition;
-        if (rv.indexEndCondition != null)
-        {
-            if (cond != null)
-            {
+        if (rv.indexEndCondition != null) {
+            if (cond != null) {
                 cond = new ExpressionLogical(OpTypes.AND, cond,
                                              rv.indexEndCondition);
             }
-            else
-            {
+            else {
                 cond = rv.indexEndCondition;
             }
         }
-        if (rv.nonIndexJoinCondition != null)
-        {
-            if (cond != null)
-            {
+        if (rv.nonIndexJoinCondition != null) {
+            if (cond != null) {
                 cond = new ExpressionLogical(OpTypes.AND, cond,
                                              rv.nonIndexJoinCondition);
             }
-            else
-            {
+            else {
                 cond = rv.nonIndexJoinCondition;
             }
         }
-        if (rv.nonIndexWhereCondition != null)
-        {
-            if (cond != null)
-            {
+        if (rv.nonIndexWhereCondition != null) {
+            if (cond != null) {
                 cond = new ExpressionLogical(OpTypes.AND, cond,
                                              rv.nonIndexWhereCondition);
             }
-            else
-            {
+            else {
                 cond = rv.nonIndexWhereCondition;
             }
         }
 
-        if (cond != null)
-        {
-            sb.append(cond.voltGetXML(session, orig_indent + HSQLInterface.XML_INDENT)).append("\n");
+        if (cond != null) {
+            condition.children.add(cond.voltGetXML(session));
         }
-        sb.append(orig_indent).append("</condition>");
-
-        return sb;
     }
 
     /**
@@ -1371,55 +1346,40 @@ public class StatementDML extends StatementDMQL {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-     String voltGetXML(Session session, String orig_indent)
+     VoltXMLElement voltGetXML(Session session)
      throws HSQLParseException
      {
-        StringBuffer sb;
-
-        sb = new StringBuffer();
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
+        VoltXMLElement xml = new VoltXMLElement("unknown");
+        xml.attributes.put("table", targetTable.getName().name);
 
         switch (type) {
 
             case StatementTypes.INSERT :
-                sb.append(orig_indent).append("<insert table=\"");
-                sb.append(targetTable.getName().name).append("\">\n");
-                voltAppendInsertColumns(session, sb, indent).append('\n');
-                voltAppendParameters(session, sb, indent).append('\n');
-                sb.append(orig_indent).append("</insert>");
+                xml.name = "insert";
+                voltAppendInsertColumns(session, xml);
+                voltAppendParameters(session, xml);
                 break;
 
             case StatementTypes.UPDATE_CURSOR :
             case StatementTypes.UPDATE_WHERE :
-                sb.append(orig_indent).append("<update table=\"");
-                sb.append(targetTable.getName().name).append("\">\n");
-                voltAppendUpdateColumns(session, sb, indent).append('\n');
-                voltAppendParameters(session, sb, indent).append('\n');
-                sb.append(targetRangeVariables[0].voltGetXML(session, indent)).append('\n');
-                voltAppendUpdateCondition(session, sb, indent).append('\n');
-                sb.append(orig_indent).append("</update>");
+                xml.name = "update";
+                voltAppendUpdateColumns(session, xml);
+                voltAppendParameters(session, xml);
+                xml.children.add(targetRangeVariables[0].voltGetXML(session));
+                voltAppendUpdateCondition(session, xml);
                 break;
 
             case StatementTypes.DELETE_CURSOR :
             case StatementTypes.DELETE_WHERE :
-                sb.append(orig_indent).append("<delete table=\"");
-                sb.append(targetTable.getName().name).append("\">\n");
-                voltAppendParameters(session, sb, indent).append('\n');
-                sb.append(targetRangeVariables[0].voltGetXML(session, indent)).append('\n');
-                voltAppendUpdateCondition(session, sb, indent).append('\n');
-                sb.append(orig_indent).append("</delete>");
+                xml.name = "delete";
+                voltAppendParameters(session, xml);
+                xml.children.add(targetRangeVariables[0].voltGetXML(session));
+                voltAppendUpdateCondition(session, xml);
                 break;
-
-            default :
-                sb.append(orig_indent).append("<unknown/>");
-                break;
-
         }
-        return sb.toString();
+        return xml;
     }
 }

@@ -19,12 +19,11 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -58,59 +57,53 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public boolean distinct = false;
 
     @Override
-    void parse(Node stmtNode, Database db) {
-        NamedNodeMap attrs = stmtNode.getAttributes();
-        Node node;
+    void parse(VoltXMLElement stmtNode, Database db) {
+        String node;
 
-        if ((node = attrs.getNamedItem("limit")) != null)
-            limit = Long.parseLong(node.getNodeValue());
-        if ((node = attrs.getNamedItem("offset")) != null)
-            offset = Long.parseLong(node.getNodeValue());
-        if ((node = attrs.getNamedItem("limit_paramid")) != null)
-            limitParameterId = Long.parseLong(node.getNodeValue());
-        if ((node = attrs.getNamedItem("offset_paramid")) != null)
-            offsetParameterId = Long.parseLong(node.getNodeValue());
-        if ((node = attrs.getNamedItem("grouped")) != null)
-            grouped = Boolean.parseBoolean(node.getNodeValue());
-        if ((node = attrs.getNamedItem("distinct")) != null)
-            distinct = Boolean.parseBoolean(node.getNodeValue());
+        if ((node = stmtNode.attributes.get("limit")) != null)
+            limit = Long.parseLong(node);
+        if ((node = stmtNode.attributes.get("offset")) != null)
+            offset = Long.parseLong(node);
+        if ((node = stmtNode.attributes.get("limit_paramid")) != null)
+            limitParameterId = Long.parseLong(node);
+        if ((node = stmtNode.attributes.get("offset_paramid")) != null)
+            offsetParameterId = Long.parseLong(node);
+        if ((node = stmtNode.attributes.get("grouped")) != null)
+            grouped = Boolean.parseBoolean(node);
+        if ((node = stmtNode.attributes.get("distinct")) != null)
+            distinct = Boolean.parseBoolean(node);
 
         // limit and offset can't have both value and parameter
         if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
         if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
 
-        for (Node child = stmtNode.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child.getNodeType() != Node.ELEMENT_NODE)
-                continue;
-            if (child.getNodeName().equalsIgnoreCase("columns"))
+        for (VoltXMLElement child : stmtNode.children) {
+            if (child.name.equalsIgnoreCase("columns"))
                 parseDisplayColumns(child, db);
-            else if (child.getNodeName().equalsIgnoreCase("querycondition"))
+            else if (child.name.equalsIgnoreCase("querycondition"))
                 parseQueryCondition(child, db);
-            else if (child.getNodeName().equalsIgnoreCase("ordercolumns"))
+            else if (child.name.equalsIgnoreCase("ordercolumns"))
                 parseOrderColumns(child, db);
-            else if (child.getNodeName().equalsIgnoreCase("groupcolumns")) {
+            else if (child.name.equalsIgnoreCase("groupcolumns")) {
                 parseGroupByColumns(child, db);
             }
         }
     }
 
-    void parseDisplayColumns(Node columnsNode, Database db) {
-        for (Node child = columnsNode.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child.getNodeType() != Node.ELEMENT_NODE)
-                continue;
-            final String nodeName = child.getNodeName();
+    void parseDisplayColumns(VoltXMLElement columnsNode, Database db) {
+        for (VoltXMLElement child : columnsNode.children) {
             ParsedColInfo col = new ParsedColInfo();
             col.expression = parseExpressionTree(child, db);
             ExpressionUtil.assignLiteralConstantTypesRecursively(col.expression);
             ExpressionUtil.assignOutputValueTypesRecursively(col.expression);
             assert(col.expression != null);
-            col.alias = child.getAttributes().getNamedItem("alias").getNodeValue();
+            col.alias = child.attributes.get("alias");
 
-            if (nodeName.equals("columnref")) {
+            if (child.name.equals("columnref")) {
                 col.columnName =
-                    child.getAttributes().getNamedItem("column").getNodeValue();
+                    child.attributes.get("column");
                 col.tableName =
-                    child.getAttributes().getNamedItem("table").getNodeValue();
+                    child.attributes.get("table");
             }
             else
             {
@@ -127,42 +120,33 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    void parseQueryCondition(Node conditionNode, Database db) {
-        Node exprNode = conditionNode.getFirstChild();
-        while ((exprNode != null) && (exprNode.getNodeType() != Node.ELEMENT_NODE))
-            exprNode = exprNode.getNextSibling();
-        if (exprNode == null)
+    void parseQueryCondition(VoltXMLElement conditionNode, Database db) {
+        if (conditionNode.children.size() == 0)
             return;
+
+        VoltXMLElement exprNode = conditionNode.children.get(0);
         where = parseExpressionTree(exprNode, db);
         ExpressionUtil.assignLiteralConstantTypesRecursively(where);
         ExpressionUtil.assignOutputValueTypesRecursively(where);
     }
 
-    void parseGroupByColumns(Node columnsNode, Database db) {
-        for (Node child = columnsNode.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child.getNodeType() != Node.ELEMENT_NODE)
-                continue;
-
+    void parseGroupByColumns(VoltXMLElement columnsNode, Database db) {
+        for (VoltXMLElement child : columnsNode.children) {
             parseGroupByColumn(child, db);
         }
     }
 
-    void parseGroupByColumn(Node groupByNode, Database db) {
-        // make sure everything is kosher
-        assert(groupByNode.getNodeType() == Node.ELEMENT_NODE);
+    void parseGroupByColumn(VoltXMLElement groupByNode, Database db) {
 
         ParsedColInfo col = new ParsedColInfo();
         col.expression = parseExpressionTree(groupByNode, db);
         assert(col.expression != null);
 
-        if (groupByNode.getNodeName().equals("columnref"))
+        if (groupByNode.name.equals("columnref"))
         {
-            NamedNodeMap attrs = groupByNode.getAttributes();
-            col.alias = attrs.getNamedItem("alias").getNodeValue();
-            col.columnName =
-                attrs.getNamedItem("column").getNodeValue();
-            col.tableName =
-                attrs.getNamedItem("table").getNodeValue();
+            col.alias = groupByNode.attributes.get("alias");
+            col.columnName = groupByNode.attributes.get("column");
+            col.tableName = groupByNode.attributes.get("table");
             col.groupBy = true;
         }
         else
@@ -179,58 +163,48 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         groupByColumns.add(col);
     }
 
-    void parseOrderColumns(Node columnsNode, Database db) {
-        for (Node child = columnsNode.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child.getNodeType() != Node.ELEMENT_NODE)
-                continue;
-
+    void parseOrderColumns(VoltXMLElement columnsNode, Database db) {
+        for (VoltXMLElement child : columnsNode.children) {
             parseOrderColumn(child, db);
         }
     }
 
-    void parseOrderColumn(Node orderByNode, Database db) {
+    void parseOrderColumn(VoltXMLElement orderByNode, Database db) {
         // make sure everything is kosher
-        assert(orderByNode.getNodeType() == Node.ELEMENT_NODE);
-        assert(orderByNode.getNodeName().equalsIgnoreCase("operation"));
-        NamedNodeMap attrs = orderByNode.getAttributes();
-        Node operationTypeNode = attrs.getNamedItem("type");
-        assert(operationTypeNode != null);
-        assert(operationTypeNode.getNodeValue().equalsIgnoreCase("orderby"));
+        assert(orderByNode.name.equalsIgnoreCase("operation"));
+        String operationType = orderByNode.attributes.get("type");
+        assert(operationType != null);
+        assert(operationType.equalsIgnoreCase("orderby"));
 
         // get desc/asc
-        Node descNode = attrs.getNamedItem("desc");
-        boolean descending = descNode.getNodeValue().equalsIgnoreCase("true");
+        String desc = orderByNode.attributes.get("desc");
+        boolean descending = (desc != null) && (desc.equalsIgnoreCase("true"));
 
         // get the columnref expression inside the orderby node
-        Node child = orderByNode.getFirstChild();
-        while (child.getNodeType() != Node.ELEMENT_NODE)
-            child = child.getNextSibling();
+        VoltXMLElement child = orderByNode.children.get(0);
         assert(child != null);
 
-        NamedNodeMap childAttrs = child.getAttributes();
         // Cases:
         // inner child could be columnref, in which case it's just a normal
         // column.  Just make a ParsedColInfo object for it and the planner
         // will do the right thing later
-        if (child.getNodeName().equals("columnref"))
+        if (child.name.equals("columnref"))
         {
-            String alias = childAttrs.getNamedItem("alias").getNodeValue();
+            String alias = child.attributes.get("alias");
             // create the orderby column
             ParsedColInfo col = new ParsedColInfo();
             col.alias = alias;
             col.expression = parseExpressionTree(child, db);
             ExpressionUtil.assignLiteralConstantTypesRecursively(col.expression);
             ExpressionUtil.assignOutputValueTypesRecursively(col.expression);
-            col.columnName =
-                childAttrs.getNamedItem("column").getNodeValue();
-            col.tableName =
-                    childAttrs.getNamedItem("table").getNodeValue();
+            col.columnName = child.attributes.get("column");
+            col.tableName = child.attributes.get("table");
             col.orderBy = true;
             col.ascending = !descending;
             orderColumns.add(col);
         }
         // inner child could be an operation, which forks into two subcases:
-        else if (child.getNodeName().equals("operation"))
+        else if (child.name.equals("operation"))
         {
             ParsedColInfo order_col = new ParsedColInfo();
             order_col.columnName = "";
@@ -249,7 +223,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             //    a way to not do that that is valid SQL
             if (order_exp instanceof TupleValueExpression)
             {
-                String alias = childAttrs.getNamedItem("alias").getNodeValue();
+                String alias = child.attributes.get("alias");
                 ParsedColInfo orig_col = null;
                 for (ParsedColInfo col : displayColumns)
                 {
@@ -292,7 +266,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         else
         {
-            throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.getNodeName());
+            throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
         }
     }
 

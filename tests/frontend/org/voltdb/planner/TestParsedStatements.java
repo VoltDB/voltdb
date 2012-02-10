@@ -30,16 +30,19 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Map.Entry;
 
+import junit.framework.TestCase;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.AllTpccSQL;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.TPCCClient;
-import org.voltdb.catalog.*;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.utils.BuildDirectoryUtils;
-import junit.framework.TestCase;
 
 public class TestParsedStatements extends TestCase {
 
@@ -75,7 +78,7 @@ public class TestParsedStatements extends TestCase {
     void runSQLTest(String stmtName, String stmtSQL) {
         // use HSQLDB to get XML that describes the semantics of the statement
         // this is much easier to parse than SQL and is checked against the catalog
-        String xmlSQL = null;
+        VoltXMLElement xmlSQL = null;
         try {
             xmlSQL = m_hsql.getXMLCompiledStatement(stmtSQL);
         } catch (HSQLParseException e) {
