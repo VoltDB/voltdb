@@ -94,7 +94,7 @@ public class StatsAgent {
         handledSelectors.add(SysProcSelector.PROCEDURE);
     }
 
-    public Mailbox getMailbox(final HostMessenger hostMessenger, final long HSId) {
+    public Mailbox getMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_mailbox = new Mailbox() {
 
             @Override
@@ -159,7 +159,7 @@ public class StatsAgent {
 
             @Override
             public long getHSId() {
-                return HSId;
+                return hsId;
             }
 
             @Override
@@ -167,6 +167,7 @@ public class StatsAgent {
                 throw new UnsupportedOperationException();
             }
         };
+        hostMessenger.createMailbox(hsId, m_mailbox);
         return m_mailbox;
     }
 
