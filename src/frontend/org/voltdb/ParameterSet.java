@@ -627,6 +627,11 @@ import org.voltdb.types.VoltDecimalHelper;
                         break;
                     case STRING:
                         byte encodedStrings[][] = m_encodedStringArrays.poll();
+                        // This check used to be done by FastSerializer.writeArray(), but things changed?
+                        if (encodedStrings.length > Short.MAX_VALUE) {
+                            throw new IOException("Array exceeds maximum length of "
+                                                  + Short.MAX_VALUE + " bytes");
+                        }
                         buf.putShort((short)encodedStrings.length);
                         for (int zz = 0; zz < encodedStrings.length; zz++) {
                             FastSerializer.writeString(encodedStrings[zz], buf);

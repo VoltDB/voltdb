@@ -58,7 +58,6 @@ import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializableTestUtil;
 import org.voltdb.types.TimestampType;
 
 public class TestParameterSet extends TestCase {
@@ -106,6 +105,40 @@ public class TestParameterSet extends TestCase {
 
         byte[] bin = (byte[]) out.toArray()[0];
         assertEquals(bin[0], 'f'); assertEquals(bin[1], 'o'); assertEquals(bin[2], 'o');
+    }
+
+    private boolean arrayLengthTester(Object[] objs)
+    {
+        params = new ParameterSet(true);
+        params.setParameters(objs);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        boolean threw = false;
+        try
+        {
+            params.flattenToBuffer(buf);
+        }
+        catch (IOException ioe)
+        {
+            threw = true;
+        }
+        return threw;
+    }
+
+    public void testArraysTooLong() throws IOException {
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new short[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new int[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new long[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new double[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new String[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new TimestampType[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new BigDecimal[Short.MAX_VALUE + 1]}));
     }
 
     public void testFloatsInsteadOfDouble() throws IOException {
