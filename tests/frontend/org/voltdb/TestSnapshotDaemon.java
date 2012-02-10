@@ -25,14 +25,8 @@ package org.voltdb;
 
 import static org.junit.Assert.*;
 
-import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.concurrent.Future;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.junit.*;
@@ -135,7 +129,7 @@ public class TestSnapshotDaemon {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         m_initiator = new Initiator();
         m_daemon = new SnapshotDaemon();
-        m_daemon.init(m_initiator, m_mockVoltDB.getZK());
+        m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK());
         return m_daemon;
     }
 
