@@ -53,9 +53,9 @@ public class TestRawProcessor extends TestCase {
 
 
         @Override
-        public boolean enqueue(DeferredSerialization ds) {
+        public void enqueue(DeferredSerialization ds) {
             try {
-                ByteBuffer b = ds.serialize(pool).b;
+                ByteBuffer b = ds.serialize()[0];
                 b.getInt(); // eat the length prefix
                 FastDeserializer fds = new FastDeserializer(b);
                 ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
@@ -64,7 +64,6 @@ public class TestRawProcessor extends TestCase {
             catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            return true;
         }
     }
 
