@@ -22,8 +22,11 @@
  */
 package org.voltdb.dtxn;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import junit.framework.TestCase;
 
@@ -36,7 +39,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.messaging.FastSerializable;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -71,11 +73,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public synchronized boolean enqueue(FastSerializable f)
+        public synchronized void enqueue(ByteBuffer buf)
         {
             m_gotResponse = true;
             notify();
-            return false;
         }
     }
 
@@ -168,7 +169,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds) {
+        public void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
             // TODO Auto-generated method stub
 
         }
@@ -210,7 +211,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
     {
         long now = EstTime.currentTimeMillis();
         InFlightTxnState retval = new InFlightTxnState(
-                txnId, coordIds[0], null, new int[]{}, readOnly,
+                txnId, coordIds[0], null, new long[]{}, readOnly,
                 isSinglePart, new StoredProcedureInvocation(),
                 m_testConnect, MESSAGE_SIZE, now, 0, "", false);
         if (coordIds.length > 1) {
@@ -266,8 +267,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testNonReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_mockVolt.getCatalogContext().siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_mockVolt.getCatalogContext().siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
@@ -304,8 +310,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_mockVolt.getCatalogContext().siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_mockVolt.getCatalogContext().siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
@@ -337,8 +348,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testRecoveringBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_mockVolt.getCatalogContext().siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_mockVolt.getCatalogContext().siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
 
         m_testStream.reset();
@@ -398,8 +414,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testInconsistentResults()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_mockVolt.getCatalogContext().siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_mockVolt.getCatalogContext().siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
@@ -455,8 +476,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testEarlyReadWriteFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_mockVolt.getCatalogContext().siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_mockVolt.getCatalogContext().siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
@@ -471,8 +497,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testMidReadWriteFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_mockVolt.getCatalogContext().siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_mockVolt.getCatalogContext().siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
@@ -487,8 +518,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testMultipleTxnIdMidFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_mockVolt.getCatalogContext().siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_mockVolt.getCatalogContext().siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
@@ -518,9 +554,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testFaultNotification() throws Exception
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState =
-            new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
+        Set<Long> sites = m_mockVolt.getCatalogContext().siteTracker.getAllLiveSites();
+        for (long site : sites) {
+            siteMap.put(site, m_mockVolt.getCatalogContext().siteTracker.getPartitionForSite(site));
+        }
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
