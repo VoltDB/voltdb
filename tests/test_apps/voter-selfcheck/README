@@ -1,4 +1,5 @@
 This application is based on the examples/voter.  Its current differences:
+- Based on vote app as of wan beta
 - rejected (too many) votes are counted and returned by the vote procedure.
   This is useful for testing replication - since the hash of the replication
   result will be checked against the hash of the original result.  Differences
