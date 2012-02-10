@@ -445,10 +445,10 @@ public class TestVoltProcedure extends TestCase {
     private class MockStatsAgent extends StatsAgent {
         public StatsSource m_source = null;
         public SysProcSelector m_selector = null;
-        public int m_catalogId = 0;
+        public long m_catalogId = 0;
 
         @Override
-        public void registerStatsSource(SysProcSelector selector, int catalogId, StatsSource source) {
+        public void registerStatsSource(SysProcSelector selector, long catalogId, StatsSource source) {
             m_source = source;
             m_selector = selector;
             m_catalogId = catalogId;
