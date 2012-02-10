@@ -52,10 +52,12 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializableTestUtil;
 import org.voltdb.types.TimestampType;
 
@@ -66,35 +68,55 @@ public class TestParameterSet extends TestCase {
         params = new ParameterSet();
     }
 
-    public void testNull() {
-        params.setParameters(new Object[]{null});
+    public void testNull() throws IOException {
+        params.setParameters(new Object[]{null, null, null});
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
 
-        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
-        assertEquals(1, out.toArray().length);
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
+
+        assertEquals(3, out.toArray().length);
         assertNull(out.toArray()[0]);
     }
 
-    public void testStrings() {
+    public void testStrings() throws IOException {
         params.setParameters(new Object[]{"foo"});
-        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
         assertEquals(1, out.toArray().length);
         assertEquals("foo", out.toArray()[0]);
     }
 
-    public void testStringsAsByteArray() {
+    public void testStringsAsByteArray() throws IOException {
         params = new ParameterSet(true);
         params.setParameters(new Object[]{new byte[]{'f', 'o', 'o'}});
-        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
         assertEquals(1, out.toArray().length);
 
         byte[] bin = (byte[]) out.toArray()[0];
         assertEquals(bin[0], 'f'); assertEquals(bin[1], 'o'); assertEquals(bin[2], 'o');
     }
 
-    public void testFloatsInsteadOfDouble() {
+    public void testFloatsInsteadOfDouble() throws IOException {
         params = new ParameterSet(true);
         params.setParameters(5.5f);
-        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
         Object value = out.toArray()[0];
         assertTrue(value instanceof Double);
         assertTrue((5.5f - ((Double) value).doubleValue()) < 0.01);

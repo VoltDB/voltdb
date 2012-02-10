@@ -443,6 +443,7 @@ import org.voltdb.types.VoltDecimalHelper;
         for (int ii = 0; ii < m_params.length; ii++) {
             Object obj = m_params[ii];
             if ((obj == null) || (obj == JSONObject.NULL)) {
+                size++;
                 continue;
             }
             size += 1;//everything has a type even arrays and null
