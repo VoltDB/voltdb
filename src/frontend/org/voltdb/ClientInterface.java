@@ -63,6 +63,7 @@ import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.MiscUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -137,6 +138,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final int m_allPartitions[];
     final long m_siteId;
+    final long m_plannerSiteId;
 
     final Mailbox m_mailbox;
 
@@ -665,7 +667,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             try {
                 final ClientResponseImpl error = handleRead(message, this, c);
                 if (error != null) {
-                    ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize());
+                    ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
                     error.flattenToBuffer(buf).flip();
                     c.writeStream().enqueue(buf);
                 }
@@ -864,6 +867,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         };
         messenger.createMailbox(null, m_mailbox);
+        m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         registerMailbox(messenger.getZK());
         m_siteId = m_mailbox.getHSId();
     }
@@ -1029,8 +1033,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sql, partitionParam));
 
         try {
-            // XXX: need to know the async compiler mailbox id.
-            m_mailbox.send(Long.MIN_VALUE, work);
+            m_mailbox.send(m_plannerSiteId, work);
         } catch (MessagingException ex) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
@@ -1324,7 +1327,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                                         new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
                                         plannedStmt.clientHandle);
-                            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+                            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                            buf.putInt(buf.capacity() + 4);
                             errorResponse.flattenToBuffer(buf);
                             buf.flip();
                             ((Connection)(plannedStmt.clientData)).writeStream().enqueue(buf);
@@ -1441,7 +1445,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0], result.errorMsg,
                             result.clientHandle);
                 final Connection c = (Connection) result.clientData;
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
                 errorResponse.flattenToBuffer(buf);
                 buf.flip();
                 c.writeStream().enqueue(buf);

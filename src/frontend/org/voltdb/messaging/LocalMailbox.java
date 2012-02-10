@@ -40,6 +40,7 @@ public abstract class LocalMailbox implements Mailbox {
     public void send(long hsId, VoltMessage message)
         throws MessagingException {
         assert(message != null);
+        message.m_sourceHSId = this.hsId;
         hostMessenger.send(hsId, message);
     }
 
@@ -48,6 +49,7 @@ public abstract class LocalMailbox implements Mailbox {
         throws MessagingException {
         assert(message != null);
         assert(hsIds != null);
+        message.m_sourceHSId = this.hsId;
         hostMessenger.send(hsIds, message);
     }
 

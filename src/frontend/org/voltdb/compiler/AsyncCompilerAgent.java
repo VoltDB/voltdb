@@ -105,13 +105,13 @@ public class AsyncCompilerAgent {
                 final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
                 final AsyncCompilerResult result = compileAdHocPlan(w);
                 // XXX: need client interface mailbox id.
-                m_mailbox.send(Long.MIN_VALUE, new LocalObjectMessage(result));
+                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
             }
             else if (wrapper.payload instanceof CatalogChangeWork) {
                 final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
                 final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
                 // XXX: need client interface mailbox id.
-                m_mailbox.send(Long.MIN_VALUE, new LocalObjectMessage(result));
+                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
             }
         } catch (MessagingException ex) {
             ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());

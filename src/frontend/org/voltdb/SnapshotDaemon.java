@@ -1307,7 +1307,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[0],
                                        "@SnapshotSave requires 3 parameters. Path, nonce, and blocking",
                                        invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
             return;
@@ -1319,7 +1320,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[0],
                                        "@SnapshotSave path is null",
                                        invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
             return;
@@ -1331,7 +1333,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[0],
                                        "@SnapshotSave nonce is null",
                                        invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
             return;
@@ -1343,7 +1346,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[0],
                                        "@SnapshotSave blocking is null",
                                        invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
             return;
@@ -1356,7 +1360,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave path param is a " + params[0].getClass().getSimpleName() +
                                            " and should be a java.lang.String",
                                        invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
             return;
@@ -1369,7 +1374,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave nonce param is a " + params[0].getClass().getSimpleName() +
                                            " and should be a java.lang.String",
                                        invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
             return;
@@ -1385,7 +1391,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave blocking param is a " + params[0].getClass().getSimpleName() +
                                            " and should be a java.lang.[Byte|Short|Integer|Long]",
                                        invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
             return;
@@ -1422,7 +1429,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[] { result },
                                        "A request to perform a user snapshot already exists",
                                        invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
             return;
@@ -1489,7 +1497,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         response.initFromBuffer(buf);
         response.setClientHandle(invocation.clientHandle);
         // Not sure if we need to preserve the original byte buffer here, playing it safe
-        ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize());
+        ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf2.putInt(buf2.capacity() - 4);
         response.flattenToBuffer(buf2).flip();
         c.writeStream().enqueue(buf2);
     }
