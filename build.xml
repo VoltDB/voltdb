@@ -831,11 +831,10 @@ JAVA COMPILATION
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
     <invoke-javac srcdir="${src.gpl.dir}:${vendor.src.dir}"/>
 
-    <!-- compile the individual test directories
+    <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
         excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>
--->
 </target>
 
 <!-- This task only executes if the voltpro.flavor property is set. -->
@@ -1205,6 +1204,7 @@ TEST CASES
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/network/**/Test*.class'/>
                 <include name='org/voltdb/messaging/**/*Test.class'/>
