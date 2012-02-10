@@ -140,7 +140,7 @@ public class TestNIOReadStream extends TestCase {
 
     public void testSpanRead() throws IOException {
         // Write a block that spans multiple buffers
-        final int SIZE = 4096*5;
+        final int SIZE = 4096*10;
         channel.nextRead = new byte[SIZE];
         channel.nextRead[0] = 42;
         channel.nextRead[SIZE-1] = 79;
@@ -176,12 +176,12 @@ public class TestNIOReadStream extends TestCase {
     }
 
     public void testIncompleteReads() throws IOException {
-        channel.nextRead = new byte[17408];
+        channel.nextRead = new byte[1024 * 32 + 1500];
         assertEquals(1024 * 32, stream.read(channel, 1500, pool));
         assertEquals(1024 * 32, stream.dataAvailable());
         channel.nextRead = new byte[500];
         assertEquals(500, stream.read(channel, 1500, pool));
-        assertEquals(8692, stream.dataAvailable());
+        assertEquals(1024 * 32 + 500, stream.dataAvailable());
     }
 
     public void testReadInt() throws IOException {

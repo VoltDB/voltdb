@@ -150,6 +150,11 @@ public class RejoinTestBase extends TestCase {
         ServerThread localServer;
     }
 
+    @Override
+    public void setUp() {
+        throw new UnsupportedOperationException("We know rejoin doesn't work yet");
+    }
+
     Context getServerReadyToReceiveNewNode() throws Exception {
         Context retval = new Context();
 
