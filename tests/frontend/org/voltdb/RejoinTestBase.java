@@ -176,60 +176,61 @@ public class RejoinTestBase extends TestCase {
 
         retval.localServer.start();
         host2.waitForGroupJoin(2);
-        // whomever is host zero has to send the catalog out,
-        //  so check and fufil this duty if needed
-        if (host2.getHostId() == 0)
-            host2.sendCatalog(jarFile.getFullJarBytes());
-
-        int myHostId = host2.getHostId() * 100;
-        host2.createLocalSite(myHostId);
-        //Need to create the initiator mailbox to receive heartbeats
-        Mailbox initiatorMailbox = host2.createMailbox(myHostId, VoltDB.DTXN_MAILBOX_ID, false);
-        Mailbox mailbox = host2.createMailbox(myHostId, VoltDB.AGREEMENT_MAILBOX_ID, false);
-        AgreementSite site = new AgreementSite(
-                myHostId,
-                new HashSet<Integer>(Arrays.asList(0, 100)),
-                myHostId == 0 ? 1 : 2,
-                new HashSet<Integer>(),
-                mailbox,
-                new InetSocketAddress(2182),
-                null,
-                false);
-        site.start();
-
-        host2.sendReadyMessage();
-
-        ZooKeeper zk = ZKUtil.getClient("localhost", 60000);
-        try {
-            zk.create(
-                    "/cluster_metadata", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (Exception e) {}
-        System.out.println(zk.getChildren("/cluster_metadata", false));
-        zk.create(
-                "/cluster_metadata/" + host2.getHostId(), new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-
-        retval.localServer.waitForInitialization();
-        zk.close();
-        HostMessenger host1 = VoltDB.instance().getHostMessenger();
-
-        site.shutdown();
-
-        //int host2id = host2.getHostId();
-        host2.closeForeignHostSocket(host1.getHostId());
-        // this is just to wait for the fault manager to kick in
-        Thread.sleep(50);
-        host2.shutdown();
-        // this is just to wait for the fault manager to kick in
-        Thread.sleep(50);
-
-        // wait until the fault manager has kicked in
-
-        for (int i = 0; host1.countForeignHosts() > 0; i++) {
-            if (i > 10) fail();
-            Thread.sleep(50);
-        }
-        assertEquals(0, host1.countForeignHosts());
-
-        return retval;
+        throw new UnsupportedOperationException("Need a bit of work to mock this up in the new world.");
+//        // whomever is host zero has to send the catalog out,
+//        //  so check and fufil this duty if needed
+//        if (host2.getHostId() == 0)
+//            host2.sendCatalog(jarFile.getFullJarBytes());
+//
+//        int myHostId = host2.getHostId() * 100;
+//        host2.createLocalSite(myHostId);
+//        //Need to create the initiator mailbox to receive heartbeats
+//        Mailbox initiatorMailbox = host2.createMailbox(myHostId, VoltDB.DTXN_MAILBOX_ID, false);
+//        Mailbox mailbox = host2.createMailbox(myHostId, VoltDB.AGREEMENT_MAILBOX_ID, false);
+//        AgreementSite site = new AgreementSite(
+//                myHostId,
+//                new HashSet<Integer>(Arrays.asList(0, 100)),
+//                myHostId == 0 ? 1 : 2,
+//                new HashSet<Integer>(),
+//                mailbox,
+//                new InetSocketAddress(2182),
+//                null,
+//                false);
+//        site.start();
+//
+//        host2.sendReadyMessage();
+//
+//        ZooKeeper zk = ZKUtil.getClient("localhost", 60000);
+//        try {
+//            zk.create(
+//                    "/cluster_metadata", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+//        } catch (Exception e) {}
+//        System.out.println(zk.getChildren("/cluster_metadata", false));
+//        zk.create(
+//                "/cluster_metadata/" + host2.getHostId(), new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+//
+//        retval.localServer.waitForInitialization();
+//        zk.close();
+//        HostMessenger host1 = VoltDB.instance().getHostMessenger();
+//
+//        site.shutdown();
+//
+//        //int host2id = host2.getHostId();
+//        host2.closeForeignHostSocket(host1.getHostId());
+//        // this is just to wait for the fault manager to kick in
+//        Thread.sleep(50);
+//        host2.shutdown();
+//        // this is just to wait for the fault manager to kick in
+//        Thread.sleep(50);
+//
+//        // wait until the fault manager has kicked in
+//
+//        for (int i = 0; host1.countForeignHosts() > 0; i++) {
+//            if (i > 10) fail();
+//            Thread.sleep(50);
+//        }
+//        assertEquals(0, host1.countForeignHosts());
+//
+//        return retval;
     }
 }
