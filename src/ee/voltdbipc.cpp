@@ -427,10 +427,10 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     };
     struct initialize * cs = (struct initialize*) cmd;
 
-    printf("initialize: cluster=%d, site=%d\n",
-           ntohl(cs->clusterId), ntohl(cs->siteId));
+    printf("initialize: cluster=%d, site=%jd\n",
+           ntohl(cs->clusterId), (intmax_t)ntohll(cs->siteId));
     cs->clusterId = ntohl(cs->clusterId);
-    cs->siteId = ntohl(cs->siteId);
+    cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
     cs->hostnameLength = ntohs(cs->hostnameLength);
