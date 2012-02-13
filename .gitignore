@@ -16,6 +16,7 @@ obj/
 /src/frontend/org/voltdb/catalog/*.java
 /voltdb/libvoltdb*.so
 /voltdb/voltdb*.jar
+/examples/*/*.jar
 /.DS_Store
 debugoutput/
 /voltdbroot/
