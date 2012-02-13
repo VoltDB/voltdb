@@ -63,7 +63,6 @@ import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.MiscUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
