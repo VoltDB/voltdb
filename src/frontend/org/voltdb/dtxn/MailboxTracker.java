@@ -24,6 +24,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -40,6 +42,8 @@ public class MailboxTracker {
     private static final VoltLogger log = new VoltLogger("HOST");
 
     private final ZooKeeper m_zk;
+    private final ExecutorService m_es =
+            Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Mailbox tracker"));
 
     private final boolean m_isLeader;
     private volatile Map<Integer, ArrayList<Long>> m_hostsToSites =
@@ -69,11 +73,16 @@ public class MailboxTracker {
         List<String> children = m_zk.getChildren(VoltZK.mailboxes_executionsites, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
-                try {
-                    getAndWatchSites();
-                } catch (Exception e) {
-                    log.error(e.getMessage());
-                }
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            getAndWatchSites();
+                        } catch (Exception e) {
+                            log.error(e.getMessage());
+                        }
+                    }
+                });
             }
         });
         ZKUtil.sortSequentialNodes(children);
@@ -131,11 +140,16 @@ public class MailboxTracker {
         List<String> children = m_zk.getChildren(VoltZK.mailboxes_asyncplanners, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
-                try {
-                    getAndWatchPlanners();
-                } catch (Exception e) {
-                    log.error(e.getMessage());
-                }
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            getAndWatchPlanners();
+                        } catch (Exception e) {
+                            log.error(e.getMessage());
+                        }
+                    }
+                });
             }
         });
 
@@ -158,11 +172,16 @@ public class MailboxTracker {
         List<String> children = m_zk.getChildren(VoltZK.mailboxes_initiators, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
-                try {
-                    getAndWatchInitiators();
-                } catch (Exception e) {
-                    log.error(e.getMessage());
-                }
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            getAndWatchInitiators();
+                        } catch (Exception e) {
+                            log.error(e.getMessage());
+                        }
+                    }
+                });
             }
         });
 

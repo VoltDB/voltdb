@@ -90,16 +90,9 @@ public class LeaderElector {
      * "http://zookeeper.apache.org/doc/trunk/recipes.html#sc_leaderElection"
      * >Zookeeper Leader Election</a>
      *
-     * @param path
-     * @param data
-     * @param cb
-     *            when this node becomes the leader, the callback will be fired.
-     * @return A pair of the created node path and a boolean indicating if we
-     *         are the first one or not
      * @throws Exception
      */
-    public void createAndElectLeader()
-    throws Exception {
+    private void createAndElectLeader() throws Exception {
         node = zk.create(ZKUtil.joinZKPath(dir, "node"), data,
                          Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         eventHandler.run();
