@@ -76,6 +76,7 @@ public class TestDistributer extends TestCase {
                     ByteBuffer buf = ByteBuffer.allocate(4 + response.getSerializedSize());
                     buf.putInt(buf.capacity() - 4);
                     response.flattenToBuffer(buf);
+                    buf.clear();
                     c.writeStream().enqueue(buf);
                     roundTrips.incrementAndGet();
                     System.err.println("Sending response.");
