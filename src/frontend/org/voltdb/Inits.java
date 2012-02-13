@@ -36,8 +36,6 @@ import java.util.concurrent.PriorityBlockingQueue;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -48,6 +46,7 @@ import org.voltdb.dtxn.MailboxTracker;
 import org.voltdb.export.ExportManager;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -534,24 +533,13 @@ public class Inits {
         @Override
         public void run() {
             try {
+                m_rvdb.getStatsAgent().getMailbox(
+                            VoltDB.instance().getHostMessenger(),
+                            m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
 
-                // Hack in the construction of stats and async compiler mailboxes.
-                // they need the agreementSiteId until mailbox construction is
-                // sanitized. Note that the agents (not the mailboxes) are owned
-                // by RealVoltDB
-                Mailbox statsMailbox =
-                    m_rvdb.getStatsAgent().getMailbox(
-                            VoltDB.instance().getHostMessenger(), HostMessenger.STATS_SITE_ID);
-                m_rvdb.m_messenger.createMailbox(
-                        m_rvdb.m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID),
-                        statsMailbox);
-
-                Mailbox asyncCompilerMailbox =
-                    m_rvdb.getAsyncCompilerAgent().createMailbox(
-                            VoltDB.instance().getHostMessenger(), HostMessenger.ASYNC_COMPILER_SITE_ID);
-                m_rvdb.m_messenger.createMailbox(
-                        m_rvdb.m_messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID),
-                        asyncCompilerMailbox);
+                m_rvdb.getAsyncCompilerAgent().createMailbox(
+                            VoltDB.instance().getHostMessenger(),
+                            m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));
             } catch (Exception e) {
                 hostLog.fatal(null, e);
                 System.exit(-1);

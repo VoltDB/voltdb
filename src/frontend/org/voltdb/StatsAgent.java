@@ -96,22 +96,24 @@ public class StatsAgent {
         handledSelectors.add(SysProcSelector.PROCEDURE);
     }
 
-    public Mailbox getMailbox(final HostMessenger hostMessenger, final long hsId) {
+    public void getMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_mailbox = new Mailbox() {
 
             @Override
-            public void send(long HSId, VoltMessage message)
+            public void send(long destinationHSId, VoltMessage message)
                     throws MessagingException {
                 assert(message != null);
-                hostMessenger.send(HSId, message);
+                message.m_sourceHSId = hsId;
+                hostMessenger.send(destinationHSId, message);
             }
 
             @Override
-            public void send(long[] HSIds, VoltMessage message)
+            public void send(long[] desinationHSIds, VoltMessage message)
                     throws MessagingException {
                 assert(message != null);
-                assert(HSIds != null);
-                hostMessenger.send(HSIds, message);
+                assert(desinationHSIds != null);
+                message.m_sourceHSId = hsId;
+                hostMessenger.send(desinationHSIds, message);
             }
 
             @Override
@@ -170,7 +172,6 @@ public class StatsAgent {
             }
         };
         hostMessenger.createMailbox(hsId, m_mailbox);
-        return m_mailbox;
     }
 
     private void handleMailboxMessage(VoltMessage message) {

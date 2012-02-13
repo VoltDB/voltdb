@@ -65,8 +65,15 @@ public class AsyncCompilerAgent {
         }
     }
 
-    public Mailbox createMailbox(final HostMessenger hostMessenger, final int siteId) {
+    public void createMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_mailbox = new LocalMailbox(hostMessenger) {
+
+            @Override
+            public void send(long destinationHSId, VoltMessage message) throws MessagingException {
+                message.m_sourceHSId = hsId;
+                hostMessenger.send(destinationHSId, message);
+            }
+
             @Override
             public void deliver(final VoltMessage message) {
                 try {
@@ -95,7 +102,7 @@ public class AsyncCompilerAgent {
                 }
             }
         };
-        return m_mailbox;
+        hostMessenger.createMailbox(hsId, m_mailbox);
     }
 
     private void handleMailboxMessage(final VoltMessage message) {

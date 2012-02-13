@@ -135,8 +135,6 @@ public class MockVoltDB implements VoltDBInterface
         execSite.setIsup(true);
         execSite.setPartition(partition);*/
 
-        m_statsAgent = new StatsAgent();
-//        Mailbox mbox = m_statsAgent.getMailbox(m_hostMessenger, 1);
 //        MockMailbox.postoffice.get(VoltDB.STATS_MAILBOX_ID).put(1, mbox);
 //        MockMailbox mailbox = new MockMailbox();
 //        MockMailbox.registerMailbox(1, VoltDB.AGREEMENT_MAILBOX_ID, mailbox);
@@ -165,6 +163,10 @@ public class MockVoltDB implements VoltDBInterface
             throw new RuntimeException(e);
         }
         VoltZK.createPersistentZKNodes(m_hostMessenger.getZK());
+
+        m_statsAgent = new StatsAgent();
+        m_statsAgent.getMailbox(m_hostMessenger,
+                m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
     }
 
     public Procedure addProcedureForTest(String name)

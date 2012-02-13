@@ -76,7 +76,8 @@ public class TestStatsAgent {
         m_mvoltdb.addSite( 2, 1, 0, false);
         VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);
         m_secondAgent = new StatsAgent();
-        m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(), 2);
+        m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(),
+                VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42));
     }
 
     @After
