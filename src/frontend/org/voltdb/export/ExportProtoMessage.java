@@ -164,6 +164,7 @@ public class ExportProtoMessage
     public ByteBuffer toBuffer() throws IOException {
         ByteBuffer buf = ByteBuffer.allocate(4 + serializableBytes());
         flattenToBuffer(buf);
+        buf.flip();
         return buf;
     }
 
