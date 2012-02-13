@@ -141,8 +141,8 @@ public class SiteTracker {
      *
      * @return
      */
-    public boolean isLeader() {
-        return m_mailboxTracker.isLeader();
+    public boolean isFirstHost() {
+        return m_mailboxTracker.isFirstHost();
     }
 
     /**

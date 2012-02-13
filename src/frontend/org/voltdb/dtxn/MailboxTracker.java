@@ -45,7 +45,8 @@ public class MailboxTracker {
     private final ExecutorService m_es =
             Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Mailbox tracker"));
 
-    private final boolean m_isLeader;
+    private final int m_hostId;
+    private boolean m_isFirstHost;
     private volatile Map<Integer, ArrayList<Long>> m_hostsToSites =
             new HashMap<Integer, ArrayList<Long>>();
     private volatile Map<Integer, ArrayList<Long>> m_partitionsToSites =
@@ -59,17 +60,14 @@ public class MailboxTracker {
 
     public MailboxTracker(ZooKeeper zk, int hostId) throws Exception {
         m_zk = zk;
+        m_hostId = hostId;
 
-        m_isLeader = (getAndWatchSites() == hostId);
+        getAndWatchSites();
         getAndWatchPlanners();
         getAndWatchInitiators();
     }
 
-    /**
-     * @return the host ID of the first host that registered the mailboxes
-     * @throws Exception
-     */
-    private int getAndWatchSites() throws Exception {
+    private void getAndWatchSites() throws Exception {
         List<String> children = m_zk.getChildren(VoltZK.mailboxes_executionsites, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
@@ -133,7 +131,7 @@ public class MailboxTracker {
         m_partitionsToSites = partitionsToSites;
         m_sitesToPartitions = sitesToPartitions;
 
-        return firstHostId;
+        m_isFirstHost =  (m_hostId == firstHostId);
     }
 
     private void getAndWatchPlanners() throws Exception {
@@ -254,7 +252,7 @@ public class MailboxTracker {
         return initiators;
     }
 
-    public boolean isLeader() {
-        return m_isLeader;
+    public boolean isFirstHost() {
+        return m_isFirstHost;
     }
 }
