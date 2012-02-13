@@ -783,7 +783,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
-        createPersistentZKNodes();
+        VoltZK.createPersistentZKNodes(m_messenger.getZK());
 
         if (!isRejoin) {
             m_messenger.waitForGroupJoin(numberOfNodes);
@@ -791,22 +791,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
-    }
-
-    /**
-     * Race to create the persistent nodes.
-     */
-    void createPersistentZKNodes() {
-
-        for (int i=0; i < VoltZK.ZK_HIERARCHY.length; i++) {
-            try {
-                m_messenger.getZK().create(VoltZK.ZK_HIERARCHY[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            } catch (org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException e) {
-                // this is an expected race.
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
-        }
     }
 
     HashSet<Integer> rejoinExistingMesh(int numberOfNodes, long deploymentCRC) {

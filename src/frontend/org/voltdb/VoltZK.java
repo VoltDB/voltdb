@@ -17,6 +17,13 @@
 
 package org.voltdb;
 
+import java.util.LinkedList;
+
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.voltcore.agreement.ZKUtil;
+
 /**
  * VoltZK provides constants for all voltdb-registered
  * ZooKeeper paths.
@@ -64,5 +71,26 @@ public class VoltZK {
             mailboxes_clientinterfaces,
     };
 
+    /**
+     * Race to create the persistent nodes.
+     */
+    public static void createPersistentZKNodes(ZooKeeper zk) {
+        LinkedList<ZKUtil.StringCallback> callbacks = new LinkedList<ZKUtil.StringCallback>();
+        for (int i=0; i < VoltZK.ZK_HIERARCHY.length; i++) {
+                ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
+                callbacks.add(cb);
+                zk.create(VoltZK.ZK_HIERARCHY[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb, null);
+
+        }
+        try {
+            for (ZKUtil.StringCallback cb : callbacks) {
+                cb.get();
+            }
+        } catch (org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException e) {
+            // this is an expected race.
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+    }
 
 }

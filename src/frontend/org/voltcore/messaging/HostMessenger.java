@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -232,7 +233,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
 
-            createHierarchy();
+            CoreZK.createHierarchy(m_zk);
 
             /*
              * This creates the ephemeral sequential node with host id 0 which
@@ -251,19 +252,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
-    }
-
-    /**
-     * Creates the ZK directory nodes. Only the leader should do this.
-     */
-    private void createHierarchy() {
-        for (String node : CoreZK.ZK_HIERARCHY) {
-            try {
-                m_zk.create(node, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
-            }
-        }
     }
 
     //For test only
