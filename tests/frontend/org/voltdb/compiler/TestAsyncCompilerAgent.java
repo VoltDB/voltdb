@@ -94,12 +94,13 @@ public class TestAsyncCompilerAgent {
                     new AdHocPlannerWork(100l, false, 0, 0, "localhost", false, null,
                                          "select * from a", 0);
             LocalObjectMessage msg = new LocalObjectMessage(work);
+            msg.m_sourceHSId = 100;
             m_agent.m_mailbox.deliver(msg);
         }
 
         // check for one rejected request
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_agent.m_mailbox).send(eq(100), captor.capture());
+        verify(m_agent.m_mailbox).send(eq(100L), captor.capture());
         assertNotNull(((AsyncCompilerResult) captor.getValue().payload).errorMsg);
         // let all requests return
         blockingAnswer.flag.release(AsyncCompilerAgent.MAX_QUEUE_DEPTH + 1);
@@ -107,6 +108,6 @@ public class TestAsyncCompilerAgent {
         // check if all previous requests finish
         m_agent.shutdown();
         VerificationMode expected = times(AsyncCompilerAgent.MAX_QUEUE_DEPTH + 2);
-        verify(m_agent.m_mailbox, expected).send(eq(100), any(LocalObjectMessage.class));
+        verify(m_agent.m_mailbox, expected).send(eq(100L), any(LocalObjectMessage.class));
     }
 }

@@ -164,6 +164,7 @@ public class MockVoltDB implements VoltDBInterface
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        VoltZK.createPersistentZKNodes(m_hostMessenger.getZK());
     }
 
     public Procedure addProcedureForTest(String name)

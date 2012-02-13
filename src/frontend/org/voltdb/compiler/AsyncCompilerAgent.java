@@ -88,7 +88,7 @@ public class AsyncCompilerAgent {
                     retval.clientData = work.clientData;
                     try {
                         // XXX: need client interface mailbox id.
-                        m_mailbox.send(Long.MIN_VALUE, new LocalObjectMessage(retval));
+                        m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
                     } catch (MessagingException ex) {
                         ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
                     }

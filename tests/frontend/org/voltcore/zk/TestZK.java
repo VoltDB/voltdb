@@ -25,11 +25,12 @@ package org.voltcore.zk;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
+import org.voltcore.agreement.LeaderElector;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.apache.zookeeper_voltpatches.*;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
@@ -237,13 +238,17 @@ public class TestZK extends ZKTestBase {
 
         zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
-        Pair<String, Boolean> result1 = ZKUtil.createAndElectLeader(zk, "/election", new byte[0], null);
-        Pair<String, Boolean> result2 = ZKUtil.createAndElectLeader(zk2, "/election", new byte[0], null);
-        Pair<String, Boolean> result3 = ZKUtil.createAndElectLeader(zk3, "/election", new byte[0], null);
+        LeaderElector elector1 = new LeaderElector(zk, "/election", new byte[0], null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", new byte[0], null);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", new byte[0], null);
 
-        assertTrue(result1.getSecond());
-        assertTrue(!result2.getSecond());
-        assertTrue(!result3.getSecond());
+        assertTrue(elector1.isLeader());
+        assertFalse(elector2.isLeader());
+        assertFalse(elector3.isLeader());
+
+        elector1.done();
+        elector2.done();
+        elector3.done();
 
         zk.close();
         zk2.close();

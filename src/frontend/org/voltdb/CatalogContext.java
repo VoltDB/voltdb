@@ -145,6 +145,7 @@ public class CatalogContext {
                     realDepCRC,
                     catalogVersion + incValue,
                     catalogCRC);
+        retval.siteTracker.setMailboxTracker(siteTracker.getMailboxTracker());
         return retval;
     }
 

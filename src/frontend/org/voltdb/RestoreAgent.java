@@ -44,7 +44,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.agreement.ZKUtil;
+import org.voltcore.agreement.LeaderElector;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
@@ -94,7 +94,6 @@ SnapshotCompletionInterest {
     private final static String RESTORE = VoltZK.restore;
     private final static String RESTORE_BARRIER = VoltZK.restore_barrier;
     private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
-    private String m_zkBarrierNode = null;
 
     // Transaction ID of the restore sysproc
     private final static long RESTORE_TXNID = 1l;
@@ -110,7 +109,7 @@ SnapshotCompletionInterest {
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
     private boolean m_planned = false;
-    private boolean m_isLeader = false;
+    private LeaderElector m_leaderElector = null;
 
     private TransactionInitiator m_initiator;
 
@@ -208,7 +207,7 @@ SnapshotCompletionInterest {
             /*
              * If this is the leader, initiate the snapshot restore
              */
-            if (m_isLeader) {
+            if (m_leaderElector.isLeader()) {
                 long txnId = 0;
                 if (m_snapshotToRestore != null) {
                     txnId = m_snapshotToRestore.txnId;
@@ -227,7 +226,7 @@ SnapshotCompletionInterest {
 
             m_restoreHeartbeatThread.start();
 
-            if (!m_isLeader || m_snapshotToRestore == null) {
+            if (!m_leaderElector.isLeader() || m_snapshotToRestore == null) {
                 /*
                  * Hosts that are not initiating the restore should change
                  * state immediately
@@ -498,10 +497,7 @@ SnapshotCompletionInterest {
      */
     void enterRestore() {
         try {
-            Pair<String, Boolean> result =
-                    ZKUtil.createAndElectLeader(m_zk, RESTORE_BARRIER, new byte[0], null);
-            m_zkBarrierNode = result.getFirst();
-            m_isLeader = result.getSecond();
+            m_leaderElector = new LeaderElector(m_zk, RESTORE_BARRIER, new byte[0], null);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
                                      false, e);
@@ -514,7 +510,7 @@ SnapshotCompletionInterest {
      */
     private void exitRestore() {
         try {
-            m_zk.delete(m_zkBarrierNode, -1);
+            m_leaderElector.done();
         } catch (Exception ignore) {}
 
         LOG.debug("Waiting for all hosts to complete restore");
@@ -1149,7 +1145,7 @@ SnapshotCompletionInterest {
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs
              */
-            if (m_isLeader) {
+            if (m_leaderElector.isLeader()) {
                 try {
                     try {
                         m_zk.create(VoltZK.truncation_snapshot_path,
