@@ -1062,7 +1062,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         try {
             // XXX: need to know the async compiler mailbox id.
-            m_mailbox.send(Long.MIN_VALUE, work);
+            m_mailbox.send(m_plannerSiteId, work);
         } catch (MessagingException ex) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
