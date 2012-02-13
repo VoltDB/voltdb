@@ -223,7 +223,12 @@ public class SocketJoiner {
         else {
             inetsockaddr = new InetSocketAddress(m_internalInterface, m_internalPort);
         }
-        m_listenerSocket.socket().bind(inetsockaddr);
+        try {
+            m_listenerSocket.socket().bind(inetsockaddr);
+        } catch (Exception e) {
+            LOG.fatal("Failed to bind to " + inetsockaddr);
+            throw e;
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Non-Primary Listening on:" + inetsockaddr.toString());
         }

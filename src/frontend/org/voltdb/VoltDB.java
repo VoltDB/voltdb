@@ -152,6 +152,8 @@ public class VoltDB {
 
         public int m_drAgentPortStart = DEFAULT_DR_PORT;
 
+        public Integer m_leaderPort = null;
+
         public Configuration() { }
 
         public Configuration(String args[]) {
@@ -221,7 +223,9 @@ public class VoltDB {
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
                 }
-
+                else if (arg.equals("leaderport")) {
+                    m_leaderPort = Integer.valueOf(args[++i]);
+                }
                 else if (arg.equals("leader")) {
                     m_leader = args[++i].trim();
                     if (m_leader.compareTo("") == 0) {
@@ -233,7 +237,6 @@ public class VoltDB {
                         m_leader = null;
                     }
                 }
-
                 else if (arg.equals("rejoinhost")) {
                     m_rejoinToHostAndPort = args[++i].trim();
                     if (m_rejoinToHostAndPort.compareTo("") == 0)

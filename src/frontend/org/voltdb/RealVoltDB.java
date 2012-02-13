@@ -769,7 +769,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         org.voltcore.messaging.HostMessenger.Config hmconfig =
             new org.voltcore.messaging.HostMessenger.Config(
-                leader.getHostAddress(), m_config.m_internalPort);
+                leader.getHostAddress(),
+                m_config.m_leaderPort != null ? m_config.m_leaderPort : m_config.m_internalPort);
+        hmconfig.internalPort = m_config.m_internalPort;
+        hmconfig.internalInterface = m_config.m_internalInterface;
+        hmconfig.zkInterface = m_config.m_zkInterface;
+        hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         m_messenger =
             new org.voltcore.messaging.HostMessenger(hmconfig);

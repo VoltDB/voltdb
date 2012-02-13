@@ -92,18 +92,18 @@ public class LocalCluster implements VoltServerConfig {
 
     // components
     ProcessBuilder m_procBuilder;
-    private int m_debugOffset1;
-    private int m_debugOffset2;
+    private final int m_debugOffset1;
+    private final int m_debugOffset2;
 
     private int m_ipcPortOffset1;
     private int m_ipcPortOffset2;
     private int m_ipcPortOffset3;
 
-    private int m_voltFilePrefixOffset;
+    private final int m_voltFilePrefixOffset;
 
-    private int m_timestampSaltOffset;
+    private final int m_timestampSaltOffset;
 
-    private int m_licensePathOffset;
+    private final int m_licensePathOffset;
 
     @SuppressWarnings("unused")
     private File m_pathToVoltRoot = null;
@@ -114,8 +114,10 @@ public class LocalCluster implements VoltServerConfig {
 
     private final boolean m_isRejoinTest;
 
-    private int m_voltStartCmdOffset;
-    private int m_voltStartModeOffset;
+    private final int m_voltStartCmdOffset;
+    private final int m_voltStartModeOffset;
+
+    private final int m_internalPortOffset;
 
 
     /* class pipes a process's output to a file name.
@@ -188,7 +190,7 @@ public class LocalCluster implements VoltServerConfig {
                         String[] split = data.split(" ");
                         synchronized(this) {
                             try {
-                                m_hostId = Integer.parseInt(split[split.length - 1]);
+                                m_hostId = Long.valueOf(split[split.length - 1]).intValue();
                             } catch (java.lang.NumberFormatException e) {
                                 System.err.println("Had a number format exception processing line: '" + data + "'");
                                 throw e;
@@ -351,29 +353,34 @@ public class LocalCluster implements VoltServerConfig {
                                            "-1",
                                            "leader",
                                            "localhost",
-                                           "");
+                                           "leaderport",
+                                           String.valueOf(VoltDB.DEFAULT_INTERNAL_PORT - 1),
+                                           "",
+                                           "internalport",
+                                           "-1");
 
         List<String> command = m_procBuilder.command();
         // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = command.size() - 22;
-        m_debugOffset2 = command.size() - 21;
+        m_debugOffset1 = command.size() - 26;
+        m_debugOffset2 = command.size() - 25;
         if (m_debug) {
             command.add(m_debugOffset1, "");
             command.add(m_debugOffset1, "");
         }
 
-        m_voltFilePrefixOffset = command.size() - 22;
+        m_voltFilePrefixOffset = command.size() - 26;
         command.add(m_voltFilePrefixOffset, "");
 
-        m_licensePathOffset = command.size() - 18;
-        m_zkPortOffset = command.size() - 16;
-        m_timestampSaltOffset = command.size() - 14;
-        m_pathToDeploymentOffset = command.size() - 10;
-        m_portOffset = command.size() - 8;
-        m_adminPortOffset = command.size() - 6;
-        m_voltStartCmdOffset = command.size() - 5;
-        m_rejoinOffset = command.size() - 4;
-        m_voltStartModeOffset = command.size() - 1;
+        m_licensePathOffset = command.size() - 22;
+        m_zkPortOffset = command.size() - 20;
+        m_timestampSaltOffset = command.size() - 18;
+        m_pathToDeploymentOffset = command.size() - 14;
+        m_portOffset = command.size() - 12;
+        m_adminPortOffset = command.size() - 10;
+        m_voltStartCmdOffset = command.size() - 9;
+        m_rejoinOffset = command.size() - 8;
+        m_voltStartModeOffset = command.size() - 7;
+        m_internalPortOffset = command.size() - 1;
 
         if (m_target.isIPC) {
             command.add("");
@@ -651,6 +658,7 @@ public class LocalCluster implements VoltServerConfig {
 
             // voltdb client/native ports move forward from 21212
             m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
+            m_procBuilder.command().set(m_internalPortOffset, String.valueOf(VoltDB.DEFAULT_INTERNAL_PORT + hostId));
             // voltdb admin-mode ports move backwards from 21211
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
@@ -815,6 +823,7 @@ public class LocalCluster implements VoltServerConfig {
         long start = 0;
         try {
             m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
+            m_procBuilder.command().set(m_internalPortOffset, String.valueOf(VoltDB.DEFAULT_INTERNAL_PORT) + hostId);
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(adminPortNo));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_voltStartCmdOffset, "rejoinhost");
