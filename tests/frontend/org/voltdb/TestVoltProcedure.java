@@ -269,7 +269,12 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName());
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
-        site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize());
+        site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize()) {
+            @Override
+            public int getCorrespondingPartitionId() {
+                return 42;
+            }
+        };
         nullParam = new ParameterSet();
         nullParam.setParameters(new Object[]{null});
     }
