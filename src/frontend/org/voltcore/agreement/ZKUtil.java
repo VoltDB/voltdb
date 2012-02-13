@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.TreeSet;
 import java.io.*;
 import java.util.concurrent.CountDownLatch;
@@ -206,95 +205,6 @@ public class ZKUtil {
             return null;
         }
         return zk;
-    }
-
-    /**
-     * Creates an ephemeral sequential node under the given directory and check
-     * if we are the first one who created it.
-     *
-     * @param zk
-     * @param path
-     * @param data
-     * @param cb
-     *            callback when the watcher fires, null if not interested in
-     *            node disappearance
-     * @return A pair of the created node path and a boolean indicating if we
-     *         are the first one or not
-     * @throws Exception
-     */
-    public static Pair<String, Boolean> createAndElectLeader(ZooKeeper zk, String path,
-                                                             byte[] data, final Runnable cb)
-    throws Exception {
-        String node = zk.create(joinZKPath(path, "node"), data, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-        String lowest = watchNextLowerNode(zk, path, node, cb);
-        // If we are the lowest sequential node, we are the leader
-        return Pair.of(node, node.equals(lowest));
-    }
-
-    /**
-     * Set a watch on the node that comes before the specified node in the
-     * directory.
-     *
-     * @param zk
-     * @param path
-     * @param node
-     * @param cb
-     *            callback when the watcher fires, null if not interested in
-     *            node disappearance
-     * @return The lowest sequential node
-     * @throws Exception
-     */
-    public static String watchNextLowerNode(ZooKeeper zk, String path, String node,
-                                            final Runnable cb) throws Exception {
-        Watcher watcher = null;
-        if (cb != null) {
-            watcher = new Watcher() {
-                @Override
-                public void process(WatchedEvent event) {
-                    cb.run();
-                }
-            };
-        }
-
-        /*
-         * Iterate through the sorted list of children and find the given node,
-         * then setup a watcher on the previous node if it exists, otherwise the
-         * previous of the previous...until we reach the beginning, then we are
-         * the lowest node.
-         */
-        List<String> children = zk.getChildren(path, false);
-        sortSequentialNodes(children);
-        String lowest = null;
-        String previous = null;
-        ListIterator<String> iter = children.listIterator();
-        while (iter.hasNext()) {
-            String child = joinZKPath(path, iter.next());
-            if (lowest == null) {
-                lowest = child;
-                previous = child;
-                continue;
-            }
-
-            if (child.equals(node)) {
-                while (zk.exists(previous, watcher) == null) {
-                    if (previous.equals(lowest)) {
-                        /*
-                         * If the leader disappeared, and we follow the leader, we
-                         * become the leader now
-                         */
-                        lowest = child;
-                        break;
-                    } else {
-                        // reverse the direction of iteration
-                        previous = iter.previous();
-                    }
-                }
-                break;
-            }
-            previous = child;
-        }
-
-        return lowest;
     }
 
     /**
