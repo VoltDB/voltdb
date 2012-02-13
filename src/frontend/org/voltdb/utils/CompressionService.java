@@ -16,17 +16,19 @@
  */
 package org.voltdb.utils;
 
-import java.util.concurrent.*;
-import java.util.*;
-import java.io.*;
-import java.util.zip.*;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.Base64;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.xerial.snappy.Snappy;
 
 public final class CompressionService {

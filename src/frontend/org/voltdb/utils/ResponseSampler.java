@@ -199,8 +199,7 @@ public abstract class ResponseSampler {
             if (!filename.startsWith(SAMPLE_FILE_PREFIX))
                 continue;
             if (filename.contains(REPLAY_TOKEN)) {
-                LOG.fatal("Found replay files in the samples directory. Can't continue until cleaned up.");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Found replay files in the samples directory. Can't continue until cleaned up.", false, null);
             }
 
             // sanity check

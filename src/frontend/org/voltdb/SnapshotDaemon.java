@@ -394,8 +394,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
             }
         } catch (Exception e) {
-            loggingLog.fatal("Exception in snapshot daemon electing master via ZK", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Exception in snapshot daemon electing master via ZK", true, e);
         }
     }
 
@@ -445,9 +444,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             payload.putLong(0, now);
             m_zk.setData(VoltZK.request_truncation_snapshot, payload.array(), -1);
         } catch (Exception e) {
-            loggingLog.error("Setting data on the truncation snapshot request in ZK should never fail", e);
             //Cause a cascading failure?
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Setting data on the truncation snapshot request in ZK should never fail", true, e);
         }
         final Object params[] = new Object[3];
         params[0] = snapshotPath;

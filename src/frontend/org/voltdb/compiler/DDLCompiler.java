@@ -29,12 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -56,14 +53,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.StringInputStream;
 import org.voltdb.utils.VoltTypeUtil;
-import org.w3c.dom.Document;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
 
 /**
  * Compiles schema (SQL DDL) text files and stores the results in a given catalog.
@@ -147,7 +137,7 @@ public class DDLCompiler {
         String hexDDL = Encoder.hexEncode(m_fullDDL);
         catalog.execute("set " + db.getPath() + " schema \"" + hexDDL + "\"");
 
-        String xmlCatalog;
+        VoltXMLElement xmlCatalog;
         try
         {
             xmlCatalog = m_hsql.getXMLFromCatalog();
@@ -367,59 +357,36 @@ public class DDLCompiler {
         }
     }
 
-    public void fillCatalogFromXML(Catalog catalog, Database db, String xml)
+    public void fillCatalogFromXML(Catalog catalog, Database db, VoltXMLElement xml)
     throws VoltCompiler.VoltCompilerException {
-        StringInputStream xmlStream = new StringInputStream(xml);
 
-        Document doc = null;
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setValidating(true);
-
-        try {
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            doc = builder.parse(xmlStream);
-        } catch (SAXParseException sxe) {
-            m_compiler.addErr(sxe.getMessage(), sxe.getLineNumber());
-        } catch (SAXException sxe) {
-            m_compiler.addErr(sxe.getMessage());
-        } catch (ParserConfigurationException e) {
-            m_compiler.addErr(e.getMessage());
-        } catch (IOException e) {
-            m_compiler.addErr(e.getMessage());
-        }
-
-        if ((doc == null) || m_compiler.hasErrors())
+        if (xml == null)
             throw m_compiler.new VoltCompilerException("Unable to parse catalog xml file from hsqldb");
 
-        Node root = doc.getDocumentElement();
-        assert root.getNodeName().equals("databaseschema");
+        assert xml.name.equals("databaseschema");
 
-        NodeList tableNodes = root.getChildNodes();
-        for (int i = 0; i < tableNodes.getLength(); i++) {
-            Node node = tableNodes.item(i);
-            if (node.getNodeName().equals("table"))
+        for (VoltXMLElement node : xml.children) {
+            if (node.name.equals("table"))
                 addTableToCatalog(catalog, db, node);
         }
 
         processMaterializedViews(db);
     }
 
-    void addTableToCatalog(Catalog catalog, Database db, Node node) throws VoltCompilerException {
-        assert node.getNodeName().equals("table");
+    void addTableToCatalog(Catalog catalog, Database db, VoltXMLElement node) throws VoltCompilerException {
+        assert node.name.equals("table");
 
         // clear these maps, as they're table specific
         columnMap.clear();
         indexMap.clear();
 
-        NamedNodeMap attrs = node.getAttributes();
-        String name = attrs.getNamedItem("name").getNodeValue();
+        String name = node.attributes.get("name");
 
         Table table = db.getTables().add(name);
 
         // handle the case where this is a materialized view
-        Node queryAttr = attrs.getNamedItem("query");
-        if (queryAttr != null) {
-            String query = queryAttr.getNodeValue();
+        String query = node.attributes.get("query");
+        if (query != null) {
             assert(query.length() > 0);
             matViewMap.put(table, query);
         }
@@ -429,18 +396,13 @@ public class DDLCompiler {
         //  then this is reversed
         table.setIsreplicated(true);
 
-        NodeList childNodes = node.getChildNodes();
-
         ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
-        for (int i = 0; i < childNodes.getLength(); i++) {
-            Node subNode = childNodes.item(i);
+        for (VoltXMLElement subNode : node.children) {
 
-            if (subNode.getNodeName().equals("columns")) {
-                NodeList columnNodes = subNode.getChildNodes();
+            if (subNode.name.equals("columns")) {
                 int colIndex = 0;
-                for (int j = 0; j < columnNodes.getLength(); j++) {
-                    Node columnNode = columnNodes.item(j);
-                    if (columnNode.getNodeName().equals("column"))
+                for (VoltXMLElement columnNode : subNode.children) {
+                    if (columnNode.name.equals("column"))
                         addColumnToCatalog(table, columnNode, colIndex++, columnTypes);
                 }
                 // limit the total number of columns in a table
@@ -451,20 +413,16 @@ public class DDLCompiler {
                 }
             }
 
-            if (subNode.getNodeName().equals("indexes")) {
-                NodeList indexNodes = subNode.getChildNodes();
-                for (int j = 0; j < indexNodes.getLength(); j++) {
-                    Node indexNode = indexNodes.item(j);
-                    if (indexNode.getNodeName().equals("index"))
+            if (subNode.name.equals("indexes")) {
+                for (VoltXMLElement indexNode : subNode.children) {
+                    if (indexNode.name.equals("index"))
                         addIndexToCatalog(table, indexNode);
                 }
             }
 
-            if (subNode.getNodeName().equals("constraints")) {
-                NodeList constraintNodes = subNode.getChildNodes();
-                for (int j = 0; j < constraintNodes.getLength(); j++) {
-                    Node constraintNode = constraintNodes.item(j);
-                    if (constraintNode.getNodeName().equals("constraint"))
+            if (subNode.name.equals("constraints")) {
+                for (VoltXMLElement constraintNode : subNode.children) {
+                    if (constraintNode.name.equals("constraint"))
                         addConstraintToCatalog(table, constraintNode);
                 }
             }
@@ -495,15 +453,13 @@ public class DDLCompiler {
         }
     }
 
-    void addColumnToCatalog(Table table, Node node, int index, ArrayList<VoltType> columnTypes) throws VoltCompilerException {
-        assert node.getNodeName().equals("column");
+    void addColumnToCatalog(Table table, VoltXMLElement node, int index, ArrayList<VoltType> columnTypes) throws VoltCompilerException {
+        assert node.name.equals("column");
 
-        NamedNodeMap attrs = node.getAttributes();
-
-        String name = attrs.getNamedItem("name").getNodeValue();
-        String typename = attrs.getNamedItem("type").getNodeValue();
-        String nullable = attrs.getNamedItem("nullable").getNodeValue();
-        String sizeString = attrs.getNamedItem("size").getNodeValue();
+        String name = node.attributes.get("name");
+        String typename = node.attributes.get("type");
+        String nullable = node.attributes.get("nullable");
+        String sizeString = node.attributes.get("size");
         String defaultvalue = null;
         String defaulttype = null;
 
@@ -511,23 +467,17 @@ public class DDLCompiler {
         Integer.parseInt(sizeString);
 
         // Default Value
-        NodeList children = node.getChildNodes();
-        for (int i = 0, cnt = children.getLength(); i < cnt; i++) {
-            Node child = children.item(i);
-            if (child.getNodeName().equals("default")) {
-                NodeList inner_children = child.getChildNodes();
-                for (int j = 0; j < inner_children.getLength(); j++) {
-                    Node inner_child = inner_children.item(j);
-                    attrs = inner_child.getAttributes();
-
+        for (VoltXMLElement child : node.children) {
+            if (child.name.equals("default")) {
+                for (VoltXMLElement inner_child : child.children) {
                     // Value
-                    if (inner_child.getNodeName().equals("value")) {
-                        defaultvalue = attrs.getNamedItem("value").getNodeValue();
-                        defaulttype = attrs.getNamedItem("type").getNodeValue();
+                    if (inner_child.name.equals("value")) {
+                        defaultvalue = inner_child.attributes.get("value");
+                        defaulttype = inner_child.attributes.get("type");
                     }
                     // Function
-                    /*else if (inner_child.getNodeName().equals("function")) {
-                        defaultvalue = attrs.getNamedItem("name").getNodeValue();
+                    /*else if (inner_child.name.equals("function")) {
+                        defaultvalue = inner_child.attributes.get("name");
                         defaulttype = VoltType.VOLTFUNCTION.name();
                     }*/
                     if (defaultvalue != null) break;
@@ -538,6 +488,12 @@ public class DDLCompiler {
             defaultvalue = null;
         if (defaulttype != null)
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
+
+        // replace newlines in default values
+        if (defaultvalue != null) {
+            defaultvalue = defaultvalue.replace('\n', ' ');
+            defaultvalue = defaultvalue.replace('\r', ' ');
+        }
 
         VoltType type = VoltType.typeFromString(typename);
         columnTypes.add(type);
@@ -573,17 +529,15 @@ public class DDLCompiler {
         columnMap.put(name, column);
     }
 
-    void addIndexToCatalog(Table table, Node node) throws VoltCompilerException {
-        assert node.getNodeName().equals("index");
+    void addIndexToCatalog(Table table, VoltXMLElement node) throws VoltCompilerException {
+        assert node.name.equals("index");
 
-        NamedNodeMap attrs = node.getAttributes();
-
-        String name = attrs.getNamedItem("name").getNodeValue();
-        boolean unique = Boolean.parseBoolean(attrs.getNamedItem("unique").getNodeValue());
+        String name = node.attributes.get("name");
+        boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
 
         // this won't work for multi-column indices
         // XXX not sure what 'this' is above, perhaps stale comment --izzy
-        String colList = attrs.getNamedItem("columns").getNodeValue();
+        String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
         boolean has_nonint_col = false;
@@ -658,13 +612,11 @@ public class DDLCompiler {
      * @param node
      * @throws VoltCompilerException
      */
-    void addConstraintToCatalog(Table table, Node node) throws VoltCompilerException {
-        assert node.getNodeName().equals("constraint");
+    void addConstraintToCatalog(Table table, VoltXMLElement node) throws VoltCompilerException {
+        assert node.name.equals("constraint");
 
-        NamedNodeMap attrs = node.getAttributes();
-
-        String name = attrs.getNamedItem("name").getNodeValue();
-        String typeName = attrs.getNamedItem("type").getNodeValue();
+        String name = node.attributes.get("name");
+        String typeName = node.attributes.get("type");
         ConstraintType type = ConstraintType.valueOf(typeName);
         if (type == null) {
             throw this.m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");
@@ -674,8 +626,8 @@ public class DDLCompiler {
         // TODO: We need to be able to use indexes for foreign keys. I am purposely
         //       leaving those out right now because HSQLDB just makes too many of them.
         Constraint catalog_const = null;
-        if (attrs.getNamedItem("index") != null) {
-            String indexName = attrs.getNamedItem("index") .getNodeValue();
+        if (node.attributes.get("index") != null) {
+            String indexName = node.attributes.get("index");
             Index catalog_index = indexMap.get(indexName);
 
             // if the constraint name contains index type hints, exercise them (giant hack)
@@ -699,7 +651,7 @@ public class DDLCompiler {
 
         // Foreign Keys
         if (type == ConstraintType.FOREIGN_KEY) {
-            String fkey_table_name = attrs.getNamedItem("foreignkeytable").getNodeValue();
+            String fkey_table_name = node.attributes.get("foreignkeytable");
             Table catalog_fkey_tbl = ((Database)table.getParent()).getTables().getIgnoreCase(fkey_table_name);
             if (catalog_fkey_tbl == null) {
                 throw this.m_compiler.new VoltCompilerException("Invalid foreign key table '" + fkey_table_name + "'");
@@ -707,15 +659,12 @@ public class DDLCompiler {
             catalog_const.setForeignkeytable(catalog_fkey_tbl);
 
             // Column mappings
-            NodeList children = node.getChildNodes();
-            for (int i = 0, cnt = children.getLength(); i < cnt; i++) {
-                Node child = children.item(i);
-                if (child.getNodeName().equals("reference")) {
-                    attrs = child.getAttributes();
-                    String from_colname = attrs.getNamedItem("from").getNodeValue();
+            for (VoltXMLElement child : node.children) {
+                if (child.name.equals("reference")) {
+                    String from_colname = child.attributes.get("from");
                     Column from_col = table.getColumns().get(from_colname);
 
-                    String to_colname = attrs.getNamedItem("to").getNodeValue();
+                    String to_colname = child.attributes.get("to");
                     Column to_col = catalog_fkey_tbl.getColumns().get(to_colname);
 
                     // Make a reference in the fromcolumn to their column in the constraint
@@ -745,7 +694,7 @@ public class DDLCompiler {
             String query = entry.getValue();
 
             // get the xml for the query
-            String xmlquery = null;
+            VoltXMLElement xmlquery = null;
             try {
                 xmlquery = m_hsql.getXMLCompiledStatement(query);
             }

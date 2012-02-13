@@ -332,23 +332,19 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        StringBuilder sb = new StringBuilder();
+        VoltXMLElement column = new VoltXMLElement("column");
 
-        // begin open column tag
-        sb.append(indent).append("<column");
         // output column metadata
-        sb.append(" name='").append(columnName.name).append("'");
+        column.attributes.put("name", columnName.name);
         String typestring = Types.getTypeName(dataType.typeCode);
-        sb.append(" type='").append(typestring).append("'");
-        sb.append(" nullable='").append(isNullable()).append("'");
-        sb.append(" size='").append(dataType.precision).append("'");
+        column.attributes.put("type", typestring);
+        column.attributes.put("nullable", String.valueOf(isNullable()));
+        column.attributes.put("size", String.valueOf(dataType.precision));
 
         if ((typestring.compareTo("VARCHAR") == 0) &&
             (dataType.precision > 1048576)) {
@@ -365,20 +361,12 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         if (exp != null) {
             exp.dataType = dataType;
 
-            // end open tag
-            sb.append(">\n");
             // add default value to body of column element
-            sb.append(indent + "  ").append("<default>\n");
-            sb.append(exp.voltGetXML(session, indent + "    ")).append("\n");
-            sb.append(indent + "  ").append("</default>\n");
-            sb.append(indent + "</column>\n");
-        }
-        // if there is not a default value for the column
-        else {
-            // end self-closing open tag
-            sb.append(" />\n");
+            VoltXMLElement defaultElem = new VoltXMLElement("default");
+            column.children.add(defaultElem);
+            defaultElem.children.add(exp.voltGetXML(session));
         }
 
-        return sb.toString();
+        return column;
     }
 }

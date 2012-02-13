@@ -450,13 +450,9 @@ int VoltDBEngine::executePlanFragment(string fragmentString,
     // how many current plans (too see if we added any)
     size_t frags = m_planFragments.size();
 
-    boost::scoped_array<char> buffer(new char[fragmentString.size() * 2 + 1]);
-    catalog::Catalog::hexEncodeString(fragmentString.c_str(), buffer.get());
-    string hexEncodedFragment(buffer.get());
-
     try
     {
-        if (initPlanFragment(AD_HOC_FRAG_ID, hexEncodedFragment))
+        if (initPlanFragment(AD_HOC_FRAG_ID, fragmentString))
         {
             NValueArray parameterValueArray(0);
             retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId,
@@ -842,7 +838,15 @@ bool VoltDBEngine::rebuildPlanFragmentCollections() {
                  pf_iterator!= catalogStmt->fragments().end(); pf_iterator++) {
                 int64_t fragId = uniqueIdForFragment(pf_iterator->second);
                 string planNodeTree = pf_iterator->second->plannodetree();
-                if (!initPlanFragment(fragId, planNodeTree)) {
+
+                // hex decode the string
+                assert (planNodeTree.size() % 2 == 0);
+                int buffer_length = (int)planNodeTree.size() / 2 + 1;
+                boost::shared_array<char> buffer(new char[buffer_length]);
+                catalog::Catalog::hexDecodeString(planNodeTree, buffer.get());
+                std::string bufferString( buffer.get() );
+
+                if (!initPlanFragment(fragId, bufferString)) {
                     VOLT_ERROR("Failed to initialize plan fragment '%s' from"
                                " catalogs\nFailed SQL Statement: %s",
                                pf_iterator->second->name().c_str(),

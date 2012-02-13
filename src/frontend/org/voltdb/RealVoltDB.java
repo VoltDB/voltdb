@@ -453,7 +453,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_snapshotCompletionMonitor.init(m_messenger.getZK());
             } catch (Exception e) {
                 hostLog.fatal("Error initializing snapshot completion monitor", e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Error initializing snapshot completion monitor", true, e);
             }
 
             if (m_commandLog != null && isRejoin) {
@@ -468,7 +468,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger.waitForAllHostsToBeReady(m_deployment.getCluster().getHostcount());
             } catch (Exception e) {
                 hostLog.fatal("Failed to announce ready state.");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Failed to announce ready state.", false, null);
             }
 
             heartbeatThread = new HeartbeatThread(m_clientInterfaces);
@@ -617,7 +617,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         // wasn't a valid xml deployment file
         if (m_deployment == null) {
             hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
+                    + m_config.m_pathToDeployment, false, null);
         }
 
         // note the heatbeats are specified in seconds in xml, but ms internally
@@ -751,10 +752,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     void buildClusterMesh(boolean isRejoin) {
         int numberOfNodes = m_deployment.getCluster().getHostcount();
         if (numberOfNodes <= 0) {
-            // XXX check this deployment file schema.
             hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(),
                     new Object[] { numberOfNodes }, null);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Invalid cluster size: " + numberOfNodes, false, null);
         }
 
         String leaderAddress = m_config.m_leader;
@@ -764,7 +764,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         } catch (UnknownHostException ex) {
             hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(),
                     new Object[] { leaderAddress }, null);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Failed to resolve leader address.", false, null);
         }
 
         org.voltcore.messaging.HostMessenger.Config hmconfig =
@@ -1149,8 +1149,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             "unexpected error and will die, taking this VoltDB node down.";
             System.err.println(errmsg);
             t.printStackTrace();
-            hostLog.fatal(errmsg, t);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
     }
 
@@ -1625,8 +1624,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.info("Node recovery completed");
             }
         } catch (Exception e) {
-            hostLog.fatal("Unable to log host recovery completion to ZK", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Unable to log host recovery completion to ZK", true, e);
         }
         hostLog.info("Logging host recovery completion to ZK");
     }
@@ -1741,7 +1739,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.l7dlog(Level.FATAL,
                                LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
                                e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
         }
 

@@ -40,7 +40,7 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         } catch (MissingResourceException e) {
             System.err.println("Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.");
             e.printStackTrace(System.err);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.", true, e);
         }
         Logger.getRootLogger().setResourceBundle(rb);
 

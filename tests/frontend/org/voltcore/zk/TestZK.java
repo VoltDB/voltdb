@@ -22,11 +22,10 @@
  */
 package org.voltcore.zk;
 
-import static org.junit.Assert.*;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.messaging.HostMessenger;
@@ -39,10 +38,17 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 public class TestZK extends ZKTestBase {
 
@@ -236,8 +242,8 @@ public class TestZK extends ZKTestBase {
         Pair<String, Boolean> result3 = ZKUtil.createAndElectLeader(zk3, "/election", new byte[0], null);
 
         assertTrue(result1.getSecond());
-        assertFalse(result2.getSecond());
-        assertFalse(result3.getSecond());
+        assertTrue(!result2.getSecond());
+        assertTrue(!result3.getSecond());
 
         zk.close();
         zk2.close();

@@ -48,7 +48,7 @@ public class ConstraintFailureException extends SQLException {
         catch (IOException e) {
             // implies that the EE created an invalid constraint
             // failure, which would be a corruption/defect.
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         if (exceptionBuffer.hasRemaining()) {
             int tableSize = exceptionBuffer.getInt();

@@ -88,9 +88,8 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
         VoltDB.instance().clusterUpdate(sb.toString());
         if (m_rvdb.getCatalogContext().siteTracker.getFailedPartitions().size() != 0)
         {
-            hostLog.fatal("Failure of host " + node_fault.getHostId() +
-                          " has rendered the cluster unviable.  Shutting down...");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Failure of host " + node_fault.getHostId() +
+                    " has rendered the cluster unviable.  Shutting down...", false, null);
         }
         m_waitForFaultReported.release();
 

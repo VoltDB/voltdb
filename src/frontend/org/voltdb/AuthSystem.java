@@ -339,8 +339,7 @@ public class AuthSystem {
         try {
             md = MessageDigest.getInstance("SHA-1");
         } catch (NoSuchAlgorithmException e) {
-            authLogger.l7dlog(Level.FATAL, LogKeys.auth_AuthSystem_NoSuchAlgorithm.name(), e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         byte passwordHash[] = md.digest(password);
         if (java.util.Arrays.equals(passwordHash, user.m_shadowPassword)) {

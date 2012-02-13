@@ -25,16 +25,16 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.junit.After;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 import org.voltcore.network.*;
 import org.voltdb.client.ClientResponse;

@@ -122,9 +122,9 @@ public class TestVoltMessageSerialization extends TestCase {
         Object[] params1 = {(Integer)10, (Double)10.1};
         Object[] params2 = {(Integer)20, (Double)20.2};
 
-        ParameterSet param_set1 = new ParameterSet(true);
+        ParameterSet param_set1 = new ParameterSet();
         param_set1.setParameters(params1);
-        ParameterSet param_set2 = new ParameterSet(true);
+        ParameterSet param_set2 = new ParameterSet();
         param_set2.setParameters(params2);
 
         FastSerializer param1_fs = new FastSerializer();

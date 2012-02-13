@@ -119,7 +119,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             new HashMap<Integer, ArrayDeque<VoltTable>>();
 
         private final VoltLogger hostLog = new VoltLogger("HOST");
-
         private final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
 
 
@@ -184,14 +183,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             if (dependencies == null) {
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotFound.name(),
                                new Object[] { dependencyId }, null);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No additional info.", false, null);
             }
             for (final Object dependency : dependencies) {
                 if (dependency == null) {
                     hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyContainedNull.name(),
                                    new Object[] { dependencyId },
                             null);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("No additional info.", false, null);
                 }
                 if (log.isTraceEnabled()) {
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
@@ -201,7 +200,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 if (!(dependency instanceof VoltTable)) {
                     hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotVoltTable.name(),
                                    new Object[] { dependencyId }, null);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("No additional info.", false, null);
                 }
             }
 
@@ -221,14 +220,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param reason Reason the EE crashed
      */
     public static void crashVoltDB(String reason, String traces[], String filename, int lineno) {
-        if (reason != null) {
-            System.err.println(reason);
-            System.err.println("In " + filename + ":" + lineno);
+        VoltLogger hostLog = new VoltLogger("HOST");
+        String fn = (filename == null) ? "unknown" : filename;
+        String re = (reason == null) ? "Fatal EE error." : reason;
+        hostLog.fatal(re + " In " + fn + ":" + lineno);
+        if (traces != null) {
             for ( String trace : traces) {
-                System.err.println(trace);
+                hostLog.fatal(trace);
             }
         }
-        VoltDB.crashVoltDB();
+        VoltDB.crashLocalVoltDB(re + " In " + fn + ":" + lineno, true, null);
     }
 
     /**

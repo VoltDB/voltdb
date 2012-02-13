@@ -43,17 +43,10 @@ import org.voltdb.types.VoltDecimalHelper;
 
     static final byte ARRAY = -99;
 
-    private final boolean m_serializingToEE;
-
     private final LinkedList<byte[]> m_encodedStrings = new LinkedList<byte[]>();
     private final LinkedList<byte[][]> m_encodedStringArrays = new LinkedList<byte[][]>();
 
     public ParameterSet() {
-        m_serializingToEE = false;
-    }
-
-    public ParameterSet(boolean serializingToEE) {
-        m_serializingToEE = serializingToEE;
     }
 
     static Object limitType(Object o) {

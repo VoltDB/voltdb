@@ -1032,20 +1032,19 @@ public final class Constraint implements SchemaObject {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      */
-    String voltGetXML(Session session, String indent)
+    VoltXMLElement voltGetXML(Session session)
     throws HSQLParseException
     {
-        StringBuilder sb = new StringBuilder();
+        VoltXMLElement constraint = null;
 
         // Skip "MAIN" constraints, as they are the parent of foreign key references
         if (this.constType != MAIN) {
-            sb.append(indent).append("<constraint");
-            sb.append(" name='").append(getName().name).append("'");
-            sb.append(" type='").append(getTypeName()).append("'");
+            constraint = new VoltXMLElement("constraint");
+
+            constraint.attributes.put("name", getName().name);
+            constraint.attributes.put("type", getTypeName());
 
             // Foreign Keys
             if (this.constType == FOREIGN_KEY) {
@@ -1055,8 +1054,7 @@ public final class Constraint implements SchemaObject {
                 Table fkey_table = this.getMain();
                 int fkey_cols[] = this.getMainColumns();
 
-                sb.append(" foreignkeytable='").append(fkey_table.getName().statementName).append("'");
-                sb.append(" >\n");
+                constraint.attributes.put("foreignkeytable", fkey_table.getName().statementName);
 
                 // XXX Can bad SQL get us here or does HSQL barf before that?
                 assert(our_cols.length == fkey_cols.length);
@@ -1064,24 +1062,21 @@ public final class Constraint implements SchemaObject {
                     String our_colname = our_table.getColumn(our_cols[i]).getName().statementName;
                     String fkey_colname = fkey_table.getColumn(fkey_cols[i]).getName().statementName;
 
-                    sb.append(indent).append(indent).append("<reference");
-                    sb.append(" from='").append(our_colname).append("'");
-                    sb.append(" to='").append(fkey_colname).append("'");
-                    sb.append(" />\n");
+                    VoltXMLElement ref = new VoltXMLElement("constraint");
+                    constraint.children.add(ref);
+                    ref.attributes.put("from", our_colname);
+                    ref.attributes.put("to", fkey_colname);
                 }
-                sb.append(indent).append("</constraint>\n");
-
+            }
             // All other constraints...
-            } else {
+            else {
                 if (core.mainIndex != null)
-                    sb.append(" index='").append(core.mainIndex.getName().name).append("'");
+                    constraint.attributes.put("index", core.mainIndex.getName().name);
                 else
-                    sb.append(" index=''");
-
-                sb.append(" />\n");
+                    constraint.attributes.put("index", "");
             }
         }
 
-        return sb.toString();
+        return constraint;
     }
 }

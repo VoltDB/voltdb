@@ -17,7 +17,6 @@
 
 package org.voltdb.jdbc;
 
-import java.sql.NClob;
 import javax.sql.rowset.serial.SerialClob;
 
 public class JDBC4NClob extends SerialClob implements java.sql.NClob

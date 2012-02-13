@@ -34,6 +34,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 
 public class SnapshotCompletionMonitor {
+    @SuppressWarnings("unused")
     private static final VoltLogger LOG = new VoltLogger("LOGGING");
     final LinkedList<SnapshotCompletionInterest> m_interests = new LinkedList<SnapshotCompletionInterest>();
     private ZooKeeper m_zk;
@@ -100,8 +101,7 @@ public class SnapshotCompletionMonitor {
                 }
             }
         } catch (Exception e) {
-            LOG.fatal("Exception in snapshot completion monitor", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Exception in snapshot completion monitor", true, e);
         }
     }
 
@@ -128,8 +128,7 @@ public class SnapshotCompletionMonitor {
             processSnapshotData(data);
         } catch (NoNodeException e) {
         } catch (Exception e) {
-            LOG.fatal("Exception in snapshot completion monitor", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Exception in snapshot completion monitor", true, e);
         }
     }
 
@@ -186,8 +185,7 @@ public class SnapshotCompletionMonitor {
                     m_lastKnownSnapshots =
                         new TreeSet<String>(m_zk.getChildren(VoltZK.completed_snapshots, m_newSnapshotWatcher));
                 } catch (Exception e) {
-                    LOG.fatal("Error initializing snapshot completion monitor", e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("Error initializing snapshot completion monitor", true, e);
                 }
             }
         });

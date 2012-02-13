@@ -1890,48 +1890,23 @@ public class FunctionSQL extends Expression {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         // XXX Should this throw HSQLParseException instead?
         assert(getType() == OpTypes.SQL_FUNCTION);
 
-        /*StringBuffer sb = new StringBuffer();
+        VoltXMLElement exp = new VoltXMLElement("function");
+        exp.attributes.put("name", name);
+        exp.attributes.put("type", dataType.getNameString());
 
-        sb.append(indent).append("<operation id=\"").append(this.getUniqueId()).append("\"");
-        sb.append(" type=\"").append("function").append("\"");
-        if (getAlias() != null) {
-            sb.append(" alias='" + getAlias() + "'");
-        }
-        sb.append(">\n");
         for (Expression expr : nodes) {
             if (expr != null)
-                sb.append(expr.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append('\n');
+                exp.children.add(expr.voltGetXML(session));
         }
-        sb.append(indent).append("</operation>");
 
-        return sb.toString();*/
-
-        StringBuffer sb = new StringBuffer();
-
-        sb.append(indent).append("<function");
-        sb.append(" name='").append(this.name).append("'");
-        sb.append(" type='").append(dataType.getNameString()).append("'");
-        sb.append(">\n");
-        /*for (int i = 0; i < argList.length; i++) {
-            if (argList[i] != null)
-                sb.append(indent + "  ").append(argList[i].describe(session)).append("/>\n");
-        }*/
-        for (Expression expr : nodes) {
-            if (expr != null)
-                sb.append(expr.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append('\n');
-        }
-        sb.append(indent).append("</function>");
-
-        return sb.toString();
+        return exp;
     }
 }

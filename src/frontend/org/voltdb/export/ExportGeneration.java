@@ -125,8 +125,7 @@ public class ExportGeneration {
                     try {
                         addDataSource(f);
                     } catch (IOException e) {
-                        exportLog.fatal(e);
-                        VoltDB.crashVoltDB();
+                        VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                     }
                 } else {
                     //Delete ads that have no data
@@ -246,8 +245,7 @@ public class ExportGeneration {
                         " signature " + table.getSignature() + " partition id " + partition);
                 dataSourcesForPartition.put(table.getSignature(), exportDataSource);
             } catch (IOException e) {
-                exportLog.fatal(e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
         }
     }

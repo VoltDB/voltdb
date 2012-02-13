@@ -143,29 +143,24 @@ public class ExpressionOrderBy extends Expression {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        StringBuffer sb = new StringBuffer();
-
-        String extra = "desc='" + (isDescending ? "true" : "false") + "'";
-
-        sb.append(indent).append("<operation id=\"").append(this.getUniqueId()).append("\"");
-        sb.append(" type=\"").append("orderby").append("\"");
+        VoltXMLElement exp = new VoltXMLElement("operation");
+        // We want to keep track of which expressions are the same in the XML output
+        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("type", "orderby");
         if ((this.alias != null) && (getAlias().length() > 0)) {
-            sb.append(" alias='" + getAlias() + "'");
+            exp.attributes.put("alias", getAlias());
         }
-        sb.append(" ").append(extra);
-        sb.append(">\n");
-        for (Expression expr : nodes) {
-            sb.append(expr.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append('\n');
-        }
-        sb.append(indent).append("</operation>");
+        exp.attributes.put("desc", isDescending ? "true" : "false");
 
-        return sb.toString();
+        for (Expression expr : nodes) {
+            exp.children.add(expr.voltGetXML(session));
+        }
+
+        return exp;
     }
 }

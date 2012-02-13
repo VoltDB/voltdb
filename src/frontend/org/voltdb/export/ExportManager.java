@@ -96,7 +96,7 @@ public class ExportManager
              */
             ExportDataProcessor proc = m_processor.get();
             if (proc == null) {
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No export data processor found", false, null);
             }
             proc.queueWork(new Runnable() {
                 @Override
@@ -166,8 +166,7 @@ public class ExportManager
                 try {
                     VoltFile.recursivelyDelete(f);
                 } catch (IOException e) {
-                    exportLog.fatal(e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
             }
         }
@@ -303,8 +302,7 @@ public class ExportManager
                     m_onGenerationDrained,
                     exportOverflowDirectory);
         } catch (IOException e1) {
-            exportLog.error(e1);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e1.getMessage(), true, e1);
         }
         newGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
 

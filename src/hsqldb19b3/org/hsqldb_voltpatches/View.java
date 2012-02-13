@@ -231,50 +231,42 @@ public class View extends TableDerived {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    String voltGetXML(Session session, String indent) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        StringBuilder sb = new StringBuilder();
+        VoltXMLElement table = new VoltXMLElement("table");
 
-        // append open table tag
-        sb.append(indent).append("<table");
         // add table metadata
-        sb.append(" name='").append(getName().name).append("'");
-        sb.append(" query='").append(statement).append("'");
-        sb.append(">\n");
+        table.attributes.put("name", getName().name);
+        table.attributes.put("query", statement);
 
         // read all the columns
-        sb.append(indent + "  ").append("<columns>\n");
+        VoltXMLElement columns = new VoltXMLElement("columns");
+        table.children.add(columns);
         int[] columnIndices = getColumnMap();
         for (int i : columnIndices) {
             ColumnSchema column = getColumn(i);
-            sb.append(column.voltGetXML(session, indent + "    "));
+            columns.children.add(column.voltGetXML(session));
         }
-        sb.append(indent + "  ").append("</columns>\n");
 
         // read all the indexes
-        sb.append(indent + "  ").append("<indexes>\n");
+        VoltXMLElement indexes = new VoltXMLElement("indexes");
+        table.children.add(indexes);
         for (Index index : getIndexes()) {
-            sb.append(index.voltGetXML(session, indent + "    "));
+            indexes.children.add(index.voltGetXML(session));
         }
-        sb.append(indent + "  ").append("</indexes>\n");
 
         // read all the constraints
-        sb.append(indent + "  ").append("<constraints>\n");
+        VoltXMLElement constraints = new VoltXMLElement("constraints");
+        table.children.add(constraints);
         for (Constraint constraint : getConstraints()) {
             // giant hack to ignore "CHECK" constraint
             if (constraint.getConstraintType() != Constraint.CHECK)
-                sb.append(constraint.voltGetXML(session, indent + "    "));
+                constraints.children.add(constraint.voltGetXML(session));
         }
-        sb.append(indent + "  ").append("</constraints>\n");
 
-        // close table tag
-        sb.append(indent).append("</table>\n");
-
-        return sb.toString();
+        return table;
     }
 }

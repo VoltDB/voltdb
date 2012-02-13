@@ -17,18 +17,13 @@
 
 package org.voltdb.planner;
 
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.InputMismatchException;
 import java.util.Map.Entry;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -41,33 +36,8 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.StringInputStream;
-import org.w3c.dom.Document;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.ErrorHandler;
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
 
 public abstract class AbstractParsedStmt {
-
-    static class HSQLXMLErrorHandler implements ErrorHandler {
-        @Override
-        public void error(SAXParseException exception) throws SAXException {
-            throw exception;
-        }
-
-        @Override
-        public void fatalError(SAXParseException exception) throws SAXException {
-            throw exception;
-        }
-
-        @Override
-        public void warning(SAXParseException exception) throws SAXException {
-            throw exception;
-        }
-    }
 
     public static class TablePair {
         public Table t1;
@@ -126,76 +96,49 @@ public abstract class AbstractParsedStmt {
      * @param xmlSQL
      * @param db
      */
-    public static AbstractParsedStmt parse(String sql, String xmlSQL, Database db, String joinOrder) {
+    public static AbstractParsedStmt parse(String sql, VoltXMLElement xmlSQL, Database db, String joinOrder) {
         final String INSERT_NODE_NAME = "insert";
         final String UPDATE_NODE_NAME = "update";
         final String DELETE_NODE_NAME = "delete";
         final String SELECT_NODE_NAME = "select";
 
         AbstractParsedStmt retval = null;
-        StringInputStream input = new StringInputStream(xmlSQL);
-        HSQLXMLErrorHandler errHandler = new HSQLXMLErrorHandler();
-        Document doc = null;
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
-        try {
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            builder.setErrorHandler(errHandler);
-            doc = builder.parse(input);
-        } catch (SAXParseException sxe) {
-            System.err.println(sxe.getMessage() + ": " + String.valueOf(sxe.getLineNumber()));
-            throw new InputMismatchException("XML Parsing failure during planning");
-        } catch (SAXException sxe) {
-            System.err.println(sxe.getMessage());
-            throw new InputMismatchException("XML Parsing failure during planning");
-        } catch (ParserConfigurationException e) {
-            System.err.println(e.getMessage());
-            throw new InputMismatchException("XML Parsing failure during planning");
-        } catch (IOException e) {
-            System.err.println(e.getMessage());
-            throw new InputMismatchException("XML Parsing failure during planning");
-        }
-
-        if (doc == null) {
+        if (xmlSQL == null) {
             System.err.println("Unexpected error parsing hsql parsed stmt xml");
             throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
         }
 
-        Node docElement = doc.getDocumentElement();
-        assert(docElement.getNodeName().equalsIgnoreCase("statement"));
+        assert(xmlSQL.name.equals("statement"));
 
-        Node stmtTypeElement = docElement.getFirstChild();
-        while (stmtTypeElement.getNodeType() != Node.ELEMENT_NODE)
-            stmtTypeElement = stmtTypeElement.getNextSibling();
+        VoltXMLElement stmtTypeElement = xmlSQL.children.get(0);
 
         // create non-abstract instances
-        if (stmtTypeElement.getNodeName().equalsIgnoreCase(INSERT_NODE_NAME)) {
+        if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
             retval = new ParsedInsertStmt();
         }
-        else if (stmtTypeElement.getNodeName().equalsIgnoreCase(UPDATE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
             retval = new ParsedUpdateStmt();
         }
-        else if (stmtTypeElement.getNodeName().equalsIgnoreCase(DELETE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
             retval = new ParsedDeleteStmt();
         }
-        else if (stmtTypeElement.getNodeName().equalsIgnoreCase(SELECT_NODE_NAME)) {
+        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
             retval = new ParsedSelectStmt();
         }
         else {
-            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.getNodeName());
+            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
         }
 
         // parse tables and parameters
-        NodeList children = stmtTypeElement.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node node = children.item(i);
-            if (node.getNodeName().equalsIgnoreCase("parameters")) {
+        for (VoltXMLElement node : stmtTypeElement.children) {
+            if (node.name.equalsIgnoreCase("parameters")) {
                 retval.parseParameters(node, db);
             }
-            if (node.getNodeName().equalsIgnoreCase("tablescans")) {
+            if (node.name.equalsIgnoreCase("tablescans")) {
                 retval.parseTables(node, db);
             }
-            if (node.getNodeName().equalsIgnoreCase("scan_columns"))
+            if (node.name.equalsIgnoreCase("scan_columns"))
             {
                 retval.parseScanColumns(node, db);
             }
@@ -221,7 +164,7 @@ public abstract class AbstractParsedStmt {
      * @param stmtElement
      * @param db
      */
-    abstract void parse(Node stmtElement, Database db);
+    abstract void parse(VoltXMLElement stmtElement, Database db);
 
     /**
      * Convert a HSQL VoltXML expression to an AbstractExpression tree.
@@ -229,25 +172,24 @@ public abstract class AbstractParsedStmt {
      * @param db
      * @return configured AbstractExpression
      */
-    AbstractExpression parseExpressionTree(Node root, Database db) {
-        String elementName = root.getNodeName().toLowerCase();
-        NamedNodeMap attrs = root.getAttributes();
+    AbstractExpression parseExpressionTree(VoltXMLElement root, Database db) {
+        String elementName = root.name.toLowerCase();
         AbstractExpression retval = null;
 
         if (elementName.equals("value")) {
-            retval = parseValueExpression(root, attrs);
+            retval = parseValueExpression(root);
         }
         else if (elementName.equals("columnref")) {
-            retval = parseColumnRefExpression(root, attrs, db);
+            retval = parseColumnRefExpression(root, db);
         }
         else if (elementName.equals("bool")) {
-            retval = parseBooleanExpresion(root, attrs);
+            retval = parseBooleanExpresion(root);
         }
         else if (elementName.equals("operation")) {
-            retval = parseOperationExpression(root, attrs, db);
+            retval = parseOperationExpression(root, db);
         }
         else if (elementName.equals("function")) {
-            retval = parseFunctionExpression(root, attrs);
+            retval = parseFunctionExpression(root);
         }
         else if (elementName.equals("asterisk")) {
             return null;
@@ -264,9 +206,9 @@ public abstract class AbstractParsedStmt {
      * @param attrs
      * @return
      */
-    AbstractExpression parseValueExpression(Node exprNode, NamedNodeMap attrs) {
-        String type = attrs.getNamedItem("type").getNodeValue();
-        Node isParam = attrs.getNamedItem("isparam");
+    AbstractExpression parseValueExpression(VoltXMLElement exprNode) {
+        String type = exprNode.attributes.get("type");
+        String isParam = exprNode.attributes.get("isparam");
 
         VoltType vt = VoltType.typeFromString(type);
         int size = VoltType.MAX_VALUE_LENGTH;
@@ -276,9 +218,9 @@ public abstract class AbstractParsedStmt {
             if (vt == VoltType.NULL) size = 0;
             else size = vt.getLengthInBytesForFixedTypes();
         }
-        if ((isParam != null) && (isParam.getNodeValue().equalsIgnoreCase("true"))) {
+        if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
             ParameterValueExpression expr = new ParameterValueExpression();
-            long id = Long.parseLong(attrs.getNamedItem("id").getNodeValue());
+            long id = Long.parseLong(exprNode.attributes.get("id"));
             ParameterInfo param = paramsById.get(id);
 
             expr.setValueType(vt);
@@ -294,7 +236,7 @@ public abstract class AbstractParsedStmt {
             if (vt == VoltType.NULL)
                 expr.setValue(null);
             else
-                expr.setValue(attrs.getNamedItem("value").getNodeValue());
+                expr.setValue(exprNode.attributes.get("value"));
             return expr;
         }
     }
@@ -306,12 +248,12 @@ public abstract class AbstractParsedStmt {
      * @param db
      * @return
      */
-    AbstractExpression parseColumnRefExpression(Node exprNode, NamedNodeMap attrs, Database db) {
+    AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode, Database db) {
         TupleValueExpression expr = new TupleValueExpression();
 
-        String alias = attrs.getNamedItem("alias").getNodeValue();
-        String tableName = attrs.getNamedItem("table").getNodeValue();
-        String columnName = attrs.getNamedItem("column").getNodeValue();
+        String alias = exprNode.attributes.get("alias");
+        String tableName = exprNode.attributes.get("table");
+        String columnName = exprNode.attributes.get("column");
 
         Table table = db.getTables().getIgnoreCase(tableName);
         assert(table != null);
@@ -334,12 +276,12 @@ public abstract class AbstractParsedStmt {
      * @param attrs
      * @return
      */
-    AbstractExpression parseBooleanExpresion(Node exprNode, NamedNodeMap attrs) {
+    AbstractExpression parseBooleanExpresion(VoltXMLElement exprNode) {
         ConstantValueExpression expr = new ConstantValueExpression();
 
         expr.setValueType(VoltType.BIGINT);
         expr.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        if (attrs.getNamedItem("attrs").getNodeValue().equalsIgnoreCase("true"))
+        if (exprNode.attributes.get("attrs").equalsIgnoreCase("true"))
             expr.setValue("1");
         else
             expr.setValue("0");
@@ -353,8 +295,8 @@ public abstract class AbstractParsedStmt {
      * @param db
      * @return
      */
-    AbstractExpression parseOperationExpression(Node exprNode, NamedNodeMap attrs, Database db) {
-        String type = attrs.getNamedItem("type").getNodeValue();
+    AbstractExpression parseOperationExpression(VoltXMLElement exprNode, Database db) {
+        String type = exprNode.attributes.get("type");
         ExpressionType exprType = ExpressionType.get(type);
         AbstractExpression expr = null;
 
@@ -383,27 +325,21 @@ public abstract class AbstractParsedStmt {
         // Expression implementations.
 
         if (expr instanceof AggregateExpression) {
-            Node node;
-            if ((node = attrs.getNamedItem("distinct")) != null) {
+            String node;
+            if ((node = exprNode.attributes.get("distinct")) != null) {
                 AggregateExpression ae = (AggregateExpression)expr;
-                ae.m_distinct = Boolean.parseBoolean(node.getNodeValue());
+                ae.m_distinct = Boolean.parseBoolean(node);
             }
         }
 
-        // setup for children access
-        NodeList children = exprNode.getChildNodes();
-        int i = 0;
-
         // get the first (left) node that is an element
-        Node leftExprNode = children.item(i++);
-        while ((leftExprNode != null) && (leftExprNode.getNodeType() != Node.ELEMENT_NODE))
-            leftExprNode = children.item(i++);
+        VoltXMLElement leftExprNode = exprNode.children.get(0);
         assert(leftExprNode != null);
 
         // get the second (right) node that is an element (might be null)
-        Node rightExprNode = children.item(i++);
-        while ((rightExprNode != null) && (rightExprNode.getNodeType() != Node.ELEMENT_NODE))
-            rightExprNode = children.item(i++);
+        VoltXMLElement rightExprNode = null;
+        if (exprNode.children.size() > 1)
+            rightExprNode = exprNode.children.get(1);
 
         // recursively parse the left subtree (could be another operator or
         // a constant/tuple/param value operand).
@@ -429,8 +365,8 @@ public abstract class AbstractParsedStmt {
      * @param attrs
      * @return
      */
-    AbstractExpression parseFunctionExpression(Node exprNode, NamedNodeMap attrs) {
-        String name = attrs.getNamedItem("name").getNodeValue().toLowerCase();
+    AbstractExpression parseFunctionExpression(VoltXMLElement exprNode) {
+        String name = exprNode.attributes.get("name").toLowerCase();
 
         // we don't currently support ANY functions.
         throw new PlanningErrorException("Function '" + name + "' is not supported");
@@ -444,14 +380,12 @@ public abstract class AbstractParsedStmt {
      * @param columnsNode
      * @param db
      */
-    void parseScanColumns(Node columnsNode, Database db)
+    void parseScanColumns(VoltXMLElement columnsNode, Database db)
     {
         scanColumns = new HashMap<String, ArrayList<SchemaColumn>>();
-        for (Node child = columnsNode.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child.getNodeType() != Node.ELEMENT_NODE)
-                continue;
-            final String nodeName = child.getNodeName();
-            assert(nodeName.equals("columnref"));
+
+        for (VoltXMLElement child : columnsNode.children) {
+            assert(child.name.equals("columnref"));
             AbstractExpression col_exp = parseExpressionTree(child, db);
             ExpressionUtil.assignLiteralConstantTypesRecursively(col_exp);
             ExpressionUtil.assignOutputValueTypesRecursively(col_exp);
@@ -478,12 +412,10 @@ public abstract class AbstractParsedStmt {
      * @param tablesNode
      * @param db
      */
-    private void parseTables(Node tablesNode, Database db) {
-        NodeList children = tablesNode.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node node = children.item(i);
-            if (node.getNodeName().equalsIgnoreCase("tablescan")) {
-                String tableName = node.getAttributes().getNamedItem("table").getNodeValue();
+    private void parseTables(VoltXMLElement tablesNode, Database db) {
+        for (VoltXMLElement node : tablesNode.children) {
+            if (node.name.equalsIgnoreCase("tablescan")) {
+                String tableName = node.attributes.get("table");
                 Table table = db.getTables().getIgnoreCase(tableName);
                 assert(table != null);
                 tableList.add(table);
@@ -491,17 +423,14 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    private void parseParameters(Node paramsNode, Database db) {
-        NodeList children = paramsNode.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node node = children.item(i);
-            if (node.getNodeName().equalsIgnoreCase("parameter")) {
+    private void parseParameters(VoltXMLElement paramsNode, Database db) {
+        for (VoltXMLElement node : paramsNode.children) {
+            if (node.name.equalsIgnoreCase("parameter")) {
                 ParameterInfo param = new ParameterInfo();
 
-                NamedNodeMap attrs = node.getAttributes();
-                long id = Long.parseLong(attrs.getNamedItem("id").getNodeValue());
-                param.index = Integer.parseInt(attrs.getNamedItem("index").getNodeValue());
-                String typeName = attrs.getNamedItem("type").getNodeValue();
+                long id = Long.parseLong(node.attributes.get("id"));
+                param.index = Integer.parseInt(node.attributes.get("index"));
+                String typeName = node.attributes.get("type");
                 param.type = VoltType.typeFromString(typeName);
                 paramsById.put(id, param);
                 paramList.add(param);

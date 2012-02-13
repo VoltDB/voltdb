@@ -4,14 +4,15 @@ import os, sys, shutil, datetime
 from fabric.api import run, cd, local, get, settings, lcd
 from fabric_ssh_config import getSSHInfoForHost
 
-builddir = "/tmp/" + os.getenv('USER') + "/buildtemp"
+username='test'
+builddir = "/tmp/" + username + "/buildtemp"
 version = "UNKNOWN"
 
 ################################################
 # CHECKOUT CODE INTO A TEMP DIR
 ################################################
 
-def checkoutCode(engSvnUrl, proSvnUrl):
+def checkoutCode(voltdbGit, proGit):
     global buildir
     # clean out the existing dir
     run("rm -rf " + builddir)
@@ -21,7 +22,9 @@ def checkoutCode(engSvnUrl, proSvnUrl):
     with cd(builddir):
         # do the checkouts
         run("git clone git@github.com:VoltDB/voltdb.git")
+        run("cd voltdb; git checkout %s" % voltdbGit)
         run("git clone git@github.com:VoltDB/pro.git")
+        run("cd pro; git checkout %s" % proGit)
         return run("cat voltdb/version.txt").strip()
 
 ################################################
@@ -118,31 +121,41 @@ def createCandidateSysmlink(releaseDir):
 # BACKUP RELEASE DIR
 ################################################
 
-def backupReleaseDir(releaseDir):
-    # make a backup with the timstamp of the build
+def backupReleaseDir(releaseDir,archiveDir,version):
+    if not os.path.exists(archiveDir):
+        os.makedirs(archiveDir)
+    # make a backup with the timstamp of the  build
     timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
-    local("tar -czf " +  releaseDir + "-" + timestamp + ".tgz " + releaseDir)
+    local("tar -czf %s/%s-%s.tgz %s" \
+          % (archiveDir, version, timestamp, releaseDir))
 
 ################################################
-# GET THE SVN URLS TO BUILD THE KIT FROM
+# GET THE GIT TAGS OR SHAS TO BUILD FROM
 ################################################
 
-if len(sys.argv) > 3:
-    print "usage"
+if (len(sys.argv) > 3 or (len(sys.argv) == 2 and sys.argv[1] == "-h")):
+    print "usage:"
+    print "   build-kit.py"
+    print "   build-kit.py git-tag"
+    print "   build-kit.py voltdb-git-SHA pro-git-SHA"
 
-def getSVNURL(defaultPrefix, input):
-    input = input.strip()
-    if input.startswith("http"):
-        return input
-    if input[0] == '/':
-        input = input[1:]
-    return defaultPrefix + input
+proTreeish = "master"
+voltdbTreeish = "master"
 
-argv = sys.argv
-if len(argv) == 1: argv = ["build-kit.py", "trunk", "branches/rest"]
-if len(argv) == 2: argv = ["build-kit.py", argv[0], argv[0]]
-eng_svn_url = getSVNURL("https://svn.voltdb.com/eng/", argv[1])
-pro_svn_url = getSVNURL("https://svn.voltdb.com/pro/", argv[2])
+#Candidate is only for newest trunk build
+createCandidate = True
+
+if len(sys.argv) == 2:
+    createCandidate = False
+    proTreeish = sys.argv[1]
+    voltdbTreeish = sys.argv[1]
+if len(sys.argv) == 3:
+    createCandidate = False
+    voltdbTreeish = sys.argv[1]
+    proTreeish = sys.argv[2]
+
+print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
+print "Create link for releases/candidate = %s" % createCandidate 
 
 version = "unknown"
 releaseDir = "unknown"
@@ -152,9 +165,13 @@ volt5f = getSSHInfoForHost("volt5f")
 voltmini = getSSHInfoForHost("voltmini")
 
 # build kits on 5f
-with settings(user='test',host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
-    version = checkoutCode(eng_svn_url, pro_svn_url)
-    releaseDir = os.getenv('HOME') + "/releases/" + version
+with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
+    version = checkoutCode(voltdbTreeish, proTreeish)
+    if voltdbTreeish == "master":
+        releaseDir = os.getenv('HOME') + "/releases/" + version
+    else:
+        releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
+            (os.getenv('HOME'), version, voltdbTreeish, proTreeish)
     makeReleaseDir(releaseDir)
     print "VERSION: " + version
     buildCommunity()
@@ -163,14 +180,17 @@ with settings(user='test',host_string=volt5f[1],disable_known_hosts=True,key_fil
     copyEnterpriseFilesToReleaseDir(releaseDir, version, "LINUX")
 
 # build kits on the mini
-with settings(user='test',host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
-    version2 = checkoutCode(eng_svn_url, pro_svn_url)
+with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
+    version2 = checkoutCode(voltdbTreeish, proTreeish)
     assert version == version2
     buildCommunity()
     copyCommunityFilesToReleaseDir(releaseDir, version, "MAC")
     buildPro()
     copyEnterpriseFilesToReleaseDir(releaseDir, version, "MAC")
 
+
 computeChecksums(releaseDir)
-createCandidateSysmlink(releaseDir)
-backupReleaseDir(releaseDir)
+if createCandidate:
+    createCandidateSysmlink(releaseDir)
+archiveDir = os.getenv('HOME') + "/releases/archive/" + version
+backupReleaseDir(releaseDir, archiveDir, version)

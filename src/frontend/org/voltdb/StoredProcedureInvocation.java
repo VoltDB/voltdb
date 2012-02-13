@@ -37,6 +37,7 @@ import org.voltdb.messaging.FastSerializer;
  *
  */
 public class StoredProcedureInvocation implements FastSerializable, JSONString {
+    @SuppressWarnings("unused")
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     ProcedureInvocationType type = ProcedureInvocationType.ORIGINAL;
@@ -125,8 +126,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         try {
             return params.get();
         } catch (InterruptedException e) {
-            hostLog.fatal("Interrupted while deserializing a parameter set");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Interrupted while deserializing a parameter set", false, e);
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         }

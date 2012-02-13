@@ -905,8 +905,7 @@ public abstract class CatalogUtil {
         } while(false);
         if (error != null) {
             if (crashOnFailedValidation) {
-                hostLog.fatal(error);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB(error, false, null);
             } else {
                 hostLog.warn(error);
             }

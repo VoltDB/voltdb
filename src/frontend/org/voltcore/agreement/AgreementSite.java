@@ -855,8 +855,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         // this timeout is totally arbitrary
         // 30s is pretty long in general, but sometimes localcluster may need this long :-(
         if (!m_recoveryComplete.await(30, TimeUnit.SECONDS)) {
-            m_recoveryLog.fatal("Timed out waiting for the agreement site to recover");
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Timed out waiting for the agreement site to recover", false, null);
         }
     }
 

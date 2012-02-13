@@ -39,6 +39,7 @@ import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -271,7 +272,7 @@ public class SnapshotSiteProcessor {
                 hostLog.error("Attempted to activate copy on write mode for table "
                         + task.m_name + " and failed");
                 hostLog.error(task);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("No additional info", false, null);
             }
         }
     }
@@ -309,8 +310,7 @@ public class SnapshotSiteProcessor {
                     currentTask.m_tableId,
                     TableStreamType.SNAPSHOT);
             if (serialized < 0) {
-                hostLog.error("Failure while serialize data from a table for COW snapshot");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
             }
 
             /**
@@ -461,23 +461,19 @@ public class SnapshotSiteProcessor {
             try {
                 data = zk.getData(snapshotPath, false, stat);
             } catch (Exception e) {
-                hostLog.fatal("This ZK get should never fail", e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("This ZK get should never fail", true, e);
             }
             if (data == null) {
-                hostLog.fatal("Data should not be null if the node exists");
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Data should not be null if the node exists", false, null);
             }
 
             try {
                 JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
                 if (jsonObj.getLong("txnId") != txnId) {
-                    hostLog.fatal("TxnId should match");
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
                 if (jsonObj.getInt("hosts") != numHosts) {
-                    hostLog.fatal("Num hosts should match");
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB("Num hosts should match", false, null);
                 }
                 int numHostsFinished = jsonObj.getInt("finishedHosts") + 1;
                 jsonObj.put("finishedHosts", numHostsFinished);
@@ -490,8 +486,7 @@ public class SnapshotSiteProcessor {
             } catch (KeeperException.BadVersionException e) {
                 continue;
             } catch (Exception e) {
-                hostLog.fatal("This ZK call should never fail", e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("This ZK call should never fail", true, e);
             }
             success = true;
         }
@@ -507,15 +502,13 @@ public class SnapshotSiteProcessor {
                     zk.delete(VoltZK.completed_snapshots + snapshots.first(), -1);
                 } catch (NoNodeException e) {}
                 catch (Exception e) {
-                    hostLog.fatal(
-                            "Deleting a snapshot completion record from ZK should only fail with NoNodeException", e);
-                    VoltDB.crashVoltDB();
+                    VoltDB.crashLocalVoltDB(
+                            "Deleting a snapshot completion record from ZK should only fail with NoNodeException", true, e);
                 }
                 snapshots.remove(snapshots.first());
             }
         } catch (Exception e) {
-            hostLog.fatal("Retrieving list of completed snapshots from ZK should never fail", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB("Retrieving list of completed snapshots from ZK should never fail", true, e);
         }
 
         try {
@@ -524,7 +517,7 @@ public class SnapshotSiteProcessor {
         } catch (NoNodeException e) {
             hostLog.warn("Expect the snapshot node to already exist during deletion", e);
         } catch (Exception e) {
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 

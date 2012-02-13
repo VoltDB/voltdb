@@ -62,6 +62,7 @@ import org.voltdb.types.TimestampType;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
+
     @Override
     public void setUp() {
         params = new ParameterSet();
@@ -93,7 +94,7 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testStringsAsByteArray() throws IOException {
-        params = new ParameterSet(true);
+        params = new ParameterSet();
         params.setParameters(new Object[]{new byte[]{'f', 'o', 'o'}});
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
@@ -109,7 +110,7 @@ public class TestParameterSet extends TestCase {
 
     private boolean arrayLengthTester(Object[] objs)
     {
-        params = new ParameterSet(true);
+        params = new ParameterSet();
         params.setParameters(objs);
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         boolean threw = false;
@@ -142,7 +143,7 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testFloatsInsteadOfDouble() throws IOException {
-        params = new ParameterSet(true);
+        params = new ParameterSet();
         params.setParameters(5.5f);
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
@@ -156,7 +157,7 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testJSONEncodesBinary() throws JSONException, IOException {
-        params = new ParameterSet(true);
+        params = new ParameterSet();
         params.setParameters(new Object[]{ 123,
                                            12345,
                                            1234567,

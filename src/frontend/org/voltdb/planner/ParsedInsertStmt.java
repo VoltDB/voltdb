@@ -20,15 +20,13 @@ package org.voltdb.planner;
 import java.util.HashMap;
 import java.util.Map.Entry;
 
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 /**
  *
@@ -43,12 +41,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     }
 
     @Override
-    void parse(Node stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode, Database db) {
         assert(tableList.size() <= 1);
 
-        NamedNodeMap attrs = stmtNode.getAttributes();
-        Node tableNameAttr = attrs.getNamedItem("table");
-        String tableName = tableNameAttr.getNodeValue();
+        String tableName = stmtNode.attributes.get("table");
         Table table = db.getTables().getIgnoreCase(tableName);
 
         // if the table isn't in the list add it
@@ -59,14 +55,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         else
             assert(tableList.get(0) == table);
 
-        NodeList children = stmtNode.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node node = children.item(i);
-            if (node.getNodeName().equalsIgnoreCase("columns")) {
-                NodeList colChildren = node.getChildNodes();
-                for (int j = 0; j < colChildren.getLength(); j++) {
-                    Node colNode = colChildren.item(j);
-                    if (colNode.getNodeName().equalsIgnoreCase("column")) {
+        for (VoltXMLElement node : stmtNode.children) {
+            if (node.name.equalsIgnoreCase("columns")) {
+                for (VoltXMLElement colNode : node.children) {
+                    if (colNode.name.equalsIgnoreCase("column")) {
                          parseInsertColumn(colNode, db, table);
                     }
                 }
@@ -74,26 +66,19 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         }
     }
 
-    void parseInsertColumn(Node columnNode, Database db, Table table) {
-        NamedNodeMap attrs = columnNode.getAttributes();
-        Node tableNameAttr = attrs.getNamedItem("table");
-        Node columnNameAttr = attrs.getNamedItem("name");
-        String tableName = tableNameAttr.getNodeValue();
-        String columnName = columnNameAttr.getNodeValue();
+    void parseInsertColumn(VoltXMLElement columnNode, Database db, Table table) {
+        String tableName = columnNode.attributes.get("table");
+        String columnName = columnNode.attributes.get("name");
 
         assert(tableName.equalsIgnoreCase(table.getTypeName()));
         Column column = table.getColumns().getIgnoreCase(columnName);
 
         AbstractExpression expr = null;
-        NodeList children = columnNode.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node node = children.item(i);
-            if (node.getNodeType() == Node.ELEMENT_NODE) {
-                expr = parseExpressionTree(node, db);
-                ExpressionUtil.assignLiteralConstantTypesRecursively(expr,
-                        VoltType.get((byte)column.getType()));
-                ExpressionUtil.assignOutputValueTypesRecursively(expr);
-            }
+        for (VoltXMLElement node : columnNode.children) {
+            expr = parseExpressionTree(node, db);
+            ExpressionUtil.assignLiteralConstantTypesRecursively(expr,
+                    VoltType.get((byte)column.getType()));
+            ExpressionUtil.assignOutputValueTypesRecursively(expr);
         }
 
         columns.put(column, expr);

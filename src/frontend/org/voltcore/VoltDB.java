@@ -18,6 +18,7 @@
 package org.voltcore;
 
 import java.util.Map;
+
 import org.voltcore.logging.VoltLogger;
 
 /**
@@ -48,33 +49,21 @@ public class VoltDB {
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
     /**
-     * Wrapper for crashLocalVoltDB() to keep compatibility with >100 calls.
-     */
-    @Deprecated
-    public static void crashVoltDB() {
-        crashLocalVoltDB("Unexpected crash", true, null);
-    }
-
-    /**
      * Exit the process with an error message, optionally with a stack trace.
      *
      * In the future it would be nice to notify any non-failed subsystems
      * that the node is going down. For now, just die.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
-//        if (instance().ignoreCrash()) {
-//            return;
-//        }
-
         VoltLogger log = new VoltLogger("HOST");
 
         if (t != null) {
-            //log.fatal(errMsg, t);
+            log.fatal(errMsg, t);
             System.out.print(errMsg);
             t.printStackTrace();
         } else {
             System.out.println(errMsg);
-            //log.fatal(errMsg);
+            log.fatal(errMsg);
         }
 
         if (stackTrace) {

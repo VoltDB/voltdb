@@ -414,14 +414,6 @@ public class VoltDB {
     }
 
     /**
-     * Wrapper for crashLocalVoltDB() to keep compatibility with >100 calls.
-     * Prefer crashLocalVoltDB() in new code.
-     */
-    public static void crashVoltDB() {
-        crashLocalVoltDB("Unexpected crash", true, null);
-    }
-
-    /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
@@ -437,7 +429,7 @@ public class VoltDB {
             log.fatal(errMsg);
 
         if (stackTrace) {
-            StringBuilder sb = new StringBuilder("Stack trace from crashVoltDB() method:\n");
+            StringBuilder sb = new StringBuilder("Stack trace from crashLocalVoltDB() method:\n");
 
             Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
             StackTraceElement[] myTrace = traces.get(Thread.currentThread());

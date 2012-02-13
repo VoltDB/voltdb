@@ -177,7 +177,7 @@ public class StatementInsert extends StatementDML {
 
         while (nav.hasNext()) {
             Object[] data       = baseTable.getNewRowData(session);
-            Object[] sourceData = (Object[]) nav.getNext();
+            Object[] sourceData = nav.getNext();
 
             for (int i = 0; i < columnMap.length; i++) {
                 int  j          = columnMap[i];
@@ -236,42 +236,36 @@ public class StatementInsert extends StatementDML {
 
     /*************** VOLTDB *********************/
 
-    private StringBuffer voltAppendInsertColumns(Session session,
-                                                 StringBuffer sb,
-                                                 String orig_indent)
+    private void voltAppendInsertColumns(Session session, VoltXMLElement xml)
     throws HSQLParseException
     {
-        sb.append(orig_indent).append("<columns>\n");
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
-
+        VoltXMLElement columns = new VoltXMLElement("columns");
+        xml.children.add(columns);
 
         for (int i = 0; i < insertColumnMap.length; i++)
         {
-            sb.append(indent).append("<column table=\"").append(targetTable.tableName.name);
-            sb.append("\" name=\"").append(targetTable.getColumn(insertColumnMap[i]).getName().name);
-            sb.append("\">\n");
-            sb.append(insertExpression.nodes[0].nodes[i].voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
-            sb.append(indent).append("</column>\n");
+            VoltXMLElement col = new VoltXMLElement("column");
+            columns.children.add(col);
+            col.attributes.put("table", targetTable.tableName.name);
+            col.attributes.put("name", targetTable.getColumn(insertColumnMap[i]).getName().name);
+            col.children.add(insertExpression.nodes[0].nodes[i].voltGetXML(session));
         }
-        sb.append(orig_indent).append("</columns>");
-
-        return sb;
     }
 
-    private StringBuffer voltAppendParameters(Session session, StringBuffer sb, String orig_indent) {
-        sb.append(orig_indent).append("<parameters>\n");
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
+    private void voltAppendParameters(Session session, VoltXMLElement xml) {
+
+        VoltXMLElement params = new VoltXMLElement("parameters");
+        xml.children.add(params);
+
         for (int i = 0; i < parameters.length; i++) {
-            sb.append(indent).append("<parameter index='").append(i).append("'");
+            VoltXMLElement parameter = new VoltXMLElement("parameter");
+            params.children.add(parameter);
+
+            parameter.attributes.put("index", String.valueOf(i));
             Expression param = parameters[i];
-            sb.append(" id='").append(param.getUniqueId()).append("'");
-            sb.append(" type='").append(Types.getTypeName(param.getDataType().typeCode)).append("'");
-            sb.append(" />\n");
+            parameter.attributes.put("id", param.getUniqueId());
+            parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
         }
-
-        sb.append(orig_indent).append("</parameters>");
-
-        return sb;
     }
 
     /**
@@ -279,34 +273,28 @@ public class StatementInsert extends StatementDML {
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @param indent A string of whitespace to be prepended to every line
-     * in the resulting XML.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-     String voltGetXML(Session session, String orig_indent)
-     throws HSQLParseException
-     {
-        StringBuffer sb;
-
-        sb = new StringBuffer();
-        String indent = orig_indent + HSQLInterface.XML_INDENT;
+    VoltXMLElement voltGetXML(Session session)
+    throws HSQLParseException
+    {
+        VoltXMLElement insert = new VoltXMLElement("insert");
 
         switch (type) {
 
             case StatementTypes.INSERT :
-                sb.append(orig_indent).append("<insert table=\"");
-                sb.append(targetTable.getName().name).append("\">\n");
-                voltAppendInsertColumns(session, sb, indent).append('\n');
-                voltAppendParameters(session, sb, indent).append('\n');
-                sb.append(orig_indent).append("</insert>");
+                insert.attributes.put("table", targetTable.getName().name);
+
+                voltAppendInsertColumns(session, insert);
+                voltAppendParameters(session, insert);
                 break;
 
             default :
-                sb.append(orig_indent).append("<unknown/>");
+                insert.name = "unknown";
                 break;
-
         }
-        return sb.toString();
+
+        return insert;
     }
 }

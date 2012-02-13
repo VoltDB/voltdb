@@ -19,6 +19,7 @@ package org.voltdb.sysprocs;
 
 import java.util.HashMap;
 import java.util.List;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
@@ -43,6 +44,7 @@ import org.voltcore.logging.VoltLogger;
 
 public class SystemCatalog extends VoltSystemProcedure
 {
+    @SuppressWarnings("unused")
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     @Override

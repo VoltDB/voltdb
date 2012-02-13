@@ -95,10 +95,6 @@ public class EchoServer {
                     break;
                 case STRING:
                     String str = fds.readString();
-                    int strLen = 2;
-                    if (str != null) {
-                        strLen += str.getBytes("UTF-8").length;
-                    }
                     fs.writeString(str);
                     break;
                 case VARBINARY:

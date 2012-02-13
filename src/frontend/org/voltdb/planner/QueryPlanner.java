@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Cluster;
@@ -109,7 +110,7 @@ public class QueryPlanner {
 
         // use HSQLDB to get XML that describes the semantics of the statement
         // this is much easier to parse than SQL and is checked against the catalog
-        String xmlSQL = null;
+        VoltXMLElement xmlSQL = null;
         try {
             xmlSQL = m_HSQL.getXMLCompiledStatement(sql);
         } catch (HSQLParseException e) {
@@ -122,7 +123,7 @@ public class QueryPlanner {
             // output the xml from hsql to disk for debugging
             PrintStream xmlDebugOut =
                 BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-xml", procName + "_" + stmtName + ".xml");
-            xmlDebugOut.println(xmlSQL);
+            xmlDebugOut.println(xmlSQL.toString());
             xmlDebugOut.close();
         }
 
