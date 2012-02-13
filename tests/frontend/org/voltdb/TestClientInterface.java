@@ -285,7 +285,7 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(Long.MIN_VALUE),
+        verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
                                  captor.capture());
         assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
     }
