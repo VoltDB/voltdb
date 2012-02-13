@@ -90,6 +90,7 @@ public class TestClientInterface {
         doReturn(mock(VoltNetworkPool.class)).when(m_messenger).getNetwork();
         doReturn(mock(ZooKeeper.class)).when(m_messenger).getZK();
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
+        doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
 
         // Set up CI with the mock objects.
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
@@ -217,7 +218,7 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(Long.MIN_VALUE),
+        verify(m_messenger).send(eq(32L),
                                  captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
@@ -227,7 +228,7 @@ public class TestClientInterface {
         msg = createMsg("@AdHoc", "select * from a where i = 3", 3);
         resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
-        verify(m_messenger).send(eq(Long.MIN_VALUE),
+        verify(m_messenger).send(eq(32L),
                                  captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         assertTrue(captor.getValue().payload.toString().contains("partition param: 3"));
