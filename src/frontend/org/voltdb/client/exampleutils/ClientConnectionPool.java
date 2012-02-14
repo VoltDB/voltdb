@@ -16,9 +16,8 @@
  */
 package org.voltdb.client.exampleutils;
 
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Provides support for database connection pooling, allowing for optimal
@@ -34,10 +33,8 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class ClientConnectionPool
 {
-    private static final Lock lock = new ReentrantLock();
     private static final ConcurrentHashMap<String,PerfCounterMap> Statistics = new ConcurrentHashMap<String,PerfCounterMap>();
-    private static final short MAX_USERS_PER_CLIENT = 50;
-    private static final ConcurrentHashMap<String,ClientConnection> ClientConnections = new ConcurrentHashMap<String,ClientConnection>();
+    private static final HashMap<String,ClientConnection> ClientConnections = new HashMap<String,ClientConnection>();
 
     /**
      * No instantiation allowed.
@@ -190,24 +187,21 @@ public class ClientConnectionPool
     {
         String clientConnectionKeyBase = getClientConnectionKeyBase(servers, port, user, password, isHeavyWeight, maxOutstandingTxns);
         String clientConnectionKey = clientConnectionKeyBase;
-        int cnt = 1;
-        lock.lock();
-        try
-        {
-            while(ClientConnections.containsKey(clientConnectionKey))
-            {
-                if (ClientConnections.get(clientConnectionKey).Users >= MAX_USERS_PER_CLIENT)
-                    clientConnectionKey += "::" + cnt++;
-                else
-                    break;
-            }
+
+        synchronized (ClientConnections) {
             if (!ClientConnections.containsKey(clientConnectionKey))
-                ClientConnections.put(clientConnectionKey, new ClientConnection(clientConnectionKeyBase, clientConnectionKey, servers, port, user, password, isHeavyWeight, maxOutstandingTxns));
+                ClientConnections.put(
+                        clientConnectionKey,
+                        new ClientConnection(
+                                clientConnectionKeyBase,
+                                clientConnectionKey,
+                                servers,
+                                port,
+                                user,
+                                password,
+                                isHeavyWeight,
+                                maxOutstandingTxns));
             return ClientConnections.get(clientConnectionKey).use();
-        }
-        finally
-        {
-            lock.unlock();
         }
     }
 
@@ -277,16 +271,11 @@ public class ClientConnectionPool
      */
     public static void dispose(ClientConnection connection)
     {
-        lock.lock();
-        try
+        synchronized (ClientConnections)
         {
             connection.dispose();
             if (connection.Users == 0)
                 ClientConnections.remove(connection.Key);
-        }
-        finally
-        {
-            lock.unlock();
         }
     }
 
