@@ -42,8 +42,6 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.utils.NotImplementedException;
 
