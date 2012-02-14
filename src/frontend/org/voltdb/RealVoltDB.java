@@ -137,7 +137,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     final HashSet<Integer> m_downHosts = new HashSet<Integer>();
     final Set<Integer> m_downNonExecSites = new HashSet<Integer>();
     //For command log only, will also mark self as faulted
-    final Set<Integer> m_downSites = new HashSet<Integer>();
+    final Set<Long> m_downSites = new HashSet<Long>();
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
