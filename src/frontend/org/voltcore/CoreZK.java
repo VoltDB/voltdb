@@ -31,6 +31,12 @@ import org.voltcore.agreement.ZKUtil;
 public class CoreZK {
     private static final String root = "/core";
 
+    // unique instance ID for this cluster,
+    // which is the JSON object:
+    // -- coord: (int) original coordinator IP address as an int
+    // -- timestamp: (long) the timestamp at which the first zookeeper node was created
+    public static final String instance_id = "/core/instance_id";
+
     // hosts in the current system (ephemeral)
     public static final String hosts = "/core/hosts";
     public static final String hosts_host = "/core/hosts/host";

@@ -50,6 +50,7 @@ import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.MiscUtils;
 
 /**
@@ -101,8 +102,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private final Config m_config;
     private final SocketJoiner m_joiner;
     private final VoltNetworkPool m_network;
-
     private volatile boolean m_localhostReady = false;
+    // memoized InstanceId
+    private InstanceId m_instanceId = null;
 
     /*
      * References to other hosts in the mesh.
@@ -243,6 +245,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 VoltDB.crashLocalVoltDB("Selected host id for coordinator was not 0, " + selectedHostId, false, null);
             }
 
+            // Store the components of the instance ID in ZK
+            JSONObject instance_id = new JSONObject();
+            instance_id.put("coord",
+                            ByteBuffer.wrap(m_config.coordinatorIp.getAddress().getAddress()).getInt());
+            instance_id.put("timestamp", System.currentTimeMillis());
+            hostLog.debug("Cluster will have instance ID:\n" + instance_id.toString(4));
+            byte[] payload = instance_id.toString(4).getBytes("UTF-8");
+            m_zk.create(CoreZK.instance_id, payload, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
             /*
              * Store all the hosts and host ids here so that waitForGroupJoin
              * knows the size of the mesh. This part only registers this host
@@ -268,6 +279,33 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public VoltMessageFactory getMessageFactory()
     {
         return m_config.factory;
+    }
+
+    /**
+     * Get a unique ID for this cluster
+     * @return
+     */
+    public InstanceId getInstanceId()
+    {
+        if (m_instanceId == null)
+        {
+            try
+            {
+                byte[] data =
+                    m_zk.getData(CoreZK.instance_id, false, null);
+                JSONObject idJSON = new JSONObject(new String(data, "UTF-8"));
+                m_instanceId = new InstanceId(idJSON.getInt("coord"),
+                                              idJSON.getLong("timestamp"));
+
+            }
+            catch (Exception e)
+            {
+                String msg = "Unable to get instance ID info from " + CoreZK.instance_id;
+                hostLog.error(msg);
+                throw new RuntimeException(msg, e);
+            }
+        }
+        return m_instanceId;
     }
 
     /*

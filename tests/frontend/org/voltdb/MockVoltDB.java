@@ -434,11 +434,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Object[] getInstanceId() {
-        return new Object[] { new Long(0), new Integer(0) };
-    }
-
-    @Override
     public BackendTarget getBackendTargetType() {
         return BackendTarget.NONE;
     }

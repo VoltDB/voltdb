@@ -100,8 +100,6 @@ public class SocketJoiner {
     Map<Integer, SocketChannel> m_sockets = new HashMap<Integer, SocketChannel>();
     ServerSocketChannel m_listenerSocket = null;
     VoltLogger m_hostLog;
-    long m_timestamp;//Part of instanceId
-    byte m_addr[];
     private final JoinHandler m_joinHandler;
 
     // from configuration data
