@@ -1246,7 +1246,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     params.m_params[0] = new String("OVERVIEW");
                 }
                 //So that the modified version is reserialized, null out the lazy copy
-                task.unserializedParams = null;
+                task.serializedParams = null;
             }
 
             // the shared dispatch for sysprocs
