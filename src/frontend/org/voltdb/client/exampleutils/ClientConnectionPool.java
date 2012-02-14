@@ -203,12 +203,12 @@ public class ClientConnectionPool
             }
             if (!ClientConnections.containsKey(clientConnectionKey))
                 ClientConnections.put(clientConnectionKey, new ClientConnection(clientConnectionKeyBase, clientConnectionKey, servers, port, user, password, isHeavyWeight, maxOutstandingTxns));
+            return ClientConnections.get(clientConnectionKey).use();
         }
         finally
         {
             lock.unlock();
         }
-        return ClientConnections.get(clientConnectionKey).use();
     }
 
     /**
