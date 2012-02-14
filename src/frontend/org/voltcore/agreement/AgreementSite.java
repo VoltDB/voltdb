@@ -33,9 +33,6 @@ import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterInputStream;
 
 import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.apache.jute_voltpatches.BinaryOutputArchive;
@@ -44,7 +41,6 @@ import org.apache.zookeeper_voltpatches.server.NIOServerCnxn;
 import org.apache.zookeeper_voltpatches.server.Request;
 import org.apache.zookeeper_voltpatches.server.ServerCnxn;
 import org.apache.zookeeper_voltpatches.server.ZooKeeperServer;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.TransactionIdManager;
 import org.voltcore.VoltDB;

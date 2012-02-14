@@ -103,9 +103,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         RoadBlock roadblock = m_roadblocks.peek();
         if (roadblock != null && roadblock.m_transactionId < txnId) {
             roadblock = m_roadblocks.poll();
-            m_recoveryLog.info("Delivering roadblock action: " +
-                               roadblock.m_action + " for txnId: " +
-                               roadblock.m_transactionId);
+            hostLog.info("Delivering roadblock action: " +
+                         roadblock.m_action + " for txnId: " +
+                         roadblock.m_transactionId);
             if (roadblock.m_action != null) {
                 m_mailbox.deliverFront(roadblock.m_action);
             }
