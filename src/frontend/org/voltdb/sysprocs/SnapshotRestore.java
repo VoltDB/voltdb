@@ -286,6 +286,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 ObjectInputStream ois = new ObjectInputStream(bais);
 
                 //Sequence numbers for every table and partition
+                @SuppressWarnings("unchecked")
                 Map<String, Map<Integer, Long>> exportSequenceNumbers =
                         (Map<String, Map<Integer, Long>>)ois.readObject();
                 Database db = context.getDatabase();

@@ -36,13 +36,11 @@ import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
 import org.voltcore.agreement.ZKUtil;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Table;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;

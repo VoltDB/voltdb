@@ -46,18 +46,17 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.MailboxTracker;
 import org.voltdb.utils.CatalogUtil;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltFile;
 
 public class SnapshotUtil {

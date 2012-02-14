@@ -21,13 +21,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 
-//import org.voltdb.CommandLog;
-import org.voltcore.VoltDB;
-
-/**
- *
- *
- */
 public class SiteMailbox implements Mailbox {
 
     final HostMessenger m_hostMessenger;
