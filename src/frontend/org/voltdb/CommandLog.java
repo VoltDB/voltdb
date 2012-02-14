@@ -38,7 +38,8 @@ public interface CommandLog {
     *            Long.MIN if there was none.
     */
     public abstract void initForRejoin(CatalogContext context, long txnId,
-                                       long faultSequenceNumber, Set<Integer> failedSites);
+                                       long faultSequenceNumber,
+                                       Set<Long> failedSites);
 
     public abstract boolean needsInitialization();
 
