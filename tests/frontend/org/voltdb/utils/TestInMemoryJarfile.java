@@ -36,7 +36,7 @@ import java.util.jar.JarInputStream;
 
 import junit.framework.TestCase;
 
-import org.voltdb.benchmark.tpcc.TPCCClient;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.VoltCompiler;
@@ -52,7 +52,7 @@ public class TestInMemoryJarfile extends TestCase {
     {
         String schemaPath = "";
         try {
-            URL url = TPCCClient.class.getResource("tpcc-ddl.sql");
+            URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
             schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();

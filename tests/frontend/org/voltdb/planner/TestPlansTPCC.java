@@ -26,7 +26,7 @@ package org.voltdb.planner;
 import java.util.List;
 
 import junit.framework.TestCase;
-import org.voltdb.benchmark.tpcc.TPCCClient;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.plannodes.*;
 
 
@@ -57,7 +57,7 @@ public class TestPlansTPCC extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TPCCClient.class.getResource("tpcc-ddl.sql"), "testplanstpcc");
+        aide = new PlannerTestAideDeCamp(TPCCProjectBuilder.class.getResource("tpcc-ddl.sql"), "testplanstpcc");
     }
 
     protected void tearDown() throws Exception {

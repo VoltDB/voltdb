@@ -36,7 +36,6 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.AllTpccSQL;
-import org.voltdb.benchmark.tpcc.TPCCClient;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
@@ -57,7 +56,7 @@ public class TestParsedStatements extends TestCase {
         Catalog catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
         m_db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
-        URL url = TPCCClient.class.getResource("tpcc-ddl.sql");
+        URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
         m_hsql = HSQLInterface.loadHsqldb();
         try {
             m_hsql.runDDLFile(URLDecoder.decode(url.getPath(), "UTF-8"));

@@ -36,7 +36,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.benchmark.tpcc.TPCCClient;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
@@ -218,7 +218,7 @@ public class TestVoltCompiler extends TestCase {
     public void testSnapshotSettings() throws IOException {
         String schemaPath = "";
         try {
-            final URL url = TPCCClient.class.getResource("tpcc-ddl.sql");
+            final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
             schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
@@ -668,7 +668,7 @@ public class TestVoltCompiler extends TestCase {
     public void testWithTPCCDDL() {
         String schemaPath = "";
         try {
-            final URL url = TPCCClient.class.getResource("tpcc-ddl.sql");
+            final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
             schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
@@ -697,7 +697,7 @@ public class TestVoltCompiler extends TestCase {
     public void testSeparateCatalogCompilation() throws IOException {
         String schemaPath = "";
         try {
-            final URL url = TPCCClient.class.getResource("tpcc-ddl.sql");
+            final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
             schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
@@ -769,7 +769,7 @@ public class TestVoltCompiler extends TestCase {
     public void testExtraFilesExist() throws IOException {
         String schemaPath = "";
         try {
-            final URL url = TPCCClient.class.getResource("tpcc-ddl.sql");
+            final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
             schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
