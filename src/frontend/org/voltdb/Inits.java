@@ -35,6 +35,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 
 import org.voltcore.utils.Pair;
@@ -44,6 +45,7 @@ import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Site;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
+import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -328,15 +330,23 @@ public class Inits {
                 newCluster.getSites().get(site.getTypeName()).setIsup(site.getIsup());
             }
 
-            // if the dummy catalog doesn't have a 0 txnid (like from a rejoin), use that one
-            long existingCatalogTxnId = m_rvdb.m_catalogContext.m_transactionId;
-            // IV2 XXX Fix this - port catalog version syncing.
-            int existingCatalogVersion = 0; // m_rvdb.m_messenger.getDiscoveredCatalogVersion();
-
-            m_rvdb.m_serializedCatalog = catalog.serialize();
-            m_rvdb.m_catalogContext = new CatalogContext(
-                    existingCatalogTxnId,
-                    catalog, catalogBytes, m_rvdb.m_depCRC, existingCatalogVersion, -1);
+            try {
+                long catalogTxnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
+                zk.create(
+                        VoltZK.initial_catalog_txnid,
+                        String.valueOf(catalogTxnId).getBytes("UTF-8"),
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+                ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+                zk.getData(VoltZK.initial_catalog_txnid, false, cb, null);
+                catalogTxnId = Long.valueOf(new String(cb.getData(), "UTF-8"));
+                m_rvdb.m_serializedCatalog = catalog.serialize();
+                m_rvdb.m_catalogContext = new CatalogContext(
+                        catalogTxnId,
+                        catalog, catalogBytes, m_rvdb.m_depCRC, 0, -1);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", false, e);
+            }
         }
     }
 
