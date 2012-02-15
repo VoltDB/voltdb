@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
@@ -54,7 +55,7 @@ public class TestExportDataSource extends TestCase {
         m_mockVoltDB = new MockVoltDB();
         m_mockVoltDB.addHost(m_host);
         m_mockVoltDB.addPartition(m_part);
-        m_mockVoltDB.addSite(m_site, m_host, m_part, true);
+        m_mockVoltDB.addSite(MiscUtils.getHSIdFromHostAndSite(m_host, m_site), m_part);
         m_mockVoltDB.addTable("TableName", false);
         m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);

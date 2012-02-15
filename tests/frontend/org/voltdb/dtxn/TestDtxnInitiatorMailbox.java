@@ -37,6 +37,7 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.VoltType;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.NodeFailureFault;
@@ -45,6 +46,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.MiscUtils;
 
 public class TestDtxnInitiatorMailbox extends TestCase
 {
@@ -255,13 +257,17 @@ public class TestDtxnInitiatorMailbox extends TestCase
         m_mockVolt.shouldIgnoreCrashes = true;
         m_mockVolt.addHost(HOST_ID);
         m_mockVolt.addPartition(0);
-        m_mockVolt.addSite(1, HOST_ID, 0, true);
-        m_mockVolt.addSite(0, HOST_ID, 0, true);
-        m_mockVolt.addSite(2, HOST_ID, 0, false);
+
+        Long site1 = MiscUtils.getHSIdFromHostAndSite(HOST_ID, 1);
+        Long site0 = MiscUtils.getHSIdFromHostAndSite(HOST_ID, 0);
+        Long site2 = MiscUtils.getHSIdFromHostAndSite(HOST_ID, 2);
+        m_mockVolt.addSite( site1, 0);
+        m_mockVolt.addSite( site0, 0);
+        m_mockVolt.addSite( site2, MailboxType.Initiator);
         m_siteMap.clear();
-        m_siteMap.put(0L, 0);
-        m_siteMap.put(1L, 0);
-        m_siteMap.put(2L, 0);
+        m_siteMap.put(site0, 0);
+        m_siteMap.put(site1, 0);
+        m_siteMap.put(site2, 0);
         m_mockVolt.setFaultDistributor(new FaultDistributor(m_mockVolt));
         VoltDB.replaceVoltDBInstanceForTest(m_mockVolt);
     }

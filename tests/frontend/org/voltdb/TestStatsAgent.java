@@ -37,6 +37,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import org.voltcore.network.*;
+import org.voltcore.utils.MiscUtils;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.client.ClientResponse;
 
 public class TestStatsAgent {
@@ -72,12 +74,13 @@ public class TestStatsAgent {
         m_mvoltdb = new MockVoltDB();
         m_mvoltdb.addHost(0);
         m_mvoltdb.addHost(1);
-        m_mvoltdb.addSite( 1, 0, 0, false);
-        m_mvoltdb.addSite( 2, 1, 0, false);
+        m_mvoltdb.addSite( MiscUtils.getHSIdFromHostAndSite( 0, 1), MailboxType.Initiator);
+        m_mvoltdb.addSite( MiscUtils.getHSIdFromHostAndSite( 1, 2), MailboxType.Initiator);
         VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);
         m_secondAgent = new StatsAgent();
-        m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(),
-                VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42));
+        long secondAgentHSId = VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42);
+        m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(), secondAgentHSId);
+        m_mvoltdb.addSite(secondAgentHSId, MailboxType.StatsAgent);
     }
 
     @After

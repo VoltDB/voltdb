@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +39,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
@@ -94,6 +97,10 @@ public class MockVoltDB implements VoltDBInterface
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     private final ExecutorService m_es = Executors.newSingleThreadExecutor();
+    public int m_hostId = 0;
+    private SiteTracker m_siteTracker;
+    private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
+        new HashMap<MailboxType, List<MailboxNodeContent>>();
 
     public MockVoltDB()
     {
@@ -168,6 +175,12 @@ public class MockVoltDB implements VoltDBInterface
         m_statsAgent = new StatsAgent();
         m_statsAgent.getMailbox(m_hostMessenger,
                 m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
+        for (MailboxType type : MailboxType.values()) {
+            m_mailboxMap.put(type, new LinkedList<MailboxNodeContent>());
+        }
+        m_mailboxMap.get(MailboxType.StatsAgent).add(
+                new MailboxNodeContent(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID), null));
+        m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
     }
 
     public Procedure addProcedureForTest(String name)
@@ -193,31 +206,29 @@ public class MockVoltDB implements VoltDBInterface
     private final Hashtable<Long, ExecutionSite> m_localSites =
         new Hashtable<Long, ExecutionSite>();
 
-    public void addSite(long siteId, int hostId, int partitionId, boolean isExec)
+    public void addSite(long siteId, MailboxType type) {
+        m_mailboxMap.get(type).add(new MailboxNodeContent(siteId, null));
+        m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
+    }
+
+    public void addSite(long siteId, int partitionId)
     {
-        if (hostId == 0) {
+        if (((int)siteId) == 0) {
             m_localSites.put(siteId, new ExecutionSite(partitionId));
         }
         getCluster().getSites().add(Long.toString(siteId));
-        getSite(siteId).setHost(getHost(hostId));
-        getSite(siteId).setIsexec(isExec);
-        if (isExec)
-        {
-            getSite(siteId).setPartition(getPartition(partitionId));
-        }
+        getSite(siteId).setHost(getHost((int)siteId));
+        getSite(siteId).setIsexec(true);
+        getSite(siteId).setPartition(getPartition(partitionId));
         getSite(siteId).setIsup(true);
+        MailboxNodeContent mnc = new MailboxNodeContent( siteId, partitionId);
+        m_mailboxMap.get(MailboxType.ExecutionSite).add(mnc);
+        m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
     }
 
     public synchronized void killSite(long siteId) {
         m_catalog = m_catalog.deepCopy();
         getSite(siteId).setIsup(false);
-    }
-
-    public void addSite(int siteId, int hostId, int partitionId, boolean isExec,
-                        boolean isUp)
-    {
-        addSite(siteId, hostId, partitionId, isExec);
-        getSite(siteId).setIsup(isUp);
     }
 
     public void addTable(String tableName, boolean isReplicated)
@@ -555,7 +566,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public SiteTracker getSiteTracker() {
-        // TODO Auto-generated method stub
-        return null;
+        return m_siteTracker;
     }
 }

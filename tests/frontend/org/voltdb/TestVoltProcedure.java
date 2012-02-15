@@ -55,6 +55,7 @@ import java.util.Date;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.types.TimestampType;
@@ -248,7 +249,7 @@ public class TestVoltProcedure extends TestCase {
         manager = new MockVoltDB();
         manager.addHost(0);
         manager.addPartition(0);
-        manager.addSite(1, 0, 0, true);
+        manager.addSite(MiscUtils.getHSIdFromHostAndSite( 0, 1), 0);
         agent = new MockStatsAgent();
         manager.setStatsAgent(agent);
         VoltDB.replaceVoltDBInstanceForTest(manager);

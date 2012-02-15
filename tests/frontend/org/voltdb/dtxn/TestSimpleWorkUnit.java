@@ -58,6 +58,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.MiscUtils;
 
 public class TestSimpleWorkUnit extends TestCase
 {
@@ -83,7 +84,7 @@ public class TestSimpleWorkUnit extends TestCase
         }
         for (int i = 0; i < numParts * replicas; i++)
         {
-            m_voltdb.addSite(i, i / sites_per_host, i % replicas, true);
+            m_voltdb.addSite(MiscUtils.getHSIdFromHostAndSite(i / sites_per_host, i), i % replicas);
         }
     }
 

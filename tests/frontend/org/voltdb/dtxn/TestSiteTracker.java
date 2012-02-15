@@ -28,241 +28,167 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.MockVoltDB;
+import org.voltdb.VoltZK.MailboxType;
 
 public class TestSiteTracker extends TestCase
 {
     public void testNoReplication() throws Exception
     {
-        throw new UnsupportedOperationException("getOneSiteForPartition was removed?");
-//        MockVoltDB helper = new MockVoltDB();
-//
-//        helper.addHost(0);
-//        helper.addHost(1);
-//        helper.addPartition(0);
-//        helper.addPartition(1);
-//        helper.addPartition(2);
-//        helper.addPartition(3);
-//        helper.addSite(1, 0, 0, true);
-//        helper.addSite(2, 0, 1, true);
-//        helper.addSite(101, 1, 2, true);
-//        helper.addSite(102, 1, 3, true);
-//
-//        SiteTracker tracker = helper.getSiteTracker();
-//        assertEquals(1, tracker.getOneSiteForPartition(0));
-//        assertEquals(2, tracker.getOneSiteForPartition(1));
-//        assertEquals(101, tracker.getOneSiteForPartition(2));
-//        assertEquals(102, tracker.getOneSiteForPartition(3));
-//        assertEquals(1, (int)tracker.getAllSitesForPartition(0).get(0));
-//        assertEquals(2, (int)tracker.getAllSitesForPartition(1).get(0));
-//        assertEquals(101, (int)tracker.getAllSitesForPartition(2).get(0));
-//        assertEquals(102, (int)tracker.getAllSitesForPartition(3).get(0));
-//        for (int i = 0; i < 4; i++)
-//        {
-//            assertEquals(1, tracker.getAllSitesForPartition(i).size());
-//        }
-//        int[] sites = tracker.getAllSitesForEachPartition(new int[] {1, 2, 3});
-//        assertEquals(3, sites.length);
-//        for (int site : sites)
-//        {
-//            assertTrue(site == 2 || site == 101 || site == 102);
-//        }
-//        assertEquals(0, tracker.getPartitionForSite(1));
-//        assertEquals(1, tracker.getPartitionForSite(2));
-//        assertEquals(2, tracker.getPartitionForSite(101));
-//        assertEquals(3, tracker.getPartitionForSite(102));
-//
-//        helper.shutdown(null);
+        MockVoltDB helper = new MockVoltDB();
+
+        Long site1 = MiscUtils.getHSIdFromHostAndSite( 0, 1);
+        Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
+        Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
+        Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
+        helper.addHost(0);
+        helper.addHost(1);
+        helper.addPartition(0);
+        helper.addPartition(1);
+        helper.addPartition(2);
+        helper.addPartition(3);
+        helper.addSite(site1, 0);
+        helper.addSite(site2, 1);
+        helper.addSite(site101, 2);
+        helper.addSite(site102, 3);
+
+        SiteTracker tracker = helper.getSiteTracker();
+        assertEquals(site1, tracker.getSitesForPartition(0).get(0));
+        assertEquals(site2, tracker.getSitesForPartition(1).get(0));
+        assertEquals(site101, tracker.getSitesForPartition(2).get(0));
+        assertEquals(site102, tracker.getSitesForPartition(3).get(0));
+        for (int i = 0; i < 4; i++)
+        {
+            assertEquals(1, tracker.getSitesForPartition(i).size());
+        }
+        long[] sites = tracker.getSitesForPartitionsAsArray(new int[] {1, 2, 3});
+        assertEquals(3, sites.length);
+        for (long site : sites)
+        {
+            assertTrue(site == site2 || site == site101 || site == site102);
+        }
+        assertEquals(0, tracker.getPartitionForSite(site1));
+        assertEquals(1, tracker.getPartitionForSite(site2));
+        assertEquals(2, tracker.getPartitionForSite(site101));
+        assertEquals(3, tracker.getPartitionForSite(site102));
+
+        helper.shutdown(null);
     }
 
     public void testEasyReplication() throws Exception
     {
-        throw new UnsupportedOperationException("getAllSitesForPartition was removed?");
-//        MockVoltDB helper = new MockVoltDB();
-//
-//        helper.addHost(0);
-//        helper.addHost(1);
-//        helper.addPartition(0);
-//        helper.addPartition(1);
-//        helper.addSite(1, 0, 0, true);
-//        helper.addSite(2, 0, 1, true);
-//        helper.addSite(101, 1, 0, true);
-//        helper.addSite(102, 1, 1, true);
-//
-//        SiteTracker tracker = helper.getSiteTracker();
-//        assertTrue(tracker.getAllSitesForPartition(0).contains(1));
-//        assertTrue(tracker.getAllSitesForPartition(0).contains(101));
-//        assertTrue(tracker.getAllSitesForPartition(1).contains(2));
-//        assertTrue(tracker.getAllSitesForPartition(1).contains(102));
-//        for (int i = 0; i < 2; i++)
-//        {
-//            assertEquals(2, tracker.getAllSitesForPartition(i).size());
-//        }
-//        int[] sites = tracker.getAllSitesForEachPartition(new int[] {0, 1});
-//        assertEquals(4, sites.length);
-//        for (int site : sites)
-//        {
-//            assertTrue(site == 1 || site == 2 || site == 101 || site == 102);
-//        }
-//        assertEquals(0, tracker.getPartitionForSite(1));
-//        assertEquals(1, tracker.getPartitionForSite(2));
-//        assertEquals(0, tracker.getPartitionForSite(101));
-//        assertEquals(1, tracker.getPartitionForSite(102));
-//        helper.shutdown(null);
+        MockVoltDB helper = new MockVoltDB();
+
+        Long site1 = MiscUtils.getHSIdFromHostAndSite( 0, 1);
+        Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
+        Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
+        Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
+        helper.addHost(0);
+        helper.addHost(1);
+        helper.addPartition(0);
+        helper.addPartition(1);
+        helper.addSite(site1, 0);
+        helper.addSite(site2, 1);
+        helper.addSite(site101, 0);
+        helper.addSite(site102, 1);
+
+        SiteTracker tracker = helper.getSiteTracker();
+        assertTrue(tracker.getSitesForPartition(0).contains(site1));
+        assertTrue(tracker.getSitesForPartition(0).contains(site101));
+        assertTrue(tracker.getSitesForPartition(1).contains(site2));
+        assertTrue(tracker.getSitesForPartition(1).contains(site102));
+        for (int i = 0; i < 2; i++)
+        {
+            assertEquals(2, tracker.getSitesForPartition(i).size());
+        }
+        long[] sites = tracker.getSitesForPartitionsAsArray(new int[] {0, 1});
+        assertEquals(4, sites.length);
+        for (long site : sites)
+        {
+            assertTrue(site == site1 || site == site2 || site == site101 || site == site102);
+        }
+        assertEquals(0, tracker.getPartitionForSite(site1));
+        assertEquals(1, tracker.getPartitionForSite(site2));
+        assertEquals(0, tracker.getPartitionForSite(site101));
+        assertEquals(1, tracker.getPartitionForSite(site102));
+        helper.shutdown(null);
     }
 
     public void testHostToSites() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
 
+        Long site0 = MiscUtils.getHSIdFromHostAndSite( 0, 0);
+        Long site1 = MiscUtils.getHSIdFromHostAndSite( 0, 1);
+        Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
+        Long site3 = MiscUtils.getHSIdFromHostAndSite( 0, 3);
+        Long site100 = MiscUtils.getHSIdFromHostAndSite( 1, 100);
+        Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
+        Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
+        Long site103 = MiscUtils.getHSIdFromHostAndSite( 1, 103);
         helper.addHost(0);
         helper.addHost(1);
         helper.addPartition(0);
         helper.addPartition(1);
-        helper.addSite(0, 0, 0, false, true);
-        helper.addSite(1, 0, 0, true, true);
-        helper.addSite(2, 0, 1, true, true);
-        helper.addSite(3, 0, 1, true, false);
-        helper.addSite(100, 1, 0, false, true);
-        helper.addSite(101, 1, 0, true, true);
-        helper.addSite(102, 1, 1, true, false);
-        helper.addSite(103, 1, 1, true, true);
+        helper.addSite(site0, MailboxType.Initiator);
+        helper.addSite(site1, 0);
+        helper.addSite(site2, 1);
+        helper.addSite(site3, 1);
+        helper.addSite(site100, MailboxType.Initiator);
+        helper.addSite(site101, 0);
+        helper.addSite(site102, 1);
+        helper.addSite(site103, 1);
 
         SiteTracker tracker = helper.getSiteTracker();
         List<Long> host0 = tracker.getSitesForHost(0);
-        assertTrue(host0.contains(0L));
-        assertTrue(host0.contains(1L));
-        assertTrue(host0.contains(2L));
-        assertFalse(host0.contains(101L));
-        host0 = tracker.getSitesForHost(0);
-        assertFalse(host0.contains(0L));
-        assertTrue(host0.contains(1L));
-        assertTrue(host0.contains(2L));
-        assertFalse(host0.contains(3L));
-        assertFalse(host0.contains(101L));
-        List<Long> host1 = tracker.getSitesForHost(1);
-        assertTrue(host1.contains(100L));
-        assertTrue(host1.contains(101L));
-        assertTrue(host1.contains(102L));
-        assertFalse(host1.contains(1L));
-        host1 = tracker.getSitesForHost(1);
-        assertFalse(host1.contains(100L));
-        assertTrue(host1.contains(101L));
-        assertFalse(host1.contains(102L));
-        assertTrue(host1.contains(103L));
-        assertFalse(host1.contains(1L));
-        helper.shutdown(null);
-    }
+        assertFalse(host0.contains(site0));
+        assertTrue(host0.contains(site1));
+        assertTrue(host0.contains(site2));
+        assertTrue(host0.contains(site3));
+        assertFalse(host0.contains(site101));
 
-    public void testUpSites() throws Exception
-    {
-        throw new UnsupportedOperationException("getUpSites was removed?");
-//        MockVoltDB helper = new MockVoltDB();
-//
-//        helper.addHost(0);
-//        helper.addHost(1);
-//        helper.addPartition(0);
-//        helper.addPartition(1);
-//        helper.addSite(0, 0, 0, false, true);
-//        helper.addSite(1, 0, 0, true, true);
-//        helper.addSite(2, 0, 1, true, true);
-//        helper.addSite(100, 1, 0, false, false);
-//        helper.addSite(101, 1, 0, true, false);
-//        helper.addSite(102, 1, 1, true, false);
-//
-//        SiteTracker tracker = helper.getSiteTracker();
-//        ArrayDeque<Site> up_sites = tracker.getUpSites();
-//        assertTrue(up_sites.contains(helper.getSite(0)));
-//        assertTrue(up_sites.contains(helper.getSite(1)));
-//        assertTrue(up_sites.contains(helper.getSite(2)));
-//        assertFalse(up_sites.contains(helper.getSite(100)));
-//        assertFalse(up_sites.contains(helper.getSite(101)));
-//        assertFalse(up_sites.contains(helper.getSite(102)));
-//
-//        assertEquals(2, tracker.getLiveSiteCount());
-//        helper.shutdown(null);
+        List<Long> host1 = tracker.getSitesForHost(1);
+        assertFalse(host1.contains(site0));
+        assertFalse(host1.contains(site1));
+        assertTrue(host1.contains(site101));
+        assertTrue(host1.contains(site102));
+        assertTrue(host1.contains(site103));
+        helper.shutdown(null);
     }
 
     public void testExecutionSiteIds() throws Exception
     {
         MockVoltDB helper = new MockVoltDB();
 
+        Long site0 = MiscUtils.getHSIdFromHostAndSite( 0, 0);
+        Long site1 = MiscUtils.getHSIdFromHostAndSite( 0, 1);
+        Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
+        Long site100 = MiscUtils.getHSIdFromHostAndSite( 1, 100);
+        Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
+        Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
+
         helper.addHost(0);
         helper.addHost(1);
         helper.addPartition(0);
         helper.addPartition(1);
-        helper.addSite(0, 0, 0, false);
-        helper.addSite(1, 0, 0, true);
-        helper.addSite(2, 0, 1, true);
-        helper.addSite(100, 1, 0, false);
-        helper.addSite(101, 1, 0, true);
-        helper.addSite(102, 1, 1, true);
+        helper.addSite(site0, MailboxType.Initiator);
+        helper.addSite(site1, 0);
+        helper.addSite(site2, 1);
+        helper.addSite(site100, MailboxType.Initiator);
+        helper.addSite(site101, 0);
+        helper.addSite(site102, 1);
 
         SiteTracker tracker = helper.getSiteTracker();
         Set<Long> exec_sites = tracker.getAllSites();
-        assertFalse(exec_sites.contains(0L));
-        assertTrue(exec_sites.contains(1L));
-        assertTrue(exec_sites.contains(2L));
-        assertFalse(exec_sites.contains(100L));
-        assertTrue(exec_sites.contains(101L));
-        assertTrue(exec_sites.contains(102L));
-        assertEquals((Long) 1L, tracker.getLowestSiteForHost(0));
-        assertEquals((Long) 101L, tracker.getLowestSiteForHost(1));
-
-        helper.shutdown(null);
-    }
-
-    public void testLiveSitesForPartitions() throws Exception
-    {
-        MockVoltDB helper = new MockVoltDB();
-        helper.addHost(0);
-        helper.addHost(1);
-        helper.addPartition(0);
-        helper.addPartition(1);
-        helper.addSite(0, 0, 0, false, true);
-        helper.addSite(1, 0, 0, true, true);
-        helper.addSite(2, 0, 1, true, true);
-        helper.addSite(100, 1, 0, false, false);
-        helper.addSite(101, 1, 0, true, false);
-        helper.addSite(102, 1, 1, true, false);
-
-        SiteTracker tracker = helper.getSiteTracker();
-        assertEquals(1, tracker.getSitesForPartition(0).size());
-        assertEquals(1, tracker.getSitesForPartition(1).size());
-        assertTrue(tracker.getSitesForPartition(0).contains(1));
-        assertFalse(tracker.getSitesForPartition(0).contains(101));
-
-        List<Long> sites = tracker.getSitesForPartitions(new int[] {0, 1});
-        assertEquals(2, sites.size());
-        for (long site : sites)
-        {
-            assertTrue(site == 1 || site == 2);
-        }
-
-        helper.shutdown(null);
-    }
-
-    public void testClusterViable() throws Exception
-    {
-        MockVoltDB helper = new MockVoltDB();
-
-        helper.addHost(0);
-        helper.addHost(1);
-        helper.addPartition(0);
-        helper.addPartition(1);
-        helper.addSite(0, 0, 0, false, true);
-        helper.addSite(1, 0, 0, true, true);
-        helper.addSite(2, 0, 1, true, true);
-        helper.addSite(100, 1, 0, false, false);
-        helper.addSite(101, 1, 0, true, false);
-        helper.addSite(102, 1, 1, true, false);
-
-        SiteTracker tracker = helper.getSiteTracker();
-        assertEquals(0, tracker.getFailedPartitions().size());
-        helper.killSite(2);
-        tracker = helper.getSiteTracker();
-        assertEquals(1, tracker.getFailedPartitions().size());
-        assertEquals((Integer) 1, tracker.getFailedPartitions().get(0));
+        assertFalse(exec_sites.contains(site0));
+        assertTrue(exec_sites.contains(site1));
+        assertTrue(exec_sites.contains(site2));
+        assertFalse(exec_sites.contains(site100));
+        assertTrue(exec_sites.contains(site101));
+        assertTrue(exec_sites.contains(site102));
+        assertEquals(site1, tracker.getLowestSiteForHost(0));
+        assertEquals(site101, tracker.getLowestSiteForHost(1));
 
         helper.shutdown(null);
     }

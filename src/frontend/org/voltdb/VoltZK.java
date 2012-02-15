@@ -50,9 +50,10 @@ public class VoltZK {
      * "partitionId" field.
      */
     public static enum MailboxType {
-        AsyncPlanner, ClientInterface, ExecutionSite, Initiator
+        AsyncPlanner, ClientInterface, ExecutionSite, Initiator, StatsAgent
     }
     public static final String mailboxes = "/db/mailboxes";
+    public static final String mailboxes_statsagents = "/db/mailboxes/" + MailboxType.AsyncPlanner;
     public static final String mailboxes_asyncplanners = "/db/mailboxes/" + MailboxType.AsyncPlanner;
     public static final String mailboxes_clientinterfaces = "/db/mailboxes/" + MailboxType.ClientInterface;
     public static final String mailboxes_clientinterfaces_ci = "/db/mailboxes/" + MailboxType.ClientInterface + "/ci";
@@ -82,6 +83,7 @@ public class VoltZK {
             mailboxes_initiators,
             mailboxes_asyncplanners,
             mailboxes_clientinterfaces,
+            mailboxes_statsagents,
     };
 
     /**

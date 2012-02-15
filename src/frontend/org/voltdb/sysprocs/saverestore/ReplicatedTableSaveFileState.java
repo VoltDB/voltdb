@@ -20,6 +20,7 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
@@ -195,5 +196,5 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private final Set<Integer> m_hostsWithThisTable = new HashSet<Integer>();
-    private final Set<Long> m_sitesWithThisTable = new HashSet<Long>();
+    private final Set<Long> m_sitesWithThisTable = new TreeSet<Long>();
 }

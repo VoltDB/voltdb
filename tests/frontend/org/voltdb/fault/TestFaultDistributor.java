@@ -29,10 +29,11 @@ import java.io.File;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.*;
-import org.voltdb.VoltDB;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.SnapshotSchedule;
 
 public class TestFaultDistributor extends TestCase
@@ -230,22 +231,26 @@ public class TestFaultDistributor extends TestCase
         voltdb.addPartition(1);
 
         voltdb.addHost(0);
-        voltdb.addSite(100, 0, 1, true);
-        voltdb.addSite(1000, 0, 1, false);
+        Long site100 = MiscUtils.getHSIdFromHostAndSite(0, 100);
+        Long site1000 = MiscUtils.getHSIdFromHostAndSite(0, 1000);
+        voltdb.addSite(site100, 1);
+        voltdb.addSite(site1000, MailboxType.Initiator);
 
         voltdb.addHost(1);
-        voltdb.addSite(101, 0, 1, true);
-        voltdb.addSite(1010, 0, 1, false);
+        Long site101 = MiscUtils.getHSIdFromHostAndSite(0, 101);
+        Long site1010 = MiscUtils.getHSIdFromHostAndSite(0, 1010);
+        voltdb.addSite(site101, 1);
+        voltdb.addSite(site1010, MailboxType.Initiator);
         voltdb.getCatalogContext();
 
         // set sites at host 0 down... as if the catalog were updated
         // and the surviving set was not the blessed host id.
-        voltdb.killSite(100);
-        voltdb.killSite(1000);
+        voltdb.killSite(site100);
+        voltdb.killSite(site1000);
 
         HashSet<Long> failedSiteIds = new HashSet<Long>();
-        failedSiteIds.add(100l);
-        failedSiteIds.add(1000l);
+        failedSiteIds.add(site100);
+        failedSiteIds.add(site1000);
 
         // should get a PPD now.
         PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
@@ -264,22 +269,26 @@ public class TestFaultDistributor extends TestCase
         voltdb.addPartition(1);
 
         voltdb.addHost(0);
-        voltdb.addSite(100, 0, 1, true);
-        voltdb.addSite(1000, 0, 1, false);
+        Long site100 = MiscUtils.getHSIdFromHostAndSite(0, 100);
+        Long site1000 = MiscUtils.getHSIdFromHostAndSite(0, 1000);
+        voltdb.addSite(site100, 1);
+        voltdb.addSite(site1000, MailboxType.Initiator);
 
         voltdb.addHost(1);
-        voltdb.addSite(101, 1, 1, true);
-        voltdb.addSite(1010, 1, 1, false);
+        Long site101 = MiscUtils.getHSIdFromHostAndSite(0, 101);
+        Long site1010 = MiscUtils.getHSIdFromHostAndSite(0, 1010);
+        voltdb.addSite(site101, 1);
+        voltdb.addSite(site1010, MailboxType.Initiator);
         voltdb.getCatalogContext();
 
         // set sites at host 1 down... as if the catalog were updated
         // and the surviving set contained the blessed host id.
-        voltdb.killSite(101);
-        voltdb.killSite(1010);
+        voltdb.killSite(site101);
+        voltdb.killSite(site1010);
 
         HashSet<Long> failedSiteIds = new HashSet<Long>();
-        failedSiteIds.add(101l);
-        failedSiteIds.add(1010l);
+        failedSiteIds.add(site101);
+        failedSiteIds.add(site1010);
 
         // should get a PPD now.
         PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);

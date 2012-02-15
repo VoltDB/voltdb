@@ -35,6 +35,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.json_voltpatches.JSONObject;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
@@ -530,10 +531,15 @@ public class Inits {
         @Override
         public void run() {
             try {
+                final long statsAgentHSId = m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
                 m_rvdb.getStatsAgent().getMailbox(
                             VoltDB.instance().getHostMessenger(),
-                            m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
-
+                            statsAgentHSId);
+                JSONObject jsObj = new JSONObject();
+                jsObj.put("HSId", statsAgentHSId);
+                byte[] payload = jsObj.toString(4).getBytes("UTF-8");
+                m_rvdb.getHostMessenger().getZK().create(VoltZK.mailboxes_statsagents, payload,
+                                           Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
                             VoltDB.instance().getHostMessenger(),
                             m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));

@@ -36,24 +36,25 @@ public class SiteTracker {
     private final int m_hostId;
     private boolean m_isFirstHost;
 
-    private Set<Integer> m_allHosts = new HashSet<Integer>();
-    private Set<Long> m_allSites = new HashSet<Long>();
-    private Set<Long> m_allInitiators = new HashSet<Long>();
+    private final Set<Integer> m_allHosts = new HashSet<Integer>();
+    private final Set<Long> m_allSites = new HashSet<Long>();
+    private final Set<Long> m_allInitiators = new HashSet<Long>();
 
-    private Map<Integer, ArrayList<Long>> m_hostsToSites =
+    private final Map<Integer, ArrayList<Long>> m_hostsToSites =
             new HashMap<Integer, ArrayList<Long>>();
-    private Map<Integer, ArrayList<Integer>> m_hostsToPartitions =
+    private final Map<Integer, ArrayList<Integer>> m_hostsToPartitions =
             new HashMap<Integer, ArrayList<Integer>>();
-    private Map<Integer, ArrayList<Long>> m_partitionsToSites =
+    private final Map<Integer, ArrayList<Long>> m_partitionsToSites =
             new HashMap<Integer, ArrayList<Long>>();
-    private Map<Long, Integer> m_sitesToPartitions =
+    private final Map<Long, Integer> m_sitesToPartitions =
             new HashMap<Long, Integer>();
-    private Map<Integer, ArrayList<Long>> m_hostsToInitiators =
+    private final Map<Integer, ArrayList<Long>> m_hostsToInitiators =
             new HashMap<Integer, ArrayList<Long>>();
-    private Map<MailboxType, ArrayList<Long>> m_otherHSIds =
+    private final Map<MailboxType, ArrayList<Long>> m_otherHSIds =
             new HashMap<MailboxType, ArrayList<Long>>();
-    private Map<MailboxType, Map<Integer, ArrayList<Long>>> m_hostsToOtherHSIds =
+    private final Map<MailboxType, Map<Integer, ArrayList<Long>>> m_hostsToOtherHSIds =
             new HashMap<MailboxType, Map<Integer, ArrayList<Long>>>();
+    private long m_statsAgents[];
 
     public SiteTracker(int hostId, Map<MailboxType, List<MailboxNodeContent>> mailboxes) {
         m_hostId = hostId;
@@ -63,10 +64,25 @@ public class SiteTracker {
                 populateSites(e.getValue());
             } else if (e.getKey().equals(MailboxType.Initiator)) {
                 populateInitiators(e.getValue());
+            } if (e.getKey().equals(MailboxType.StatsAgent)) {
+                populateStatsAgents(e.getValue());
             } else {
                 populateOtherHSIds(e.getKey(), e.getValue());
             }
         }
+    }
+
+    private void populateStatsAgents(List<MailboxNodeContent> value) {
+        m_statsAgents = new long[value.size()];
+        int ii = 0;
+        for (MailboxNodeContent mnc : value) {
+            m_statsAgents[ii] = mnc.HSId;
+            ii++;
+        }
+    }
+
+    public long[] getStatsAgents() {
+        return m_statsAgents;
     }
 
     private void populateSites(List<MailboxNodeContent> objs) {
