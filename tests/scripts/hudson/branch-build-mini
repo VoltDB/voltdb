@@ -1,3 +1,0 @@
-cd release
-/opt/local/bin/svn info
-ant clean compile ee
