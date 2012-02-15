@@ -519,6 +519,7 @@ public class LocalCluster implements VoltServerConfig {
             config.m_pathToCatalog = m_jarFileName;
             config.m_pathToDeployment = m_pathToDeployment;
             config.m_port = VoltDB.DEFAULT_PORT;
+            config.m_internalPort = VoltDB.DEFAULT_INTERNAL_PORT - 1;
             config.m_adminPort = m_baseAdminPort;
             config.m_startAction = START_ACTION.CREATE;
             config.m_replicationRole = role;
