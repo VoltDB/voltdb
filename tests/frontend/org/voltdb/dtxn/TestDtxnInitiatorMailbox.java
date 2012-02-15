@@ -24,13 +24,14 @@ package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 import junit.framework.TestCase;
 
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.EstTime;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
@@ -40,8 +41,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.VoltType;
 import org.voltdb.fault.FaultDistributor;
-import org.voltdb.fault.NodeFailureFault;
-import org.voltcore.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltcore.network.WriteStream;

@@ -52,9 +52,6 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 
-import org.voltdb.messaging.FastSerializer;
-import org.voltcore.utils.DBBPool;
-
 import junit.framework.TestCase;
 
 public class TestFastSerializer extends TestCase {

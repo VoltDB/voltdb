@@ -23,35 +23,14 @@
 
 package org.voltcore.zk;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.Map.Entry;
 import java.util.concurrent.Semaphore;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
-import org.voltdb.VoltDB;
-import org.voltcore.agreement.AgreementSite;
-import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.VoltFault;
-import org.voltdb.fault.VoltFault.FaultType;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
-import org.voltcore.messaging.Subject;
-import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.DBBPool;
 
 /**
  *

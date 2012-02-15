@@ -25,30 +25,18 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.URLEncoder;
-import java.util.Arrays;
-import java.util.HashSet;
 
 import junit.framework.TestCase;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.VoltDB.Configuration;
-import org.voltcore.agreement.AgreementSite;
-import org.voltcore.agreement.ZKUtil;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.Mailbox;
-import org.voltcore.network.VoltNetworkPool;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.rejoinfuzz.NonOrgVoltDBProc;
@@ -170,7 +158,7 @@ public class RejoinTestBase extends TestCase {
         config.m_isRejoinTest = true;
         retval.localServer = new ServerThread(config);
 
-        long deploymentCRC = CatalogUtil.getDeploymentCRC(builder.getPathToDeployment());
+        //long deploymentCRC = CatalogUtil.getDeploymentCRC(builder.getPathToDeployment());
 
         // start the fake HostMessenger
         InMemoryJarfile jarFile = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar"));

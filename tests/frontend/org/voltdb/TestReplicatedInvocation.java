@@ -43,7 +43,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ReplicaProcCaller;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.messaging.FastSerializable;
 import org.voltdb.utils.VoltFile;
 
 public class TestReplicatedInvocation {

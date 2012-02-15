@@ -53,12 +53,10 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
-import junit.framework.*;
 import java.nio.channels.SelectionKey;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
+import junit.framework.TestCase;
+
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.EstTimeUpdater;
 

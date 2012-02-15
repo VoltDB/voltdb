@@ -24,33 +24,15 @@
 package org.voltcore.messaging;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.HashSet;
 import java.util.Random;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase;
-
-import org.mockito.ArgumentCaptor;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.voltdb.MockVoltDB;
-import org.voltdb.VoltDB;
-import org.voltdb.client.ConnectionUtil;
-import org.voltcore.network.VoltNetworkPool;
-import org.voltcore.messaging.VoltMessage;
-import org.voltcore.messaging.SocketJoiner.JoinHandler;
-import static org.mockito.Mockito.*;
 
 public class TestMessaging extends TestCase {
     public static class MsgTest extends VoltMessage {
@@ -145,7 +127,6 @@ public class TestMessaging extends TestCase {
         public void run() {
             // create a site
             int hostId = mySiteId % hostCount;
-            InetAddress leader = null;
             HostMessenger currentMessenger = null;
             Mailbox[] mbox = new Mailbox[(int)mailboxCount];
 
@@ -162,7 +143,6 @@ public class TestMessaging extends TestCase {
                     if (isPrimary)
                     {
                         System.out.printf("Host/Site %d/%d is initializing the HostMessenger class.\n", hostId, mySiteId);
-                        leader = ConnectionUtil.getLocalAddress();
                     }
                     System.out.printf("Host/Site %d/%d is creating a new HostMessenger.\n", hostId, mySiteId);
                     HostMessenger.Config config = new HostMessenger.Config();
@@ -342,7 +322,6 @@ public class TestMessaging extends TestCase {
         Mailbox mb1 = msg1.createMailbox();
         Mailbox mb2 = msg2.createMailbox();
 
-        long siteId1 = mb1.getHSId();
         long siteId2 = mb2.getHSId();
 
         MsgTest.initWithSize(16);
@@ -412,7 +391,6 @@ public class TestMessaging extends TestCase {
         Mailbox mb4 = msg3.createMailbox();
         Mailbox mb5 = msg1.createMailbox();
 
-        long siteId1 = mb1.getHSId();
         long siteId5 = mb5.getHSId();
 
         long siteId2 = mb2.getHSId();
@@ -553,8 +531,6 @@ public class TestMessaging extends TestCase {
         System.out.println("Finished socket joiner for msg1");
         msg2.waitForGroupJoin(2);
         System.out.println("Finished socket joiner for msg2");
-
-        final int msg2hostId = msg2.getHostId();
 
         // kill host #2
         // triggers the fault manager
