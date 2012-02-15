@@ -249,7 +249,8 @@ public class TestVoltProcedure extends TestCase {
         manager = new MockVoltDB();
         manager.addHost(0);
         manager.addPartition(0);
-        manager.addSite(MiscUtils.getHSIdFromHostAndSite( 0, 1), 0);
+        final long executionSiteId = MiscUtils.getHSIdFromHostAndSite( 0, 1);
+        manager.addSite(executionSiteId, 0);
         agent = new MockStatsAgent();
         manager.setStatsAgent(agent);
         VoltDB.replaceVoltDBInstanceForTest(manager);
@@ -270,7 +271,7 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName());
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
-        site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize()) {
+        site = new MockExecutionSite(executionSiteId, VoltDB.instance().getCatalogContext().catalog.serialize()) {
             @Override
             public int getCorrespondingPartitionId() {
                 return 42;
@@ -405,7 +406,7 @@ public class TestVoltProcedure extends TestCase {
         assertNotNull(agent.m_source);
         assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);
         assertEquals(agent.m_catalogId,
-                     Integer.parseInt(site.m_context.cluster.getSites().get(Long.toString(site.getSiteId())).getTypeName()));
+                     Long.parseLong(site.m_context.cluster.getSites().get(Long.toString(site.getSiteId())).getTypeName()));
         Object statsRow[][] = agent.m_source.getStatsRows(false, 0L);
         assertNotNull(statsRow);
         assertEquals( 0, statsRow.length);
@@ -439,7 +440,7 @@ public class TestVoltProcedure extends TestCase {
     }
 
     private class MockExecutionSite extends ExecutionSite {
-        public MockExecutionSite(int siteId, String serializedCatalog) {
+        public MockExecutionSite(long siteId, String serializedCatalog) {
             super(siteId);
             // get some catalog shortcuts ready
             Catalog catalog = new Catalog();

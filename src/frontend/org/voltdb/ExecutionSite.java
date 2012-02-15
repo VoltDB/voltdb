@@ -613,7 +613,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Dummy ExecutionSite useful to some tests that require Mock/Do-Nothing sites.
      * @param siteId
      */
-    ExecutionSite(int siteId) {
+    ExecutionSite(long siteId) {
         m_siteId = siteId;
         m_systemProcedureContext = new SystemProcedureContext();
         ee = null;
