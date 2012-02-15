@@ -605,7 +605,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             }
         }
         int partitionId = tracker.getPartitionForSite(HSId);
-        ArrayList<Long> sourceSites = new ArrayList<Long>(tracker.getLiveSitesForPartition(partitionId));
+        ArrayList<Long> sourceSites = new ArrayList<Long>(tracker.getSitesForPartition(partitionId));
         sourceSites.remove(new Long(HSId));
 
         if (sourceSites.isEmpty()) {

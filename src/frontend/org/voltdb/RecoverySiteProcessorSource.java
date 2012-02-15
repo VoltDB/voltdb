@@ -746,13 +746,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
          * First make sure the recovering partition didn't go down before this message was received.
          * Return null so no recovery work is done.
          */
-        boolean isUp = false;
-        for (long up : tracker.getUpExecutionSites()) {
-            if (destinationSiteId == up) {
-                isUp = true;
-            }
-        }
-        if (!isUp) {
+        if (!tracker.getAllSites().contains(destinationSiteId)) {
             return null;
         }
 

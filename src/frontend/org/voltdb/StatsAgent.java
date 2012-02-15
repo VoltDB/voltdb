@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -38,6 +39,7 @@ import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
+import org.voltcore.utils.MiscUtils;
 
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
@@ -302,11 +304,13 @@ public class StatsAgent {
         obj.put("returnAddress", m_mailbox.getHSId());
         obj.put("selector", "WANNODE");
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
-        final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
-        for (Integer host : st.getAllLiveHosts()) {
+        final SiteTracker st = VoltDB.instance().getSiteTracker();
+        Set<Integer> allHosts = st.getAllHosts();
+        for (int host : allHosts) {
+            long hsid = MiscUtils.getHSIdFromHostAndSite(host, HostMessenger.STATS_SITE_ID);
             psr.expectedStatsResponses++;
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
-            m_mailbox.send(st.getFirstNonExecSiteForHost(host), bpm);
+            m_mailbox.send(hsid, bpm);
         }
     }
 

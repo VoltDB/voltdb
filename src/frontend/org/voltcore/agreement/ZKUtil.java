@@ -312,4 +312,41 @@ public class ZKUtil {
         }
     }
 
+    public static class ChildrenCallback implements
+    org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback {
+        private final CountDownLatch done = new CountDownLatch(1);
+        private Object results[];
+
+        public Object[] get() throws InterruptedException, KeeperException {
+            done.await();
+            return getResult();
+        }
+
+        public Object[] get(long timeout, TimeUnit unit)
+                throws InterruptedException, KeeperException,
+                TimeoutException {
+            if (done.await(timeout, unit)) {
+                return getResult();
+            } else {
+                throw new TimeoutException();
+            }
+        }
+
+        private Object[] getResult() throws KeeperException {
+            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
+            if (code == KeeperException.Code.OK) {
+                return results;
+            } else {
+                throw KeeperException.create(code);
+            }
+        }
+
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            results = new Object[] {rc, path, ctx, children};
+            done.countDown();
+        }
+
+    }
+
 }

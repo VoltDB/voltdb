@@ -256,7 +256,7 @@ class WorkUnit
                 HashSet<Long> expected_sites = new HashSet<Long>();
                 expected_sites.add(HSId);
                 if ((dependency & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0) {
-                    depsToExpect = siteTracker.getLiveSiteCount();
+                    depsToExpect = siteTracker.getAllSites().size();
                     for (Long hs_id : nonCoordinatingHSIds)
                     {
                         expected_sites.add(hs_id);
@@ -276,7 +276,7 @@ class WorkUnit
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
 
-        int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(HSId);
+        int partition = VoltDB.instance().getSiteTracker().getPartitionForSite(HSId);
         long map_id = partition;
         if (m_taskType == FragmentTaskMessage.SYS_PROC_PER_SITE)
         {

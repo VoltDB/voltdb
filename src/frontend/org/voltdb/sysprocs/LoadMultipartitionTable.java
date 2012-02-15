@@ -19,6 +19,8 @@ package org.voltdb.sysprocs;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
@@ -39,6 +41,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.SiteTracker;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,
@@ -257,12 +260,16 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 partitionedTables[p].add(table);
             }
 
-            int num_exec_sites = VoltDB.instance().getCatalogContext().siteTracker.getLiveSiteCount();
+            SiteTracker tracker = VoltDB.instance().getSiteTracker();
+            Map<Long, Integer> sitesToPartitions = tracker.getSitesToPartitions();
+            int num_exec_sites = sitesToPartitions.size();
             pfs = new SynthesizedPlanFragment[num_exec_sites + 1];
             int site_index = 0;
-            for (long site : VoltDB.instance().getCatalogContext().siteTracker.getAllLiveSites()) {
+            for (Entry<Long, Integer> e : sitesToPartitions.entrySet()) {
+                long site = e.getKey();
+                int partition = e.getValue();
+
                 ParameterSet params = new ParameterSet();
-                int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(site);
                 params.setParameters(tableName, partitionedTables[partition]);
                 pfs[site_index] = new SynthesizedPlanFragment();
                 pfs[site_index].fragmentId = SysProcFragmentId.PF_distribute;

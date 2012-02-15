@@ -26,9 +26,9 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltdb.CatalogContext;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportGeneration;
@@ -223,9 +223,9 @@ public class RawProcessor implements ExportDataProcessor {
                     // serialize the makup of the cluster
                     //  - the catalog context knows which hosts are up
                     //  - the hostmessenger knows the hostnames of hosts
-                    CatalogContext cx = VoltDB.instance().getCatalogContext();
-                    if (cx != null) {
-                        Set<Integer> liveHosts = cx.siteTracker.getAllLiveHosts();
+                    SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
+                    if (siteTracker != null) {
+                        Set<Integer> liveHosts = siteTracker.getAllHosts();
                         fs.writeInt(liveHosts.size());
                         for (int hostId : liveHosts) {
                             String metadata = VoltDB.instance().getClusterMetadataMap().get(hostId);

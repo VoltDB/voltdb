@@ -451,7 +451,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                      cl.getInternalsnapshotpath(),
                                                      snapshotPath,
                                                      allPartitions,
-                                                     context.siteTracker.getAllLiveHosts());
+                                                     null);
+                                                     // TODO: context.siteTracker.getAllHosts());
         restoreAgent.setCatalogContext(context);
         assert(initiator != null);
         restoreAgent.setInitiator(initiator);

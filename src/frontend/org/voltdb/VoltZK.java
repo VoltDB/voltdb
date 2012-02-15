@@ -17,11 +17,14 @@
 
 package org.voltdb;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
-
+import java.util.List;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.agreement.ZKUtil;
 
 /**
@@ -38,15 +41,25 @@ public class VoltZK {
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
 
-    // mailboxes
+    /*
+     * mailboxes
+     *
+     * Contents in the mailbox ZK nodes are all simple JSON objects. No nested
+     * objects should be stored in them. They must all have a field called
+     * "HSId" that maps to their host-site ID. Some of them may also contain a
+     * "partitionId" field.
+     */
+    public static enum MailboxType {
+        AsyncPlanner, ClientInterface, ExecutionSite, Initiator
+    }
     public static final String mailboxes = "/db/mailboxes";
-    public static final String mailboxes_asyncplanners = "/db/mailboxes/asyncplanners";
-    public static final String mailboxes_clientinterfaces = "/db/mailboxes/clientinterfaces";
-    public static final String mailboxes_clientinterfaces_ci = "/db/mailboxes/clientinterfaces/ci";
-    public static final String mailboxes_executionsites = "/db/mailboxes/executionsites";
-    public static final String mailboxes_executionsites_site = "/db/mailboxes/executionsites/site";
-    public static final String mailboxes_initiators = "/db/mailboxes/initiators";
-    public static final String mailboxes_initiators_initiator = "/db/mailboxes/initiators/initiator";
+    public static final String mailboxes_asyncplanners = "/db/mailboxes/" + MailboxType.AsyncPlanner;
+    public static final String mailboxes_clientinterfaces = "/db/mailboxes/" + MailboxType.ClientInterface;
+    public static final String mailboxes_clientinterfaces_ci = "/db/mailboxes/" + MailboxType.ClientInterface + "/ci";
+    public static final String mailboxes_executionsites = "/db/mailboxes/" + MailboxType.ExecutionSite;
+    public static final String mailboxes_executionsites_site = "/db/mailboxes/" + MailboxType.ExecutionSite + "/site";
+    public static final String mailboxes_initiators = "/db/mailboxes/" + MailboxType.Initiator;
+    public static final String mailboxes_initiators_initiator = "/db/mailboxes/" + MailboxType.Initiator + "/initiator";
 
     // snapshot and command log
     public static final String completed_snapshots = "/db/completed_snapshots";
@@ -93,4 +106,23 @@ public class VoltZK {
         }
     }
 
+    /**
+     * Helper method for parsing mailbox node contents into Java objects.
+     * @throws JSONException
+     */
+    public static List<MailboxNodeContent> parseMailboxContents(List<String> jsons) throws JSONException {
+        ArrayList<MailboxNodeContent> objects = new ArrayList<MailboxNodeContent>(jsons.size());
+        for (String json : jsons) {
+            MailboxNodeContent content = null;
+            JSONObject jsObj = new JSONObject(json);
+            long HSId = jsObj.getLong("HSId");
+            Integer partitionId = null;
+            if (jsObj.has("partitionId")) {
+                partitionId = jsObj.getInt("partitionId");
+            }
+            content = new MailboxNodeContent(HSId, partitionId);
+            objects.add(content);
+        }
+        return objects;
+    }
 }

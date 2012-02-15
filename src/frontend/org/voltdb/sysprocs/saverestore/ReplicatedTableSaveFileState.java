@@ -64,8 +64,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     generateRestorePlan(Table catalogTable)
     {
         for (int hostId : m_hostsWithThisTable) {
-            m_sitesWithThisTable.addAll(VoltDB.instance().getCatalogContext().
-                                        siteTracker.getLiveExecutionSitesForHost(hostId));
+            m_sitesWithThisTable.addAll(VoltDB.instance().getSiteTracker().getSitesForHost(hostId));
         }
 
         SynthesizedPlanFragment[] restore_plan = null;
@@ -97,7 +96,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     {
         SynthesizedPlanFragment[] restore_plan = null;
         Set<Long> execution_site_ids =
-            VoltDB.instance().getCatalogContext().siteTracker.getExecutionSiteIds();
+            VoltDB.instance().getSiteTracker().getAllSites();
         Set<Long> sites_missing_table =
             getSitesMissingTable(execution_site_ids);
         // not sure we want to deal with handling expected load failures,

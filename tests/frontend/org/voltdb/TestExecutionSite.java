@@ -301,7 +301,7 @@ public class TestExecutionSite extends TestCase {
 //            m_voltdb.getFaultDistributor().reportFault(
 //                    new NodeFailureFault(
 //                            getHostIdForSiteId(m_siteId),
-//                            m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(m_siteId)),
+//                            m_voltdb.getSiteTracker().getNonExecSitesForHost(getHostIdForSiteId(m_siteId)),
 //                            String.valueOf(getHostIdForSiteId(m_siteId))));
 //            // remove this site from the postoffice
 //            postoffice.remove(m_siteId);
@@ -973,7 +973,7 @@ public class TestExecutionSite extends TestCase {
 //        m_voltdb.getFaultDistributor().reportFault(
 //                new NodeFailureFault(
 //                        getHostIdForSiteId(0),
-//                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(0)),
+//                        m_voltdb.getSiteTracker().getNonExecSitesForHost(getHostIdForSiteId(0)),
 //                        String.valueOf(getHostIdForSiteId(0))));
 //
 //        es2.join();
@@ -1088,7 +1088,7 @@ public class TestExecutionSite extends TestCase {
 //        m_voltdb.getFaultDistributor().reportFault(
 //                new NodeFailureFault(
 //                        getHostIdForSiteId(1),
-//                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(1)),
+//                        m_voltdb.getSiteTracker().getNonExecSitesForHost(getHostIdForSiteId(1)),
 //                        String.valueOf(getHostIdForSiteId(1))));
 //
 //        // the fault data message from the "other surviving" sites
@@ -1228,7 +1228,7 @@ public class TestExecutionSite extends TestCase {
 //        HeartbeatMessage hbm =
 //            new HeartbeatMessage(initiator_id, txn_id, safe_txn_id);
 //        int[] upExecutionSites =
-//            m_voltdb.getCatalogContext().siteTracker.getUpExecutionSites();
+//            m_voltdb.getSiteTracker().getUpExecutionSites();
 //
 //        for (int i : upExecutionSites) {
 //            m_mboxes[i].deliver(hbm);
@@ -1389,7 +1389,7 @@ public class TestExecutionSite extends TestCase {
 //        m_voltdb.getFaultDistributor().reportFault(
 //                new NodeFailureFault(
 //                        getHostIdForSiteId(involvedSites2.get(0)),
-//                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(involvedSites2.get(0))),
+//                        m_voltdb.getSiteTracker().getNonExecSitesForHost(getHostIdForSiteId(involvedSites2.get(0))),
 //                        String.valueOf(getHostIdForSiteId(involvedSites2.get(0)))));
 //        // remove this site from the postoffice
 //        postoffice.remove(involvedSites2.get(0));
@@ -1399,7 +1399,7 @@ public class TestExecutionSite extends TestCase {
 //        m_voltdb.getFaultDistributor().reportFault(
 //                new NodeFailureFault(
 //                        getHostIdForSiteId(involvedSites2.get(1)),
-//                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(involvedSites2.get(1))),
+//                        m_voltdb.getSiteTracker().getNonExecSitesForHost(getHostIdForSiteId(involvedSites2.get(1))),
 //                        String.valueOf(getHostIdForSiteId(involvedSites2.get(1)))));
 //        // remove this site from the postoffice
 //        postoffice.remove(involvedSites2.get(1));

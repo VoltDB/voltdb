@@ -250,8 +250,8 @@ public class Statistics extends VoltSystemProcedure {
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+                VoltDB.instance().getSiteTracker().
+                getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() != lowest_site_id)
             {
                 // Hacky way to generate an empty table with the correct schema
@@ -280,8 +280,8 @@ public class Statistics extends VoltSystemProcedure {
             // All other sites should just return empty results tables.
             int hostId = context.getExecutionSite().getCorrespondingHostId();
             Long lowestSiteId =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(hostId);
+                VoltDB.instance().getSiteTracker().
+                getLowestSiteForHost(hostId);
             if (context.getExecutionSite().getSiteId() == lowestSiteId) {
                 assert(result.getRowCount() == 1);
             }
@@ -307,8 +307,8 @@ public class Statistics extends VoltSystemProcedure {
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+                VoltDB.instance().getSiteTracker().
+                getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 assert(params.toArray() != null);
@@ -357,8 +357,8 @@ public class Statistics extends VoltSystemProcedure {
             // All other sites should just return empty results tables.
             int hostId = context.getExecutionSite().getCorrespondingHostId();
             Long lowestSiteId =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(hostId);
+                VoltDB.instance().getSiteTracker().
+                getLowestSiteForHost(hostId);
             VoltTable result = new VoltTable(LiveClientStats.liveClientColumnInfo);
             if (context.getExecutionSite().getSiteId() == lowestSiteId) {
                 assert(params.toArray().length == 2);

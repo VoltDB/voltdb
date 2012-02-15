@@ -970,7 +970,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // in the cluster, make our SnapshotDaemon responsible for snapshots
     public void mayActivateSnapshotDaemon() {
         SnapshotSchedule schedule = m_catalogContext.get().database.getSnapshotschedule().get("default");
-        if (m_catalogContext.get().siteTracker.isFirstHost() &&
+        if (VoltDB.instance().getSiteTracker().isFirstHost() &&
             schedule != null && schedule.getEnabled())
         {
             Future<Void> future = m_snapshotDaemon.makeActive(schedule);

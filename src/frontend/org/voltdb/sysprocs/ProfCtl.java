@@ -63,8 +63,8 @@ public class ProfCtl extends VoltSystemProcedure {
                 // Choose the lowest site ID on this host to do the work.
                 int host_id = context.getExecutionSite().getCorrespondingHostId();
                 Long lowest_site_id =
-                    VoltDB.instance().getCatalogContext().siteTracker.
-                    getLowestLiveExecSiteIdForHost(host_id);
+                    VoltDB.instance().getSiteTracker().
+                    getLowestSiteForHost(host_id);
                 if (context.getExecutionSite().getSiteId() != lowest_site_id)
                 {
                     table.addRow("GPERF_NOOP");

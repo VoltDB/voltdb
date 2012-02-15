@@ -23,11 +23,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
@@ -91,7 +93,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 SiteTracker tracker = site.getSiteTracker();
                 // Add this check for tests which use a mock execution site
                 if (tracker != null) {
-                    m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_hsId);
+                    Set<Long> allSites = tracker.getAllSites();
+                    allSites.remove(m_hsId);
+                    m_nonCoordinatingSites = MiscUtils.toLongArray(allSites);
                 }
                 m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
                                                   null, m_hsId,

@@ -215,8 +215,8 @@ public class ExportGeneration {
     private void addDataSources(
             Table table, int hostId, CatalogContext catalogContext)
     {
-        SiteTracker siteTracker = catalogContext.siteTracker;
-        List<Long> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
+        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
+        List<Long> sites = siteTracker.getSitesForHost(hostId);
 
         for (Long site : sites) {
             Integer partition = siteTracker.getPartitionForSite(site);

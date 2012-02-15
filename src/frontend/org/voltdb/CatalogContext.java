@@ -27,7 +27,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
@@ -47,7 +46,6 @@ public class CatalogContext {
     public final int numberOfPartitions;
     public final int numberOfExecSites;
     public final int numberOfNodes;
-    public final SiteTracker siteTracker;
     public final int catalogVersion;
     private final long catalogCRC;
     public final long deploymentCRC;
@@ -94,7 +92,6 @@ public class CatalogContext {
         procedures = database.getProcedures();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         sites = cluster.getSites();
-        siteTracker = new SiteTracker();
         this.deploymentCRC = deploymentCRC;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
 
@@ -145,7 +142,6 @@ public class CatalogContext {
                     realDepCRC,
                     catalogVersion + incValue,
                     catalogCRC);
-        retval.siteTracker.setMailboxTracker(siteTracker.getMailboxTracker());
         return retval;
     }
 

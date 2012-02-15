@@ -187,8 +187,8 @@ public class SnapshotSave extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+                VoltDB.instance().getSiteTracker().
+                getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 TRACE_LOG.trace("Checking feasibility of save with path and nonce: "

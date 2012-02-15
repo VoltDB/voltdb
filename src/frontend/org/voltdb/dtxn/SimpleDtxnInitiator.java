@@ -191,13 +191,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
         else
         {
-            SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
-            List<Long> sitesOnThisHost =
-                tracker.getLiveExecutionSitesForHost(m_hostId);
+            SiteTracker tracker = VoltDB.instance().getSiteTracker();
+            List<Long> sitesOnThisHost = tracker.getSitesForHost(m_hostId);
             long coordinatorId = sitesOnThisHost.get(0);
             ArrayList<Long> replicaIds = new ArrayList<Long>();
-            for (Long replica : tracker.getLiveSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
-                if (replica != coordinatorId && tracker.getAllLiveSites().contains(replica)) {
+            for (Long replica : tracker.getSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
+                if (replica != coordinatorId) {
                     replicaIds.add(replica);
                 }
             }
@@ -207,8 +206,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             // store only partitions that are NOT the coordinator or coordinator replica
             // this is a bit too slow
             long[] allSiteIds =
-                VoltDB.instance().getCatalogContext().
-                siteTracker.getLiveSitesForEachPartition(partitions);
+                VoltDB.instance().getSiteTracker().getSitesForPartitionsAsArray(partitions);
 
             for (int i = 0; i < allSiteIds.length; i++)
             {
@@ -260,9 +258,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     @Override
     public void sendHeartbeat(final long txnId) {
-        final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
-        long remoteHeartbeatTargets[][] = st.getRemoteHeartbeatTargets();
-        long localHeartbeatTargets[] = st.getLocalHeartbeatTargets();
+        final SiteTracker st = VoltDB.instance().getSiteTracker();
+        long remoteHeartbeatTargets[][] = st.getRemoteSites();
+        long localHeartbeatTargets[] = st.getLocalSites();
 
         try {
             /*
@@ -271,7 +269,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
              * initiator on that host who will then demux the heartbeats
              */
             for (long hostTargets[] : remoteHeartbeatTargets) {
-                final long initiatorSiteId = st.getFirstNonExecSiteForHost(st.getHostForSite(hostTargets[0]));
+                final long initiatorSiteId = st.getInitiatorsForHost(SiteTracker.getHostForSite(hostTargets[0])).get(0);
                 assert(initiatorSiteId != 1L);//uninitialized value
                 long safeTxnIds[] = new long[hostTargets.length];
                 for (int ii = 0; ii < safeTxnIds.length; ii++) {
@@ -314,16 +312,15 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              long now)
     {
         List<Long> siteIds;
+        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
 
         // Special case the common 1 partition case -- cheap via SiteTracker
         if (partitions.length == 1) {
-            siteIds = VoltDB.instance().getCatalogContext().
-            siteTracker.getLiveSitesForPartition(partitions[0]);
+            siteIds = siteTracker.getSitesForPartition(partitions[0]);
         }
         // need all sites for a set of partitions -- a little more expensive
         else {
-            siteIds = VoltDB.instance().getCatalogContext().
-            siteTracker.getLiveSitesForEachPartitionAsList(partitions);
+            siteIds = siteTracker.getSitesForPartitions(partitions);
         }
 
         increaseBackpressure(messageSize);

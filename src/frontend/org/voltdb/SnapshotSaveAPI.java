@@ -125,7 +125,7 @@ public class SnapshotSaveAPI
                 context.getExecutionSite().initiateSnapshots(
                         m_taskList,
                         txnId,
-                        context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size());
+                        context.getExecutionSite().getSiteTracker().getAllHosts().size());
             }
         }
 
@@ -222,7 +222,7 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        int hosts = context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size();
+        int hosts = context.getExecutionSite().getSiteTracker().getAllHosts().size();
         createSnapshotCompletionNode( nonce, txnId, isTruncation, hosts);
 
         try {
@@ -512,7 +512,7 @@ public class SnapshotSaveAPI
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             SnapshotUtil.getPartitionsOnHost(context, hostId),
+                                             SnapshotUtil.getPartitionsOnHost(hostId),
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

@@ -44,7 +44,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 
-import org.voltdb.dtxn.MailboxTracker;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
@@ -249,7 +249,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 this);
         m_cluster = cluster;
         m_siteId = site.getCorrespondingSiteId();
-        m_hostId = MailboxTracker.getHostForHSId(m_siteId);
+        m_hostId = SiteTracker.getHostForSite(m_siteId);
         // XXX HACK GIANT HACK given the current assumption that there is
         // only one database per cluster, I'm asserting this and then
         // skirting around the need to have the database name in order to get
@@ -274,8 +274,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             // Choose the lowest site ID on this host to truncate export data
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_hs_id =
-                    VoltDB.instance().getCatalogContext().siteTracker.
-                    getLowestLiveExecSiteIdForHost(host_id);
+                    VoltDB.instance().getSiteTracker().
+                    getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
                 ExportManager.instance().
@@ -362,8 +362,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_hs_id =
-                    VoltDB.instance().getCatalogContext().siteTracker.
-                    getLowestLiveExecSiteIdForHost(host_id);
+                    VoltDB.instance().getSiteTracker().
+                    getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
                 try {
@@ -421,8 +421,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_hs_id =
-                    VoltDB.instance().getCatalogContext().siteTracker.
-                    getLowestLiveExecSiteIdForHost(host_id);
+                    VoltDB.instance().getSiteTracker().
+                    getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
                 // implicitly synchronized by the way restore operates.
@@ -1393,11 +1393,8 @@ public class SnapshotRestore extends VoltSystemProcedure
         // LoadMultipartitionTable.  Consider ways to consolidate later
         Map<Long, Integer> sites_to_partitions =
                 new HashMap<Long, Integer>();
-        for (long site : VoltDB.instance().getCatalogContext().siteTracker.getAllLiveSites())
-        {
-            Integer partitionId = VoltDB.instance().getCatalogContext().siteTracker.getMailboxTracker().getPartitionForSite(site);
-            sites_to_partitions.put(site, partitionId);
-        }
+        SiteTracker tracker = VoltDB.instance().getSiteTracker();
+        sites_to_partitions.putAll(tracker.getSitesToPartitions());
 
         try
         {

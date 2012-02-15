@@ -63,6 +63,7 @@ import org.voltcore.agreement.ZKUtil;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltdb.VoltDB.START_ACTION;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -74,7 +75,9 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.DtxnInitiatorMailbox;
 import org.voltdb.dtxn.ExecutorTxnIdSafetyState;
 import org.voltdb.dtxn.MailboxTracker;
+import org.voltdb.dtxn.MailboxUpdateHandler;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
@@ -100,7 +103,7 @@ import org.voltdb.utils.VoltSampler;
  * namespace. A lot of the global namespace is described by VoltDBInterface
  * to allow test mocking.
  */
-public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, MailboxUpdateHandler
 {
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -108,6 +111,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     CatalogContext m_catalogContext;
+    volatile SiteTracker m_siteTracker;
+    MailboxTracker m_mailboxTracker;
     private String m_buildString;
     private static final String m_defaultVersionString = "2.2.1";
     private String m_versionString = m_defaultVersionString;
@@ -298,8 +303,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_faultManager = new FaultDistributor(this);
             try {
                 siteMailboxes = createMailboxesForSites();
-                MailboxTracker mailboxTracker = new MailboxTracker(m_messenger.getZK(), m_messenger.getHostId());
-                m_catalogContext.siteTracker.setMailboxTracker(mailboxTracker);
+                // This will set up site tracker
+                m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
+                m_mailboxTracker.start();
                 initiatorMailbox = createInitiatorMailbox();
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
@@ -315,12 +321,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
             if (config.m_backend.isIPC) {
-                int eeCount = 0;
-                for (long site : m_catalogContext.siteTracker.getAllLiveSites()) {
-                    if (m_myHostId == MailboxTracker.getHostForHSId(site)) {
-                        eeCount++;
-                    }
-                }
+                int eeCount = m_siteTracker.getLocalSites().length;
                 if (config.m_ipcPorts.size() != eeCount) {
                     hostLog.fatal("Specified an IPC backend but only supplied " + config.m_ipcPorts.size() +
                             " backend ports when " + eeCount + " are required");
@@ -340,7 +341,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_currentThreadSite = null;
             for (Mailbox mailbox : siteMailboxes) {
                 long site = mailbox.getHSId();
-                int sitesHostId = MailboxTracker.getHostForHSId(site);
+                int sitesHostId = SiteTracker.getHostForSite(site);
 
                 // start a local site
                 if (sitesHostId == m_myHostId) {
@@ -400,7 +401,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // Create the client interface
             int portOffset = 0;
             // TODO: fix
-            //for (long site : m_catalogContext.siteTracker.getMailboxTracker().getAllInitiators()) {
+            //for (long site : m_siteTracker.getMailboxTracker().getAllInitiators()) {
             for (int i = 0; i < 1; i++) {
                 // create DTXN and CI for each local non-EE site
                 SimpleDtxnInitiator initiator =
@@ -553,11 +554,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     private DtxnInitiatorMailbox createInitiatorMailbox() throws Exception {
-        Map<Long, Integer> siteMap = new HashMap<Long, Integer>();
-        Set<Long> sites = m_catalogContext.siteTracker.getAllLiveSites();
-        for (long site : sites) {
-            siteMap.put(site, m_catalogContext.siteTracker.getPartitionForSite(site));
-        }
+        Map<Long, Integer> siteMap = m_siteTracker.getSitesToPartitions();
         ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
         DtxnInitiatorMailbox mailbox = new DtxnInitiatorMailbox(safetyState, m_messenger);
         m_messenger.createMailbox(null, mailbox);
@@ -1014,7 +1011,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         /*
          * Spin and attempt to retrieve cluster metadata for all nodes in the cluster.
          */
-        HashSet<Integer> metadataToRetrieve = new HashSet<Integer>(m_catalogContext.siteTracker.getAllLiveHosts());
+        HashSet<Integer> metadataToRetrieve = new HashSet<Integer>(m_siteTracker.getAllHosts());
         metadataToRetrieve.remove(m_messenger.getHostId());
         while (!metadataToRetrieve.isEmpty()) {
             Map<Integer, ZKUtil.ByteArrayCallback> callbacks = new HashMap<Integer, ZKUtil.ByteArrayCallback>();
@@ -1040,7 +1037,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         // print out cluster membership
         hostLog.info("About to list cluster interfaces for all nodes with format [ip1 ip2 ... ipN] client-port:admin-port:http-port");
-        for (int hostId : m_catalogContext.siteTracker.getAllLiveHosts()) {
+        for (int hostId : m_siteTracker.getAllHosts()) {
             if (hostId == m_messenger.getHostId()) {
                 hostLog.info(
                         String.format(
@@ -1286,7 +1283,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 //            m_faultManager.reportFaultCleared(
 //                    new NodeFailureFault(
 //                            joinNodeInfo.hostId,
-//                            m_catalogContext.siteTracker.getNonExecSitesForHost(joinNodeInfo.hostId),
+//                            m_siteTracker.getNonExecSitesForHost(joinNodeInfo.hostId),
 //                            joinNodeInfo.hostName));
 //            try {
 //                m_faultHandler.m_waitForFaultClear.acquire();
@@ -1405,7 +1402,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 // to keep a rolling N catalogs? Or perhaps to keep catalogs for N minutes? Open
                 // to opinions here.
                 contextTracker.m_dispensedSites++;
-                int ttlsites = m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size();
+                int ttlsites = m_siteTracker.getSitesForHost(m_messenger.getHostId()).size();
                 if (contextTracker.m_dispensedSites == ttlsites) {
                     m_txnIdToContextTracker.remove(currentTxnId);
                 }
@@ -1787,5 +1784,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public boolean getReplicationActive()
     {
         return m_replicationActive;
+    }
+
+    @Override
+    public void handleMailboxUpdate(Map<MailboxType, List<MailboxNodeContent>> mailboxes) {
+        m_siteTracker = new SiteTracker(m_myHostId, mailboxes);
+    }
+
+    @Override
+    public SiteTracker getSiteTracker() {
+        return m_siteTracker;
     }
 }

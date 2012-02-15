@@ -417,16 +417,16 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         }
 
         // this tracker *is already updated* with the new failed site IDs
-        final SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
+        final SiteTracker tracker = VoltDB.instance().getSiteTracker();
 
         // collapse failed sites into failed hosts
         final HashSet<Integer> failedHosts = new HashSet<Integer>();
         for (Long siteId : newFailedSiteIds) {
-            failedHosts.add(tracker.getHostForSite(siteId));
+            failedHosts.add(SiteTracker.getHostForSite(siteId));
         }
 
         // because tracker already represents newFailedSiteId failures...
-        final int prevSurvivorCnt = tracker.getAllLiveHosts().size() + failedHosts.size();
+        final int prevSurvivorCnt = tracker.getAllHosts().size() + failedHosts.size();
 
         // find the lowest hostId between the still-alive hosts and the
         // failed hosts. Which set contains the lowest hostId?
@@ -439,7 +439,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             }
         }
 
-        for (Integer hostId : tracker.getAllLiveHosts()) {
+        for (Integer hostId : tracker.getAllHosts()) {
             if (hostId < blessedHostId) {
                 blessedHostId = hostId;
                 blessedHostIdInFailedSet = false;

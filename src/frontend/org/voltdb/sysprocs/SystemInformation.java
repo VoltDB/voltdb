@@ -100,8 +100,8 @@ public class SystemInformation extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+                VoltDB.instance().getSiteTracker().
+                getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 result = populateOverviewTable(context);
@@ -127,8 +127,8 @@ public class SystemInformation extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+                VoltDB.instance().getSiteTracker().
+                getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 result = populateDeploymentProperties(context);

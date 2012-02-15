@@ -23,15 +23,12 @@
 
 package org.voltdb.dtxn;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
-import org.voltdb.catalog.Site;
 
 public class TestSiteTracker extends TestCase
 {
@@ -51,7 +48,7 @@ public class TestSiteTracker extends TestCase
 //        helper.addSite(101, 1, 2, true);
 //        helper.addSite(102, 1, 3, true);
 //
-//        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+//        SiteTracker tracker = helper.getSiteTracker();
 //        assertEquals(1, tracker.getOneSiteForPartition(0));
 //        assertEquals(2, tracker.getOneSiteForPartition(1));
 //        assertEquals(101, tracker.getOneSiteForPartition(2));
@@ -92,7 +89,7 @@ public class TestSiteTracker extends TestCase
 //        helper.addSite(101, 1, 0, true);
 //        helper.addSite(102, 1, 1, true);
 //
-//        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+//        SiteTracker tracker = helper.getSiteTracker();
 //        assertTrue(tracker.getAllSitesForPartition(0).contains(1));
 //        assertTrue(tracker.getAllSitesForPartition(0).contains(101));
 //        assertTrue(tracker.getAllSitesForPartition(1).contains(2));
@@ -131,24 +128,24 @@ public class TestSiteTracker extends TestCase
         helper.addSite(102, 1, 1, true, false);
         helper.addSite(103, 1, 1, true, true);
 
-        SiteTracker tracker = helper.getCatalogContext().siteTracker;
-        List<Long> host0 = tracker.getAllSitesForHost(0);
+        SiteTracker tracker = helper.getSiteTracker();
+        List<Long> host0 = tracker.getSitesForHost(0);
         assertTrue(host0.contains(0L));
         assertTrue(host0.contains(1L));
         assertTrue(host0.contains(2L));
         assertFalse(host0.contains(101L));
-        host0 = tracker.getLiveExecutionSitesForHost(0);
+        host0 = tracker.getSitesForHost(0);
         assertFalse(host0.contains(0L));
         assertTrue(host0.contains(1L));
         assertTrue(host0.contains(2L));
         assertFalse(host0.contains(3L));
         assertFalse(host0.contains(101L));
-        List<Long> host1 = tracker.getAllSitesForHost(1);
+        List<Long> host1 = tracker.getSitesForHost(1);
         assertTrue(host1.contains(100L));
         assertTrue(host1.contains(101L));
         assertTrue(host1.contains(102L));
         assertFalse(host1.contains(1L));
-        host1 = tracker.getLiveExecutionSitesForHost(1);
+        host1 = tracker.getSitesForHost(1);
         assertFalse(host1.contains(100L));
         assertTrue(host1.contains(101L));
         assertFalse(host1.contains(102L));
@@ -173,7 +170,7 @@ public class TestSiteTracker extends TestCase
 //        helper.addSite(101, 1, 0, true, false);
 //        helper.addSite(102, 1, 1, true, false);
 //
-//        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+//        SiteTracker tracker = helper.getSiteTracker();
 //        ArrayDeque<Site> up_sites = tracker.getUpSites();
 //        assertTrue(up_sites.contains(helper.getSite(0)));
 //        assertTrue(up_sites.contains(helper.getSite(1)));
@@ -201,16 +198,16 @@ public class TestSiteTracker extends TestCase
         helper.addSite(101, 1, 0, true);
         helper.addSite(102, 1, 1, true);
 
-        SiteTracker tracker = helper.getCatalogContext().siteTracker;
-        Set<Long> exec_sites = tracker.getExecutionSiteIds();
+        SiteTracker tracker = helper.getSiteTracker();
+        Set<Long> exec_sites = tracker.getAllSites();
         assertFalse(exec_sites.contains(0L));
         assertTrue(exec_sites.contains(1L));
         assertTrue(exec_sites.contains(2L));
         assertFalse(exec_sites.contains(100L));
         assertTrue(exec_sites.contains(101L));
         assertTrue(exec_sites.contains(102L));
-        assertEquals((Long) 1L, tracker.getLowestLiveExecSiteIdForHost(0));
-        assertEquals((Long) 101L, tracker.getLowestLiveExecSiteIdForHost(1));
+        assertEquals((Long) 1L, tracker.getLowestSiteForHost(0));
+        assertEquals((Long) 101L, tracker.getLowestSiteForHost(1));
 
         helper.shutdown(null);
     }
@@ -229,14 +226,14 @@ public class TestSiteTracker extends TestCase
         helper.addSite(101, 1, 0, true, false);
         helper.addSite(102, 1, 1, true, false);
 
-        SiteTracker tracker = helper.getCatalogContext().siteTracker;
-        assertEquals(1, tracker.getLiveSitesForPartition(0).size());
-        assertEquals(1, tracker.getLiveSitesForPartition(1).size());
-        assertTrue(tracker.getLiveSitesForPartition(0).contains(1));
-        assertFalse(tracker.getLiveSitesForPartition(0).contains(101));
+        SiteTracker tracker = helper.getSiteTracker();
+        assertEquals(1, tracker.getSitesForPartition(0).size());
+        assertEquals(1, tracker.getSitesForPartition(1).size());
+        assertTrue(tracker.getSitesForPartition(0).contains(1));
+        assertFalse(tracker.getSitesForPartition(0).contains(101));
 
-        long[] sites = tracker.getLiveSitesForEachPartition(new int[] {0, 1});
-        assertEquals(2, sites.length);
+        List<Long> sites = tracker.getSitesForPartitions(new int[] {0, 1});
+        assertEquals(2, sites.size());
         for (long site : sites)
         {
             assertTrue(site == 1 || site == 2);
@@ -260,10 +257,10 @@ public class TestSiteTracker extends TestCase
         helper.addSite(101, 1, 0, true, false);
         helper.addSite(102, 1, 1, true, false);
 
-        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+        SiteTracker tracker = helper.getSiteTracker();
         assertEquals(0, tracker.getFailedPartitions().size());
         helper.killSite(2);
-        tracker = helper.getCatalogContext().siteTracker;
+        tracker = helper.getSiteTracker();
         assertEquals(1, tracker.getFailedPartitions().size());
         assertEquals((Integer) 1, tracker.getFailedPartitions().get(0));
 

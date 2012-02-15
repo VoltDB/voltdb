@@ -108,8 +108,8 @@ public class Rejoin extends VoltSystemProcedure {
 
         // verify valid hostId
         VoltDBInterface instance = VoltDB.instance();
-        SiteTracker st = instance.getCatalogContext().siteTracker;
-        if (st.getAllDownHosts().contains((rejoinHostId)))
+        SiteTracker st = instance.getSiteTracker();
+        if (!st.getAllHosts().contains((rejoinHostId)))
         {
           // connect
             error = VoltDB.instance().doRejoinPrepare(
@@ -265,7 +265,7 @@ public class Rejoin extends VoltSystemProcedure {
                         rejoinHostId,
                         rejoiningHostName,
                         portToConnect,
-                        context.getExecutionSite().m_context.siteTracker.getAllLiveHosts());
+                        context.getExecutionSite().getSiteTracker().getAllHosts());
             return new DependencyPair(DEP_rejoinAllNodeWork, depResult);
         }
         else if (fragmentId == SysProcFragmentId.PF_rejoinCommit) {
@@ -291,7 +291,7 @@ public class Rejoin extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String rejoiningHostname, int portToConnect) {
 
         // pick a hostid to replace
-        Set<Integer> downHosts = VoltDB.instance().getCatalogContext().siteTracker.getAllDownHosts();
+        Set<Integer> downHosts = VoltDB.instance().getSiteTracker().getAllDownHosts();
         // if there are no down hosts from the point of view of this node
         if (downHosts.isEmpty()) {
             throw new VoltAbortException("Unable to find down node to replace.");

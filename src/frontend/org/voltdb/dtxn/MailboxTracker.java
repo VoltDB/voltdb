@@ -18,241 +18,105 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.agreement.ZKUtil;
+import org.voltcore.agreement.ZKUtil.ByteArrayCallback;
+import org.voltcore.agreement.ZKUtil.ChildrenCallback;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.MiscUtils;
 
+import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltZK;
+import org.voltdb.VoltZK.MailboxType;
 
 public class MailboxTracker {
     private static final VoltLogger log = new VoltLogger("HOST");
 
     private final ZooKeeper m_zk;
+    private final MailboxUpdateHandler m_handler;
     private final ExecutorService m_es =
             Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Mailbox tracker"));
 
-    private final int m_hostId;
-    private boolean m_isFirstHost;
-    private volatile Map<Integer, ArrayList<Long>> m_hostsToSites =
-            new HashMap<Integer, ArrayList<Long>>();
-    private volatile Map<Integer, ArrayList<Long>> m_partitionsToSites =
-            new HashMap<Integer, ArrayList<Long>>();
-    private volatile Map<Long, Integer> m_sitesToPartitions =
-            new HashMap<Long, Integer>();
-    private volatile Map<Integer, Long> m_hostsToPlanners =
-            new HashMap<Integer, Long>();
-    private volatile Map<Integer, ArrayList<Long>> m_hostsToInitiators =
-            new HashMap<Integer, ArrayList<Long>>();
+    private final Runnable m_task = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                getMailboxDirs();
+            } catch (Exception e) {
+                log.error(e.getMessage());
+            }
+        }
+    };
 
-    public MailboxTracker(ZooKeeper zk, int hostId) throws Exception {
+    private final Watcher m_watcher = new Watcher() {
+        @Override
+        public void process(WatchedEvent event) {
+            m_es.submit(m_task);
+        }
+    };
+
+    public MailboxTracker(ZooKeeper zk, MailboxUpdateHandler handler) {
         m_zk = zk;
-        m_hostId = hostId;
-
-        getAndWatchSites();
-        getAndWatchPlanners();
-        getAndWatchInitiators();
+        m_handler = handler;
     }
 
-    private void getAndWatchSites() throws Exception {
-        List<String> children = m_zk.getChildren(VoltZK.mailboxes_executionsites, new Watcher() {
-            @Override
-            public void process(WatchedEvent event) {
-                m_es.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            getAndWatchSites();
-                        } catch (Exception e) {
-                            log.error(e.getMessage());
-                        }
-                    }
-                });
-            }
-        });
+    public void start() throws InterruptedException, ExecutionException {
+        Future<?> submit = m_es.submit(m_task);
+        submit.get();
+    }
+
+    private void getMailboxDirs() throws Exception {
+        Map<MailboxType, List<MailboxNodeContent>> objects =
+                new HashMap<VoltZK.MailboxType, List<MailboxNodeContent>>();
+
+        List<String> mailboxes = m_zk.getChildren(VoltZK.mailboxes, false);
+        Map<MailboxType, ChildrenCallback> callbacks = new HashMap<MailboxType, ChildrenCallback>();
+        for (String dir : mailboxes) {
+            MailboxType type = MailboxType.valueOf(dir);
+            ChildrenCallback cb = new ChildrenCallback();
+            m_zk.getChildren(ZKUtil.joinZKPath(VoltZK.mailboxes, dir), m_watcher, cb, null);
+            callbacks.put(type, cb);
+        }
+
+        for (java.util.Map.Entry<MailboxType, ChildrenCallback> e : callbacks.entrySet()) {
+            Object[] result = e.getValue().get();
+            String dir = (String) result[1];
+            @SuppressWarnings("unchecked")
+            List<String> children = (List<String>) result[3];
+            List<MailboxNodeContent> contents = readContents(dir, children);
+            objects.put(e.getKey(), contents);
+        }
+
+        m_handler.handleMailboxUpdate(objects);
+    }
+
+    private List<MailboxNodeContent> readContents(String dir, List<String> children)
+    throws Exception {
         ZKUtil.sortSequentialNodes(children);
-
-        log.info("Mailboxtracker getAndWatchSites() triggered.");
-
-        int firstHostId = -1;
-        Map<Integer, ArrayList<Long>> hostsToSites = new HashMap<Integer, ArrayList<Long>>();
-        Map<Integer, ArrayList<Long>> partitionsToSites = new HashMap<Integer, ArrayList<Long>>();
-        Map<Long, Integer> sitesToPartitions = new HashMap<Long, Integer>();
-        for (String child : children) {
-            byte[] data = m_zk.getData(VoltZK.mailboxes_executionsites + "/" + child, false, null);
-            JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
-
-            log.info("Mailboxtracker getAndWatchSites processing: " + jsObj.toString(2));
-
-            try {
-                long HSId = jsObj.getLong("HSId");
-                int partitionId = jsObj.getInt("partitionId");
-                int hostId = MiscUtils.getHostIdFromHSId(HSId);
-
-                if (firstHostId == -1) {
-                    firstHostId = hostId;
-                }
-
-                ArrayList<Long> hostSiteList = hostsToSites.get(hostId);
-                if (hostSiteList == null)
-                {
-                    hostSiteList = new ArrayList<Long>();
-                    hostsToSites.put(hostId, hostSiteList);
-                }
-                hostSiteList.add(HSId);
-
-                ArrayList<Long> partSiteList = partitionsToSites.get(partitionId);
-                if (partSiteList == null) {
-                    partSiteList = new ArrayList<Long>();
-                    partitionsToSites.put(partitionId, partSiteList);
-                }
-                partSiteList.add(HSId);
-
-                sitesToPartitions.put(HSId, partitionId);
-            } catch (JSONException e) {
-                log.error(e.getMessage());
-            }
+        List<ByteArrayCallback> callbacks = new ArrayList<ByteArrayCallback>();
+        for (String node : children) {
+            String path = ZKUtil.joinZKPath(dir, node);
+            ByteArrayCallback cb = new ByteArrayCallback();
+            m_zk.getData(path, false, cb, null);
+            callbacks.add(cb);
         }
 
-        m_hostsToSites = hostsToSites;
-        m_partitionsToSites = partitionsToSites;
-        m_sitesToPartitions = sitesToPartitions;
-
-        m_isFirstHost =  (m_hostId == firstHostId);
-    }
-
-    private void getAndWatchPlanners() throws Exception {
-        List<String> children = m_zk.getChildren(VoltZK.mailboxes_asyncplanners, new Watcher() {
-            @Override
-            public void process(WatchedEvent event) {
-                m_es.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            getAndWatchPlanners();
-                        } catch (Exception e) {
-                            log.error(e.getMessage());
-                        }
-                    }
-                });
-            }
-        });
-
-        Map<Integer, Long> hostsToPlanners = new HashMap<Integer, Long>();
-        for (String child : children) {
-            byte[] data = m_zk.getData(VoltZK.mailboxes_asyncplanners + "/" + child, false, null);
-            JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
-            try {
-                long HSId = jsObj.getLong("HSId");
-                hostsToPlanners.put(MiscUtils.getHostIdFromHSId(HSId), HSId);
-            } catch (JSONException e) {
-                log.error(e.getMessage());
-            }
+        List<String> jsons = new ArrayList<String>();
+        for (ByteArrayCallback cb : callbacks) {
+            byte[] data = cb.getData();
+            jsons.add(new String(data, "UTF-8"));
         }
 
-        m_hostsToPlanners = hostsToPlanners;
-    }
-
-    private void getAndWatchInitiators() throws Exception {
-        List<String> children = m_zk.getChildren(VoltZK.mailboxes_initiators, new Watcher() {
-            @Override
-            public void process(WatchedEvent event) {
-                m_es.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            getAndWatchInitiators();
-                        } catch (Exception e) {
-                            log.error(e.getMessage());
-                        }
-                    }
-                });
-            }
-        });
-
-        Map<Integer, ArrayList<Long>> hostsToInitiators = new HashMap<Integer, ArrayList<Long>>();
-        for (String child : children) {
-            byte[] data = m_zk.getData(VoltZK.mailboxes_initiators + "/" + child, false, null);
-            JSONObject jsObj = new JSONObject(new String(data, "UTF-8"));
-            try {
-                long HSId = jsObj.getLong("HSId");
-                int hostId = MiscUtils.getHostIdFromHSId(HSId);
-
-                ArrayList<Long> initiators = hostsToInitiators.get(hostId);
-                if (initiators == null) {
-                    initiators = new ArrayList<Long>();
-                    hostsToInitiators.put(hostId, initiators);
-                }
-                initiators.add(HSId);
-                // TODO: needs to determine if it's the master or replica
-            } catch (JSONException e) {
-                log.error(e.getMessage());
-            }
-        }
-
-        m_hostsToInitiators = hostsToInitiators;
-    }
-
-    public static int getHostForHSId(long HSId) {
-        return MiscUtils.getHostIdFromHSId(HSId);
-    }
-
-    public List<Long> getSitesForHost(int hostId) {
-        return m_hostsToSites.get(hostId);
-    }
-
-    public List<Long> getSitesForPartition(int partitionId) {
-        return m_partitionsToSites.get(partitionId);
-    }
-
-    public Integer getPartitionForSite(long hsId) {
-        return m_sitesToPartitions.get(hsId);
-    }
-
-    public Long getPlannerForHost(int hostId) {
-        return m_hostsToPlanners.get(hostId);
-    }
-
-    public List<Long> getInitiatorForHost(int hostId) {
-        return m_hostsToInitiators.get(hostId);
-    }
-
-    public Set<Integer> getAllHosts() {
-        HashSet<Integer> hosts = new HashSet<Integer>();
-        hosts.addAll(m_hostsToSites.keySet());
-        return hosts;
-    }
-
-    public Set<Long> getAllSites() {
-        HashSet<Long> sites = new HashSet<Long>();
-        for (Collection<Long> values : m_hostsToSites.values()) {
-            sites.addAll(values);
-        }
-        return sites;
-    }
-
-    public Set<Long> getAllInitiators() {
-        HashSet<Long> initiators = new HashSet<Long>();
-        for (Collection<Long> values : m_hostsToInitiators.values()) {
-            initiators.addAll(values);
-        }
-        return initiators;
-    }
-
-    public boolean isFirstHost() {
-        return m_isFirstHost;
+        return VoltZK.parseMailboxContents(jsons);
     }
 }

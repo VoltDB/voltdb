@@ -46,6 +46,7 @@ import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
 
 public class MockVoltDB implements VoltDBInterface
@@ -550,5 +551,11 @@ public class MockVoltDB implements VoltDBInterface
     public boolean getReplicationActive()
     {
         return false;
+    }
+
+    @Override
+    public SiteTracker getSiteTracker() {
+        // TODO Auto-generated method stub
+        return null;
     }
 }
