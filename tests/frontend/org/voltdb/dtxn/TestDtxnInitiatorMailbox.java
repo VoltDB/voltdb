@@ -32,20 +32,18 @@ import junit.framework.TestCase;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.MiscUtils;
 
 public class TestDtxnInitiatorMailbox extends TestCase
 {
