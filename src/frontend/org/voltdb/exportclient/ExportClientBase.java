@@ -28,11 +28,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.BandwidthMonitor;
-import org.voltcore.utils.Pair;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Provides an extensible base class for writing Export clients
@@ -123,17 +124,11 @@ public abstract class ExportClientBase {
      * @param server
      */
     public void addServerInfo(String server, boolean adminIfNoPort) {
-        InetSocketAddress addr = null;
         int defaultPort = adminIfNoPort ? VoltDB.DEFAULT_ADMIN_PORT : VoltDB.DEFAULT_PORT;
-        String[] parts = server.trim().split(":");
-        if (parts.length == 1) {
-            addr = new InetSocketAddress(parts[0], defaultPort);
-        }
-        else {
-            assert(parts.length == 2);
-            int port = Integer.parseInt(parts[1]);
-            addr = new InetSocketAddress(parts[0], port);
-        }
+
+        InetSocketAddress addr = new InetSocketAddress(
+                MiscUtils.getHostnameFromHostnameColonPort(server),
+                MiscUtils.getPortFromHostnameColonPort(server, defaultPort));
         m_servers.add(addr);
     }
 

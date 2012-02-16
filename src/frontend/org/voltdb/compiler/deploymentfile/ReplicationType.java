@@ -15,15 +15,15 @@ import javax.xml.bind.annotation.XmlType;
 
 
 /**
- * <p>Java class for pathEntry complex type.
+ * <p>Java class for replicationType complex type.
  * 
  * <p>The following schema fragment specifies the expected content contained within this class.
  * 
  * <pre>
- * &lt;complexType name="pathEntry">
+ * &lt;complexType name="replicationType">
  *   &lt;complexContent>
  *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
- *       &lt;attribute name="path" use="required" type="{http://www.w3.org/2001/XMLSchema}string" />
+ *       &lt;attribute name="port" type="{http://www.w3.org/2001/XMLSchema}int" default="5555" />
  *     &lt;/restriction>
  *   &lt;/complexContent>
  * &lt;/complexType>
@@ -32,34 +32,38 @@ import javax.xml.bind.annotation.XmlType;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "pathEntry")
-public class PathEntry {
+@XmlType(name = "replicationType")
+public class ReplicationType {
 
-    @XmlAttribute(required = true)
-    protected String path;
+    @XmlAttribute
+    protected Integer port;
 
     /**
-     * Gets the value of the path property.
+     * Gets the value of the port property.
      * 
      * @return
      *     possible object is
-     *     {@link String }
+     *     {@link Integer }
      *     
      */
-    public String getPath() {
-        return path;
+    public int getPort() {
+        if (port == null) {
+            return  5555;
+        } else {
+            return port;
+        }
     }
 
     /**
-     * Sets the value of the path property.
+     * Sets the value of the port property.
      * 
      * @param value
      *     allowed object is
-     *     {@link String }
+     *     {@link Integer }
      *     
      */
-    public void setPath(String value) {
-        this.path = value;
+    public void setPort(Integer value) {
+        this.port = value;
     }
 
 }

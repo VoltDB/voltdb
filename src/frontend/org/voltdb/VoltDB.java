@@ -105,6 +105,9 @@ public class VoltDB {
         /** interface to use for backchannel comm (default: any) */
         public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
 
+        /** port number to use for WAN/DR channel (override in the deployment file) */
+        public int m_drAgentPortStart = -1;
+
         /** information used to rejoin this new node to a cluster */
         public String m_rejoinToHostAndPort = null;
 
@@ -149,8 +152,6 @@ public class VoltDB {
 
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
-
-        public int m_drAgentPortStart = DEFAULT_DR_PORT;
 
         public Integer m_leaderPort = null;
 
@@ -209,9 +210,17 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalport ")) {
                     m_internalPort = Integer.parseInt(arg.substring("internalport ".length()));
-                } else if (arg.startsWith("zkport")) {
+                }
+                else if (arg.equals("replicationport")) {
+                    m_drAgentPortStart = Integer.parseInt(args[++i]);
+                }
+                else if (arg.startsWith("replicationport ")) {
+                    m_drAgentPortStart = Integer.parseInt(arg.substring("replicationport ".length()));
+                }
+                else if (arg.startsWith("zkport")) {
                     m_zkInterface = "127.0.0.1:" + args[++i];
-                } else if (arg.equals("externalinterface")) {
+                }
+                else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
                 else if (arg.startsWith("externalinterface ")) {

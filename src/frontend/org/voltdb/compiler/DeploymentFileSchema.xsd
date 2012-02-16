@@ -42,6 +42,7 @@
       <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
+      <xs:element name="replication" minOccurs="0" maxOccurs="1" type="replicationType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
@@ -104,8 +105,13 @@
     <xs:attribute name="port" type="xs:int" default="21211"/>
     <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
+  
+  <!-- <replication> -->
+  <xs:complexType name="replicationType">
+    <xs:attribute name="port" type="xs:int" default="5555"/>
+  </xs:complexType>
 
-    <!-- <command log> -->
+  <!-- <command log> -->
   <xs:complexType name="commandLogType">
     <xs:all>
         <xs:element name="frequency" minOccurs="0" maxOccurs="1">
