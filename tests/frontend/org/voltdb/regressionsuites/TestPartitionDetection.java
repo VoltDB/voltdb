@@ -97,7 +97,7 @@ public class TestPartitionDetection extends TestCase
 
 
     static class Callback implements ProcedureCallback {
-        private Semaphore m_rateLimit;
+        private final Semaphore m_rateLimit;
         public Callback(Semaphore rateLimit) {
             m_rateLimit = rateLimit;
         }
@@ -118,7 +118,7 @@ public class TestPartitionDetection extends TestCase
     }
 
     static class CallbackGood implements ProcedureCallback {
-        private Semaphore m_rateLimit;
+        private final Semaphore m_rateLimit;
         public static AtomicBoolean allOk = new AtomicBoolean(true);
 
         public CallbackGood(Semaphore rateLimit) {
@@ -212,14 +212,14 @@ public class TestPartitionDetection extends TestCase
             cltthread.setDaemon(true);
             cltthread.start();
             */
-
-            while (!cluster.areAllNonLocalProcessesDead()) {
-                System.err.println("Waiting for cluster to stop execution");
-                Thread.sleep(5000);
-            }
-
-            // now verify the snapshot.
-            validateSnapshot(true);
+            throw new UnsupportedOperationException("New world failure detection is not implemented");
+//            while (!cluster.areAllNonLocalProcessesDead()) {
+//                System.err.println("Waiting for cluster to stop execution");
+//                Thread.sleep(5000);
+//            }
+//
+//            // now verify the snapshot.
+//            validateSnapshot(true);
         }
         finally {
             client.close();
