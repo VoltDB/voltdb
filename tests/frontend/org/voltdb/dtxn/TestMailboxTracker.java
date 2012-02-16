@@ -84,6 +84,7 @@ public class TestMailboxTracker extends ZKTestBase {
         MailboxNodeContent node2 = list.get(1);
         assertEquals(2, node2.HSId.longValue());
         assertEquals(1, node2.partitionId.intValue());
+        tracker.shutdown();
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -118,5 +119,6 @@ public class TestMailboxTracker extends ZKTestBase {
         assertEquals(1, list.size());
         assertEquals(2, list.get(0).HSId.longValue());
         assertEquals(1, list.get(0).partitionId.intValue());
+        tracker.shutdown();
     }
 }
