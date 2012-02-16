@@ -1620,33 +1620,6 @@ BENCHMARKS
 ***************************************
 -->
 
-<target name="benchmarkcluster"
-    description="Call the standard benchmark target configured to use test cluster.">
-    <antcall target="benchmark" inheritAll='true'>
-        <param name="hostcount" value="12"/>
-        <param name="sitesperhost" value="12"/>
-        <param name="clientcount" value="3"/>
-        <param name="processesperclient" value="1"/>
-        <param name="duration" value="60000" />
-        <param name="warehouses" value="144"/>
-        <param name="loadthreads" value="12" />
-    </antcall>
-</target>
-
-<target name="benchmarklocal"
-    description="Call the standard benchmark target configured to use one node of the test cluster.">
-    <antcall target="benchmark" inheritAll='true'>
-        <param name="hostcount" value="1"/>
-        <param name="host1" value="localhost"/>
-        <param name="sitesperhost" value="2"/>
-        <param name="clientcount" value="1"/>
-        <param name="clienthost1" value="localhost"/>
-        <param name="processesperclient" value="1"/>
-        <param name="warehouses" value="2"/>
-        <param name="local" value="true"/>
-        <param name="volt.server.memory" value="2048"/>
-    </antcall>
-</target>
 <target name='proccallmicrobench' depends='ee, compile'
     description="Run client-server stored procedure call overhead microbenchmark. [-Dclients={# clients}]">
     <java fork="true" failonerror="true"
