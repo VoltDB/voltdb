@@ -73,7 +73,6 @@
 <property name='src.ee.parent.dir'           location='src/ee' />
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
-<property name='m1catalog'                   location='${src.test.dir}/org/voltdb/catalog/catalog.txt' />
 <property name='depcache'                    value='.depcache' />
 
 <!-- emma build instrumentation location -->
@@ -918,7 +917,6 @@ NATIVE EE STUFF
 <target name="eecheck" depends="ee"
     description="Run testcases for C++ JNI library.">
     <exec dir='.' executable='python' failonerror='true'>
-        <env key='M1CATALOG_PATH' value='${m1catalog}' />
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <arg line="build.py ${build} test" />
@@ -1234,13 +1232,6 @@ TEST CASES
         message="JUnit had failures"
     />
 
-    <!-- Regenerate milestoneOneCatalog/ -->
-    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <unjar
-        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
-        dest='${build.dir}/expanded/milestoneOneCatalog'
-    />
 </target>
 
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
@@ -1372,7 +1363,6 @@ TEST CASES
     name='lcov-unit-tests'
     description="Run C++ unit tests from the coverage directory">
     <exec dir='.' executable='python' failonerror='true'>
-        <env key='M1CATALOG_PATH' value='${m1catalog}' />
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
         <arg line="build.py ${build} test coverage" />
     </exec>
@@ -1502,43 +1492,6 @@ TEST CASES
         target='main'
     />
     <delete dir='${dist.dir}/foo' />
-</target>
-
-<target name='m1test_pre' depends='ee, compile'>
-    <mkdir dir='${build.testoutput.dir}' />
-    <junit fork="yes" printsummary='yes' haltonfailure="yes" showoutput='true'>
-        <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="PLANNER" value="${planner}" />
-        <classpath refid='project.classpath' />
-        <formatter type="plain" unless="hudson"/>
-        <formatter type="xml" if="hudson"/>
-        <batchtest todir="${build.testoutput.dir}">
-            <fileset dir='${build.test.dir}'>
-                <include name='org/voltdb/compiler/TestMilestoneOneCompile.class'/>
-                <exclude name="**/*$*.class"/>
-            </fileset>
-        </batchtest>
-        <assertions><enable/></assertions>
-    </junit>
-    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <unjar
-        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
-        dest='${build.dir}/expanded/milestoneOneCatalog'
-    />
-    <copy
-        file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-        todir='${build.test.dir}/org/voltdb/catalog'
-    />
-    <copy
-          file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-          todir='${build.test.dir}/org/voltdb/catalog'
-    />
-    <copy
-          file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-          todir='${src.test.dir}/org/voltdb/catalog/'
-    />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"
