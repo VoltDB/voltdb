@@ -38,6 +38,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.catalog.Table;
@@ -145,7 +146,7 @@ public class SnapshotSaveAPI
                 blockingResult.addRow(
                         context.getHostId(),
                         hostname,
-                        context.getSiteId(),
+                        MiscUtils.getSiteIdFromHSId(context.getSiteId()),
                         status,
                         err);
             } else {
@@ -156,7 +157,7 @@ public class SnapshotSaveAPI
                 blockingResult.addRow(
                         context.getHostId(),
                         hostname,
-                        context.getSiteId(),
+                        MiscUtils.getSiteIdFromHSId(context.getSiteId()),
                         status,
                         err);
             }

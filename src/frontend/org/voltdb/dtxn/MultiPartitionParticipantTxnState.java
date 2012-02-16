@@ -93,9 +93,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 SiteTracker tracker = site.getSiteTracker();
                 // Add this check for tests which use a mock execution site
                 if (tracker != null) {
-                    Set<Long> allSites = tracker.getAllSites();
-                    allSites.remove(m_hsId);
-                    m_nonCoordinatingSites = MiscUtils.toLongArray(allSites);
+                    m_nonCoordinatingSites = tracker.getAllSitesExcluding(m_hsId);
                 }
                 m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
                                                   null, m_hsId,

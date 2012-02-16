@@ -27,7 +27,11 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -430,6 +434,18 @@ public class MiscUtils {
             sb.append(id.intValue()).append(':').append((int)(id.longValue() >> 32));
         }
         return sb.toString();
+    }
+
+    public static int getSiteIdFromHSId(long siteId) {
+        return (int)(siteId>>32);
+    }
+
+    public static <K,V> Map<K, List<V>> unmodifiableMapCopy(Map<K, List<V>> m) {
+        HashMap<K, List<V>> copy = new HashMap<K, List<V>>();
+        for (Map.Entry<K, List<V>> e : m.entrySet()) {
+            copy.put(e.getKey(), Collections.unmodifiableList(e.getValue()));
+        }
+        return Collections.unmodifiableMap(copy);
     }
 
 }

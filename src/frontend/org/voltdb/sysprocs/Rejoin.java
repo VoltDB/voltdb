@@ -156,7 +156,7 @@ public class Rejoin extends VoltSystemProcedure {
 
     VoltTable phaseThreeCommit(int rejoinHostId, SystemProcedureExecutionContext context) {
         VoltTable retval = new VoltTable(
-                new ColumnInfo("HostId", VoltType.BIGINT),
+                new ColumnInfo("HostId", VoltType.INTEGER),
                 new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
         );
 
@@ -243,7 +243,7 @@ public class Rejoin extends VoltSystemProcedure {
             HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
 
-        HostMessenger messenger = (HostMessenger) VoltDB.instance().getHostMessenger();
+        HostMessenger messenger = VoltDB.instance().getHostMessenger();
         int hostId = messenger.getHostId();
         Object[] oparams = params.toArray();
         VoltTable depResult = null;
