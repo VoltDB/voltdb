@@ -53,8 +53,8 @@ public class VoltZK {
         AsyncPlanner, ClientInterface, ExecutionSite, Initiator, StatsAgent
     }
     public static final String mailboxes = "/db/mailboxes";
-    public static final String mailboxes_statsagents = "/db/mailboxes/" + MailboxType.AsyncPlanner;
-    public static final String mailboxes_asyncplanners = "/db/mailboxes/" + MailboxType.AsyncPlanner;
+    public static final String mailboxes_statsagents = "/db/mailboxes/" + MailboxType.StatsAgent;
+    public static final String mailboxes_statsagents_agents = "/db/mailboxes/" + MailboxType.StatsAgent + "/statsagent";
     public static final String mailboxes_clientinterfaces = "/db/mailboxes/" + MailboxType.ClientInterface;
     public static final String mailboxes_clientinterfaces_ci = "/db/mailboxes/" + MailboxType.ClientInterface + "/ci";
     public static final String mailboxes_executionsites = "/db/mailboxes/" + MailboxType.ExecutionSite;
@@ -82,7 +82,6 @@ public class VoltZK {
             mailboxes,
             mailboxes_executionsites,
             mailboxes_initiators,
-            mailboxes_asyncplanners,
             mailboxes_clientinterfaces,
             mailboxes_statsagents,
     };

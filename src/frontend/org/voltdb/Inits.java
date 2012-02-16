@@ -576,7 +576,7 @@ public class Inits {
                 JSONObject jsObj = new JSONObject();
                 jsObj.put("HSId", statsAgentHSId);
                 byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-                m_rvdb.getHostMessenger().getZK().create(VoltZK.mailboxes_statsagents, payload,
+                m_rvdb.getHostMessenger().getZK().create(VoltZK.mailboxes_statsagents_agents, payload,
                                            Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
                             VoltDB.instance().getHostMessenger(),

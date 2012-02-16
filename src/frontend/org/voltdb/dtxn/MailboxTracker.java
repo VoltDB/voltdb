@@ -25,10 +25,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.VoltDB;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.agreement.ZKUtil.ByteArrayCallback;
 import org.voltcore.agreement.ZKUtil.ChildrenCallback;
@@ -40,8 +42,6 @@ import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 
 public class MailboxTracker {
-    private static final VoltLogger log = new VoltLogger("HOST");
-
     private final ZooKeeper m_zk;
     private final MailboxUpdateHandler m_handler;
     private final ExecutorService m_es =
@@ -53,7 +53,7 @@ public class MailboxTracker {
             try {
                 getMailboxDirs();
             } catch (Exception e) {
-                log.error(e.getMessage());
+                VoltDB.crashLocalVoltDB("Error in mailbox tracker", false, e);
             }
         }
     };
@@ -73,6 +73,11 @@ public class MailboxTracker {
     public void start() throws InterruptedException, ExecutionException {
         Future<?> submit = m_es.submit(m_task);
         submit.get();
+    }
+
+    public void shutdown() throws InterruptedException {
+        m_es.shutdown();
+        m_es.awaitTermination(356, TimeUnit.DAYS);
     }
 
     private void getMailboxDirs() throws Exception {

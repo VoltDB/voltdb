@@ -1156,6 +1156,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_periodicWorkThread.shutdown();
             heartbeatThread.interrupt();
             heartbeatThread.join();
+            m_mailboxTracker.shutdown();
             // Things are going pear-shaped, tell the fault distributor to
             // shut its fat mouth
             m_faultManager.shutDown();
