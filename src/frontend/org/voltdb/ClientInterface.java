@@ -1689,6 +1689,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public void enqueue(ByteBuffer b)
         {
             ClientResponseImpl resp = new ClientResponseImpl();
+            b.position(4);
             try
             {
                 resp.initFromBuffer(b);
