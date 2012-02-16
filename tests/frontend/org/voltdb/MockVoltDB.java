@@ -213,6 +213,12 @@ public class MockVoltDB implements VoltDBInterface
     public void addSite(long siteId, MailboxType type) {
         m_mailboxMap.get(type).add(new MailboxNodeContent(siteId, null));
         m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
+        if (type == MailboxType.Initiator) {
+            getCluster().getSites().add(Long.toString(siteId));
+            getSite(siteId).setHost(getHost((int)siteId));
+            getSite(siteId).setIsexec(false);
+            getSite(siteId).setIsup(true);
+        }
     }
 
     public void addSite(long siteId, int partitionId)

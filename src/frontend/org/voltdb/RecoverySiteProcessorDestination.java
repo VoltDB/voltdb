@@ -250,11 +250,11 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         RecoveryMessageType type = RecoveryMessageType.values()[message.get(messageTypeOffset)];
         assert(type == RecoveryMessageType.ScanTuples ||
                 type == RecoveryMessageType.Complete);
-        message.getInt(HSIdOffset);
+        message.getLong(HSIdOffset);
         final int blockIndex = message.getInt(blockIndexOffset);
         final int tableId = message.getInt(tableIdOffset);
-        ByteBuffer ackMessage = ByteBuffer.allocate(12);
-        ackMessage.putInt(12);
+        ByteBuffer ackMessage = ByteBuffer.allocate(16);
+        ackMessage.putInt(16);
         ackMessage.putLong(m_HSId);
         ackMessage.putInt(blockIndex);
         ackMessage.flip();
