@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -61,7 +62,15 @@ public class MailboxTracker {
     private final Watcher m_watcher = new Watcher() {
         @Override
         public void process(WatchedEvent event) {
-            m_es.submit(m_task);
+            try {
+                m_es.submit(m_task);
+            } catch (RejectedExecutionException e) {
+                if (m_es.isShutdown()) {
+                    return;
+                } else {
+                    VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
+                }
+            }
         }
     };
 
