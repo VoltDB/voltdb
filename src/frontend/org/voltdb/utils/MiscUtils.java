@@ -23,24 +23,22 @@ import java.io.FileWriter;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.GregorianCalendar;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.ReplicationRole;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.VoltLogger;
-
-import org.voltdb.ReplicationRole;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -376,5 +374,59 @@ public class MiscUtils {
 
     public static boolean isPro() {
         return null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+    }
+
+    /**
+     * @param server String containing a hostname/ip, or a hostname/ip:port.
+     * @param defaultPort If a port isn't specified, use this one.
+     * @return hostname or textual ip representation.
+     */
+    public static String getHostnameFromHostnameColonPort(String server) {
+        server = server.trim();
+        String[] parts = server.split(":");
+        if (parts.length == 1) {
+            return server;
+        }
+        else {
+            assert(parts.length == 2);
+            return parts[0].trim();
+        }
+    }
+
+    /**
+     * @param server String containing a hostname/ip, or a hostname/ip:port.
+     * @param defaultPort If a port isn't specified, use this one.
+     * @return port number.
+     */
+    public static int getPortFromHostnameColonPort(String server, int defaultPort) {
+        String[] parts = server.split(":");
+        if (parts.length == 1) {
+            return defaultPort;
+        }
+        else {
+            assert(parts.length == 2);
+            return Integer.parseInt(parts[1]);
+        }
+    }
+
+    /**
+     * @param server String containing a hostname/ip, or a hostname/ip:port.
+     * @param defaultPort If a port isn't specified, use this one.
+     * @return String in hostname/ip:port format.
+     */
+    public static String getHostnameColonPortString(String server, int defaultPort) {
+        server = server.trim();
+        String[] parts = server.trim().split(":");
+        if (parts.length == 1) {
+            // handle empty port string
+            if (server.endsWith(":"))
+                return server + String.valueOf(0);
+            // handle no port string given
+            return server + ":" + String.valueOf(defaultPort);
+        }
+        else {
+            assert(parts.length == 2);
+            return server;
+        }
     }
 }

@@ -106,17 +106,21 @@ public class MockVoltDB implements VoltDBInterface
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     private final ExecutorService m_es = Executors.newSingleThreadExecutor();
 
-    public MockVoltDB()
+    public MockVoltDB() {
+        this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
+    }
+
+    public MockVoltDB(int clientPort, int adminPort, int httpPort, int drPort)
     {
         try {
             JSONObject obj = new JSONObject();
             JSONArray jsonArray = new JSONArray();
             jsonArray.put("127.0.0.1");
             obj.put("interfaces", jsonArray);
-            obj.put("clientPort", 21212);
-            obj.put("adminPort", 21211);
-            obj.put("httpPort", -1);
-            obj.put("drPort", 5555);
+            obj.put("clientPort", clientPort);
+            obj.put("adminPort", adminPort);
+            obj.put("httpPort", httpPort);
+            obj.put("drPort", drPort);
             m_localMetadata = obj.toString(4);
         } catch (Exception e) {
             throw new RuntimeException(e);

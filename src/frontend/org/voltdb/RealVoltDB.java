@@ -1109,6 +1109,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         try {
             InputStream buildstringStream =
                 ClassLoader.getSystemResourceAsStream("buildstring.txt");
+            if (buildstringStream == null) {
+                throw new RuntimeException("Unreadable or missing buildstring.txt file.");
+            }
             while ((b = (byte) buildstringStream.read()) != -1) {
                 sb.append((char)b);
             }
@@ -1128,7 +1131,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 versionString = sb.toString().trim();
             }
             catch (Exception ignored2) {
-                log.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), ignored);
+                log.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
             }
         }
         return new String[] { versionString, buildString };
