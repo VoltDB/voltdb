@@ -275,8 +275,8 @@ public class TestFaultDistributor extends TestCase
         voltdb.addSite(site1000, MailboxType.Initiator);
 
         voltdb.addHost(1);
-        Long site101 = MiscUtils.getHSIdFromHostAndSite(0, 101);
-        Long site1010 = MiscUtils.getHSIdFromHostAndSite(0, 1010);
+        Long site101 = MiscUtils.getHSIdFromHostAndSite(1, 101);
+        Long site1010 = MiscUtils.getHSIdFromHostAndSite(1, 1010);
         voltdb.addSite(site101, 1);
         voltdb.addSite(site1010, MailboxType.Initiator);
         voltdb.getCatalogContext();
