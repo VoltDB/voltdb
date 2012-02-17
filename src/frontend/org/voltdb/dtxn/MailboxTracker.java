@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.VoltDB;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.agreement.ZKUtil.ByteArrayCallback;
 import org.voltcore.agreement.ZKUtil.ChildrenCallback;
@@ -54,7 +53,7 @@ public class MailboxTracker {
             try {
                 getMailboxDirs();
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error in mailbox tracker", false, e);
+                org.voltdb.VoltDB.crashLocalVoltDB("Error in mailbox tracker", false, e);
             }
         }
     };
@@ -68,7 +67,7 @@ public class MailboxTracker {
                 if (m_es.isShutdown()) {
                     return;
                 } else {
-                    VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
                 }
             }
         }

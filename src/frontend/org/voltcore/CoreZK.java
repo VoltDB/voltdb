@@ -67,7 +67,8 @@ public class CoreZK {
                 cb.get();
             }
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
+            org.voltdb.VoltDB.crashLocalVoltDB(
+                    e.getMessage(), false, e);
         }
     }
 }

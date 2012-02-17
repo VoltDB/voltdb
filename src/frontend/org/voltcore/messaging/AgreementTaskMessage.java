@@ -23,7 +23,6 @@ import java.util.LinkedList;
 
 import org.apache.zookeeper_voltpatches.data.Id;
 import org.apache.zookeeper_voltpatches.server.Request;
-import org.voltcore.VoltDB;
 
 public class AgreementTaskMessage extends VoltMessage {
 
@@ -113,7 +112,7 @@ public class AgreementTaskMessage extends VoltMessage {
                     m_ids.add(bytes);
                     msgsize += bytes.length;
                 } catch (UnsupportedEncodingException e) {
-                    VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                    org.voltdb.VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
                 }
             }
         }

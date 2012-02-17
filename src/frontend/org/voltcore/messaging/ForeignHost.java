@@ -18,6 +18,7 @@
 package org.voltcore.messaging;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -266,6 +267,15 @@ public class ForeignHost {
 
         final long sourceHSId = in.getLong();
         final int destCount = in.getInt();
+        if (destCount == -1) {//This is a poison pill
+            byte messageBytes[] = new byte[in.getInt()];
+            in.get(messageBytes);
+            String message = new String(messageBytes, "UTF-8");
+            message = String.format("Fatal error from id,hostname(%d,%s): %s",
+                    m_hostId, hostname(), message);
+            org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
+        }
+
         recvDests = new long[destCount];
         for (int i = 0; i < destCount; i++) {
             recvDests[i] = in.getLong();
@@ -290,5 +300,23 @@ public class ForeignHost {
                 m_hostMessenger.reportForeignHostFailed((int)failedHostId);
             }
         }
+    }
+
+    public void sendPoisonPill(String err) {
+        byte errBytes[];
+        try {
+            errBytes = err.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+            return;
+        }
+        ByteBuffer message = ByteBuffer.allocate( 16 + errBytes.length);
+        message.putInt(message.capacity() - 4);
+        message.putLong(-1);
+        message.putInt(-1);
+        message.putInt(errBytes.length);
+        message.put(errBytes);
+        message.flip();
+        m_connection.writeStream().enqueue(message);
     }
 }

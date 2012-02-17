@@ -155,13 +155,16 @@ public class TransactionIdManager {
                     }
                     // if the loop above ended because it ran too much
                     if (count < 0) {
-                        VoltDB.crashLocalVoltDB("VoltDB was unable to recover after the system time was externally negatively adusted. " +
-                                  "It is possible that there is a serious system time or NTP error. ", false, null);
+                        org.voltdb.VoltDB.crashLocalVoltDB(
+                              "VoltDB was unable to recover after the system time was externally negatively adusted. " +
+                               "It is possible that there is a serious system time or NTP error. ", false, null);
                     }
                 }
                 // crash immediately if time has gone backwards by too much
                 else {
-                    VoltDB.crashLocalVoltDB(String.format("%.2f is larger than the max allowable number of seconds that the clock can be negatively adjusted (%d)",
+                    org.voltdb.VoltDB.crashLocalVoltDB(
+                            String.format("%.2f is larger than the max allowable number of seconds that " +
+                                    "the clock can be negatively adjusted (%d)",
                                 diffSeconds, BACKWARD_TIME_FORGIVENESS_WINDOW_MS / 1000), false, null);
                 }
             }

@@ -149,7 +149,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
                 ss.register(selector, SelectionKey.OP_ACCEPT);
             } catch (IOException e) {
                 // LOG.fatal("Unable to bind to ZooKeeper client socket", e);
-                org.voltcore.VoltDB.crashLocalVoltDB(
+                org.voltdb.VoltDB.crashLocalVoltDB(
                         "Unable to bind to ZooKeeper client socket", true, e);
             }
         }

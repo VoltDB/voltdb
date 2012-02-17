@@ -20,8 +20,6 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltcore.VoltDB;
-
 public class VoltMessageFactory {
     // Identify each message
     final public static byte AGREEMENT_TASK_ID = 1;
@@ -110,7 +108,7 @@ public class VoltMessageFactory {
             message = new BinaryPayloadMessage();
             break;
         default:
-            VoltDB.crashLocalVoltDB("Unrecognized message type " + messageType, true, null);
+            org.voltdb.VoltDB.crashLocalVoltDB("Unrecognized message type " + messageType, true, null);
         }
         return message;
     }

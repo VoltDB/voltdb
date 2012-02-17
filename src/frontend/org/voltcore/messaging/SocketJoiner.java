@@ -33,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.VoltDB;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 
@@ -162,7 +161,7 @@ public class SocketJoiner {
                 } catch (InterruptedException e) {
 
                 } catch (Throwable e) {
-                    VoltDB.crashLocalVoltDB("Error in socket joiner run loop", false, e);
+                    org.voltdb.VoltDB.crashLocalVoltDB("Error in socket joiner run loop", false, e);
                 }
             }
         });

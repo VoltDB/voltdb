@@ -25,7 +25,6 @@ import java.util.ResourceBundle;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
-import org.voltcore.VoltDB;
 import org.voltcore.logging.VoltLogger.CoreVoltLogger;
 
 /**
@@ -40,7 +39,9 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         } catch (MissingResourceException e) {
             System.err.println("Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.");
             e.printStackTrace(System.err);
-            VoltDB.crashLocalVoltDB("Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.", true, e);
+            org.voltdb.VoltDB.crashLocalVoltDB(
+                    "Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.",
+                    true, e);
         }
         Logger.getRootLogger().setResourceBundle(rb);
 
