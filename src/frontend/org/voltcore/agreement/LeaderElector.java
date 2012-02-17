@@ -27,9 +27,12 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.MiscUtils;
 
 public class LeaderElector {
+    private final static VoltLogger LOG = new VoltLogger("HOST");
+
     private final ZooKeeper zk;
     private final String dir;
     private final byte[] data;
@@ -45,12 +48,14 @@ public class LeaderElector {
             String lowestNode = null;
             try {
                 lowestNode = watchNextLowerNode();
+                LOG.debug("Watching elector node: " + lowestNode);
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
             if (node.equals(lowestNode)) {
                 // become the leader
+                LOG.debug("I am the new leader: " + node);
                 isLeader = true;
                 if (cb != null) {
                     cb.run();

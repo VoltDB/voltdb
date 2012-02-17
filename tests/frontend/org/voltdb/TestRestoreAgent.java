@@ -47,8 +47,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
@@ -56,9 +58,13 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.WriteStream;
+import org.voltcore.zk.ZKTestBase;
 import org.voltdb.RestoreAgent.SnapshotInfo;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Partition;
 import org.voltdb.client.Client;
@@ -67,14 +73,19 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
-import org.voltcore.network.WriteStream;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
-import org.voltcore.zk.ZKTestBase;
 
 @RunWith(Parameterized.class)
 public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callback {
+
+    private final static VoltLogger LOG = new VoltLogger("HOST");
+
+    static final int TEST_SERVER_BASE_PORT = 30210;
+    static final int TEST_ZK_BASE_PORT = 21820;
+
     static int uid = 0;
 
     @Parameters
@@ -130,6 +141,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     SnapshotCompletionMonitor snapshotMonitor = null;
     boolean snapshotted = false;
 
+    HashMap<Integer, SiteTracker> siteTrackers = null;
     CatalogContext context;
     File catalogJarFile;
     String deploymentPath;
@@ -207,9 +219,11 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             VoltTable[] results = new VoltTable[] {result};
             ClientResponseImpl response = new ClientResponseImpl(ClientResponse.SUCCESS,
                                                                  results, null);
-            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
+            //ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+            //buf.putInt(buf.capacity() - 4);
+            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
             response.flattenToBuffer(buf);
+            buf.flip();
             ((WriteStream) clientData).enqueue(buf);
             return true;
         }
@@ -337,6 +351,22 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         long crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath,
                                                           true);
         context = new CatalogContext(0, catalog, bytes, crc, 0, 0);
+
+        siteTrackers = new HashMap<Integer, SiteTracker>();
+        // create MailboxNodeContexts for all hosts (we only need getAllHosts(), I think)
+        for (int i = 0; i < hostCount; i++)
+        {
+            ArrayList<MailboxNodeContent> hosts = new ArrayList<MailboxNodeContent>();
+            for (int j = 0; j < hostCount; j++)
+            {
+                MailboxNodeContent mnc = new MailboxNodeContent((long)j, j);
+                hosts.add(mnc);
+            }
+            HashMap<MailboxType, List<MailboxNodeContent>> blah =
+                new HashMap<MailboxType, List<MailboxNodeContent>>();
+            blah.put(MailboxType.ExecutionSite, hosts);
+            siteTrackers.put(i, new SiteTracker(i, blah));
+        }
     }
 
     /**
@@ -392,12 +422,15 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         snapshotted = false;
         m_unexpectedSPIs.clear();
         setUpZK(1);
+        getClient(0).create("/db", null, Ids.OPEN_ACL_UNSAFE,
+                            CreateMode.PERSISTENT);
         snapshotMonitor = new MockSnapshotMonitor();
         snapshotMonitor.init(getClient(0));
     }
 
     @After
     public void tearDown() throws Exception {
+        tearDownZK();
         String msg = "";
         for (String name : m_unexpectedSPIs) {
             msg += name + ", ";
@@ -406,7 +439,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         for (File p : paths) {
             VoltFile.recursivelyDelete(p);
         }
-        tearDownZK();
     }
 
     /**
@@ -442,6 +474,11 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         org.voltdb.catalog.CommandLog cl = context.cluster.getLogconfig().get("log");
 
+        Set<Integer> all_hosts = new HashSet<Integer>();
+        for (int host = 0; host < m_hostCount; host++)
+        {
+            all_hosts.add(host);
+        }
         RestoreAgent restoreAgent = new RestoreAgent(getClient(0),
                                                      snapshotMonitor, this,
                                                      hostId, this.action,
@@ -451,9 +488,9 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                      cl.getInternalsnapshotpath(),
                                                      snapshotPath,
                                                      allPartitions,
-                                                     null);
-                                                     // TODO: context.siteTracker.getAllHosts());
+                                                     all_hosts);
         restoreAgent.setCatalogContext(context);
+        restoreAgent.setSiteTracker(siteTrackers.get(hostId));
         assert(initiator != null);
         restoreAgent.setInitiator(initiator);
         return restoreAgent;
@@ -564,6 +601,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
+                                               TEST_SERVER_BASE_PORT,
+                                               TEST_ZK_BASE_PORT,
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
         server.waitForInitialization();
@@ -597,6 +636,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
+                                               TEST_SERVER_BASE_PORT,
+                                               TEST_ZK_BASE_PORT,
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
         server.waitForInitialization();
@@ -631,6 +672,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
+                                               TEST_SERVER_BASE_PORT,
+                                               TEST_ZK_BASE_PORT,
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
         server.waitForInitialization();

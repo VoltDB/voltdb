@@ -72,6 +72,29 @@ public class ServerThread extends Thread {
         setName("ServerThread");
     }
 
+    public ServerThread(String pathToCatalog,
+                        String pathToDeployment,
+                        int internalPort,
+                        int zkPort,
+                        BackendTarget target)
+    {
+        m_config = new VoltDB.Configuration();
+        m_config.m_pathToCatalog = pathToCatalog;
+        m_config.m_pathToDeployment = pathToDeployment;
+        m_config.m_backend = target;
+        m_config.m_pathToLicense = getTestLicensePath();
+        m_config.m_leader = "localhost";
+        m_config.m_internalPort = internalPort;
+        m_config.m_zkInterface = "127.0.0.1:" + zkPort;
+
+        if (!m_config.validate()) {
+            m_config.usage();
+            System.exit(-1);
+        }
+
+        setName("ServerThread");
+    }
+
     @Override
     public void run() {
         VoltDB.initialize(m_config);

@@ -56,6 +56,7 @@ import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -176,6 +177,8 @@ SnapshotCompletionInterest {
         public void setCatalogContext(CatalogContext context) {}
         @Override
         public void setInitiator(TransactionInitiator initiator) {}
+        @Override
+        public void setSiteTracker(SiteTracker siteTracker) {}
     };
 
     /*
@@ -204,29 +207,57 @@ SnapshotCompletionInterest {
                 findRestoreCatalog();
             }
 
-            /*
-             * If this is the leader, initiate the snapshot restore
-             */
-            if (m_leaderElector.isLeader()) {
-                long txnId = 0;
-                if (m_snapshotToRestore != null) {
-                    txnId = m_snapshotToRestore.txnId;
-                }
-                sendSnapshotTxnId(txnId);
+            boolean leader = false;
 
-                if (m_snapshotToRestore != null) {
-                    LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
-                              " in " + m_snapshotToRestore.path);
-                    Object[] params = new Object[] {m_snapshotToRestore.path,
-                                                    m_snapshotToRestore.nonce};
-                    initSnapshotWork(RESTORE_TXNID,
-                                     Pair.of("@SnapshotRestore", params));
+            try {
+                // Wait until either we're the leader or the snapshot TXNID node
+                // exists, then do the right thing.
+                while (!m_leaderElector.isLeader() &&
+                        (m_zk.exists(SNAPSHOT_ID, null) == null))
+                {
+                    Thread.sleep(200);
                 }
+
+                /*
+                 * If this is the leader, initiate the snapshot restore
+                 */
+                if (m_zk.exists(SNAPSHOT_ID, null) == null)
+                {
+                    if (m_leaderElector.isLeader())
+                    {
+                        leader = true;
+                        long txnId = 0;
+                        if (m_snapshotToRestore != null) {
+                            txnId = m_snapshotToRestore.txnId;
+                        }
+                        sendSnapshotTxnId(txnId);
+
+                        if (m_snapshotToRestore != null) {
+                            LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
+                                      " in " + m_snapshotToRestore.path);
+                            Object[] params = new Object[] {m_snapshotToRestore.path,
+                                                            m_snapshotToRestore.nonce};
+                            initSnapshotWork(RESTORE_TXNID,
+                                             Pair.of("@SnapshotRestore", params));
+                        }
+                    }
+                    else
+                    {
+                        throw new RuntimeException("The unpossible has happened");
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                VoltDB.crashGlobalVoltDB("Failed to safely enter recovery: " + e.getMessage(),
+                                         false, e);
             }
 
             m_restoreHeartbeatThread.start();
 
-            if (!m_leaderElector.isLeader() || m_snapshotToRestore == null) {
+            // Use our remembered leader state since the actual leader could have
+            // finished and abdicated before we get here.
+            if (!leader || m_snapshotToRestore == null) {
                 /*
                  * Hosts that are not initiating the restore should change
                  * state immediately
@@ -456,6 +487,11 @@ SnapshotCompletionInterest {
         m_replayAgent.setCatalogContext(context);
     }
 
+    public void setSiteTracker(SiteTracker siteTracker)
+    {
+        m_replayAgent.setSiteTracker(siteTracker);
+    }
+
     public void setInitiator(TransactionInitiator initiator) {
         m_initiator = initiator;
         if (m_replayAgent != null)
@@ -497,7 +533,8 @@ SnapshotCompletionInterest {
      */
     void enterRestore() {
         try {
-            m_leaderElector = new LeaderElector(m_zk, RESTORE_BARRIER, new byte[0], null);
+            m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
+                                                new byte[0], null);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
                                      false, e);
@@ -532,6 +569,13 @@ SnapshotCompletionInterest {
                 break;
             }
         }
+
+        // Clean up the ZK snapshot ID node so that we're good for next time.
+        try
+        {
+            m_zk.delete(SNAPSHOT_ID, -1);
+        }
+        catch (Exception ignore) {}
     }
 
     /**
@@ -540,7 +584,7 @@ SnapshotCompletionInterest {
      * logs. This method won't block.
      */
     public void restore() {
-        new Thread(m_restorePlanner, "restore-planner").start();
+        new Thread(m_restorePlanner, "restore-planner-host-" + m_hostId).start();
     }
 
     /**
@@ -712,28 +756,20 @@ SnapshotCompletionInterest {
     }
 
     /**
-     * Wait for the specified host to send the txnId of the snapshot the cluster
-     * is restoring from.
+     * Get the txnId of the snapshot the cluster is restoring from from ZK.
+     * NOTE that the barrier for this is now completely contained
+     * in run() in the restorePlanner thread; nobody gets out of there until
+     * someone wins the leader election and successfully writes the SNAPSHOT_ID
+     * node, so we just need to read it here.
      */
-    private void waitForSnapshotTxnId() {
+    private void fetchSnapshotTxnId() {
         long txnId = 0;
-        while (true) {
-            LOG.debug("Waiting for the initiator to send the snapshot txnid");
-            try {
-                if (m_zk.exists(SNAPSHOT_ID, false) == null) {
-                    Thread.sleep(200);
-                    continue;
-                } else {
-                    byte[] data = m_zk.getData(SNAPSHOT_ID, false, null);
-                    txnId = ByteBuffer.wrap(data).getLong();
-                    break;
-                }
-            } catch (KeeperException e2) {
-                VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
-            } catch (InterruptedException e2) {
-                continue;
-            }
-        }
+        try {
+            byte[] data = m_zk.getData(SNAPSHOT_ID, false, null);
+            txnId = ByteBuffer.wrap(data).getLong();
+        } catch (KeeperException e2) {
+            VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
+        } catch (InterruptedException e2) {}
 
         // If the txnId is not 0, it means we restored a snapshot
         if (txnId != 0) {
@@ -1096,7 +1132,7 @@ SnapshotCompletionInterest {
      */
     private void changeState() {
         if (m_state == State.RESTORE) {
-            waitForSnapshotTxnId();
+            fetchSnapshotTxnId();
             exitRestore();
             m_state = State.REPLAY;
 

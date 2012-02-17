@@ -628,6 +628,7 @@ public class Inits {
                 }
 
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
+                m_rvdb.m_restoreAgent.setSiteTracker(m_rvdb.m_siteTracker);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
 

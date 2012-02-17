@@ -490,6 +490,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             TransactionInitiator initiator = m_dtxns.get(0);
             if (m_restoreAgent != null) {
                 m_restoreAgent.setCatalogContext(m_catalogContext);
+                m_restoreAgent.setSiteTracker(m_siteTracker);
                 m_restoreAgent.setInitiator(initiator);
             }
         }
