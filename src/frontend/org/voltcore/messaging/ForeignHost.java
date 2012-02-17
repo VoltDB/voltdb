@@ -310,7 +310,7 @@ public class ForeignHost {
             e.printStackTrace();
             return;
         }
-        ByteBuffer message = ByteBuffer.allocate( 16 + errBytes.length);
+        ByteBuffer message = ByteBuffer.allocate( 20 + errBytes.length);
         message.putInt(message.capacity() - 4);
         message.putLong(-1);
         message.putInt(-1);
