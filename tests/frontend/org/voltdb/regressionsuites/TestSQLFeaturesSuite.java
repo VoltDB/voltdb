@@ -50,6 +50,17 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class
     };
 
+    @Override
+    public void setUp() throws Exception {
+        if (m_config instanceof LocalCluster) {
+            LocalCluster config = (LocalCluster)m_config;
+            if (config.m_jarFileName.endsWith("sqlfeatures-cluster-rejoin.jar")) {
+                throw new Exception("This config requires rejoin/failure which isn't implemented yet.");
+            }
+        }
+        super.setUp();
+    }
+
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
