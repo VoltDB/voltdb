@@ -253,7 +253,8 @@ public class TestFaultDistributor extends TestCase
         failedSiteIds.add(site1000);
 
         // should get a PPD now.
-        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
+        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(
+                failedSiteIds, VoltDB.instance().getSiteTracker());
         assertEquals(PPDPolicyDecision.PartitionDetection, makePPDPolicyDecisions);
     }
 
@@ -291,7 +292,9 @@ public class TestFaultDistributor extends TestCase
         failedSiteIds.add(site1010);
 
         // should get a PPD now.
-        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
+        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(
+                failedSiteIds,
+                VoltDB.instance().getSiteTracker());
         assertEquals(PPDPolicyDecision.NodeFailure, makePPDPolicyDecisions);
     }
 

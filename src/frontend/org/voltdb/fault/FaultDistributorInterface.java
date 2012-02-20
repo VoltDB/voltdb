@@ -18,6 +18,7 @@ package org.voltdb.fault;
 
 import java.util.HashSet;
 
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.VoltFault.FaultType;
 
 public interface FaultDistributorInterface
@@ -81,7 +82,8 @@ public interface FaultDistributorInterface
      * Allow fault manager to make partition detection decisons once
      * a fault set is agreed to by the execution site agreement process
      * @param newFailedSiteIds
+     * @param SiteTracker snapshot
      * @return
      */
-    public abstract PPDPolicyDecision makePPDPolicyDecisions(HashSet<Long> newFailedSiteIds);
+    public abstract PPDPolicyDecision makePPDPolicyDecisions(HashSet<Long> newFailedSiteIds, SiteTracker st);
 }

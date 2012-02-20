@@ -24,9 +24,10 @@ import java.util.concurrent.Semaphore;
 
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.MiscUtils;
 
 class VoltDBNodeFailureFaultHandler implements FaultHandler {
 
@@ -57,24 +58,19 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
     public void faultOccured(Set<VoltFault> faults)
     {
         for (VoltFault fault : faults) {
-            if (fault instanceof NodeFailureFault)
+            if (fault instanceof SiteFailureFault)
             {
-                NodeFailureFault node_fault = (NodeFailureFault) fault;
-                handleNodeFailureFault(node_fault);
+                SiteFailureFault site_fault = (SiteFailureFault) fault;
+                handleSiteFailureFault(site_fault);
             }
             VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
         }
     }
 
-    private void handleNodeFailureFault(NodeFailureFault node_fault) {
-        ArrayList<Long> dead_sites = new ArrayList<Long>();
-            VoltDB.instance().getSiteTracker().getSitesForHost(node_fault.getHostId());
-        Collections.sort(dead_sites);
-        hostLog.error("Host failed, host id: " + node_fault.getHostId() +
-                " hostname: " + node_fault.getHostname());
-        hostLog.error("  Removing sites from cluster: " + dead_sites);
+    private void handleSiteFailureFault(SiteFailureFault site_fault) {
+        hostLog.error("Sites failed, site ids: " + MiscUtils.hsIdCollectionToString(site_fault.getSiteIds()));
         StringBuilder sb = new StringBuilder();
-        for (long site_id : dead_sites)
+        for (long site_id : site_fault.getSiteIds())
         {
             sb.append("set ");
             String site_path = VoltDB.instance().getCatalogContext().catalog.
@@ -84,11 +80,11 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
             sb.append("\n");
         }
         VoltDB.instance().clusterUpdate(sb.toString());
-        if (m_rvdb.getSiteTracker().getFailedPartitions().size() != 0)
-        {
-            VoltDB.crashLocalVoltDB("Failure of host " + node_fault.getHostId() +
-                    " has rendered the cluster unviable.  Shutting down...", false, null);
-        }
+//        if (m_rvdb.getSiteTracker().getFailedPartitions().size() != 0)
+//        {
+//            VoltDB.crashLocalVoltDB("Failure of sites " + MiscUtils.hsIdCollectionToString(site_fault.getSiteIds()) +
+//                    " has rendered the cluster unviable.  Shutting down...", false, null);
+//        }
         m_waitForFaultReported.release();
 
         /*
@@ -121,7 +117,7 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
     @Override
     public void faultCleared(Set<VoltFault> faults) {
         for (VoltFault fault : faults) {
-            if (fault instanceof NodeFailureFault) {
+            if (fault instanceof SiteFailureFault) {
                 m_waitForFaultClear.release();
             }
         }

@@ -35,7 +35,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
@@ -63,17 +63,12 @@ public class DtxnInitiatorMailbox implements Mailbox
         {
             synchronized (m_initiator) {
                 for (VoltFault fault : faults) {
-                    if (fault instanceof NodeFailureFault)
+                    if (fault instanceof SiteFailureFault)
                     {
-                        NodeFailureFault node_fault = (NodeFailureFault)fault;
-                        ArrayList<Long> dead_sites = new ArrayList<Long>();
-                        // TODO: fix
-//                            VoltDB.instance().getCatalogContext().siteTracker.
-//                            getAllSitesForHost(node_fault.getHostId());
-                        for (Long site_id : dead_sites)
-                        {
-                            removeSite(site_id);
-                            m_safetyState.removeState(site_id);
+                        SiteFailureFault site_fault = (SiteFailureFault)fault;
+                        for (Long site : site_fault.getSiteIds()) {
+                            removeSite(site);
+                            m_safetyState.removeState(site);
                         }
                     }
                     VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
@@ -116,7 +111,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         VoltDB.instance().getFaultDistributor().
         // For Node failure, the initiators need to be ordered after the catalog
         // but before everything else (to prevent any new work for bad sites)
-        registerFaultHandler(NodeFailureFault.NODE_FAILURE_INITIATOR,
+        registerFaultHandler(SiteFailureFault.SITE_FAILURE_INITIATOR,
                              new InitiatorNodeFailureFaultHandler(),
                              FaultType.NODE_FAILURE);
     }

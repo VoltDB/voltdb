@@ -22,10 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 
 public class FailureSiteUpdateMessage extends VoltMessage {
-
-    /** Site id of the messaging-issuing site. */
-    public long m_sourceHSId;
-
     /** Site id of the failed sites */
     public HashSet<Long> m_failedHSIds = new HashSet<Long>();
 
@@ -39,13 +35,11 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     public long m_committedTxnId;
 
     public FailureSiteUpdateMessage(
-            long sourceHSId,
             HashSet<Long> failedHSIds,
             long initiatorForSafeTxnId,
             long safeTxnId,
             long committedTxnId)
     {
-        m_sourceHSId = sourceHSId;
         m_failedHSIds = new HashSet<Long>(failedHSIds);
         m_initiatorForSafeTxnId = initiatorForSafeTxnId;
         m_safeTxnId = safeTxnId;
@@ -61,7 +55,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
 
     @Override
     public int getSerializedSize() {
-        int msgsize = 4 + 4 * 8 + (8 * m_failedHSIds.size()); // 3 ints, 2 longs, 1 byte, 4 byte failed host count + 4 bytes per failed host
+        int msgsize = 4 + 3 * 8 + (8 * m_failedHSIds.size()); // 3 ints, 2 longs, 1 byte, 4 byte failed host count + 4 bytes per failed host
         msgsize += super.getSerializedSize();
         return msgsize;
     }
@@ -69,7 +63,6 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf) {
         buf.put(VoltMessageFactory.FAILURE_SITE_UPDATE_ID);
-        buf.putLong(m_sourceHSId);
         buf.putInt(m_failedHSIds.size());
         for (Long hostId : m_failedHSIds) {
             buf.putLong(hostId);
@@ -84,7 +77,6 @@ public class FailureSiteUpdateMessage extends VoltMessage {
 
     @Override
     public void initFromBuffer(ByteBuffer buf) {
-        m_sourceHSId = buf.getLong();
         int numIds = buf.getInt();
         for (int ii = 0; ii < numIds; ii++) {
             m_failedHSIds.add(buf.getLong());

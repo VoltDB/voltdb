@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -239,6 +240,15 @@ public class MockVoltDB implements VoltDBInterface
     public synchronized void killSite(long siteId) {
         m_catalog = m_catalog.deepCopy();
         getSite(siteId).setIsup(false);
+        for (List<MailboxNodeContent> lmnc : m_mailboxMap.values()) {
+            Iterator<MailboxNodeContent> iter = lmnc.iterator();
+            while (iter.hasNext()) {
+                if (iter.next().HSId == siteId) {
+                    iter.remove();
+                }
+            }
+        }
+        m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
     }
 
     public void addTable(String tableName, boolean isReplicated)
@@ -435,6 +445,9 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void shutdown(Thread mainSiteThread) throws InterruptedException
     {
+        if (m_faultDistributor != null) {
+            m_faultDistributor.shutDown();
+        }
         m_snapshotCompletionMonitor.shutdown();
         m_es.shutdown();
         m_es.awaitTermination( 1, TimeUnit.DAYS);

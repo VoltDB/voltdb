@@ -42,13 +42,13 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // A list of registered handlers for each fault type.
-    private HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>> m_faultHandlers;
+    private final HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>> m_faultHandlers;
 
     // A set of unhandled faults by fault handler
-    private HashMap<FaultHandler, FaultHandlerData> m_faultHandlersData = new HashMap<FaultHandler, FaultHandlerData> ();
+    private final HashMap<FaultHandler, FaultHandlerData> m_faultHandlersData = new HashMap<FaultHandler, FaultHandlerData> ();
 
     // A list of already-seen faults by fault type
-    private HashMap<FaultType, HashSet<VoltFault>> m_knownFaults = new HashMap<FaultType, HashSet<VoltFault>>();
+    private final HashMap<FaultType, HashSet<VoltFault>> m_knownFaults = new HashMap<FaultType, HashSet<VoltFault>>();
 
     // A list of faults that at least one handler has not reported handled.
     private ArrayDeque<VoltFault> m_pendingFaults = new ArrayDeque<VoltFault>();
@@ -60,7 +60,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     private HashMap<FaultType, HashSet<VoltFault>> m_pendingClearedFaults  = new HashMap<FaultType, HashSet<VoltFault>>();
 
     // Fault distributer runs in this thread
-    private Thread m_thread;
+    private final Thread m_thread;
 
     // If true, concurrent failures of 1/2 or more of the current node set, leaving behind
     // a durable survivor set will cause the survivors to checkpoint and die.
@@ -128,6 +128,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      *        when the the specified type occurs
      * @param types The FaultType in which the caller is interested
      */
+    @Override
     public synchronized void registerFaultHandler(int order,
                                                   FaultHandler handler,
                                                   FaultType... types)
@@ -405,7 +406,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     }
 
     @Override
-    public PPDPolicyDecision makePPDPolicyDecisions(HashSet<Long> newFailedSiteIds)
+    public PPDPolicyDecision makePPDPolicyDecisions(HashSet<Long> newFailedSiteIds, SiteTracker tracker)
     {
         if (!m_partitionDetectionEnabled) {
             return PPDPolicyDecision.NodeFailure;
@@ -415,9 +416,6 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         if (newFailedSiteIds == null || newFailedSiteIds.size() == 0) {
             return PPDPolicyDecision.NodeFailure;
         }
-
-        // this tracker *is already updated* with the new failed site IDs
-        final SiteTracker tracker = VoltDB.instance().getSiteTracker();
 
         // collapse failed sites into failed hosts
         final HashSet<Integer> failedHosts = new HashSet<Integer>();

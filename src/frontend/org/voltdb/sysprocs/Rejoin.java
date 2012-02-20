@@ -291,7 +291,7 @@ public class Rejoin extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String rejoiningHostname, int portToConnect) {
 
         // pick a hostid to replace
-        Set<Integer> downHosts = VoltDB.instance().getSiteTracker().getAllDownHosts();
+        Set<Integer> downHosts = null;// = VoltDB.instance().getSiteTracker().getAllDownHosts();
         // if there are no down hosts from the point of view of this node
         if (downHosts.isEmpty()) {
             throw new VoltAbortException("Unable to find down node to replace.");

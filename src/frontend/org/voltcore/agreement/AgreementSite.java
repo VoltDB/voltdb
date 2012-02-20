@@ -669,7 +669,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 }
 
                 FailureSiteUpdateMessage srcmsg =
-                    new FailureSiteUpdateMessage(m_hsId,
+                    new FailureSiteUpdateMessage(
                                                  m_pendingFailedSites,
                                                  site,
                                                  txnId != null ? txnId : Long.MIN_VALUE,

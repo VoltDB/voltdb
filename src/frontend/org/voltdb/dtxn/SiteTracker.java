@@ -392,20 +392,4 @@ public class SiteTracker {
         }
         return hostIdList.get(host);
     }
-
-    /**
-     * XXX: remove this
-     * @return
-     */
-    public List<Integer> getFailedPartitions() {
-        throw new NotImplementedException("This method should be removed");
-    }
-
-    /**
-     * XXX: remove this
-     * @return
-     */
-    public Set<Integer> getAllDownHosts() {
-        throw new NotImplementedException("This method should be removed");
-    }
 }
