@@ -69,16 +69,37 @@ void throwCastSQLValueOutOfRangeException(
         const ValueType newType);
 
 template<>
-void throwCastSQLValueOutOfRangeException<double>(
+inline void throwCastSQLValueOutOfRangeException<double>(
         const double value,
         const ValueType origType,
-        const ValueType newType);
+        const ValueType newType)
+{
+    char msg[1024];
+    snprintf(msg, 1024, "Type %s with value %f can't be cast as %s because the value is "
+            "out of range for the destination type",
+            valueToString(origType).c_str(),
+            value,
+            valueToString(newType).c_str());
+    throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                       msg);
+}
 
 template<>
-void throwCastSQLValueOutOfRangeException<int64_t>(
+inline void throwCastSQLValueOutOfRangeException<int64_t>(
                                   const int64_t value,
                                   const ValueType origType,
-                                  const ValueType newType);
+                                  const ValueType newType)
+{
+    char msg[1024];
+    snprintf(msg, 1024, "Type %s with value %jd can't be cast as %s because the value is "
+            "out of range for the destination type",
+            valueToString(origType).c_str(),
+            (intmax_t)value,
+            valueToString(newType).c_str());
+    throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                       msg);
+}
+
 
 /**
  * A class to wrap all scalar values regardless of type and

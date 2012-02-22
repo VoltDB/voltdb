@@ -41,11 +41,11 @@ namespace voltdb
         void increaseAllocated(int bytes);
         void reduceAllocated(int bytes);
 
-        const int64_t getAllocated() const;
+        int64_t getAllocated() const;
         void setLogThreshold(int64_t threshold);
-        const int64_t getLogThreshold() const;
+        int64_t getLogThreshold() const;
         void setMemoryLimit(int64_t limit);
-        const int64_t getMemoryLimit() const;
+        int64_t getMemoryLimit() const;
 
     private:
         // The current amount of memory used by temp tables for this

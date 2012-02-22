@@ -70,7 +70,7 @@ TempTableLimits::increaseAllocated(int bytes)
     }
 }
 
-const int64_t
+int64_t
 TempTableLimits::getAllocated() const
 {
     return m_currMemoryInBytes;
@@ -82,7 +82,7 @@ TempTableLimits::setLogThreshold(int64_t threshold)
     m_logThreshold = threshold;
 }
 
-const int64_t
+int64_t
 TempTableLimits::getLogThreshold() const
 {
     return m_logThreshold;
@@ -94,7 +94,7 @@ TempTableLimits::setMemoryLimit(int64_t limit)
     m_memoryLimit = limit;
 }
 
-const int64_t
+int64_t
 TempTableLimits::getMemoryLimit() const
 {
     return m_memoryLimit;

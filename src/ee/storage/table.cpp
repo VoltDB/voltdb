@@ -46,6 +46,7 @@
 #include <sstream>
 #include <cassert>
 #include <cstdio>
+#include "boost/scoped_array.hpp"
 #include "table.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -441,7 +442,7 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
     // Store the following information so that we can provide them to the user
     // on failure
     ValueType types[colcount];
-    std::string names[colcount];
+    boost::scoped_array<std::string> names(new std::string[colcount]);
 
     // skip the column types
     for (int i = 0; i < colcount; ++i) {
