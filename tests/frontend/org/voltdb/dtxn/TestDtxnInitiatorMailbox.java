@@ -24,6 +24,7 @@ package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,6 +43,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 
@@ -549,19 +551,17 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
 
         synchronized (m_testStream) {
-            throw new UnsupportedOperationException("Fault distributor isn't working yet");
-//            NodeFailureFault node_failure = new NodeFailureFault(
-//                    HOST_ID,
-//                    Arrays.asList(new Long[] { 2L }),// the non exec site in setUp()
-//                    "localhost");
-//            VoltDB.instance().getFaultDistributor().reportFault(node_failure);
-//            m_testStream.wait(10000);
+            SiteFailureFault site_failure = new SiteFailureFault(
+                    Arrays.asList(new Long[] { 0L })// the non exec site in setUp()
+                    );
+            VoltDB.instance().getFaultDistributor().reportFault(site_failure);
+            m_testStream.wait(10000);
         }
 
-//        Thread.sleep(100);
-//        assertTrue(m_testStream.gotResponse());
-//        assertEquals(1, initiator.m_reduceCount);
-//        assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
+        Thread.sleep(100);
+        assertTrue(m_testStream.gotResponse());
+        assertEquals(1, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
     }
 
     MockWriteStream m_testStream = new MockWriteStream();

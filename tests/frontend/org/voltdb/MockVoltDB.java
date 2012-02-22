@@ -60,32 +60,6 @@ public class MockVoltDB implements VoltDBInterface
     int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config());
-//    {
-//        @Override
-//        public void send(final int siteId, final int mailboxId, final VoltMessage message)
-//            throws MessagingException {
-//            Mailbox mailbox = MockMailbox.postoffice.get(mailboxId).get(siteId);
-//            if (mailbox != null) {
-//                mailbox.deliver(message);
-//            }
-//        }
-//
-//        @Override
-//        public void send(int[] siteIds, int mailboxId, final VoltMessage message)
-//            throws MessagingException {
-//            for (int i : siteIds) {
-//                Mailbox mailbox = MockMailbox.postoffice.get(mailboxId).get(i);
-//                if (mailbox != null) {
-//                    mailbox.deliver(message);
-//                }
-//            }
-//        }
-//
-//        @Override
-//        public int getHostId() {
-//            return 1;
-//        }
-//    };
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
     private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
@@ -128,45 +102,6 @@ public class MockVoltDB implements VoltDBInterface
         cluster.setHeartbeattimeout(10000);
         assert(cluster != null);
 
-        /*Host host = cluster.getHosts().add("0");
-        Site execSite = cluster.getSites().add("1");
-        Site initSite = cluster.getSites().add("0");
-        Partition partition = cluster.getPartitions().add("0");
-
-        host.setIpaddr("localhost");
-
-        initSite.setHost(host);
-        initSite.setIsexec(false);
-        initSite.setInitiatorid(0);
-        initSite.setIsup(true);
-
-        execSite.setHost(host);
-        execSite.setIsexec(true);
-        execSite.setIsup(true);
-        execSite.setPartition(partition);*/
-
-//        MockMailbox.postoffice.get(VoltDB.STATS_MAILBOX_ID).put(1, mbox);
-//        MockMailbox mailbox = new MockMailbox();
-//        MockMailbox.registerMailbox(1, VoltDB.AGREEMENT_MAILBOX_ID, mailbox);
-/*
-         try {
-            m_agreementSite =
-                new AgreementSite(
-                    1,
-                    new HashSet<Integer>(Arrays.asList(1)),
-                    1,
-                    new HashSet<Integer>(),
-                    mailbox,
-                    new InetSocketAddress(2181),
-                    null,
-                    false);
-            m_agreementSite.start();
-            m_zk = org.voltdb.agreement.ZKUtil.getClient("localhost:2181", 60 * 1000);
-            m_snapshotCompletionMonitor.init(m_zk);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        */
         try {
             m_hostMessenger.start();
         } catch (Exception e) {
