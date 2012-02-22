@@ -139,10 +139,19 @@ public class TestVoltType extends TestCase {
         long usec = 999999999;
         TimestampType ts1 = new TimestampType(usec);
         assertEquals(usec, ts1.getTime());
+        String ts1string = ts1.toString();
+        TimestampType ts1prime = new TimestampType(ts1string);
+        assertEquals(usec, ts1prime.getTime());
 
         usec = 999999000;
         ts1 = new TimestampType(usec);
         assertEquals(usec, ts1.getTime());
+
+        // the 0 at the start of microseconds is important
+        // for round-trip string/string correctness test
+        String date = "2011-06-24 10:30:26.123012";
+        TimestampType ts3 = new TimestampType(date);
+        assertEquals(date, ts3.toString());
     }
 
     /* Compare some values that differ by microseconds and by full millis */

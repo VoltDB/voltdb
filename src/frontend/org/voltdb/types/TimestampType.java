@@ -110,9 +110,10 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
      */
     @Override
     public String toString() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
         String format = sdf.format(m_date);
-        return format + "." + m_usecs;
+        // zero-pad so 1 or 2 digit usecs get appended correctly
+        return format + String.format("%03d", m_usecs);
     }
 
     /**

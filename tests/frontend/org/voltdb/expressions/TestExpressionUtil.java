@@ -485,4 +485,17 @@ public class TestExpressionUtil extends TestCase {
         assertEquals(VoltType.TIMESTAMP, cve.getValueType());
         assertEquals(8, cve.getValueSize());
     }
+
+    public void testSetOutputTypeForInsertExpressionWithLiteralStringDates() throws Exception
+    {
+        ConstantValueExpression cve = new ConstantValueExpression();
+        TimestampType ts = new TimestampType(999999999);
+        cve.setValue(ts.toString());
+        cve.setValueType(VoltType.STRING);
+        cve.setValueSize(ts.toString().length());
+        HashMap<Integer, VoltType> override_map = new HashMap<Integer, VoltType>();
+        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        assertEquals(VoltType.TIMESTAMP, cve.getValueType());
+        assertEquals("999999999", cve.m_value);
+    }
 }
