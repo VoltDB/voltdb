@@ -33,21 +33,6 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    /**
-     * When clearing a fault, specifically a rejoining node, wait to make sure it is cleared
-     * before proceeding because proceeding might generate new faults that should
-     * be deduped by the FaultManager.
-     */
-    final Semaphore m_waitForFaultClear = new Semaphore(0);
-
-    /**
-     * When starting up as a rejoining node a fault is reported
-     * for every currently down node. Once this fault is handled
-     * here by RealVoltDB's handler the catalog will be updated.
-     * Then the rest of the system can init with the updated catalog.
-     */
-    final Semaphore m_waitForFaultReported = new Semaphore(0);
-
     private final RealVoltDB m_rvdb;
 
     VoltDBNodeFailureFaultHandler(RealVoltDB realVoltDB) {
@@ -68,13 +53,6 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
 
     private void handleSiteFailureFault(SiteFailureFault site_fault) {
         hostLog.error("Sites failed, site ids: " + MiscUtils.hsIdCollectionToString(site_fault.getSiteIds()));
-//        if (m_rvdb.getSiteTracker().getFailedPartitions().size() != 0)
-//        {
-//            VoltDB.crashLocalVoltDB("Failure of sites " + MiscUtils.hsIdCollectionToString(site_fault.getSiteIds()) +
-//                    " has rendered the cluster unviable.  Shutting down...", false, null);
-//        }
-        m_waitForFaultReported.release();
-
         /*
          * Use a new thread since this is a asynchronous (and infrequent)
          * task and locks are being held by the fault distributor.
@@ -101,15 +79,4 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
             }
         }.start();
     }
-
-    @Override
-    public void faultCleared(Set<VoltFault> faults) {
-        for (VoltFault fault : faults) {
-            if (fault instanceof SiteFailureFault) {
-                m_waitForFaultClear.release();
-            }
-        }
-    }
-
-
 }

@@ -45,7 +45,6 @@ public class TestFaultDistributor extends TestCase
         int m_order;
         OrderTracker m_orderTracker;
         Semaphore m_handledFaults = new Semaphore(0);
-        Semaphore m_clearedFaults = new Semaphore(0);
 
         public MockFaultHandler(FaultType type)
         {
@@ -76,11 +75,6 @@ public class TestFaultDistributor extends TestCase
                 }
             }
             m_handledFaults.release();
-        }
-
-        @Override
-        public void faultCleared(Set<VoltFault> faults) {
-            m_clearedFaults.release();
         }
     }
 
@@ -194,28 +188,6 @@ public class TestFaultDistributor extends TestCase
         assertTrue(node_handler5a.m_gotFault);
         assertTrue(node_handler7.m_gotFault);
         assertTrue(order_tracker.m_goodOrder);
-    }
-
-    public void testFaultClearing() throws Exception
-    {
-        FaultDistributor dut = new  FaultDistributor(m_voltdb);
-        OrderTracker orderTracker = new OrderTracker(-1);
-        MockFaultHandler mh1 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
-        MockFaultHandler mh2 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
-        dut.registerFaultHandler(1, mh1, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(1, mh2, FaultType.NODE_FAILURE);
-        VoltFault theFault = new VoltFault(FaultType.NODE_FAILURE);
-        dut.reportFault(theFault);
-
-        // this is really a race against the other thread. but
-        // will test momentarily that the clear() api is called.
-        // if this fails intermittently at all, will have to (fix
-        // the software) and write a more deterministic test
-        assertEquals(0, mh1.m_clearedFaults.availablePermits());
-        assertEquals(0, mh2.m_clearedFaults.availablePermits());
-
-        mh1.m_clearedFaults.acquire();
-        mh2.m_clearedFaults.acquire();
     }
 
     // trigger PPD

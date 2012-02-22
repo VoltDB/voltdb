@@ -321,10 +321,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedSites));
             }
         }
-
-        @Override
-        public void faultCleared(Set<VoltFault> faults) {
-        }
     }
 
     private final HashMap<Long, VoltSystemProcedure> m_registeredSysProcPlanFragments =
