@@ -184,7 +184,7 @@ public class TestReplicatedInvocation {
         result = resp.getResults()[0];
         while (result.advanceRow()) {
             if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
-                assertTrue(result.getString("VALUE").equalsIgnoreCase("master"));
+                assertTrue(result.getString("VALUE").equalsIgnoreCase("none"));
             }
         }
     }

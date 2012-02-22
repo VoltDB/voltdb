@@ -98,11 +98,8 @@ public class LocalCluster implements VoltServerConfig {
     private int m_ipcPortOffset1;
     private int m_ipcPortOffset2;
     private int m_ipcPortOffset3;
-
     private int m_voltFilePrefixOffset;
-
     private int m_timestampSaltOffset;
-
     private int m_licensePathOffset;
 
     @SuppressWarnings("unused")
@@ -645,7 +642,7 @@ public class LocalCluster implements VoltServerConfig {
 
     private void startOne(int hostId, boolean clearLocalDataDirectories, String startMode) {
         try {
-            // set the dragent's port offset
+            // set the dragent's port offset (dragent uses three ports per agent...)
             m_procBuilder.environment().put("dragentportoffset",
                     String.valueOf(VoltDB.DEFAULT_DR_PORT + hostId * 3));
 
@@ -655,9 +652,13 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_voltStartCmdOffset, "create");
-            if (ReplicationRole.MASTER.toString().equalsIgnoreCase(startMode)
-                || ReplicationRole.REPLICA.toString().equalsIgnoreCase(startMode))
+            // set 'replica' on the command line, or nothing.
+            if (startMode.equals(ReplicationRole.REPLICA)) {
                 m_procBuilder.command().set(m_voltStartModeOffset, startMode);
+            }
+            else {
+                m_procBuilder.command().set(m_voltStartModeOffset, "");
+            }
             m_procBuilder.command().set(m_rejoinOffset, "");
             m_procBuilder.command().set(m_licensePathOffset, ServerThread.getTestLicensePath());
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));

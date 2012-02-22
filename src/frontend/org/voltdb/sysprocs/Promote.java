@@ -57,7 +57,7 @@ public class Promote extends VoltSystemProcedure {
             getLowestLiveExecSiteIdForHost(host_id);
         if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
         {
-            VoltDB.instance().setReplicationRole(ReplicationRole.MASTER);
+            VoltDB.instance().setReplicationRole(ReplicationRole.NONE);
         }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.network.VoltNetwork;
@@ -224,4 +225,9 @@ public interface VoltDBInterface
      * tasks.
      */
     public ExecutorService getComputationService();
+
+    /**
+     * Return the license api. This may be null in community editions!
+     */
+     public LicenseApi getLicenseApi();
 }

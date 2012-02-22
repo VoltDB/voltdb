@@ -95,21 +95,55 @@ public class MiscUtils {
 
     /**
      * Instantiate the license api impl based on enterprise/community editions
+     * @return a valid API for community and pro editions, or null on error.
      */
     public static LicenseApi licenseApiFactory(String pathToLicense) {
 
-        // verify the file exists.
-        File licenseFile = new File(pathToLicense);
-        if (licenseFile.exists() == false) {
-            hostLog.fatal("Unable to open license file: " + pathToLicense);
-            return null;
+        if (MiscUtils.isPro() == false) {
+            return new LicenseApi() {
+                @Override
+                public boolean initializeFromFile(File license) {
+                    return true;
+                }
+
+                @Override
+                public boolean isTrial() {
+                    return false;
+                }
+
+                @Override
+                public int maxHostcount() {
+                    return Integer.MAX_VALUE;
+                }
+
+                @Override
+                public Calendar expires() {
+                    Calendar result = Calendar.getInstance();
+                    result.add(Calendar.YEAR, 20); // good enough?
+                    return result;
+                }
+
+                @Override
+                public boolean verify() {
+                    return true;
+                }
+
+                @Override
+                public boolean isWanReplicationAllowed() {
+                    return false;
+                }
+
+                @Override
+                public boolean isCommandLoggingAllowed() {
+                    return false;
+                }
+            };
         }
 
         // boilerplate to create a license api interface
         LicenseApi licenseApi = null;
         Class<?> licApiKlass = MiscUtils.loadProClass("org.voltdb.licensetool.LicenseApiImpl",
                                                       "License API", false);
-
         if (licApiKlass != null) {
             try {
                 licenseApi = (LicenseApi)licApiKlass.newInstance();
@@ -123,7 +157,14 @@ public class MiscUtils {
         }
 
         if (licenseApi == null) {
-            hostLog.fatal("Unable to load license file: could not create license API.");
+            hostLog.fatal("Unable to load license file: could not create License API.");
+            return null;
+        }
+
+        // verify the license file exists.
+        File licenseFile = new File(pathToLicense);
+        if (licenseFile.exists() == false) {
+            hostLog.fatal("Unable to open license file: " + pathToLicense);
             return null;
         }
 
@@ -174,7 +215,7 @@ public class MiscUtils {
         }
 
         // enforce wan replication constraint
-        if (replicationRole == ReplicationRole.MASTER) {
+        if (replicationRole == ReplicationRole.REPLICA) {
             if (licenseApi.isWanReplicationAllowed() == false) {
                 hostLog.fatal("Warning, VoltDB license does not allow use of WAN Replication.");
                 return false;
