@@ -80,6 +80,7 @@ public class TestSimpleWorkUnit extends TestCase
             System.out.println("Adding site host " + (i / sites_per_host) + " site " + i);
             m_voltdb.addSite(MiscUtils.getHSIdFromHostAndSite(i / sites_per_host, i), i % replicas);
         }
+        st = m_voltdb.getSiteTracker();
     }
 
     @Override
