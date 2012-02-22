@@ -170,7 +170,7 @@ public class ExecutionSiteFuzzChecker
         // Should all match
         TransactionRecord model_txn = null;
         TransactionRecord coord_txn = null;
-        HashSet<Integer> failed_sites = new HashSet<Integer>();
+        HashSet<Long> failed_sites = new HashSet<Long>();
         boolean saw_rollback = false;
 
         // Run through the list once and extract coordinator and failure info.
