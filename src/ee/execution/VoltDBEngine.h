@@ -136,7 +136,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t partitionId,
                         int32_t hostId,
                         std::string hostname,
-                        int64_t tempTableMemoryLimit);
+                        int64_t tempTableMemoryLimit,
+                        int32_t totalPartitions);
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }

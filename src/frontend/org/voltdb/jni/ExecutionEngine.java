@@ -420,6 +420,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param partitionId id of partitioned assigned to this EE
      * @param hostId id of the host this EE is running on
      * @param hostname name of the host this EE is running on
+     * @param totalPartitions number of partitions in the cluster for the hashinator
      * @return error code
      */
     protected native int nativeInitialize(
@@ -429,7 +430,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             String hostname,
-            long tempTableMemory);
+            long tempTableMemory,
+            int totalPartitions);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.

@@ -124,8 +124,6 @@ public class TestReplicatedTableSaveFileState extends TestCase
         for (int i = 0; i < number_of_sites; ++i)
         {
             addHostToTestData(i);
-            catalog_creator.addPartition(i);
-            catalog_creator.addHost(i);
             catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( i, i), i);
         }
         // Add some non-exec sites for more test coverage
@@ -183,12 +181,8 @@ public class TestReplicatedTableSaveFileState extends TestCase
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
             addHostToTestData(i);
-            catalog_creator.addPartition(i);
-            catalog_creator.addHost(i);
             catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( i, i), i);
         }
-        catalog_creator.addPartition(number_of_sites - 1);
-        catalog_creator.addHost(number_of_sites - 1);
         catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( number_of_sites - 1, number_of_sites - 1),
                                 number_of_sites - 1);
         // Add some non-exec sites for more test coverage

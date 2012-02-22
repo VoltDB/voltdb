@@ -49,11 +49,11 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
@@ -800,11 +800,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
         Database database = cluster.getDatabases().get("database");
         CatalogMap<Table> tables = database.getTables();
-        CatalogMap<Site> sites = cluster.getSites();
-        int num_hosts = cluster.getHosts().size();
+        SiteTracker st = VoltDB.instance().getSiteTracker();
+        int num_hosts = st.m_numberOfHosts;
         int replicated = 0;
         int total_tables = 0;
-        int expected_entries = 0;
+        int expected_entries = st.m_numberOfExecutionSites;
 
         for (Table table : tables)
         {
@@ -816,12 +816,6 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 {
                     replicated++;
                 }
-            }
-        }
-
-        for (Site s : sites) {
-            if (s.getIsexec()) {
-                expected_entries++;
             }
         }
         assertEquals(expected_entries, results[0].getRowCount());

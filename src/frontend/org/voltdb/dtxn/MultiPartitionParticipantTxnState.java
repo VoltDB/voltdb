@@ -511,7 +511,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 w.putDummyDependency(dependencyId, response.getExecutorSiteId());
             }
             else {
-                w.putDependency(dependencyId, response.getExecutorSiteId(), payload);
+                w.putDependency(dependencyId, response.getExecutorSiteId(), payload, m_site.getSiteTracker());
             }
             if (w.allDependenciesSatisfied()) {
                 handleWorkUnitComplete(w);

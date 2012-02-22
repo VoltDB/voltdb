@@ -42,12 +42,6 @@ public class TestSiteTracker extends TestCase
         Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
         Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
         Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
-        helper.addHost(0);
-        helper.addHost(1);
-        helper.addPartition(0);
-        helper.addPartition(1);
-        helper.addPartition(2);
-        helper.addPartition(3);
         helper.addSite(site1, 0);
         helper.addSite(site2, 1);
         helper.addSite(site101, 2);
@@ -84,10 +78,6 @@ public class TestSiteTracker extends TestCase
         Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
         Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
         Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
-        helper.addHost(0);
-        helper.addHost(1);
-        helper.addPartition(0);
-        helper.addPartition(1);
         helper.addSite(site1, 0);
         helper.addSite(site2, 1);
         helper.addSite(site101, 0);
@@ -127,10 +117,6 @@ public class TestSiteTracker extends TestCase
         Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
         Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
         Long site103 = MiscUtils.getHSIdFromHostAndSite( 1, 103);
-        helper.addHost(0);
-        helper.addHost(1);
-        helper.addPartition(0);
-        helper.addPartition(1);
         helper.addSite(site0, MailboxType.Initiator);
         helper.addSite(site1, 0);
         helper.addSite(site2, 1);
@@ -168,10 +154,6 @@ public class TestSiteTracker extends TestCase
         Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
         Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
 
-        helper.addHost(0);
-        helper.addHost(1);
-        helper.addPartition(0);
-        helper.addPartition(1);
         helper.addSite(site0, MailboxType.Initiator);
         helper.addSite(site1, 0);
         helper.addSite(site2, 1);

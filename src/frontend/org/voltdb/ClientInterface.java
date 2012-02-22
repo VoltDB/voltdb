@@ -66,7 +66,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
@@ -821,18 +820,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             CatalogContext context,
             ReplicationRole replicationRole,
             SimpleDtxnInitiator initiator,
-            int hostCount,
+            int partitionCount,
             int port,
             int adminPort,
             long timestampTestingSalt) throws Exception {
 
         // create a list of all partitions
-        int[] allPartitions = new int[context.numberOfPartitions];
+        int[] allPartitions = new int[partitionCount];
         int index = 0;
-        for (Partition partition : context.cluster.getPartitions()) {
-            allPartitions[index++] = Integer.parseInt(partition.getTypeName());
+        for (Integer partition : VoltDB.instance().getSiteTracker().m_partitionsToSitesImmutable.keySet()) {
+            allPartitions[index++] = partition;
         }
-        assert(index == context.numberOfPartitions);
 
         /*
          * Construct the runnables so they have access to the list of connections

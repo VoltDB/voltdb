@@ -34,6 +34,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.eclipse.jetty.server.AsyncContinuation;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
@@ -46,6 +47,8 @@ import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltcore.CoreZK;
 import org.voltcore.logging.VoltLogger;
 
 public class HTTPAdminListener {
@@ -193,10 +196,12 @@ public class HTTPAdminListener {
 
                 CatalogContext context = VoltDB.instance().getCatalogContext();
 
+                SiteTracker st = VoltDB.instance().getSiteTracker();
+
                 // get the cluster info
-                String clusterinfo = context.numberOfNodes + " hosts ";
-                clusterinfo += " with " + context.numberOfExecSites + " sites ";
-                clusterinfo += " (" + context.numberOfExecSites / context.numberOfNodes;
+                String clusterinfo = st.getAllHosts().size() + " hosts ";
+                clusterinfo += " with " + st.getAllSites().size() + " sites ";
+                clusterinfo += " (" + st.getAllSites().size() / st.getAllHosts().size();
                 clusterinfo += " per host)";
 
                 // get the start time

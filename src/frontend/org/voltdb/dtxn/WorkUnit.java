@@ -270,13 +270,19 @@ class WorkUnit
         }
     }
 
-    void putDependency(int dependencyId, long HSId, VoltTable payload) {
+    void putDependency(int dependencyId, long HSId, VoltTable payload, SiteTracker st) {
         assert payload != null;
         assert m_dependencies != null;
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
 
-        int partition = VoltDB.instance().getSiteTracker().getPartitionForSite(HSId);
+        int partition = 0;
+        try {
+            partition = st.getPartitionForSite(HSId);
+        } catch (NullPointerException e) {
+            System.out.println("NPE on site " + HSId);
+            throw e;
+        }
         long map_id = partition;
         if (m_taskType == FragmentTaskMessage.SYS_PROC_PER_SITE)
         {

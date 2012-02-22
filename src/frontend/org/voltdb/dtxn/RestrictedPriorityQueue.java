@@ -42,7 +42,7 @@ import org.voltcore.logging.VoltLogger;
  */
 public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> {
     private static final long serialVersionUID = 1L;
-    private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
+    private final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
 
     public enum QueueState {
         UNBLOCKED,
@@ -267,8 +267,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         noteTransactionRecievedAndReturnLastSeen(initiatorId, Long.MAX_VALUE, true, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
 
         // remove initiator from minimum. txnid scoreboard
-        LastInitiatorData remove = m_initiatorData.remove(initiatorId);
-        assert(remove != null);
+        m_initiatorData.remove(initiatorId);
     }
 
     public void faultTransaction(OrderableTransaction txnState) {

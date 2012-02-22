@@ -47,10 +47,9 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
      * @param singlePartition Does this statement access one or multiple partitions?
      */
-    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition,
-                           int partitionCount)
+    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition)
     {
-        super(db, parsedStmt, singlePartition, partitionCount);
+        super(db, parsedStmt, singlePartition);
 
         assert(m_parsedStmt.tableList.size() == 1);
         m_targetTable = m_parsedStmt.tableList.get(0);

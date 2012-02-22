@@ -58,8 +58,7 @@ public abstract class SubPlanAssembler {
     /** Do the plan need to scan all partitions or just one? */
     final boolean m_singlePartition;
 
-    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition,
-                     int partitionCount)
+    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition)
     {
         m_db = db;
         m_parsedStmt = parsedStmt;

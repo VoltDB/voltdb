@@ -40,9 +40,15 @@ public class SiteTracker {
     private final Set<Integer> m_allHosts = new HashSet<Integer>();
     public final Set<Integer> m_allHostsImmutable = Collections.unmodifiableSet(m_allHosts);
 
+    /*
+     * Includes initiator sites and execution sites only. Not really "all"
+     */
     private final Set<Long> m_allSites = new HashSet<Long>();
     public final Set<Long> m_allSitesImmutable = Collections.unmodifiableSet(m_allSites);
-    private final long m_allSitesArray[];
+
+    private final Set<Long> m_allExecutionSites = new HashSet<Long>();
+    public final Set<Long> m_allExecutionSitesImmutable = Collections.unmodifiableSet(m_allExecutionSites);
+    private final long m_allExecutionSitesArray[];
 
     private final Set<Long> m_allInitiators = new HashSet<Long>();
     public final Set<Long> m_allInitiatorsImmutable = Collections.unmodifiableSet(m_allInitiators);
@@ -64,6 +70,12 @@ public class SiteTracker {
     public final Map<MailboxType, List<Long>> m_otherHSIdsImmutable;
 
     public final Map<MailboxType, Map<Integer, List<Long>>> m_hostsToOtherHSIdsImmutable;
+
+    public final int m_numberOfPartitions;
+    public final int m_numberOfHosts;
+    public final int m_numberOfExecutionSites;
+
+    private final int m_allPartitions[];
 
     private long m_statsAgents[];
 
@@ -109,11 +121,25 @@ public class SiteTracker {
             hostsToOtherHSIds.put(e.getKey(), MiscUtils.unmodifiableMapCopy(e.getValue()));
         }
         m_hostsToOtherHSIdsImmutable = Collections.unmodifiableMap(hostsToOtherHSIdsReplacement);
-        m_allSitesArray = new long[m_allSites.size()];
+        m_allExecutionSitesArray = new long[m_allExecutionSites.size()];
         int ii = 0;
-        for (Long site : m_allSites) {
-            m_allSitesArray[ii++] = site;
+        for (Long site : m_allExecutionSites) {
+            m_allExecutionSitesArray[ii++] = site;
         }
+        m_numberOfPartitions = m_partitionsToSitesImmutable.keySet().size();
+        m_numberOfHosts = m_hostsToSitesImmutable.keySet().size();
+        m_numberOfExecutionSites = m_sitesToPartitionsImmutable.keySet().size();
+        m_allPartitions = new int[m_numberOfPartitions];
+        ii = 0;
+        for (Integer partition : m_partitionsToSitesImmutable.keySet()) {
+            m_allPartitions[ii++] = partition;
+        }
+        m_allSites.addAll(m_allExecutionSites);
+        m_allSites.addAll(m_allInitiators);
+    }
+
+    public int[] getAllPartitions() {
+        return Arrays.copyOf(m_allPartitions, m_allPartitions.length);
     }
 
     private void populateStatsAgents(List<MailboxNodeContent> value) {
@@ -167,7 +193,7 @@ public class SiteTracker {
 
 
             m_allHosts.add(hostId);
-            m_allSites.add(obj.HSId);
+            m_allExecutionSites.add(obj.HSId);
             sitesToPartitions.put(obj.HSId, obj.partitionId);
         }
         m_isFirstHost = (m_hostId == firstHostId);
@@ -227,17 +253,17 @@ public class SiteTracker {
     }
 
     public Set<Long> getAllSites() {
-        return m_allSitesImmutable;
+        return m_allExecutionSitesImmutable;
     }
 
     public long[] getAllSitesExcluding(long site) {
-        long allSitesMinusOne[] = new long[m_allSitesArray.length - 1];
+        long allSitesMinusOne[] = new long[m_allExecutionSitesArray.length - 1];
         int zz = 0;
-        for (int ii = 0; ii < m_allSitesArray.length; ii++) {
-            if (m_allSitesArray[ii] == site) {
+        for (int ii = 0; ii < m_allExecutionSitesArray.length; ii++) {
+            if (m_allExecutionSitesArray[ii] == site) {
                 continue;
             }
-            allSitesMinusOne[zz++] =  m_allSitesArray[ii];
+            allSitesMinusOne[zz++] =  m_allExecutionSitesArray[ii];
         }
         return allSitesMinusOne;
     }

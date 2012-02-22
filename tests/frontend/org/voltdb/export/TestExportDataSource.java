@@ -53,8 +53,6 @@ public class TestExportDataSource extends TestCase {
     @Override
     public void setUp() {
         m_mockVoltDB = new MockVoltDB();
-        m_mockVoltDB.addHost(m_host);
-        m_mockVoltDB.addPartition(m_part);
         m_mockVoltDB.addSite(MiscUtils.getHSIdFromHostAndSite(m_host, m_site), m_part);
         m_mockVoltDB.addTable("TableName", false);
         m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);

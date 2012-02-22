@@ -66,7 +66,6 @@ import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Partition;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -466,11 +465,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             snapshotPath = context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
         }
 
-        int[] allPartitions = new int[context.numberOfPartitions];
-        int i = 0;
-        for (Partition p : context.cluster.getPartitions()) {
-            allPartitions[i++] = Integer.parseInt(p.getTypeName());
-        }
+        SiteTracker st = VoltDB.instance().getSiteTracker();
+        int[] allPartitions = st.getAllPartitions();
 
         org.voltdb.catalog.CommandLog cl = context.cluster.getLogconfig().get("log");
 
@@ -482,7 +478,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         RestoreAgent restoreAgent = new RestoreAgent(getClient(0),
                                                      snapshotMonitor, this,
                                                      hostId, this.action,
-                                                     context.numberOfPartitions,
                                                      cl.getEnabled(),
                                                      cl.getLogpath(),
                                                      cl.getInternalsnapshotpath(),

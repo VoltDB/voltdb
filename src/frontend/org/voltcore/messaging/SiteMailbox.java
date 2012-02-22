@@ -88,6 +88,7 @@ public class SiteMailbox implements Mailbox {
             throws MessagingException {
         assert(message != null);
         assert(hsIds != null);
+        message.m_sourceHSId = m_hsId;
         m_hostMessenger.send(hsIds, message);
     }
 

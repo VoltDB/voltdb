@@ -381,8 +381,6 @@ public class TestPartitionedTableSaveFileState extends TestCase
     private void addSiteInfoToCatalog(int siteId, int hostId, int partitionId,
                                       boolean isExec)
     {
-        m_voltDB.addPartition(partitionId);
-        m_voltDB.addHost(hostId);
         if (isExec) {
             m_voltDB.addSite(MiscUtils.getHSIdFromHostAndSite(hostId, siteId), partitionId);
         } else {

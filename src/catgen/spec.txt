@@ -4,9 +4,6 @@ end
 
 begin Cluster           "A set of connected hosts running one or more database application contexts"
   Database* databases   "The set of databases the cluster is running"
-  Host* hosts           "The set of host that belong to this cluster"
-  Site* sites           "The set of physical execution contexts executing on this cluster"
-  Partition* partitions "The set of logical partitions in this cluster"
   Deployment* deployment "Storage for settings passed in on deployment"
   int localepoch        "The number of seconds since the epoch that we're calling our local epoch"
   bool securityEnabled  "Whether security and authentication should be enabled/disabled"
@@ -32,21 +29,6 @@ end
 begin Systemsettings  "Container for deployment systemsettings element"
   int maxtemptablesize   "The maximum allocation size for temp tables in the EE"
   int snapshotpriority "The priority of snapshot work"
-end
-
-begin Host      "A single host participating in the cluster"
-  string ipaddr "The ip address or hostname of the host"
-end
-
-begin Partition       "A logical, replicate-able partition"
-end
-
-begin Site             "A physical execution context for the system"
-  bool  isexec         "Does the site execute workunits?"
-  Host? host           "Which host does the site belong to?"
-  Partition? partition "Which logical data partition does this host process?"
-  int initiatorid      "If the site is an initiator, this is its tightly packed id"
-  bool isUp            "Is the site up?"
 end
 
 begin Database          "A set of schema, procedures and other metadata that together comprise an application"

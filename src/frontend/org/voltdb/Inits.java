@@ -41,8 +41,6 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Site;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
 import org.voltcore.agreement.ZKUtil;
@@ -323,13 +321,6 @@ public class Inits {
                 System.exit(-1);
             }
 
-            // copy the existing cluster up/down status to the new catalog
-            Cluster newCluster = catalog.getClusters().get("cluster");
-            Cluster oldCluster = m_rvdb.m_catalogContext.cluster;
-            for (Site site : oldCluster.getSites()) {
-                newCluster.getSites().get(site.getTypeName()).setIsup(site.getIsup());
-            }
-
             try {
                 long catalogTxnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
@@ -600,11 +591,7 @@ public class Inits {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
                 }
 
-                int[] allPartitions = new int[m_rvdb.m_catalogContext.numberOfPartitions];
-                int i = 0;
-                for (Partition p : m_rvdb.m_catalogContext.cluster.getPartitions()) {
-                    allPartitions[i++] = Integer.parseInt(p.getTypeName());
-                }
+                int[] allPartitions = m_rvdb.getSiteTracker().getAllPartitions();
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
 
@@ -615,7 +602,6 @@ public class Inits {
                                                       m_rvdb,
                                                       m_rvdb.m_myHostId,
                                                       m_config.m_startAction,
-                                                      m_rvdb.m_catalogContext.numberOfPartitions,
                                                       cl.getEnabled(),
                                                       cl.getLogpath(),
                                                       cl.getInternalsnapshotpath(),

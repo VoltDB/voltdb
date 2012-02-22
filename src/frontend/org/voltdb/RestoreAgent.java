@@ -103,7 +103,6 @@ SnapshotCompletionInterest {
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final START_ACTION m_action;
-    private final int m_partitionCount;
     private final Set<Integer> m_liveHosts;
     private final boolean m_clEnabled;
     private final String m_clPath;
@@ -295,7 +294,7 @@ SnapshotCompletionInterest {
                           ioe);
                 return;
             }
-            handleResponse((ClientResponse) resp);
+            handleResponse(resp);
         }
 
         @Override
@@ -427,8 +426,7 @@ SnapshotCompletionInterest {
     }
 
     public RestoreAgent(ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
-                        Callback callback, int hostId, START_ACTION action,
-                        int partitionCount, boolean clEnabled,
+                        Callback callback, int hostId, START_ACTION action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
                         Set<Integer> liveHosts)
@@ -439,7 +437,6 @@ SnapshotCompletionInterest {
         m_callback = callback;
         m_action = action;
         m_zk = zk;
-        m_partitionCount = partitionCount;
         m_clEnabled = VoltDB.instance().getConfig().m_isEnterprise ? clEnabled : false;
         m_clPath = clPath;
         m_clSnapshotPath = clSnapshotPath;
@@ -470,7 +467,7 @@ SnapshotCompletionInterest {
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_zk,
-                                                                    m_partitionCount,
+                                                                    m_allPartitions.length,
                                                                     m_clPath,
                                                                     m_allPartitions,
                                                                     m_liveHosts,

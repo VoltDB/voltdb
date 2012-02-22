@@ -356,15 +356,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Convenience method for doing the verbose COW remove from the map
      */
     private void removeForeignHost(int hostId) {
+        ForeignHost fh = null;
         while (true) {
+            fh = null;
             HashMap<Integer, ForeignHost> original = m_foreignHosts.get();
             HashMap<Integer, ForeignHost> update = new HashMap<Integer, ForeignHost>(original);
-            if (update.remove(hostId) == null) {
+            if ((fh = update.remove(hostId)) == null) {
                 return;
             }
             if (m_foreignHosts.compareAndSet(original, update)) {
                 break;
             }
+        }
+        if (fh != null) {
+            fh.close();
         }
     }
 

@@ -275,7 +275,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             // Choose the lowest site ID on this host to truncate export data
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_hs_id =
-                    VoltDB.instance().getSiteTracker().
+                    context.getSiteTracker().
                     getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
@@ -363,7 +363,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_hs_id =
-                    VoltDB.instance().getSiteTracker().
+                    context.getSiteTracker().
                     getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
@@ -422,7 +422,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_hs_id =
-                    VoltDB.instance().getSiteTracker().
+                    context.getSiteTracker().
                     getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_hs_id)
             {
@@ -741,7 +741,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
             VoltTable result =
                     performDistributePartitionedTable(table_name, originalHosts,
-                            relevantPartitions);
+                            relevantPartitions, context);
             return new DependencyPair( dependency_id, result);
         }
         else if (fragmentId ==
@@ -1387,14 +1387,15 @@ public class SnapshotRestore extends VoltSystemProcedure
 
     private VoltTable performDistributePartitionedTable(String tableName,
             int originalHostIds[],
-            int relevantPartitionIds[])
+            int relevantPartitionIds[],
+            SystemProcedureExecutionContext ctx)
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
         // XXX This is all very similar to the splitting code in
         // LoadMultipartitionTable.  Consider ways to consolidate later
         Map<Long, Integer> sites_to_partitions =
                 new HashMap<Long, Integer>();
-        SiteTracker tracker = VoltDB.instance().getSiteTracker();
+        SiteTracker tracker = ctx.getSiteTracker();
         sites_to_partitions.putAll(tracker.getSitesToPartitions());
 
         try
@@ -1447,7 +1448,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
 
                 byte[][] partitioned_tables =
-                        createPartitionedTables(tableName, table);
+                        createPartitionedTables(tableName, table, tracker.m_numberOfPartitions);
                 if (c != null) {
                     c.discard();
                 }
@@ -1501,9 +1502,8 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private byte[][] createPartitionedTables(String tableName,
-            VoltTable loadedTable) throws Exception
+            VoltTable loadedTable, int number_of_partitions) throws Exception
             {
-        int number_of_partitions = m_cluster.getPartitions().size();
         Table catalog_table = m_database.getTables().getIgnoreCase(tableName);
         assert(!catalog_table.getIsreplicated());
         // XXX blatantly stolen from LoadMultipartitionTable

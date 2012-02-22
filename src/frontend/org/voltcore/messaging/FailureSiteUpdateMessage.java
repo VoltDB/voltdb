@@ -20,8 +20,10 @@ package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
 import java.util.HashSet;
+import java.util.Set;
 
 public class FailureSiteUpdateMessage extends VoltMessage {
+
     /** Site id of the failed sites */
     public HashSet<Long> m_failedHSIds = new HashSet<Long>();
 
@@ -35,7 +37,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     public long m_committedTxnId;
 
     public FailureSiteUpdateMessage(
-            HashSet<Long> failedHSIds,
+            Set<Long> failedHSIds,
             long initiatorForSafeTxnId,
             long safeTxnId,
             long committedTxnId)

@@ -22,6 +22,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
@@ -33,11 +36,11 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltcore.messaging.HostMessenger;
@@ -171,45 +174,51 @@ public class Rejoin extends VoltSystemProcedure {
         ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
         ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
         Cluster cluster = context.getCluster();
-        for (Site site : cluster.getSites()) {
-            int siteId = Integer.parseInt(site.getTypeName());
-            int hostId = Integer.parseInt(site.getHost().getTypeName());
-            if (hostId == rejoinHostId) {
-                assert(site.getIsup() == false);
-                rejoiningSiteIds.add(siteId);
-                if (site.getIsexec() == true) {
-                    rejoiningExecSiteIds.add(siteId);
-                }
-            }
-        }
-        assert(rejoiningSiteIds.size() > 0);
-
-        StringBuilder sb = new StringBuilder();
-        for (int siteId : rejoiningSiteIds)
-        {
-            sb.append("set ");
-            String site_path = VoltDB.instance().getCatalogContext().catalog.
-                               getClusters().get("cluster").getSites().
-                               get(Integer.toString(siteId)).getPath();
-            sb.append(site_path).append(" ").append("isUp true");
-            sb.append("\n");
-        }
-        String catalogDiffCommands = sb.toString();
-
-        String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), true);
-        context.getExecutionSite().updateClusterState(catalogDiffCommands);
-
-        retval.addRow(context.getSiteId(), error);
-
-        if (debugFlag) {
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
-        return retval;
+        throw new UnsupportedOperationException();
+//        /*
+//         * Retrieve the topology since it was last updated,
+//         * and then validate it against what site tracker has
+//         */
+//        final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+//        for (Site site : cluster.getSites()) {
+//            int siteId = Integer.parseInt(site.getTypeName());
+//            int hostId = Integer.parseInt(site.getHost().getTypeName());
+//            if (hostId == rejoinHostId) {
+//                assert(site.getIsup() == false);
+//                rejoiningSiteIds.add(siteId);
+//                if (site.getIsexec() == true) {
+//                    rejoiningExecSiteIds.add(siteId);
+//                }
+//            }
+//        }
+//        assert(rejoiningSiteIds.size() > 0);
+//
+//        StringBuilder sb = new StringBuilder();
+//        for (int siteId : rejoiningSiteIds)
+//        {
+//            sb.append("set ");
+//            String site_path = VoltDB.instance().getCatalogContext().catalog.
+//                               getClusters().get("cluster").getSites().
+//                               get(Integer.toString(siteId)).getPath();
+//            sb.append(site_path).append(" ").append("isUp true");
+//            sb.append("\n");
+//        }
+//        String catalogDiffCommands = sb.toString();
+//
+//        String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), true);
+//        context.getExecutionSite().updateClusterState(catalogDiffCommands);
+//
+//        retval.addRow(context.getSiteId(), error);
+//
+//        if (debugFlag) {
+//            try {
+//                Thread.sleep(250);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//
+//        return retval;
     }
 
     VoltTable phaseThreeRollback(int hostId) {

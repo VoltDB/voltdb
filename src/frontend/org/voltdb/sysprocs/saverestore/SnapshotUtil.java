@@ -782,13 +782,6 @@ public class SnapshotUtil {
         return my_tables;
     }
 
-    public static final List<Integer> getPartitionsOnHost(int host) {
-        final ArrayList<Integer> results = new ArrayList<Integer>();
-        results.addAll(VoltDB.instance().getSiteTracker().getPartitionsForHost(host));
-        return results;
-    }
-
-
     public static File[] retrieveRelevantFiles(String filePath,
                                                final String fileNonce)
     {

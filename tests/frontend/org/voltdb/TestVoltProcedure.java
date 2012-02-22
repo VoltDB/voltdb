@@ -58,6 +58,7 @@ import junit.framework.TestCase;
 import org.voltcore.utils.MiscUtils;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.TimestampType;
 
 public class TestVoltProcedure extends TestCase {
@@ -242,14 +243,15 @@ public class TestVoltProcedure extends TestCase {
     MockExecutionSite site;
     MockStatsAgent agent;
     ParameterSet nullParam;
+    private long executionSiteId;
 
     @Override
     public void setUp()
     {
         manager = new MockVoltDB();
-        manager.addHost(0);
-        manager.addPartition(0);
-        final long executionSiteId = MiscUtils.getHSIdFromHostAndSite( 0, 1);
+
+        final long executionSiteId = MiscUtils.getHSIdFromHostAndSite( 0, 42);
+        this.executionSiteId = executionSiteId;
         manager.addSite(executionSiteId, 0);
         agent = new MockStatsAgent();
         manager.setStatsAgent(agent);
@@ -271,7 +273,11 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName());
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
-        site = new MockExecutionSite(executionSiteId, VoltDB.instance().getCatalogContext().catalog.serialize()) {
+        site = new MockExecutionSite(
+                executionSiteId,
+                VoltDB.instance().getCatalogContext().catalog.serialize(),
+                VoltDB.instance().getSiteTracker()) {
+
             @Override
             public int getCorrespondingPartitionId() {
                 return 42;
@@ -396,7 +402,7 @@ public class TestVoltProcedure extends TestCase {
 
     public void testProcedureStatsCollector() {
         NullProcedureWrapper wrapper = new LongProcedure();
-        wrapper.init(site.m_context.cluster.getPartitions().size(),
+        wrapper.init(site.getSiteTracker().m_numberOfPartitions,
                      site, site.m_context.database.getProcedures().get(LongProcedure.class.getName()),
                      BackendTarget.NATIVE_EE_JNI, null, null);
         ParameterSet params = new ParameterSet();
@@ -406,7 +412,7 @@ public class TestVoltProcedure extends TestCase {
         assertNotNull(agent.m_source);
         assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);
         assertEquals(agent.m_catalogId,
-                     Long.parseLong(site.m_context.cluster.getSites().get(Long.toString(site.getSiteId())).getTypeName()));
+                     executionSiteId);
         Object statsRow[][] = agent.m_source.getStatsRows(false, 0L);
         assertNotNull(statsRow);
         assertEquals( 0, statsRow.length);
@@ -434,18 +440,19 @@ public class TestVoltProcedure extends TestCase {
             e.printStackTrace();
         }
 
-        wrapper.init(site.m_context.cluster.getPartitions().size(), site,
+        wrapper.init(site.getSiteTracker().m_numberOfPartitions, site,
                      site.m_context.database.getProcedures().get(procedure.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
         return wrapper.call(null, (Object) null);
     }
 
     private class MockExecutionSite extends ExecutionSite {
-        public MockExecutionSite(long siteId, String serializedCatalog) {
+        public MockExecutionSite(long siteId, String serializedCatalog, SiteTracker tracker) {
             super(siteId);
             // get some catalog shortcuts ready
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
             m_context = new CatalogContext(System.currentTimeMillis(), catalog, null, 0, 0, 0);
+            m_tracker = tracker;
         }
     }
 

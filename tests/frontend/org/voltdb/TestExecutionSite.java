@@ -309,13 +309,15 @@ public class TestExecutionSite extends TestCase {
             //System.out.println("KILLING SITE: " + m_siteId);
             m_sites.get(m_siteId).shutdown();
             m_voltdb.killSite(m_siteId);
+            long initiatorId = getInitiatorIds()[MiscUtils.getSiteIdFromHSId(m_siteId)];
+            m_voltdb.killSite(initiatorId);
+
             /*
              * Fail the site, and its initiator
              */
             m_voltdb.getFaultDistributor().reportFault(
                     new SiteFailureFault(Arrays.asList(new Long[] {
-                            m_siteId, MiscUtils.getHSIdFromHostAndSite(m_siteId.intValue(),
-                                    MiscUtils.getSiteIdFromHSId(m_siteId) + 1000)})));
+                            m_siteId, initiatorId})));
             // remove this site from the postoffice
             postoffice.remove(m_siteId);
             // stop/join this site's thread
@@ -355,7 +357,6 @@ public class TestExecutionSite extends TestCase {
 
         // one host and one initiator per site
         for (int ss=0; ss < siteCount; ss++) {
-            m_voltdb.addHost(getHostIdForSiteId(ss));
             final long siteId = MiscUtils.getHSIdFromHostAndSite(getHostIdForSiteId(ss), getInitiatorIdForSiteId(ss));
             m_voltdb.addSite( siteId, MailboxType.Initiator);
             // Configure log4j so that ExecutionSite generates FUZZTEST output
@@ -372,7 +373,6 @@ public class TestExecutionSite extends TestCase {
         // create k+1 sites per partition
         int siteIndex = 0;
         for (int pp=0; pp < partitionCount; pp++) {
-            m_voltdb.addPartition(pp);
             for (int kk=0; kk < (kFactor + 1); kk++) {
                 final long siteId = MiscUtils.getHSIdFromHostAndSite(getHostIdForSiteId(siteIndex), siteIndex);
                 m_voltdb.addSite(siteId, pp);
@@ -421,7 +421,6 @@ public class TestExecutionSite extends TestCase {
                         m_rpqs.get(siteId),
                         false,
                         false,
-                        new HashSet<Integer>(),
                         0));
             registerMailbox(siteId, m_mboxes.get(siteId));
         }
@@ -429,6 +428,9 @@ public class TestExecutionSite extends TestCase {
     @Override
     protected void setUp() throws Exception
     {
+        if (m_voltdb != null) {
+            tearDown();
+        }
         super.setUp();
         setUp( SITE_COUNT, PARTITION_COUNT, K_FACTOR);
     }
@@ -436,10 +438,13 @@ public class TestExecutionSite extends TestCase {
     @Override
     protected void tearDown() throws Exception
     {
+        System.out.println("Doing shutdown");
         super.tearDown();
         m_sites.clear();
         m_mboxes.clear();
         m_voltdb.shutdown(null);
+        m_voltdb = null;
+        System.out.println("Shutdown ZK");
         m_checker = null;
     }
 
@@ -1122,9 +1127,10 @@ public class TestExecutionSite extends TestCase {
         es1.start();
 
         m_voltdb.killSite(getHSIdForES(1));
+        m_voltdb.killSite(getInitiatorIds()[1]);
         m_voltdb.getFaultDistributor().reportFault(
                 new SiteFailureFault(
-                        Arrays.asList(new Long[] { getHSIdForES(1) })));
+                        Arrays.asList(new Long[] { getInitiatorIds()[1], getHSIdForES(1) })));
         es1.join();
 
         // post-conditions
@@ -1166,6 +1172,7 @@ public class TestExecutionSite extends TestCase {
                                         true,          // single partition
                                         spi,
                                         safe_txn_id);  // last safe txnid
+            itm.m_sourceHSId = initiator_id;
             m_mboxes.get(i).deliver(itm);
         }
     }
@@ -1225,13 +1232,14 @@ public class TestExecutionSite extends TestCase {
                                     false,         // multi-partition
                                     spi,
                                     safe_txn_id);  // last safe txnid
-
+        itm.m_sourceHSId = initiator_id;
         m_mboxes.get(coordinator_id).deliver(itm);
 
         for (long participant : participants) {
             final MultiPartitionParticipantMessage mppm =
                 new MultiPartitionParticipantMessage
                 (initiator_id, coordinator_id, txn_id, readOnly);
+            mppm.m_sourceHSId = initiator_id;
             m_mboxes.get(participant).deliver(mppm);
         }
     }
@@ -1250,6 +1258,7 @@ public class TestExecutionSite extends TestCase {
     {
         HeartbeatMessage hbm =
             new HeartbeatMessage(initiator_id, txn_id, safe_txn_id);
+        hbm.m_sourceHSId = initiator_id;
         for (Mailbox m : m_mboxes.values()) {
             m.deliver(hbm);
         }
@@ -1365,6 +1374,7 @@ public class TestExecutionSite extends TestCase {
                                         true,          // single partition
                                         spi,
                                         0);  // last safe txnid
+        itm.m_sourceHSId = getInitiatorIds()[initiatorToDie1 / 1000];
         m_mboxes.get(involvedSites1.get(2)).deliver(itm);
 
         //This initiator will initiate the txn with the higher txn id that is fully replicated
@@ -1383,24 +1393,24 @@ public class TestExecutionSite extends TestCase {
                                             true,          // single partition
                                             spi,
                                             2);  // last safe txnid
+            itm.m_sourceHSId = getInitiatorIds()[initiatorToDie2 / 1000];
             m_mboxes.get(involvedSites1.get(ii)).deliver(itm);
         }
 
+        LocalObjectMessage lom = new LocalObjectMessage(new Runnable() {
+            @Override
+            public void run() {
+                throw new Error();
+            }
+        });
+        lom.m_sourceHSId = involvedSites2.get(0);
         /*
          * Kill the two initiators
          */
-        m_mboxes.get(involvedSites2.get(0)).deliver(new LocalObjectMessage(new Runnable() {
-            @Override
-            public void run() {
-                throw new Error();
-            }
-        }));
-        m_mboxes.get(involvedSites2.get(1)).deliver(new LocalObjectMessage(new Runnable() {
-            @Override
-            public void run() {
-                throw new Error();
-            }
-        }));
+        m_mboxes.get(involvedSites2.get(0)).deliver(lom);
+        lom.m_sourceHSId = involvedSites2.get(1);
+        m_mboxes.get(involvedSites2.get(1)).deliver(lom);
+
         m_siteThreads.get(involvedSites2.get(0)).join();
         m_siteThreads.get(involvedSites2.get(1)).join();
 
@@ -1408,7 +1418,11 @@ public class TestExecutionSite extends TestCase {
         m_voltdb.killSite(involvedSites2.get(0));
         m_voltdb.getFaultDistributor().reportFault(
                 new SiteFailureFault(
-                        Arrays.asList( new Long[] {involvedSites2.get(0)})));
+                        Arrays.asList( new Long[] {
+                                MiscUtils.getHSIdFromHostAndSite(
+                                        involvedSites2.get(0).intValue(),
+                                        (int)(involvedSites2.get(0).longValue() >> 32) + 1000),
+                                        involvedSites2.get(0)})));
         // remove this site from the postoffice
         postoffice.remove(involvedSites2.get(0));
 
@@ -1416,7 +1430,11 @@ public class TestExecutionSite extends TestCase {
         m_voltdb.killSite(involvedSites2.get(1));
         m_voltdb.getFaultDistributor().reportFault(
                 new SiteFailureFault(
-                        Arrays.asList(new Long[]{involvedSites2.get(1)})));
+                        Arrays.asList(new Long[]{
+                                MiscUtils.getHSIdFromHostAndSite(
+                                        involvedSites2.get(1).intValue(),
+                                        (int)(involvedSites2.get(1).longValue() >> 32) + 1000),
+                                        involvedSites2.get(1)})));
         // remove this site from the postoffice
         postoffice.remove(involvedSites2.get(1));
 
@@ -1444,12 +1462,8 @@ public class TestExecutionSite extends TestCase {
 
         for (RussianRouletteMailbox mailbox : m_mboxes.values()) {
             if (mailbox != null) {
-                mailbox.deliver(new LocalObjectMessage(new Runnable() {
-                    @Override
-                    public void run() {
-                        throw new Error();
-                    }
-                }));
+                lom.m_sourceHSId = mailbox.getHSId();
+                mailbox.deliver(lom);
             }
         }
 

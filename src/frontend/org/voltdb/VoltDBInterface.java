@@ -130,13 +130,6 @@ public interface VoltDBInterface
            int expectedCatalogVersion, long currentTxnId, long deploymentCRC);
 
    /**
-    * Updates the physical cluster configuration stored in the catalog at this server.
-    *
-    * @param diffCommands  The catalog commands that will update the cluster config
-    */
-   void clusterUpdate(String diffCommands);
-
-   /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
      * when the run() method is called, and set to false when shutting down.
      *

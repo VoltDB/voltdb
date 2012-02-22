@@ -177,10 +177,10 @@ public class AdHoc extends VoltSystemProcedure {
         if (replicatedTableDML) {
             assert(results.length == 1);
             long changedTuples = results[0].asScalarLong();
-            assert((changedTuples % VoltDB.instance().getCatalogContext().numberOfPartitions) == 0);
+            assert((changedTuples % ctx.getSiteTracker().m_numberOfPartitions) == 0);
 
             VoltTable retval = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
-            retval.addRow(changedTuples / VoltDB.instance().getCatalogContext().numberOfPartitions);
+            retval.addRow(changedTuples / ctx.getSiteTracker().m_numberOfPartitions);
             results[0] = retval;
         }
 

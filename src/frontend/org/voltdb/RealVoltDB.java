@@ -52,6 +52,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.utils.Pair;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -110,6 +111,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
+    private volatile boolean m_validateConfiguredNumberOfPartitionsOnMailboxUpdate;
+    private int m_configuredNumberOfPartitions;
     CatalogContext m_catalogContext;
     volatile SiteTracker m_siteTracker;
     MailboxTracker m_mailboxTracker;
@@ -234,6 +237,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_statsAgent = new StatsAgent();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
+            m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = false;
             m_snapshotCompletionMonitor = null;
             m_catalogContext = null;
             m_partitionCountStats = null;
@@ -298,11 +302,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
 
             ArrayDeque<Mailbox> siteMailboxes = null;
+            ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             // start mailbox tracker since all the
             m_faultManager = new FaultDistributor(this);
             try {
-                siteMailboxes = createMailboxesForSites();
+                Pair<ArrayDeque<Mailbox>, ClusterConfig> p = createMailboxesForSites();
+                siteMailboxes = p.getFirst();
+                clusterConfig = p.getSecond();
                 // This will set up site tracker
                 m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
                 m_mailboxTracker.start();
@@ -373,7 +380,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                           null,
                                           m_recovering,
                                           m_replicationActive,
-                                          m_downHosts,
                                           m_catalogContext.m_transactionId);
                 m_localSites.put(localThreadMailbox.getHSId(), siteObj);
                 m_currentThreadSite = siteObj;
@@ -418,7 +424,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                                    m_catalogContext,
                                                    m_replicationRole,
                                                    initiator,
-                                                   m_catalogContext.numberOfNodes,
+                                                   clusterConfig.getPartitionCount(),
                                                    config.m_port + portOffset,
                                                    config.m_adminPort + portOffset,
                                                    m_config.m_timestampTestingSalt);
@@ -430,7 +436,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_dtxns.add(initiator);
             }
 
-            m_partitionCountStats = new PartitionCountStats( m_catalogContext.numberOfPartitions);
+            m_partitionCountStats = new PartitionCountStats( clusterConfig.getPartitionCount());
             m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
                                              0, m_partitionCountStats);
             m_ioStats = new IOStats();
@@ -469,6 +475,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 hostLog.fatal("Failed to announce ready state.");
                 VoltDB.crashLocalVoltDB("Failed to announce ready state.", false, null);
             }
+            m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = true;
+            if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
+                VoltDB.crashGlobalVoltDB("Mismatch between configured number of partitions (" +
+                        m_configuredNumberOfPartitions + ") and actual (" +
+                        m_siteTracker.m_numberOfPartitions + ")",
+                        true, null);
+            }
 
             heartbeatThread = new HeartbeatThread(m_clientInterfaces);
             heartbeatThread.start();
@@ -477,8 +490,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
 
-            int k = m_catalogContext.numberOfExecSites / m_catalogContext.numberOfPartitions;
-            if (k == 1) {
+            if (clusterConfig.getReplicationFactor() == 1) {
                 hostLog.warn("Running without redundancy (k=0) is not recommended for production use.");
             }
 
@@ -496,15 +508,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
     }
 
-    private ArrayDeque<Mailbox> createMailboxesForSites() throws Exception {
+    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSites() throws Exception {
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
         int sitesperhost = m_deployment.getCluster().getSitesperhost();
         int hostcount = m_deployment.getCluster().getHostcount();
         int kfactor = m_deployment.getCluster().getKfactor();
         ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+        if (!clusterConfig.validate()) {
+            VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
+        }
         JSONObject topo = registerClusterConfig(clusterConfig);
         List<Integer> partitions =
             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
+        m_configuredNumberOfPartitions = partitions.size();
         assert(partitions.size() == sitesperhost);
         for (Integer partition : partitions)
         {
@@ -512,7 +528,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             mailboxes.add(mailbox);
             registerExecutionSiteMailbox(mailbox.getHSId(), partition);
         }
-        return mailboxes;
+        return Pair.of( mailboxes, clusterConfig);
     }
 
     private JSONObject registerClusterConfig(ClusterConfig config)
@@ -1447,22 +1463,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public void clusterUpdate(String diffCommands)
-    {
-        synchronized(m_catalogUpdateLock)
-        {
-            //Reuse the txn id since this doesn't change schema/procs/export
-            m_catalogContext = m_catalogContext.update(m_catalogContext.m_transactionId, null,
-                                                       diffCommands, false, -1);
-        }
-
-        for (ClientInterface ci : m_clientInterfaces)
-        {
-            ci.notifyOfCatalogUpdate();
-        }
-    }
-
-    @Override
     public VoltDB.Configuration getConfig() {
         return m_config;
     }
@@ -1793,7 +1793,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     @Override
     public void handleMailboxUpdate(Map<MailboxType, List<MailboxNodeContent>> mailboxes) {
+        SiteTracker oldTracker = m_siteTracker;
         m_siteTracker = new SiteTracker(m_myHostId, mailboxes);
+        if (m_validateConfiguredNumberOfPartitionsOnMailboxUpdate) {
+            if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
+                VoltDB.crashGlobalVoltDB(
+                        "Configured number of partitions " + m_configuredNumberOfPartitions +
+                        " is not the same as the number of partitions present " + m_siteTracker.m_numberOfPartitions,
+                        true, null);
+            }
+            if (m_siteTracker.m_numberOfPartitions != oldTracker.m_numberOfPartitions) {
+                VoltDB.crashGlobalVoltDB(
+                        "Configured number of partitions in new tracker" + m_siteTracker.m_numberOfPartitions +
+                        " is not the same as the number of partitions present " + oldTracker.m_numberOfPartitions,
+                        true, null);
+            }
+        }
     }
 
     @Override

@@ -344,7 +344,7 @@ public class SnapshotSaveAPI
                                     saveFilePath,
                                     table,
                                     context.getHostId(),
-                                    context.getCluster().getPartitions().size(),
+                                    context.getSiteTracker().m_numberOfPartitions,
                                     txnId);
                         targets.add(sdt);
                         final SnapshotDataTarget sdtFinal = sdt;
@@ -513,7 +513,7 @@ public class SnapshotSaveAPI
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             SnapshotUtil.getPartitionsOnHost(hostId),
+                                             context.getSiteTracker().getPartitionsForHost(hostId),
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

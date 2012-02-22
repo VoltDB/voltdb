@@ -25,7 +25,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.InMemoryJarfile;
@@ -41,11 +40,7 @@ public class CatalogContext {
     public final Cluster cluster;
     public final Database database;
     public final CatalogMap<Procedure> procedures;
-    public final CatalogMap<Site> sites;
     public final AuthSystem authSystem;
-    public final int numberOfPartitions;
-    public final int numberOfExecSites;
-    public final int numberOfNodes;
     public final int catalogVersion;
     private final long catalogCRC;
     public final long deploymentCRC;
@@ -91,25 +86,9 @@ public class CatalogContext {
         database = cluster.getDatabases().get("database");
         procedures = database.getProcedures();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
-        sites = cluster.getSites();
         this.deploymentCRC = deploymentCRC;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
 
-        // count nodes
-        numberOfNodes = cluster.getHosts().size();
-
-        // count exec sites
-        int execSiteCount = 0;
-        for (Site site : sites) {
-            if (site.getPartition() != null) {
-                assert (site.getIsexec());
-                execSiteCount++;
-            }
-        }
-        numberOfExecSites = execSiteCount;
-
-        // count partitions
-        numberOfPartitions = cluster.getPartitions().size();
         catalogVersion = version;
     }
 

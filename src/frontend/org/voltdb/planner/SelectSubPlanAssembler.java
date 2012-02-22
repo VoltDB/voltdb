@@ -58,9 +58,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param singlePartition Does this statement access one or multiple partitions?
      */
     SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
-                           boolean singlePartition, int partitionCount)
+                           boolean singlePartition)
     {
-        super(db, parsedStmt, singlePartition, partitionCount);
+        super(db, parsedStmt, singlePartition);
         //If a join order was provided
         if (parsedStmt.joinOrder != null) {
             //Extract the table names from the , separated list

@@ -66,7 +66,6 @@ public class ExecutionSiteRunner implements Runnable {
                                           null,
                                           m_recovering,
                                           m_replicationActive,
-                                          m_failedHostIds,
                                           m_txnId);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);

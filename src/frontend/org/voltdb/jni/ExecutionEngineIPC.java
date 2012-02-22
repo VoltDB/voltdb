@@ -536,7 +536,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final String hostname,
             final int tempTableMemory,
             final BackendTarget target,
-            final int port) {
+            final int port,
+            final int totalPartitions) {
         super(site);
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
@@ -553,7 +554,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
-        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory);
+        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory, totalPartitions);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -585,8 +586,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int partitionId,
             final int hostId,
             final String hostname,
-            final long tempTableMemory
-            )
+            final long tempTableMemory,
+            final int totalPartitions)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -599,6 +600,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(partitionId);
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
+        m_data.putLong(tempTableMemory);
+        m_data.putInt(totalPartitions);
         m_data.putShort((short)hostname.length());
         try {
             m_data.put(hostname.getBytes("UTF-8"));

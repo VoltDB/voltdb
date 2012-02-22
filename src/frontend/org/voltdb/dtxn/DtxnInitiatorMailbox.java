@@ -71,7 +71,6 @@ public class DtxnInitiatorMailbox implements Mailbox
                             m_safetyState.removeState(site);
                         }
                     }
-                    VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
                 }
             }
         }

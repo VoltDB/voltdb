@@ -64,7 +64,6 @@ import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -809,7 +808,6 @@ public abstract class CatalogUtil {
         if (!config.validate()) {
             hostLog.error(config.getErrorMsg());
         } else {
-            ClusterCompiler.compile(catalog, config);
             Cluster catCluster = catalog.getClusters().get("cluster");
             // copy the deployment info that is currently not recorded anywhere else
             Deployment catDeploy = catCluster.getDeployment().get("deployment");

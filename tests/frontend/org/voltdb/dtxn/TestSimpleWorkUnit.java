@@ -66,6 +66,7 @@ public class TestSimpleWorkUnit extends TestCase
     VoltTable t1;
     VoltTable t2;
     MockVoltDB m_voltdb;
+    SiteTracker st;
 
     // automatically generate a limited set of cluster topologies
     public void setUpSites(int numHosts, int numParts, int replicas)
@@ -74,14 +75,6 @@ public class TestSimpleWorkUnit extends TestCase
         assert(((numParts * replicas) % numHosts) == 0);
         assert(numHosts % replicas == 0);
         int sites_per_host = (numParts * replicas) / numHosts;
-        for (int i = 0; i < numHosts; i++)
-        {
-            m_voltdb.addHost(i);
-        }
-        for (int i = 0; i < numParts; i++)
-        {
-            m_voltdb.addPartition(i);
-        }
         for (int i = 0; i < numParts * replicas; i++)
         {
             System.out.println("Adding site host " + (i / sites_per_host) + " site " + i);
@@ -106,11 +99,13 @@ public class TestSimpleWorkUnit extends TestCase
         t1.addRow("dude");
         t2 = new VoltTable(cols2, 1);
         t2.addRow(10);
+        st = m_voltdb.getSiteTracker();
     }
 
     @Override
     public void tearDown() throws Exception {
         m_voltdb.shutdown(null);
+        st = null;
     }
 
     public void testNoDependenciesNoReplicas() {
@@ -137,11 +132,11 @@ public class TestSimpleWorkUnit extends TestCase
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(multi_dep).size(), 0);
-        w.putDependency(4, 0, t1);
+        w.putDependency(4, 0, t1, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, 0, t2);
+        w.putDependency(multi_dep, 0, t2, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite(0, 1), t2);
+        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite(0, 1), t2, st);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(t1, w.getDependency(4).get(0));
         assertEquals(t2, w.getDependency(multi_dep).get(0));
@@ -155,20 +150,20 @@ public class TestSimpleWorkUnit extends TestCase
 
         // Put a dependency that does not exist
         try {
-            w.putDependency(0, 0, t1);
+            w.putDependency(0, 0, t1, st);
             fail("assertion expected");
         } catch (AssertionError e) {}
 
         // Put a dependency with a null value
         try {
-            w.putDependency(4, 0, null);
+            w.putDependency(4, 0, null, st);
             fail("assertion expected");
         } catch (AssertionError e) {}
 
         // Put a dependency twice
-        w.putDependency(4, 0, t1);
+        w.putDependency(4, 0, t1, st);
         try {
-            w.putDependency(4, 0, t1);
+            w.putDependency(4, 0, t1, st);
             fail("assertion expected");
         } catch (AssertionError e) {}
     }
@@ -187,15 +182,15 @@ public class TestSimpleWorkUnit extends TestCase
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
-        w.putDependency(4, 0, t1);
+        w.putDependency(4, 0, t1, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, 0, t2);
+        w.putDependency(multi_dep, 0, t2, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 0, 1), t2);
+        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 0, 1), t2, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 1, 2), t2);
+        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 1, 2), t2, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 1, 3), t2);
+        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 1, 3), t2, st);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(1, w.getDependency(4).size());
         assertEquals(t1, w.getDependency(4).get(0));
@@ -219,14 +214,14 @@ public class TestSimpleWorkUnit extends TestCase
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
-        w.putDependency(4, 0, t1);
+        w.putDependency(4, 0, t1, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, 0, t2);
+        w.putDependency(multi_dep, 0, t2, st);
         assertFalse(w.allDependenciesSatisfied());
         boolean threw = false;
         try
         {
-            w.putDependency(multi_dep, 1, t3);
+            w.putDependency(multi_dep, 1, t3, st);
         }
         catch (RuntimeException e)
         {
@@ -250,13 +245,13 @@ public class TestSimpleWorkUnit extends TestCase
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
-        w.putDependency(4, 0, t1);
+        w.putDependency(4, 0, t1, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, 0, t2);
+        w.putDependency(multi_dep, 0, t2, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 0, 1), t2);
+        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 0, 1), t2, st);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 1, 2), t2);
+        w.putDependency(multi_dep, MiscUtils.getHSIdFromHostAndSite( 1, 2), t2, st);
         assertFalse(w.allDependenciesSatisfied());
         w.removeSite(MiscUtils.getHSIdFromHostAndSite( 1, 3));
         assertTrue(w.allDependenciesSatisfied());

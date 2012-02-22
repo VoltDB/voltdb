@@ -63,23 +63,11 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
                 SiteFailureFault site_fault = (SiteFailureFault) fault;
                 handleSiteFailureFault(site_fault);
             }
-            VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
         }
     }
 
     private void handleSiteFailureFault(SiteFailureFault site_fault) {
         hostLog.error("Sites failed, site ids: " + MiscUtils.hsIdCollectionToString(site_fault.getSiteIds()));
-        StringBuilder sb = new StringBuilder();
-        for (long site_id : site_fault.getSiteIds())
-        {
-            sb.append("set ");
-            String site_path = VoltDB.instance().getCatalogContext().catalog.
-                               getClusters().get("cluster").getSites().
-                               get(Long.toString(site_id)).getPath();
-            sb.append(site_path).append(" ").append("isUp false");
-            sb.append("\n");
-        }
-        VoltDB.instance().clusterUpdate(sb.toString());
 //        if (m_rvdb.getSiteTracker().getFailedPartitions().size() != 0)
 //        {
 //            VoltDB.crashLocalVoltDB("Failure of sites " + MiscUtils.hsIdCollectionToString(site_fault.getSiteIds()) +
@@ -102,9 +90,9 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
                 }
 
                 // kill the cluster if this all happened too soon
-                if (VoltDB.instance().getHostMessenger().isLocalHostReady() == false) {
+                if (m_rvdb.getHostMessenger().isLocalHostReady() == false) {
                     // check that this isn't a rejoining node
-                    if (VoltDB.instance().getConfig().m_rejoinToHostAndPort == null) {
+                    if (m_rvdb.getConfig().m_rejoinToHostAndPort == null) {
                         String message = "Node fault detected before all nodes finished " +
                                          "initializing. Cluster will not start.";
                         VoltDB.crashGlobalVoltDB(message, false, null);

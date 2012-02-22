@@ -648,8 +648,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
         survivorSet.removeAll(m_pendingFailedSites);
         long survivors[] = MiscUtils.toLongArray(survivorSet);
-        m_recoveryLog.info("Agreement, Sending fault data " + m_pendingFailedSites.toString() + " to "
-                + survivorSet.toString() + " survivors");
+        m_recoveryLog.info("Agreement, Sending fault data " + MiscUtils.hsIdCollectionToString(m_pendingFailedSites)
+                + " to "
+                + MiscUtils.hsIdCollectionToString(survivorSet) + " survivors");
         for (Long survivor : survivors) {
             messagesPerSite.put(survivor, m_pendingFailedSites.size());
         }
@@ -763,12 +764,12 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 }
             }
 
-            expectedResponseCount.put( fm.m_sourceHSId, expectedResponseCount.get(fm.m_sourceHSId) - 1);
             ++responses;
             m_recoveryLog.info("Agreement, Received failure message " + responses + " of " + expectedResponses
                     + " from " + MiscUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
                     MiscUtils.hsIdCollectionToString(fm.m_failedHSIds) +
                     " safe txn id " + fm.m_safeTxnId + " failed site " + fm.m_committedTxnId);
+            expectedResponseCount.put( fm.m_sourceHSId, expectedResponseCount.get(fm.m_sourceHSId) - 1);
             m_recoveryLog.info("Agreement, expecting failures messages " + expectedResponseCount);
             if (!initiatorSafeInitPoint.containsKey(fm.m_initiatorForSafeTxnId)) {
                 initiatorSafeInitPoint.put(fm.m_initiatorForSafeTxnId, Long.MIN_VALUE);

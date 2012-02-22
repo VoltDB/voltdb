@@ -252,8 +252,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
     {
         m_mockVolt = new MockVoltDB();
         m_mockVolt.shouldIgnoreCrashes = true;
-        m_mockVolt.addHost(HOST_ID);
-        m_mockVolt.addPartition(0);
 
         Long site1 = MiscUtils.getHSIdFromHostAndSite(HOST_ID, 1);
         Long site0 = MiscUtils.getHSIdFromHostAndSite(HOST_ID, 0);

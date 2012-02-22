@@ -254,7 +254,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint partitionId,
     jint hostId,
     jstring hostname,
-    jlong tempTableMemory)
+    jlong tempTableMemory,
+    jint totalPartitions)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -278,7 +279,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    partitionId,
                                    hostId,
                                    hostString,
-                                   tempTableMemory);
+                                   tempTableMemory,
+                                   totalPartitions);
 
         if (success) {
             VOLT_DEBUG("initialize succeeded");

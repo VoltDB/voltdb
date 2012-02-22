@@ -101,7 +101,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_site_id =
-                VoltDB.instance().getSiteTracker().
+                context.getSiteTracker().
                 getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
@@ -221,7 +221,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_site_id =
-                VoltDB.instance().getSiteTracker().
+                context.getSiteTracker().
                 getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
@@ -294,7 +294,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
             Long lowest_site_id =
-                VoltDB.instance().getSiteTracker().
+                context.getSiteTracker().
                 getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {

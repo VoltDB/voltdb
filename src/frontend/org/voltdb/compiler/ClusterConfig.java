@@ -175,9 +175,9 @@ public class ClusterConfig
 
 
 
-    private int m_hostCount;
-    private int m_sitesPerHost;
-    private int m_replicationFactor;
+    private final int m_hostCount;
+    private final int m_sitesPerHost;
+    private final int m_replicationFactor;
 
     private String m_errorMsg;
 }

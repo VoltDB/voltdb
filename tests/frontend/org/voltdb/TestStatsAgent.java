@@ -72,8 +72,6 @@ public class TestStatsAgent {
     @Before
     public void setUp() throws Exception {
         m_mvoltdb = new MockVoltDB();
-        m_mvoltdb.addHost(0);
-        m_mvoltdb.addHost(1);
         m_mvoltdb.addSite( MiscUtils.getHSIdFromHostAndSite( 0, 1), MailboxType.Initiator);
         m_mvoltdb.addSite( MiscUtils.getHSIdFromHostAndSite( 1, 2), MailboxType.Initiator);
         VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);

@@ -96,8 +96,6 @@ public class TestRawProcessor extends TestCase {
         public static int m_part = 2;
 
         static {
-            m_mockVoltDB.addHost(m_host);
-            m_mockVoltDB.addPartition(m_part);
 
             m_mockVoltDB.addSite(MiscUtils.getHSIdFromHostAndSite( m_host, m_site), m_part);
             m_mockVoltDB.addTable("TableName", false);
