@@ -279,9 +279,7 @@ public class VoltDB {
                     m_startAction = START_ACTION.START;
                 }
 
-                else if (arg.equals("master")) {
-                    m_replicationRole = ReplicationRole.MASTER;
-                } else if (arg.equals("replica")) {
+                else if (arg.equals("replica")) {
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
 

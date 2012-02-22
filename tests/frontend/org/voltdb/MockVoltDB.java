@@ -39,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
@@ -302,7 +304,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getBuildString()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
@@ -321,14 +322,12 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ArrayList<ClientInterface> getClientInterfaces()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public Configuration getConfig()
     {
-        // TODO Auto-generated method stub
         return new VoltDB.Configuration();
     }
 
@@ -362,14 +361,12 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Messenger getMessenger()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public VoltNetwork getNetwork()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
@@ -403,7 +400,6 @@ public class MockVoltDB implements VoltDBInterface
     public boolean ignoreCrash()
     {
         if (shouldIgnoreCrashes) {
-            // TODO Auto-generated method stub
             m_howManyCrashes++;
             return true;
         } else {
@@ -420,22 +416,17 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean isRunning()
     {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public void readBuildInfo(String editionTag)
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
     public void run()
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -452,8 +443,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void startSampler()
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -484,27 +473,21 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void logUpdate(String xmlConfig, long currentTxnId)
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
     public String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public String doRejoinPrepare(long currentTxnId, int rejoinHostId,
             String rejoiningHostname, int portToConnect, Set<Integer> liveHosts) {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public void onExecutionSiteRecoveryCompletion(long transferred) {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -514,7 +497,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public boolean recovering() {
-        // TODO Auto-generated method stub
         return false;
     }
 
@@ -600,14 +582,17 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void setReplicationActive(boolean active)
     {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
     public boolean getReplicationActive()
     {
-        // TODO Auto-generated method stub
         return false;
+    }
+
+    @Override
+    public LicenseApi getLicenseApi()
+    {
+        return MiscUtils.licenseApiFactory(getConfig().m_pathToLicense);
     }
 }

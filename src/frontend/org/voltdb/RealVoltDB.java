@@ -251,7 +251,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // The configured license api: use to decide enterprise/cvommunity edition feature enablement
     LicenseApi m_licenseApi;
-    LicenseApi getLicenseApi() { return m_licenseApi; }
+
+    @Override
+    public LicenseApi getLicenseApi() {
+        return m_licenseApi;
+    }
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
@@ -343,6 +347,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             buildClusterMesh(isRejoin);
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
+            if (m_licenseApi == null) {
+                VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
+                        "See previous log message for details.", false, null);
+            }
 
             // do the many init tasks in the Inits class
             Inits inits = new Inits(this, 1);
@@ -963,14 +971,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
         }
 
-        if (m_replicationRole == ReplicationRole.MASTER) {
-                hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster.");
-        } else if (m_replicationRole == ReplicationRole.REPLICA) {
+        if (m_replicationRole == ReplicationRole.REPLICA) {
             hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster. " +
                              "Clients can only call read-only procedures.");
         }
-        if (httpPortExtraLogMessage != null)
+        if (httpPortExtraLogMessage != null) {
             hostLog.info(httpPortExtraLogMessage);
+        }
         if (httpPort != -1) {
             hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", httpPort));
         }
@@ -1771,13 +1778,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     {
         if (m_replicationRole == null) {
             m_replicationRole = role;
-        } else if (m_replicationRole == ReplicationRole.REPLICA) {
-            if (role != ReplicationRole.MASTER) {
-                return;
-            }
-
-            hostLog.info("Changing replication role from " + m_replicationRole +
-                         " to " + role);
+        }
+        else if (role != ReplicationRole.REPLICA && m_replicationRole == ReplicationRole.REPLICA) {
+            hostLog.info("Promoting replication role from replica to master.");
             m_replicationRole = role;
             for (ClientInterface ci : m_clientInterfaces) {
                 ci.setReplicationRole(m_replicationRole);
