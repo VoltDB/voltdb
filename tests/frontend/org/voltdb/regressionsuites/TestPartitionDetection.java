@@ -212,14 +212,14 @@ public class TestPartitionDetection extends TestCase
             cltthread.setDaemon(true);
             cltthread.start();
             */
-            throw new UnsupportedOperationException("New world failure detection is not implemented");
-//            while (!cluster.areAllNonLocalProcessesDead()) {
-//                System.err.println("Waiting for cluster to stop execution");
-//                Thread.sleep(5000);
-//            }
-//
-//            // now verify the snapshot.
-//            validateSnapshot(true);
+
+            while (!cluster.areAllNonLocalProcessesDead()) {
+                System.err.println("Waiting for cluster to stop execution");
+                Thread.sleep(5000);
+            }
+
+            // now verify the snapshot.
+            validateSnapshot(true);
         }
         finally {
             client.close();

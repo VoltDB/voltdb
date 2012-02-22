@@ -78,7 +78,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     /**
      * Indicates if backpressure has been seen and reported
      */
-    private AtomicBoolean m_hadBackPressure = new AtomicBoolean(false);
+    private final AtomicBoolean m_hadBackPressure = new AtomicBoolean(false);
 
     /*
      * Whether or not to send heartbeats. It's set to false by default, this

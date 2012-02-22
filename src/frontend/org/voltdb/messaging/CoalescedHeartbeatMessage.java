@@ -75,6 +75,7 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
             m_messages[ii] = new HeartbeatMessage(super.m_initiatorHSId,
                                                   super.m_txnId,
                                                   buf.getLong());
+            m_messages[ii].m_sourceHSId = m_sourceHSId;
         }
         assert(buf.capacity() == buf.position());
     }

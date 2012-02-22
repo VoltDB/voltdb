@@ -35,9 +35,9 @@ public class ExecutionSiteRunner implements Runnable {
     volatile ExecutionSite m_siteObj;
     private final boolean m_recovering;
     private final boolean m_replicationActive;
-    private final HashSet<Integer> m_failedHostIds;
     private final long m_txnId;
     private final Mailbox m_mailbox;
+    private final int m_configuredNumberOfPartitions;
 
     public ExecutionSiteRunner(
             Mailbox mailbox,
@@ -45,14 +45,14 @@ public class ExecutionSiteRunner implements Runnable {
             final String serializedCatalog,
             boolean recovering,
             boolean replicationActive,
-            HashSet<Integer> failedHostIds,
-            VoltLogger hostLog) {
+            VoltLogger hostLog,
+            int configuredNumberOfPartitions) {
         m_mailbox = mailbox;
         m_serializedCatalog = serializedCatalog;
         m_recovering = recovering;
         m_replicationActive = replicationActive;
-        m_failedHostIds = failedHostIds;
         m_txnId = context.m_transactionId;
+        m_configuredNumberOfPartitions = configuredNumberOfPartitions;
     }
 
     @Override
@@ -66,7 +66,8 @@ public class ExecutionSiteRunner implements Runnable {
                                           null,
                                           m_recovering,
                                           m_replicationActive,
-                                          m_txnId);
+                                          m_txnId,
+                                          m_configuredNumberOfPartitions);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }

@@ -632,7 +632,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                   RestrictedPriorityQueue transactionQueue,
                   boolean recovering,
                   boolean replicationActive,
-                  final long txnId) throws Exception
+                  final long txnId,
+                  int configuredNumberOfPartitions) throws Exception
     {
         m_siteId = mailbox.getHSId();
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
@@ -670,7 +671,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 serializedCatalog = voltdb.getCatalogContext().catalog.serialize();
             }
             hsql = null;
-            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog, txnId);
+            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog, txnId, configuredNumberOfPartitions);
         }
 
         m_systemProcedureContext = new SystemProcedureContext();
@@ -759,7 +760,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     }
 
     private ExecutionEngine
-    initializeEE(BackendTarget target, String serializedCatalog, final long txnId)
+    initializeEE(BackendTarget target, String serializedCatalog, final long txnId, int configuredNumberOfPartitions)
     {
         String hostname = ConnectionUtil.getHostnameOrAddress();
 
@@ -776,7 +777,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        m_tracker.m_numberOfPartitions);
+                        configuredNumberOfPartitions);
                 eeTemp.loadCatalog( txnId, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, txnId);

@@ -421,7 +421,8 @@ public class TestExecutionSite extends TestCase {
                         m_rpqs.get(siteId),
                         false,
                         false,
-                        0));
+                        0,
+                        partitionCount));
             registerMailbox(siteId, m_mboxes.get(siteId));
         }
     }

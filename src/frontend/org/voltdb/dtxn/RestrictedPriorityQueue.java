@@ -92,6 +92,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     }
 
     public void makeRoadBlock(long blockAfter, QueueState blockReason, VoltMessage action) {
+        action.m_sourceHSId = m_siteId;
         RoadBlock roadblock = new RoadBlock(blockAfter, blockReason, action);
         m_roadblocks.add(roadblock);
         Collections.sort(m_roadblocks);

@@ -83,6 +83,7 @@ import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -142,10 +143,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
     DeploymentType m_deployment;
-    final HashSet<Integer> m_downHosts = new HashSet<Integer>();
-    final Set<Integer> m_downNonExecSites = new HashSet<Integer>();
-    //For command log only, will also mark self as faulted
-    final Set<Long> m_downSites = new HashSet<Long>();
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -358,8 +355,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                                     m_serializedCatalog,
                                                     m_recovering,
                                                     m_replicationActive,
-                                                    m_downHosts,
-                                                    hostLog);
+                                                    hostLog,
+                                                    m_configuredNumberOfPartitions);
                     m_runners.add(runner);
                     Thread runnerThread = new Thread(runner, "Site " + site);
                     runnerThread.start();
@@ -380,7 +377,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                           null,
                                           m_recovering,
                                           m_replicationActive,
-                                          m_catalogContext.m_transactionId);
+                                          m_catalogContext.m_transactionId,
+                                          m_configuredNumberOfPartitions);
                 m_localSites.put(localThreadMailbox.getHSId(), siteObj);
                 m_currentThreadSite = siteObj;
             } catch (Exception e) {
@@ -466,7 +464,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         m_catalogContext, Long.MIN_VALUE,
                         0,
                         // m_messenger.getDiscoveredFaultSequenceNumber(),
-                        m_downSites);
+                        null);
             }
 
             try {
@@ -1807,6 +1805,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         "Configured number of partitions in new tracker" + m_siteTracker.m_numberOfPartitions +
                         " is not the same as the number of partitions present " + oldTracker.m_numberOfPartitions,
                         true, null);
+            }
+        }
+        if (oldTracker != null) {
+            HashSet<Long> delta = new HashSet<Long>(oldTracker.m_allSitesImmutable);
+            delta.removeAll(m_siteTracker.m_allSitesImmutable);
+            if (!delta.isEmpty()) {
+                m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(delta)));
             }
         }
     }

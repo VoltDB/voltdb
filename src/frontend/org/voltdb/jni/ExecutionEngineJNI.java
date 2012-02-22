@@ -97,6 +97,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     {
         // base class loads the volt shared library
         super(site);
+        System.out.println("Starting with configured number of partitions " + totalPartitions);
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
                 + ", site_id = " + siteId + "...");
