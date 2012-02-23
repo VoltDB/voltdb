@@ -181,7 +181,7 @@ public class TestVoltType extends TestCase {
         // test.. but that would seem exceedingly unlikely? Do this a few times
         // to try to avoid the false negative.
         for (int ii=0; ii < 5; ++ii) {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             TimestampType now = new TimestampType();
             Date date = new Date();
             if (now.toString().startsWith(sdf.format(date))) {
