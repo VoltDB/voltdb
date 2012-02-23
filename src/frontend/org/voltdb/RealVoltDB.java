@@ -75,6 +75,7 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.DtxnInitiatorMailbox;
 import org.voltdb.dtxn.ExecutorTxnIdSafetyState;
+import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.MailboxTracker;
 import org.voltdb.dtxn.MailboxUpdateHandler;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
@@ -116,6 +117,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     private int m_configuredNumberOfPartitions;
     CatalogContext m_catalogContext;
     volatile SiteTracker m_siteTracker;
+    MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
     private static final String m_defaultVersionString = "2.2.1";
@@ -229,6 +231,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_dtxns.clear();
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
+            m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes);
             m_deployment = null;
             m_messenger = null;
             m_statsAgent = new StatsAgent();
@@ -303,17 +306,47 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             DtxnInitiatorMailbox initiatorMailbox = null;
             // start mailbox tracker since all the
             m_faultManager = new FaultDistributor(this);
+            long initiatorHSId = 0;
             try {
                 Pair<ArrayDeque<Mailbox>, ClusterConfig> p = createMailboxesForSites();
                 siteMailboxes = p.getFirst();
                 clusterConfig = p.getSecond();
                 // This will set up site tracker
+                initiatorHSId = registerInitiatorMailbox();
+                final long statsHSId = m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
+                m_messenger.generateMailboxId(m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
+                m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
                 m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
                 m_mailboxTracker.start();
-                initiatorMailbox = createInitiatorMailbox();
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
+
+            m_mailboxPublisher.publish(m_messenger.getZK());
+
+            /*
+             * Before this barrier pretty much every remotely visible mailbox id has to have been
+             * registered with host messenger and published with mailbox publisher
+             */
+            boolean siteTrackerInit = false;
+            for (int ii = 0; ii < 4000; ii++) {
+                if (m_siteTracker.getAllHosts().size() < m_deployment.getCluster().getHostcount()) {
+                    try {
+                        Thread.sleep(5);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    siteTrackerInit = true;
+                    break;
+                }
+            }
+            if (!siteTrackerInit) {
+                VoltDB.crashLocalVoltDB("Failed to initialize site tracker with all hosts before timeout", true, null);
+            }
+
+            initiatorMailbox = createInitiatorMailbox(initiatorHSId);
+
 
             // do the many init tasks in the Inits class
             Inits inits = new Inits(this, 1);
@@ -475,6 +508,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = true;
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
+                for (Map.Entry<Integer, List<Long>> entry : m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
+                    System.out.println(entry.getKey() + " -- "
+                            + org.voltcore.utils.MiscUtils.hsIdCollectionToString(entry.getValue()));
+                }
                 VoltDB.crashGlobalVoltDB("Mismatch between configured number of partitions (" +
                         m_configuredNumberOfPartitions + ") and actual (" +
                         m_siteTracker.m_numberOfPartitions + ")",
@@ -518,13 +555,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         JSONObject topo = registerClusterConfig(clusterConfig);
         List<Integer> partitions =
             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-        m_configuredNumberOfPartitions = partitions.size();
+
+        m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
         assert(partitions.size() == sitesperhost);
         for (Integer partition : partitions)
         {
             Mailbox mailbox = m_messenger.createMailbox();
             mailboxes.add(mailbox);
-            registerExecutionSiteMailbox(mailbox.getHSId(), partition);
+            MailboxNodeContent mnc = new MailboxNodeContent(mailbox.getHSId(), partition);
+            m_mailboxPublisher.registerMailbox(MailboxType.ExecutionSite, mnc);
         }
         return Pair.of( mailboxes, clusterConfig);
     }
@@ -553,36 +592,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return topo;
     }
 
-    /**
-     * Publishes the HSId of this execution site to ZK
-     * @param zk
-     * @param partitionId
-     * @throws Exception
+    /*
+     * First register, then create.
      */
-    private void registerExecutionSiteMailbox(long HSId, int partitionId) throws Exception {
-        JSONObject jsObj = new JSONObject();
-        jsObj.put("HSId", HSId);
-        jsObj.put("partitionId", partitionId);
-        byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-        m_messenger.getZK().create(VoltZK.mailboxes_executionsites_site, payload,
-                                   Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+    private long registerInitiatorMailbox() throws Exception {
+        long hsid = m_messenger.generateMailboxId(null);
+        MailboxNodeContent mnc = new MailboxNodeContent(hsid, null);
+        m_mailboxPublisher.registerMailbox(MailboxType.Initiator, mnc);
+        return hsid;
     }
 
-    private DtxnInitiatorMailbox createInitiatorMailbox() throws Exception {
+    private DtxnInitiatorMailbox createInitiatorMailbox(long hsid) {
         Map<Long, Integer> siteMap = m_siteTracker.getSitesToPartitions();
         ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(siteMap);
         DtxnInitiatorMailbox mailbox = new DtxnInitiatorMailbox(safetyState, m_messenger);
-        m_messenger.createMailbox(null, mailbox);
-        registerInitiatorMailbox(mailbox.getHSId());
+        mailbox.setHSId(hsid);
+        m_messenger.registerMailbox(mailbox);
         return mailbox;
-    }
-
-    private void registerInitiatorMailbox(long HSId) throws Exception {
-        JSONObject jsObj = new JSONObject();
-        jsObj.put("HSId", HSId);
-        byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-        m_messenger.getZK().create(VoltZK.mailboxes_initiators_initiator, payload,
-                                   Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
     }
 
     /**
@@ -1167,14 +1193,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_mode = OperationMode.SHUTTINGDOWN;
             m_executionSitesRecovered = false;
             m_agreementSiteRecovered = false;
-            m_snapshotCompletionMonitor.shutdown();
-            m_periodicWorkThread.shutdown();
-            heartbeatThread.interrupt();
-            heartbeatThread.join();
             m_mailboxTracker.shutdown();
             // Things are going pear-shaped, tell the fault distributor to
             // shut its fat mouth
             m_faultManager.shutDown();
+            m_snapshotCompletionMonitor.shutdown();
+            m_periodicWorkThread.shutdown();
+            heartbeatThread.interrupt();
+            heartbeatThread.join();
 
             if (m_hasStartedSampler.get()) {
                 m_sampler.setShouldStop();
@@ -1253,6 +1279,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_computationService.shutdown();
             m_computationService.awaitTermination(1, TimeUnit.DAYS);
             m_computationService = null;
+            m_siteTracker = null;
+            m_mailboxPublisher = null;
 
             // probably unnecessary
             System.gc();
@@ -1819,5 +1847,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public SiteTracker getSiteTracker() {
         return m_siteTracker;
+    }
+
+    @Override
+    public MailboxPublisher getMailboxPublisher() {
+        return m_mailboxPublisher;
     }
 }

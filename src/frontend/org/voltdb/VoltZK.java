@@ -50,17 +50,9 @@ public class VoltZK {
      * "partitionId" field.
      */
     public static enum MailboxType {
-        AsyncPlanner, ClientInterface, ExecutionSite, Initiator, StatsAgent
+        ClientInterface, ExecutionSite, Initiator, StatsAgent
     }
     public static final String mailboxes = "/db/mailboxes";
-    public static final String mailboxes_statsagents = "/db/mailboxes/" + MailboxType.StatsAgent;
-    public static final String mailboxes_statsagents_agents = "/db/mailboxes/" + MailboxType.StatsAgent + "/statsagent";
-    public static final String mailboxes_clientinterfaces = "/db/mailboxes/" + MailboxType.ClientInterface;
-    public static final String mailboxes_clientinterfaces_ci = "/db/mailboxes/" + MailboxType.ClientInterface + "/ci";
-    public static final String mailboxes_executionsites = "/db/mailboxes/" + MailboxType.ExecutionSite;
-    public static final String mailboxes_executionsites_site = "/db/mailboxes/" + MailboxType.ExecutionSite + "/site";
-    public static final String mailboxes_initiators = "/db/mailboxes/" + MailboxType.Initiator;
-    public static final String mailboxes_initiators_initiator = "/db/mailboxes/" + MailboxType.Initiator + "/initiator";
 
     // snapshot and command log
     public static final String completed_snapshots = "/db/completed_snapshots";
@@ -80,10 +72,6 @@ public class VoltZK {
     public static final String[] ZK_HIERARCHY = {
             root,
             mailboxes,
-            mailboxes_executionsites,
-            mailboxes_initiators,
-            mailboxes_clientinterfaces,
-            mailboxes_statsagents,
     };
 
     /**

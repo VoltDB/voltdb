@@ -680,6 +680,67 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return fhost;
     }
 
+    public void registerMailbox(Mailbox mailbox) {
+        while (true) {
+            HashMap<Long, Mailbox> original = m_siteMailboxes.get();
+            if (!original.containsKey(mailbox.getHSId())) {
+                throw new RuntimeException("Can only register a mailbox with an hsid alreadly generated");
+            }
+            HashMap<Long, Mailbox> update = new HashMap<Long, Mailbox>(original);
+            update.put(mailbox.getHSId(), mailbox);
+            if (m_siteMailboxes.compareAndSet(original, update)) {
+                break;
+            }
+        }
+    }
+
+    /*
+     * Generate a slot for the mailbox and put a noop box there. Can also
+     * supply a value
+     */
+    public long generateMailboxId(Long mailboxId) {
+        final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
+        while (true) {
+            HashMap<Long, Mailbox> original = m_siteMailboxes.get();
+            HashMap<Long, Mailbox> update = new HashMap<Long, Mailbox>(original);
+            update.put(hsId, new Mailbox() {
+                @Override
+                public void send(long hsId, VoltMessage message)
+                        throws MessagingException {}
+                @Override
+                public void send(long[] hsIds, VoltMessage message)
+                        throws MessagingException {}
+                @Override
+                public void deliver(VoltMessage message) {
+                    hostLog.warn("No-op mailbox(" + hsId + ") dropped message " + message);
+                }
+                @Override
+                public void deliverFront(VoltMessage message) {}
+                @Override
+                public VoltMessage recv() {return null;}
+                @Override
+                public VoltMessage recvBlocking() {return null;}
+                @Override
+                public VoltMessage recvBlocking(long timeout) {return null;}
+                @Override
+                public VoltMessage recv(Subject[] s) {return null;}
+                @Override
+                public VoltMessage recvBlocking(Subject[] s) {return null;}
+                @Override
+                public VoltMessage recvBlocking(Subject[] s, long timeout) { return null;}
+                @Override
+                public long getHSId() {return 0L;}
+                @Override
+                public void setHSId(long hsId) {}
+
+            });
+            if (m_siteMailboxes.compareAndSet(original, update)) {
+                break;
+            }
+        }
+        return hsId;
+    }
+
     /*
      * Create a site mailbox with a generated host id
      */

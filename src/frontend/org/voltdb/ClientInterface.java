@@ -46,10 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -65,6 +62,7 @@ import org.voltcore.network.WriteStream;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -880,11 +878,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @throws Exception
      */
     private void registerMailbox(ZooKeeper zk) throws Exception {
-        JSONObject jsObj = new JSONObject();
-        jsObj.put("HSId", m_mailbox.getHSId());
-        byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-        zk.create(VoltZK.mailboxes_clientinterfaces_ci, payload,
-                  Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        MailboxNodeContent mnc = new MailboxNodeContent(m_mailbox.getHSId(), null);
+        VoltDB.instance().getMailboxPublisher().registerMailbox(MailboxType.ClientInterface, mnc);
+        VoltDB.instance().getMailboxPublisher().publish(zk);
     }
 
     private void registerPolicies(ReplicationRole replicationRole) {

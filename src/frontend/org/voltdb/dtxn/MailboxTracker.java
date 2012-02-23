@@ -17,24 +17,30 @@
 
 package org.voltdb.dtxn;
 
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.agreement.ZKUtil.ByteArrayCallback;
-import org.voltcore.agreement.ZKUtil.ChildrenCallback;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.MiscUtils;
 
 import org.voltdb.MailboxNodeContent;
@@ -45,24 +51,32 @@ public class MailboxTracker {
     private final ZooKeeper m_zk;
     private final MailboxUpdateHandler m_handler;
     private final ExecutorService m_es =
-            Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Mailbox tracker"));
+            Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Mailbox tracker", 1024 * 128));
 
-    private final Runnable m_task = new Runnable() {
+    private byte m_lastChecksum[] = null;
+
+    private class EventTask implements Runnable {
+        private final WatchedEvent m_event;
+
+        public EventTask(WatchedEvent event) {
+            m_event = event;
+        }
+
         @Override
         public void run() {
             try {
-                getMailboxDirs();
+                getMailboxes(m_event);
             } catch (Exception e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("Error in mailbox tracker", false, e);
             }
         }
-    };
+    }
 
     private final Watcher m_watcher = new Watcher() {
         @Override
-        public void process(WatchedEvent event) {
+        public void process(final WatchedEvent event) {
             try {
-                m_es.submit(m_task);
+                m_es.submit(new EventTask(event));
             } catch (RejectedExecutionException e) {
                 if (m_es.isShutdown()) {
                     return;
@@ -79,8 +93,7 @@ public class MailboxTracker {
     }
 
     public void start() throws InterruptedException, ExecutionException {
-        Future<?> submit = m_es.submit(m_task);
-        submit.get();
+        m_es.submit(new EventTask(null)).get();
     }
 
     public void shutdown() throws InterruptedException {
@@ -88,48 +101,85 @@ public class MailboxTracker {
         m_es.awaitTermination(356, TimeUnit.DAYS);
     }
 
-    private void getMailboxDirs() throws Exception {
-        Map<MailboxType, List<MailboxNodeContent>> objects =
-                new HashMap<VoltZK.MailboxType, List<MailboxNodeContent>>();
+    private void getMailboxes(WatchedEvent event) throws Exception {
 
-        List<String> mailboxes = m_zk.getChildren(VoltZK.mailboxes, false);
-        Map<MailboxType, ChildrenCallback> callbacks = new HashMap<MailboxType, ChildrenCallback>();
-        for (String dir : mailboxes) {
-            MailboxType type = MailboxType.valueOf(dir);
-            ChildrenCallback cb = new ChildrenCallback();
-            m_zk.getChildren(ZKUtil.joinZKPath(VoltZK.mailboxes, dir), m_watcher, cb, null);
-            callbacks.put(type, cb);
+        Set<String> mailboxes;
+
+        /*
+         * Only set the watch the first time (null) or again if it has been fired
+         */
+        if (event == null || event.getPath().equals(VoltZK.mailboxes)){
+            mailboxes = new TreeSet<String>(m_zk.getChildren(VoltZK.mailboxes, m_watcher));
+        } else {
+            /*
+             * There is no need to do a rebuild if this was a delete. The watch
+             * on the parent node will fire because the children changed and the processing will be done then.
+             */
+            if (event != null && event.getType() == EventType.NodeDeleted) {
+                return;
+            }
+            mailboxes = new TreeSet<String>(m_zk.getChildren(VoltZK.mailboxes, false));
         }
 
-        for (java.util.Map.Entry<MailboxType, ChildrenCallback> e : callbacks.entrySet()) {
-            Object[] result = e.getValue().get();
-            String dir = (String) result[1];
-            @SuppressWarnings("unchecked")
-            List<String> children = (List<String>) result[3];
-            List<MailboxNodeContent> contents = readContents(dir, children);
-            objects.put(e.getKey(), contents);
-        }
-
-        m_handler.handleMailboxUpdate(objects);
-    }
-
-    private List<MailboxNodeContent> readContents(String dir, List<String> children)
-    throws Exception {
-        ZKUtil.sortSequentialNodes(children);
         List<ByteArrayCallback> callbacks = new ArrayList<ByteArrayCallback>();
-        for (String node : children) {
-            String path = ZKUtil.joinZKPath(dir, node);
+        for (String mailboxSet : mailboxes) {
             ByteArrayCallback cb = new ByteArrayCallback();
-            m_zk.getData(path, false, cb, null);
+
+            /*
+             * Only set the watch the first time (null) or again if it has been fired
+             */
+            if (event == null || event.getPath().equals(VoltZK.mailboxes + "/" + mailboxSet)) {
+                m_zk.getData(ZKUtil.joinZKPath(VoltZK.mailboxes, mailboxSet), m_watcher, cb, null);
+            } else {
+                m_zk.getData(ZKUtil.joinZKPath(VoltZK.mailboxes, mailboxSet), m_watcher, cb, null);
+            }
+
             callbacks.add(cb);
         }
 
-        List<String> jsons = new ArrayList<String>();
-        for (ByteArrayCallback cb : callbacks) {
-            byte[] data = cb.getData();
-            jsons.add(new String(data, "UTF-8"));
+        MessageDigest digest = MessageDigest.getInstance("SHA-1");
+        Map<MailboxType, List<MailboxNodeContent>> mailboxMap = new HashMap<MailboxType, List<MailboxNodeContent>>();
+        for (ByteArrayCallback callback : callbacks) {
+            try {
+                byte payload[] = callback.getData();
+                digest.update(payload);
+                JSONObject jsObj = new JSONObject(new String(payload, "UTF-8"));
+                readContents(jsObj, mailboxMap);
+            } catch (KeeperException.NoNodeException e) {}
         }
+        byte digestBytes[] = digest.digest();
 
-        return VoltZK.parseMailboxContents(jsons);
+        if (m_lastChecksum != null && Arrays.equals( m_lastChecksum, digestBytes)) {
+            return;
+        }
+        m_lastChecksum = digestBytes;
+        m_handler.handleMailboxUpdate(mailboxMap);
+    }
+
+    private void readContents(JSONObject obj, Map<MailboxType, List<MailboxNodeContent>> mailboxMap)
+        throws Exception {
+        @SuppressWarnings("unchecked")
+        Iterator<String> keys = obj.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            MailboxType type = MailboxType.valueOf(key);
+
+            List<MailboxNodeContent> mailboxes = mailboxMap.get(type);
+            if (mailboxes == null) {
+                mailboxes = new ArrayList<MailboxNodeContent>();
+                mailboxMap.put(type, mailboxes);
+            }
+
+            JSONArray mailboxObjects = obj.getJSONArray(key);
+            for (int ii = 0; ii < mailboxObjects.length(); ii++) {
+                JSONObject mailboxDescription = mailboxObjects.getJSONObject(ii);
+                long hsId = mailboxDescription.getLong("HSId");
+                Integer partitionId = null;
+                if (mailboxDescription.has("partitionId")) {
+                    partitionId = mailboxDescription.getInt("partitionId");
+                }
+                mailboxes.add(new MailboxNodeContent(hsId, partitionId));
+            }
+        }
     }
 }

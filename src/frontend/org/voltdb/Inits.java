@@ -39,6 +39,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -564,11 +565,7 @@ public class Inits {
                 m_rvdb.getStatsAgent().getMailbox(
                             VoltDB.instance().getHostMessenger(),
                             statsAgentHSId);
-                JSONObject jsObj = new JSONObject();
-                jsObj.put("HSId", statsAgentHSId);
-                byte[] payload = jsObj.toString(4).getBytes("UTF-8");
-                m_rvdb.getHostMessenger().getZK().create(VoltZK.mailboxes_statsagents_agents, payload,
-                                           Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+                m_rvdb.getMailboxPublisher().publish(VoltDB.instance().getHostMessenger().getZK());
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
                             VoltDB.instance().getHostMessenger(),
                             m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));

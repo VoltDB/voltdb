@@ -31,7 +31,6 @@ import org.voltcore.utils.MiscUtils;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK.MailboxType;
-import org.voltdb.utils.NotImplementedException;
 
 public class SiteTracker {
     private final int m_hostId;
@@ -41,7 +40,7 @@ public class SiteTracker {
     public final Set<Integer> m_allHostsImmutable = Collections.unmodifiableSet(m_allHosts);
 
     /*
-     * Includes initiator sites and execution sites only. Not really "all"
+     * Includes initiator sites, execution sites, and stats agents. Not really "all"
      */
     private final Set<Long> m_allSites = new HashSet<Long>();
     public final Set<Long> m_allSitesImmutable = Collections.unmodifiableSet(m_allSites);
@@ -136,6 +135,9 @@ public class SiteTracker {
         }
         m_allSites.addAll(m_allExecutionSites);
         m_allSites.addAll(m_allInitiators);
+        for (List<Long> siteIds : otherHSIds.values()) {
+            m_allSites.addAll(siteIds);
+        }
     }
 
     public int[] getAllPartitions() {

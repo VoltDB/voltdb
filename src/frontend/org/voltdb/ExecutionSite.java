@@ -260,8 +260,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Generated when a snapshot buffer is discarded. Reminds the EE thread
      * that there is probably more snapshot work to do.
      */
-    static class PotentialSnapshotWorkMessage extends VoltMessage
+    private class PotentialSnapshotWorkMessage extends VoltMessage
     {
+        public PotentialSnapshotWorkMessage() {
+            m_sourceHSId = m_siteId;
+        }
+
         @Override
         public byte getSubject() {
             return Subject.DEFAULT.getId();

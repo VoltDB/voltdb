@@ -26,8 +26,6 @@ package org.voltdb.dtxn;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
@@ -60,14 +58,13 @@ public class TestMailboxTracker extends ZKTestBase {
     public void testMailboxTracker() throws Exception {
         ZooKeeper zk = getClient(0);
         MailboxTracker tracker = new MailboxTracker(zk, handler);
+        MailboxPublisher publisher = new MailboxPublisher(VoltZK.mailboxes);
 
         VoltZK.createPersistentZKNodes(zk);
-        String data1 = "{HSId: 1, partitionId: 0}";
-        zk.create(VoltZK.mailboxes_executionsites_site, data1.getBytes(),
-                  Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-        String data2 = "{HSId: 2, partitionId: 1}";
-        zk.create(VoltZK.mailboxes_executionsites_site, data2.getBytes(),
-                  Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+
+        publisher.registerMailbox(MailboxType.ExecutionSite, new MailboxNodeContent( 1L, 0));
+        publisher.registerMailbox(MailboxType.ExecutionSite, new MailboxNodeContent( 2L, 1));
+        publisher.publish(zk);
 
         // start the mailbox tracker and watch all the changes
         tracker.start();
@@ -93,14 +90,16 @@ public class TestMailboxTracker extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(0);
         MailboxTracker tracker = new MailboxTracker(zk, handler);
+        MailboxPublisher publisher = new MailboxPublisher(VoltZK.mailboxes);
 
         VoltZK.createPersistentZKNodes(zk);
-        String data1 = "{HSId: 1, partitionId: 0}";
-        zk2.create(VoltZK.mailboxes_executionsites_site, data1.getBytes(),
-                   Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-        String data2 = "{HSId: 2, partitionId: 1}";
-        zk.create(VoltZK.mailboxes_executionsites_site, data2.getBytes(),
-                  Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+
+        publisher.registerMailbox(MailboxType.ExecutionSite, new MailboxNodeContent( 1L, 0));
+        publisher.publish(zk2);
+
+        publisher = new MailboxPublisher(VoltZK.mailboxes);
+        publisher.registerMailbox(MailboxType.ExecutionSite, new MailboxNodeContent( 2L, 1));
+        publisher.publish(zk);
 
         tracker.start();
 

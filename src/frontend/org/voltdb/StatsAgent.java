@@ -171,7 +171,7 @@ public class StatsAgent {
                 throw new UnsupportedOperationException();
             }
         };
-        hostMessenger.createMailbox(hsId, m_mailbox);
+        hostMessenger.registerMailbox(m_mailbox);
     }
 
     private void handleMailboxMessage(VoltMessage message) {

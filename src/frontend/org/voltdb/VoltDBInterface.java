@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
 
+import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
 
@@ -80,6 +81,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public Map<Integer, String> getClusterMetadataMap();
+    public MailboxPublisher getMailboxPublisher();
 
     /**
      * Open a connection to a rejoining node and create a foreign host for it.
