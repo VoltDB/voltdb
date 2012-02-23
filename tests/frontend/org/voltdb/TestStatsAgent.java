@@ -36,6 +36,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.*;
 import org.voltcore.utils.MiscUtils;
 import org.voltdb.VoltZK.MailboxType;
@@ -77,6 +78,8 @@ public class TestStatsAgent {
         VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);
         m_secondAgent = new StatsAgent();
         long secondAgentHSId = VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42);
+        VoltDB.instance().getHostMessenger().generateMailboxId(
+                VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42));
         m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(), secondAgentHSId);
         m_mvoltdb.addSite(secondAgentHSId, MailboxType.StatsAgent);
     }
