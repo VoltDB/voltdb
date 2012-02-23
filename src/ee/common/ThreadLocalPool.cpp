@@ -175,7 +175,8 @@ boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPoo
     size_t alloc_size = getAllocationSizeForObject(size);
     if (alloc_size == 0)
     {
-        throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %Zu", size);
+        throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %du",
+            static_cast<int32_t>(size));
     }
     return getExact(alloc_size);
 }

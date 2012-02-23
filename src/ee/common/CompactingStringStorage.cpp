@@ -42,7 +42,8 @@ CompactingStringStorage::get(size_t size)
     size_t alloc_size = ThreadLocalPool::getAllocationSizeForObject(size);
     if (alloc_size == 0)
     {
-        throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %Zu", size);
+        throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %d",
+            static_cast<int32_t>(size));
     }
     return getExact(alloc_size);
 }

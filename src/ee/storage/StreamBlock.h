@@ -61,7 +61,7 @@ namespace voltdb
          * Returns the universal stream offset of the block not
          * including any of the octets in this block.
          */
-        const size_t uso() const {
+        size_t uso() const {
             return m_uso;
         }
 
@@ -71,14 +71,14 @@ namespace voltdb
          * universal stream offset for the entire block. This excludes
          * the length prefix.
          */
-        const size_t offset() const {
+        size_t offset() const {
             return m_offset;
         }
 
         /**
          * Number of bytes left in the buffer
          */
-        const size_t remaining() const {
+        size_t remaining() const {
             return m_capacity - m_offset;
         }
 

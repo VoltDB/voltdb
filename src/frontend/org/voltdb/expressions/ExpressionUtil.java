@@ -24,6 +24,7 @@ import java.util.Stack;
 
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.NotImplementedException;
 import org.voltcore.utils.Pair;
@@ -590,10 +591,8 @@ public abstract class ExpressionUtil {
             if (neededType == VoltType.TIMESTAMP) {
                 if (cve.getValueType() == VoltType.STRING) {
                     try {
-                        java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(cve.m_value);
-                        long timeInMicroSecs = sqlTS.getTime() * 1000;
-                        timeInMicroSecs += sqlTS.getNanos() / 1000;
-                        cve.m_value = String.valueOf(timeInMicroSecs);
+                        TimestampType ts = new TimestampType(cve.m_value);
+                        cve.m_value = String.valueOf(ts.getTime());
                         cve.setValueType(neededType);
                         cve.setValueSize(neededSize);
                         checkConstantValueTypeSafety(cve);
