@@ -465,7 +465,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             snapshotPath = context.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
         }
 
-        SiteTracker st = VoltDB.instance().getSiteTracker();
+        SiteTracker st = siteTrackers.get(hostId);
         int[] allPartitions = st.getAllPartitions();
 
         org.voltdb.catalog.CommandLog cl = context.cluster.getLogconfig().get("log");
