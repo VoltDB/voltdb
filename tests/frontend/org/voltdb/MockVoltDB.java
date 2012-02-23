@@ -111,6 +111,7 @@ public class MockVoltDB implements VoltDBInterface
         }
         VoltZK.createPersistentZKNodes(m_hostMessenger.getZK());
 
+        m_hostMessenger.generateMailboxId(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
         m_statsAgent = new StatsAgent();
         m_statsAgent.getMailbox(m_hostMessenger,
                 m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));

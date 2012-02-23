@@ -43,6 +43,7 @@ import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.messaging.FastSerializer;
 import org.voltcore.messaging.HostMessenger;
@@ -91,6 +92,7 @@ public class TestClientInterface {
         doReturn(mock(ZooKeeper.class)).when(m_messenger).getZK();
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
+        doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
 
         // Set up CI with the mock objects.
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
