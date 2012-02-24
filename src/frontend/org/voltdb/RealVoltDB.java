@@ -1039,7 +1039,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     new ZKUtil.StringCallback(),
                     null);
             zk.create(
-                    VoltZK.cluster_metadata + m_messenger.getHostId(),
+                    VoltZK.cluster_metadata + "/" + m_messenger.getHostId(),
                     getLocalMetadata().getBytes("UTF-8"),
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.EPHEMERAL,
@@ -1058,7 +1058,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             Map<Integer, ZKUtil.ByteArrayCallback> callbacks = new HashMap<Integer, ZKUtil.ByteArrayCallback>();
             for (Integer hostId : metadataToRetrieve) {
                 ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
-                zk.getData(VoltZK.cluster_metadata + hostId, false, cb, null);
+                zk.getData(VoltZK.cluster_metadata + "/" + hostId, false, cb, null);
                 callbacks.put(hostId, cb);
             }
 
