@@ -706,7 +706,7 @@ public abstract class CatalogUtil {
      * @return Returns a reference to the root <deployment> element.
      */
     @SuppressWarnings("unchecked")
-    private static DeploymentType getDeployment(InputStream deployIS) {
+    public static DeploymentType getDeployment(InputStream deployIS) {
         try {
             JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
             // This schema shot the sheriff.

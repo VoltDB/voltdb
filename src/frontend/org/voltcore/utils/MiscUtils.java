@@ -17,15 +17,22 @@
 package org.voltcore.utils;
 
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.URL;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -448,4 +455,38 @@ public class MiscUtils {
         return Collections.unmodifiableMap(copy);
     }
 
+    public static byte[] urlToBytes(String url) {
+        try {
+            // get the URL/path for the deployment and prep an InputStream
+            InputStream input = null;
+            try {
+                URL inputURL = new URL(url);
+                input = inputURL.openStream();
+            } catch (MalformedURLException ex) {
+                // Invalid URL. Try as a file.
+                try {
+                    input = new FileInputStream(url);
+                } catch (FileNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+            } catch (IOException ioex) {
+                throw new RuntimeException(ioex);
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+            byte readBytes[] = new byte[1024 * 8];
+            while (true) {
+                int read = input.read(readBytes);
+                if (read == -1) {
+                    break;
+                }
+                baos.write(readBytes, 0, read);
+            }
+
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,6 +53,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.CRC32;
 
 import org.voltcore.utils.Pair;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -289,7 +291,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // VOLTDB_RESPONSE_SAMPLE_PATH to a valid path
             ResponseSampler.initializeIfEnabled();
 
-            readDeploymentAndCreateStarterCatalogContext();
+            buildClusterMesh(isRejoin);
+            final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
+            if (!isRejoin) {
+                m_messenger.waitForGroupJoin(numberOfNodes);
+            }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
             final int availableProcessors = Runtime.getRuntime().availableProcessors();
@@ -298,19 +304,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 poolSize = 2;
             }
             m_periodicWorkThread = MiscUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize, 1024 * 128);
-            buildClusterMesh(isRejoin);
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
 
             /*
-             * Pass in a latch for the watchdog. Will count down on success in all cases
-             * even if not rejoin
+             * Construct all the mailboxes for things that need to be globally addressable so they can be published
+             * in one atomic shot.
+             *
+             * The starting state for partition assignments are statically derived from the host id generated
+             * by host messenger and the k-factor/host count/sites per host. This starting state
+             * is published to ZK as the toplogy metadata node.
+             *
+             * On rejoin the rejoining node has to inspect the topology meta node to find out what is missing
+             * and then update the topology listing itself as a replacement for one of the missing host ids.
+             * Then it does a compare and set of the topology.
              */
-            CountDownLatch rejoinCompleted = new CountDownLatch(1);
-            if (isRejoin) {
-                createRejoinBarrierAndWatchdog(rejoinCompleted);
-            }
-
             ArrayDeque<Mailbox> siteMailboxes = null;
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
@@ -333,8 +341,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             m_mailboxPublisher.publish(m_messenger.getZK());
-
-            rejoinCompleted.countDown();
 
             /*
              * Before this barrier pretty much every remotely visible mailbox id has to have been
@@ -555,39 +561,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
     }
 
-    private void createRejoinBarrierAndWatchdog(final CountDownLatch rejoinCompleted) {
-        ZooKeeper zk = m_messenger.getZK();
-        while (true) {
-            try {
-                zk.create(VoltZK.rejoin_barrier, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                break;
-            } catch (KeeperException.NoNodeException e) {
-                hostLog.info("Unable to create rejoin barrier, will retry in 5 seconds");
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e1) {
-                    throw new RuntimeException(e);
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            new Thread("Rejoin watchdog") {
-                @Override
-                public void run() {
-                    try {
-                        if (!rejoinCompleted.await(1, TimeUnit.MINUTES)) {
-                            VoltDB.crashLocalVoltDB("Rejoin watchdog timed out rejoin after 60 seconds", false, null);
-                        }
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }.start();
-        }
-
-    }
-
-
     private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSites() throws Exception {
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
         int sitesperhost = m_deployment.getCluster().getSitesperhost();
@@ -693,42 +666,89 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }, 0, 6, TimeUnit.MINUTES);
     }
 
-    void readDeploymentAndCreateStarterCatalogContext() {
-        m_deployment = CatalogUtil.parseDeployment(m_config.m_pathToDeployment);
-        // wasn't a valid xml deployment file
-        if (m_deployment == null) {
-            hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
-            VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
-                    + m_config.m_pathToDeployment, false, null);
-        }
+    int readDeploymentAndCreateStarterCatalogContext() {
+        /*
+         * Debate with the cluster what the deployment file should be
+         */
+        try {
+            ZooKeeper zk = m_messenger.getZK();
+            byte deploymentBytes[] = org.voltcore.utils.MiscUtils.urlToBytes(m_config.m_pathToDeployment);
 
-        // note the heatbeats are specified in seconds in xml, but ms internally
-        HeartbeatType hbt = m_deployment.getHeartbeat();
-        if (hbt != null)
-            m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
+            try {
+                if (deploymentBytes != null) {
+                    zk.create(VoltZK.deploymentBytes, deploymentBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+                } else {
+                    throw new KeeperException.NodeExistsException();
+                }
+            } catch (KeeperException.NodeExistsException e) {
+                byte deploymentBytesTemp[] = zk.getData(VoltZK.deploymentBytes, false, null);
+                if (deploymentBytesTemp == null) {
+                    throw new RuntimeException(
+                            "Deployment file could not be found locally or remotely at "
+                            + m_config.m_pathToDeployment);
+                }
+                CRC32 crc = new CRC32();
+                crc.update(deploymentBytes);
+                final long checksumHere = crc.getValue();
+                crc.reset();
+                crc.update(deploymentBytesTemp);
+                if (checksumHere != crc.getValue()) {
+                    hostLog.info("Deployment configuration was pulled from ZK, and the checksum did not match " +
+                            "the locally supplied file");
+                } else {
+                    hostLog.info("Could not locate deployment info at given URL: " + m_config.m_pathToDeployment);
+                }
+                deploymentBytes = deploymentBytesTemp;
+            }
 
-        // create a dummy catalog to load deployment info into
-        Catalog catalog = new Catalog();
-        Cluster cluster = catalog.getClusters().add("cluster");
-        Database db = cluster.getDatabases().add("database");
+            m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+            // wasn't a valid xml deployment file
+            if (m_deployment == null) {
+                hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
+                VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
+                        + m_config.m_pathToDeployment, false, null);
+            }
 
-        // create groups as needed for users
-        if (m_deployment.getUsers() != null) {
-            for (UsersType.User user : m_deployment.getUsers().getUser()) {
-                String groupsCSV = user.getGroups();
-                String[] groups = groupsCSV.split(",");
-                for (String group : groups) {
-                    if (db.getGroups().get(group) == null) {
-                        db.getGroups().add(group);
+            // note the heatbeats are specified in seconds in xml, but ms internally
+            HeartbeatType hbt = m_deployment.getHeartbeat();
+            if (hbt != null)
+                m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
+
+            // create a dummy catalog to load deployment info into
+            Catalog catalog = new Catalog();
+            Cluster cluster = catalog.getClusters().add("cluster");
+            Database db = cluster.getDatabases().add("database");
+
+            // create groups as needed for users
+            if (m_deployment.getUsers() != null) {
+                for (UsersType.User user : m_deployment.getUsers().getUser()) {
+                    String groupsCSV = user.getGroups();
+                    String[] groups = groupsCSV.split(",");
+                    for (String group : groups) {
+                        if (db.getGroups().get(group) == null) {
+                            db.getGroups().add(group);
+                        }
                     }
                 }
             }
-        }
 
-        long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
-                                                             true, true);
-        assert(depCRC != -1);
-        m_catalogContext = new CatalogContext(0, catalog, null, depCRC, 0, -1);
+            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
+                                                                 true, true);
+            assert(depCRC != -1);
+            m_catalogContext = new CatalogContext(0, catalog, null, depCRC, 0, -1);
+
+            int numberOfNodes = m_deployment.getCluster().getHostcount();
+            if (numberOfNodes <= 0) {
+                hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(),
+                        new Object[] { numberOfNodes }, null);
+                VoltDB.crashLocalVoltDB("Invalid cluster size: " + numberOfNodes, false, null);
+            }
+
+            return numberOfNodes;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     void collectLocalNetworkMetadata() {
@@ -831,13 +851,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * site are synched to the existing cluster.
      */
     void buildClusterMesh(boolean isRejoin) {
-        int numberOfNodes = m_deployment.getCluster().getHostcount();
-        if (numberOfNodes <= 0) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(),
-                    new Object[] { numberOfNodes }, null);
-            VoltDB.crashLocalVoltDB("Invalid cluster size: " + numberOfNodes, false, null);
-        }
-
         String leaderAddress = m_config.m_leader;
         InetAddress leader = null;
         try {
@@ -860,7 +873,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         m_messenger =
             new org.voltcore.messaging.HostMessenger(hmconfig);
 
-        hostLog.l7dlog( Level.TRACE, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { numberOfNodes, leader }, null);
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
         try {
@@ -870,10 +882,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         VoltZK.createPersistentZKNodes(m_messenger.getZK());
-
-        if (!isRejoin) {
-            m_messenger.waitForGroupJoin(numberOfNodes);
-        }
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
