@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
@@ -301,6 +302,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
 
+            /*
+             * Pass in a latch for the watchdog. Will count down on success in all cases
+             * even if not rejoin
+             */
+            CountDownLatch rejoinCompleted = new CountDownLatch(1);
+            if (isRejoin) {
+                createRejoinBarrierAndWatchdog(rejoinCompleted);
+            }
+
             ArrayDeque<Mailbox> siteMailboxes = null;
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
@@ -323,6 +333,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             m_mailboxPublisher.publish(m_messenger.getZK());
+
+            rejoinCompleted.countDown();
 
             /*
              * Before this barrier pretty much every remotely visible mailbox id has to have been
@@ -542,6 +554,39 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
         }
     }
+
+    private void createRejoinBarrierAndWatchdog(final CountDownLatch rejoinCompleted) {
+        ZooKeeper zk = m_messenger.getZK();
+        while (true) {
+            try {
+                zk.create(VoltZK.rejoin_barrier, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                break;
+            } catch (KeeperException.NoNodeException e) {
+                hostLog.info("Unable to create rejoin barrier, will retry in 5 seconds");
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e1) {
+                    throw new RuntimeException(e);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            new Thread("Rejoin watchdog") {
+                @Override
+                public void run() {
+                    try {
+                        if (!rejoinCompleted.await(1, TimeUnit.MINUTES)) {
+                            VoltDB.crashLocalVoltDB("Rejoin watchdog timed out rejoin after 60 seconds", false, null);
+                        }
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }.start();
+        }
+
+    }
+
 
     private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSites() throws Exception {
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();

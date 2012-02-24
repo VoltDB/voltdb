@@ -37,6 +37,7 @@ public class VoltZK {
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String topology = "/db/topology";
     public static final String unfaulted_hosts = "/db/unfaulted_hosts";
+    public static final String rejoin_barrier = "/db/rejoin_barrier";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
