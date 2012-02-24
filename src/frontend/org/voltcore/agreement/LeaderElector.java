@@ -40,7 +40,8 @@ public class LeaderElector {
     private String node = null;
 
     private volatile boolean isLeader = false;
-    private final ExecutorService es;
+    private static final ExecutorService es =
+        Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Leader elector", 1024 * 128));
 
     private final Runnable eventHandler = new Runnable() {
         @Override
@@ -70,7 +71,6 @@ public class LeaderElector {
         this.dir = path;
         this.data = data;
         this.cb = cb;
-        es = Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Leader elector-" + dir));
 
         createAndElectLeader();
     }
