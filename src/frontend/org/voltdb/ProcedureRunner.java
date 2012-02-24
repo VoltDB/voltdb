@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -46,7 +47,6 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
@@ -130,12 +130,12 @@ public class ProcedureRunner {
         m_procedure.init(this);
 
         m_statsCollector = new ProcedureStatsCollector(
-                site.getCorrespondingSiteId(),
-                site.getCorrespondingPartitionId(),
-                catProc);
+                m_site.getCorrespondingSiteId(),
+                m_site.getCorrespondingPartitionId(),
+                m_catProc);
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 SysProcSelector.PROCEDURE,
-                Integer.parseInt(site.getCorrespondingCatalogSite().getTypeName()),
+                site.getCorrespondingSiteId(),
                 m_statsCollector);
 
         // this is a stupid hack to make the EE happy
@@ -1090,7 +1090,7 @@ public class ProcedureRunner {
        m_txnState.setupProcedureResume(finalTask, depsToResume);
 
        // create all the local work for the transaction
-       FragmentTaskMessage localTask = new FragmentTaskMessage(m_txnState.initiatorSiteId,
+       FragmentTaskMessage localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                  m_site.getCorrespondingSiteId(),
                                                  m_txnState.txnId,
                                                  m_txnState.isReadOnly(),
@@ -1107,7 +1107,7 @@ public class ProcedureRunner {
        m_txnState.createLocalFragmentWork(localTask, localFragsAreNonTransactional && finalTask);
 
        // create and distribute work for all sites in the transaction
-       FragmentTaskMessage distributedTask = new FragmentTaskMessage(m_txnState.initiatorSiteId,
+       FragmentTaskMessage distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        m_site.getCorrespondingSiteId(),
                                                        m_txnState.txnId,
                                                        m_txnState.isReadOnly(),

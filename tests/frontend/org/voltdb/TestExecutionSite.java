@@ -39,6 +39,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HeartbeatMessage;
+import org.voltcore.messaging.HeartbeatResponseMessage;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -50,21 +60,10 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.executionsitefuzz.ExecutionSiteFuzzChecker;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.SiteFailureFault;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltcore.messaging.HeartbeatMessage;
-import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltcore.messaging.LocalObjectMessage;
-import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltcore.messaging.Subject;
-import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.MiscUtils;
 
 public class TestExecutionSite extends TestCase {
 
@@ -697,10 +696,10 @@ public class TestExecutionSite extends TestCase {
                     int localTask_outputDep = m_txnState.getNextDependencyId();
 
                     FragmentTaskMessage localTask =
-                        new FragmentTaskMessage(txnState.initiatorHSId,
-                                                txnState.coordinatorSiteId,
-                                                txnState.txnId,
-                                                txnState.isReadOnly(),
+                        new FragmentTaskMessage(m_txnState.initiatorHSId,
+                                                m_txnState.coordinatorSiteId,
+                                                m_txnState.txnId,
+                                                m_txnState.isReadOnly(),
                                                 new long[] {1},
                                                 new int[] {localTask_outputDep},
                                                 new ByteBuffer[] {paramBuf},
@@ -709,10 +708,10 @@ public class TestExecutionSite extends TestCase {
                     localTask.addInputDepId(0, localTask_startDep);
 
                     FragmentTaskMessage distributedTask =
-                        new FragmentTaskMessage(txnState.initiatorHSId,
-                                                txnState.coordinatorSiteId,
-                                                txnState.txnId,
-                                                txnState.isReadOnly(),
+                        new FragmentTaskMessage(m_txnState.initiatorHSId,
+                                                m_txnState.coordinatorSiteId,
+                                                m_txnState.txnId,
+                                                m_txnState.isReadOnly(),
                                                 new long[] {0},
                                                 new int[] {localTask_startDep},
                                                 new ByteBuffer[] {paramBuf},
@@ -828,7 +827,7 @@ public class TestExecutionSite extends TestCase {
 
         assertTrue(tx1.isDone());
         assertEquals(null, m_sites.get(siteId0).m_transactionsById.get(tx1.txnId));
-        assertEquals((++callcheck), MockSPVoltProcedure.m_called);
+        assertEquals((++callcheck), MockSPProcedureRunner.m_called);
         assertEquals(1000, m_sites.get(siteId0).lastCommittedTxnId);
         assertEquals(0, m_sites.get(siteId0).lastKnownGloballyCommitedMultiPartTxnId);
     }
@@ -859,7 +858,7 @@ public class TestExecutionSite extends TestCase {
         m_sites.get(siteId0).recursableRun(tx1);
         assertTrue(tx1.isDone());
         assertEquals(null, m_sites.get(siteId0).m_transactionsById.get(tx1.txnId));
-        assertEquals((++callcheck), MockSPVoltProcedure.m_called);
+        assertEquals((++callcheck), MockSPProcedureRunner.m_called);
     }
 
     /*
@@ -1062,7 +1061,7 @@ public class TestExecutionSite extends TestCase {
         assertTrue(tx1_2.isDone());       // did run to completion because of globalCommitPt.
         assertEquals(should_rollback, tx1_2.needsRollback()); // did not rollback because of globalCommitPt.
         assertEquals(null, m_sites.get(siteId1).m_transactionsById.get(tx1_2.txnId));
-        assertEquals((++callcheck), MockMPVoltProcedure.m_called);
+        assertEquals((++callcheck), MockMPProcedureRunner.m_called);
     }
 
     /*
@@ -1186,7 +1185,7 @@ public class TestExecutionSite extends TestCase {
         assertTrue(tx1_1.isDone());
         assertFalse(tx1_1.needsRollback());
         assertEquals(null, es0.m_transactionsById.get(tx1_1.txnId));
-        assertEquals((++callcheck), MockMPVoltProcedure.m_called);
+        assertEquals((++callcheck), MockMPProcedureRunner.m_called);
     }
 
     /*

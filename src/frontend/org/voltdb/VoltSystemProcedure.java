@@ -206,7 +206,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             }
 
             FragmentTaskMessage task = new FragmentTaskMessage(
-                txnState.initiatorSiteId,
+                txnState.initiatorHSId,
                 m_site.getCorrespondingSiteId(),
                 txnState.txnId,
                 false,
@@ -232,7 +232,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 if (pf.siteId == -1)
                     txnState.createLocalFragmentWork(task, false);
                 else
-                    txnState.createFragmentWork(new int[] { pf.siteId },
+                    txnState.createFragmentWork(new long[] { pf.siteId },
                                                          task);
             }
         }

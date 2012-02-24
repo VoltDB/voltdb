@@ -35,6 +35,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
@@ -82,8 +84,6 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FastDeserializer;
@@ -644,7 +644,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     {
         this(voltdb, mailbox, serializedCatalog, transactionQueue,
              new ProcedureRunnerFactory(), recovering, replicationActive,
-             failedHostIds, txnId, configuredNumberOfPartitions);
+             txnId, configuredNumberOfPartitions);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -959,7 +959,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
             runner = m_runnerFactory.create(procedure, m_tracker.m_numberOfPartitions,
                          this, proc, hsql);
-            procedure.initSysProc(m_context.cluster.getPartitions().size(), this, proc, m_context.cluster);
+            procedure.initSysProc(m_tracker.m_numberOfPartitions, this, proc, m_context.cluster);
             procs.put(entry.getKey(), runner);
         }
     }
