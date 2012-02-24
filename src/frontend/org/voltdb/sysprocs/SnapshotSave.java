@@ -19,14 +19,22 @@ package org.voltdb.sysprocs;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.*;
+import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.SnapshotSaveAPI;
+import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.catalog.*;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
@@ -81,21 +89,19 @@ public class SnapshotSave extends VoltSystemProcedure
 
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
+    public void init()
     {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_saveTest, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_saveTestResults, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargets, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargetsResults, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_snapshotSaveQuiesce, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_snapshotSaveQuiesceResults, this);
+        registerPlanFragment(SysProcFragmentId.PF_saveTest);
+        registerPlanFragment(SysProcFragmentId.PF_saveTestResults);
+        registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargets);
+        registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargetsResults);
+        registerPlanFragment(SysProcFragmentId.PF_snapshotSaveQuiesce);
+        registerPlanFragment(SysProcFragmentId.PF_snapshotSaveQuiesceResults);
     }
 
     @Override
     public DependencyPair
-    executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies,
+    executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                         long fragmentId,
                         ParameterSet params,
                         SystemProcedureExecutionContext context)
@@ -147,7 +153,7 @@ public class SnapshotSave extends VoltSystemProcedure
     }
 
     private DependencyPair createSnapshotTargetsResults(
-            HashMap<Integer, List<VoltTable>> dependencies) {
+            Map<Integer, List<VoltTable>> dependencies) {
         {
             TRACE_LOG.trace("Aggregating create snapshot target results");
             assert (dependencies.size() > 0);
@@ -256,7 +262,7 @@ public class SnapshotSave extends VoltSystemProcedure
     }
 
     private DependencyPair saveTestResults(
-            HashMap<Integer, List<VoltTable>> dependencies) {
+            Map<Integer, List<VoltTable>> dependencies) {
         {
             TRACE_LOG.trace("Aggregating save feasiblity results");
             assert (dependencies.size() > 0);

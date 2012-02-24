@@ -17,22 +17,17 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
 
@@ -52,16 +47,13 @@ public class Quiesce extends VoltSystemProcedure {
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
-    {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_quiesce_sites, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_quiesce_processed_sites, this);
+    public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_quiesce_sites);
+        registerPlanFragment(SysProcFragmentId.PF_quiesce_processed_sites);
     }
 
     @Override
-    public DependencyPair executePlanFragment(HashMap<Integer,List<VoltTable>> dependencies,
+    public DependencyPair executePlanFragment(Map<Integer,List<VoltTable>> dependencies,
         long fragmentId, ParameterSet params, SystemProcedureExecutionContext context)
     {
         try {

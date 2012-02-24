@@ -22,16 +22,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.voltdb.BackendTarget;
+import org.voltdb.ClientInterface;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.ClientInterface;
-import org.voltdb.HsqlBackend;
 import org.voltdb.LiveClientStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -39,8 +36,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
@@ -101,32 +96,28 @@ public class Statistics extends VoltSystemProcedure {
 //        SysProcFragmentId.PF_initiatorAggregator;
 
     @Override
-        public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-
-        site.registerPlanFragment(SysProcFragmentId.PF_tableData, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_tableAggregator, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_indexData, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_indexAggregator, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_nodeMemory, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_nodeMemoryAggregator, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_procedureData, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_procedureAggregator, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_initiatorData, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_initiatorAggregator, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_partitionCount, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_ioData, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_ioDataAggregator, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_starvationData, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_starvationDataAggregator, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_liveClientData, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_liveClientDataAggregator, this);
+    public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_tableData);
+        registerPlanFragment(SysProcFragmentId.PF_tableAggregator);
+        registerPlanFragment(SysProcFragmentId.PF_indexData);
+        registerPlanFragment(SysProcFragmentId.PF_indexAggregator);
+        registerPlanFragment(SysProcFragmentId.PF_nodeMemory);
+        registerPlanFragment(SysProcFragmentId.PF_nodeMemoryAggregator);
+        registerPlanFragment(SysProcFragmentId.PF_procedureData);
+        registerPlanFragment(SysProcFragmentId.PF_procedureAggregator);
+        registerPlanFragment(SysProcFragmentId.PF_initiatorData);
+        registerPlanFragment(SysProcFragmentId.PF_initiatorAggregator);
+        registerPlanFragment(SysProcFragmentId.PF_partitionCount);
+        registerPlanFragment(SysProcFragmentId.PF_ioData);
+        registerPlanFragment(SysProcFragmentId.PF_ioDataAggregator);
+        registerPlanFragment(SysProcFragmentId.PF_starvationData);
+        registerPlanFragment(SysProcFragmentId.PF_starvationDataAggregator);
+        registerPlanFragment(SysProcFragmentId.PF_liveClientData);
+        registerPlanFragment(SysProcFragmentId.PF_liveClientDataAggregator);
     }
 
     @Override
-    public DependencyPair executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies,
+    public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                                                   long fragmentId,
                                                   ParameterSet params,
                                                   ExecutionSite.SystemProcedureExecutionContext context)
@@ -504,8 +495,7 @@ public class Statistics extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_ioDataAggregator);
+        results = executeSysProcPlanFragments(pfs, DEP_ioDataAggregator);
         return results;
     }
 
@@ -520,8 +510,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].multipartition = false;
         pfs[0].parameters = new ParameterSet();
 
-        results =
-            executeSysProcPlanFragments(pfs, DEP_partitionCount);
+        results = executeSysProcPlanFragments(pfs, DEP_partitionCount);
         return results;
     }
 
@@ -548,8 +537,7 @@ public class Statistics extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_initiatorAggregator);
+        results = executeSysProcPlanFragments(pfs, DEP_initiatorAggregator);
         return results;
     }
 
@@ -576,8 +564,7 @@ public class Statistics extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_nodeMemoryAggregator);
+        results = executeSysProcPlanFragments(pfs, DEP_nodeMemoryAggregator);
         return results;
     }
 
@@ -604,8 +591,7 @@ public class Statistics extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_procedureAggregator);
+        results = executeSysProcPlanFragments(pfs, DEP_procedureAggregator);
         return results;
     }
 
@@ -632,8 +618,7 @@ public class Statistics extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_starvationDataAggregator);
+        results = executeSysProcPlanFragments(pfs, DEP_starvationDataAggregator);
         return results;
     }
 
@@ -660,8 +645,7 @@ public class Statistics extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_tableAggregator);
+        results = executeSysProcPlanFragments(pfs, DEP_tableAggregator);
         return results;
     }
 
@@ -715,8 +699,7 @@ public class Statistics extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_liveClientDataAggregator);
+        results = executeSysProcPlanFragments(pfs, DEP_liveClientDataAggregator);
         return results;
     }
 }

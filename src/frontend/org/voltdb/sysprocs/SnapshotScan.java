@@ -25,24 +25,20 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
 import org.json_voltpatches.JSONArray;
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
@@ -74,22 +70,20 @@ public class SnapshotScan extends VoltSystemProcedure {
         SysProcFragmentId.PF_hostDiskFreeScanResults;
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_snapshotDigestScan, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_snapshotDigestScanResults, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_snapshotScan, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_snapshotScanResults, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_hostDiskFreeScan, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_hostDiskFreeScanResults, this);
+    public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_snapshotDigestScan);
+        registerPlanFragment(SysProcFragmentId.PF_snapshotDigestScanResults);
+        registerPlanFragment(SysProcFragmentId.PF_snapshotScan);
+        registerPlanFragment(SysProcFragmentId.PF_snapshotScanResults);
+        registerPlanFragment(SysProcFragmentId.PF_hostDiskFreeScan);
+        registerPlanFragment(SysProcFragmentId.PF_hostDiskFreeScanResults);
     }
 
     private String errorString = null;
 
     @Override
     public DependencyPair
-    executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
+    executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
         errorString = null;

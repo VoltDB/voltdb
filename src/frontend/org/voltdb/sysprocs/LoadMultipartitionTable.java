@@ -17,26 +17,20 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
-import org.voltdb.SQLStmtInitializer;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -59,21 +53,15 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
     static final int DEP_aggregate = (int) SysProcFragmentId.PF_aggregate;
 
-    private Cluster m_cluster = null;
-
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql,
-            Cluster cluster) {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        m_cluster = cluster;
-        site.registerPlanFragment(SysProcFragmentId.PF_distribute, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_aggregate, this);
+    public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_distribute);
+        registerPlanFragment(SysProcFragmentId.PF_aggregate);
     }
 
     @Override
     public DependencyPair executePlanFragment(
-            HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
         // Return a single long for modified rowcount
         VoltTable result = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
@@ -95,7 +83,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
             try {
                 // voltLoadTable is void. Assume success or exception.
-                super.voltLoadTable(context.getCluster().getTypeName(),
+                voltLoadTable(context.getCluster().getTypeName(),
                                     context.getDatabase().getTypeName(),
                                     tableName,
                                     toInsert);
@@ -199,7 +187,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
         // create a SQLStmt instance on the fly (unusual to do)
         SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
-        SQLStmtInitializer.initSQLStmt(stmt, catStmt);
+        ProcedureRunner.initSQLStmt(stmt, catStmt);
 
         if (catTable.getIsreplicated()) {
             long queued = 0;

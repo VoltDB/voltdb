@@ -41,31 +41,27 @@ import java.util.concurrent.Future;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.BackendTarget;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.DependencyPair;
-
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.ClusterSaveFileState;
 import org.voltdb.sysprocs.saverestore.SavedTableConverter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -74,9 +70,6 @@ import org.voltdb.sysprocs.saverestore.TableSaveFileState;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
-import org.voltcore.utils.MiscUtils;
-import org.voltcore.utils.Pair;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 @ProcInfo (
         singlePartition = false
@@ -202,55 +195,25 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
+    public void init()
     {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_restoreScan, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_restoreScanResults,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreLoadReplicatedTable,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreLoadReplicatedTableResults,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreDistributeReplicatedTable,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreDistributePartitionedTable,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreDistributePartitionedTableResults,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreSendReplicatedTable,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreSendReplicatedTableResults,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreSendPartitionedTable,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreSendPartitionedTableResults,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreDigestScan,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreDigestScanResults,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreDistributeExportSequenceNumbers,
-                this);
-        site.registerPlanFragment(SysProcFragmentId.
-                PF_restoreDistributeExportSequenceNumbersResults,
-                this);
-        m_cluster = cluster;
-        m_siteId = MiscUtils.getSiteIdFromHSId(site.getCorrespondingSiteId());
-        m_hostId = SiteTracker.getHostForSite(site.getCorrespondingSiteId());
+        registerPlanFragment(SysProcFragmentId.PF_restoreScan);
+        registerPlanFragment(SysProcFragmentId.PF_restoreScanResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreLoadReplicatedTable);
+        registerPlanFragment(SysProcFragmentId.PF_restoreLoadReplicatedTableResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeReplicatedTable);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributePartitionedTable);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributePartitionedTableResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreSendReplicatedTable);
+        registerPlanFragment(SysProcFragmentId.PF_restoreSendReplicatedTableResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreSendPartitionedTable);
+        registerPlanFragment(SysProcFragmentId.PF_restoreSendPartitionedTableResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDigestScan);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDigestScanResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeExportSequenceNumbersResults);
+        m_siteId = MiscUtils.getSiteIdFromHSId(m_site.getCorrespondingSiteId());
+        m_hostId = SiteTracker.getHostForSite(m_site.getCorrespondingSiteId());
         // XXX HACK GIANT HACK given the current assumption that there is
         // only one database per cluster, I'm asserting this and then
         // skirting around the need to have the database name in order to get
@@ -261,7 +224,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
     @Override
     public DependencyPair
-    executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
+    executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
             SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers)
@@ -580,7 +543,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
                     try
                     {
-                        super.voltLoadTable(context.getCluster().getTypeName(),
+                        voltLoadTable(context.getCluster().getTypeName(),
                                 context.getDatabase().getTypeName(),
                                 table_name, table);
                     }
@@ -660,7 +623,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 ByteBuffer.wrap(
                                         CompressionService.decompressBytes(compressedTable)),
                                         true);
-                super.voltLoadTable(context.getCluster().getTypeName(),
+                voltLoadTable(context.getCluster().getTypeName(),
                         context.getDatabase().getTypeName(),
                         table_name, table);
             }
@@ -788,7 +751,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 ByteBuffer.wrap(
                                         CompressionService.decompressBytes(compressedTable)),
                                         true);
-                super.voltLoadTable(context.getCluster().getTypeName(),
+                voltLoadTable(context.getCluster().getTypeName(),
                         context.getDatabase().getTypeName(),
                         table_name, table);
             }
@@ -1364,8 +1327,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 pfs[1].parameters = result_params;
                 TRACE_LOG.trace("Sending replicated table: " + tableName + " to site id:" +
                         siteId);
-                results =
-                        executeSysProcPlanFragments(pfs, final_dependency_id);
+                results = executeSysProcPlanFragments(pfs, final_dependency_id);
             }
         } catch (IOException e) {
             VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
@@ -1486,8 +1448,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 ParameterSet params = new ParameterSet();
                 params.setParameters(result_dependency_id);
                 pfs[sites_to_partitions.size()].parameters = params;
-                results =
-                        executeSysProcPlanFragments(pfs, result_dependency_id);
+                results = executeSysProcPlanFragments(pfs, result_dependency_id);
             }
         } catch (Exception e) {
             VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
@@ -1558,7 +1519,6 @@ public class SnapshotRestore extends VoltSystemProcedure
         return m_database.getTables().get(tableName);
     }
 
-    private Cluster m_cluster;
     private Database m_database;
     private long m_siteId;
     private int m_hostId;

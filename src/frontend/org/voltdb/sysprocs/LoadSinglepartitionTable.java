@@ -18,25 +18,21 @@
 package org.voltdb.sysprocs;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
-import org.voltdb.SQLStmtInitializer;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
@@ -55,20 +51,15 @@ import org.voltdb.messaging.FastDeserializer;
 public class LoadSinglepartitionTable extends VoltSystemProcedure
 {
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql,
-            Cluster cluster) {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-    }
+    public void init() {}
 
     /**
      * This single-partition sysproc has no special fragments
      */
     @Override
     public DependencyPair executePlanFragment(
-            HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
-        // TODO Auto-generated method stub
         return null;
     }
 
@@ -128,7 +119,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
 
         // create a SQLStmt instance on the fly (unusual to do)
         SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
-        SQLStmtInitializer.initSQLStmt(stmt, catStmt);
+        ProcedureRunner.initSQLStmt(stmt, catStmt);
 
         long queued = 0;
         long executed = 0;
