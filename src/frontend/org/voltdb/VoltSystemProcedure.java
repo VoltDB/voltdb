@@ -19,11 +19,12 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.TransactionState;
@@ -56,6 +57,24 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     /** Standard success return value for sysprocs returning STATUS_SCHEMA */
     protected static long STATUS_OK = 0L;
 
+    protected int m_numberOfPartitions;
+    protected Procedure m_catProc;
+    protected Cluster m_cluster;
+    protected ExecutionSite m_site;
+
+    void initSysProc(int numberOfPartitions, ExecutionSite site,
+            Procedure catProc, Cluster cluster) {
+
+        m_numberOfPartitions = numberOfPartitions;
+        m_site = site;
+        m_catProc = catProc;
+        m_cluster = cluster;
+
+        init();
+    }
+
+    abstract public void init();
+
     /**
      * Utility to aggregate a list of tables sharing a schema. Common for
      * sysprocs to do this, to aggregate results.
@@ -81,19 +100,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         return result;
     }
 
-    /**
-     * Allow sysprocs to update m_currentTxnState manually. User procedures are
-     * passed this state in call(); sysprocs have other entry points on
-     * non-coordinator sites.
-     */
-    public void setTransactionState(TransactionState txnState) {
-        m_currentTxnState = txnState;
-    }
-
-    public TransactionState getTransactionState() {
-        return m_currentTxnState;
-    }
-
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
         public int siteId = -1;
@@ -113,7 +119,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     }
 
     abstract public DependencyPair executePlanFragment(
-            HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params,
             ExecutionSite.SystemProcedureExecutionContext context);
 
@@ -130,27 +136,25 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      *            table returned as the result of this procedure.
      * @return the resulting VoltTable as a length-one array.
      */
-    protected VoltTable[] executeSysProcPlanFragments(
+    public VoltTable[] executeSysProcPlanFragments(
             SynthesizedPlanFragment pfs[], int aggregatorOutputDependencyId) {
+
+        TransactionState txnState = m_runner.getTxnState();
+
         VoltTable[] results = new VoltTable[1];
         executeSysProcPlanFragmentsAsync(pfs);
 
         // the stack frame drop terminates the recursion and resumes
         // execution of the current stored procedure.
-        assert (m_currentTxnState != null);
-        assert (m_currentTxnState instanceof MultiPartitionParticipantTxnState);
-        m_currentTxnState
-                         .setupProcedureResume(
-                                               false,
-                                               new int[] { aggregatorOutputDependencyId });
+        assert (txnState != null);
+        assert (txnState instanceof MultiPartitionParticipantTxnState);
+        txnState.setupProcedureResume(false, new int[] { aggregatorOutputDependencyId });
 
         // execute the tasks that just got queued.
         // recursively call recurableRun and don't allow it to shutdown
-        Map<Integer, List<VoltTable>> mapResults = m_site
-                                                         .recursableRun(m_currentTxnState);
+        Map<Integer, List<VoltTable>> mapResults = m_site.recursableRun(txnState);
 
-        List<VoltTable> matchingTablesForId = mapResults
-                                                        .get(aggregatorOutputDependencyId);
+        List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
         if (matchingTablesForId == null) {
             assert (mapResults.size() == 0);
             results[0] = null;
@@ -173,8 +177,11 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      *            dependency id produced by the aggregation pf The id of the
      *            table returned as the result of this procedure.
      */
-    protected void executeSysProcPlanFragmentsAsync(
+    public void executeSysProcPlanFragmentsAsync(
             SynthesizedPlanFragment pfs[]) {
+
+        TransactionState txnState = m_runner.getTxnState();
+
         for (SynthesizedPlanFragment pf : pfs) {
             assert (pf.parameters != null);
 
@@ -199,9 +206,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             }
 
             FragmentTaskMessage task = new FragmentTaskMessage(
-                m_currentTxnState.initiatorSiteId,
+                txnState.initiatorSiteId,
                 m_site.getCorrespondingSiteId(),
-                m_currentTxnState.txnId,
+                txnState.txnId,
                 false,
                 new long[] { pf.fragmentId },
                 new int[] { pf.outputDepId },
@@ -219,15 +226,20 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
             if (pf.multipartition) {
                 // create a workunit for every execution site
-                m_currentTxnState.createAllParticipatingFragmentWork(task);
+                txnState.createAllParticipatingFragmentWork(task);
             } else {
                 // create one workunit for the current site
                 if (pf.siteId == -1)
-                    m_currentTxnState.createLocalFragmentWork(task, false);
+                    txnState.createLocalFragmentWork(task, false);
                 else
-                    m_currentTxnState.createFragmentWork(new int[] { pf.siteId },
+                    txnState.createFragmentWork(new int[] { pf.siteId },
                                                          task);
             }
         }
+    }
+
+    public void registerPlanFragment(long fragmentId) {
+        assert(m_runner != null);
+        m_site.registerPlanFragment(fragmentId, m_runner);
     }
 }

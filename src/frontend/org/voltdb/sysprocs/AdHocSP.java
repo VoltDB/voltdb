@@ -17,8 +17,8 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
@@ -35,8 +35,11 @@ import org.voltdb.jni.ExecutionEngine;
 public class AdHocSP extends VoltSystemProcedure {
 
     @Override
+    public void init() {}
+
+    @Override
     public DependencyPair executePlanFragment(
-            HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
         // This code should never be called.
         assert(false);

@@ -18,17 +18,14 @@
 package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
@@ -36,7 +33,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
@@ -55,14 +51,12 @@ public class Rejoin extends VoltSystemProcedure {
     public static boolean debugFlag = false;
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_rejoinBlock, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_rejoinPrepare, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_rejoinCommit, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_rejoinRollback, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_rejoinAggregate, this);
+    public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_rejoinBlock);
+        registerPlanFragment(SysProcFragmentId.PF_rejoinPrepare);
+        registerPlanFragment(SysProcFragmentId.PF_rejoinCommit);
+        registerPlanFragment(SysProcFragmentId.PF_rejoinRollback);
+        registerPlanFragment(SysProcFragmentId.PF_rejoinAggregate);
     }
 
     VoltTable phaseZeroBlock(int hostId, int rejoinHostId, String rejoiningHostName)
@@ -113,7 +107,7 @@ public class Rejoin extends VoltSystemProcedure {
         {
           // connect
             error = VoltDB.instance().doRejoinPrepare(
-                    getTransactionId(),
+                    m_runner.getTxnState().txnId,
                     rejoinHostId,
                     rejoiningHostname,
                     portToConnect,
@@ -196,7 +190,7 @@ public class Rejoin extends VoltSystemProcedure {
         }
         String catalogDiffCommands = sb.toString();
 
-        String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), true);
+        String error = VoltDB.instance().doRejoinCommitOrRollback(m_runner.getTxnState().txnId, true);
         context.getExecutionSite().updateClusterState(catalogDiffCommands);
 
         retval.addRow(Integer.parseInt(context.getSite().getTypeName()), error);
@@ -240,7 +234,7 @@ public class Rejoin extends VoltSystemProcedure {
 
     @Override
     public DependencyPair executePlanFragment(
-            HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
 
         HostMessenger messenger = (HostMessenger) VoltDB.instance().getMessenger();

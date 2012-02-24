@@ -17,8 +17,8 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
@@ -26,14 +26,11 @@ import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 
 /**
@@ -49,16 +46,14 @@ public class AdHoc extends VoltSystemProcedure {
     final int COLLECT_DEPID = 2 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
+    public void init()
     {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_runAdHocFragment, this);
-        m_db = cluster.getDatabases().get("database");
+        registerPlanFragment(SysProcFragmentId.PF_runAdHocFragment);
+        m_db = m_cluster.getDatabases().get("database");
     }
 
     @Override
-    public DependencyPair executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+    public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context)
     {
         // get the three params (depId, json plan, sql stmt)
@@ -78,17 +73,18 @@ public class AdHoc extends VoltSystemProcedure {
 
         VoltTable table = null;
 
-        if (VoltDB.getEEBackendType() == BackendTarget.HSQLDB_BACKEND) {
+        HsqlBackend hsql = m_runner.getHsqlBackendIfExists();
+        if (hsql != null) {
             // Call HSQLDB
             assert(sql != null);
-            table = m_hsql.runDML(sql);
+            table = hsql.runDML(sql);
         }
         else
         {
             assert(plan != null);
             table =
                 context.getExecutionEngine().
-                executeCustomPlanFragment(plan, outputDepId, inputDepId, getTransactionId(),
+                executeCustomPlanFragment(plan, outputDepId, inputDepId, m_runner.getTxnState().txnId,
                                           context.getLastCommittedTxnId(),
                                           context.getNextUndo());
         }
@@ -168,8 +164,7 @@ public class AdHoc extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, AGG_DEPID);
+        results = executeSysProcPlanFragments(pfs, AGG_DEPID);
 
         // rather icky hack to handle how the number of modified tuples will always be
         // inflated when changing replicated tables - the user really doesn't want to know

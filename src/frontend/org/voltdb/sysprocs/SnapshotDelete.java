@@ -19,23 +19,18 @@ package org.voltdb.sysprocs;
 
 import java.io.File;
 import java.io.FileFilter;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.VoltFile;
@@ -54,19 +49,16 @@ public class SnapshotDelete extends VoltSystemProcedure {
         SysProcFragmentId.PF_snapshotDeleteResults;
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
-    {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_snapshotDelete, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_snapshotDeleteResults, this);
+    public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_snapshotDelete);
+        registerPlanFragment(SysProcFragmentId.PF_snapshotDeleteResults);
     }
 
     private String errorString = null;
 
     @Override
     public DependencyPair
-    executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, final ParameterSet params,
+    executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId, final ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
         //String hostname = ConnectionUtil.getHostnameOrAddress();

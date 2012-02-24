@@ -18,37 +18,29 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
-import org.voltdb.HsqlBackend;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
+
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
-    {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-    }
+    public void init() {}
 
     @Override
     public DependencyPair executePlanFragment(
-            HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context)
     {
         throw new RuntimeException("UpdateApplicationCatalog was given an " +

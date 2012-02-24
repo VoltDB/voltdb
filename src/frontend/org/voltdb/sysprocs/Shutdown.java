@@ -17,22 +17,17 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.logging.VoltLogger;
 
@@ -47,15 +42,13 @@ import org.voltdb.logging.VoltLogger;
 public class Shutdown extends VoltSystemProcedure {
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_shutdownCommand, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_procedureDone, this);
+    public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_shutdownCommand);
+        registerPlanFragment(SysProcFragmentId.PF_procedureDone);
     }
 
     @Override
-    public DependencyPair executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies,
+    public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                                            long fragmentId,
                                            ParameterSet params,
                                            ExecutionSite.SystemProcedureExecutionContext context)
@@ -110,8 +103,7 @@ public class Shutdown extends VoltSystemProcedure {
         pfs[0].multipartition = true;
         pfs[0].parameters = new ParameterSet();
 
-        executeSysProcPlanFragments(pfs,
-                (int) SysProcFragmentId.PF_procedureDone);
+        executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_procedureDone);
         return new VoltTable[0];
     }
 }

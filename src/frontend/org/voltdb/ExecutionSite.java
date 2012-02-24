@@ -48,6 +48,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
@@ -113,11 +114,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
         new ExecutionSiteNodeFailureFaultHandler();
 
-    final HashMap<String, VoltProcedure> procs = new HashMap<String, VoltProcedure>(16, (float) .1);
+    final HashMap<String, ProcedureRunner> procs = new HashMap<String, ProcedureRunner>(16, (float) .1);
     private final Mailbox m_mailbox;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
+    final ProcedureRunnerFactory m_runnerFactory;
 
     private final long m_startupTime = System.currentTimeMillis();
     private PartitionDRGateway m_partitionDRGateway = null;
@@ -370,8 +372,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
     }
 
-    private final HashMap<Long, VoltSystemProcedure> m_registeredSysProcPlanFragments =
-        new HashMap<Long, VoltSystemProcedure>();
+    private final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
+        new HashMap<Long, ProcedureRunner>();
 
 
     /**
@@ -625,7 +627,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public long getCurrentTxnId();
         public long getNextUndo();
         public ExecutionSite getExecutionSite();
-        public HashMap<String, VoltProcedure> getProcedures();
+        public HashMap<String, ProcedureRunner> getProcedures();
     }
 
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
@@ -646,7 +648,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         @Override
         public ExecutionSite getExecutionSite()               { return ExecutionSite.this; }
         @Override
-        public HashMap<String, VoltProcedure> getProcedures() { return procs; }
+        public HashMap<String, ProcedureRunner> getProcedures() { return procs; }
     }
 
     SystemProcedureContext m_systemProcedureContext;
@@ -667,14 +669,29 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         m_starvationTracker = null;
         m_tableStats = null;
         m_indexStats = null;
+        m_runnerFactory = null;
 
         // initialize the DR gateway
         m_partitionDRGateway = new PartitionDRGateway();
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
+            final int siteId, String serializedCatalog,
+            RestrictedPriorityQueue transactionQueue,
+            boolean recovering,
+            boolean replicationActive,
+            HashSet<Integer> failedHostIds,
+            final long txnId)
+    {
+        this(voltdb, mailbox, siteId, serializedCatalog, transactionQueue,
+             new ProcedureRunnerFactory(), recovering, replicationActive,
+             failedHostIds, txnId);
+    }
+
+    ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
                   final int siteId, String serializedCatalog,
                   RestrictedPriorityQueue transactionQueue,
+                  ProcedureRunnerFactory runnerFactory,
                   boolean recovering,
                   boolean replicationActive,
                   HashSet<Integer> failedHostIds,
@@ -686,6 +703,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         m_siteId = siteId;
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
+        m_runnerFactory = runnerFactory;
         m_recovering = recovering;
         m_context = voltdb.getCatalogContext();
         //lastCommittedTxnId = txnId;
@@ -914,7 +932,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 continue;
             }
 
-            VoltProcedure wrapper = null;
+            ProcedureRunner runner = null;
+            VoltProcedure procedure = null;
             if (proc.getHasjava()) {
                 final String className = proc.getClassname();
                 Class<?> procClass = null;
@@ -933,7 +952,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     }
                 }
                 try {
-                    wrapper = (VoltProcedure) procClass.newInstance();
+                    procedure = (VoltProcedure) procClass.newInstance();
                 }
                 catch (final InstantiationException e) {
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
@@ -945,12 +964,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
             }
             else {
-                wrapper = new VoltProcedure.StmtProcedure();
+                procedure = new ProcedureRunner.StmtProcedure();
             }
 
-            wrapper.init(m_context.cluster.getPartitions().size(),
-                         this, proc, backendTarget, hsql, m_context.cluster);
-            procs.put(proc.getTypeName(), wrapper);
+            assert(procedure != null);
+            runner = m_runnerFactory.create(procedure,
+                         m_context.cluster.getPartitions().size(),
+                         this, proc, hsql);
+            procs.put(proc.getTypeName(), runner);
         }
     }
 
@@ -960,7 +981,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             Config sysProc = entry.getValue();
             Procedure proc = sysProc.asCatalogProcedure();
 
-            VoltProcedure wrapper = null;
+            VoltSystemProcedure procedure = null;
+            ProcedureRunner runner = null;
+
             final String className = sysProc.getClassname();
             Class<?> procClass = null;
             try {
@@ -980,7 +1003,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             }
 
             try {
-                wrapper = (VoltProcedure) procClass.newInstance();
+                procedure = (VoltSystemProcedure) procClass.newInstance();
             }
             catch (final InstantiationException e) {
                 hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
@@ -991,9 +1014,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         new Object[] { getSiteId(), siteIndex }, e);
             }
 
-            wrapper.init(m_context.cluster.getPartitions().size(),
-                         this, proc, backendTarget, hsql, m_context.cluster);
-            procs.put(entry.getKey(), wrapper);
+            runner = m_runnerFactory.create(procedure, m_context.cluster.getPartitions().size(),
+                         this, proc, hsql);
+            procedure.initSysProc(m_context.cluster.getPartitions().size(), this, proc, m_context.cluster);
+            procs.put(entry.getKey(), runner);
         }
     }
 
@@ -1912,19 +1936,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         // assume success. errors correct this assumption as they occur
         currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
 
-        VoltSystemProcedure proc = null;
+        ProcedureRunner runner = null;
         synchronized (m_registeredSysProcPlanFragments) {
-            proc = m_registeredSysProcPlanFragments.get(fragmentId);
+            runner = m_registeredSysProcPlanFragments.get(fragmentId);
+        }
+        if (runner == null) {
+            assert(false);
         }
 
         try {
-            // set transaction state for non-coordinator snapshot restore sites
-            proc.setTransactionState(txnState);
             final DependencyPair dep
-                = proc.executePlanFragment(dependencies,
-                                           fragmentId,
-                                           params,
-                                           m_systemProcedureContext);
+                = runner.executePlanFragment(txnState,
+                                             dependencies,
+                                             fragmentId,
+                                             params,
+                                             m_systemProcedureContext);
 
             sendDependency(currentFragResponse, dep.depId, dep.dependency);
         }
@@ -1980,7 +2006,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      */
 
     @Override
-    public void registerPlanFragment(final long pfId, final VoltSystemProcedure proc) {
+    public void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
         synchronized (m_registeredSysProcPlanFragments) {
             assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
             m_registeredSysProcPlanFragments.put(pfId, proc);
@@ -2279,12 +2305,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             final VoltMessage task)
     {
         final InitiateTaskMessage itask = (InitiateTaskMessage)task;
-        final VoltProcedure wrapper = procs.get(itask.getStoredProcedureName());
+        final ProcedureRunner runner = procs.get(itask.getStoredProcedureName());
 
         final InitiateResponseMessage response = new InitiateResponseMessage(itask);
 
         // feasible to receive a transaction initiated with an earlier catalog.
-        if (wrapper == null) {
+        if (runner == null) {
             response.setResults(
                 new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                                        new VoltTable[] {},
@@ -2311,17 +2337,26 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
                 if (callerParams != null) {
                     ClientResponseImpl cr = null;
-                    if (wrapper instanceof VoltSystemProcedure) {
+
+                    // find the txn id visible to the proc
+                    long txnId = txnState.txnId;
+                    StoredProcedureInvocation invocation = txnState.getInvocation();
+                    if ((invocation != null) && (invocation.getType() == ProcedureInvocationType.REPLICATED)) {
+                        txnId = invocation.getOriginalTxnId();
+                    }
+
+                    // call the proc
+                    runner.setupTransaction(txnState);
+                    if (runner.isSystemProcedure()) {
                         final Object[] combinedParams = new Object[callerParams.length + 1];
                         combinedParams[0] = m_systemProcedureContext;
                         for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                        cr = wrapper.call(txnState, combinedParams);
-                        response.setResults(cr, itask);
+                        cr = runner.call(txnId, combinedParams);
                     }
                     else {
-                        cr = wrapper.call(txnState, itask.getParameters());
-                        response.setResults(cr, itask);
+                        cr = runner.call(txnId, itask.getParameters());
                     }
+                    response.setResults(cr, itask);
                     // record the results of write transactions to the transaction state
                     // this may be used to verify the WAN replica cluster gets the same value
                     // skip for multi-partition txns because only 1 of k+1 partitions will

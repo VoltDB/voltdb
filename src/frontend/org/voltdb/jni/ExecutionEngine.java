@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltdb.DependencyPair;
@@ -100,7 +101,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Does not copy the table data - references WorkUnit's tables.
      * @param dependencies
      */
-    public void stashWorkUnitDependencies(final HashMap<Integer, List<VoltTable>> dependencies) {
+    public void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies) {
         m_dependencyTracker.trackNewWorkUnit(dependencies);
     }
 
@@ -141,7 +142,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
          * Store dependency tables for later retrieval by the EE.
          * @param workunit
          */
-        void trackNewWorkUnit(final HashMap<Integer, List<VoltTable>> dependencies) {
+        void trackNewWorkUnit(final Map<Integer, List<VoltTable>> dependencies) {
             for (final Entry<Integer, List<VoltTable>> e : dependencies.entrySet()) {
                 // could do this optionally - debug only.
                 verifyDependencySanity(e.getKey(), e.getValue());

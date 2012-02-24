@@ -17,14 +17,19 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.HashMap;
 import java.util.List;
-import org.voltdb.*;
+import java.util.Map;
+
+import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.catalog.Cluster;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 
 /**
@@ -39,15 +44,13 @@ public class ProfCtl extends VoltSystemProcedure {
     static final int DEP_ID = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     @Override
-        public void init(int numberOfPartitions, SiteProcedureConnection site,
-                Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-        site.registerPlanFragment(SysProcFragmentId.PF_startSampler, this);
-        m_db = cluster.getDatabases().get("database");
+        public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_startSampler);
+        m_db = m_cluster.getDatabases().get("database");
     }
 
     @Override
-    public DependencyPair executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+    public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
 
         VoltTable table = new VoltTable(new ColumnInfo("Result", VoltType.STRING));
@@ -105,6 +108,7 @@ public class ProfCtl extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        return executeSysProcPlanFragments(new SynthesizedPlanFragment[] { spf }, DEP_ID);
+        return executeSysProcPlanFragments(
+                new SynthesizedPlanFragment[] { spf }, DEP_ID);
     }
 }

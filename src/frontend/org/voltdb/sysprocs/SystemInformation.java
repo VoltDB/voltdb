@@ -21,26 +21,22 @@ import java.io.File;
 import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.GroupRef;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
@@ -74,21 +70,16 @@ public class SystemInformation extends VoltSystemProcedure
     };
 
     @Override
-    public void init(int numberOfPartitions, SiteProcedureConnection site,
-                     Procedure catProc, BackendTarget eeType, HsqlBackend hsql,
-                     Cluster cluster)
+    public void init()
     {
-        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
-
-        site.registerPlanFragment(SysProcFragmentId.PF_systemInformationOverview, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_systemInformationOverviewAggregate, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_systemInformationDeployment, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_systemInformationAggregate, this);
+        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverview);
+        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverviewAggregate);
+        registerPlanFragment(SysProcFragmentId.PF_systemInformationDeployment);
+        registerPlanFragment(SysProcFragmentId.PF_systemInformationAggregate);
     }
 
     @Override
-    public DependencyPair executePlanFragment(HashMap<Integer,
-                                              List<VoltTable>> dependencies,
+    public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                                               long fragmentId,
                                               ParameterSet params,
                                               SystemProcedureExecutionContext context)
@@ -316,8 +307,7 @@ public class SystemInformation extends VoltSystemProcedure
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_systemInformationAggregate);
+        results = executeSysProcPlanFragments(pfs, DEP_systemInformationAggregate);
         return results;
     }
 

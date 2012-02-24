@@ -36,7 +36,7 @@ public interface SiteProcedureConnection {
      * @param pfId
      * @param proc
      */
-    public void registerPlanFragment(final long pfId, final VoltSystemProcedure proc);
+    public void registerPlanFragment(final long pfId, final ProcedureRunner proc);
 
     /**
      * Get the catalog site entry for the corresponding SiteProcedureConnection
