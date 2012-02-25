@@ -47,7 +47,7 @@ public class PartitionDRGateway {
         // if this is a primary cluster in a DR-enabled scenario
         //  try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToWAN && vdb.getReplicationRole() != ReplicationRole.REPLICA) {
+        if (licensedToWAN) {
             try {
                 Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
                 Object obj = pdrgiClass.newInstance();
