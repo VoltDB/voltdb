@@ -282,6 +282,9 @@ public class VoltDB {
                 else if (arg.equals("replica")) {
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
+                else if (arg.equals("dragentportstart")) {
+                    m_drAgentPortStart = Integer.parseInt(args[++i]);
+                }
 
                 // handle timestampsalt
                 else if (arg.equals("timestampsalt")) {
@@ -315,11 +318,7 @@ public class VoltDB {
                     usage();
                     System.exit(-1);
                 }
-            }
 
-            // set the dr agent's port config from properties
-            if (System.getenv().containsKey("dragentportoffset")) {
-                m_drAgentPortStart = Integer.parseInt(System.getenv("dragentportoffset"));
             }
         }
 
