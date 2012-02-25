@@ -23,6 +23,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -191,7 +192,7 @@ public class LocalCluster implements VoltServerConfig {
             return this;
         }
 
-        String rejoinHost;
+        String rejoinHost = "";
         public CommandLine rejoinHost(String rejoinHost) {
             this.rejoinHost = rejoinHost;
             return this;
@@ -218,14 +219,14 @@ public class LocalCluster implements VoltServerConfig {
             return this;
         }
 
-        int zkport;
+        int zkport = -1;
         public CommandLine zkport(int zkport) {
             this.zkport = zkport;
             m_zkInterface = "127.0.0.1:" + zkport;
             return this;
         }
 
-        String buildDir;
+        String buildDir = "";
         public CommandLine buildDir(String buildDir) {
             this.buildDir = buildDir;
             return this;
@@ -234,19 +235,19 @@ public class LocalCluster implements VoltServerConfig {
             return buildDir;
         }
 
-        String jzmq_dir;
+        String jzmq_dir = "";
         public CommandLine jzmqDir(String jzmqDir) {
             jzmq_dir = jzmqDir;
             return this;
         }
 
-        String log4j;
+        String log4j = "";
         public CommandLine log4j(String log4j) {
             this.log4j = log4j;
             return this;
         }
 
-        String voltFilePrefix;
+        String voltFilePrefix = "";
         public CommandLine voltFilePrefix(String voltFilePrefix) {
             this.voltFilePrefix = voltFilePrefix;
             return this;
@@ -258,7 +259,7 @@ public class LocalCluster implements VoltServerConfig {
             return this;
         }
 
-        String classPath;
+        String classPath = "";
         public CommandLine classPath(String classPath) {
             this.classPath = classPath;
             return this;
@@ -294,6 +295,22 @@ public class LocalCluster implements VoltServerConfig {
             return this;
         }
 
+        public void dumpToFile(String filename) {
+            try {
+                FileWriter out = new FileWriter(filename);
+                List<String> lns = createCommandLine();
+                for (String l : lns) {
+                    out.write(l.toCharArray());
+                    out.write('\n');
+                }
+                out.flush();
+                out.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+
         // Return a command line list compatible with ProcessBuilder.command()
         public List<String> createCommandLine() {
             List<String> cmdline = new ArrayList<String>(50);
@@ -301,7 +318,7 @@ public class LocalCluster implements VoltServerConfig {
             cmdline.add("-Djava.library.path=" + buildDir + "/nativelibs" + ":" + jzmq_dir);
             cmdline.add("-Dlog4j.configuration=" + log4j);
             cmdline.add("-DLOG_SEGMENT_SIZE=8");
-            cmdline.add("-DVoltFilePrefix="); cmdline.add(voltFilePrefix);
+            cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
             cmdline.add("-ea");
             cmdline.add("-XX:-ReduceInitialCardMarks");
             cmdline.add("-XX:MaxDirectMemorySize=2g");
@@ -318,7 +335,9 @@ public class LocalCluster implements VoltServerConfig {
             // VOLTDB main() parameters
             //
             cmdline.add("org.voltdb.VoltDB");
-            cmdline.add("license"); cmdline.add(ServerThread.getTestLicensePath());
+            if (m_isEnterprise) {
+                cmdline.add("license"); cmdline.add(ServerThread.getTestLicensePath());
+            }
             cmdline.add("zkport"); cmdline.add(Integer.toString(zkport));
             cmdline.add("timestampsalt"); cmdline.add(Long.toString(m_timestampTestingSalt));
             cmdline.add("catalog"); cmdline.add(jarFileName());
@@ -326,7 +345,7 @@ public class LocalCluster implements VoltServerConfig {
             cmdline.add("port"); cmdline.add(Integer.toString(m_port));
             cmdline.add("adminport"); cmdline.add(Integer.toString(m_adminPort));
 
-            if (!rejoinHost.isEmpty()) {
+            if (rejoinHost.isEmpty()) {
                 cmdline.add("leader"); cmdline.add("localhost");
             }
             else {
@@ -338,8 +357,7 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             if (target().isIPC) {
-                cmdline.add("ipcports");
-                cmdline.add(ipcPortList);
+                cmdline.add("ipcports"); cmdline.add(ipcPortList);
                 cmdline.add("valgrind");
             }
 
@@ -510,9 +528,11 @@ public class LocalCluster implements VoltServerConfig {
 
         if (m_hasLocalServer) {
             // Generate a new root for the in-process server if clearing directories.
+            File subroot = null;
             if (clearLocalDataDirectories) {
                 try {
-                    m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
+                    subroot = VoltFile.initNewSubrootForThisProcess();
+                    m_subRoots.add(subroot);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -522,13 +542,20 @@ public class LocalCluster implements VoltServerConfig {
 
             // Make the local Configuration object...
             CommandLine cmdln = (CommandLine)(templateCmdLine.makeCopy());
+            cmdln.voltFilePrefix(subroot.getPath());
             cmdln.port(portGenerator.next());
             cmdln.adminPort(portGenerator.next());
+            cmdln.zkport(portGenerator.next());
             for (EEProcess proc : m_eeProcs.get(0)) {
-                cmdln.port(proc.port());
+                assert(proc != null);
+                cmdln.ipcPort(portGenerator.next());
             }
 
             cmdln.rejoinTest(true);
+
+            // for debug, dump the command line to a unique file.
+            cmdln.dumpToFile("/home/rbetts/cmd_" + Integer.toString(portGenerator.next()));
+
             m_localServer = new ServerThread(cmdln);
             m_localServer.start();
             oopStartIndex++;
@@ -693,6 +720,10 @@ public class LocalCluster implements VoltServerConfig {
 
             m_procBuilder.command().clear();
             m_procBuilder.command().addAll(cmdln.createCommandLine());
+
+            // for debug, dump the command line to a file.
+            cmdln.dumpToFile("/home/rbetts/cmd_" + Integer.toString(portGenerator.next()));
+
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
 
