@@ -165,7 +165,7 @@ public class LocalCluster implements VoltServerConfig {
         // prefix. This helps avoid collisions given the raw number
         // of fields at work. In some cases, the VoltDB.Configuration
         // setting is set (for the m_hasLocalServer case) and a CommandLine
-        // field is set equivantly (for the process builder case).
+        // field is set as well (for the process builder case).
 
         public CommandLine port(int port) {
             m_port = port;
@@ -335,15 +335,12 @@ public class LocalCluster implements VoltServerConfig {
             // VOLTDB main() parameters
             //
             cmdline.add("org.voltdb.VoltDB");
+            cmdline.add(m_startAction.toString().toLowerCase());
             if (m_isEnterprise) {
                 cmdline.add("license"); cmdline.add(ServerThread.getTestLicensePath());
             }
-            cmdline.add("zkport"); cmdline.add(Integer.toString(zkport));
-            cmdline.add("timestampsalt"); cmdline.add(Long.toString(m_timestampTestingSalt));
             cmdline.add("catalog"); cmdline.add(jarFileName());
             cmdline.add("deployment"); cmdline.add(pathToDeployment());
-            cmdline.add("port"); cmdline.add(Integer.toString(m_port));
-            cmdline.add("adminport"); cmdline.add(Integer.toString(m_adminPort));
 
             if (rejoinHost.isEmpty()) {
                 cmdline.add("leader"); cmdline.add("localhost");
@@ -356,6 +353,10 @@ public class LocalCluster implements VoltServerConfig {
                 cmdline.add("replica");
             }
 
+            // cmdline.add("timestampsalt"); cmdline.add(Long.toString(m_timestampTestingSalt));
+            cmdline.add("port"); cmdline.add(Integer.toString(m_port));
+            cmdline.add("adminport"); cmdline.add(Integer.toString(m_adminPort));
+            cmdline.add("zkport"); cmdline.add(Integer.toString(zkport));
             if (target().isIPC) {
                 cmdline.add("ipcports"); cmdline.add(ipcPortList);
                 cmdline.add("valgrind");
@@ -441,6 +442,7 @@ public class LocalCluster implements VoltServerConfig {
         // Create the base command line that each process can makeCopy and modify
         this.templateCmdLine.
             target(target).
+            startCommand(VoltDB.START_ACTION.CREATE).
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(jarFileName)).
             buildDir(buildDir).
             jzmqDir(jzmq_dir).
@@ -551,10 +553,14 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.ipcPort(portGenerator.next());
             }
 
-            cmdln.rejoinTest(true);
+            // rtb: why is this? this flag short-circuits an Inits worker
+            // but can only be set on the local in-process server (there is no
+            // command line version of it.) Consequently, in-process and out-of-
+            // process VoltDBs initialize differently when this flag is set.
+            // cmdln.rejoinTest(true);
 
             // for debug, dump the command line to a unique file.
-            cmdln.dumpToFile("/home/rbetts/cmd_" + Integer.toString(portGenerator.next()));
+            cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
             m_localServer = new ServerThread(cmdln);
             m_localServer.start();
@@ -689,7 +695,6 @@ public class LocalCluster implements VoltServerConfig {
 
             cmdln.port(portGenerator.next());
             cmdln.adminPort(portGenerator.next());
-            cmdln.startCommand(VoltDB.START_ACTION.CREATE);
             cmdln.replicaMode(replicaMode);
             cmdln.rejoinHost("");
             cmdln.timestampSalt(getRandomTimestampSalt());
@@ -722,7 +727,7 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().addAll(cmdln.createCommandLine());
 
             // for debug, dump the command line to a file.
-            cmdln.dumpToFile("/home/rbetts/cmd_" + Integer.toString(portGenerator.next()));
+            cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
@@ -779,13 +784,11 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
-        return false;
-        // return recoverOne(false, 0, hostId, portOffset, rejoinHost);
+        return recoverOne(false, 0, hostId, portOffset, rejoinHost);
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId) {
-        return false;
-        // return recoverOne( logtime, startTime, hostId, null, "localhost");
+        return recoverOne( logtime, startTime, hostId, null, "localhost");
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer portOffset, String rejoinHost) {
