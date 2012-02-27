@@ -913,6 +913,7 @@ public class ProcedureRunner {
            }
        }
 
+       // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
        if (!m_isNative) {
            VoltTable[] results = new VoltTable[stmtCount];
            for (int i = 0; i < stmtCount; i++) {
@@ -921,10 +922,12 @@ public class ProcedureRunner {
            return results;
        }
 
+       // FOR MP-TXNS
        if (slowPath) {
            return slowPath(batchSize, batchStmts, batchArgs, finalTask);
        }
 
+       // FOR SP-TXNS
        VoltTable[] results = null;
        results = m_site.executeQueryPlanFragmentsAndGetResults(
            m_fragmentIds,

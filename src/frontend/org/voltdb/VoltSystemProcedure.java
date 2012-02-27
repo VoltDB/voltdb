@@ -61,6 +61,13 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected Procedure m_catProc;
     protected Cluster m_cluster;
     protected ExecutionSite m_site;
+    protected ProcedureRunner m_runner; // overrides private parent var
+
+    @Override
+    void init(ProcedureRunner procRunner) {
+        super.init(procRunner);
+        m_runner = procRunner;
+    }
 
     void initSysProc(int numberOfPartitions, ExecutionSite site,
             Procedure catProc, Cluster cluster) {
@@ -73,6 +80,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         init();
     }
 
+    /**
+     * For Sysproc init tasks like registering plan frags
+     */
     abstract public void init();
 
     /**
