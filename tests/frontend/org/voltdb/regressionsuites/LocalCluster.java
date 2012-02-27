@@ -93,12 +93,24 @@ public class LocalCluster implements VoltServerConfig {
     ProcessBuilder m_procBuilder;
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
 
-    // Produce a (presumably) available TCP/IP port number.
+    // Produce a (presumably) available IP port number.
     PortGenerator portGenerator = new PortGenerator();
     static class PortGenerator {
-        private final AtomicInteger nextPort = new AtomicInteger(20000);
+        private final AtomicInteger nextPort = new AtomicInteger(10000);
+        private final AtomicInteger nextCport = new AtomicInteger(21212);
+        private final AtomicInteger nextAport = new AtomicInteger(21211);
         public int next() {
-            return nextPort.incrementAndGet();
+            return nextPort.getAndIncrement();
+        }
+        public int nextClient() {
+            return nextCport.getAndIncrement();
+        }
+        public int nextAdmin() {
+            return nextAport.getAndDecrement();
+        }
+        public void reset() {
+            nextCport.set(21212);
+            nextAport.set(21211);
         }
     }
 
@@ -336,9 +348,11 @@ public class LocalCluster implements VoltServerConfig {
             //
             cmdline.add("org.voltdb.VoltDB");
             cmdline.add(m_startAction.toString().toLowerCase());
+
             if (m_isEnterprise) {
                 cmdline.add("license"); cmdline.add(ServerThread.getTestLicensePath());
             }
+
             cmdline.add("catalog"); cmdline.add(jarFileName());
             cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
@@ -357,11 +371,11 @@ public class LocalCluster implements VoltServerConfig {
             cmdline.add("port"); cmdline.add(Integer.toString(m_port));
             cmdline.add("adminport"); cmdline.add(Integer.toString(m_adminPort));
             cmdline.add("zkport"); cmdline.add(Integer.toString(zkport));
+
             if (target().isIPC) {
                 cmdline.add("ipcports"); cmdline.add(ipcPortList);
                 cmdline.add("valgrind");
             }
-
 
             return cmdline;
         }
@@ -507,6 +521,10 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
 
+        // reset the port generator. RegressionSuite always expects
+        // to find ClientInterface and Admin mode on known ports.
+        portGenerator.reset();
+
         // set to true to spew startup timing data
         boolean logtime = false;
         long startTime = 0;
@@ -545,8 +563,8 @@ public class LocalCluster implements VoltServerConfig {
             // Make the local Configuration object...
             CommandLine cmdln = (CommandLine)(templateCmdLine.makeCopy());
             cmdln.voltFilePrefix(subroot.getPath());
-            cmdln.port(portGenerator.next());
-            cmdln.adminPort(portGenerator.next());
+            cmdln.port(portGenerator.nextClient());
+            cmdln.adminPort(portGenerator.nextAdmin());
             cmdln.zkport(portGenerator.next());
             for (EEProcess proc : m_eeProcs.get(0)) {
                 assert(proc != null);
@@ -560,7 +578,7 @@ public class LocalCluster implements VoltServerConfig {
             // cmdln.rejoinTest(true);
 
             // for debug, dump the command line to a unique file.
-            cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
+            // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
             m_localServer = new ServerThread(cmdln);
             m_localServer.start();
@@ -693,8 +711,8 @@ public class LocalCluster implements VoltServerConfig {
             portGenerator.next();
             portGenerator.next();
 
-            cmdln.port(portGenerator.next());
-            cmdln.adminPort(portGenerator.next());
+            cmdln.port(portGenerator.nextClient());
+            cmdln.adminPort(portGenerator.nextAdmin());
             cmdln.replicaMode(replicaMode);
             cmdln.rejoinHost("");
             cmdln.timestampSalt(getRandomTimestampSalt());
@@ -727,7 +745,7 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().addAll(cmdln.createCommandLine());
 
             // for debug, dump the command line to a file.
-            cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
+            // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
