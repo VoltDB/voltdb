@@ -178,6 +178,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new NoConnectionsException("Client instance is shutdown");
         }
 
+        if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
+            throw new IOException("Can't invoke a procedure synchronously from with the client callback thread " +
+                    " without deadlocking the client library");
+        }
+
         m_distributer.queue(
                 invocation,
                 cb,
