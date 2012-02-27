@@ -27,6 +27,7 @@ import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
@@ -41,7 +42,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -753,7 +753,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public DependencyPair executePlanFragment(final long planFragmentId, final int outputDepId,
+    public VoltTable executePlanFragment(final long planFragmentId,
             final int inputDepId, final ParameterSet parameterSet, final long txnId,
             final long lastCommittedTxnId, final long undoToken)
             throws EEException {
@@ -771,7 +771,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoToken);
         m_data.putLong(planFragmentId);
-        m_data.putInt(outputDepId);
+        m_data.putInt(0); // output dep id is not needed
         m_data.putInt(inputDepId);
         m_data.put(fser.getBuffer());
 
@@ -795,7 +795,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new EEException(result);
         } else {
             try {
-                return m_connection.readDependencies();
+                DependencyPair dp = m_connection.readDependencies();
+                return dp.dependency;
             } catch (final IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -805,7 +806,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable executeCustomPlanFragment(final String plan, int outputDepId,
+    public VoltTable executeCustomPlanFragment(final String plan,
             int inputDepId, final long txnId, final long lastCommittedTxnId,
             final long undoQuantumToken) throws EEException
     {
@@ -821,7 +822,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(txnId);
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoQuantumToken);
-        m_data.putInt(outputDepId);
+        m_data.putInt(0); // output dep id is not needed
         m_data.putInt(inputDepId);
         m_data.put(fser.getBuffer());
 

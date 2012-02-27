@@ -84,7 +84,7 @@ public class AdHoc extends VoltSystemProcedure {
             assert(plan != null);
             table =
                 context.getExecutionEngine().
-                executeCustomPlanFragment(plan, outputDepId, inputDepId, m_runner.getTxnState().txnId,
+                executeCustomPlanFragment(plan, inputDepId, m_runner.getTxnState().txnId,
                                           context.getLastCommittedTxnId(),
                                           context.getNextUndo());
         }

@@ -2205,15 +2205,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                  * No roll back support.
                  */
                 try {
-                    final DependencyPair dep = ee.executePlanFragment(fragmentId,
-                                                                      outputDepId,
-                                                                      inputDepId,
-                                                                      params,
-                                                                      txnState.txnId,
-                                                                      lastCommittedTxnId,
-                                                                      txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken());
+                    final VoltTable dependency = ee.executePlanFragment(fragmentId,
+                                                                        inputDepId,
+                                                                        params,
+                                                                        txnState.txnId,
+                                                                        lastCommittedTxnId,
+                                                                        txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken());
 
-                    sendDependency(currentFragResponse, dep.depId, dep.dependency);
+                    sendDependency(currentFragResponse, outputDepId, dependency);
 
                 } catch (final EEException e) {
                     hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);

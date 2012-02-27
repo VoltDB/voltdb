@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.voltdb.DependencyPair;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
@@ -33,10 +35,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -274,16 +273,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
 
     /** Run a plan fragment */
-    abstract public DependencyPair executePlanFragment(
-        long planFragmentId, int outputDepId,
-        int inputDepId, ParameterSet parameterSet,
+    abstract public VoltTable executePlanFragment(
+        long planFragmentId, int inputDepId, ParameterSet parameterSet,
         long txnId, long lastCommittedTxnId, long undoQuantumToken)
       throws EEException;
 
     /** Run a plan fragment */
     abstract public VoltTable executeCustomPlanFragment(
-            String plan, int outputDepId,
-            int inputDepId, long txnId,
+            String plan, int inputDepId, long txnId,
             long lastCommittedTxnId, long undoQuantumToken) throws EEException;
 
     /** Run multiple query plan fragments */
@@ -490,10 +487,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return error code
      */
     protected native int nativeExecutePlanFragment(long pointer, long planFragmentId,
-            int outputDepId, int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
+            int outputDepId, // outputDepId is unused, can set to 0
+            int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
 
     protected native int nativeExecuteCustomPlanFragment(long pointer, String plan,
-            int outputDepId, int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
+            int outputDepId, // outputDepId is unused, can set to 0
+            int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

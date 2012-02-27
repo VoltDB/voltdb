@@ -20,7 +20,8 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltdb.DependencyPair;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
@@ -30,11 +31,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -212,8 +211,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param undoToken Token identifying undo quantum for generated undo info
      */
     @Override
-    public DependencyPair executePlanFragment(final long planFragmentId,
-                                              final int outputDepId,
+    public VoltTable executePlanFragment(final long planFragmentId,
                                               final int inputDepId,
                                               final ParameterSet parameterSet,
                                               final long txnId,
@@ -238,7 +236,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // checkMaxFsSize();
         // Execute the plan, passing a raw pointer to the byte buffer.
         deserializer.clear();
-        final int errorCode = nativeExecutePlanFragment(pointer, planFragmentId, outputDepId, inputDepId,
+        final int errorCode = nativeExecutePlanFragment(pointer, planFragmentId, 0, inputDepId,
                                                         txnId, lastCommittedTxnId, undoToken);
         try {
             checkErrorCode(errorCode);
@@ -259,7 +257,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     dependencies[i] = fds.readObject(VoltTable.class);
                 }
                 assert(depIds.length == 1);
-                return new DependencyPair(depIds[0], dependencies[0]);
+                return dependencies[0];
             } catch (final IOException ex) {
                 LOG.error("Failed to deserialze result dependencies" + ex);
                 throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
@@ -271,7 +269,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable executeCustomPlanFragment(final String plan, final int outputDepId,
+    public VoltTable executeCustomPlanFragment(final String plan,
             final int inputDepId, final long txnId, final long lastCommittedTxnId,
             final long undoQuantumToken) throws EEException
     {
@@ -280,7 +278,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //C++ JSON deserializer is not thread safe, must synchronize
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeExecuteCustomPlanFragment(pointer, plan, outputDepId, inputDepId,
+            errorCode = nativeExecuteCustomPlanFragment(pointer, plan, 0, inputDepId,
                                                         txnId, lastCommittedTxnId, undoQuantumToken);
         }
         try {

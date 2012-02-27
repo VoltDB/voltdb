@@ -20,7 +20,7 @@ package org.voltdb.jni;
 import java.util.ArrayList;
 import java.util.Random;
 
-import org.voltdb.DependencyPair;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -29,7 +29,6 @@ import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -38,7 +37,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public DependencyPair executePlanFragment(final long planFragmentId, int outputDepId,
+    public VoltTable executePlanFragment(final long planFragmentId,
             int inputDepIdfinal, ParameterSet parameterSet, final long txnId,
             final long lastCommittedTxnId, final long undoToken) throws EEException
     {
@@ -90,7 +89,7 @@ public class MockExecutionEngine extends ExecutionEngine {
                   new VoltTable.ColumnInfo("foo", VoltType.INTEGER)
         });
         vt.addRow(Integer.valueOf(1));
-        return new DependencyPair(outputDepId, vt);
+        return vt;
     }
 
     @Override
@@ -101,7 +100,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable executeCustomPlanFragment(final String plan, int outputDepId,
+    public VoltTable executeCustomPlanFragment(final String plan,
             int inputDepId, final long txnId, final long lastCommittedTxnId, final long undoQuantumToken)
             throws EEException {
         // TODO Auto-generated method stub
