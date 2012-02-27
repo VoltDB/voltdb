@@ -98,8 +98,8 @@ public class LocalCluster implements VoltServerConfig {
     PortGenerator portGenerator = new PortGenerator();
     static class PortGenerator {
         private final AtomicInteger nextPort = new AtomicInteger(10000);
-        private final AtomicInteger nextCport = new AtomicInteger(21212);
-        private final AtomicInteger nextAport = new AtomicInteger(21211);
+        private final AtomicInteger nextCport = new AtomicInteger(VoltDB.DEFAULT_PORT);
+        private final AtomicInteger nextAport = new AtomicInteger(VoltDB.DEFAULT_ADMIN_PORT);
         public int next() {
             return nextPort.getAndIncrement();
         }
@@ -183,6 +183,9 @@ public class LocalCluster implements VoltServerConfig {
         public CommandLine port(int port) {
             m_port = port;
             return this;
+        }
+        public int port() {
+            return m_port;
         }
 
         public CommandLine adminPort(int adminPort) {
@@ -348,7 +351,11 @@ public class LocalCluster implements VoltServerConfig {
             // VOLTDB main() parameters
             //
             cmdline.add("org.voltdb.VoltDB");
-            cmdline.add(m_startAction.toString().toLowerCase());
+
+            // rejoin has no startAction
+            if (m_startAction != null) {
+                cmdline.add(m_startAction.toString().toLowerCase());
+            }
 
             if (m_isEnterprise) {
                 cmdline.add("license"); cmdline.add(ServerThread.getTestLicensePath());
@@ -489,6 +496,13 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
+        // ATTN: LocalCluster does not support non-default admin ports.
+        // Need a way to correctly initializing the portGenerator
+        // and then resetting it after tests to the usual default.
+        if (adminPort != VoltDB.DEFAULT_ADMIN_PORT) {
+            return false;
+        }
+
         if (!m_compiled) {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
                     adminPort, adminOnStartup);
@@ -764,6 +778,7 @@ public class LocalCluster implements VoltServerConfig {
             }
             cmdln.voltFilePrefix(subroot.getPath());
 
+            m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             m_procBuilder.command().addAll(cmdln.createCommandLine());
 
@@ -832,150 +847,116 @@ public class LocalCluster implements VoltServerConfig {
         return recoverOne( logtime, startTime, hostId, null, "localhost");
     }
 
-    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer portOffset, String rejoinHost) {
-        return false;
+    // Re-start a (dead) process. HostId is the enumberation of the host
+    // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
+    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId, String rejoinHost) {
 
-//        // port for the new node
-//        int portNo = VoltDB.DEFAULT_PORT + hostId;
-//        int adminPortNo = m_baseAdminPort - hostId;
-//
-//        // port to connect to (not too simple, eh?)
-//        int portNoToRejoin = VoltDB.DEFAULT_PORT + ((hostId + 1) % getNodeCount());
-//        if (m_hasLocalServer) portNoToRejoin = VoltDB.DEFAULT_PORT;
-//
-//        if (portOffset != null) {
-//            portNoToRejoin = VoltDB.DEFAULT_PORT + portOffset;
-//            // adminPortNo = m_baseAdminPort - portOffset;
-//        }
-//        System.out.println("Rejoining " + hostId + " to hostID: " + portOffset);
-//
-//
-//        ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
-//        for (EEProcess proc : eeProcs) {
-//            try {
-//                proc.waitForShutdown();
-//            } catch (InterruptedException e) {
-//                throw new RuntimeException(e);
-//            }
-//        }
-//        eeProcs.clear();
-//
-//        for (int ii = 0; ii < m_siteCount; ii++) {
-//            String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
-//            eeProcs.add(new EEProcess(m_target, logfile));
-//        }
-//
-//        if (m_target.isIPC) {
-//            m_procBuilder.command().set(m_ipcPortOffset1, "ipcports");
-//            String portString = "";
-//            for (EEProcess proc : m_eeProcs.get(hostId)) {
-//                if (portString.isEmpty()) {
-//                    portString += Integer.valueOf(proc.port());
-//                } else {
-//                    portString += "," + Integer.valueOf(proc.port());
-//                }
-//            }
-//            m_procBuilder.command().set(m_ipcPortOffset2, portString);
-//            m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
-//        }
-//
-//        //When recovering reuse the root from the original
-//        m_procBuilder.command().set(
-//                m_voltFilePrefixOffset,
-//                "-DVoltFilePrefix=" + m_subRoots.get(hostId).getPath());
-//
-//        PipeToFile ptf = null;
-//        long start = 0;
-//        try {
-//            m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
-//            m_procBuilder.command().set(m_adminPortOffset, String.valueOf(adminPortNo));
-//            m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
-//            m_procBuilder.command().set(m_voltStartCmdOffset, "rejoinhost");
-//            m_procBuilder.command().set(m_rejoinOffset, rejoinHost + ":" + String.valueOf(portNoToRejoin));
-//            m_procBuilder.command().set(m_licensePathOffset, "");
-//            m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
-//            if (m_debug) {
-//                System.out.println("Debug port is " + m_debugPortOffset);
-//                m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
-//                m_procBuilder.command().set(
-//                        m_debugOffset2,
-//                        "-agentlib:jdwp=transport=dt_socket,address="
-//                        + m_debugPortOffset++ + ",server=y,suspend=n");
-//            }
-//            m_procBuilder.command().set(m_zkPortOffset, Integer.toString(2181 + hostId));
-//            // Rejoin should never need to be told the operating mode
-//            m_procBuilder.command().set(m_voltStartModeOffset, "");
-//            Process proc = m_procBuilder.start();
-//            start = System.currentTimeMillis();
-//
-//            // write output to obj/release/testoutput/<test name>-n.txt
-//            // this may need to be more unique? Also very useful to just
-//            // set this to a hardcoded path and use "tail -f" to debug.
-//            String testoutputdir = m_buildDir + File.separator + "testoutput";
-//            // make sure the directory exists
-//            File dir = new File(testoutputdir);
-//            if (dir.exists()) {
-//                assert(dir.isDirectory());
-//            }
-//            else {
-//                boolean status = dir.mkdirs();
-//                assert(status);
-//            }
-//
-//            ptf = new PipeToFile(testoutputdir + File.separator +
-//                    getName() + "-" + hostId + ".txt", proc.getInputStream(),
-//                    PipeToFile.m_rejoinToken, true, proc);
-//            synchronized (this) {
-//                m_pipes.set(hostId, ptf);
-//                // replace the existing dead proc
-//                m_cluster.set(hostId, proc);
-//            }
-//            Thread t = new Thread(ptf);
-//            t.setName("ClusterPipe:" + String.valueOf(hostId));
-//            t.start();
-//        }
-//        catch (IOException ex) {
-//            System.out.println("Failed to start cluster process:" + ex.getMessage());
-//            Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
-//            assert (false);
-//        }
-//
-//        // wait for the joining site to be ready
-//        synchronized (ptf) {
-//            if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
-//            while (ptf.m_witnessedReady.get() != true) {
-//                // if eof, then no point in waiting around
-//                if (ptf.m_eof.get())
-//                    break;
-//
-//                // if process is dead, no point in waiting around
-//                if (isProcessDead(ptf.getProcess()))
-//                    break;
-//
-//                try {
-//                    // wait for explicit notification
-//                    ptf.wait();
-//                }
-//                catch (InterruptedException ex) {
-//                    Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
-//                }
-//            }
-//        }
-//        if (ptf.m_witnessedReady.get()) {
-//            long finish = System.currentTimeMillis();
-//            System.out.println(
-//                    "Took " + (finish - start) +
-//                    " milliseconds, time from init was " + (finish - ptf.m_initTime));
-//            return true;
-//        } else {
-//            System.out.println("Recovering process exited before recovery completed");
-//            try {
-//                silentShutdownSingleHost(hostId, true);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return false;
-//        }
+        // Lookup the client interface port of the rejoin host
+        // I have no idea why this code ignores the user's input
+        // based on other state in this class except to say that whoever wrote
+        // it this way originally probably eats kittens and hates cake.
+        if (rejoinHostId == null || m_hasLocalServer) {
+            rejoinHostId = 0;
+        }
+        int portNoToRejoin = m_cmdLines.get(rejoinHostId).port();
+        System.out.println("Rejoining " + hostId + " to hostID: " + rejoinHostId);
+
+        // rebuild the EE proc set.
+        ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
+        for (EEProcess proc : eeProcs) {
+            try {
+                proc.waitForShutdown();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        eeProcs.clear();
+        for (int ii = 0; ii < m_siteCount; ii++) {
+            String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
+            eeProcs.add(new EEProcess(templateCmdLine.target(), logfile));
+        }
+
+        PipeToFile ptf = null;
+        long start = 0;
+        try {
+            CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
+            // Rejoin has no VoltDB.START_ACTION
+            rejoinCmdLn.startCommand(null);
+            rejoinCmdLn.rejoinHost(rejoinHost + ":" + String.valueOf(portNoToRejoin));
+
+            m_procBuilder.command().clear();
+            m_procBuilder.command().addAll(rejoinCmdLn.createCommandLine());
+            Process proc = m_procBuilder.start();
+            start = System.currentTimeMillis();
+
+            // write output to obj/release/testoutput/<test name>-n.txt
+            // this may need to be more unique? Also very useful to just
+            // set this to a hardcoded path and use "tail -f" to debug.
+            String testoutputdir = rejoinCmdLn.buildDir() + File.separator + "testoutput";
+            // make sure the directory exists
+            File dir = new File(testoutputdir);
+            if (dir.exists()) {
+                assert(dir.isDirectory());
+            }
+            else {
+                boolean status = dir.mkdirs();
+                assert(status);
+            }
+
+            ptf = new PipeToFile(testoutputdir + File.separator +
+                    getName() + "-" + hostId + ".txt", proc.getInputStream(),
+                    PipeToFile.m_rejoinToken, true, proc);
+            synchronized (this) {
+                m_pipes.set(hostId, ptf);
+                // replace the existing dead proc
+                m_cluster.set(hostId, proc);
+            }
+            Thread t = new Thread(ptf);
+            t.setName("ClusterPipe:" + String.valueOf(hostId));
+            t.start();
+        }
+        catch (IOException ex) {
+            System.out.println("Failed to start cluster process:" + ex.getMessage());
+            Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+            assert (false);
+        }
+
+        // wait for the joining site to be ready
+        synchronized (ptf) {
+            if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
+            while (ptf.m_witnessedReady.get() != true) {
+                // if eof, then no point in waiting around
+                if (ptf.m_eof.get())
+                    break;
+
+                // if process is dead, no point in waiting around
+                if (isProcessDead(ptf.getProcess()))
+                    break;
+
+                try {
+                    // wait for explicit notification
+                    ptf.wait();
+                }
+                catch (InterruptedException ex) {
+                    Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+        if (ptf.m_witnessedReady.get()) {
+            long finish = System.currentTimeMillis();
+            System.out.println(
+                    "Took " + (finish - start) +
+                    " milliseconds, time from init was " + (finish - ptf.m_initTime));
+            return true;
+        } else {
+            System.out.println("Recovering process exited before recovery completed");
+            try {
+                silentShutdownSingleHost(hostId, true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return false;
+        }
     }
 
     @Override
