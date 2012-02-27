@@ -6,7 +6,6 @@ import java.util.List;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
-import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
@@ -194,6 +193,14 @@ public class CommandLine extends VoltDB.Configuration
         return m_pathToDeployment;
     }
 
+    public CommandLine pathToLicense(String pathToLicense) {
+        m_pathToLicense = pathToLicense;
+        return this;
+    }
+    public String pathToLicense() {
+        return m_pathToLicense;
+    }
+
     public CommandLine drAgentStartPort(int portStart) {
         m_drAgentPortStart = portStart;
         return this;
@@ -246,7 +253,7 @@ public class CommandLine extends VoltDB.Configuration
         }
 
         if (m_isEnterprise) {
-            cmdline.add("license"); cmdline.add(ServerThread.getTestLicensePath());
+            cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
 
         cmdline.add("catalog"); cmdline.add(jarFileName());

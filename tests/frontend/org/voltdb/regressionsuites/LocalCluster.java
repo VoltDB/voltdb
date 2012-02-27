@@ -202,6 +202,7 @@ public class LocalCluster implements VoltServerConfig {
             buildDir(buildDir).
             jzmqDir(jzmq_dir).
             classPath(classPath).
+            pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
     }
 
