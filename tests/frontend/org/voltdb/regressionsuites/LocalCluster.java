@@ -89,6 +89,7 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     ArrayList<PipeToFile> m_pipes = null;
+    ArrayList<CommandLine> m_cmdLines = null;
     ServerThread m_localServer = null;
     ProcessBuilder m_procBuilder;
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
@@ -424,6 +425,7 @@ public class LocalCluster implements VoltServerConfig {
         m_debug = debug;
         m_failureState = kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<PipeToFile>();
+        m_cmdLines = new ArrayList<CommandLine>();
 
         String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
         if (buildDir == null) {
@@ -505,95 +507,48 @@ public class LocalCluster implements VoltServerConfig {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
-        assert (!m_running);
-        if (m_running) {
-            return;
-        }
-
-        // clear any logs, export or snapshot data for this run
+    void startLocalServer(boolean clearLocalDataDirectories) {
+        // Generate a new root for the in-process server if clearing directories.
+        File subroot = null;
         if (clearLocalDataDirectories) {
             try {
-                m_subRoots.clear();
-                VoltFile.deleteAllSubRoots();
+                subroot = VoltFile.initNewSubrootForThisProcess();
+                m_subRoots.add(subroot);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        // reset the port generator. RegressionSuite always expects
-        // to find ClientInterface and Admin mode on known ports.
-        portGenerator.reset();
-
-        // set to true to spew startup timing data
-        boolean logtime = false;
-        long startTime = 0;
-        if (logtime) {
-            startTime = System.currentTimeMillis();
-            System.out.println("********** Starting cluster at: " + startTime);
+        // Make the local Configuration object...
+        CommandLine cmdln = (CommandLine)(templateCmdLine.makeCopy());
+        cmdln.voltFilePrefix(subroot.getPath());
+        cmdln.port(portGenerator.nextClient());
+        cmdln.adminPort(portGenerator.nextAdmin());
+        cmdln.zkport(portGenerator.next());
+        for (EEProcess proc : m_eeProcs.get(0)) {
+            assert(proc != null);
+            cmdln.ipcPort(portGenerator.next());
         }
 
-        for (int ii = 0; ii < m_hostCount; ii++) {
-            ArrayList<EEProcess> procs = new ArrayList<EEProcess>();
-            m_eeProcs.add(procs);
-            for (int zz = 0; zz < m_siteCount; zz++) {
-                String logfile = "LocalCluster_host_" + ii + "_site" + zz + ".log";
-                procs.add(new EEProcess(templateCmdLine.target(), logfile));
-            }
-        }
+        // rtb: why is this? this flag short-circuits an Inits worker
+        // but can only be set on the local in-process server (there is no
+        // command line version of it.) Consequently, in-process and out-of-
+        // process VoltDBs initialize differently when this flag is set.
+        // cmdln.rejoinTest(true);
 
-        m_pipes.clear();
-        m_cluster.clear();
-        int oopStartIndex = 0;
+        // for debug, dump the command line to a unique file.
+        // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
-        if (m_hasLocalServer) {
-            // Generate a new root for the in-process server if clearing directories.
-            File subroot = null;
-            if (clearLocalDataDirectories) {
-                try {
-                    subroot = VoltFile.initNewSubrootForThisProcess();
-                    m_subRoots.add(subroot);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            m_cluster.add(null);
-            m_pipes.add(null);
+        m_cluster.add(null);
+        m_pipes.add(null);
+        m_cmdLines.add(cmdln);
+        m_localServer = new ServerThread(cmdln);
+        m_localServer.start();
+    }
 
-            // Make the local Configuration object...
-            CommandLine cmdln = (CommandLine)(templateCmdLine.makeCopy());
-            cmdln.voltFilePrefix(subroot.getPath());
-            cmdln.port(portGenerator.nextClient());
-            cmdln.adminPort(portGenerator.nextAdmin());
-            cmdln.zkport(portGenerator.next());
-            for (EEProcess proc : m_eeProcs.get(0)) {
-                assert(proc != null);
-                cmdln.ipcPort(portGenerator.next());
-            }
-
-            // rtb: why is this? this flag short-circuits an Inits worker
-            // but can only be set on the local in-process server (there is no
-            // command line version of it.) Consequently, in-process and out-of-
-            // process VoltDBs initialize differently when this flag is set.
-            // cmdln.rejoinTest(true);
-
-            // for debug, dump the command line to a unique file.
-            // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
-
-            m_localServer = new ServerThread(cmdln);
-            m_localServer.start();
-            oopStartIndex++;
-        }
-
-        // create all the out-of-process servers
-        for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories, role);
-        }
-
-        // spin until all the pipes see the magic "Server completed.." string.
+    boolean waitForAllReady() {
         long startOfPipeWait = System.currentTimeMillis();
         boolean allReady = false;
-        if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
         do {
             if ((System.currentTimeMillis() - startOfPipeWait) > PIPE_WAIT_MAX_TIMEOUT) {
                 break;
@@ -628,11 +583,71 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
         } while (allReady == false);
+        return allReady;
+    }
 
-        if (logtime) System.out.println("********** post witness: " + (System.currentTimeMillis() - startTime) + " ms");
+    private void printTiming(boolean logtime, String msg) {
+        if (logtime) {
+            System.out.println("************ " + msg);
+        }
+    }
+
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
+        assert (!m_running);
+        if (m_running) {
+            return;
+        }
+
+        // set to true to spew startup timing data
+        boolean logtime = false;
+        long startTime = 0;
+        printTiming(logtime, "Starting cluster at: " + System.currentTimeMillis());
+
+        // clear any logs, export or snapshot data for this run
+        if (clearLocalDataDirectories) {
+            try {
+                m_subRoots.clear();
+                VoltFile.deleteAllSubRoots();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        // reset the port generator. RegressionSuite always expects
+        // to find ClientInterface and Admin mode on known ports.
+        portGenerator.reset();
+
+        m_eeProcs.clear();
+        for (int ii = 0; ii < m_hostCount; ii++) {
+            ArrayList<EEProcess> procs = new ArrayList<EEProcess>();
+            m_eeProcs.add(procs);
+            for (int zz = 0; zz < m_siteCount; zz++) {
+                String logfile = "LocalCluster_host_" + ii + "_site" + zz + ".log";
+                procs.add(new EEProcess(templateCmdLine.target(), logfile));
+            }
+        }
+
+        m_pipes.clear();
+        m_cluster.clear();
+        m_cmdLines.clear();
+        int oopStartIndex = 0;
+
+        // create the in-process server instance.
+        if (m_hasLocalServer) {
+            startLocalServer(clearLocalDataDirectories);
+            ++oopStartIndex;
+        }
+
+        // create all the out-of-process servers
+        for (int i = oopStartIndex; i < m_hostCount; i++) {
+            startOne(i, clearLocalDataDirectories, role);
+        }
+
+        printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
+        boolean allReady = waitForAllReady();
+        printTiming(logtime, "Post-witness: " + (System.currentTimeMillis() - startTime) + "ms");
 
         // verify all processes started up and count failures
-        int expectedProcesses = m_hostCount - (m_hasLocalServer ? 1 : 0);
         int downProcesses = 0;
         for (Process proc : m_cluster) {
             if ((proc != null) && (isProcessDead(proc))) {
@@ -650,6 +665,7 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             if (downProcesses > 0) {
+                int expectedProcesses = m_hostCount - (m_hasLocalServer ? 1 : 0);
                 throw new RuntimeException(
                         String.format("%d/%d external processes failed to start",
                                 downProcesses, expectedProcesses));
@@ -662,42 +678,49 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         // Finally, make sure the local server thread is running and wait if it is not.
-        if (m_hasLocalServer)
+        if (m_hasLocalServer) {
             m_localServer.waitForInitialization();
-        if (logtime) System.out.println("********** DONE: " + (System.currentTimeMillis() - startTime) + " ms");
+        }
+
+        printTiming(logtime, "DONE: " + (System.currentTimeMillis() - startTime) + " ms");
         m_running = true;
 
         // if supposed to kill a server, it's go time
         if (m_failureState != FailureState.ALL_RUNNING) {
-            System.out.println("Killing one cluster member.");
-            int procIndex = 0;
-            if (m_hasLocalServer) {
-                procIndex = 1;
-            }
-
-            Process proc = m_cluster.get(procIndex);
-            proc.destroy();
-            int retval = 0;
-            try {
-                retval = proc.waitFor();
-                for (EEProcess eeproc : m_eeProcs.get(procIndex)) {
-                    eeproc.waitForShutdown();
-                }
-            } catch (InterruptedException e) {
-                System.out.println("External VoltDB process is acting crazy.");
-            } finally {
-                m_cluster.set(procIndex, null);
-            }
-            // exit code 143 is the forcible shutdown code from .destroy()
-            if (retval != 0 && retval != 143) {
-                System.out.println("External VoltDB process terminated abnormally with return: " + retval);
-            }
+            killOne();
         }
 
         // after killing a server, bring it back in recovery mode
         if (m_failureState == FailureState.ONE_RECOVERING) {
             int hostId = m_hasLocalServer ? 1 : 0;
             recoverOne(logtime, startTime, hostId);
+        }
+    }
+
+    private void killOne()
+    {
+        System.out.println("Killing one cluster member.");
+        int procIndex = 0;
+        if (m_hasLocalServer) {
+            procIndex = 1;
+        }
+
+        Process proc = m_cluster.get(procIndex);
+        proc.destroy();
+        int retval = 0;
+        try {
+            retval = proc.waitFor();
+            for (EEProcess eeproc : m_eeProcs.get(procIndex)) {
+                eeproc.waitForShutdown();
+            }
+        } catch (InterruptedException e) {
+            System.out.println("External VoltDB process is acting crazy.");
+        } finally {
+            m_cluster.set(procIndex, null);
+        }
+        // exit code 143 is the forcible shutdown code from .destroy()
+        if (retval != 0 && retval != 143) {
+            System.out.println("External VoltDB process terminated abnormally with return: " + retval);
         }
     }
 
