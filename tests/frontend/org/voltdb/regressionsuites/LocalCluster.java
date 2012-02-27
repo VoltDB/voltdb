@@ -375,10 +375,11 @@ public class LocalCluster implements VoltServerConfig {
                 cmdline.add("replica");
             }
 
-            // cmdline.add("timestampsalt"); cmdline.add(Long.toString(m_timestampTestingSalt));
+            cmdline.add("timestampsalt"); cmdline.add(Long.toString(m_timestampTestingSalt));
             cmdline.add("port"); cmdline.add(Integer.toString(m_port));
             cmdline.add("adminport"); cmdline.add(Integer.toString(m_adminPort));
             cmdline.add("zkport"); cmdline.add(Integer.toString(zkport));
+            cmdline.add("replicationport"); cmdline.add(Integer.toString(m_drAgentPortStart));
 
             if (target().isIPC) {
                 cmdline.add("ipcports"); cmdline.add(ipcPortList);
@@ -539,6 +540,10 @@ public class LocalCluster implements VoltServerConfig {
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
         cmdln.zkport(portGenerator.next());
+        // replication port and its two automatic followers.
+        cmdln.drAgentStartPort(portGenerator.next());
+        portGenerator.next();
+        portGenerator.next();
         for (EEProcess proc : m_eeProcs.get(0)) {
             assert(proc != null);
             cmdln.ipcPort(portGenerator.next());
