@@ -1178,6 +1178,10 @@ public class LocalCluster implements VoltServerConfig {
         templateCmdLine.setMaxHeap(heap);
     }
 
+    public String getPathToDeployment() {
+        return templateCmdLine.pathToDeployment();
+    }
+
     @Override
     public boolean isValgrind() {
         final String buildType = System.getenv().get("BUILD");
