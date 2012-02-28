@@ -987,6 +987,7 @@ public class TestExecutionSite extends TestCase {
      */
     @SuppressWarnings("deprecation")
     public void testMultiPartitionParticipantTxnState_handleSiteFaults() {
+        start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");

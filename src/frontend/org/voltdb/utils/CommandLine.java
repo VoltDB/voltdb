@@ -208,6 +208,9 @@ public class CommandLine extends VoltDB.Configuration
         m_drAgentPortStart = portStart;
         return this;
     }
+    public int drAgentStartPort() {
+        return m_drAgentPortStart;
+    }
 
     public void dumpToFile(String filename) {
         try {
