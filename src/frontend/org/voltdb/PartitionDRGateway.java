@@ -42,7 +42,8 @@ public class PartitionDRGateway {
                                                  File overflowDir)
     {
         final VoltDBInterface vdb = VoltDB.instance();
-        final boolean licensedToWAN = vdb.getLicenseApi().isWanReplicationAllowed();
+        LicenseApi api = vdb.getLicenseApi();
+        final boolean licensedToWAN = api.isWanReplicationAllowed();
 
         // if this is a primary cluster in a DR-enabled scenario
         //  try to load the real version of this class
@@ -63,8 +64,7 @@ public class PartitionDRGateway {
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, rejoiningAtStartup, replicationActive,
-                      overflowDir);
+            pdrg.init(partitionId, rejoiningAtStartup, replicationActive, overflowDir);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }

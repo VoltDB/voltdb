@@ -333,7 +333,7 @@ public class TestExecutionSite extends TestCase {
     StringWriter[] m_siteResults = new StringWriter[SITE_COUNT];
     Random m_rand;
 
-    private void setUp(int siteCount, int partitionCount, int kFactor) {
+    private void start(int siteCount, int partitionCount, int kFactor) {
         long seed = System.currentTimeMillis();
         m_rand = new Random(seed);
         m_checker = new ExecutionSiteFuzzChecker();
@@ -410,25 +410,20 @@ public class TestExecutionSite extends TestCase {
             registerMailbox(ss, m_mboxes[ss]);
         }
     }
-    @Override
-    protected void setUp() throws Exception
-    {
-        super.setUp();
-        setUp( SITE_COUNT, PARTITION_COUNT, K_FACTOR);
-    }
 
     @Override
     protected void tearDown() throws Exception
     {
-        super.tearDown();
         for (int i=0; i < m_sites.length; ++i) {
             m_sites[i] = null;
             m_mboxes[i] = null;
         }
-        m_voltdb.getFaultDistributor().shutDown();
-        m_voltdb.m_snapshotCompletionMonitor.shutdown();
-        m_voltdb.getZK().close();
-        m_voltdb.m_agreementSite.shutdown();
+        if (m_voltdb != null) {
+            m_voltdb.getFaultDistributor().shutDown();
+            m_voltdb.m_snapshotCompletionMonitor.shutdown();
+            m_voltdb.getZK().close();
+            m_voltdb.m_agreementSite.shutdown();
+        }
         m_voltdb = null;
         m_checker = null;
     }
@@ -739,7 +734,8 @@ public class TestExecutionSite extends TestCase {
         for (int ii = 0; ii < 1; ii++) {
             tearDown();
             System.gc();
-            setUp();
+            start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
+
             final int totalTransactions = 20000;
             final long firstTxnId = 10000;
             for (int i=0; i < SITE_COUNT; ++i) {
@@ -780,6 +776,7 @@ public class TestExecutionSite extends TestCase {
      */
     public void testSinglePartitionTxn()
     {
+        start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         final boolean readOnly = false;
         final boolean singlePartition = true;
 
@@ -817,6 +814,7 @@ public class TestExecutionSite extends TestCase {
      */
     public void testROSinglePartitionTxn()
     {
+        start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         final boolean readOnly = true;
         final boolean singlePartition = true;
 
@@ -846,7 +844,7 @@ public class TestExecutionSite extends TestCase {
      */
     public void testMultiPartitionTxn() throws Exception {
         tearDown();
-        setUp( 2, 2, 0);
+        start( 2, 2, 0);
         final boolean readOnly = false, singlePartition = false;
         Thread es1, es2;
 
@@ -915,7 +913,7 @@ public class TestExecutionSite extends TestCase {
     throws Exception
     {
         tearDown();
-        setUp( 2, 2, 0);
+        start( 2, 2, 0);
         // cause the coordinator to die before committing.
         TestExecutionSite.MockMPProcedureRunner.
         simulate_coordinator_dies_during_commit = true;
@@ -941,7 +939,7 @@ public class TestExecutionSite extends TestCase {
     throws Exception
     {
         tearDown();
-        setUp( 2, 2, 0);
+        start( 2, 2, 0);
         // cause the coordinator to die before committing.
         TestExecutionSite.MockMPProcedureRunner.
         simulate_coordinator_dies_during_commit = true;
@@ -1096,7 +1094,7 @@ public class TestExecutionSite extends TestCase {
      */
     public void testFailedMultiPartitionParticipant() throws Exception {
         tearDown();
-        setUp( 2, 2, 0);
+        start( 2, 2, 0);
         final boolean readOnly = false, singlePartition = false;
         Thread es1;
 
@@ -1359,6 +1357,7 @@ public class TestExecutionSite extends TestCase {
      */
     public void testENG1617() throws Exception {
         System.out.println("Starting testENG1617");
+        start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         for (int i=0; i < SITE_COUNT; ++i) {
           m_mboxes[i].setFailureLikelihood(0);
         }

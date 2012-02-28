@@ -22,9 +22,12 @@
  */
 package org.voltdb;
 
+import java.io.File;
+
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -593,6 +596,48 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public LicenseApi getLicenseApi()
     {
-        return MiscUtils.licenseApiFactory(getConfig().m_pathToLicense);
+        return new LicenseApi() {
+            @Override
+            public boolean initializeFromFile(File license) {
+                return true;
+            }
+
+            @Override
+            public boolean isTrial() {
+                return false;
+            }
+
+            @Override
+            public int maxHostcount() {
+                return Integer.MAX_VALUE;
+            }
+
+            @Override
+            public Calendar expires() {
+                Calendar result = Calendar.getInstance();
+                result.add(Calendar.YEAR, 20); // good enough?
+                return result;
+            }
+
+            @Override
+            public boolean verify() {
+                return true;
+            }
+
+            @Override
+            public boolean isWanReplicationAllowed() {
+                // TestExecutionSite (and probably others)
+                // use MockVoltDB without requiring unique
+                // zmq ports for the wan replicator. Note
+                // that getReplicationActive(), above, is
+                // hardcoded to false, too.
+                return false;
+            }
+
+            @Override
+            public boolean isCommandLoggingAllowed() {
+                return true;
+            }
+        };
     }
 }
