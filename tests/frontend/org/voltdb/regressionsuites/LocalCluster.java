@@ -176,6 +176,8 @@ public class LocalCluster implements VoltServerConfig {
             jzmq_dir = System.getProperty("user.dir") + "/third_party/cpp/jnilib";
         }
 
+        String java_library_path = buildDir + "/nativelibs" + ":" + jzmq_dir;
+
         String classPath = System.getProperty("java.class.path") + ":" + buildDir
             + File.separator + jarFileName + ":" + buildDir + File.separator + "prod";
 
@@ -200,7 +202,7 @@ public class LocalCluster implements VoltServerConfig {
             startCommand(VoltDB.START_ACTION.CREATE).
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(jarFileName)).
             buildDir(buildDir).
-            jzmqDir(jzmq_dir).
+            javaLibraryPath(java_library_path).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
@@ -488,7 +490,6 @@ public class LocalCluster implements VoltServerConfig {
             cmdln.port(portGenerator.nextClient());
             cmdln.adminPort(portGenerator.nextAdmin());
             cmdln.replicaMode(replicaMode);
-            cmdln.rejoinHost("");
             cmdln.timestampSalt(getRandomTimestampSalt());
 
             if (m_debug) {
@@ -619,7 +620,7 @@ public class LocalCluster implements VoltServerConfig {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
             // Rejoin has no VoltDB.START_ACTION
             rejoinCmdLn.startCommand(null);
-            rejoinCmdLn.rejoinHost(rejoinHost + ":" + String.valueOf(portNoToRejoin));
+            rejoinCmdLn.rejoinHostAndPort(rejoinHost + ":" + String.valueOf(portNoToRejoin));
 
             m_procBuilder.command().clear();
             m_procBuilder.command().addAll(rejoinCmdLn.createCommandLine());

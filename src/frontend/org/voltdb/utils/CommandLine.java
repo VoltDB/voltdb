@@ -1,3 +1,19 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2012 VoltDB Inc.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.voltdb.utils;
 
 import java.io.FileWriter;
@@ -46,12 +62,11 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_isRejoinTest = m_isRejoinTest;
 
         // second, copy the derived class fields
-        cl.rejoinHost = rejoinHost;
         cl.debugPort = debugPort;
         cl.ipcPortList = ipcPortList;
         cl.zkport = zkport;
         cl.buildDir = buildDir;
-        cl.jzmq_dir = jzmq_dir;
+        cl.java_library_path = java_library_path;
         cl.log4j = log4j;
         cl.voltFilePrefix = voltFilePrefix;
         cl.maxHeap = maxHeap;
@@ -95,9 +110,8 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String rejoinHost = "";
-    public CommandLine rejoinHost(String rejoinHost) {
-        this.rejoinHost = rejoinHost;
+    public CommandLine rejoinHostAndPort(String rejoinHostAndPort) {
+        this.m_rejoinToHostAndPort = rejoinHostAndPort;
         return this;
     }
 
@@ -141,9 +155,9 @@ public class CommandLine extends VoltDB.Configuration
         return buildDir;
     }
 
-    String jzmq_dir = "";
-    public CommandLine jzmqDir(String jzmqDir) {
-        jzmq_dir = jzmqDir;
+    String java_library_path = "";
+    public CommandLine javaLibraryPath(String javaLibraryPath) {
+        java_library_path = javaLibraryPath;
         return this;
     }
 
@@ -232,7 +246,7 @@ public class CommandLine extends VoltDB.Configuration
     public List<String> createCommandLine() {
         List<String> cmdline = new ArrayList<String>(50);
         cmdline.add("java");
-        cmdline.add("-Djava.library.path=" + buildDir + "/nativelibs" + ":" + jzmq_dir);
+        cmdline.add("-Djava.library.path=" + java_library_path);
         cmdline.add("-Dlog4j.configuration=" + log4j);
         cmdline.add("-DLOG_SEGMENT_SIZE=8");
         cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
@@ -265,11 +279,11 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("catalog"); cmdline.add(jarFileName());
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
-        if (rejoinHost.isEmpty()) {
+        if (m_rejoinToHostAndPort == null || m_rejoinToHostAndPort.isEmpty()) {
             cmdline.add("leader"); cmdline.add("localhost");
         }
         else {
-            cmdline.add("rejoinhost"); cmdline.add(rejoinHost);
+            cmdline.add("rejoinhost"); cmdline.add(m_rejoinToHostAndPort);
         }
 
         if (m_replicationRole == ReplicationRole.REPLICA) {
