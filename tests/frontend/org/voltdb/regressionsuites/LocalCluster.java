@@ -351,6 +351,9 @@ public class LocalCluster implements VoltServerConfig {
             return;
         }
 
+        // set 'replica' option -- known here for the first time.
+        templateCmdLine.replicaMode(role);
+
         // set to true to spew startup timing data
         boolean logtime = false;
         long startTime = 0;
