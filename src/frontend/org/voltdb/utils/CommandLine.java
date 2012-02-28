@@ -62,7 +62,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_isRejoinTest = m_isRejoinTest;
 
         // second, copy the derived class fields
-        cl.rejoinHost = rejoinHost;
         cl.debugPort = debugPort;
         cl.ipcPortList = ipcPortList;
         cl.zkport = zkport;
@@ -111,9 +110,8 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String rejoinHost = "";
-    public CommandLine rejoinHost(String rejoinHost) {
-        this.rejoinHost = rejoinHost;
+    public CommandLine rejoinHostAndPort(String rejoinHostAndPort) {
+        this.m_rejoinToHostAndPort = rejoinHostAndPort;
         return this;
     }
 
@@ -278,11 +276,11 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("catalog"); cmdline.add(jarFileName());
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
-        if (rejoinHost.isEmpty()) {
+        if (m_rejoinToHostAndPort == null || m_rejoinToHostAndPort.isEmpty()) {
             cmdline.add("leader"); cmdline.add("localhost");
         }
         else {
-            cmdline.add("rejoinhost"); cmdline.add(rejoinHost);
+            cmdline.add("rejoinhost"); cmdline.add(m_rejoinToHostAndPort);
         }
 
         if (m_replicationRole == ReplicationRole.REPLICA) {
