@@ -253,7 +253,7 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-ea");
         cmdline.add("-XX:-ReduceInitialCardMarks");
         cmdline.add("-XX:MaxDirectMemorySize=2g");
-        cmdline.add("-Xmx2g");
+        cmdline.add(maxHeap);
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-classpath"); cmdline.add(classPath);
 
