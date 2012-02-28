@@ -128,6 +128,9 @@ public class CommandLine extends VoltDB.Configuration
         m_zkInterface = "127.0.0.1:" + zkport;
         return this;
     }
+    public String zkinterface() {
+        return m_zkInterface;
+    }
 
     String buildDir = "";
     public CommandLine buildDir(String buildDir) {

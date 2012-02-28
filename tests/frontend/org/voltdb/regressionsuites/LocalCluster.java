@@ -914,6 +914,10 @@ public class LocalCluster implements VoltServerConfig {
         return templateCmdLine.pathToDeployment();
     }
 
+    public String zkinterface(int hostId) {
+        return m_cmdLines.get(hostId).zkinterface();
+    }
+
     @Override
     public boolean isValgrind() {
         final String buildType = System.getenv().get("BUILD");
