@@ -80,7 +80,7 @@ public class VoltDB {
 
         public List<Integer> m_ipcPorts = Collections.synchronizedList(new LinkedList<Integer>());
 
-        private static final VoltLogger hostLog = new VoltLogger("HOST");
+        protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
         /** Whether to enable watchdogs to check for possible deadlocks **/
         public boolean m_useWatchdogs = false;

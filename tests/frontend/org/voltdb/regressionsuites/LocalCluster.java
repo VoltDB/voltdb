@@ -198,8 +198,10 @@ public class LocalCluster implements VoltServerConfig {
 
         // Create the base command line that each process can makeCopy and modify
         this.templateCmdLine.
+            addTestOptions(true).
+            leader("localhost").
             target(target).
-            startCommand(VoltDB.START_ACTION.CREATE).
+            startCommand("create").
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(jarFileName)).
             buildDir(buildDir).
             javaLibraryPath(java_library_path).
@@ -524,7 +526,7 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().addAll(cmdln.createCommandLine());
 
             // for debug, dump the command line to a file.
-            // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
+            //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
 
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
@@ -621,8 +623,6 @@ public class LocalCluster implements VoltServerConfig {
         long start = 0;
         try {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
-            // Rejoin has no VoltDB.START_ACTION
-            rejoinCmdLn.startCommand(null);
             rejoinCmdLn.rejoinHostAndPort(rejoinHost + ":" + String.valueOf(portNoToRejoin));
 
             m_procBuilder.command().clear();

@@ -17,6 +17,8 @@
 package org.voltdb.utils;
 
 import java.io.FileWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -62,6 +64,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_isRejoinTest = m_isRejoinTest;
 
         // second, copy the derived class fields
+        cl.includeTestOpts = includeTestOpts;
         cl.debugPort = debugPort;
         cl.ipcPortList = ipcPortList;
         cl.zkport = zkport;
@@ -69,8 +72,14 @@ public class CommandLine extends VoltDB.Configuration
         cl.java_library_path = java_library_path;
         cl.log4j = log4j;
         cl.voltFilePrefix = voltFilePrefix;
+        cl.initialHeap = initialHeap;
         cl.maxHeap = maxHeap;
         cl.classPath = classPath;
+        cl.javaExecutable = javaExecutable;
+        cl.jmxPort = jmxPort;
+        cl.jmxHost = jmxHost;
+        cl.rejoinUser = rejoinUser;
+        cl.rejoinPassword = rejoinPassword;
 
         return cl;
     }
@@ -82,6 +91,13 @@ public class CommandLine extends VoltDB.Configuration
     // setting is set (for the m_hasLocalServer case) and a CommandLine
     // field is set as well (for the process builder case).
 
+    boolean includeTestOpts = false;
+    public CommandLine addTestOptions(boolean addEm)
+    {
+        includeTestOpts = addEm;
+        return this;
+    }
+
     public CommandLine port(int port) {
         m_port = port;
         return this;
@@ -90,13 +106,31 @@ public class CommandLine extends VoltDB.Configuration
         return m_port;
     }
 
+    public CommandLine internalPort(int internalPort) {
+        m_internalPort = internalPort;
+        return this;
+    }
+
     public CommandLine adminPort(int adminPort) {
         m_adminPort = adminPort;
         return this;
     }
 
-    public CommandLine startCommand(VoltDB.START_ACTION startCommand) {
-        m_startAction = startCommand;
+    public CommandLine startCommand(String command)
+    {
+        String upcmd = command.toUpperCase();
+        VoltDB.START_ACTION action = VoltDB.START_ACTION.START;
+        try {
+            action = VoltDB.START_ACTION.valueOf(upcmd);
+        }
+        catch (IllegalArgumentException iae)
+        {
+            // command wasn't a valid enum type;  default to START and warn
+            // the user
+            hostLog.warn("Unknown start command: " + command +
+                         ".  CommandLine will default to START");
+        }
+        m_startAction = action;
         return this;
     }
 
@@ -105,8 +139,27 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine isReplica(boolean isReplica)
+    {
+        if (isReplica)
+        {
+            m_replicationRole = ReplicationRole.REPLICA;
+        }
+        else
+        {
+            m_replicationRole = ReplicationRole.NONE;
+        }
+        return this;
+    }
+
     public CommandLine replicaMode(ReplicationRole replicaMode) {
         m_replicationRole = replicaMode;
+        return this;
+    }
+
+    public CommandLine leader(String leader)
+    {
+        m_leader = leader;
         return this;
     }
 
@@ -173,7 +226,13 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String maxHeap = "-Xmx2g";
+    String initialHeap = "";
+    public CommandLine setInitialHeap(int megabytes) {
+        initialHeap = "-Xms" + megabytes + "m";
+        return this;
+    }
+
+    String maxHeap = "-Xmx2048m";
     public CommandLine setMaxHeap(int megabytes) {
         maxHeap = "-Xmx" + megabytes + "m";
         return this;
@@ -226,6 +285,51 @@ public class CommandLine extends VoltDB.Configuration
         return m_drAgentPortStart;
     }
 
+    String javaExecutable = "java";
+    public CommandLine javaExecutable(String javaExecutable)
+    {
+        this.javaExecutable = javaExecutable;
+        return this;
+    }
+
+    int jmxPort = 9090;
+    public CommandLine jmxPort(int jmxPort)
+    {
+        this.jmxPort = jmxPort;
+        return this;
+    }
+
+    String jmxHost = "127.0.0.1";
+    public CommandLine jmxHost(String jmxHost)
+    {
+        this.jmxHost = jmxHost;
+        return this;
+    }
+
+    String rejoinUser = null;
+    public CommandLine rejoinUser(String rejoinUser) {
+        this.rejoinUser = rejoinUser;
+        return this;
+    }
+
+    String rejoinPassword = null;
+    public CommandLine rejoinPassword(String rejoinPassword) {
+        this.rejoinPassword = rejoinPassword;
+        return this;
+    }
+
+    public CommandLine internalInterface(String internalInterface)
+    {
+        m_internalInterface = internalInterface;
+        return this;
+    }
+
+    public CommandLine externalInterface(String externalInterface)
+    {
+        m_externalInterface = externalInterface;
+        return this;
+    }
+
     public void dumpToFile(String filename) {
         try {
             FileWriter out = new FileWriter(filename);
@@ -241,21 +345,48 @@ public class CommandLine extends VoltDB.Configuration
         }
     }
 
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        List<String> lns = createCommandLine();
+        for (String l : lns)
+        {
+            sb.append(l).append(" ");
+        }
+        return sb.toString();
+    }
+
 
     // Return a command line list compatible with ProcessBuilder.command()
     public List<String> createCommandLine() {
         List<String> cmdline = new ArrayList<String>(50);
-        cmdline.add("java");
+        cmdline.add(javaExecutable);
+        cmdline.add("-XX:-ReduceInitialCardMarks");
+        cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-Djava.library.path=" + java_library_path);
         cmdline.add("-Dlog4j.configuration=" + log4j);
-        cmdline.add("-DLOG_SEGMENT_SIZE=8");
-        cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
-        cmdline.add("-ea");
-        cmdline.add("-XX:-ReduceInitialCardMarks");
-        cmdline.add("-XX:MaxDirectMemorySize=2g");
         cmdline.add(maxHeap);
-        cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-classpath"); cmdline.add(classPath);
+
+        if (includeTestOpts)
+        {
+            cmdline.add("-DLOG_SEGMENT_SIZE=8");
+            cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
+            cmdline.add("-ea");
+            cmdline.add("-XX:MaxDirectMemorySize=2g");
+        }
+        else
+        {
+            cmdline.add("-server");
+            cmdline.add("-XX:HeapDumpPath=/tmp");
+            cmdline.add(initialHeap);
+        }
+
+        if (m_isEnterprise)
+        {
+            cmdline.add("-Dvolt.rmi.agent.port=" + jmxPort);
+            cmdline.add("-Dvolt.rmi.server.hostname=" + jmxHost);
+        }
 
         if (debugPort > -1) {
             cmdline.add("-Xdebug");
@@ -267,11 +398,6 @@ public class CommandLine extends VoltDB.Configuration
         //
         cmdline.add("org.voltdb.VoltDB");
 
-        // rejoin has no startAction
-        if (m_startAction != null) {
-            cmdline.add(m_startAction.toString().toLowerCase());
-        }
-
         if (m_isEnterprise) {
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
@@ -279,26 +405,75 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("catalog"); cmdline.add(jarFileName());
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
+        // rejoin has no startAction or replication role
         if (m_rejoinToHostAndPort == null || m_rejoinToHostAndPort.isEmpty()) {
-            cmdline.add("leader"); cmdline.add("localhost");
+            if (m_startAction != null) {
+                cmdline.add(m_startAction.toString().toLowerCase());
+            }
+            cmdline.add("leader"); cmdline.add(m_leader);
+
+            if (m_replicationRole == ReplicationRole.REPLICA) {
+                cmdline.add("replica");
+            }
         }
         else {
-            cmdline.add("rejoinhost"); cmdline.add(m_rejoinToHostAndPort);
+            StringBuilder rejoinArg = new StringBuilder();
+            if (rejoinUser != null)
+            {
+                rejoinArg.append(rejoinUser);
+                String password = null;
+                if (rejoinPassword != null)
+                {
+                    try {
+                        password = URLEncoder.encode(rejoinPassword, "UTF-8");
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                }
+                if (password != null) {
+                    rejoinArg.append(":").append(password);
+                }
+            }
+            if (rejoinArg.length() > 0) {
+                rejoinArg.append("@");
+            }
+            rejoinArg.append(m_rejoinToHostAndPort);
+            cmdline.add("rejoinhost"); cmdline.add(rejoinArg.toString());
         }
 
-        if (m_replicationRole == ReplicationRole.REPLICA) {
-            cmdline.add("replica");
+        if (includeTestOpts)
+        {
+            cmdline.add("timestampsalt"); cmdline.add(Long.toString(m_timestampTestingSalt));
         }
 
-        cmdline.add("timestampsalt"); cmdline.add(Long.toString(m_timestampTestingSalt));
         cmdline.add("port"); cmdline.add(Integer.toString(m_port));
-        cmdline.add("adminport"); cmdline.add(Integer.toString(m_adminPort));
-        cmdline.add("zkport"); cmdline.add(Integer.toString(zkport));
-        cmdline.add("replicationport"); cmdline.add(Integer.toString(m_drAgentPortStart));
+        cmdline.add("internalport"); cmdline.add(Integer.toString(m_internalPort));
+        if (m_adminPort != -1)
+        {
+            cmdline.add("adminport"); cmdline.add(Integer.toString(m_adminPort));
+        }
+        if (zkport != -1)
+        {
+            cmdline.add("zkport"); cmdline.add(Integer.toString(zkport));
+        }
+        if (m_drAgentPortStart != -1)
+        {
+            cmdline.add("replicationport"); cmdline.add(Integer.toString(m_drAgentPortStart));
+        }
 
         if (target().isIPC) {
             cmdline.add("ipcports"); cmdline.add(ipcPortList);
             cmdline.add("valgrind");
+        }
+
+        if (!m_internalInterface.isEmpty())
+        {
+            cmdline.add("internalinterface"); cmdline.add(m_internalInterface);
+        }
+
+        if (!m_externalInterface.isEmpty())
+        {
+            cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
 
         return cmdline;
