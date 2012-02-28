@@ -490,7 +490,6 @@ public class LocalCluster implements VoltServerConfig {
             cmdln.port(portGenerator.nextClient());
             cmdln.adminPort(portGenerator.nextAdmin());
             cmdln.replicaMode(replicaMode);
-            cmdln.rejoinHost("");
             cmdln.timestampSalt(getRandomTimestampSalt());
 
             if (m_debug) {
@@ -621,7 +620,7 @@ public class LocalCluster implements VoltServerConfig {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
             // Rejoin has no VoltDB.START_ACTION
             rejoinCmdLn.startCommand(null);
-            rejoinCmdLn.rejoinHost(rejoinHost + ":" + String.valueOf(portNoToRejoin));
+            rejoinCmdLn.rejoinHostAndPort(rejoinHost + ":" + String.valueOf(portNoToRejoin));
 
             m_procBuilder.command().clear();
             m_procBuilder.command().addAll(rejoinCmdLn.createCommandLine());
