@@ -67,7 +67,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.ipcPortList = ipcPortList;
         cl.zkport = zkport;
         cl.buildDir = buildDir;
-        cl.jzmq_dir = jzmq_dir;
+        cl.java_library_path = java_library_path;
         cl.log4j = log4j;
         cl.voltFilePrefix = voltFilePrefix;
         cl.maxHeap = maxHeap;
@@ -157,9 +157,9 @@ public class CommandLine extends VoltDB.Configuration
         return buildDir;
     }
 
-    String jzmq_dir = "";
-    public CommandLine jzmqDir(String jzmqDir) {
-        jzmq_dir = jzmqDir;
+    String java_library_path = "";
+    public CommandLine javaLibraryPath(String javaLibraryPath) {
+        java_library_path = javaLibraryPath;
         return this;
     }
 
@@ -245,7 +245,7 @@ public class CommandLine extends VoltDB.Configuration
     public List<String> createCommandLine() {
         List<String> cmdline = new ArrayList<String>(50);
         cmdline.add("java");
-        cmdline.add("-Djava.library.path=" + buildDir + "/nativelibs" + ":" + jzmq_dir);
+        cmdline.add("-Djava.library.path=" + java_library_path);
         cmdline.add("-Dlog4j.configuration=" + log4j);
         cmdline.add("-DLOG_SEGMENT_SIZE=8");
         cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
