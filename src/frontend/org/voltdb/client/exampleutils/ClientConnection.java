@@ -186,17 +186,15 @@ public class ClientConnection implements Closeable
          * Processes the server response, tracking performance statistics internally, then calling the user-specified callback (if any).
          */
         @Override
-        public void clientCallback(ClientResponse response)
+        public void clientCallback(ClientResponse response) throws Exception
         {
-            try
-            {
-                this.Owner.Statistics.update(this.Procedure, response);
-                if (this.UserCallback != null)
-                    this.UserCallback.clientCallback(response);
+
+            this.Owner.Statistics.update(this.Procedure, response);
+            if (this.UserCallback != null)
+                this.UserCallback.clientCallback(response);
             }
-            catch(Exception x) {} // If the user callback crashes, nothign we can do (user should handle exceptions on his own, we're just wrapping around for tracking!)
         }
-    }
+
 
     /**
      * Executes a procedure asynchronously, then calls the provided user callback with the server response upon completion.
