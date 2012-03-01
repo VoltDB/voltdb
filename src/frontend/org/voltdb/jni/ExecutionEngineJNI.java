@@ -318,7 +318,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int numParameterSets,
             final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException {
 
-        assert (planFragmentIds.length == parameterSets.length);
         if (numFragmentIds == 0) return new VoltTable[0];
         final int batchSize = numFragmentIds;
         if (LOG.isTraceEnabled()) {

@@ -537,8 +537,7 @@ public class TestExecutionSite extends TestCase {
     public static class MockProcedureRunnerFactory extends ProcedureRunnerFactory {
 
         @Override
-        public ProcedureRunner create(VoltProcedure procedure,
-                int numberOfPartitions, SiteProcedureConnection site,
+        public ProcedureRunner create(VoltProcedure procedure, SiteProcedureConnection site,
                 Procedure catProc, HsqlBackend hsql) {
 
             if (procedure instanceof MockROSPVoltProcedure)
@@ -548,7 +547,7 @@ public class TestExecutionSite extends TestCase {
             else if (procedure instanceof MockMPVoltProcedure)
                 return new MockMPProcedureRunner((MockMPVoltProcedure) procedure, (ExecutionSite) site);
             else if (procedure instanceof VoltSystemProcedure)
-                return super.create(procedure, numberOfPartitions, site, catProc, hsql);
+                return super.create(procedure, site, catProc, hsql);
             else
                 assert(false);
             return null;
@@ -563,7 +562,7 @@ public class TestExecutionSite extends TestCase {
         final ExecutionSite m_site;
 
         MockSPProcedureRunner(MockSPVoltProcedure procedure, ExecutionSite site) {
-            super(procedure, 1, site, null, null);
+            super(procedure, site, null, null);
             m_procedure = procedure;
             m_site = site;
         }
@@ -637,7 +636,7 @@ public class TestExecutionSite extends TestCase {
         */
 
         public MockMPProcedureRunner(MockMPVoltProcedure procedure, ExecutionSite site) {
-            super(procedure, 1, site, null, null);
+            super(procedure, site, null, null);
             m_procedure = procedure;
             m_site = site;
         }

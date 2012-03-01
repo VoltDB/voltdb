@@ -912,9 +912,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             }
 
             assert(procedure != null);
-            runner = m_runnerFactory.create(procedure,
-                         m_tracker.m_numberOfPartitions,
-                         this, proc, hsql);
+            runner = m_runnerFactory.create(procedure, this, proc, hsql);
             procs.put(proc.getTypeName(), runner);
         }
     }
@@ -957,8 +955,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         new Object[] { getSiteId(), siteIndex }, e);
             }
 
-            runner = m_runnerFactory.create(procedure, m_tracker.m_numberOfPartitions,
-                         this, proc, hsql);
+            runner = m_runnerFactory.create(procedure, this, proc, hsql);
             procedure.initSysProc(m_tracker.m_numberOfPartitions, this, proc, m_context.cluster);
             procs.put(entry.getKey(), runner);
         }
@@ -2349,5 +2346,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     public PartitionDRGateway getPartitionDRGateway() {
         return m_partitionDRGateway;
+    }
+
+    @Override
+    public long getReplicatedDMLDivisor() {
+        return m_tracker.m_numberOfPartitions;
     }
 }

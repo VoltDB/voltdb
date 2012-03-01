@@ -23,11 +23,10 @@ public class ProcedureRunnerFactory {
 
     public ProcedureRunner create(
             VoltProcedure procedure,
-            int numberOfPartitions,
             SiteProcedureConnection site,
             Procedure catProc,
             HsqlBackend hsql) {
-        return new ProcedureRunner(procedure, numberOfPartitions, site, catProc, hsql);
+        return new ProcedureRunner(procedure, site, catProc, hsql);
     }
 
 }

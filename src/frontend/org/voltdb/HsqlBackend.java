@@ -30,11 +30,11 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.exceptions.ConstraintFailureException;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
@@ -214,7 +214,7 @@ public class HsqlBackend {
         }
     }
 
-    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, Object... args) {
+    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params) {
         //HSQLProcedureWrapper does nothing smart. it just implements this interface with runStatement()
         StringBuilder sqlOut = new StringBuilder(stmt.getText().length() * 2);
 
@@ -224,7 +224,8 @@ public class HsqlBackend {
 
         int lastIndex = 0;
         String sql = stmt.getText();
-        for (int i = 0; i < args.length; i++) {
+        Object[] paramObjs = params.m_params;
+        for (int i = 0; i < paramObjs.length; i++) {
             int nextIndex = sql.indexOf('?', lastIndex);
             if (nextIndex == -1)
                 throw new RuntimeException("SQL Statement has more arguments than params.");
@@ -235,20 +236,22 @@ public class HsqlBackend {
             assert(stmtParam != null);
             VoltType type = VoltType.get((byte) stmtParam.getJavatype());
 
-            if (args[i] == null) {
+            if (VoltType.isNullVoltType(paramObjs[i])) {
                 sqlOut.append("NULL");
-            } else if (args[i] instanceof TimestampType) {
+            }
+            else if (paramObjs[i] instanceof TimestampType) {
                 if (type != VoltType.TIMESTAMP)
                     throw new RuntimeException("Inserting date into mismatched column type in HSQL.");
-                TimestampType d = (TimestampType) args[i];
+                TimestampType d = (TimestampType) paramObjs[i];
                 // convert VoltDB's microsecond granularity to millis.
                 Timestamp t = new Timestamp(d.getTime() * 1000);
                 sqlOut.append('\'').append(t.toString()).append('\'');
-            } else if (args[i] instanceof byte[]) {
+            }
+            else if (paramObjs[i] instanceof byte[]) {
                 if (type == VoltType.STRING) {
                     // Convert from byte[] -> String; escape single quotes
                     try {
-                        sqlOut.append(sqlEscape(new String((byte[]) args[i], "UTF-8")));
+                        sqlOut.append(sqlEscape(new String((byte[]) paramObjs[i], "UTF-8")));
                     } catch (UnsupportedEncodingException e) {
                         // should NEVER HAPPEN
                         System.err.println("FATAL: Your JVM doens't support UTF-&");
@@ -257,26 +260,28 @@ public class HsqlBackend {
                 }
                 else if (type == VoltType.VARBINARY) {
                     // Convert from byte[] -> String; using hex
-                    sqlOut.append(sqlEscape(Encoder.hexEncode((byte[]) args[i])));
+                    sqlOut.append(sqlEscape(Encoder.hexEncode((byte[]) paramObjs[i])));
                 }
                 else {
                     throw new RuntimeException("Inserting string/varbinary (bytes) into mismatched column type in HSQL.");
                 }
-            } else if (args[i] instanceof String) {
+            }
+            else if (paramObjs[i] instanceof String) {
                 if (type != VoltType.STRING)
                     throw new RuntimeException("Inserting string into mismatched column type in HSQL.");
                 // Escape single quotes
-                sqlOut.append(sqlEscape((String) args[i]));
-            } else {
+                sqlOut.append(sqlEscape((String) paramObjs[i]));
+            }
+            else {
                 if (type == VoltType.TIMESTAMP) {
-                    long t = Long.parseLong(args[i].toString());
+                    long t = Long.parseLong(paramObjs[i].toString());
                     TimestampType d = new TimestampType(t);
                     // convert VoltDB's microsecond granularity to millis
                     Timestamp ts = new Timestamp(d.getTime() * 1000);
                     sqlOut.append('\'').append(ts.toString()).append('\'');
                 }
                 else
-                    sqlOut.append(args[i].toString());
+                    sqlOut.append(paramObjs[i].toString());
             }
         }
         sqlOut.append(sql, lastIndex, sql.length());
