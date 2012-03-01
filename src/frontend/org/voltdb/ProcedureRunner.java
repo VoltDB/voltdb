@@ -173,27 +173,6 @@ public class ProcedureRunner {
             m_statsCollector.beginProcedure();
 
             byte status = ClientResponseImpl.SUCCESS;
-
-            if (paramList.length != m_paramTypes.length) {
-                m_statsCollector.endProcedure(false, true);
-                String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
-                    " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
-                status = ClientResponseImpl.GRACEFUL_FAILURE;
-                return getErrorResponse(status, msg, null);
-            }
-
-            for (int i = 0; i < m_paramTypes.length; i++) {
-                try {
-                    paramList[i] = tryToMakeCompatible(i, paramList[i]);
-                } catch (Exception e) {
-                    m_statsCollector.endProcedure( false, true);
-                    String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
-                            ": " + e.getMessage();
-                    status = ClientResponseImpl.GRACEFUL_FAILURE;
-                    return getErrorResponse(status, msg, null);
-                }
-            }
-
             VoltTable[] results = null;
 
             if (paramList.length != m_paramTypes.length) {
@@ -623,12 +602,6 @@ public class ProcedureRunner {
         if (param instanceof ExecutionSite.SystemProcedureExecutionContext) {
             return param;
         }
-
-        // hack to fixup varbinary support for statement procs
-        /*if (m_paramTypes[paramTypeIndex] == byte[].class) {
-            m_paramTypeComponentType[paramTypeIndex] = byte.class;
-            m_paramTypeIsArray[paramTypeIndex] = true;
-        }*/
 
         Class<?> pclass = param.getClass();
 
