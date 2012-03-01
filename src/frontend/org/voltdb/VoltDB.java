@@ -27,6 +27,7 @@ import java.util.TimeZone;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * <code>VoltDB</code> is the main class for VoltDB server.
@@ -371,7 +372,11 @@ public class VoltDB {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
-            hostLog.fatal("Usage: org.voltdb.VoltDB <action> leader <hostname> deployment <deployment.xml> license <license.xml> [catalog <catalog.jar>]");
+            if (MiscUtils.isPro()) {
+                hostLog.fatal("Usage: org.voltdb.VoltDB [create|recover|replica] leader <hostname> deployment <deployment.xml> license <license.xml> catalog <catalog.jar>");
+            } else {
+                hostLog.fatal("Usage: org.voltdb.VoltDB [create|recover] leader <hostname> deployment <deployment.xml> catalog <catalog.jar>");
+            }
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 
