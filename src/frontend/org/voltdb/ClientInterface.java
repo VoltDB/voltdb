@@ -683,6 +683,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void started(final Connection c) {
             m_connection = c;
+            final String user = m_username != null && !m_username.isEmpty() ? m_username : "<none>";
+            authLog.debug("Connecting user " + user + " at host " + m_hostname);
         }
 
         @Override
@@ -694,6 +696,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public void stopped(Connection c) {
             m_numConnections.decrementAndGet();
             m_initiator.removeConnectionStats(connectionId());
+            final String user = m_username != null && !m_username.isEmpty() ? m_username : "<none>";
+            authLog.debug("Disconnecting user " + user + " at host " + m_hostname);
         }
 
         @Override
