@@ -466,12 +466,12 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("valgrind");
         }
 
-        if (!m_internalInterface.isEmpty())
+        if (m_internalInterface != null && !m_internalInterface.isEmpty())
         {
             cmdline.add("internalinterface"); cmdline.add(m_internalInterface);
         }
 
-        if (!m_externalInterface.isEmpty())
+        if (m_internalInterface != null && !m_externalInterface.isEmpty())
         {
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
