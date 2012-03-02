@@ -28,13 +28,13 @@ import org.voltdb.expressions.TupleValueExpression;
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public static class ParsedColInfo {
-        public String alias;
-        public String columnName;
-        public String tableName;
-        public AbstractExpression expression;
+        public String alias = null;
+        public String columnName = null;
+        public String tableName = null;
+        public AbstractExpression expression = null;
         public boolean finalOutput = true;
         public int index = 0;
-        public int size;
+        public int size = 0;
 
         // orderby stuff
         public boolean orderBy = false;
