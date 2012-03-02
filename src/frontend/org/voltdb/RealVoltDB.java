@@ -1897,8 +1897,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return m_computationService;
     }
 
-    @Override
-    public void prepareReplication() {
+    private void prepareReplication() {
         if (m_localSites != null && !m_localSites.isEmpty()) {
             // get any site and start the DR server, it's static
             ExecutionSite site = m_localSites.values().iterator().next();

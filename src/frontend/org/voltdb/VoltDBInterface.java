@@ -176,8 +176,6 @@ public interface VoltDBInterface
 
     public ReplicationRole getReplicationRole();
 
-    public void prepareReplication();
-
     public void setReplicationActive(boolean active);
 
     public boolean getReplicationActive();
