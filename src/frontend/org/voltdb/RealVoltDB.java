@@ -1844,6 +1844,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
+        // Start listening on the DR ports
+        prepareReplication();
+
         if (m_startMode != null) {
             m_mode = m_startMode;
         } else {
@@ -1892,6 +1895,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public ExecutorService getComputationService() {
         return m_computationService;
+    }
+
+    @Override
+    public void prepareReplication() {
+        if (m_localSites != null && !m_localSites.isEmpty()) {
+            // get any site and start the DR server, it's static
+            ExecutionSite site = m_localSites.values().iterator().next();
+            site.getPartitionDRGateway().start();
+        }
     }
 
     @Override

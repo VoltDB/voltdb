@@ -43,7 +43,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
@@ -640,4 +639,7 @@ public class MockVoltDB implements VoltDBInterface
             }
         };
     }
+
+    @Override
+    public void prepareReplication() {}
 }
