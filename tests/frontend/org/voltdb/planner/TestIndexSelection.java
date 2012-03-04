@@ -27,13 +27,14 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
 
-public class TestIndexVSHashChoice extends TestCase {
+public class TestIndexSelection extends TestCase {
 
     private PlannerTestAideDeCamp aide;
 
@@ -61,8 +62,8 @@ public class TestIndexVSHashChoice extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestIndexVSHashChoice.class.getResource("testplans-indexvshash-ddl.sql"),
-                                         "testindexvshashplans");
+        aide = new PlannerTestAideDeCamp(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"),
+                                         "testindexselectionplans");
 
         // Set all tables to non-replicated.
         Cluster cluster = aide.getCatalog().getClusters().get("cluster");
@@ -78,7 +79,7 @@ public class TestIndexVSHashChoice extends TestCase {
         aide.tearDown();
     }
 
-    public void testEng931Plan()
+    /*public void testEng931Plan()
     {
         AbstractPlanNode pn = null;
         pn =
@@ -91,6 +92,24 @@ public class TestIndexVSHashChoice extends TestCase {
 
         if (pn != null) {
             System.out.println(pn.toJSONString());
+        }
+    }*/
+
+    public void testEng2541Plan() throws JSONException
+    {
+        AbstractPlanNode pn = null;
+        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+        assertTrue(pn != null);
+
+        pn = pn.getChild(0);
+        //assertTrue(pn instanceof IndexScanPlanNode);
+        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
+
+        if (pn != null) {
+            JSONObject j = new JSONObject(pn.toJSONString());
+            System.out.println(j.toString(2));
+            System.out.println();
+            System.out.println(pn.toExplainPlanString());
         }
     }
 }

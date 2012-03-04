@@ -97,7 +97,7 @@ public abstract class VoltTypeUtil {
 
     /*
      * Determine if a cast is allowable w/o loss of precision
-     * for index key comparison. This is probably overly strict.
+     * for index key comparison.
      */
     public static boolean isAllowableCastForKeyComparator(VoltType from, VoltType to) {
         // self to self cast is obviously fine.
@@ -118,21 +118,8 @@ public abstract class VoltTypeUtil {
         }
 
         // disallow integers getting smaller
-        if (from == VoltType.BIGINT) {
-            if (to == VoltType.SMALLINT ||
-                to == VoltType.TINYINT  ||
-                to == VoltType.INTEGER)
-                return false;
-        }
-        else if (from == VoltType.INTEGER) {
-            if (to == VoltType.SMALLINT ||
-                to == VoltType.TINYINT)
-                return false;
-        }
-        else if (from == VoltType.SMALLINT) {
-            if (to == VoltType.TINYINT)
-                return false;
-        }
+        if (to.isInteger())
+            return from.isInteger();
 
         return true;
     }
