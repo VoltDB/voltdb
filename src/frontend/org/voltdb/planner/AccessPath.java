@@ -73,7 +73,7 @@ public class AccessPath {
         //Iterate over the tables to collect partition columns
         Map<String, String> partitionMap = new HashMap<String, String>();
         for (Table t : joinOrder) {
-            if (!t.getIsreplicated()) {
+            if (!t.getIsreplicated() && t.getMaterializer() == null) {
                 Column partition = t.getPartitioncolumn();
                 assert(partition != null);
                 partitionMap.put(t.getTypeName(), partition.getTypeName());
