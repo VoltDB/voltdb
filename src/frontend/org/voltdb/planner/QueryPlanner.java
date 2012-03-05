@@ -340,9 +340,11 @@ public class QueryPlanner {
 
         // DTXN/EE can't handle plans that have more than 2 fragments yet.
         if (bestPlan.fragments.size() > 2) {
-            m_recentErrorMsg = "Unable to plan for statement. Likely statement is "+
-                "joining two partitioned tables in a multi-partition statement on non-partitioned key. " +
-                "This is not supported at this time.";
+            m_recentErrorMsg = "Unable to plan for statement. Possibly " +
+                "joining partitioned tables in a multi-partition procedure " +
+                "using a column that is not the partitioning attribute " +
+                "or a non-equality operator. " +
+                "This is statement not supported at this time.";
             return null;
         }
 
