@@ -27,10 +27,13 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -834,15 +837,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     }
 
     public boolean updateClusterState() {
-        m_tracker = VoltDB.instance().getSiteTracker();
-
-        // make sure the restricted priority queue knows about all of the up initiators
-        // for most catalog changes this will do nothing
-        // for rejoin, it will matter
-        for (Long initiator : m_tracker.m_allInitiatorsImmutable) {
-            m_transactionQueue.ensureInitiatorIsKnown(initiator);
-        }
-
         return true;
     }
 
@@ -969,10 +963,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     @Override
     public void run() {
         // enumerate site id (pad to 4 digits for sort)
-        String name = "ExecutionSite:";
-        if (getSiteId() < 10) name += "0";
-        if (getSiteId() < 100) name += "0";
-        if (getSiteId() < 1000) name += "0";
+        String name = "ExecutionSite: ";
         name += MiscUtils.hsIdToString(getSiteId());
         Thread.currentThread().setName(name);
 
@@ -1432,6 +1423,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * are concurrent faults. New faults are added to this set.
      */
     private final HashSet<Long> m_pendingFailedSites = new HashSet<Long>();
+    private final List<Runnable> m_joinsToCommitPostFailure = new LinkedList<Runnable>();
 
     /**
      * Find the global multi-partition commit point and the global initiator point for the
@@ -1456,7 +1448,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             for (Long siteId : fault.getSiteIds()) {
                 if (!m_pendingFailedSites.add(siteId)) {
                     VoltDB.crashLocalVoltDB("A site id shouldn't be distributed as a fault twice", true, null);
-
                 }
             }
         }
@@ -1513,6 +1504,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         m_tracker = newTracker;//Get a snapshot of the site tracker
         m_pendingFailedSites.clear();
+        Iterator<Runnable> iter = m_joinsToCommitPostFailure.iterator();
+        while (iter.hasNext()) {
+            try {
+                iter.next().run();
+            } finally {
+                iter.remove();
+            }
+        }
     }
 
     private Long extractGlobalFaultData(
@@ -1521,8 +1520,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         if (!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites)) {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
         }
-        Set<Long> failingInitiators = new HashSet<Long>(m_pendingFailedSites);
-        failingInitiators.retainAll(m_tracker.getAllInitiators());
+
         long commitPoint = Long.MIN_VALUE;
 
         final int localPartitionId =
@@ -1542,7 +1540,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
              * Can receive messages from beyond the grave
              */
             if (!m_tracker.m_allExecutionSitesImmutable.contains(key.getFirst())) {
-                iter.remove();
                 continue;
             }
 
@@ -1551,17 +1548,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
             commitPoint = Math.max(commitPoint, commitedTxnId);
             if (remotePartitionId == localPartitionId) {
-                try {
-                    Long initiatorId = key.getSecond();
-                    if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
-                        initiatorSafeInitPoint.put( initiatorId, Long.MIN_VALUE);
-                    }
-
-                    initiatorSafeInitPoint.put( initiatorId,
-                            Math.max(initiatorSafeInitPoint.get(initiatorId), safeTxnId));
-                } finally {
-                    iter.remove();
+                Long initiatorId = key.getSecond();
+                if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
+                    initiatorSafeInitPoint.put( initiatorId, Long.MIN_VALUE);
                 }
+
+                initiatorSafeInitPoint.put( initiatorId,
+                        Math.max(initiatorSafeInitPoint.get(initiatorId), safeTxnId));
             }
         }
         assert(commitPoint != Long.MIN_VALUE);
@@ -1576,9 +1569,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * own partition). Do this once for each failed initiator that we know about.
      * Sends all data all the time to avoid a need for request/response.
      */
-    private int discoverGlobalFaultData_send(SiteTracker newTracker)
+    private void discoverGlobalFaultData_send(SiteTracker newTracker)
     {
-        int expectedResponses = 0;
         Set<Long> survivors = newTracker.getAllSites();
         m_recoveryLog.info("Sending fault data " + MiscUtils.hsIdCollectionToString(m_pendingFailedSites) + " to "
                 + MiscUtils.hsIdCollectionToString(survivors) +
@@ -1602,15 +1594,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                      lastKnownGloballyCommitedMultiPartTxnId);
 
                     m_mailbox.send(MiscUtils.toLongArray(survivors), srcmsg);
-                    expectedResponses += (survivors.size());
                 }
             }
         }
         catch (MessagingException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
-        m_recoveryLog.info("Sent fault data. Expecting " + expectedResponses + " responses.");
-        return expectedResponses;
     }
 
     /*
@@ -1665,7 +1654,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 return false;
             }
 
-            m_recoveryLog.info("Received failure message  from " + fm.m_sourceHSId + " for failed sites " +
+            m_recoveryLog.info("Received failure message  from " + MiscUtils.hsIdToString(fm.m_sourceHSId) +
+                    " for failed sites " +
                     MiscUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
                     MiscUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
                     " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
@@ -1684,6 +1674,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             for (Long failingInitiator : failingInitiators) {
                 Pair<Long, Long> key = Pair.of( otherSite, failingInitiator);
                 if (!m_failureSiteUpdateLedger.containsKey(key)) {
+                    System.out.println("Can't conclude failure detection because there is " +
+                            "no failure entry for other site " + MiscUtils.hsIdToString(key.getFirst()) +
+                            " failing initiator " + MiscUtils.hsIdToString(key.getSecond()));
                     return false;
                 }
             }
@@ -2351,5 +2344,30 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     @Override
     public long getReplicatedDMLDivisor() {
         return m_tracker.m_numberOfPartitions;
+    }
+
+    public Future<?> notifySitesAdded() {
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                if (!m_pendingFailedSites.isEmpty()) {
+                    m_joinsToCommitPostFailure.add(this);
+                    return;
+                }
+                m_tracker = VoltDB.instance().getSiteTracker();
+
+                // make sure the restricted priority queue knows about all of the up initiators
+                // for most catalog changes this will do nothing
+                // for rejoin, it will matter
+                for (Long initiator : m_tracker.m_allInitiatorsImmutable) {
+                    m_transactionQueue.ensureInitiatorIsKnown(initiator);
+                }
+            }
+        };
+        FutureTask<Object> fut = new FutureTask<Object>(r, null);
+        LocalObjectMessage lom = new LocalObjectMessage(fut);
+        lom.m_sourceHSId = m_siteId;
+        m_mailbox.deliver(lom);
+        return fut;
     }
 }

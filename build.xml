@@ -1035,7 +1035,7 @@ TEST CASES
             <jvmarg value="-Djava.library.path=${build.dir}/nativelibs:${base.dir}/third_party/cpp/jnilib" />
             <jvmarg value="-server" />
             <jvmarg value="-Xcheck:jni" />
-            <jvmarg value="-Xmx2048m"/>
+            <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />

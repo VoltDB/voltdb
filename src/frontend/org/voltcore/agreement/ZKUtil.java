@@ -224,6 +224,68 @@ public class ZKUtil {
         });
     }
 
+    public static class StatCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.StatCallback {
+        private final CountDownLatch done = new CountDownLatch(1);
+        private Object results[];
+
+
+        public Object[] get() throws InterruptedException, KeeperException {
+            done.await();
+            return getResult();
+        }
+
+        public Stat getStat() throws InterruptedException, KeeperException {
+            done.await();
+            return (Stat)getResult()[3];
+        }
+
+        private Object[] getResult() throws KeeperException {
+            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
+            if (code == KeeperException.Code.OK) {
+                return results;
+            } else {
+                throw KeeperException.create(code);
+            }
+        }
+
+        @Override
+        public void processResult(int rc, String path, Object ctx, Stat stat) {
+            results = new Object[] { rc, path, ctx, stat };
+            done.countDown();
+        }
+    }
+
+    public static class VoidCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.VoidCallback {
+        private final CountDownLatch done = new CountDownLatch(1);
+        private Object results[];
+
+
+        public Object[] get() throws InterruptedException, KeeperException {
+            done.await();
+            return getResult();
+        }
+
+        public byte[] getData() throws InterruptedException, KeeperException {
+            done.await();
+            return (byte[])getResult()[3];
+        }
+
+        private Object[] getResult() throws KeeperException {
+            KeeperException.Code code = KeeperException.Code.get((Integer)results[0]);
+            if (code == KeeperException.Code.OK) {
+                return results;
+            } else {
+                throw KeeperException.create(code);
+            }
+        }
+
+        @Override
+        public void processResult(int rc, String path, Object ctx) {
+            results = new Object[] { rc, path, ctx };
+            done.countDown();
+        }
+
+    }
     public static class ByteArrayCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback {
         private final CountDownLatch done = new CountDownLatch(1);
         private Object results[];

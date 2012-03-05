@@ -149,7 +149,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                                 haveFailed.set(true);
                                 break;
                             }
-                            if (cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                            if (cluster.recoverOne( dead, toConnectTo, "localhost")) {
                                 break;
                             }
                             attempts++;
@@ -192,7 +192,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                         haveFailed.set(true);
                         break;
                     }
-                    if (cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                    if (cluster.recoverOne( recoverNow, toConnectTo, "localhost")) {
                         break;
                     }
                     attempts++;

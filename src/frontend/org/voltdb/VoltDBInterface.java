@@ -33,11 +33,6 @@ public interface VoltDBInterface
 {
     public boolean recovering();
 
-    /*
-     * Invoked from the command log once this node is marked unfaulted.
-     */
-    public void recoveryComplete();
-
     /**
      * Whether calls to crashVoltDB should result in a crash or be ignored
      */
@@ -80,7 +75,6 @@ public interface VoltDBInterface
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
-    public Map<Integer, String> getClusterMetadataMap();
     public MailboxPublisher getMailboxPublisher();
 
     /**
@@ -143,8 +137,6 @@ public interface VoltDBInterface
      * Notify RealVoltDB that recovery is complete
      */
     void onExecutionSiteRecoveryCompletion(long transferred);
-
-    void onAgreementSiteRecoveryCompletion();
 
     /**
      * Set the operational mode this server should be in once it has finished

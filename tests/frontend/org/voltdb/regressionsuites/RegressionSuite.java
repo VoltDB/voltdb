@@ -70,7 +70,6 @@ public class RegressionSuite extends TestCase {
     @Override
     public void setUp() throws Exception {
         //New tests means a new server thread that hasn't done a restore
-        SnapshotRestore.m_haveDoneRestore = false;
         m_config.startUp(true);
     }
 

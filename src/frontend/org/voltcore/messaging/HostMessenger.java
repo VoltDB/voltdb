@@ -17,7 +17,6 @@
 
 package org.voltcore.messaging;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -187,14 +186,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_network.start();
 
             /*
-             * Override the supplied and default config values on the leader to reflect
-             * that SJ actually bound to the coordinator ip and nothing else. Not necessarily
-             * the right thing but it is expedient
-             */
-            m_config.internalInterface = m_config.coordinatorIp.getAddress().getHostAddress();
-            m_config.internalPort = m_config.coordinatorIp.getPort();
-
-            /*
              * m_localHostId is 0 of course.
              */
             long agreementHSId = getHSIdForLocalSite(AGREEMENT_SITE_ID);
@@ -217,15 +208,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              */
             m_agreementSite =
                 new AgreementSite(
-                    this,
-                    agreementHSId,
-                    agreementSites,
-                    0,
-                    sm,
-                    new InetSocketAddress(
-                            m_config.zkInterface.split(":")[0],
-                            Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                    m_config.backwardsTimeForgivenessWindow);
+                        agreementHSId,
+                        agreementSites,
+                        0,
+                        sm,
+                        new InetSocketAddress(
+                                m_config.zkInterface.split(":")[0],
+                                Integer.parseInt(m_config.zkInterface.split(":")[1])),
+                                m_config.backwardsTimeForgivenessWindow);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
             m_zk = org.voltcore.agreement.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);
@@ -247,7 +237,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             // Store the components of the instance ID in ZK
             JSONObject instance_id = new JSONObject();
             instance_id.put("coord",
-                            ByteBuffer.wrap(m_config.coordinatorIp.getAddress().getAddress()).getInt());
+                    ByteBuffer.wrap(m_config.coordinatorIp.getAddress().getAddress()).getInt());
             instance_id.put("timestamp", System.currentTimeMillis());
             hostLog.debug("Cluster will have instance ID:\n" + instance_id.toString(4));
             byte[] payload = instance_id.toString(4).getBytes("UTF-8");
@@ -294,7 +284,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     m_zk.getData(CoreZK.instance_id, false, null);
                 JSONObject idJSON = new JSONObject(new String(data, "UTF-8"));
                 m_instanceId = new InstanceId(idJSON.getInt("coord"),
-                                              idJSON.getLong("timestamp"));
+                        idJSON.getLong("timestamp"));
 
             }
             catch (Exception e)
@@ -318,8 +308,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fhost = null;
         try {
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
-            putForeignHost(hostId, fhost);
             fhost.register(this);
+            putForeignHost(hostId, fhost);
             fhost.enableRead();
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
@@ -413,8 +403,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * Now add the host to the mailbox system
              */
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
-            putForeignHost(hostId, fhost);
             fhost.register(this);
+            putForeignHost(hostId, fhost);
             fhost.enableRead();
 
             /*
@@ -468,7 +458,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         JSONObject hostObj = new JSONObject();
         hostObj.put("hostId", getHostId());
         hostObj.put("address",
-                m_config.internalInterface.isEmpty() ? socket.socket().getLocalAddress() : m_config.internalInterface);
+                m_config.internalInterface.isEmpty() ?
+                        socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface);
         hostObj.put("port", m_config.internalPort);
         jsArray.put(hostObj);
         for (Map.Entry<Integer, ForeignHost>  entry : m_foreignHosts.get().entrySet()) {
@@ -519,8 +510,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             ForeignHost fhost = null;
             try {
                 fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout, listeningAddresses[ii]);
-                putForeignHost(hosts[ii], fhost);
                 fhost.register(this);
+                putForeignHost(hosts[ii], fhost);
             } catch (java.io.IOException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
             }
@@ -534,15 +525,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         createMailbox(agreementHSId, sm);
         m_agreementSite =
             new AgreementSite(
-                this,
-                agreementHSId,
-                agreementSites,
-                yourHostId,
-                sm,
-                new InetSocketAddress(
-                        m_config.zkInterface.split(":")[0],
-                        Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                m_config.backwardsTimeForgivenessWindow);
+                    agreementHSId,
+                    agreementSites,
+                    yourHostId,
+                    sm,
+                    new InetSocketAddress(
+                            m_config.zkInterface.split(":")[0],
+                            Integer.parseInt(m_config.zkInterface.split(":")[1])),
+                            m_config.backwardsTimeForgivenessWindow);
 
         /*
          * Now that the agreement site mailbox has been created it is safe
@@ -569,12 +559,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          */
         byte hostInfoBytes[];
         if (m_config.internalInterface.isEmpty()) {
-            InetAddress intf = InetAddress.getByName(m_joiner.m_reportedInternalInterface);
-            InetSocketAddress addr = new InetSocketAddress(intf, m_config.internalPort);
+            InetSocketAddress addr =
+                new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort);
             hostInfoBytes = addr.toString().getBytes("UTF-8");
         } else {
-            InetAddress intf = InetAddress.getByName(m_config.internalInterface);
-            InetSocketAddress addr = new InetSocketAddress(intf, m_config.internalPort);
+            InetSocketAddress addr =
+                new InetSocketAddress(m_config.internalInterface, m_config.internalPort);
             hostInfoBytes = addr.toString().getBytes("UTF-8");
         }
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -706,13 +696,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             update.put(hsId, new Mailbox() {
                 @Override
                 public void send(long hsId, VoltMessage message)
-                        throws MessagingException {}
+                throws MessagingException {}
                 @Override
                 public void send(long[] hsIds, VoltMessage message)
-                        throws MessagingException {}
+                throws MessagingException {}
                 @Override
                 public void deliver(VoltMessage message) {
-                    hostLog.warn("No-op mailbox(" + hsId + ") dropped message " + message);
+                    hostLog.warn("No-op mailbox(" + MiscUtils.hsIdToString(hsId) + ") dropped message " + message);
                 }
                 @Override
                 public void deliverFront(VoltMessage message) {}
@@ -773,7 +763,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void send(long[] destinationHSIds, final VoltMessage message)
-            throws MessagingException {
+    throws MessagingException {
 
         assert(message != null);
         assert(destinationHSIds != null);
@@ -793,7 +783,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (foreignHosts.size() == 0) return;
 
         for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
-                e.getKey().send(e.getValue(), message);
+            e.getKey().send(e.getValue(), message);
         }
         foreignHosts.clear();
     }

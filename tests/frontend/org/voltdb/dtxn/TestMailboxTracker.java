@@ -58,7 +58,7 @@ public class TestMailboxTracker extends ZKTestBase {
     public void testMailboxTracker() throws Exception {
         ZooKeeper zk = getClient(0);
         MailboxTracker tracker = new MailboxTracker(zk, handler);
-        MailboxPublisher publisher = new MailboxPublisher(VoltZK.mailboxes);
+        MailboxPublisher publisher = new MailboxPublisher(VoltZK.mailboxes + "/1");
 
         VoltZK.createPersistentZKNodes(zk);
 
@@ -90,14 +90,14 @@ public class TestMailboxTracker extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(0);
         MailboxTracker tracker = new MailboxTracker(zk, handler);
-        MailboxPublisher publisher = new MailboxPublisher(VoltZK.mailboxes);
+        MailboxPublisher publisher = new MailboxPublisher(VoltZK.mailboxes + "/1");
 
         VoltZK.createPersistentZKNodes(zk);
 
         publisher.registerMailbox(MailboxType.ExecutionSite, new MailboxNodeContent( 1L, 0));
         publisher.publish(zk2);
 
-        publisher = new MailboxPublisher(VoltZK.mailboxes);
+        publisher = new MailboxPublisher(VoltZK.mailboxes + "/2");
         publisher.registerMailbox(MailboxType.ExecutionSite, new MailboxNodeContent( 2L, 1));
         publisher.publish(zk);
 

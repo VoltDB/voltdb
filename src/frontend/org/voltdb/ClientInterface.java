@@ -27,9 +27,11 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
@@ -75,6 +77,7 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltcore.logging.Level;
@@ -1154,7 +1157,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
         ClientResponseImpl error = null;
 
-
         // Check for admin mode restrictions before proceeding any further
         VoltDBInterface instance = VoltDB.instance();
         if (instance.getMode() == OperationMode.PAUSED && !handler.isAdmin())
@@ -1753,5 +1755,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public SnapshotDaemon getSnapshotDaemon() {
         return m_snapshotDaemon;
+    }
+
+    public void notifySitesAdded(Set<Long> deltaAdded) {
+        SiteTracker st = VoltDB.instance().getSiteTracker();
+        Set<Long> copy = new HashSet<Long>(st.m_allExecutionSitesImmutable);
+        copy.retainAll(deltaAdded);
+        m_initiator.notifyExecutionSiteRejoin(new ArrayList<Long>(copy));
     }
 }

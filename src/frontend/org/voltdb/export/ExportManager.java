@@ -350,6 +350,7 @@ public class ExportManager
         for (ExportGeneration generation : m_generations.get().values()) {
             generation.close();
         }
+        m_loaderClass = null;
     }
 
     /**

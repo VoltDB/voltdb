@@ -90,14 +90,14 @@ public class ExecutionSiteRunner implements Runnable {
             // Even though OOM should be caught by the Throwable section below,
             // it sadly needs to be handled seperately. The goal here is to make
             // sure VoltDB crashes.
-
-            String errmsg = "ExecutionSite: " + m_siteId + " ran out of Java memory. " +
+            e.printStackTrace();
+            String errmsg = "ExecutionSite: " + org.voltcore.utils.MiscUtils.hsIdToString(m_siteId) + " ran out of Java memory. " +
                 "This node will shut down.";
             VoltDB.crashLocalVoltDB(errmsg, true, e);
         }
         catch (Throwable t)
         {
-            String errmsg = "ExecutionSite: " + m_siteId + " encountered an " +
+            String errmsg = "ExecutionSite: " + org.voltcore.utils.MiscUtils.hsIdToString(m_siteId) + " encountered an " +
                 "unexpected error and will die, taking this VoltDB node down.";
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }

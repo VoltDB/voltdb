@@ -35,7 +35,6 @@ public class RecoveryMessage extends VoltMessage {
         m_recoveryMessagesAvailable = true;
     }
 
-    private long m_sourceHSId;
     private long m_txnId;
     private byte m_address[];
     private int m_port;
@@ -67,8 +66,11 @@ public class RecoveryMessage extends VoltMessage {
      */
     public RecoveryMessage(long sourceHSId, long txnId, byte address[], int port) {
         m_subject = Subject.DEFAULT.getId();
-        m_recoveryMessagesAvailable = false;
+        if (sourceHSId == -1) {
+            throw new RuntimeException("No way");
+        }
         m_sourceHSId = sourceHSId;
+        m_recoveryMessagesAvailable = false;
         m_txnId = txnId;
         m_address = address;
         m_port = port;

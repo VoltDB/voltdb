@@ -53,6 +53,9 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -472,29 +475,29 @@ public class VoltProjectBuilder {
     }
 
     public boolean compile(final String jarPath,
-                           final int sitesPerHost,
-                           final int replication) {
+            final int sitesPerHost,
+            final int replication) {
         return compile(jarPath, sitesPerHost, 1,
-                       replication, null);
+                replication, null);
     }
 
     public boolean compile(final String jarPath,
-                           final int sitesPerHost,
-                           final int hostCount,
-                           final int replication) {
+            final int sitesPerHost,
+            final int hostCount,
+            final int replication) {
         return compile(jarPath, sitesPerHost, hostCount,
-                       replication, null);
+                replication, null);
     }
 
     public boolean compile(final String jarPath,
-                           final int sitesPerHost,
-                           final int hostCount,
-                           final int replication,
-                           final String voltRoot) {
+            final int sitesPerHost,
+            final int hostCount,
+            final int replication,
+            final String voltRoot) {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount,
-                       replication, voltRoot,
-                       m_ppdEnabled, m_snapshotPath, m_ppdPrefix, false, 0, false);
+                replication, voltRoot,
+                m_ppdEnabled, m_snapshotPath, m_ppdPrefix, false, 0, false);
     }
 
     public boolean compile(
@@ -504,7 +507,7 @@ public class VoltProjectBuilder {
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication,
-                       voltRoot, ppdEnabled, snapshotPath, ppdPrefix, false, 0, false);
+                voltRoot, ppdEnabled, snapshotPath, ppdPrefix, false, 0, false);
     }
 
     public boolean compile(final String jarPath, final int sitesPerHost,
@@ -513,15 +516,15 @@ public class VoltProjectBuilder {
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication,
-                       null, m_ppdEnabled, m_snapshotPath, m_ppdPrefix, true, adminPort, adminOnStartup);
+                null, m_ppdEnabled, m_snapshotPath, m_ppdPrefix, true, adminPort, adminOnStartup);
     }
 
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
-                           final int hostCount, final int replication,
-                           String voltRoot, final boolean ppdEnabled,
-                           final String snapshotPath, final String ppdPrefix,
-                           final boolean useCustomAdmin, final int adminPort,
-                           final boolean adminOnStartup)
+            final int hostCount, final int replication,
+            String voltRoot, final boolean ppdEnabled,
+            final String snapshotPath, final String ppdPrefix,
+            final boolean useCustomAdmin, final int adminPort,
+            final boolean adminOnStartup)
     {
         assert(jarPath != null);
         assert(sitesPerHost >= 1);
@@ -649,6 +652,7 @@ public class VoltProjectBuilder {
             System.err.println("ERROR: Call compile() before trying to get the deployment path.");
             return null;
         } else {
+            System.out.println("path to deployemnt is " + m_pathToDeployment);
             return m_pathToDeployment;
         }
     }
@@ -722,7 +726,7 @@ public class VoltProjectBuilder {
             final Element proc = doc.createElement("procedure");
             proc.setAttribute("class", procedure.name);
             if (procedure.partitionInfo != null);
-                proc.setAttribute("partitioninfo", procedure.partitionInfo);
+            proc.setAttribute("partitioninfo", procedure.partitionInfo);
             // build up @groups. This attribute should be redesigned
             if (procedure.groups.length > 0) {
                 final StringBuilder groupattr = new StringBuilder();
@@ -843,7 +847,7 @@ public class VoltProjectBuilder {
     private String writeDeploymentFile(
             int hostCount, int sitesPerHost, int kFactor, String voltRoot,
             boolean useCustomAdmin, int adminPort, boolean adminOnStartup) throws IOException, JAXBException
-    {
+            {
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
 
@@ -999,7 +1003,7 @@ public class VoltProjectBuilder {
         marshaller.marshal(doc, file);
         final String deploymentPath = file.getPath();
         return deploymentPath;
-    }
+            }
 
 
     public File getPathToVoltRoot() {

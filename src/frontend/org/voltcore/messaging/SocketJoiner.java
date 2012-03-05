@@ -18,13 +18,20 @@ package org.voltcore.messaging;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedSelectorException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -83,7 +90,8 @@ public class SocketJoiner {
     InetSocketAddress m_coordIp = null;
     int m_localHostId = 0;
     Map<Integer, SocketChannel> m_sockets = new HashMap<Integer, SocketChannel>();
-    ServerSocketChannel m_listenerSocket = null;
+    private final List<ServerSocketChannel> m_listenerSockets = new ArrayList<ServerSocketChannel>();
+    private Selector m_selector;
     VoltLogger m_hostLog;
     private final JoinHandler m_joinHandler;
 
@@ -100,17 +108,19 @@ public class SocketJoiner {
 
         // Try to become leader regardless of configuration.
         try {
-            m_listenerSocket = ServerSocketChannel.open();
-            m_listenerSocket.socket().bind(m_coordIp);
-            m_listenerSocket.socket().setPerformancePreferences(0, 2, 1);
-            m_internalPort = m_coordIp.getPort();
-            m_internalInterface = m_coordIp.getAddress().getHostAddress();
+            System.out.println("Attempting to bind to leader ip " + m_coordIp);
+            ServerSocketChannel listenerSocket = ServerSocketChannel.open();
+            listenerSocket.socket().bind(m_coordIp);
+            listenerSocket.socket().setPerformancePreferences(0, 2, 1);
+            listenerSocket.configureBlocking(false);
+            m_listenerSockets.add(listenerSocket);
+            System.out.println("bound");
         }
         catch (IOException e) {
-            if (m_listenerSocket != null) {
+            if (!m_listenerSockets.isEmpty()) {
                 try {
-                    m_listenerSocket.close();
-                    m_listenerSocket = null;
+                    m_listenerSockets.get(0).close();
+                    m_listenerSockets.clear();
                 }
                 catch (IOException ex) {
                     new VoltLogger(SocketJoiner.class.getName()).l7dlog(Level.FATAL, null, ex);
@@ -118,7 +128,7 @@ public class SocketJoiner {
             }
         }
 
-        if (m_listenerSocket != null) {
+        if (!m_listenerSockets.isEmpty()) {
             retval = true;
             if (m_hostLog != null)
                 m_hostLog.info("Connecting to VoltDB cluster as the leader...");
@@ -138,7 +148,7 @@ public class SocketJoiner {
         else {
             if (m_hostLog != null) {
                 m_hostLog.info("Connecting to the VoltDB cluster leader "
-                        + m_coordIp + ":" + m_internalPort);
+                        + m_coordIp);
             }
             /*
              * Not a leader, need to connect to the primary to join the cluster.
@@ -198,7 +208,13 @@ public class SocketJoiner {
      */
     private void doBind() throws Exception {
         LOG.debug("Creating listener socket");
-        m_listenerSocket = ServerSocketChannel.open();
+        try {
+            m_selector = Selector.open();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        ServerSocketChannel listenerSocket = ServerSocketChannel.open();
         InetSocketAddress inetsockaddr;
         if ((m_internalInterface == null) || (m_internalInterface.length() == 0)) {
             inetsockaddr = new InetSocketAddress(m_internalPort);
@@ -207,13 +223,97 @@ public class SocketJoiner {
             inetsockaddr = new InetSocketAddress(m_internalInterface, m_internalPort);
         }
         try {
-            m_listenerSocket.socket().bind(inetsockaddr);
+            System.out.println("Attempting to bind to internal ip " + inetsockaddr);
+            listenerSocket.socket().bind(inetsockaddr);
+            System.out.println("bound");
+            listenerSocket.configureBlocking(false);
+            m_listenerSockets.add(listenerSocket);
         } catch (Exception e) {
-            LOG.fatal("Failed to bind to " + inetsockaddr);
-            throw e;
+            /*
+             * If we bound to the leader address, the internal interface address  might not
+             * bind if it is all interfaces
+             */
+            if (m_listenerSockets.isEmpty()) {
+                LOG.fatal("Failed to bind to " + inetsockaddr);
+                throw e;
+            }
         }
+
+        for (ServerSocketChannel ssc : m_listenerSockets) {
+            ssc.register(m_selector, SelectionKey.OP_ACCEPT);
+        }
+
         if (LOG.isDebugEnabled()) {
             LOG.debug("Non-Primary Listening on:" + inetsockaddr.toString());
+        }
+    }
+
+    /*
+     * Pull all ready to accept sockets
+     */
+    private void processSSC(ServerSocketChannel ssc) throws Exception {
+        SocketChannel sc = null;
+        while ((sc = ssc.accept()) != null) {
+            sc.socket().setTcpNoDelay(true);
+            sc.socket().setPerformancePreferences(0, 2, 1);
+            final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
+
+            /*
+             * Read a length prefixed JSON message
+             */
+            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+
+            while (lengthBuffer.remaining() > 0) {
+                int read = sc.read(lengthBuffer);
+                if (read == -1) {
+                    throw new EOFException(remoteAddress);
+                }
+            }
+            lengthBuffer.flip();
+
+            ByteBuffer messageBytes = ByteBuffer.allocate(lengthBuffer.getInt());
+            while (messageBytes.hasRemaining()) {
+                int read = sc.read(messageBytes);
+                if (read == -1) {
+                    throw new EOFException(remoteAddress);
+                }
+            }
+            messageBytes.flip();
+
+            JSONObject jsObj = new JSONObject(new String(messageBytes.array(), "UTF-8"));
+
+            /*
+             * The type of connection, it can be a new request to join the cluster
+             * or a node that is connecting to the rest of the cluster and publishing its
+             * host id and such
+             */
+            String type = jsObj.getString("type");
+
+            /*
+             * The new connection may specify the address it is listening on,
+             * or it can be derived from the connection itself
+             */
+            InetSocketAddress listeningAddress;
+            if (jsObj.has("address")) {
+                listeningAddress = new InetSocketAddress(
+                        InetAddress.getByName(jsObj.getString("address")),
+                        jsObj.getInt("port"));
+            } else {
+                listeningAddress =
+                    new InetSocketAddress(
+                            ((InetSocketAddress)sc.socket().
+                                    getRemoteSocketAddress()).getAddress().getHostAddress(),
+                                    jsObj.getInt("port"));
+            }
+
+            System.out.println("Received request type " + type);
+            if (type.equals("REQUEST_HOSTID")) {
+                m_joinHandler.requestJoin( sc, listeningAddress);
+            } else if (type.equals("PUBLISH_HOSTID")){
+                m_joinHandler.notifyOfJoin(jsObj.getInt("hostId"), sc, listeningAddress);
+            } else {
+                throw new RuntimeException("Unexpected message type " + type + " from " + remoteAddress);
+            }
         }
     }
 
@@ -225,74 +325,23 @@ public class SocketJoiner {
     private void runPrimary() throws Exception {
         try {
             // start the server socket on the right interface
-            if (m_listenerSocket == null) {
-                doBind();
-            }
+            doBind();
 
             while (true) {
                 try {
-                    SocketChannel sc = m_listenerSocket.accept();
-                    sc.socket().setTcpNoDelay(true);
-                    sc.socket().setPerformancePreferences(0, 2, 1);
-                    final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
-
-                    /*
-                     * Read a length prefixed JSON message
-                     */
-                    ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-
-                    while (lengthBuffer.remaining() > 0) {
-                        int read = sc.read(lengthBuffer);
-                        if (read == -1) {
-                            throw new EOFException(remoteAddress);
+                    final int selectedKeyCount = m_selector.select();
+                    if (selectedKeyCount == 0) continue;
+                    Set<SelectionKey> selectedKeys = m_selector.selectedKeys();
+                    try {
+                        for (SelectionKey key : selectedKeys) {
+                            processSSC((ServerSocketChannel)key.channel());
                         }
-                    }
-                    lengthBuffer.flip();
-
-                    ByteBuffer messageBytes = ByteBuffer.allocate(lengthBuffer.getInt());
-                    while (messageBytes.hasRemaining()) {
-                        int read = sc.read(messageBytes);
-                        if (read == -1) {
-                            throw new EOFException(remoteAddress);
-                        }
-                    }
-                    messageBytes.flip();
-
-                    JSONObject jsObj = new JSONObject(new String(messageBytes.array(), "UTF-8"));
-
-                    /*
-                     * The type of connection, it can be a new request to join the cluster
-                     * or a node that is connecting to the rest of the cluster and publishing its
-                     * host id and such
-                     */
-                    String type = jsObj.getString("type");
-
-                    /*
-                     * The new connection may specify the address it is listening on,
-                     * or it can be derived from the connection itself
-                     */
-                    InetSocketAddress listeningAddress;
-                    if (jsObj.has("address")) {
-                        listeningAddress = new InetSocketAddress(
-                                jsObj.getString("address"),
-                                jsObj.getInt("port"));
-                    } else {
-                        listeningAddress =
-                            new InetSocketAddress(
-                                    ((InetSocketAddress)sc.socket().
-                                            getRemoteSocketAddress()).getAddress().getHostAddress(),
-                                    jsObj.getInt("port"));
-                    }
-
-                    System.out.println("Received request type " + type);
-                    if (type.equals("REQUEST_HOSTID")) {
-                        m_joinHandler.requestJoin( sc, listeningAddress);
-                    } else if (type.equals("PUBLISH_HOSTID")){
-                        m_joinHandler.notifyOfJoin(jsObj.getInt("hostId"), sc, listeningAddress);
-                    } else {
-                        throw new RuntimeException("Unexpected message type " + type + " from " + remoteAddress);
+                    } finally {
+                        selectedKeys.clear();
                     }
                 } catch (ClosedByInterruptException e) {
+                    throw new InterruptedException();
+                } catch (ClosedSelectorException e) {
                     throw new InterruptedException();
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -300,12 +349,17 @@ public class SocketJoiner {
             }
         }
         finally {
+            for (ServerSocketChannel ssc : m_listenerSockets) {
+                try {
+                    ssc.close();
+                } catch (Exception e) {}
+            }
+            m_listenerSockets.clear();
             try {
-                m_listenerSocket.close();
+                m_selector.close();
+            } catch (IOException e) {
             }
-            catch (IOException e) {
-                e.printStackTrace();
-            }
+            m_selector = null;
         }
     }
 
@@ -365,7 +419,10 @@ public class SocketJoiner {
             LOG.debug("Non-Primary requesting its Host ID");
             ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
             while (lengthBuffer.hasRemaining()) {
-                socket.read(lengthBuffer);
+                int read = socket.read(lengthBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
             }
             lengthBuffer.flip();
 
@@ -401,6 +458,7 @@ public class SocketJoiner {
                 int port = host.getInt("port");
                 final int hostId = host.getInt("hostId");
 
+                System.out.println("Leader provided address " + address);
                 InetSocketAddress hostAddr = new InetSocketAddress(address, port);
                 if (ii == 0) {
                     //Leader already has a socket
@@ -469,12 +527,24 @@ public class SocketJoiner {
     }
 
     public void shutdown() throws InterruptedException {
+        if (m_selector != null) {
+            try {
+                m_selector.close();
+            } catch (Exception e) {}
+        }
         m_es.shutdownNow();
         m_es.awaitTermination(356, TimeUnit.DAYS);
-        if (m_listenerSocket != null) {
+        for (ServerSocketChannel ssc : m_listenerSockets) {
             try {
-                m_listenerSocket.close();
-            } catch (IOException e) {}
+                ssc.close();
+            } catch (Exception e) {}
+        }
+        m_listenerSockets.clear();
+        if (m_selector != null) {
+            try {
+                m_selector.close();
+            } catch (Exception e) {}
+            m_selector = null;
         }
     }
 

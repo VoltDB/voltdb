@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.agreement.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
@@ -29,6 +31,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -73,7 +76,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String catalogDiffCommands, byte[] catalogBytes,
             int expectedCatalogVersion, String deploymentString,
-            long deploymentCRC)
+            long deploymentCRC) throws Exception
     {
         // TODO: compute CRC for catalog vs. a crc provided by the initiator.
         // validateCRC(catalogURL, initiatorsCRC);
@@ -82,6 +85,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // others will see there is no work to do and gracefully continue.
         // then update data at the local site.
         String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        zk.setData(VoltZK.catalogbytes, catalogBytes, -1, new ZKUtil.StatCallback(), null);
+        zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
         CatalogContext context =
             VoltDB.instance().catalogUpdate(commands, catalogBytes, expectedCatalogVersion, getTransactionId(), deploymentCRC);
         ctx.getExecutionSite().updateCatalog(commands, context);

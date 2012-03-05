@@ -38,6 +38,9 @@ public class VoltZK {
     public static final String topology = "/db/topology";
     public static final String unfaulted_hosts = "/db/unfaulted_hosts";
     public static final String deploymentBytes = "/db/deploymentBytes";
+    public static final String rejoinLock = "/db/rejoin_lock";
+    public static final String restoreMarker = "/db/did_restore";
+    public static final String operationMode = "/db/operation_mode";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
@@ -73,6 +76,7 @@ public class VoltZK {
     public static final String[] ZK_HIERARCHY = {
             root,
             mailboxes,
+            cluster_metadata,
     };
 
     /**
@@ -84,9 +88,15 @@ public class VoltZK {
                 ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
                 callbacks.add(cb);
                 zk.create(VoltZK.ZK_HIERARCHY[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb, null);
-
         }
         try {
+            ZKUtil.StringCallback callback = new ZKUtil.StringCallback();
+            zk.create(
+                    VoltZK.operationMode,
+                    null,
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT, callback, null);
+            callbacks.add(callback);
             for (ZKUtil.StringCallback cb : callbacks) {
                 cb.get();
             }

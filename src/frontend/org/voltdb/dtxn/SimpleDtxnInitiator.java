@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.MessagingException;
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.StoredProcedureInvocation;
@@ -112,7 +113,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_safetyState = m_mailbox.getSafetyState();
         m_siteId = m_mailbox.getHSId();
         m_safetyState.setHSId(m_siteId);
-        hostLog.info("Initializing initiator ID: " + initiatorId  + ", SiteID: " + m_siteId);
+        hostLog.info("Initializing initiator ID: " + initiatorId  +
+                ", SiteID: " + MiscUtils.hsIdToString(m_siteId));
 
         m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);
         m_hostId = hostId;
@@ -476,8 +478,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     @Override
     public synchronized void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
-        for (long executorSiteId : executorSiteIds) {
-            m_safetyState.addRejoinedState(executorSiteId);
+        SiteTracker st = VoltDB.instance().getSiteTracker();
+        for (Long executorSiteId : executorSiteIds) {
+            m_safetyState.addState(executorSiteId, st.m_sitesToPartitionsImmutable.get(executorSiteId));
         }
     }
 

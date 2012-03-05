@@ -190,7 +190,7 @@ public class LocalCluster implements VoltServerConfig {
                         String[] split = data.split(" ");
                         synchronized(this) {
                             try {
-                                m_hostId = Long.valueOf(split[split.length - 1]).intValue();
+                                m_hostId = Long.valueOf(split[split.length - 1].split(":")[0]).intValue();
                             } catch (java.lang.NumberFormatException e) {
                                 System.err.println("Had a number format exception processing line: '" + data + "'");
                                 throw e;
@@ -378,8 +378,14 @@ public class LocalCluster implements VoltServerConfig {
         m_portOffset = command.size() - 12;
         m_adminPortOffset = command.size() - 10;
         m_voltStartCmdOffset = command.size() - 9;
+
+        /*
+         * Both go into the empty slot before leader.
+         * Rejoing shouldn't need to specify a WAN replication mode...
+         */
         m_rejoinOffset = command.size() - 8;
-        m_voltStartModeOffset = command.size() - 7;
+        m_voltStartModeOffset = command.size() - 8;
+
         m_internalPortOffset = command.size() - 1;
 
         if (m_target.isIPC) {
@@ -710,6 +716,7 @@ public class LocalCluster implements VoltServerConfig {
                 sb.append(arg);
                 sb.append(' ');
             }
+            System.out.println(sb);
 
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
@@ -776,16 +783,16 @@ public class LocalCluster implements VoltServerConfig {
         int adminPortNo = m_baseAdminPort - hostId;
 
         // port to connect to (not too simple, eh?)
-        int portNoToRejoin = VoltDB.DEFAULT_PORT + ((hostId + 1) % getNodeCount());
-        if (m_hasLocalServer) portNoToRejoin = VoltDB.DEFAULT_PORT;
+        int portNoToRejoin = VoltDB.DEFAULT_INTERNAL_PORT + ((hostId + 1) % getNodeCount());
+        if (m_hasLocalServer) portNoToRejoin = VoltDB.DEFAULT_INTERNAL_PORT;
 
         if (portOffset != null) {
-            portNoToRejoin = VoltDB.DEFAULT_PORT + portOffset;
+            portNoToRejoin = VoltDB.DEFAULT_INTERNAL_PORT + portOffset;
             // adminPortNo = m_baseAdminPort - portOffset;
         }
         System.out.println("Rejoining " + hostId + " to hostID: " + portOffset);
 
-
+        System.out.println("Starting recovery command " + m_procBuilder.command());
         ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
         for (EEProcess proc : eeProcs) {
             try {
@@ -823,8 +830,11 @@ public class LocalCluster implements VoltServerConfig {
         PipeToFile ptf = null;
         long start = 0;
         try {
+            //The start mode ends up being clobbered by rejoinOffset
+            // Rejoin should never need to be told the operating mode
+            //m_procBuilder.command().set(m_voltStartModeOffset, "");
             m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
-            m_procBuilder.command().set(m_internalPortOffset, String.valueOf(VoltDB.DEFAULT_INTERNAL_PORT) + hostId);
+            m_procBuilder.command().set(m_internalPortOffset, String.valueOf(VoltDB.DEFAULT_INTERNAL_PORT + hostId) );
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(adminPortNo));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_voltStartCmdOffset, "rejoinhost");
@@ -840,8 +850,9 @@ public class LocalCluster implements VoltServerConfig {
                         + m_debugPortOffset++ + ",server=y,suspend=n");
             }
             m_procBuilder.command().set(m_zkPortOffset, Integer.toString(2181 + hostId));
-            // Rejoin should never need to be told the operating mode
-            m_procBuilder.command().set(m_voltStartModeOffset, "");
+
+            System.out.println("Rejoin command " + m_procBuilder.command());
+
             Process proc = m_procBuilder.start();
             start = System.currentTimeMillis();
 

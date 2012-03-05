@@ -29,7 +29,7 @@ import org.voltdb.messaging.FastSerializer;
  * Client stored procedure invocation object. Server uses an internal
  * format compatible with this wire protocol format.
  */
-class ProcedureInvocation {
+public class ProcedureInvocation {
 
     private final long m_clientHandle;
     private final String m_procName;
@@ -40,7 +40,7 @@ class ProcedureInvocation {
     private final long m_originalTxnId;
     private final ProcedureInvocationType m_type;
 
-    ProcedureInvocation(long handle, String procName, Object... parameters) {
+    public ProcedureInvocation(long handle, String procName, Object... parameters) {
         this(-1, handle, procName, parameters);
     }
 

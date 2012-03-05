@@ -58,7 +58,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false);
+                    true);
         cluster.setMaxHeap(64);
         final int numTuples = cluster.isValgrind() ? 1000 : 60000;
         boolean success = cluster.compile(builder);
@@ -160,7 +160,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
                                 haveFailed.set(true);
                                 break;
                             }
-                            if (cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                            if (cluster.recoverOne( dead, toConnectTo, "localhost")) {
                                 break;
                             }
                             attempts++;
@@ -270,7 +270,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
                                     haveFailed.set(true);
                                     break;
                                 }
-                                if (cluster.recoverOne( recover, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                                if (cluster.recoverOne( recover, toConnectTo, "localhost")) {
                                     break;
                                 }
                                 attempts++;

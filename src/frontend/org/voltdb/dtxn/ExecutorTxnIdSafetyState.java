@@ -188,7 +188,7 @@ public class ExecutorTxnIdSafetyState {
      * @param executorSiteId The id of the site to remove
      */
     public void removeState(long executorSiteId) {
-        SiteState ss = m_stateBySite.get(executorSiteId);
+        SiteState ss = m_stateBySite.remove(executorSiteId);
         if (ss == null) return;
         PartitionState ps = ss.partition;
         for (SiteState s : ps.sites) {
@@ -198,6 +198,7 @@ public class ExecutorTxnIdSafetyState {
             }
         }
         m_stateBySite.remove(executorSiteId);
+        m_stateToPartitionMap.remove(executorSiteId);
     }
 
     /**
@@ -206,9 +207,8 @@ public class ExecutorTxnIdSafetyState {
      * @param executorSiteId
      * @param partitionId
      */
-    public void addRejoinedState(long executorSiteId) {
-        int partitionId = m_stateToPartitionMap.get(executorSiteId);
-
+    public void addState(Long executorSiteId, Integer partitionId) {
+        m_stateToPartitionMap.put(executorSiteId, partitionId);
         SiteState ss = m_stateBySite.get(executorSiteId);
         if (ss != null) return;
         ss = new SiteState();

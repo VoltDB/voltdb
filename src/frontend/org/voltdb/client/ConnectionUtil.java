@@ -40,8 +40,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.utils.DBBPool.BBContainer;
-
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FastSerializer;
@@ -81,7 +79,7 @@ public class ConnectionUtil {
     }
 
     private static final HashMap<SocketChannel, ExecutorPair> m_executors =
-                                                                             new HashMap<SocketChannel, ExecutorPair>();
+        new HashMap<SocketChannel, ExecutorPair>();
     private static final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
     /**
@@ -123,9 +121,9 @@ public class ConnectionUtil {
      */
     public static Object[] getAuthenticatedConnection(
             String host, String username, byte[] hashedPassword, int port) throws IOException
-    {
+            {
         return getAuthenticatedConnection("database", host, username, hashedPassword, port);
-    }
+            }
 
     /**
      * Create a connection to a Volt server for export and authenticate the connection.
@@ -141,9 +139,9 @@ public class ConnectionUtil {
      */
     public static Object[] getAuthenticatedExportConnection(InetSocketAddress address,
             String username, byte[] hashedPassword) throws IOException
-    {
+            {
         return getAuthenticatedConnection("export", address, username, hashedPassword);
-    }
+            }
 
     public static String getHostnameOrAddress() {
         try {
@@ -209,6 +207,7 @@ public class ConnectionUtil {
         InetSocketAddress address = new InetSocketAddress(host, port);
         return getAuthenticatedConnection(service, address, username, hashedPassword);
     }
+
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username, byte[] hashedPassword)
     throws IOException {
@@ -302,7 +301,7 @@ public class ConnectionUtil {
                     throw new IOException("Server has too many connections");
                 case ClientInterface.WIRE_PROTOCOL_TIMEOUT_ERROR:
                     throw new IOException("Connection timed out during authentication. " +
-                            "The VoltDB server may be overloaded.");
+                    "The VoltDB server may be overloaded.");
                 case ClientInterface.EXPORT_DISABLED_REJECTION:
                     throw new IOException("Export not enabled for server");
                 case ClientInterface.WIRE_PROTOCOL_FORMAT_ERROR:
@@ -391,37 +390,37 @@ public class ConnectionUtil {
 
     public static Future<ClientResponse> readResponse(final ExecutorService executor, final SocketChannel channel) {
         return executor.submit(new Callable<ClientResponse>() {
-           @Override
-           public ClientResponse call() throws Exception {
-               ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-               do {
-                   final int read = channel.read(lengthBuffer);
-                   if (read == -1) {
-                       throw new EOFException();
-                   }
-                   if (lengthBuffer.hasRemaining()) {
-                       Thread.yield();
-                   }
-               }
-               while (lengthBuffer.hasRemaining());
+            @Override
+            public ClientResponse call() throws Exception {
+                ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                do {
+                    final int read = channel.read(lengthBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                    if (lengthBuffer.hasRemaining()) {
+                        Thread.yield();
+                    }
+                }
+                while (lengthBuffer.hasRemaining());
 
-               lengthBuffer.flip();
-               ByteBuffer message = ByteBuffer.allocate(lengthBuffer.getInt());
-               do {
-                   final int read = channel.read(message);
-                   if (read == -1) {
-                       throw new EOFException();
-                   }
-                   if (lengthBuffer.hasRemaining()) {
-                       Thread.yield();
-                   }
-               }
-               while (message.hasRemaining());
-               message.flip();
-               ClientResponseImpl response = new ClientResponseImpl();
-               response.initFromBuffer(message);
-               return response;
-           }
+                lengthBuffer.flip();
+                ByteBuffer message = ByteBuffer.allocate(lengthBuffer.getInt());
+                do {
+                    final int read = channel.read(message);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                    if (lengthBuffer.hasRemaining()) {
+                        Thread.yield();
+                    }
+                }
+                while (message.hasRemaining());
+                message.flip();
+                ClientResponseImpl response = new ClientResponseImpl();
+                response.initFromBuffer(message);
+                return response;
+            }
         });
     }
 }

@@ -247,8 +247,10 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                                 }
                             }
                         } else {
+                            RecoveryMessage rm = new RecoveryMessage();
+                            rm.m_sourceHSId = m_siteId;
                             //Notify that a new buffer is available
-                            m_mailbox.deliver(new RecoveryMessage());
+                            m_mailbox.deliver(rm);
                         }
                     }
                 }
@@ -491,7 +493,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             recoveryLog.info(
                     "Sending blocked on multi-part notification from " + m_siteId +
                     " at txnId " + currentTxnId + " to site " + m_destinationSiteId);
-            ByteBuffer buf = ByteBuffer.allocate(21);
+            ByteBuffer buf = ByteBuffer.allocate(25);
             BBContainer cont = DBBPool.wrapBB(buf);
             buf.putInt(21);//Length prefix
             buf.putLong(m_siteId);

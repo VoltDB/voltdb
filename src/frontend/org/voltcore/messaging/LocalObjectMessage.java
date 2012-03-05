@@ -18,7 +18,7 @@ package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
 
-public final class LocalObjectMessage extends VoltMessage {
+public class LocalObjectMessage extends VoltMessage {
     public final Object payload;
 
     public LocalObjectMessage(final Object o) {

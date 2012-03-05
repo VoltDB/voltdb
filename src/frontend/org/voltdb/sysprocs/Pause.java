@@ -17,9 +17,13 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.OperationMode;
@@ -28,6 +32,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 
 @ProcInfo(singlePartition = false)
 
@@ -59,6 +64,13 @@ public class Pause extends VoltSystemProcedure
         if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
         {
             VoltDB.instance().setMode(OperationMode.PAUSED);
+            try {
+                VoltDB.instance().getHostMessenger().getZK().setData(
+                        VoltZK.operationMode,
+                        OperationMode.PAUSED.toString().getBytes("UTF-8"), -1);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

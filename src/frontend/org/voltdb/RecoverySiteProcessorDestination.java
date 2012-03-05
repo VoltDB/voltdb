@@ -165,7 +165,9 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                             messageBuffer.limit(uncompressedSize);
                             recoveryLog.trace("Received message");
                             m_incoming.offer(container);
-                            m_mailbox.deliver(new RecoveryMessage());
+                            RecoveryMessage rm = new RecoveryMessage();
+                            rm.m_sourceHSId = m_HSId;
+                            m_mailbox.deliver(rm);
                             success = true;
                         } finally {
                             if (!success) {
@@ -254,7 +256,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         final int blockIndex = message.getInt(blockIndexOffset);
         final int tableId = message.getInt(tableIdOffset);
         ByteBuffer ackMessage = ByteBuffer.allocate(16);
-        ackMessage.putInt(16);
+        ackMessage.putInt(12);
         ackMessage.putLong(m_HSId);
         ackMessage.putInt(blockIndex);
         ackMessage.flip();

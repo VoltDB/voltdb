@@ -149,6 +149,7 @@ public class ClusterConfig
 
         JSONStringer stringer = new JSONStringer();
         stringer.object();
+        stringer.key("hostcount").value(m_hostCount);
         stringer.key("kfactor").value(getReplicationFactor());
         stringer.key("sites_per_host").value(sitesPerHost);
         stringer.key("partitions").array();

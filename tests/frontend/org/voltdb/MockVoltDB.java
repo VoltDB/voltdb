@@ -63,7 +63,6 @@ public class MockVoltDB implements VoltDBInterface
     HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config());
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
-    private final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
     boolean m_noLoadLib = false;
     public boolean shouldIgnoreCrashes = false;
@@ -74,7 +73,7 @@ public class MockVoltDB implements VoltDBInterface
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
         new HashMap<MailboxType, List<MailboxNodeContent>>();
-    private final MailboxPublisher m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes);
+    private final MailboxPublisher m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes + "/0");
 
     public MockVoltDB() {
         this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
@@ -138,7 +137,6 @@ public class MockVoltDB implements VoltDBInterface
     public void addSite(long siteId, MailboxType type) {
         m_mailboxMap.get(type).add(new MailboxNodeContent(siteId, null));
         m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
-        m_clusterMetadata.put((int)siteId, m_localMetadata);
     }
 
     public void addSite(long siteId, int partitionId)
@@ -149,7 +147,6 @@ public class MockVoltDB implements VoltDBInterface
         MailboxNodeContent mnc = new MailboxNodeContent( siteId, partitionId);
         m_mailboxMap.get(MailboxType.ExecutionSite).add(mnc);
         m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
-        m_clusterMetadata.put((int)siteId, m_localMetadata);
     }
 
     public synchronized void killSite(long siteId) {
@@ -420,11 +417,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Map<Integer, String> getClusterMetadataMap() {
-        return m_clusterMetadata;
-    }
-
-    @Override
     public void setStartMode(OperationMode mode) {
         m_startMode = mode;
     }
@@ -448,15 +440,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onAgreementSiteRecoveryCompletion() {}
-
-    @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
     }
-
-    @Override
-    public void recoveryComplete() {}
 
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay, TimeUnit unit) {

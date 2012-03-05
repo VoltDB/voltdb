@@ -36,12 +36,9 @@ import java.util.concurrent.PriorityBlockingQueue;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONObject;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
 import org.voltcore.agreement.ZKUtil;

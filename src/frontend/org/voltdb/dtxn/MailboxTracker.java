@@ -21,6 +21,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
-import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
@@ -54,6 +54,8 @@ public class MailboxTracker {
             Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Mailbox tracker", 1024 * 128));
 
     private byte m_lastChecksum[] = null;
+
+    private Set<String> m_lastChildren = new HashSet<String>();
 
     private class EventTask implements Runnable {
         private final WatchedEvent m_event;
@@ -102,41 +104,67 @@ public class MailboxTracker {
     }
 
     private void getMailboxes(WatchedEvent event) throws Exception {
-
         Set<String> mailboxes;
+
+        boolean isParentWatch = false;
+        if (event != null) {
+            String path = event.getPath();
+            if (path != null) {
+                isParentWatch = event.getPath().equals(VoltZK.mailboxes);
+            } else {
+                System.out.println("In MailboxTracker Path was null for ZK event " + event);
+            }
+        }
 
         /*
          * Only set the watch the first time (null) or again if it has been fired
          */
-        if (event == null || event.getPath().equals(VoltZK.mailboxes)){
+        if (event == null || isParentWatch){
             mailboxes = new TreeSet<String>(m_zk.getChildren(VoltZK.mailboxes, m_watcher));
         } else {
-            /*
-             * There is no need to do a rebuild if this was a delete. The watch
-             * on the parent node will fire because the children changed and the processing will be done then.
-             */
-            if (event != null && event.getType() == EventType.NodeDeleted) {
-                return;
-            }
             mailboxes = new TreeSet<String>(m_zk.getChildren(VoltZK.mailboxes, false));
         }
+
+        Set<String> newChildren = new HashSet<String>(mailboxes);
+
+        /*
+         * If the parent watch fired and no nodes have been added/deleted make this a noop now
+         * that the watch on the parent has been reset. This will happen when a child is deleted
+         * both watches on parent/child fire, the child watch is handled first and triggers the update
+         * and the parent watch is second and all that has to happen is that the watch is reset.
+         */
+        if (isParentWatch) {
+            if (m_lastChildren != null) {
+                if (m_lastChildren.equals(mailboxes)) {
+                    return;
+                }
+            }
+        }
+        newChildren.removeAll(m_lastChildren);
+        m_lastChildren = mailboxes;
 
         List<ByteArrayCallback> callbacks = new ArrayList<ByteArrayCallback>();
         for (String mailboxSet : mailboxes) {
             ByteArrayCallback cb = new ByteArrayCallback();
 
             /*
-             * Only set the watch the first time (null) or again if it has been fired
+             * Only set the watch the first time (null) or again if it has been fired.
+             * If this is a new child also set the watch.
              */
-            if (event == null || event.getPath().equals(VoltZK.mailboxes + "/" + mailboxSet)) {
+            if (event == null ||
+                    event.getPath().equals(VoltZK.mailboxes + "/" + mailboxSet) ||
+                    newChildren.contains(mailboxSet)) {
                 m_zk.getData(ZKUtil.joinZKPath(VoltZK.mailboxes, mailboxSet), m_watcher, cb, null);
             } else {
-                m_zk.getData(ZKUtil.joinZKPath(VoltZK.mailboxes, mailboxSet), m_watcher, cb, null);
+                m_zk.getData(ZKUtil.joinZKPath(VoltZK.mailboxes, mailboxSet), false, cb, null);
             }
 
             callbacks.add(cb);
         }
 
+        /*
+         * Checksum the results to see if they actually changed.
+         */
         MessageDigest digest = MessageDigest.getInstance("SHA-1");
         Map<MailboxType, List<MailboxNodeContent>> mailboxMap = new HashMap<MailboxType, List<MailboxNodeContent>>();
         for (ByteArrayCallback callback : callbacks) {
@@ -149,6 +177,9 @@ public class MailboxTracker {
         }
         byte digestBytes[] = digest.digest();
 
+        /*
+         * Try super hard not to generate spurious/duplicate updates
+         */
         if (m_lastChecksum != null && Arrays.equals( m_lastChecksum, digestBytes)) {
             return;
         }

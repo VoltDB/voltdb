@@ -23,8 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-
-import java.lang.Exception;
 import java.lang.management.ManagementFactory;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -35,7 +33,6 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,9 +41,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
@@ -55,17 +54,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.CRC32;
 
-import org.voltcore.utils.Pair;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.ZKUtil;
-
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -88,10 +90,8 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
+import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
@@ -159,8 +159,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
-    private boolean m_executionSitesRecovered = false;
-    private boolean m_agreementSiteRecovered = false;
     private long m_executionSiteRecoveryFinish;
     private long m_executionSiteRecoveryTransferred;
 
@@ -187,7 +185,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public boolean recovering() { return m_recovering; }
 
-    private final long m_recoveryStartTime = System.currentTimeMillis();
+    private long m_recoveryStartTime;
 
     CommandLog m_commandLog;
 
@@ -196,7 +194,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     private ReplicationRole m_replicationRole = null;
 
     volatile String m_localMetadata = "";
-    final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
 
     private ExecutorService m_computationService;
 
@@ -234,9 +231,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_dtxns.clear();
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
-            m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes);
             m_deployment = null;
             m_messenger = null;
+            m_startMode = null;
             m_statsAgent = new StatsAgent();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
@@ -248,8 +245,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_memoryStats = null;
             m_statsManager = null;
             m_restoreAgent = null;
+            m_siteTracker = null;
+            m_mailboxTracker = null;
+            m_recoveryStartTime = System.currentTimeMillis();
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
+
+            // set up site structure
+            m_localSites = new HashMap<Long, ExecutionSite>();
+            m_siteThreads = new HashMap<Long, Thread>();
+            m_runners = new ArrayList<ExecutionSiteRunner>();
 
             m_computationService = Executors.newFixedThreadPool(
                     Runtime.getRuntime().availableProcessors(),
@@ -267,6 +272,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = config.m_rejoinToHostAndPort != null;
+            m_recovering = isRejoin;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
@@ -292,10 +298,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ResponseSampler.initializeIfEnabled();
 
             buildClusterMesh(isRejoin);
+            m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes + "/" + m_messenger.getHostId());
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (!isRejoin) {
                 m_messenger.waitForGroupJoin(numberOfNodes);
             }
+
+            m_faultManager = new FaultDistributor(this);
+            m_faultManager.registerFaultHandler(SiteFailureFault.SITE_FAILURE_CATALOG,
+                    m_faultHandler,
+                    FaultType.NODE_FAILURE);
+            if (!m_faultManager.testPartitionDetectionDirectory(
+                    m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
+                VoltDB.crashLocalVoltDB("Unalbe to create partition detection snapshot directory at" +
+                        m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"), false, null);
+            }
+
 
             // Create the thread pool here. It's needed by buildClusterMesh()
             final int availableProcessors = Runtime.getRuntime().availableProcessors();
@@ -322,11 +340,35 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ArrayDeque<Mailbox> siteMailboxes = null;
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
-            // start mailbox tracker since all the
-            m_faultManager = new FaultDistributor(this);
             long initiatorHSId = 0;
             try {
-                Pair<ArrayDeque<Mailbox>, ClusterConfig> p = createMailboxesForSites();
+                /*
+                 * Start mailbox tracker early here because it is required
+                 * on rejoin to find the hosts that are missing from the cluster
+                 */
+                m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
+                m_mailboxTracker.start();
+
+                /*
+                 * Will count this down at the right point on regular startup as well as rejoin
+                 */
+                CountDownLatch rejoinCompleteLatch = new CountDownLatch(1);
+                Pair<ArrayDeque<Mailbox>, ClusterConfig> p;
+                if (isRejoin) {
+                    /*
+                     * Need to lock the topology metadata
+                     * so that it can be changed atomically with publishing the mailbox node
+                     * for this process on a rejoin.
+                     */
+                    createRejoinBarrierAndWatchdog(rejoinCompleteLatch);
+
+                    p = createMailboxesForSitesRejoin();
+                    ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
+                    System.out.println("Set recovering site count to " + p.getFirst().size());
+                } else {
+                    p = createMailboxesForSitesStartup();
+                }
+
                 siteMailboxes = p.getFirst();
                 clusterConfig = p.getSecond();
                 // This will set up site tracker
@@ -334,13 +376,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 final long statsHSId = m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
                 m_messenger.generateMailboxId(m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
-                m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
-                m_mailboxTracker.start();
+
+                m_mailboxPublisher.publish(m_messenger.getZK());
+
+                /*
+                 * Now that we have published our changes to the toplogy it is safe for
+                 * another node to come in and manipulate the toplogy metadata
+                 */
+                rejoinCompleteLatch.countDown();
+                if (isRejoin) {
+                    m_messenger.getZK().delete(VoltZK.rejoinLock, -1, new ZKUtil.VoidCallback(), null);
+                }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
-
-            m_mailboxPublisher.publish(m_messenger.getZK());
 
             /*
              * Before this barrier pretty much every remotely visible mailbox id has to have been
@@ -348,7 +397,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              */
             boolean siteTrackerInit = false;
             for (int ii = 0; ii < 4000; ii++) {
-                if (m_siteTracker.getAllHosts().size() < m_deployment.getCluster().getHostcount()) {
+                boolean predicate = true;
+                if (isRejoin) {
+                    predicate = !m_siteTracker.getAllHosts().contains(m_messenger.getHostId());
+                } else {
+                    predicate = m_siteTracker.getAllHosts().size() < m_deployment.getCluster().getHostcount();
+                }
+                if (predicate) {
                     try {
                         Thread.sleep(5);
                     } catch (InterruptedException e) {
@@ -360,7 +415,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 }
             }
             if (!siteTrackerInit) {
-                VoltDB.crashLocalVoltDB("Failed to initialize site tracker with all hosts before timeout", true, null);
+                VoltDB.crashLocalVoltDB(
+                        "Failed to initialize site tracker with all hosts before timeout", true, null);
             }
 
             initiatorMailbox = createInitiatorMailbox(initiatorHSId);
@@ -369,11 +425,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // do the many init tasks in the Inits class
             Inits inits = new Inits(this, 1);
             inits.doInitializationWork();
-
-            // set up site structure
-            m_localSites = Collections.synchronizedMap(new HashMap<Long, ExecutionSite>());
-            m_siteThreads = Collections.synchronizedMap(new HashMap<Long, Thread>());
-            m_runners = new ArrayList<ExecutionSiteRunner>();
 
             if (config.m_backend.isIPC) {
                 int eeCount = m_siteTracker.getLocalSites().length;
@@ -385,7 +436,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             collectLocalNetworkMetadata();
-            m_clusterMetadata.put(m_messenger.getHostId(), getLocalMetadata());
 
             /*
              * Create execution sites runners (and threads) for all exec sites except the first one.
@@ -401,15 +451,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 // start a local site
                 if (sitesHostId == m_myHostId) {
                     ExecutionSiteRunner runner =
-                            new ExecutionSiteRunner(mailbox,
-                                                    m_catalogContext,
-                                                    m_serializedCatalog,
-                                                    m_recovering,
-                                                    m_replicationActive,
-                                                    hostLog,
-                                                    m_configuredNumberOfPartitions);
+                        new ExecutionSiteRunner(mailbox,
+                                m_catalogContext,
+                                m_serializedCatalog,
+                                m_recovering,
+                                m_replicationActive,
+                                hostLog,
+                                m_configuredNumberOfPartitions);
                     m_runners.add(runner);
-                    Thread runnerThread = new Thread(runner, "Site " + site);
+                    Thread runnerThread = new Thread(runner, "Site " +
+                            org.voltcore.utils.MiscUtils.hsIdToString(site));
                     runnerThread.start();
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
                     m_siteThreads.put(site, runnerThread);
@@ -422,14 +473,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              */
             try {
                 ExecutionSite siteObj =
-                        new ExecutionSite(VoltDB.instance(),
-                                          localThreadMailbox,
-                                          m_serializedCatalog,
-                                          null,
-                                          m_recovering,
-                                          m_replicationActive,
-                                          m_catalogContext.m_transactionId,
-                                          m_configuredNumberOfPartitions);
+                    new ExecutionSite(VoltDB.instance(),
+                            localThreadMailbox,
+                            m_serializedCatalog,
+                            null,
+                            m_recovering,
+                            m_replicationActive,
+                            m_catalogContext.m_transactionId,
+                            m_configuredNumberOfPartitions);
                 m_localSites.put(localThreadMailbox.getHSId(), siteObj);
                 m_currentThreadSite = siteObj;
             } catch (Exception e) {
@@ -460,23 +511,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             for (int i = 0; i < 1; i++) {
                 // create DTXN and CI for each local non-EE site
                 SimpleDtxnInitiator initiator =
-                        new SimpleDtxnInitiator(initiatorMailbox,
-                                                m_catalogContext,
-                                                m_messenger,
-                                                m_myHostId,
-                                                m_myHostId, // fake initiator ID
-                                                m_config.m_timestampTestingSalt);
+                    new SimpleDtxnInitiator(initiatorMailbox,
+                            m_catalogContext,
+                            m_messenger,
+                            m_myHostId,
+                            m_myHostId, // fake initiator ID
+                            m_config.m_timestampTestingSalt);
 
                 try {
                     ClientInterface ci =
-                            ClientInterface.create(m_messenger,
-                                                   m_catalogContext,
-                                                   m_replicationRole,
-                                                   initiator,
-                                                   clusterConfig.getPartitionCount(),
-                                                   config.m_port + portOffset,
-                                                   config.m_adminPort + portOffset,
-                                                   m_config.m_timestampTestingSalt);
+                        ClientInterface.create(m_messenger,
+                                m_catalogContext,
+                                m_replicationRole,
+                                initiator,
+                                clusterConfig.getPartitionCount(),
+                                config.m_port + portOffset,
+                                config.m_adminPort + portOffset,
+                                m_config.m_timestampTestingSalt);
                     m_clientInterfaces.add(ci);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
@@ -487,13 +538,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             m_partitionCountStats = new PartitionCountStats( clusterConfig.getPartitionCount());
             m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
-                                             0, m_partitionCountStats);
+                    0, m_partitionCountStats);
             m_ioStats = new IOStats();
             m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
-                                             0, m_ioStats);
+                    0, m_ioStats);
             m_memoryStats = new MemoryStats();
             m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
-                                             0, m_memoryStats);
+                    0, m_memoryStats);
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
@@ -518,11 +569,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         null);
             }
 
-            try {
-                m_messenger.waitForAllHostsToBeReady(m_deployment.getCluster().getHostcount());
-            } catch (Exception e) {
-                hostLog.fatal("Failed to announce ready state.");
-                VoltDB.crashLocalVoltDB("Failed to announce ready state.", false, null);
+            if (!isRejoin) {
+                try {
+                    m_messenger.waitForAllHostsToBeReady(m_deployment.getCluster().getHostcount());
+                } catch (Exception e) {
+                    hostLog.fatal("Failed to announce ready state.");
+                    VoltDB.crashLocalVoltDB("Failed to announce ready state.", false, null);
+                }
             }
             m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = true;
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
@@ -561,7 +614,117 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
     }
 
-    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSites() throws Exception {
+    private void createRejoinBarrierAndWatchdog(final CountDownLatch cdl) {
+        ZooKeeper zk = m_messenger.getZK();
+        String lockPath = null;
+        for (int ii = 0; ii < 120; ii++) {
+            try {
+                lockPath = zk.create(VoltZK.rejoinLock, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                break;
+            } catch (KeeperException.NodeExistsException e) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e1) {
+                    throw new RuntimeException(e1);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        if (lockPath == null) {
+            VoltDB.crashLocalVoltDB("Unable to acquire rejoin lock in ZK, " +
+                    "it may be necessary to delete the lock from the ZK CLI if " +
+                    "you are sure no other rejoin is in progress", false, null);
+        }
+
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    if (!cdl.await(1, TimeUnit.MINUTES)) {
+                        VoltDB.crashLocalVoltDB("Rejoin watchdog timed out after 60 seconds, rejoin hung", false, null);
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+    }
+
+    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesRejoin() throws Exception {
+        ZooKeeper zk = m_messenger.getZK();
+        ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
+
+        Stat stat = new Stat();
+        System.out.println(zk.getChildren("/db", false));
+        JSONObject topology = new JSONObject(new String(zk.getData(VoltZK.topology, false, stat), "UTF-8"));
+
+        while (m_siteTracker == null) {
+            Thread.sleep(1);
+        }
+
+        Set<Integer> hostIdsInTopology = new HashSet<Integer>();
+        JSONArray partitions = topology.getJSONArray("partitions");
+        for (int ii = 0; ii < partitions.length(); ii++) {
+            JSONObject partition = partitions.getJSONObject(ii);
+            JSONArray replicas = partition.getJSONArray("replicas");
+            for (int zz = 0; zz < replicas.length(); zz++) {
+                hostIdsInTopology.add(replicas.getInt(zz));
+            }
+        }
+
+        /*
+         * Remove all the hosts that are still live
+         */
+        hostIdsInTopology.removeAll(m_siteTracker.m_allHostsImmutable);
+
+        /*
+         * Nothing to replace!
+         */
+        if (hostIdsInTopology.isEmpty()) {
+            VoltDB.crashLocalVoltDB("Rejoin failed because there is no failed node to replace", false, null);
+        }
+
+        Integer hostToReplace = hostIdsInTopology.iterator().next();
+
+        /*
+         * Log all the partitions to replicate and replace the failed host with self
+         */
+        Set<Integer> partitionsToReplicate = new TreeSet<Integer>();
+        for (int ii = 0; ii < partitions.length(); ii++) {
+            JSONObject partition = partitions.getJSONObject(ii);
+            JSONArray replicas = partition.getJSONArray("replicas");
+            for (int zz = 0; zz < replicas.length(); zz++) {
+                if (replicas.getInt(zz) == hostToReplace.intValue()) {
+                    partitionsToReplicate.add(partition.getInt("partition_id"));
+                    replicas.put(zz, m_messenger.getHostId());
+                }
+            }
+        }
+
+        zk.setData(VoltZK.topology, topology.toString(4).getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
+        final int hostcount = topology.getInt("hostcount");
+        final int sites_per_host = topology.getInt("sites_per_host");
+        final int kfactor = topology.getInt("kfactor");
+        ClusterConfig clusterConfig =
+            new ClusterConfig(
+                    hostcount,
+                    sites_per_host,
+                    kfactor);
+        m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
+        assert(partitionsToReplicate.size() == sites_per_host);
+        for (Integer partition : partitionsToReplicate)
+        {
+            Mailbox mailbox = m_messenger.createMailbox();
+            mailboxes.add(mailbox);
+            MailboxNodeContent mnc = new MailboxNodeContent(mailbox.getHSId(), partition);
+            m_mailboxPublisher.registerMailbox(MailboxType.ExecutionSite, mnc);
+        }
+        return Pair.of( mailboxes, clusterConfig);
+    }
+
+    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesStartup() throws Exception {
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
         int sitesperhost = m_deployment.getCluster().getSitesperhost();
         int hostcount = m_deployment.getCluster().getHostcount();
@@ -594,8 +757,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             topo = config.getTopology(m_messenger.getLiveHostIds());
             byte[] payload = topo.toString(4).getBytes("UTF-8");
             m_messenger.getZK().create(VoltZK.topology, payload,
-                                       Ids.OPEN_ACL_UNSAFE,
-                                       CreateMode.PERSISTENT);
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT);
             byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, null);
             topo = new JSONObject(new String(data, "UTF-8"));
         }
@@ -605,7 +768,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         catch (Exception e)
         {
             VoltDB.crashLocalVoltDB("Unable to write topology to ZK, dying",
-                                    true, e);
+                    true, e);
         }
         return topo;
     }
@@ -695,9 +858,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 crc.update(deploymentBytesTemp);
                 if (checksumHere != crc.getValue()) {
                     hostLog.info("Deployment configuration was pulled from ZK, and the checksum did not match " +
-                            "the locally supplied file");
+                    "the locally supplied file");
                 } else {
-                    hostLog.info("Could not locate deployment info at given URL: " + m_config.m_pathToDeployment);
+                    hostLog.info("Deployment configuration pulled from ZK");
                 }
                 deploymentBytes = deploymentBytesTemp;
             }
@@ -734,7 +897,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
-                                                                 true, true);
+                    true, true);
             assert(depCRC != -1);
             m_catalogContext = new CatalogContext(0, catalog, null, depCRC, 0, -1);
 
@@ -861,15 +1024,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             VoltDB.crashLocalVoltDB("Failed to resolve leader address.", false, null);
         }
 
-        org.voltcore.messaging.HostMessenger.Config hmconfig =
-            new org.voltcore.messaging.HostMessenger.Config(
-                leader.getHostAddress(),
-                m_config.m_leaderPort != null ? m_config.m_leaderPort : m_config.m_internalPort);
+        org.voltcore.messaging.HostMessenger.Config hmconfig;
+
+        if (m_config.m_rejoinToHostAndPort != null) {
+            hmconfig = new org.voltcore.messaging.HostMessenger.Config(
+                    MiscUtils.getHostnameFromHostnameColonPort(m_config.m_rejoinToHostAndPort),
+                    MiscUtils.getPortFromHostnameColonPort(
+                            m_config.m_rejoinToHostAndPort, m_config.m_internalPort));
+        } else {
+            hmconfig = new org.voltcore.messaging.HostMessenger.Config(
+                    leader.getHostAddress(),
+                    m_config.m_leaderPort != null ? m_config.m_leaderPort : m_config.m_internalPort);
+        }
         hmconfig.internalPort = m_config.m_internalPort;
         hmconfig.internalInterface = m_config.m_internalInterface;
         hmconfig.zkInterface = m_config.m_zkInterface;
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
+
         m_messenger =
             new org.voltcore.messaging.HostMessenger(hmconfig);
 
@@ -887,141 +1059,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         m_myHostId = m_messenger.getHostId();
     }
 
-    HashSet<Integer> rejoinExistingMesh(int numberOfNodes, long deploymentCRC) {
-        throw new UnsupportedOperationException();
-//        // sensible defaults (sorta)
-//        String rejoinHostCredentialString = null;
-//        String rejoinHostAddressString = null;
-//
-//        //Client interface port of node that will receive @Rejoin invocation
-//        int rejoinPort = m_config.m_port;
-//        String rejoinHost = null;
-//        String rejoinUser = null;
-//        String rejoinPass = null;
-//
-//        // this will cause the ExecutionSites to start in recovering mode
-//        m_recovering = true;
-//
-//        // split a "user:pass@host:port" string into "user:pass" and "host:port"
-//        int atSignIndex = m_config.m_rejoinToHostAndPort.indexOf('@');
-//        if (atSignIndex == -1) {
-//            rejoinHostAddressString = m_config.m_rejoinToHostAndPort;
-//        }
-//        else {
-//            rejoinHostCredentialString = m_config.m_rejoinToHostAndPort.substring(0, atSignIndex).trim();
-//            rejoinHostAddressString = m_config.m_rejoinToHostAndPort.substring(atSignIndex + 1).trim();
-//        }
-//
-//        int colonIndex = -1;
-//        // split a "user:pass" string into "user" and "pass"
-//        if (rejoinHostCredentialString != null) {
-//            colonIndex = rejoinHostCredentialString.indexOf(':');
-//            if (colonIndex == -1) {
-//                rejoinUser = rejoinHostCredentialString.trim();
-//                System.out.print("password: ");
-//                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-//                try {
-//                    rejoinPass = br.readLine();
-//                } catch (IOException e) {
-//                    hostLog.error("Unable to read passord for rejoining credentials from console.");
-//                    System.exit(-1);
-//                }
-//            }
-//            else {
-//                rejoinUser = rejoinHostCredentialString.substring(0, colonIndex).trim();
-//                rejoinPass = rejoinHostCredentialString.substring(colonIndex + 1).trim();
-//            }
-//        }
-//
-//        // split a "host:port" string into "host" and "port"
-//        colonIndex = rejoinHostAddressString.indexOf(':');
-//        if (colonIndex == -1) {
-//            rejoinHost = rejoinHostAddressString.trim();
-//            // note rejoinPort has a default
-//        }
-//        else {
-//            rejoinHost = rejoinHostAddressString.substring(0, colonIndex).trim();
-//            rejoinPort = Integer.parseInt(rejoinHostAddressString.substring(colonIndex + 1).trim());
-//        }
-//
-//        hostLog.info(String.format("Inter-node communication will use port %d.", m_config.m_internalPort));
-//        ServerSocketChannel listener = null;
-//        try {
-//            listener = ServerSocketChannel.open();
-//            listener.socket().bind(new InetSocketAddress(m_config.m_internalPort));
-//        } catch (IOException e) {
-//            hostLog.error("Problem opening listening rejoin socket: " + e.getMessage());
-//            System.exit(-1);
-//        }
-//        m_messenger = new HostMessenger(m_network, listener, numberOfNodes, 0, deploymentCRC, hostLog);
-//
-//        // make empty strings null
-//        if ((rejoinUser != null) && (rejoinUser.length() == 0)) rejoinUser = null;
-//        if ((rejoinPass != null) && (rejoinPass.length() == 0)) rejoinPass = null;
-//
-//        // URL Decode so usernames/passwords can contain weird stuff
-//        try {
-//            if (rejoinUser != null) rejoinUser = URLDecoder.decode(rejoinUser, "UTF-8");
-//            if (rejoinPass != null) rejoinPass = URLDecoder.decode(rejoinPass, "UTF-8");
-//        } catch (UnsupportedEncodingException e) {
-//            hostLog.error("Problem URL-decoding credentials for rejoin authentication: " + e.getMessage());
-//            System.exit(-1);
-//        }
-//
-//        ClientConfig clientConfig = new ClientConfig(rejoinUser, rejoinPass);
-//        Client client = ClientFactory.createClient(clientConfig);
-//        ClientResponse response = null;
-//        RejoinCallback rcb = new RejoinCallback() {
-//
-//        };
-//        try {
-//            client.createConnection(rejoinHost, rejoinPort);
-//            InetSocketAddress inetsockaddr = new InetSocketAddress(rejoinHost, rejoinPort);
-//            SocketChannel socket = SocketChannel.open(inetsockaddr);
-//            String ip_addr = socket.socket().getLocalAddress().getHostAddress();
-//            socket.close();
-//            m_config.m_selectedRejoinInterface =
-//                m_config.m_internalInterface.isEmpty() ? ip_addr : m_config.m_internalInterface;
-//            client.callProcedure(
-//                    rcb,
-//                    "@Rejoin",
-//                    m_config.m_selectedRejoinInterface,
-//                    m_config.m_internalPort);
-//        }
-//        catch (Exception e) {
-//            hostLog.fatal("Problem connecting client to " + m_config.m_selectedRejoinInterface + ":" +
-//                   m_config.m_internalPort + ". " + e.getMessage());
-//            VoltDB.crashVoltDB();
-//        }
-//
-//        Object retval[] = m_messenger.waitForGroupJoin(60 * 1000);
-//
-//        m_instanceId = new Object[] { retval[0], retval[1] };
-//
-//        @SuppressWarnings("unchecked")
-//        HashSet<Integer> downHosts = (HashSet<Integer>)retval[2];
-//        hostLog.info("Down hosts are " + downHosts.toString());
-//
-//        try {
-//            //Callback validates response asynchronously. Just wait for the response before continuing.
-//            //Timeout because a failure might result in the response not coming.
-//            response = rcb.waitForResponse(3000);
-//            if (response == null) {
-//                hostLog.fatal("Recovering node timed out rejoining");
-//                VoltDB.crashVoltDB();
-//            }
-//        }
-//        catch (InterruptedException e) {
-//            hostLog.fatal("Interrupted while attempting to rejoin cluster");
-//            VoltDB.crashVoltDB();
-//        }
-//        return downHosts;
-    }
-
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
         String startAction = m_config.m_startAction.toString();
         String startActionLog = "Database start action is " + (startAction.substring(0, 1).toUpperCase() +
-                                 startAction.substring(1).toLowerCase()) + ".";
+                startAction.substring(1).toLowerCase()) + ".";
         if (m_config.m_startAction == START_ACTION.START) {
             startActionLog += " Will create a new database if there is nothing to recover from.";
         }
@@ -1036,10 +1077,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         if (m_replicationRole == ReplicationRole.MASTER) {
-                hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster.");
+            hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster.");
         } else if (m_replicationRole == ReplicationRole.REPLICA) {
             hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster. " +
-                             "Clients can only call read-only procedures.");
+            "Clients can only call read-only procedures.");
         }
         if (httpPortExtraLogMessage != null)
             hostLog.info(httpPortExtraLogMessage);
@@ -1079,18 +1120,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         final ZooKeeper zk = m_messenger.getZK();
+        ZKUtil.ByteArrayCallback operationModeFuture = new ZKUtil.ByteArrayCallback();
         /*
          * Publish our cluster metadata, and then retrieve the metadata
          * for the rest of the cluster
          */
         try {
-            zk.create(
-                    VoltZK.cluster_metadata,
-                    null,
-                    Ids.OPEN_ACL_UNSAFE,
-                    CreateMode.PERSISTENT,
-                    new ZKUtil.StringCallback(),
-                    null);
             zk.create(
                     VoltZK.cluster_metadata + "/" + m_messenger.getHostId(),
                     getLocalMetadata().getBytes("UTF-8"),
@@ -1098,10 +1133,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     CreateMode.EPHEMERAL,
                     new ZKUtil.StringCallback(),
                     null);
+            zk.getData(VoltZK.operationMode, false, operationModeFuture, null);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error creating \"/cluster_metadata\" node in ZK", true, e);
         }
 
+        Map<Integer, String> clusterMetadata = new HashMap<Integer, String>(0);
         /*
          * Spin and attempt to retrieve cluster metadata for all nodes in the cluster.
          */
@@ -1119,11 +1156,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 try {
                     ZKUtil.ByteArrayCallback cb = entry.getValue();
                     Integer hostId = entry.getKey();
-                    m_clusterMetadata.put(hostId, new String(cb.getData(), "UTF-8"));
+                    clusterMetadata.put(hostId, new String(cb.getData(), "UTF-8"));
                     metadataToRetrieve.remove(hostId);
                 } catch (KeeperException.NoNodeException e) {}
-                  catch (Exception e) {
-                      VoltDB.crashLocalVoltDB("Error retrieving cluster metadata", true, e);
+                catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Error retrieving cluster metadata", true, e);
                 }
             }
 
@@ -1140,13 +1177,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 MiscUtils.formatHostMetadataFromJSON(getLocalMetadata())));
             }
             else {
-                String hostMeta = m_clusterMetadata.get(hostId);
+                String hostMeta = clusterMetadata.get(hostId);
                 hostLog.info(
                         String.format(
                                 "  Host id: %d with interfaces: %s [PEER]",
                                 hostId,
                                 MiscUtils.formatHostMetadataFromJSON(hostMeta)));
             }
+        }
+
+        try {
+            if (operationModeFuture.getData() != null) {
+                String operationModeStr = new String(operationModeFuture.getData(), "UTF-8");
+                m_startMode = OperationMode.valueOf(operationModeStr);
+            }
+        } catch (KeeperException.NoNodeException e) {}
+        catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -1225,7 +1272,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
         catch (Throwable t)
         {
-            String errmsg = "ExecutionSite: " + m_currentThreadSite.m_siteId +
+            String errmsg = "ExecutionSite: " + org.voltcore.utils.MiscUtils.hsIdToString(m_currentThreadSite.m_siteId) +
             " encountered an " +
             "unexpected error and will die, taking this VoltDB node down.";
             System.err.println(errmsg);
@@ -1244,8 +1291,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public void shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
             m_mode = OperationMode.SHUTTINGDOWN;
-            m_executionSitesRecovered = false;
-            m_agreementSiteRecovered = false;
             m_mailboxTracker.shutdown();
             // Things are going pear-shaped, tell the fault distributor to
             // shut its fat mouth
@@ -1363,90 +1408,90 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
         throw new UnsupportedOperationException();
-//        if (m_recovering) {
-//            recoveryLog.fatal("Concurrent rejoins are not supported");
-//            VoltDB.crashVoltDB();
-//        }
-//        // another site already did this work.
-//        if (currentTxnId == lastNodeRejoinFinish_txnId) {
-//            return null;
-//        }
-//        else if (currentTxnId < lastNodeRejoinFinish_txnId) {
-//            throw new RuntimeException("Trying to rejoin (commit/rollback) with an old transaction.");
-//        }
-//        recoveryLog.info("Rejoining commit node with txnid: " + currentTxnId +
-//                         " lastNodeRejoinFinish_txnId: " + lastNodeRejoinFinish_txnId);
-//        HostMessenger messenger = getHostMessenger();
-//        if (commit) {
-//            // put the foreign host into the set of active ones
-//            HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
-//            m_faultManager.reportFaultCleared(
-//                    new NodeFailureFault(
-//                            joinNodeInfo.hostId,
-//                            m_siteTracker.getNonExecSitesForHost(joinNodeInfo.hostId),
-//                            joinNodeInfo.hostName));
-//            try {
-//                m_faultHandler.m_waitForFaultClear.acquire();
-//            } catch (InterruptedException e) {
-//                VoltDB.crashVoltDB();//shouldn't happen
-//            }
-//
-//            ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
-//            ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
-//            Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
-//            for (Site site : cluster.getSites()) {
-//                int siteId = Integer.parseInt(site.getTypeName());
-//                int hostId = Integer.parseInt(site.getHost().getTypeName());
-//                if (hostId == joinNodeInfo.hostId) {
-//                    assert(site.getIsup() == false);
-//                    rejoiningSiteIds.add(siteId);
-//                    if (site.getIsexec() == true) {
-//                        rejoiningExecSiteIds.add(siteId);
-//                    }
-//                }
-//            }
-//            assert(rejoiningSiteIds.size() > 0);
-//
-//            // get a string list of all the new sites
-//            StringBuilder newIds = new StringBuilder();
-//            for (int siteId : rejoiningSiteIds) {
-//                newIds.append(siteId).append(",");
-//            }
-//            // trim the last comma
-//            newIds.setLength(newIds.length() - 1);
-//
-//            // change the catalog to reflect this change
-//            hostLog.info("Host joined, host id: " + joinNodeInfo.hostId + " hostname: " + joinNodeInfo.hostName);
-//            hostLog.info("  Adding sites to cluster: " + newIds);
-//            StringBuilder sb = new StringBuilder();
-//            for (int siteId : rejoiningSiteIds)
-//            {
-//                sb.append("set ");
-//                String site_path = VoltDB.instance().getCatalogContext().catalog.
-//                                   getClusters().get("cluster").getSites().
-//                                   get(Integer.toString(siteId)).getPath();
-//                sb.append(site_path).append(" ").append("isUp true");
-//                sb.append("\n");
-//            }
-//            String catalogDiffCommands = sb.toString();
-//            clusterUpdate(catalogDiffCommands);
-//
-//            // update the SafteyState in the initiators
-//            for (SimpleDtxnInitiator dtxn : m_dtxns) {
-//                dtxn.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
-//            }
-//
-//            //Notify the export manager the cluster topology has changed
-//            ExportManager.instance().notifyOfClusterTopologyChange();
-//        }
-//        else {
-//            // clean up any connections made
-//            messenger.rejoinForeignHostRollback();
-//        }
-//        recoveryLog.info("Setting lastNodeRejoinFinish_txnId to: " + currentTxnId);
-//        lastNodeRejoinFinish_txnId = currentTxnId;
-//
-//        return null;
+        //        if (m_recovering) {
+        //            recoveryLog.fatal("Concurrent rejoins are not supported");
+        //            VoltDB.crashVoltDB();
+        //        }
+        //        // another site already did this work.
+        //        if (currentTxnId == lastNodeRejoinFinish_txnId) {
+        //            return null;
+        //        }
+        //        else if (currentTxnId < lastNodeRejoinFinish_txnId) {
+        //            throw new RuntimeException("Trying to rejoin (commit/rollback) with an old transaction.");
+        //        }
+        //        recoveryLog.info("Rejoining commit node with txnid: " + currentTxnId +
+        //                         " lastNodeRejoinFinish_txnId: " + lastNodeRejoinFinish_txnId);
+        //        HostMessenger messenger = getHostMessenger();
+        //        if (commit) {
+        //            // put the foreign host into the set of active ones
+        //            HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
+        //            m_faultManager.reportFaultCleared(
+        //                    new NodeFailureFault(
+        //                            joinNodeInfo.hostId,
+        //                            m_siteTracker.getNonExecSitesForHost(joinNodeInfo.hostId),
+        //                            joinNodeInfo.hostName));
+        //            try {
+        //                m_faultHandler.m_waitForFaultClear.acquire();
+        //            } catch (InterruptedException e) {
+        //                VoltDB.crashVoltDB();//shouldn't happen
+        //            }
+        //
+        //            ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
+        //            ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
+        //            Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
+        //            for (Site site : cluster.getSites()) {
+        //                int siteId = Integer.parseInt(site.getTypeName());
+        //                int hostId = Integer.parseInt(site.getHost().getTypeName());
+        //                if (hostId == joinNodeInfo.hostId) {
+        //                    assert(site.getIsup() == false);
+        //                    rejoiningSiteIds.add(siteId);
+        //                    if (site.getIsexec() == true) {
+        //                        rejoiningExecSiteIds.add(siteId);
+        //                    }
+        //                }
+        //            }
+        //            assert(rejoiningSiteIds.size() > 0);
+        //
+        //            // get a string list of all the new sites
+        //            StringBuilder newIds = new StringBuilder();
+        //            for (int siteId : rejoiningSiteIds) {
+        //                newIds.append(siteId).append(",");
+        //            }
+        //            // trim the last comma
+        //            newIds.setLength(newIds.length() - 1);
+        //
+        //            // change the catalog to reflect this change
+        //            hostLog.info("Host joined, host id: " + joinNodeInfo.hostId + " hostname: " + joinNodeInfo.hostName);
+        //            hostLog.info("  Adding sites to cluster: " + newIds);
+        //            StringBuilder sb = new StringBuilder();
+        //            for (int siteId : rejoiningSiteIds)
+        //            {
+        //                sb.append("set ");
+        //                String site_path = VoltDB.instance().getCatalogContext().catalog.
+        //                                   getClusters().get("cluster").getSites().
+        //                                   get(Integer.toString(siteId)).getPath();
+        //                sb.append(site_path).append(" ").append("isUp true");
+        //                sb.append("\n");
+        //            }
+        //            String catalogDiffCommands = sb.toString();
+        //            clusterUpdate(catalogDiffCommands);
+        //
+        //            // update the SafteyState in the initiators
+        //            for (SimpleDtxnInitiator dtxn : m_dtxns) {
+        //                dtxn.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
+        //            }
+        //
+        //            //Notify the export manager the cluster topology has changed
+        //            ExportManager.instance().notifyOfClusterTopologyChange();
+        //        }
+        //        else {
+        //            // clean up any connections made
+        //            messenger.rejoinForeignHostRollback();
+        //        }
+        //        recoveryLog.info("Setting lastNodeRejoinFinish_txnId to: " + currentTxnId);
+        //        lastNodeRejoinFinish_txnId = currentTxnId;
+        //
+        //        return null;
     }
 
     /** Last transaction ID at which the logging config updated.
@@ -1466,7 +1511,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 throw new RuntimeException("Trying to update logging config with an old transaction.");
             }
             System.out.println("Updating RealVoltDB logging config from txnid: " +
-                               lastLogUpdate_txnId + " to " + currentTxnId);
+                    lastLogUpdate_txnId + " to " + currentTxnId);
             lastLogUpdate_txnId = currentTxnId;
             VoltLogger.configure(xmlConfig);
         }
@@ -1510,8 +1555,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             else if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
                 throw new RuntimeException("Trying to update main catalog context with diff " +
-                "commands generated for an out-of date catalog. Expected catalog version: " +
-                expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
+                        "commands generated for an out-of date catalog. Expected catalog version: " +
+                        expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
             }
 
             // 0. A new catalog! Update the global context and the context tracker
@@ -1617,7 +1662,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
         out.print("\n\n--reportsection\nContent-Type: text/plain\n\nClientInterface Report\n");
         for (ClientInterface ci : getClientInterfaces()) {
-          out.print(ci.toString() + "\n");
+            out.print(ci.toString() + "\n");
         }
 
         out.print("\n\n--reportsection\nContent-Type: text/plain\n\nLocalSite Report\n");
@@ -1642,14 +1687,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public synchronized void onExecutionSiteRecoveryCompletion(long transferred) {
         m_executionSiteRecoveryFinish = System.currentTimeMillis();
         m_executionSiteRecoveryTransferred = transferred;
-        m_executionSitesRecovered = true;
         onRecoveryCompletion();
     }
 
     private void onRecoveryCompletion() {
-        if (!m_executionSitesRecovered || !m_agreementSiteRecovered) {
-            return;
-        }
         try {
             m_testBlockRecoveryCompletion.acquire();
         } catch (InterruptedException e) {}
@@ -1742,7 +1783,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             hostLog.info("Changing replication role from " + m_replicationRole +
-                         " to " + role);
+                    " to " + role);
             m_replicationRole = role;
             for (ClientInterface ci : m_clientInterfaces) {
                 ci.setReplicationRole(m_replicationRole);
@@ -1754,18 +1795,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public ReplicationRole getReplicationRole()
     {
         return m_replicationRole;
-    }
-
-    /**
-     * Get the metadata map for the wholes cluster.
-     * Note: this may include failed nodes so check for live ones
-     *  and filter this if needed.
-     *
-     * Metadata is currently a JSON object
-     */
-    @Override
-    public Map<Integer, String> getClusterMetadataMap() {
-        return m_clusterMetadata;
     }
 
     /**
@@ -1800,8 +1829,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 ci.startAcceptingConnections();
             } catch (IOException e) {
                 hostLog.l7dlog(Level.FATAL,
-                               LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
-                               e);
+                        LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
+                        e);
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
         }
@@ -1816,31 +1845,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public synchronized void onAgreementSiteRecoveryCompletion() {
-        m_agreementSiteRecovered = true;
-        onRecoveryCompletion();
-    }
-
-    @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
     }
 
     @Override
-    public synchronized void recoveryComplete() {
-        m_recovering = false;
-        hostLog.info("Node recovery completed");
-    }
-
-    @Override
     public ScheduledFuture<?> scheduleWork(Runnable work,
-                             long initialDelay,
-                             long delay,
-                             TimeUnit unit) {
+            long initialDelay,
+            long delay,
+            TimeUnit unit) {
         if (delay > 0) {
             return m_periodicWorkThread.scheduleWithFixedDelay(work,
-                                                        initialDelay, delay,
-                                                        unit);
+                    initialDelay, delay,
+                    unit);
         } else {
             return m_periodicWorkThread.schedule(work, initialDelay, unit);
         }
@@ -1874,6 +1891,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public void handleMailboxUpdate(Map<MailboxType, List<MailboxNodeContent>> mailboxes) {
         SiteTracker oldTracker = m_siteTracker;
         m_siteTracker = new SiteTracker(m_myHostId, mailboxes);
+
         if (m_validateConfiguredNumberOfPartitionsOnMailboxUpdate) {
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
                 VoltDB.crashGlobalVoltDB(
@@ -1888,11 +1906,45 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         true, null);
             }
         }
+        /*
+         * Check for sites being removed,
+         * added
+         */
         if (oldTracker != null) {
-            HashSet<Long> delta = new HashSet<Long>(oldTracker.m_allSitesImmutable);
-            delta.removeAll(m_siteTracker.m_allSitesImmutable);
-            if (!delta.isEmpty()) {
-                m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(delta)));
+            HashSet<Long> deltaRemoved = new HashSet<Long>(oldTracker.m_allSitesImmutable);
+            deltaRemoved.removeAll(m_siteTracker.m_allSitesImmutable);
+            if (!deltaRemoved.isEmpty()) {
+                m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(deltaRemoved)));
+            }
+
+            HashSet<Long> deltaAdded = new HashSet<Long>(m_siteTracker.m_allSitesImmutable);
+            deltaAdded.removeAll(oldTracker.m_allSitesImmutable);
+            List<Future<?>> updateTasks = new ArrayList<Future<?>>();
+            if (!deltaAdded.isEmpty()) {
+                for (ClientInterface ci : getClientInterfaces()) {
+                    ci.notifySitesAdded(deltaAdded);
+                }
+                for (ExecutionSite es : getLocalSites().values()) {
+                    updateTasks.add(es.notifySitesAdded());
+                }
+            }
+
+            /*
+             * Waiting for the entire node to be notified could cause issues
+             * If the join occurs during failure detection it is possible
+             * for things to deadlock
+             */
+            boolean hadException = false;
+            for (Future<?> task : updateTasks) {
+                try {
+                    task.get();
+                } catch (Exception e) {
+                    hadException = true;
+                    hostLog.fatal("Error processing topology update at execution site", e);
+                }
+            }
+            if (hadException) {
+                VoltDB.crashLocalVoltDB("Error processing topology update", false, null);
             }
         }
     }

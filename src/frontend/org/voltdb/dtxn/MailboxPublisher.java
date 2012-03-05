@@ -26,23 +26,24 @@ import org.voltdb.VoltZK.MailboxType;
 
 public class MailboxPublisher {
     private final JSONObject m_mailboxes = new JSONObject();
-    private final String m_publishRoot;
-    private String m_publishedPath;
-    public MailboxPublisher(String publishRoot) {
-        m_publishRoot = publishRoot;
+    private final String m_publishPath;
+    private boolean publishedOnce = false;
+    public MailboxPublisher(String publishPath) {
+        m_publishPath = publishPath;
     }
 
     public synchronized void publish(ZooKeeper zk) {
         try {
             byte payload[] = m_mailboxes.toString(4).getBytes("UTF-8");
-            if (m_publishedPath == null) {
-                m_publishedPath = zk.create(
-                        m_publishRoot + "/mailbox",
+            if (!publishedOnce) {
+                zk.create(
+                        m_publishPath ,
                         payload,
                         Ids.OPEN_ACL_UNSAFE,
-                        CreateMode.EPHEMERAL_SEQUENTIAL);
+                        CreateMode.EPHEMERAL);
+                publishedOnce = true;
             } else {
-                zk.setData(m_publishRoot, payload, -1);
+                zk.setData(m_publishPath, payload, -1);
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

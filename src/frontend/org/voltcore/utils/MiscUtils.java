@@ -17,7 +17,6 @@
 package org.voltcore.utils;
 
 import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -25,6 +24,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
@@ -32,7 +33,6 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -456,6 +456,9 @@ public class MiscUtils {
     }
 
     public static byte[] urlToBytes(String url) {
+        if (url == null) {
+            return null;
+        }
         try {
             // get the URL/path for the deployment and prep an InputStream
             InputStream input = null;
@@ -488,5 +491,13 @@ public class MiscUtils {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static String throwableToString(Throwable t) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        t.printStackTrace(pw);
+        pw.flush();
+        return sw.toString();
     }
 }

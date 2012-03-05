@@ -332,20 +332,22 @@ public class VoltDB {
             }
 
             // require deployment file location
-            if (m_pathToDeployment == null) {
-                isValid = false;
-                hostLog.fatal("The deployment file location is missing.");
-            } else if (m_pathToDeployment.equals("")) {
-                isValid = false;
-                hostLog.fatal("The deployment file location is empty.");
-            }
-
-            if (m_replicationRole == ReplicationRole.REPLICA) {
-                if (m_startAction == START_ACTION.RECOVER) {
+            if (m_rejoinToHostAndPort == null) {
+                if (m_pathToDeployment == null) {
                     isValid = false;
-                    hostLog.fatal("Replica cluster only supports create database");
-                } else {
-                    m_startAction = START_ACTION.CREATE;
+                    hostLog.fatal("The deployment file location is missing.");
+                } else if (m_pathToDeployment.equals("")) {
+                    isValid = false;
+                    hostLog.fatal("The deployment file location is empty.");
+                }
+
+                if (m_replicationRole == ReplicationRole.REPLICA) {
+                    if (m_startAction == START_ACTION.RECOVER) {
+                        isValid = false;
+                        hostLog.fatal("Replica cluster only supports create database");
+                    } else {
+                        m_startAction = START_ACTION.CREATE;
+                    }
                 }
             }
 

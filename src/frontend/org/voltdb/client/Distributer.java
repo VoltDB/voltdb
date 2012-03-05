@@ -18,6 +18,7 @@
 package org.voltdb.client;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -38,18 +39,12 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -83,8 +78,8 @@ class Distributer {
 
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
-            Executors.newSingleThreadScheduledExecutor(
-                    MiscUtils.getThreadFactory("VoltDB Client Reaper Thread"));
+        Executors.newSingleThreadScheduledExecutor(
+                MiscUtils.getThreadFactory("VoltDB Client Reaper Thread"));
     ScheduledFuture<?> m_timeoutReaperHandle;
 
     /**
@@ -248,10 +243,11 @@ class Distributer {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final HashMap<Long, CallbackBookeeping> m_callbacks;
         private final HashMap<String, ProcedureStats> m_stats
-            = new HashMap<String, ProcedureStats>();
+        = new HashMap<String, ProcedureStats>();
         private final int m_hostId;
         private final long m_connectionId;
         private Connection m_connection;
+        private final InetSocketAddress m_socketAddress;
         private String m_hostname;
         private int m_port;
         private boolean m_isConnected = true;
@@ -267,10 +263,11 @@ class Distributer {
         private long m_invocationErrors = 0;
         private long m_lastInvocationErrors = 0;
 
-        public NodeConnection(long ids[]) {
+        public NodeConnection(long ids[], InetSocketAddress socketAddress) {
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
             m_hostId = (int)ids[0];
             m_connectionId = ids[1];
+            m_socketAddress = socketAddress;
         }
 
         public void createWork(long handle, String name, ByteBuffer c, ProcedureCallback callback) {
@@ -279,7 +276,7 @@ class Distributer {
                     final ClientResponse r = new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
                             "Connection to database host (" + m_hostname +
-                            ") was lost before a response was received");
+                    ") was lost before a response was received");
                     try {
                         callback.clientCallback(r);
                     } catch (Exception e) {
@@ -418,9 +415,9 @@ class Distributer {
                 //Invoke callbacks for all queued invocations with a failure response
                 final ClientResponse r =
                     new ClientResponseImpl(
-                        ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                        "Connection to database host (" + m_hostname +
-                        ") was lost before a response was received");
+                            ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                            "Connection to database host (" + m_socketAddress +
+                    ") was lost before a response was received");
                 for (final CallbackBookeeping callBk : m_callbacks.values()) {
                     try {
                         callBk.callback.clientCallback(r);
@@ -550,57 +547,58 @@ class Distributer {
         // schedule the task that looks for timed-out proc calls and connections
         m_timeoutReaperHandle = m_ex.scheduleAtFixedRate(new CallExpiration(), 1, 1, TimeUnit.SECONDS);
 
-//        new Thread() {
-//            @Override
-//            public void run() {
-//                long lastBytesRead = 0;
-//                long lastBytesWritten = 0;
-//                long lastRuntime = System.currentTimeMillis();
-//                try {
-//                    while (true) {
-//                        Thread.sleep(10000);
-//                        final long now = System.currentTimeMillis();
-//                        Map<Long, Pair<String, long[]>> stats = m_network.getIOStats(false);
-//                        long statsNums[] = stats.get(-1).getSecond();
-//                        final long read = statsNums[0];
-//                        final long written = statsNums[1];
-//                        final long readDelta = read - lastBytesRead;
-//                        final long writeDelta = written - lastBytesWritten;
-//                        final long timeDelta = now - lastRuntime;
-//                        lastRuntime = now;
-//                        final double seconds = timeDelta / 1000.0;
-//                        final double megabytesRead = readDelta / (double)(1024 * 1024);
-//                        final double megabytesWritten = writeDelta / (double)(1024 * 1024);
-//                        final double readRate = megabytesRead / seconds;
-//                        final double writeRate = megabytesWritten / seconds;
-//                        lastBytesRead = read;
-//                        lastBytesWritten = written;
-//                        System.err.printf("Read rate %.2f Write rate %.2f\n", readRate, writeRate);
-//                    }
-//                } catch (Exception e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }.start();
+        //        new Thread() {
+        //            @Override
+        //            public void run() {
+        //                long lastBytesRead = 0;
+        //                long lastBytesWritten = 0;
+        //                long lastRuntime = System.currentTimeMillis();
+        //                try {
+        //                    while (true) {
+        //                        Thread.sleep(10000);
+        //                        final long now = System.currentTimeMillis();
+        //                        Map<Long, Pair<String, long[]>> stats = m_network.getIOStats(false);
+        //                        long statsNums[] = stats.get(-1).getSecond();
+        //                        final long read = statsNums[0];
+        //                        final long written = statsNums[1];
+        //                        final long readDelta = read - lastBytesRead;
+        //                        final long writeDelta = written - lastBytesWritten;
+        //                        final long timeDelta = now - lastRuntime;
+        //                        lastRuntime = now;
+        //                        final double seconds = timeDelta / 1000.0;
+        //                        final double megabytesRead = readDelta / (double)(1024 * 1024);
+        //                        final double megabytesWritten = writeDelta / (double)(1024 * 1024);
+        //                        final double readRate = megabytesRead / seconds;
+        //                        final double writeRate = megabytesWritten / seconds;
+        //                        lastBytesRead = read;
+        //                        lastBytesWritten = written;
+        //                        System.err.printf("Read rate %.2f Write rate %.2f\n", readRate, writeRate);
+        //                    }
+        //                } catch (Exception e) {
+        //                    e.printStackTrace();
+        //                }
+        //            }
+        //        }.start();
     }
 
     void createConnection(String host, String program, String password, int port)
-        throws UnknownHostException, IOException
+    throws UnknownHostException, IOException
     {
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(password);
         createConnectionWithHashedCredentials(host, program, hashedPassword, port);
     }
 
     synchronized void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
-        throws UnknownHostException, IOException
+    throws UnknownHostException, IOException
     {
-        final Object connectionStuff[] =
+        final Object socketChannelAndInstanceIdAndBuildString[] =
             ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port);
-        final SocketChannel aChannel = (SocketChannel)connectionStuff[0];
-        final long numbers[] = (long[])connectionStuff[1];
+        InetSocketAddress address = new InetSocketAddress(host, port);
+        final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
+        final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         if (m_clusterInstanceId == null) {
-            long timestamp = numbers[2];
-            int addr = (int)numbers[3];
+            long timestamp = instanceIdWhichIsTimestampAndLeaderIp[2];
+            int addr = (int)instanceIdWhichIsTimestampAndLeaderIp[3];
             m_clusterInstanceId = new Object[] { timestamp, addr };
             if (m_statsLoader != null) {
                 try {
@@ -610,16 +608,16 @@ class Distributer {
                 }
             }
         } else {
-            if (!(((Long)m_clusterInstanceId[0]).longValue() == numbers[2]) ||
-                !(((Integer)m_clusterInstanceId[1]).longValue() == numbers[3])) {
+            if (!(((Long)m_clusterInstanceId[0]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[2]) ||
+                    !(((Integer)m_clusterInstanceId[1]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[3])) {
                 aChannel.close();
                 throw new IOException(
                         "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
-                        + " and server's was " + numbers[2] + "," + numbers[3]);
+                                                                                                                         + " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
             }
         }
-        m_buildString = (String)connectionStuff[2];
-        NodeConnection cxn = new NodeConnection(numbers);
+        m_buildString = (String)socketChannelAndInstanceIdAndBuildString[2];
+        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
         m_connections.add(cxn);
         Connection c = m_network.registerChannel( aChannel, cxn);
         cxn.m_hostname = c.getHostnameOrIP();
@@ -627,7 +625,7 @@ class Distributer {
         cxn.m_connection = c;
     }
 
-//    private HashMap<String, Long> reportedSizes = new HashMap<String, Long>();
+    //    private HashMap<String, Long> reportedSizes = new HashMap<String, Long>();
 
     /**
      * Queue invocation on first node connection without backpressure. If there is none with without backpressure
@@ -642,7 +640,7 @@ class Distributer {
             ProcedureInvocation invocation,
             ProcedureCallback cb,
             final boolean ignoreBackpressure)
-        throws NoConnectionsException {
+    throws NoConnectionsException {
         NodeConnection cxn = null;
         boolean backpressure = true;
 
@@ -688,16 +686,16 @@ class Distributer {
                 throw new RuntimeException(e);
             }
             cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb);
-//            final String invocationName = invocation.getProcName();
-//            if (reportedSizes.containsKey(invocationName)) {
-//                if (reportedSizes.get(invocationName) < c.b.remaining()) {
-//                    System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining() + " which is greater then last value of " + reportedSizes.get(invocationName));
-//                    reportedSizes.put(invocationName, (long)c.b.remaining());
-//                }
-//            } else {
-//                reportedSizes.put(invocationName, (long)c.b.remaining());
-//                System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining());
-//            }
+            //            final String invocationName = invocation.getProcName();
+            //            if (reportedSizes.containsKey(invocationName)) {
+            //                if (reportedSizes.get(invocationName) < c.b.remaining()) {
+            //                    System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining() + " which is greater then last value of " + reportedSizes.get(invocationName));
+            //                    reportedSizes.put(invocationName, (long)c.b.remaining());
+            //                }
+            //            } else {
+            //                reportedSizes.put(invocationName, (long)c.b.remaining());
+            //                System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining());
+            //            }
 
 
         }
@@ -729,8 +727,8 @@ class Distributer {
                 continue;
             }
             try {
-               csl.uncaughtException(cb, r, t);
-               handledByClient = true;
+                csl.uncaughtException(cb, r, t);
+                handledByClient = true;
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -936,7 +934,7 @@ class Distributer {
                                 invocationsCompleted,
                                 invocationAborts,
                                 invocationErrors
-                                );
+                        );
                     }
                 }
             }
@@ -948,7 +946,7 @@ class Distributer {
         final Long now = System.currentTimeMillis();
         final VoltTable retval = new VoltTable(connectionStatsColumns);
         final Map<Long, Pair<String,long[]>> networkStats =
-                        m_network.getIOStats(interval);
+            m_network.getIOStats(interval);
         long totalInvocations = 0;
         long totalAbortedInvocations = 0;
         long totalFailedInvocations = 0;
