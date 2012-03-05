@@ -474,4 +474,10 @@ public class MockVoltDB implements VoltDBInterface
     public MailboxPublisher getMailboxPublisher() {
         return m_mailboxPublisher;
     }
+
+    @Override
+    public void recoveryComplete() {
+        // TODO Auto-generated method stub
+
+    }
 }

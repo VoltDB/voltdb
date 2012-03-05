@@ -453,7 +453,7 @@ public class SnapshotSiteProcessor {
     private static void logSnapshotCompleteToZK(long txnId, int numHosts, boolean snapshotSuccess) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
-        final String snapshotPath = VoltZK.completed_snapshots + txnId;
+        final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
         boolean success = false;
         while (!success) {
             Stat stat = new Stat();
@@ -499,7 +499,7 @@ public class SnapshotSiteProcessor {
             TreeSet<String> snapshots = new TreeSet<String>(zk.getChildren(VoltZK.completed_snapshots, false));
             while (snapshots.size() > 30) {
                 try {
-                    zk.delete(VoltZK.completed_snapshots + snapshots.first(), -1);
+                    zk.delete(VoltZK.completed_snapshots + "/" + snapshots.first(), -1);
                 } catch (NoNodeException e) {}
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB(
@@ -513,7 +513,7 @@ public class SnapshotSiteProcessor {
 
         try {
             VoltDB.instance().getHostMessenger().getZK().delete(
-                    VoltZK.nodes_currently_snapshotting + VoltDB.instance().getHostMessenger().getHostId(), -1);
+                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
         } catch (NoNodeException e) {
             hostLog.warn("Expect the snapshot node to already exist during deletion", e);
         } catch (Exception e) {

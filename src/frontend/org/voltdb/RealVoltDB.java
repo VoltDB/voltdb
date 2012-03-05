@@ -443,6 +443,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              * Cache the first Site from the catalog and only do the setup once the other threads have been started.
              */
             Mailbox localThreadMailbox = siteMailboxes.poll();
+            ((org.voltcore.messaging.SiteMailbox)localThreadMailbox).setCommandLog(m_commandLog);
             m_currentThreadSite = null;
             for (Mailbox mailbox : siteMailboxes) {
                 long site = mailbox.getHSId();
@@ -450,6 +451,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
                 // start a local site
                 if (sitesHostId == m_myHostId) {
+                    ((org.voltcore.messaging.SiteMailbox)mailbox).setCommandLog(m_commandLog);
                     ExecutionSiteRunner runner =
                         new ExecutionSiteRunner(mailbox,
                                 m_catalogContext,
@@ -1847,6 +1849,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
+    }
+
+    @Override
+    public synchronized void recoveryComplete() {
+        m_recovering = false;
+        hostLog.info("Node recovery completed");
     }
 
     @Override

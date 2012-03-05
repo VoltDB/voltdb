@@ -20,9 +20,39 @@ package org.voltcore.messaging;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Set;
+import java.util.concurrent.Semaphore;
+
+import org.voltdb.CatalogContext;
+import org.voltdb.CommandLog;
+import org.voltdb.messaging.InitiateTaskMessage;
 
 public class SiteMailbox implements Mailbox {
 
+    private CommandLog m_commandLog = new CommandLog() {
+        @Override
+        public void init(CatalogContext context, long txnId) {}
+        @Override
+        public void initForRejoin(CatalogContext context, long txnId,
+                long faultSequenceNumber, Set<Long> failedSites) {}
+        @Override
+        public boolean needsInitialization() {
+            return false;
+        }
+        @Override
+        public void log(InitiateTaskMessage message) {}
+        @Override
+        public void shutdown() throws InterruptedException {}
+        @Override
+        public Semaphore logFault(Set<Long> failedSites, Set<Long> faultedTxns) {
+            return null;
+        }
+        @Override
+        public void logHeartbeat(long txnId) {}
+        @Override
+        public long getFaultSequenceNumber() {
+            return 0;
+        }};
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
     final long m_hsId;
@@ -33,6 +63,10 @@ public class SiteMailbox implements Mailbox {
         for (Subject s : Subject.values()) {
             m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
         }
+    }
+
+    public void setCommandLog(CommandLog log) {
+        m_commandLog = log;
     }
 
     @Override
@@ -47,6 +81,20 @@ public class SiteMailbox implements Mailbox {
 
     public void deliver(VoltMessage message, final boolean toFront) {
         assert(message != null);
+
+        /*
+         * Doing delivery here so that the delivery thread is the one interacting with the
+         * log instead of the receiver. This way only the network threads contend for the log.
+         */
+        if (message instanceof InitiateTaskMessage) {
+            InitiateTaskMessage msg = (InitiateTaskMessage)message;
+            if (!msg.isReadOnly()) {
+                m_commandLog.log(msg);
+            }
+        } else if (message instanceof HeartbeatMessage) {
+            HeartbeatMessage msg = (HeartbeatMessage)message;
+            m_commandLog.logHeartbeat(msg.getTxnId());
+        }
 
         final Deque<VoltMessage> dq = m_messages.get(message.getSubject());
         synchronized (this) {

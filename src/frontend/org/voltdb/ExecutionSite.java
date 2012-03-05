@@ -118,7 +118,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         new ExecutionSiteNodeFailureFaultHandler();
 
     final HashMap<String, ProcedureRunner> procs = new HashMap<String, ProcedureRunner>(16, (float) .1);
-    private final Mailbox m_mailbox;
+    final Mailbox m_mailbox;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;

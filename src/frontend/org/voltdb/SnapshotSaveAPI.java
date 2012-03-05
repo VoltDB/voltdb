@@ -181,12 +181,12 @@ public class SnapshotSaveAPI
         try {
             //This node shouldn't already exist... should have been erased when the last snapshot finished
             assert(VoltDB.instance().getHostMessenger().getZK().exists(
-                    VoltZK.nodes_currently_snapshotting + VoltDB.instance().getHostMessenger().getHostId(), false)
+                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), false)
                     == null);
             ByteBuffer snapshotTxnId = ByteBuffer.allocate(8);
             snapshotTxnId.putLong(txnId);
             VoltDB.instance().getHostMessenger().getZK().create(
-                    VoltZK.nodes_currently_snapshotting + VoltDB.instance().getHostMessenger().getHostId(),
+                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(),
                     snapshotTxnId.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, cb1, null);
         } catch (NodeExistsException e) {
             HOST_LOG.warn("Didn't expect the snapshot node to already exist", e);
@@ -273,7 +273,7 @@ public class SnapshotSaveAPI
         }
 
         ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
-        final String snapshotPath = VoltZK.completed_snapshots + txnId;
+        final String snapshotPath = VoltZK.completed_snapshots + "/" +  txnId;
         VoltDB.instance().getHostMessenger().getZK().create(
                 snapshotPath, nodeBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                 cb, null);

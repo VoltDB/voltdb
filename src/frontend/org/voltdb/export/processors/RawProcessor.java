@@ -84,46 +84,7 @@ public class RawProcessor implements ExportDataProcessor {
 
     private final Map<Integer, String> m_clusterMetadata = new HashMap<Integer, String>();
 
-    private void updateClusterMetadata() throws Exception {
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
-        List<String> metadataNodes = zk.getChildren(VoltZK.cluster_metadata, false);
-
-        Set<Integer> hostIds = new HashSet<Integer>();
-        for (String hostId : metadataNodes) {
-            hostIds.add(Integer.valueOf(hostId));
-        }
-
-        /*
-         * Remove anything that is no longer part of the cluster
-         */
-        Set<Integer> keySetCopy = new HashSet<Integer>(m_clusterMetadata.keySet());
-        keySetCopy.removeAll(hostIds);
-        for (Integer failedHostId : keySetCopy) {
-            m_clusterMetadata.remove(failedHostId);
-        }
-
-        /*
-         * Add anything that is new
-         */
-        Set<Integer> hostIdsCopy = new HashSet<Integer>(hostIds);
-        hostIdsCopy.removeAll(m_clusterMetadata.keySet());
-        List<Pair<Integer, ZKUtil.ByteArrayCallback>> callbacks =
-            new ArrayList<Pair<Integer, ZKUtil.ByteArrayCallback>>();
-        for (Integer hostId : hostIdsCopy) {
-            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
-            callbacks.add(Pair.of(hostId, cb));
-            zk.getData(VoltZK.cluster_metadata + "/" + hostId, false, cb, null);
-        }
-
-        for (Pair<Integer, ZKUtil.ByteArrayCallback> p : callbacks) {
-            Integer hostId = p.getFirst();
-            ZKUtil.ByteArrayCallback cb = p.getSecond();
-            try {
-               m_clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
-            } catch (KeeperException.NoNodeException e){}
-        }
-    }
 
     /**
      * As long as m_shouldContinue is true, the service will listen for new
@@ -262,7 +223,7 @@ public class RawProcessor implements ExportDataProcessor {
                 m_state = RawProcessor.CONNECTED;
 
                 try {
-                    updateClusterMetadata();
+                    VoltZK.updateClusterMetadata(m_clusterMetadata);
                 } catch (Exception e) {
                     protocolError(m, org.voltcore.utils.MiscUtils.throwableToString(e));
                 }

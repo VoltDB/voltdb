@@ -76,7 +76,7 @@ public class SnapshotCompletionMonitor {
             newChildren.removeAll(m_lastKnownSnapshots);
             m_lastKnownSnapshots = children;
             for (String newSnapshot : newChildren) {
-                String path = VoltZK.completed_snapshots + newSnapshot;
+                String path = VoltZK.completed_snapshots + "/" + newSnapshot;
                 try {
                     byte data[] = m_zk.getData(path, new Watcher() {
                         @Override

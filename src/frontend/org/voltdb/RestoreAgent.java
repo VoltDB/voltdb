@@ -286,6 +286,7 @@ SnapshotCompletionInterest {
             ClientResponseImpl resp = new ClientResponseImpl();
             try
             {
+                b.position(4);
                 resp.initFromBuffer(b);
             }
             catch (IOException ioe)

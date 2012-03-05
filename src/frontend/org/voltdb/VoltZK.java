@@ -18,14 +18,20 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.agreement.ZKUtil;
+import org.voltcore.utils.Pair;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -125,5 +131,46 @@ public class VoltZK {
             objects.add(content);
         }
         return objects;
+    }
+
+    public static void updateClusterMetadata(Map<Integer, String> clusterMetadata) throws Exception {
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+
+        List<String> metadataNodes = zk.getChildren(VoltZK.cluster_metadata, false);
+
+        Set<Integer> hostIds = new HashSet<Integer>();
+        for (String hostId : metadataNodes) {
+            hostIds.add(Integer.valueOf(hostId));
+        }
+
+        /*
+         * Remove anything that is no longer part of the cluster
+         */
+        Set<Integer> keySetCopy = new HashSet<Integer>(clusterMetadata.keySet());
+        keySetCopy.removeAll(hostIds);
+        for (Integer failedHostId : keySetCopy) {
+            clusterMetadata.remove(failedHostId);
+        }
+
+        /*
+         * Add anything that is new
+         */
+        Set<Integer> hostIdsCopy = new HashSet<Integer>(hostIds);
+        hostIdsCopy.removeAll(clusterMetadata.keySet());
+        List<Pair<Integer, ZKUtil.ByteArrayCallback>> callbacks =
+            new ArrayList<Pair<Integer, ZKUtil.ByteArrayCallback>>();
+        for (Integer hostId : hostIdsCopy) {
+            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+            callbacks.add(Pair.of(hostId, cb));
+            zk.getData(VoltZK.cluster_metadata + "/" + hostId, false, cb, null);
+        }
+
+        for (Pair<Integer, ZKUtil.ByteArrayCallback> p : callbacks) {
+            Integer hostId = p.getFirst();
+            ZKUtil.ByteArrayCallback cb = p.getSecond();
+            try {
+               clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
+            } catch (KeeperException.NoNodeException e){}
+        }
     }
 }
