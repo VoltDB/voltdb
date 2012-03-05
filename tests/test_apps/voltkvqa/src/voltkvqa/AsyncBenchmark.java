@@ -382,7 +382,6 @@ public class AsyncBenchmark
                                 final long dbCount = ByteBuffer.wrap(pairData.fetchRow(0).getVarbinary(1)).getLong(0);
                                 final String key = pairData.fetchRow(0).getString(0);
                                 final long hmCount = hm.get(key);
-                                System.out.printf("db: %d hm %d\n",dbCount,hmCount);
                                 if (dbCount < hmCount) {
                                     PutCountResults.incrementAndGet(1);
                                     System.out.printf("ERROR: Put count is low by %d in the database for key %s\n", hmCount - dbCount, key.replaceAll("\\s", ""));
