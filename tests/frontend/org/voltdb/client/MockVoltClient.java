@@ -280,7 +280,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
                                  String procName,
                                  Object... parameters) throws IOException,
                                                       NoConnectionsException {
-        System.out.println("Received procedure call for " + procName + " with original TXN ID: " + originalTxnId);
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
