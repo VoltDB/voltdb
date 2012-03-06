@@ -324,11 +324,10 @@ public class AsyncBenchmark
             // Dump statistics to a CSV file
             Con.saveStatistics(csv);
 
-            Con.close();
-
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
         }
+
         catch(org.voltdb.client.NoConnectionsException x)
         {
             System.out.println("Exception: " + x);
@@ -355,7 +354,7 @@ public class AsyncBenchmark
             System.out.println("\n\n-------------------------------------------------------------------------------------\n");
             System.out.print("Check Put counts against database... \n");
 
-            //Keep some store results [key count, error count, difference]
+            //Keep some store results [db key count, error count, difference]
             PutCountResults.set(0, 0l);
             PutCountResults.set(1, 0l);
             PutCountResults.set(2, 0l);
@@ -370,21 +369,19 @@ public class AsyncBenchmark
                     @Override
                     public void clientCallback(ClientResponse response) throws Exception
                     {
-                        if (response.getStatus() == ClientResponse.SUCCESS)
-                        {
-                            PutCountResults.incrementAndGet(0);
+                        if (response.getStatus() == ClientResponse.SUCCESS) {
                             final VoltTable pairData = response.getResults()[0];
-                            if (pairData.getRowCount() == 0) {
-                                PutCountResults.incrementAndGet(1);
-                                //System.out.print("ERROR: We're missing a row in the database\n");
-                            }
-                            else {
-                                final long dbCount = ByteBuffer.wrap(pairData.fetchRow(0).getVarbinary(1)).getLong(0);
+                            if (pairData.getRowCount() != 0) {
+                                PutCountResults.incrementAndGet(0);
                                 final String key = pairData.fetchRow(0).getString(0);
                                 final long hmCount = hm.get(key);
+                                final long dbCount = ByteBuffer.wrap(pairData.fetchRow(0).getVarbinary(1)).getLong(0);
+
                                 if (dbCount < hmCount) {
                                     PutCountResults.incrementAndGet(1);
-                                    System.out.printf("ERROR: Put count is low by %d in the database for key %s\n", hmCount - dbCount, key.replaceAll("\\s", ""));
+                                    PutCountResults.addAndGet(2, hmCount - dbCount);
+                                    System.out.printf("ERROR: Key %s: count in db '%d' is less than client expected '%d'\n",
+                                                      key.replaceAll("\\s", ""), dbCount, hmCount);
                                 }
                             }
                         }
@@ -401,14 +398,16 @@ public class AsyncBenchmark
 
             //Wait for all the responses
             Con.drain();
-            if (PutCountResults.get(1) == 0){
-                System.out.println("\n-------------------\nDatabase Put counts match\n");
+            System.out.printf("\n\t%10d\tKV Rows Checked\n",hm.size());
+            System.out.printf("\t%10d\tKV Rows Found in database\n", PutCountResults.get(0));
+            System.out.printf("\t%10d\tKV Rows Missing in database\n",hm.size() - PutCountResults.get(0));
+            System.out.printf("\n\t%10d\tKV Rows are Correct\n", PutCountResults.get(0)- PutCountResults.get(1) );
+            System.out.printf("\t%10d\tKV Rows are Incorrect (off by %d Puts)\n", PutCountResults.get(1), PutCountResults.get(2));
+
+            if (PutCountResults.get(0) == hm.size() && PutCountResults.get(1) == 0){
+                System.out.println("\n-------------------\nGood News:  Database Put counts match\n");
             }
             else {
-                System.out.printf("\n\n ERROR! Database Put counts don't match for %d keys out of %d\n",
-                        PutCountResults.get(1),PutCountResults.get(0));
-                System.out.printf("  Count in database is low by %d puts\n",
-                        PutCountResults.get(2));
                 System.exit(1);
             }
         }
