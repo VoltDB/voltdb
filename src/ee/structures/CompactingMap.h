@@ -341,7 +341,6 @@ void CompactingMap<Key, Data, Compare>::erase(TreeNode *z) {
 template<typename Key, typename Data, typename Compare>
 typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, Compare>::lookup(const Key &key) {
     TreeNode *x = m_root;
-    TreeNode *y = &NIL;
     TreeNode *retval = &NIL;
     while (x != &NIL) {
         int cmp = m_comper(x->key, key);
@@ -349,12 +348,10 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
             x = x->right;
         }
         else if (cmp > 0) {
-            y = x;
             x = x->left;
         }
         else if (cmp == 0) {
             retval = x;
-            y = x;
             x = x->left;
         }
     }
