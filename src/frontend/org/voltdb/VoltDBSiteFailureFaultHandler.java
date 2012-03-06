@@ -17,25 +17,22 @@
 
 package org.voltdb;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.MiscUtils;
 
-class VoltDBNodeFailureFaultHandler implements FaultHandler {
+class VoltDBSiteFailureFaultHandler implements FaultHandler {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     private final RealVoltDB m_rvdb;
 
-    VoltDBNodeFailureFaultHandler(RealVoltDB realVoltDB) {
+    VoltDBSiteFailureFaultHandler(RealVoltDB realVoltDB) {
         m_rvdb = realVoltDB;
     }
 
