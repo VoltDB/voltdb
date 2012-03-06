@@ -218,9 +218,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             VoltTable[] results = new VoltTable[] {result};
             ClientResponseImpl response = new ClientResponseImpl(ClientResponse.SUCCESS,
                                                                  results, null);
-            //ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-            //buf.putInt(buf.capacity() - 4);
-            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
+            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
             response.flattenToBuffer(buf);
             buf.flip();
             ((WriteStream) clientData).enqueue(buf);
