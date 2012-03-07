@@ -268,6 +268,8 @@ public class LocalCluster implements VoltServerConfig {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        } else {
+            subroot = m_subRoots.get(0);
         }
 
         // Make the local Configuration object...
@@ -623,6 +625,11 @@ public class LocalCluster implements VoltServerConfig {
         long start = 0;
         try {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
+            // This shouldn't collide but apparently it sucks.
+            // Bump it to avoid collisions on rejoin.
+            if (m_debug) {
+                rejoinCmdLn.debugPort(portGenerator.next());
+            }
             rejoinCmdLn.rejoinHostAndPort(rejoinHost + ":" + String.valueOf(portNoToRejoin));
 
             m_procBuilder.command().clear();
