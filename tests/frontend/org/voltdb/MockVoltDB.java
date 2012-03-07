@@ -36,6 +36,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
@@ -98,35 +100,41 @@ public class MockVoltDB implements VoltDBInterface
             obj.put("httpPort", httpPort);
             obj.put("drPort", drPort);
             m_localMetadata = obj.toString(4);
+
+            m_catalog = new Catalog();
+            m_catalog.execute("add / clusters " + m_clusterName);
+            m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
+                              m_databaseName);
+            Cluster cluster = m_catalog.getClusters().get(m_clusterName);
+            // Set a sane default for TestMessaging (at least)
+            cluster.setHeartbeattimeout(10000);
+            assert(cluster != null);
+
+            try {
+                m_hostMessenger.start();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            VoltZK.createPersistentZKNodes(m_hostMessenger.getZK());
+            m_hostMessenger.getZK().create(
+                    VoltZK.cluster_metadata + "/" + m_hostMessenger.getHostId(),
+                    getLocalMetadata().getBytes("UTF-8"),
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.EPHEMERAL);
+
+            m_hostMessenger.generateMailboxId(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
+            m_statsAgent = new StatsAgent();
+            m_statsAgent.getMailbox(m_hostMessenger,
+                    m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
+            for (MailboxType type : MailboxType.values()) {
+                m_mailboxMap.put(type, new LinkedList<MailboxNodeContent>());
+            }
+            m_mailboxMap.get(MailboxType.StatsAgent).add(
+                    new MailboxNodeContent(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID), null));
+            m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        m_catalog = new Catalog();
-        m_catalog.execute("add / clusters " + m_clusterName);
-        m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
-                          m_databaseName);
-        Cluster cluster = m_catalog.getClusters().get(m_clusterName);
-        // Set a sane default for TestMessaging (at least)
-        cluster.setHeartbeattimeout(10000);
-        assert(cluster != null);
-
-        try {
-            m_hostMessenger.start();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        VoltZK.createPersistentZKNodes(m_hostMessenger.getZK());
-
-        m_hostMessenger.generateMailboxId(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
-        m_statsAgent = new StatsAgent();
-        m_statsAgent.getMailbox(m_hostMessenger,
-                m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
-        for (MailboxType type : MailboxType.values()) {
-            m_mailboxMap.put(type, new LinkedList<MailboxNodeContent>());
-        }
-        m_mailboxMap.get(MailboxType.StatsAgent).add(
-                new MailboxNodeContent(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID), null));
-        m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
     }
 
     public Procedure addProcedureForTest(String name)
