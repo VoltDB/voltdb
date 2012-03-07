@@ -112,6 +112,12 @@ SnapshotCompletionInterest {
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
     private boolean m_planned = false;
+
+    /*
+     * Don't ask the leader elector if you are the leader
+     * it can give the wrong answer after the first election...
+     * Use the memoized field m_isLeader.
+     */
     private LeaderElector m_leaderElector = null;
 
     private TransactionInitiator m_initiator;
@@ -122,6 +128,7 @@ SnapshotCompletionInterest {
     private long m_truncationSnapshot = Long.MIN_VALUE;
 
     private final ZooKeeper m_zk;
+    private boolean m_isLeader = false;
 
     private final int[] m_allPartitions;
 
@@ -214,7 +221,7 @@ SnapshotCompletionInterest {
             try {
                 // Wait until either we're the leader or the snapshot TXNID node
                 // exists, then do the right thing.
-                while (!m_leaderElector.isLeader() &&
+                while (!m_isLeader &&
                         (m_zk.exists(SNAPSHOT_ID, null) == null))
                 {
                     Thread.sleep(200);
@@ -225,7 +232,7 @@ SnapshotCompletionInterest {
                  */
                 if (m_zk.exists(SNAPSHOT_ID, null) == null)
                 {
-                    if (m_leaderElector.isLeader())
+                    if (m_isLeader)
                     {
                         leader = true;
                         long txnId = 0;
@@ -537,6 +544,7 @@ SnapshotCompletionInterest {
         try {
             m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
                                                 new byte[0], null);
+            m_isLeader = m_leaderElector.isLeader();
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
                                      false, e);
@@ -1196,7 +1204,7 @@ SnapshotCompletionInterest {
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs
              */
-            if (m_leaderElector.isLeader()) {
+            if (m_isLeader) {
                 try {
                     try {
                         m_zk.create(VoltZK.truncation_snapshot_path,
