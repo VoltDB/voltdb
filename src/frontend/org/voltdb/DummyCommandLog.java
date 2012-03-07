@@ -51,6 +51,11 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
-    public void initForRejoin(CatalogContext context, long txnId,
-            long faultSequenceNumber, Set<Long> failedSites) {}
+    public void initForRejoin(CatalogContext context, long txnId, boolean isRejoin) {}
+
+    @Override
+    public void setTxnIdViableForRecovery(long txnId) {
+        // TODO Auto-generated method stub
+
+    }
 }

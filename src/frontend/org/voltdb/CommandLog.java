@@ -37,9 +37,7 @@ public interface CommandLog {
     *            The txnId of the truncation snapshot at the end of restore, or
     *            Long.MIN if there was none.
     */
-    public abstract void initForRejoin(CatalogContext context, long txnId,
-                                       long faultSequenceNumber,
-                                       Set<Long> failedSites);
+    public abstract void initForRejoin(CatalogContext context, long txnId, boolean isRejoin);
 
     public abstract boolean needsInitialization();
 
@@ -57,4 +55,6 @@ public interface CommandLog {
     public abstract void logHeartbeat(final long txnId);
 
     public abstract long getFaultSequenceNumber();
+
+    public abstract void setTxnIdViableForRecovery(long txnId);
 }

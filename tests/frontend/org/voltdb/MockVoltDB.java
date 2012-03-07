@@ -79,6 +79,13 @@ public class MockVoltDB implements VoltDBInterface
         this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
     }
 
+    /*
+     * Fake do nothing constructor...
+     */
+    public MockVoltDB(Object foo, Object bar) {
+
+    }
+
     public MockVoltDB(int clientPort, int adminPort, int httpPort, int drPort)
     {
         try {

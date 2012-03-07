@@ -78,6 +78,22 @@ public class SiteTracker {
 
     private long m_statsAgents[];
 
+    public SiteTracker() {
+        m_allExecutionSitesArray = null;
+        m_allPartitions = null;
+        m_hostId = 0;
+        m_hostsToInitiatorsImmutable = null;
+        m_hostsToOtherHSIdsImmutable = null;
+        m_partitionsToSitesImmutable = null;
+        m_hostsToPartitionsImmutable = null;
+        m_hostsToSitesImmutable = null;
+        m_numberOfHosts = 1;
+        m_numberOfExecutionSites = 0;
+        m_numberOfPartitions = 0;
+        m_otherHSIdsImmutable = null;
+        m_sitesToPartitionsImmutable = null;
+    }
+
     public SiteTracker(int hostId, Map<MailboxType, List<MailboxNodeContent>> mailboxes) {
         m_hostId = hostId;
         Map<Integer, List<Long>> hostsToSites =

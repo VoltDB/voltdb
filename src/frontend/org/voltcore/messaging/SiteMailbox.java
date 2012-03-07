@@ -33,8 +33,7 @@ public class SiteMailbox implements Mailbox {
         @Override
         public void init(CatalogContext context, long txnId) {}
         @Override
-        public void initForRejoin(CatalogContext context, long txnId,
-                long faultSequenceNumber, Set<Long> failedSites) {}
+        public void initForRejoin(CatalogContext context, long txnId, boolean isRejoin) {}
         @Override
         public boolean needsInitialization() {
             return false;
@@ -52,7 +51,10 @@ public class SiteMailbox implements Mailbox {
         @Override
         public long getFaultSequenceNumber() {
             return 0;
-        }};
+        }
+        @Override
+        public void setTxnIdViableForRecovery(long txnId) {}
+        };
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
     final long m_hsId;

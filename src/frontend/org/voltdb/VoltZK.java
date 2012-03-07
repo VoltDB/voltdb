@@ -42,7 +42,6 @@ public class VoltZK {
 
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String topology = "/db/topology";
-    public static final String unfaulted_hosts = "/db/unfaulted_hosts";
     public static final String deploymentBytes = "/db/deploymentBytes";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";
@@ -83,6 +82,7 @@ public class VoltZK {
             root,
             mailboxes,
             cluster_metadata,
+            operationMode,
     };
 
     /**
@@ -91,18 +91,11 @@ public class VoltZK {
     public static void createPersistentZKNodes(ZooKeeper zk) {
         LinkedList<ZKUtil.StringCallback> callbacks = new LinkedList<ZKUtil.StringCallback>();
         for (int i=0; i < VoltZK.ZK_HIERARCHY.length; i++) {
-                ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
-                callbacks.add(cb);
-                zk.create(VoltZK.ZK_HIERARCHY[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb, null);
+            ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
+            callbacks.add(cb);
+            zk.create(VoltZK.ZK_HIERARCHY[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb, null);
         }
         try {
-            ZKUtil.StringCallback callback = new ZKUtil.StringCallback();
-            zk.create(
-                    VoltZK.operationMode,
-                    null,
-                    Ids.OPEN_ACL_UNSAFE,
-                    CreateMode.PERSISTENT, callback, null);
-            callbacks.add(callback);
             for (ZKUtil.StringCallback cb : callbacks) {
                 cb.get();
             }

@@ -565,10 +565,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             if (m_commandLog != null && isRejoin) {
                 m_commandLog.initForRejoin(
-                        m_catalogContext, Long.MIN_VALUE,
-                        0,
-                        // m_messenger.getDiscoveredFaultSequenceNumber(),
-                        null);
+                        m_catalogContext, Long.MIN_VALUE, true);
             }
 
             if (!isRejoin) {
@@ -1380,6 +1377,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_computationService.awaitTermination(1, TimeUnit.DAYS);
             m_computationService = null;
             m_siteTracker = null;
+            m_catalogContext = null;
             m_mailboxPublisher = null;
 
             // probably unnecessary
@@ -1707,11 +1705,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
         try {
+            m_commandLog.setTxnIdViableForRecovery(
+                    TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
-            try {
-                zk.create(VoltZK.unfaulted_hosts, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            } catch (KeeperException.NodeExistsException e) {}
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
                 try {
                     zk.create(VoltZK.request_truncation_snapshot, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -1719,12 +1716,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             } else {
                 logRecoveryCompleted = true;
             }
-            ByteBuffer txnIdBuffer = ByteBuffer.allocate(8);
-            txnIdBuffer.putLong(TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
-            zk.create(
-                    VoltZK.unfaulted_hosts + m_messenger.getHostId(),
-                    txnIdBuffer.array(),
-                    Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
             if (logRecoveryCompleted) {
                 m_recovering = false;
                 hostLog.info("Node recovery completed");

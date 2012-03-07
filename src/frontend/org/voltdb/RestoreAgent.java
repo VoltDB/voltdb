@@ -94,7 +94,10 @@ SnapshotCompletionInterest {
     // to the previously used symbols.)
     private final static String RESTORE = VoltZK.restore;
     private final static String RESTORE_BARRIER = VoltZK.restore_barrier;
+    private final static String RESTORE_BARRIER2 = VoltZK.restore_barrier + "2";
     private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
+
+    private String m_generatedRestoreBarrier2;
 
     // Transaction ID of the restore sysproc
     private final static long RESTORE_TXNID = 1l;
@@ -194,16 +197,16 @@ SnapshotCompletionInterest {
                 } catch (InterruptedException e) {}
             }
         }
-    });
+    }, "Restore heartbeat thread");
 
     private final Runnable m_restorePlanner = new Runnable() {
         @Override
         public void run() {
-            /*
-             * In case the plans aren't generated yet, generate them now.
-             */
             if (!m_planned) {
                 findRestoreCatalog();
+//                VoltDB.crashLocalVoltDB("Restore planner should not be started " +
+//                        " without findRestoreCatalog already invoked",
+//                        false, null);
             }
 
             boolean leader = false;
@@ -506,6 +509,7 @@ SnapshotCompletionInterest {
     public Pair<Integer, String> findRestoreCatalog() {
         createZKDirectory(RESTORE);
         createZKDirectory(RESTORE_BARRIER);
+        createZKDirectory(RESTORE_BARRIER2);
 
         enterRestore();
 
@@ -537,6 +541,13 @@ SnapshotCompletionInterest {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
                                      false, e);
         }
+        try {
+            m_generatedRestoreBarrier2 = m_zk.create(RESTORE_BARRIER2 + "/counter", null,
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        } catch (Exception e) {
+            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
+                                     false, e);
+        }
     }
 
     /**
@@ -545,14 +556,16 @@ SnapshotCompletionInterest {
      */
     private void exitRestore() {
         try {
-            m_leaderElector.done();
-        } catch (Exception ignore) {}
+            m_zk.delete(m_generatedRestoreBarrier2, -1);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to delete zk node " + m_generatedRestoreBarrier2, false, e);
+        }
 
         LOG.debug("Waiting for all hosts to complete restore");
         List<String> children = null;
         while (true) {
             try {
-                children = m_zk.getChildren(RESTORE_BARRIER, false);
+                children = m_zk.getChildren(RESTORE_BARRIER2, false);
             } catch (KeeperException e2) {
                 VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
             } catch (InterruptedException e2) {
@@ -567,6 +580,10 @@ SnapshotCompletionInterest {
                 break;
             }
         }
+
+        try {
+            m_leaderElector.done();
+        } catch (Exception ignore) {}
 
         // Clean up the ZK snapshot ID node so that we're good for next time.
         try
