@@ -33,6 +33,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.BinaryPayloadMessage;
 import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.LocalObjectMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
@@ -95,23 +96,7 @@ public class StatsAgent {
     }
 
     public Mailbox getMailbox(final HostMessenger hostMessenger, final int siteId) {
-        m_mailbox = new Mailbox() {
-
-            @Override
-            public void send(int siteId, int mailboxId, VoltMessage message)
-                    throws MessagingException {
-                assert(message != null);
-                hostMessenger.send(siteId, mailboxId, message);
-            }
-
-            @Override
-            public void send(int[] siteIds, int mailboxId, VoltMessage message)
-                    throws MessagingException {
-                assert(message != null);
-                assert(siteIds != null);
-                hostMessenger.send(siteIds, mailboxId, message);
-            }
-
+        m_mailbox = new LocalMailbox(hostMessenger, siteId) {
             @Override
             public void deliver(final VoltMessage message) {
                 m_es.submit(new Runnable() {
@@ -121,47 +106,6 @@ public class StatsAgent {
                     }
                 });
             }
-
-            @Override
-            public void deliverFront(VoltMessage message) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recv() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(long timeout) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recv(Subject[] s) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s, long timeout) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public int getSiteId() {
-                return siteId;
-            }
-
         };
         return m_mailbox;
     }
