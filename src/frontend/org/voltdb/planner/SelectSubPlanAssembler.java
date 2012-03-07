@@ -22,11 +22,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
@@ -248,25 +251,53 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath) {
 
+        //Do we have a need for the distributed scan at all?
+        boolean needDistributedScan = false;
+        for (Table t : joinOrder) {
+            if (!needDistributedScan)
+                needDistributedScan = tableRequiresDistributedScan(t);
+            if (needDistributedScan)
+                break;
+        }
+        //Before we do the actual work we need to identify whether all the tables in the join are joined
+        //on a respective partition key or not. In the former case, all intermediate send/receive nodes
+        //for distributed tables can be replaced with a single send/receive pair at the very top of
+        //the generated access plan. See ENG-496 for more detailed explanation.
+        boolean joinOnPartition = (needDistributedScan) ?
+                AccessPath.isPartitionKeyEquality(joinOrder, accessPath) : true;
+
+        // do the actual work
+        AbstractPlanNode retv = getSelectSubPlanForAccessPathRecursive(joinOrder, accessPath, joinOnPartition);
+        // If join is on partition columns and there is at least one distributed table add Send/Receive node pair
+        if (joinOnPartition && needDistributedScan)
+            retv = addSendReceivePair(retv);
+        return retv;
+    }
+
+   /**
+     * Given a specific join order and access path set for that join order, construct the plan
+     * that gives the right tuples. This method is the meat of sub-plan-graph generation, but all
+     * of the smarts are probably done by now, so this is just boring actual construction.
+     * In case of all participant tables are joined on respective partition keys generation of
+     * Send/Received node pair is suppressed.
+     *
+     * @param joinOrder An array of tables in a specific join order.
+     * @param accessPath An array of access paths that match with the input tables.
+     * @param supressSendReceivePair indicator whether to suppress intermediate Send/Receive pairs or not
+     * @return A completed plan-sub-graph that should match the correct tuples from the
+     * correct tables.
+     */
+    private AbstractPlanNode getSelectSubPlanForAccessPathRecursive(Table[] joinOrder, AccessPath[] accessPath,
+            boolean supressSendReceivePair) {
+
         // recursive stopping condition:
         //
         // If there is one table to scan from, then just
         if (joinOrder.length == 1)
-            return getAccessPlanForTable(joinOrder[0], accessPath[0]);
+            return getAccessPlanForTable(joinOrder[0], accessPath[0], !supressSendReceivePair);
 
         // recursive step:
-        //
-        // create copies of the tails of the joinOrder and accessPath arrays
-        Table[] subJoinOrder = Arrays.copyOfRange(joinOrder, 1, joinOrder.length);
-        AccessPath[] subAccessPath = Arrays.copyOfRange(accessPath, 1, accessPath.length);
-
-        // recursively call this method to get the plan for the tail of the join order
-        AbstractPlanNode subPlan = getSelectSubPlanForAccessPath(subJoinOrder, subAccessPath);
-
-        // get all the clauses that join the applicable two tables
-        ArrayList<AbstractExpression> joinClauses = accessPath[0].joinExprs;
-
-        AbstractPlanNode nljAccessPlan = getAccessPlanForTable(joinOrder[0], accessPath[0]);
+        AbstractPlanNode nljAccessPlan = getAccessPlanForTable(joinOrder[0], accessPath[0], !supressSendReceivePair);
 
         /*
          * If the access plan for the table in the join order was for a
@@ -282,6 +313,18 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             nljAccessPlan = nljAccessPlan.getChild(0).getChild(0);
             nljAccessPlan.clearParents();
         }
+
+        //
+        // create copies of the tails of the joinOrder and accessPath arrays
+        Table[] subJoinOrder = Arrays.copyOfRange(joinOrder, 1, joinOrder.length);
+        AccessPath[] subAccessPath = Arrays.copyOfRange(accessPath, 1, accessPath.length);
+
+        // recursively call this method to get the plan for the tail of the join order
+        AbstractPlanNode subPlan =
+            getSelectSubPlanForAccessPathRecursive(subJoinOrder, subAccessPath, supressSendReceivePair);
+
+        // get all the clauses that join the applicable two tables
+        ArrayList<AbstractExpression> joinClauses = accessPath[0].joinExprs;
 
         AbstractPlanNode retval = null;
         if (nljAccessPlan instanceof IndexScanPlanNode) {
@@ -319,6 +362,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         /*
          * Now push back to the send receive pair that was squirreled away earlier.
+         * For joins of two partitioned tables on the partition key
+         * we don't actually need to generate more then one send/receive pair.
+         * See ENG-496 for more details
          */
         if (accessPlanIsSendReceive) {
             accessPlanTemp.getChild(0).clearChildren();
