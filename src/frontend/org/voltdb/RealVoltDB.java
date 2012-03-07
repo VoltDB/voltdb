@@ -294,6 +294,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_hasCatalog = new CountDownLatch(1);
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
+            m_replicationRole = m_config.m_replicationRole;
             m_replicationActive = false;
 
             m_computationService = Executors.newFixedThreadPool(
