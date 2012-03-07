@@ -1780,6 +1780,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     {
         if (m_replicationRole == null) {
             m_replicationRole = role;
+            for (ClientInterface ci : m_clientInterfaces) {
+                ci.setReplicationRole(m_replicationRole);
+            }
         }
         else if (role != ReplicationRole.REPLICA && m_replicationRole == ReplicationRole.REPLICA) {
             hostLog.info("Promoting replication role from replica to master.");

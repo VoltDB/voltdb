@@ -143,8 +143,8 @@ public class VoltDB {
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
 
-        /** replication role: master, replica */
-        public ReplicationRole m_replicationRole = ReplicationRole.NONE;
+        /** replication role. Give same default value as RealVoltDB.m_replicationRole. */
+        public ReplicationRole m_replicationRole = null;
 
         /**
          * At rejoin time an interface will be selected. It will be the
