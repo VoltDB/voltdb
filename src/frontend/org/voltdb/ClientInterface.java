@@ -1121,10 +1121,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchStatistics(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
-        // WAN uses the new StatsAgent. Other stats do not.
-        if ((params.m_params.length != 0) && (((String)params.toArray()[0]).equals("WAN"))) {
+        // DR uses the new StatsAgent. Other stats do not.
+        if ((params.m_params.length != 0) && (((String)params.toArray()[0]).equals("DR"))) {
             try {
-                VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "WAN");
+                VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "DR");
                 return null;
             } catch (Exception e) {
                 return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
@@ -1292,7 +1292,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         ccxn, buf.capacity(),
                         now);
             if (!success) {
-                // HACK: this return is for the WAN agent so that it
+                // HACK: this return is for the DR agent so that it
                 // will move along on duplicate replicated transactions
                 // reported by the slave cluster.  We report "SUCCESS"
                 // to keep the agent from choking.  ENG-2334

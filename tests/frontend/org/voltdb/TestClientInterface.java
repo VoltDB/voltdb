@@ -357,17 +357,17 @@ public class TestClientInterface {
     }
 
     /**
-     * WAN stats is not a txn, it goes to the stats agent directly.
+     * DR stats is not a txn, it goes to the stats agent directly.
      * @throws Exception
      */
     @Test
-    public void testWANStats() throws Exception {
-        ByteBuffer msg = createMsg("@Statistics", "WAN", 0);
+    public void testDRStats() throws Exception {
+        ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture());
-        assertEquals("WAN", captor.getValue());
+        assertEquals("DR", captor.getValue());
     }
 
     @Test

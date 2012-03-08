@@ -190,7 +190,7 @@ public class StatsAgent {
     }
 
     private void collectStatsImpl(Connection c, long clientHandle, String selector) throws Exception {
-        assert(selector.equals("WAN"));
+        assert(selector.equals("DR"));
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
             /*
              * Defensively check for an expired request not caught
@@ -239,7 +239,7 @@ public class StatsAgent {
         JSONObject obj = new JSONObject();
         obj.put("requestId", requestId);
         obj.put("returnAddress", m_mailbox.getHSId());
-        obj.put("selector", "WANNODE");
+        obj.put("selector", "DRNODE");
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         final SiteTracker st = VoltDB.instance().getSiteTracker();
         for (long agent : st.getStatsAgents()) {
@@ -299,19 +299,19 @@ public class StatsAgent {
     private void handleJSONMessage(JSONObject obj) throws Exception {
         String selectorString = obj.getString("selector");
         SysProcSelector selector = SysProcSelector.valueOf(selectorString);
-        if (selector == SysProcSelector.WANNODE) {
-            collectWANStats(obj);
+        if (selector == SysProcSelector.DRNODE) {
+            collectDRStats(obj);
         }
     }
 
-    private void collectWANStats(JSONObject obj) throws Exception {
+    private void collectDRStats(JSONObject obj) throws Exception {
         List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         long requestId = obj.getLong("requestId");
         long returnAddress = obj.getLong("returnAddress");
 
-        VoltTable partitionStats = getStats(SysProcSelector.WANPARTITION, catalogIds, false, now);
-        VoltTable nodeStats = getStats(SysProcSelector.WANNODE, catalogIds, false, now);
+        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, catalogIds, false, now);
+        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, catalogIds, false, now);
 
         /*
          * Send a response with no data since the stats is not supported
@@ -371,7 +371,7 @@ public class StatsAgent {
 
         ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogIds.get(0));
         //Let these two be null since they are for pro features
-        if (selector == SysProcSelector.WANNODE || selector == SysProcSelector.WANPARTITION) {
+        if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
             if (statsSources == null || statsSources.isEmpty()) {
                 return null;
             }

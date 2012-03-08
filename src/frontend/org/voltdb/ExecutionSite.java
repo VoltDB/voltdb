@@ -678,7 +678,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                              FaultType.NODE_FAILURE);
 
         // initialize the DR gateway
-        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "wan_overflow");
+        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "dr_overflow");
+
         m_partitionDRGateway =
             PartitionDRGateway.getInstance(partitionId, m_recovering,
                                            replicationActive, overflowDir);
@@ -2278,7 +2279,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     }
                     response.setResults(cr, itask);
                     // record the results of write transactions to the transaction state
-                    // this may be used to verify the WAN replica cluster gets the same value
+                    // this may be used to verify the DR replica cluster gets the same value
                     // skip for multi-partition txns because only 1 of k+1 partitions will
                     //  have the real results
                     if ((!itask.isReadOnly()) && itask.isSinglePartition()) {

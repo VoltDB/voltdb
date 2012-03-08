@@ -106,7 +106,7 @@ public class VoltDB {
         /** interface to use for backchannel comm (default: any) */
         public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
 
-        /** port number to use for WAN/DR channel (override in the deployment file) */
+        /** port number to use for DR channel (override in the deployment file) */
         public int m_drAgentPortStart = -1;
 
         /** information used to rejoin this new node to a cluster */
@@ -154,7 +154,7 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        public Integer m_leaderPort = DEFAULT_PORT;
+        public Integer m_leaderPort = DEFAULT_INTERNAL_PORT;
 
         public Configuration() { }
 

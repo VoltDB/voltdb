@@ -532,10 +532,10 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public boolean isWanReplicationAllowed() {
+            public boolean isDrReplicationAllowed() {
                 // TestExecutionSite (and probably others)
                 // use MockVoltDB without requiring unique
-                // zmq ports for the wan replicator. Note
+                // zmq ports for the DR replicator. Note
                 // that getReplicationActive(), above, is
                 // hardcoded to false, too.
                 return false;

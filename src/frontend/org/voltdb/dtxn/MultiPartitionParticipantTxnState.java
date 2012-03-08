@@ -83,7 +83,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         //where we aren't the coordinator because we are a replica of the coordinator.
         if (notice instanceof InitiateTaskMessage)
         {
-            // keep this around for DR/WAN purposes
+            // keep this around for DR purposes
             m_invocation = ((InitiateTaskMessage) notice).getStoredProcedureInvocation();
 
             if (notice.getCoordinatorHSId() == m_hsId) {

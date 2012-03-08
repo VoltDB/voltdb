@@ -103,7 +103,7 @@ public class TestStatsAgent {
                 { 42, "42" },
                 { 43, "43" }
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.WANPARTITION, 0, partitionSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRPARTITION, 0, partitionSource);
 
         List<VoltTable.ColumnInfo> nodeColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
                 new VoltTable.ColumnInfo( "c1", VoltType.STRING),
@@ -114,27 +114,27 @@ public class TestStatsAgent {
                 { "43", 43 },
                 { "42", 43 }
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.WANNODE, 0, nodeSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
 
         MockStatsSource.columns = partitionColumns;
         partitionSource = new MockStatsSource(new Object[][] {
                 { 44, "44" },
                 { 45, "45" }
         });
-        m_secondAgent.registerStatsSource(SysProcSelector.WANPARTITION, 0, partitionSource);
+        m_secondAgent.registerStatsSource(SysProcSelector.DRPARTITION, 0, partitionSource);
 
         MockStatsSource.columns = nodeColumns;
         nodeSource = new MockStatsSource(new Object[][] {
                 { "45", 44 },
                 { "44", 44 }
         });
-        m_secondAgent.registerStatsSource(SysProcSelector.WANNODE, 0, nodeSource);
+        m_secondAgent.registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
     }
 
     @Test
-    public void testCollectWANStats() throws Exception {
+    public void testCollectDRStats() throws Exception {
         createAndRegisterStats();
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -146,14 +146,14 @@ public class TestStatsAgent {
 
     @Test
     public void testCollectUnsupportedStats() throws Exception {
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
         VoltTable results[] = response.getResults();
         assertEquals(0, results.length);
         assertTrue(
-                "Requested statistic \"WAN\" is not supported in the current configuration".equals(
+                "Requested statistic \"DR\" is not supported in the current configuration".equals(
                 response.getStatusString()));
     }
 
@@ -162,7 +162,7 @@ public class TestStatsAgent {
         createAndRegisterStats();
         StatsAgent.STATS_COLLECTION_TIMEOUT = 300;
         MockStatsSource.delay = 200;
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
@@ -183,7 +183,7 @@ public class TestStatsAgent {
          * Generate a bunch of requests, should get backpressure on some of them
          */
         for (int ii = 0; ii < 12; ii++) {
-            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         }
 
         boolean hadBackpressure = false;
@@ -202,7 +202,7 @@ public class TestStatsAgent {
         /*
          * Now having recieved all responses, it should be possible to collect the stats
          */
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         ClientResponseImpl response = responses.take();
         verifyResults(response);
     }

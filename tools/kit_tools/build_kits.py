@@ -58,7 +58,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml clean dist.pro")
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Dallowreplication=false clean dist.pro")
 
 ################################################
 # COPY FILES
@@ -185,8 +185,8 @@ with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key
     assert version == version2
     buildCommunity()
     copyCommunityFilesToReleaseDir(releaseDir, version, "MAC")
-    buildPro()
-    copyEnterpriseFilesToReleaseDir(releaseDir, version, "MAC")
+    #buildPro()
+    #copyEnterpriseFilesToReleaseDir(releaseDir, version, "MAC")
 
 
 computeChecksums(releaseDir)
