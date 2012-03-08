@@ -30,6 +30,6 @@ public interface LicenseApi {
     public int maxHostcount();
     public Calendar expires();
     public boolean verify();
-    public boolean isWanReplicationAllowed();
+    public boolean isDrReplicationAllowed();
     public boolean isCommandLoggingAllowed();
 }

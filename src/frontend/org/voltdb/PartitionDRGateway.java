@@ -24,7 +24,7 @@ import org.voltdb.licensetool.LicenseApi;
 
 /**
  * Stub class that provides a gateway to the InvocationBufferServer when
- * WAN-based DR is enabled. If no DR, then it acts as a noop stub.
+ * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */
 public class PartitionDRGateway {
@@ -43,12 +43,12 @@ public class PartitionDRGateway {
     {
         final VoltDBInterface vdb = VoltDB.instance();
         LicenseApi api = vdb.getLicenseApi();
-        final boolean licensedToWAN = api.isWanReplicationAllowed();
+        final boolean licensedToDR = api.isDrReplicationAllowed();
 
         // if this is a primary cluster in a DR-enabled scenario
         //  try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToWAN) {
+        if (licensedToDR) {
             try {
                 Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
                 Object obj = pdrgiClass.newInstance();

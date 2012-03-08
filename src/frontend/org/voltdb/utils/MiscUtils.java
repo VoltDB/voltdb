@@ -129,7 +129,7 @@ public class MiscUtils {
                 }
 
                 @Override
-                public boolean isWanReplicationAllowed() {
+                public boolean isDrReplicationAllowed() {
                     return false;
                 }
 
@@ -214,10 +214,10 @@ public class MiscUtils {
             }
         }
 
-        // enforce wan replication constraint
+        // enforce DR replication constraint
         if (replicationRole == ReplicationRole.REPLICA) {
-            if (licenseApi.isWanReplicationAllowed() == false) {
-                hostLog.fatal("Warning, VoltDB license does not allow use of WAN Replication.");
+            if (licenseApi.isDrReplicationAllowed() == false) {
+                hostLog.fatal("Warning, VoltDB license does not allow use of DR replication.");
                 return false;
             }
         }

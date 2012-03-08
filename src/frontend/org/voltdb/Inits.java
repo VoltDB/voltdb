@@ -514,7 +514,7 @@ public class Inits {
             // rejoining nodes figure out the replication role from other nodes
             if (!m_isRejoin)
             {
-                // See if we should bring the server up in WAN replication mode
+                // See if we should bring the server up in DR replication mode
                 m_rvdb.setReplicationRole(m_config.m_replicationRole);
             }
         }
