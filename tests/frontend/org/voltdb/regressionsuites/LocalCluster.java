@@ -525,7 +525,8 @@ public class LocalCluster implements VoltServerConfig {
             config.m_pathToCatalog = m_jarFileName;
             config.m_pathToDeployment = m_pathToDeployment;
             config.m_port = VoltDB.DEFAULT_PORT;
-            config.m_internalPort = VoltDB.DEFAULT_INTERNAL_PORT - 1;
+            config.m_leaderPort = VoltDB.DEFAULT_INTERNAL_PORT - 1;
+            config.m_internalPort = VoltDB.DEFAULT_INTERNAL_PORT;
             config.m_adminPort = m_baseAdminPort;
             config.m_startAction = START_ACTION.CREATE;
             config.m_replicationRole = role;
@@ -670,10 +671,10 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_voltStartCmdOffset, "create");
+            m_procBuilder.command().set(m_rejoinOffset, "");
             if (ReplicationRole.MASTER.toString().equalsIgnoreCase(startMode)
                 || ReplicationRole.REPLICA.toString().equalsIgnoreCase(startMode))
                 m_procBuilder.command().set(m_voltStartModeOffset, startMode);
-            m_procBuilder.command().set(m_rejoinOffset, "");
             m_procBuilder.command().set(m_licensePathOffset, ServerThread.getTestLicensePath());
             m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
             if (m_debug) {

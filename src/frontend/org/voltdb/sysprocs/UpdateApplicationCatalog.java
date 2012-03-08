@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
@@ -86,7 +87,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // then update data at the local site.
         String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        zk.setData(VoltZK.catalogbytes, catalogBytes, -1, new ZKUtil.StatCallback(), null);
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(4 + catalogBytes.length);
+        versionAndBytes.putInt(expectedCatalogVersion + 1);
+        versionAndBytes.put(catalogBytes);
+        zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1, new ZKUtil.StatCallback(), null);
+        versionAndBytes = null;
         zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
         CatalogContext context =
             VoltDB.instance().catalogUpdate(commands, catalogBytes, expectedCatalogVersion, getTransactionId(), deploymentCRC);

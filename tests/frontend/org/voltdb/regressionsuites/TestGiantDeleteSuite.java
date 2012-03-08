@@ -46,7 +46,8 @@ public class TestGiantDeleteSuite extends RegressionSuite {
         if (isValgrind()) {
             return;
         }
-        Client client = getClient();
+
+        Client client = getClient(1000 * 60 * 10);
         client.callProcedure("InsertBatch", 20000000, 0);
         boolean threw = false;
         try

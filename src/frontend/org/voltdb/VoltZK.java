@@ -42,6 +42,7 @@ public class VoltZK {
 
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String topology = "/db/topology";
+    public static final String replicationrole = "/db/replicationrole";
     public static final String deploymentBytes = "/db/deploymentBytes";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";

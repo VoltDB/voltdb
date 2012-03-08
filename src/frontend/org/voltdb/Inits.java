@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
@@ -263,9 +265,13 @@ public class Inits {
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
+                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 4);
+                    versionAndBytes.putInt(0);
+                    versionAndBytes.put(catalogBytes);
                     // publish the catalog bytes to ZK
                     m_rvdb.getHostMessenger().getZK().create(VoltZK.catalogbytes,
-                            catalogBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                            versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    versionAndBytes = null;
 
                 }
                 catch (IOException e) {
@@ -289,9 +295,15 @@ public class Inits {
         @Override
         public void run() {
             byte[] catalogBytes = null;
+            int version = 0;
             do {
                 try {
-                    catalogBytes = m_rvdb.getHostMessenger().getZK().getData(VoltZK.catalogbytes, false, null);
+                    ByteBuffer versionAndBytes =
+                        ByteBuffer.wrap(m_rvdb.getHostMessenger().getZK().getData(VoltZK.catalogbytes, false, null));
+                    version = versionAndBytes.getInt();
+                    catalogBytes = new byte[versionAndBytes.remaining()];
+                    versionAndBytes.get(catalogBytes);
+                    versionAndBytes = null;
                 }
                 catch (org.apache.zookeeper_voltpatches.KeeperException.NoNodeException e) {
                 }
@@ -332,7 +344,7 @@ public class Inits {
                 m_rvdb.m_serializedCatalog = catalog.serialize();
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogTxnId,
-                        catalog, catalogBytes, m_rvdb.m_depCRC, 0, -1);
+                        catalog, catalogBytes, m_rvdb.m_depCRC, version, -1);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", false, e);
             }
@@ -510,11 +522,36 @@ public class Inits {
 
         @Override
         public void run() {
-            // rejoining nodes figure out the replication role from other nodes
-            if (!m_isRejoin)
-            {
-                // See if we should bring the server up in WAN replication mode
-                m_rvdb.setReplicationRole(m_config.m_replicationRole);
+            try {
+                ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
+                // rejoining nodes figure out the replication role from other nodes
+                if (!m_isRejoin)
+                {
+                    try {
+                        zk.create(
+                                VoltZK.replicationrole,
+                                m_config.m_replicationRole.toString().getBytes("UTF-8"),
+                                Ids.OPEN_ACL_UNSAFE,
+                                CreateMode.PERSISTENT);
+                    } catch (KeeperException.NodeExistsException e) {}
+                    String discoveredReplicationRole =
+                        new String(zk.getData(VoltZK.replicationrole, false, null), "UTF-8");
+                    if (!discoveredReplicationRole.equals(m_config.m_replicationRole.toString())) {
+                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredReplicationRole +
+                                " doesn't match locally specified replication role " + m_config.m_replicationRole,
+                                true, null);
+                    }
+
+                    // See if we should bring the server up in WAN replication mode
+                    m_rvdb.setReplicationRole(ReplicationRole.valueOf(discoveredReplicationRole));
+                } else {
+                    String discoveredReplicationRole =
+                        new String(zk.getData(VoltZK.replicationrole, false, null), "UTF-8");
+                    // See if we should bring the server up in WAN replication mode
+                    m_rvdb.setReplicationRole(ReplicationRole.valueOf(discoveredReplicationRole));
+                }
+            } catch (Exception e) {
+                VoltDB.crashGlobalVoltDB("Error discovering replication role", false, e);
             }
         }
     }

@@ -272,9 +272,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         out.writeString(procName);
         out.writeLong(clientHandle);
         if (serializedParams != null)
-            out.write(serializedParams.array(),
-                      serializedParams.position() + serializedParams.arrayOffset(),
-                      serializedParams.remaining());
+            out.write(serializedParams.duplicate());
         else if (params != null) {
             out.writeObject(getParams());
         }
