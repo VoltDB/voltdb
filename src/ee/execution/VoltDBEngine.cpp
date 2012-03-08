@@ -763,7 +763,6 @@ bool VoltDBEngine::rebuildTableCollections() {
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
 
-    map<string, catalog::Table*>::const_iterator it = m_database->tables().begin();
     map<string, CatalogDelegate*>::iterator cdIt = m_catalogDelegates.begin();
 
     // walk the table delegates and update local table collections

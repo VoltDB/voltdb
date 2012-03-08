@@ -162,7 +162,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 VoltDB.Configuration config = new VoltDB.Configuration();
                 config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
                 config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-                config.m_rejoinToHostAndPort = "localhost:3022";
+                config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
                 config.m_isRejoinTest = true;
                 localServer = new ServerThread(config);
 
@@ -269,7 +269,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.setMaxHeap(64);
         ServerThread localServer = null;
         try {
-            boolean success = cluster.compileWithAdminMode(builder, 9998, false);
+            boolean success = cluster.compileWithAdminMode(builder, VoltDB.DEFAULT_ADMIN_PORT, false);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
             cluster.setHasLocalServer(false);
@@ -294,7 +294,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-            config.m_rejoinToHostAndPort = "localhost:3022";
+            config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
             config.m_isRejoinTest = true;
             localServer = new ServerThread(config);
 
@@ -497,7 +497,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:3022";
+        config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
         config.m_zkInterface = "127.0.0.1:2179";
         config.m_isRejoinTest = true;
         ServerThread localServer = new ServerThread(config);
@@ -539,7 +539,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
         cluster.setMaxHeap(64);
-        boolean success = cluster.compileWithAdminMode(builder, 9998, false);
+        boolean success = cluster.compileWithAdminMode(builder, VoltDB.DEFAULT_ADMIN_PORT, false);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
@@ -550,7 +550,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Client client;
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 9997);
+        client.createConnection("localhost", VoltDB.DEFAULT_ADMIN_PORT - 1);
 
         response = client.callProcedure("@Pause");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -562,7 +562,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:3022";
+        config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
         config.m_isRejoinTest = true;
         config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);
@@ -593,8 +593,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
             @Override
             public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-                // TODO Auto-generated method stub
-
             }
 
         }
@@ -681,7 +679,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:3022";
+        config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
         config.m_isRejoinTest = true;
         config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);
@@ -762,7 +760,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:3022";
+        config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
         config.m_isRejoinTest = true;
         config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);

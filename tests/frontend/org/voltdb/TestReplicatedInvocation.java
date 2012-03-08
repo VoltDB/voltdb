@@ -81,6 +81,39 @@ public class TestReplicatedInvocation {
     }
 
     /**
+     * Test promoting a replica to master
+     * @throws Exception
+     */
+    @Test
+    public void testPromote() throws Exception {
+        if (role != ReplicationRole.REPLICA) {
+            return;
+        }
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+        ClientResponse resp = client.callProcedure("@SystemInformation", "overview");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable result = resp.getResults()[0];
+        while (result.advanceRow()) {
+            if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
+                assertTrue(result.getString("VALUE").equalsIgnoreCase("replica"));
+            }
+        }
+
+        resp = client.callProcedure("@Promote");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        resp = client.callProcedure("@SystemInformation", "overview");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        result = resp.getResults()[0];
+        while (result.advanceRow()) {
+            if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
+                assertTrue(result.getString("VALUE").equalsIgnoreCase("none"));
+            }
+        }
+    }
+    /**
      * Send a replicated procedure invocation and checks if the procedure sees
      * the specified txn ID.
      */
@@ -147,37 +180,4 @@ public class TestReplicatedInvocation {
         }
     }
 
-    /**
-     * Test promoting a replica to master
-     * @throws Exception
-     */
-    @Test
-    public void testPromote() throws Exception {
-        if (role != ReplicationRole.REPLICA) {
-            return;
-        }
-
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost");
-        ClientResponse resp = client.callProcedure("@SystemInformation", "overview");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        VoltTable result = resp.getResults()[0];
-        while (result.advanceRow()) {
-            if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
-                assertTrue(result.getString("VALUE").equalsIgnoreCase("replica"));
-            }
-        }
-
-        resp = client.callProcedure("@Promote");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-
-        resp = client.callProcedure("@SystemInformation", "overview");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        result = resp.getResults()[0];
-        while (result.advanceRow()) {
-            if (result.getString("KEY").equalsIgnoreCase("replicationrole")) {
-                assertTrue(result.getString("VALUE").equalsIgnoreCase("master"));
-            }
-        }
-    }
 }

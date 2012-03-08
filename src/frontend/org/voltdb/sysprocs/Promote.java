@@ -60,9 +60,9 @@ public class Promote extends VoltSystemProcedure {
         {
             VoltDB.instance().getHostMessenger().getZK().setData(
                     VoltZK.replicationrole,
-                    ReplicationRole.MASTER.toString().getBytes("UTF-8"),
+                    ReplicationRole.NONE.toString().getBytes("UTF-8"),
                     -1);
-            VoltDB.instance().setReplicationRole(ReplicationRole.MASTER);
+            VoltDB.instance().setReplicationRole(ReplicationRole.NONE);
         }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

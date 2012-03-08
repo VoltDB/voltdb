@@ -33,7 +33,12 @@ public abstract class LocalMailbox implements Mailbox {
     private long hsId;
 
     public LocalMailbox(HostMessenger hostMessenger) {
+        this(hostMessenger, Long.MIN_VALUE);
+    }
+
+    public LocalMailbox(HostMessenger hostMessenger, long hsId) {
         this.hostMessenger = hostMessenger;
+        this.hsId = hsId;
     }
 
     @Override

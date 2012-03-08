@@ -210,7 +210,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     // The configured license api: use to decide enterprise/cvommunity edition feature enablement
     LicenseApi m_licenseApi;
-    LicenseApi getLicenseApi() { return m_licenseApi; }
+
+    @Override
+    public LicenseApi getLicenseApi() {
+        return m_licenseApi;
+    }
 
 
     /**
@@ -250,6 +254,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_recoveryStartTime = System.currentTimeMillis();
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
+            m_replicationRole = m_config.m_replicationRole;
+            m_replicationActive = false;
 
             // set up site structure
             m_localSites = new HashMap<Long, ExecutionSite>();
@@ -324,6 +330,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_periodicWorkThread = MiscUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize, 1024 * 128);
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
+            if (m_licenseApi == null) {
+                VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
+                        "See previous log message for details.", false, null);
+            }
 
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
@@ -375,6 +385,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 initiatorHSId = registerInitiatorMailbox();
                 final long statsHSId = m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
                 m_messenger.generateMailboxId(m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
+                System.out.println("Registering stats mailbox id " + m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
                 m_mailboxPublisher.publish(m_messenger.getZK());
@@ -1075,14 +1086,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
         }
 
-        if (m_replicationRole == ReplicationRole.MASTER) {
-            hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster.");
-        } else if (m_replicationRole == ReplicationRole.REPLICA) {
+        if (m_replicationRole == ReplicationRole.REPLICA) {
             hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster. " +
             "Clients can only call read-only procedures.");
         }
-        if (httpPortExtraLogMessage != null)
+        if (httpPortExtraLogMessage != null) {
             hostLog.info(httpPortExtraLogMessage);
+        }
         if (httpPort != -1) {
             hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", httpPort));
         }
@@ -1770,13 +1780,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     {
         if (m_replicationRole == null) {
             m_replicationRole = role;
-        } else if (m_replicationRole == ReplicationRole.REPLICA) {
-            if (role != ReplicationRole.MASTER) {
-                return;
+            for (ClientInterface ci : m_clientInterfaces) {
+                ci.setReplicationRole(m_replicationRole);
             }
-
-            hostLog.info("Changing replication role from " + m_replicationRole +
-                    " to " + role);
+        }
+        else if (role != ReplicationRole.REPLICA && m_replicationRole == ReplicationRole.REPLICA) {
+            hostLog.info("Promoting replication role from replica to master.");
             m_replicationRole = role;
             for (ClientInterface ci : m_clientInterfaces) {
                 ci.setReplicationRole(m_replicationRole);
@@ -1828,6 +1837,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
         }
 
+        // Start listening on the DR ports
+        prepareReplication();
+
         if (m_startMode != null) {
             m_mode = m_startMode;
         } else {
@@ -1865,6 +1877,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public ExecutorService getComputationService() {
         return m_computationService;
+    }
+
+    private void prepareReplication() {
+        if (m_localSites != null && !m_localSites.isEmpty()) {
+            // get any site and start the DR server, it's static
+            ExecutionSite site = m_localSites.values().iterator().next();
+            site.getPartitionDRGateway().start();
+        }
     }
 
     @Override

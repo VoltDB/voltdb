@@ -22,16 +22,12 @@
  */
 package org.voltdb.regressionsuites;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,9 +35,8 @@ import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -61,341 +56,139 @@ public class LocalCluster implements VoltServerConfig {
     // will vary between -3 and 3 uniformly
     static final int TIMESTAMP_SALT_VARIANCE = 3;
 
+    int getRandomTimestampSalt() {
+        Random r = new Random();
+        // if variance is 3, get a range between 0 and 6 inclusive
+        int retval = r.nextInt(TIMESTAMP_SALT_VARIANCE * 2 + 1);
+        // shift that range so it goes from -3 to 3 inclusive
+        retval -= TIMESTAMP_SALT_VARIANCE;
+        return retval;
+    }
+
     // how long to wait for startup of external procs
     static final long PIPE_WAIT_MAX_TIMEOUT = 60 * 1000;
 
-    // configuration data
-    final String m_jarFileName;
-    final int m_siteCount;
-    final int m_hostCount;
-    final int m_replication;
-    final BackendTarget m_target;
-    final String m_buildDir;
-    int m_portOffset;
-    int m_zkPortOffset;
-    int m_adminPortOffset;
-    boolean m_hasLocalServer = true;
-    String m_pathToDeployment;
-    int m_pathToDeploymentOffset;
-    int m_rejoinOffset;
-    FailureState m_failureState;
-    int m_baseAdminPort = VoltDB.DEFAULT_ADMIN_PORT;
-
-    // state
     boolean m_compiled = false;
+    int m_siteCount;
+    int m_hostCount;
+    int m_kfactor = 0;
     boolean m_running = false;
-    ArrayList<Process> m_cluster = new ArrayList<Process>();
-    //Dedicated paths in the filesystem to be used as a root for each process
-    ArrayList<File> m_subRoots = new ArrayList<File>();
-    ArrayList<PipeToFile> m_pipes = null;
-    ServerThread m_localServer = null;
-
-    // components
-    ProcessBuilder m_procBuilder;
-    private final int m_debugOffset1;
-    private final int m_debugOffset2;
-
-    private int m_ipcPortOffset1;
-    private int m_ipcPortOffset2;
-    private int m_ipcPortOffset3;
-
-    private final int m_voltFilePrefixOffset;
-
-    private final int m_timestampSaltOffset;
-
-    private final int m_licensePathOffset;
-
-    @SuppressWarnings("unused")
-    private File m_pathToVoltRoot = null;
-    private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
-
     private final boolean m_debug;
-    private int m_debugPortOffset = 8000;
+    FailureState m_failureState;
+    ArrayList<Process> m_cluster = new ArrayList<Process>();
 
-    private final boolean m_isRejoinTest;
-
-    private final int m_voltStartCmdOffset;
-    private final int m_voltStartModeOffset;
-
-    private final int m_internalPortOffset;
-
-
-    /* class pipes a process's output to a file name.
-     * Also watches for "Server completed initialization"
-     * in output - the signal of readiness!
-     */
-    public static class PipeToFile extends Thread {
-        final static String m_initToken = "Server completed init";
-        final static String m_rejoinToken = "Node recovery completed";
-        final static String m_initiatorID = "Initializing initiator ID:";
-
-        FileWriter m_writer ;
-        BufferedReader m_input;
-        String m_filename;
-
-        // set m_witnessReady when the m_token byte sequence is seen.
-        AtomicBoolean m_witnessedReady;
-        AtomicBoolean m_eof = new AtomicBoolean(false);
-        final String m_token;
-        int m_hostId = Integer.MAX_VALUE;
-        long m_initTime;
-
-        // memoize the process here so we can easily check for process death
-        Process m_process;
-
-        PipeToFile(String filename, InputStream stream, String token,
-                   boolean appendLog, Process proc) {
-            m_witnessedReady = new AtomicBoolean(false);
-            m_token = token;
-            m_filename = filename;
-            m_input = new BufferedReader(new InputStreamReader(stream));
-            m_process = proc;
-            try {
-                m_writer = new FileWriter(filename, appendLog);
-            }
-            catch (IOException ex) {
-                Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
-                throw new RuntimeException(ex);
-            }
-        }
-
-        /**
-         * Allow callers to get the process object to double check for death
-         */
-        Process getProcess() {
-            return m_process;
-        }
-
-        public int getHostId() {
-            synchronized(this) {
-                return m_hostId;
-            }
-        }
-        @Override
-        public void run() {
-            assert(m_writer != null);
-            assert(m_input != null);
-            boolean initLocationFound = false;
-            while (m_eof.get() != true) {
-                try {
-                    String data = m_input.readLine();
-                    if (data == null) {
-                        m_eof.set(true);
-                        continue;
-                    }
-
-                    // look for the non-exec site id
-                    if (data.contains(m_initiatorID)) {
-                        // INITIALIZING INITIATOR ID: 1, SITEID: 0
-                        String[] split = data.split(" ");
-                        synchronized(this) {
-                            try {
-                                m_hostId = Long.valueOf(split[split.length - 1].split(":")[0]).intValue();
-                            } catch (java.lang.NumberFormatException e) {
-                                System.err.println("Had a number format exception processing line: '" + data + "'");
-                                throw e;
-                            }
-                        }
-                    }
-
-                    // look for a sequence of letters matching the server ready token.
-                    if (!m_witnessedReady.get() && data.contains(m_token)) {
-                        synchronized (this) {
-                            m_witnessedReady.set(true);
-                            this.notifyAll();
-                        }
-                    }
-
-                    // look for a sequence of letters matching the server ready token.
-                    if (!initLocationFound && data.contains(m_initToken)) {
-                        initLocationFound = true;
-                        m_initTime = System.currentTimeMillis();
-                    }
-
-                    m_writer.write(data + "\n");
-                    m_writer.flush();
-                }
-                catch (IOException ex) {
-                    m_eof.set(true);
-                }
-            }
-            synchronized (this) {
-                notifyAll();
-            }
-            try {
-                m_writer.close();
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
-
+    // Dedicated paths in the filesystem to be used as a root for each process
+    ArrayList<File> m_subRoots = new ArrayList<File>();
+    public ArrayList<File> getSubRoots() {
+        return m_subRoots;
     }
 
+    boolean m_hasLocalServer = true;
+    public void setHasLocalServer(boolean hasLocalServer) {
+        m_hasLocalServer = hasLocalServer;
+    }
+
+    ArrayList<PipeToFile> m_pipes = null;
+    ArrayList<CommandLine> m_cmdLines = null;
+    ServerThread m_localServer = null;
+    ProcessBuilder m_procBuilder;
+    private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
+
+    // Produce a (presumably) available IP port number.
+    PortGenerator portGenerator = new PortGenerator();
+    static class PortGenerator {
+        private final AtomicInteger nextPort = new AtomicInteger(10000);
+        private final AtomicInteger nextCport = new AtomicInteger(VoltDB.DEFAULT_PORT);
+        private final AtomicInteger nextAport = new AtomicInteger(VoltDB.DEFAULT_ADMIN_PORT);
+        public int next() {
+            return nextPort.getAndIncrement();
+        }
+        public int nextClient() {
+            return nextCport.getAndIncrement();
+        }
+        public int nextAdmin() {
+            return nextAport.getAndDecrement();
+        }
+
+        public void reset() {
+            nextCport.set(21212);
+            nextAport.set(21211);
+        }
+    }
+
+    // The base command line - each process copies and customizes this.
+    // Each local cluster process has a CommandLine instance configured
+    // with the port numbers and command line parameter value specific to that
+    // instance.
+    private final CommandLine templateCmdLine = new CommandLine();
+
     public LocalCluster(String jarFileName, int siteCount,
-            int hostCount, int replication, BackendTarget target) {
+            int hostCount, int kfactor, BackendTarget target) {
         this(jarFileName, siteCount,
-            hostCount, replication, target,
+            hostCount, kfactor, target,
             FailureState.ALL_RUNNING, false, false);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
-                        int hostCount, int replication, BackendTarget target,
+                        int hostCount, int kfactor, BackendTarget target,
                         boolean isRejoinTest) {
                     this(jarFileName, siteCount,
-                        hostCount, replication, target,
+                        hostCount, kfactor, target,
                         FailureState.ALL_RUNNING, false, isRejoinTest);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
-                        int hostCount, int replication, BackendTarget target,
+                        int hostCount, int kfactor, BackendTarget target,
                         FailureState failureState,
                         boolean debug) {
-        this(jarFileName, siteCount, hostCount, replication, target,
+        this(jarFileName, siteCount, hostCount, kfactor, target,
              failureState, debug, false);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
-                        int hostCount, int replication, BackendTarget target,
+                        int hostCount, int kfactor, BackendTarget target,
                         FailureState failureState,
                         boolean debug, boolean isRejoinTest)
     {
         System.out.println("Instantiating LocalCluster for " + jarFileName);
-        System.out.println("Sites: " + siteCount + " hosts: " + hostCount
-                           + " replication factor: " + replication);
+        System.out.println("Sites: " + siteCount + " hosts: " + hostCount + " replication factor: " + kfactor);
 
         assert (jarFileName != null);
         assert (siteCount > 0);
         assert (hostCount > 0);
-        assert (replication >= 0);
 
-//      final String buildType = System.getenv().get("BUILD");
-//      if (buildType == null) {
-        /*
-         * Disable memcheck with localcluster for now since it doesn't pass.
-         */
-            m_target = target;
-//        } else {
-//            if (buildType.startsWith("memcheck")) {
-//                if (target.equals(BackendTarget.NATIVE_EE_JNI)) {
-//                    m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
-//                } else {
-//                    m_target = target;//For memcheck
-//                }
-//            } else {
-//                m_target = target;
-//            }
-//        }
+        m_cluster.ensureCapacity(hostCount);
 
-        m_jarFileName = VoltDB.Configuration.getPathToCatalogForTest(jarFileName);
         m_siteCount = siteCount;
         m_hostCount = hostCount;
-        m_replication = replication;
-        m_cluster.ensureCapacity(m_hostCount);
+        m_kfactor = kfactor;
         m_debug = debug;
-        m_isRejoinTest = isRejoinTest;
+        m_failureState = kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
+        m_pipes = new ArrayList<PipeToFile>();
+        m_cmdLines = new ArrayList<CommandLine>();
+
         String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
-        if (buildDir == null)
-            m_buildDir = System.getProperty("user.dir") + "/obj/release";
-        else
-            m_buildDir = buildDir;
+        if (buildDir == null) {
+            buildDir = System.getProperty("user.dir") + "/obj/release";
+        }
 
         String jzmq_dir = System.getenv("VOLTDB_JZMQ_DIR"); // via build.xml
-        if (jzmq_dir == null)
+        if (jzmq_dir == null) {
             jzmq_dir = System.getProperty("user.dir") + "/third_party/cpp/jnilib";
-        System.out.println("Looking for jzmq native lib in: " + jzmq_dir);
+        }
 
-        m_failureState = failureState;
-        //m_failureState = FailureState.ALL_RUNNING;
+        String java_library_path = buildDir + "/nativelibs" + ":" + jzmq_dir;
 
-        m_failureState = failureState;
-        // don't fail nodes without k-safety
-        if (m_replication < 1)
-            m_failureState = FailureState.ALL_RUNNING;
+        String classPath = System.getProperty("java.class.path") + ":" + buildDir
+            + File.separator + jarFileName + ":" + buildDir + File.separator + "prod";
 
-        String classPath = System.getProperty("java.class.path") + ":" + m_buildDir + File.separator + m_jarFileName;
-        classPath += ":" + m_buildDir + File.separator + "prod";
-
-        // for ant
+        // First try 'ant' syntax and then 'eclipse' syntax...
         String log4j = System.getProperty("log4j.configuration");
-        // for eclipse
-        if (log4j == null) log4j = "file://" + System.getProperty("user.dir") + "/src/frontend/junit_log4j.properties";
-
-        // processes of VoltDBs using the compiled jar file.
-        m_pipes = new ArrayList<PipeToFile>();
-        m_procBuilder = new ProcessBuilder("java",
-                                           "-Djava.library.path=" + m_buildDir + "/nativelibs" + ":" + jzmq_dir,
-                                           "-Dlog4j.configuration=" + log4j,
-                                           "-DLOG_SEGMENT_SIZE=8",
-                                           "-ea",
-                                           "-XX:-ReduceInitialCardMarks",
-                                           "-XX:MaxDirectMemorySize=2g",
-                                           "-Xmx2g",
-                                           "-XX:+HeapDumpOnOutOfMemoryError",
-                                           "-classpath",
-                                           classPath,
-                                           "org.voltdb.VoltDB",
-                                           "license",
-                                           ServerThread.getTestLicensePath(),
-                                           "zkport",
-                                           "-1",
-                                           "timestampsalt",
-                                           "0",
-                                           "catalog",
-                                           m_jarFileName,
-                                           "deployment",
-                                           "",
-                                           "port",
-                                           "-1",
-                                           "adminport",
-                                           "-1",
-                                           "rejoinhost",
-                                           "-1",
-                                           "leader",
-                                           "localhost",
-                                           "leaderport",
-                                           String.valueOf(VoltDB.DEFAULT_INTERNAL_PORT - 1),
-                                           "",
-                                           "internalport",
-                                           "-1");
-
-        List<String> command = m_procBuilder.command();
-        // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = command.size() - 26;
-        m_debugOffset2 = command.size() - 25;
-        if (m_debug) {
-            command.add(m_debugOffset1, "");
-            command.add(m_debugOffset1, "");
+        if (log4j == null) {
+            log4j = "file://" + System.getProperty("user.dir") + "/src/frontend/junit_log4j.properties";
         }
 
-        m_voltFilePrefixOffset = command.size() - 26;
-        command.add(m_voltFilePrefixOffset, "");
-
-        m_licensePathOffset = command.size() - 22;
-        m_zkPortOffset = command.size() - 20;
-        m_timestampSaltOffset = command.size() - 18;
-        m_pathToDeploymentOffset = command.size() - 14;
-        m_portOffset = command.size() - 12;
-        m_adminPortOffset = command.size() - 10;
-        m_voltStartCmdOffset = command.size() - 9;
-
-        /*
-         * Both go into the empty slot before leader.
-         * Rejoing shouldn't need to specify a WAN replication mode...
-         */
-        m_rejoinOffset = command.size() - 8;
-        m_voltStartModeOffset = command.size() - 8;
-
-        m_internalPortOffset = command.size() - 1;
-
-        if (m_target.isIPC) {
-            command.add("");
-            m_ipcPortOffset1 = command.size() - 1;
-            command.add("");
-            m_ipcPortOffset2 = command.size() - 1;
-            command.add("");
-            m_ipcPortOffset3 = command.size() - 1;
-        }
+        m_procBuilder = new ProcessBuilder();
 
         // set the working directory to obj/release/prod
         //m_procBuilder.directory(new File(m_buildDir + File.separator + "prod"));
@@ -403,58 +196,56 @@ public class LocalCluster implements VoltServerConfig {
 
         Thread shutdownThread = new Thread(new ShutDownHookThread());
         java.lang.Runtime.getRuntime().addShutdownHook(shutdownThread);
+
+        // Create the base command line that each process can makeCopy and modify
+        this.templateCmdLine.
+            addTestOptions(true).
+            leader("localhost").
+            target(target).
+            startCommand("create").
+            jarFileName(VoltDB.Configuration.getPathToCatalogForTest(jarFileName)).
+            buildDir(buildDir).
+            javaLibraryPath(java_library_path).
+            classPath(classPath).
+            pathToLicense(ServerThread.getTestLicensePath()).
+            log4j(log4j);
     }
 
-    public void setHasLocalServer(boolean hasLocalServer) {
-        m_hasLocalServer = hasLocalServer;
-    }
-
-    public void setMaxHeap(int megabytes) {
-        m_procBuilder.command().set(7, "-Xmx" + megabytes + "m");
-    }
-
-    public String getPathToDeployment() {
-        return m_pathToDeployment;
-    }
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
-        if (m_compiled) {
-            return true;
+        if (!m_compiled) {
+            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor);
+            templateCmdLine.pathToDeployment(builder.getPathToDeployment());
         }
-
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication);
-        m_pathToDeployment = builder.getPathToDeployment();
-        m_pathToVoltRoot = builder.getPathToVoltRoot();
-
         return m_compiled;
     }
 
     @Override
     public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String snapshotPath, String ppdPrefix) {
-        if (m_compiled) {
-            return true;
+        if (!m_compiled) {
+            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
+                    null, true, snapshotPath, ppdPrefix);
+            templateCmdLine.pathToDeployment(builder.getPathToDeployment());
         }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication,
-                                     null, true, snapshotPath, ppdPrefix);
-        m_pathToDeployment = builder.getPathToDeployment();
-        m_pathToVoltRoot = builder.getPathToVoltRoot();
-
         return m_compiled;
     }
 
     @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
-        if (m_compiled) {
-            return true;
+        // ATTN: LocalCluster does not support non-default admin ports.
+        // Need a way to correctly initializing the portGenerator
+        // and then resetting it after tests to the usual default.
+        if (adminPort != VoltDB.DEFAULT_ADMIN_PORT) {
+            return false;
         }
-        m_baseAdminPort = adminPort;
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication,
-                                     m_baseAdminPort, adminOnStartup);
-        m_pathToDeployment = builder.getPathToDeployment();
-        m_pathToVoltRoot = builder.getPathToVoltRoot();
 
+        if (!m_compiled) {
+            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
+                    adminPort, adminOnStartup);
+            templateCmdLine.pathToDeployment(builder.getPathToDeployment());
+        }
         return m_compiled;
     }
 
@@ -468,89 +259,56 @@ public class LocalCluster implements VoltServerConfig {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
-        assert (!m_running);
-        if (m_running) {
-            return;
-        }
-
-        // clear any logs, export or snapshot data for this run
+    void startLocalServer(boolean clearLocalDataDirectories) {
+        // Generate a new root for the in-process server if clearing directories.
+        File subroot = null;
         if (clearLocalDataDirectories) {
             try {
-                m_subRoots.clear();
-                VoltFile.deleteAllSubRoots();
+                subroot = VoltFile.initNewSubrootForThisProcess();
+                m_subRoots.add(subroot);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        } else {
+            subroot = m_subRoots.get(0);
         }
 
-        // set to true to spew startup timing data
-        boolean logtime = false;
-        long startTime = 0;
-        if (logtime) {
-            startTime = System.currentTimeMillis();
-            System.out.println("********** Starting cluster at: " + startTime);
+        // Make the local Configuration object...
+        CommandLine cmdln = (templateCmdLine.makeCopy());
+        cmdln.internalPort(portGenerator.next());
+        cmdln.voltFilePrefix(subroot.getPath());
+        cmdln.internalPort(portGenerator.next());
+        cmdln.port(portGenerator.nextClient());
+        cmdln.adminPort(portGenerator.nextAdmin());
+        cmdln.zkport(portGenerator.next());
+        // replication port and its two automatic followers.
+        cmdln.drAgentStartPort(portGenerator.next());
+        portGenerator.next();
+        portGenerator.next();
+        for (EEProcess proc : m_eeProcs.get(0)) {
+            assert(proc != null);
+            cmdln.ipcPort(portGenerator.next());
         }
 
-        int oopStartIndex = 0;
+        // rtb: why is this? this flag short-circuits an Inits worker
+        // but can only be set on the local in-process server (there is no
+        // command line version of it.) Consequently, in-process and out-of-
+        // process VoltDBs initialize differently when this flag is set.
+        // cmdln.rejoinTest(true);
 
-        for (int ii = 0; ii < m_hostCount; ii++) {
-            ArrayList<EEProcess> procs = new ArrayList<EEProcess>();
-            m_eeProcs.add(procs);
-            for (int zz = 0; zz < m_siteCount; zz++) {
-                String logfile = "LocalCluster_host_" + ii + "_site" + zz + ".log";
-                procs.add(new EEProcess(m_target, logfile));
-            }
-        }
+        // for debug, dump the command line to a unique file.
+        // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
-        m_pipes.clear();
-        m_cluster.clear();
+        m_cluster.add(null);
+        m_pipes.add(null);
+        m_cmdLines.add(cmdln);
+        m_localServer = new ServerThread(cmdln);
+        m_localServer.start();
+    }
 
-        // create the in-process server
-        if (m_hasLocalServer) {
-            //If the local directories are being cleared, generate a new root for the
-            //in process server
-            if (clearLocalDataDirectories) {
-                try {
-                    m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            m_cluster.add(null);
-            m_pipes.add(null);
-            Configuration config = new Configuration();
-            config.m_backend = m_target;
-            config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
-            config.m_pathToCatalog = m_jarFileName;
-            config.m_pathToDeployment = m_pathToDeployment;
-            config.m_port = VoltDB.DEFAULT_PORT;
-            config.m_leaderPort = VoltDB.DEFAULT_INTERNAL_PORT - 1;
-            config.m_internalPort = VoltDB.DEFAULT_INTERNAL_PORT;
-            config.m_adminPort = m_baseAdminPort;
-            config.m_startAction = START_ACTION.CREATE;
-            config.m_replicationRole = role;
-            ArrayList<Integer> ports = new ArrayList<Integer>();
-            for (EEProcess proc : m_eeProcs.get(0)) {
-                ports.add(proc.port());
-            }
-            config.m_ipcPorts = java.util.Collections.synchronizedList(ports);
-            config.m_isRejoinTest = m_isRejoinTest;
-
-            m_localServer = new ServerThread(config);
-            m_localServer.start();
-            oopStartIndex++;
-        }
-
-        // create all the out-of-process servers
-        for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories, role.toString().toLowerCase());
-        }
-
-        // spin until all the pipes see the magic "Server completed.." string.
+    boolean waitForAllReady() {
         long startOfPipeWait = System.currentTimeMillis();
         boolean allReady = false;
-        if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
         do {
             if ((System.currentTimeMillis() - startOfPipeWait) > PIPE_WAIT_MAX_TIMEOUT) {
                 break;
@@ -585,11 +343,75 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
         } while (allReady == false);
+        return allReady;
+    }
 
-        if (logtime) System.out.println("********** post witness: " + (System.currentTimeMillis() - startTime) + " ms");
+    private void printTiming(boolean logtime, String msg) {
+        if (logtime) {
+            System.out.println("************ " + msg);
+        }
+    }
+
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
+        assert (!m_running);
+        if (m_running) {
+            return;
+        }
+
+        // set 'replica' option -- known here for the first time.
+        templateCmdLine.replicaMode(role);
+
+        // set to true to spew startup timing data
+        boolean logtime = false;
+        long startTime = 0;
+        printTiming(logtime, "Starting cluster at: " + System.currentTimeMillis());
+
+        // clear any logs, export or snapshot data for this run
+        if (clearLocalDataDirectories) {
+            try {
+                m_subRoots.clear();
+                VoltFile.deleteAllSubRoots();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        // reset the port generator. RegressionSuite always expects
+        // to find ClientInterface and Admin mode on known ports.
+        portGenerator.reset();
+        templateCmdLine.leaderPort(portGenerator.next());
+
+        m_eeProcs.clear();
+        for (int ii = 0; ii < m_hostCount; ii++) {
+            ArrayList<EEProcess> procs = new ArrayList<EEProcess>();
+            m_eeProcs.add(procs);
+            for (int zz = 0; zz < m_siteCount; zz++) {
+                String logfile = "LocalCluster_host_" + ii + "_site" + zz + ".log";
+                procs.add(new EEProcess(templateCmdLine.target(), logfile));
+            }
+        }
+
+        m_pipes.clear();
+        m_cluster.clear();
+        m_cmdLines.clear();
+        int oopStartIndex = 0;
+
+        // create the in-process server instance.
+        if (m_hasLocalServer) {
+            startLocalServer(clearLocalDataDirectories);
+            ++oopStartIndex;
+        }
+
+        // create all the out-of-process servers
+        for (int i = oopStartIndex; i < m_hostCount; i++) {
+            startOne(i, clearLocalDataDirectories, role);
+        }
+
+        printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
+        boolean allReady = waitForAllReady();
+        printTiming(logtime, "Post-witness: " + (System.currentTimeMillis() - startTime) + "ms");
 
         // verify all processes started up and count failures
-        int expectedProcesses = m_hostCount - (m_hasLocalServer ? 1 : 0);
         int downProcesses = 0;
         for (Process proc : m_cluster) {
             if ((proc != null) && (isProcessDead(proc))) {
@@ -607,6 +429,7 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             if (downProcesses > 0) {
+                int expectedProcesses = m_hostCount - (m_hasLocalServer ? 1 : 0);
                 throw new RuntimeException(
                         String.format("%d/%d external processes failed to start",
                                 downProcesses, expectedProcesses));
@@ -619,36 +442,16 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         // Finally, make sure the local server thread is running and wait if it is not.
-        if (m_hasLocalServer)
+        if (m_hasLocalServer) {
             m_localServer.waitForInitialization();
-        if (logtime) System.out.println("********** DONE: " + (System.currentTimeMillis() - startTime) + " ms");
+        }
+
+        printTiming(logtime, "DONE: " + (System.currentTimeMillis() - startTime) + " ms");
         m_running = true;
 
         // if supposed to kill a server, it's go time
         if (m_failureState != FailureState.ALL_RUNNING) {
-            System.out.println("Killing one cluster member.");
-            int procIndex = 0;
-            if (m_hasLocalServer) {
-                procIndex = 1;
-            }
-
-            Process proc = m_cluster.get(procIndex);
-            proc.destroy();
-            int retval = 0;
-            try {
-                retval = proc.waitFor();
-                for (EEProcess eeproc : m_eeProcs.get(procIndex)) {
-                    eeproc.waitForShutdown();
-                }
-            } catch (InterruptedException e) {
-                System.out.println("External VoltDB process is acting crazy.");
-            } finally {
-                m_cluster.set(procIndex, null);
-            }
-            // exit code 143 is the forcible shutdown code from .destroy()
-            if (retval != 0 && retval != 143) {
-                System.out.println("External VoltDB process terminated abnormally with return: " + retval);
-            }
+            killOne();
         }
 
         // after killing a server, bring it back in recovery mode
@@ -658,49 +461,64 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories, String startMode) {
+    private void killOne()
+    {
+        System.out.println("Killing one cluster member.");
+        int procIndex = 0;
+        if (m_hasLocalServer) {
+            procIndex = 1;
+        }
+
+        Process proc = m_cluster.get(procIndex);
+        proc.destroy();
+        int retval = 0;
         try {
-            // set the dragent's port offset
-            m_procBuilder.environment().put("dragentportoffset",
-                    String.valueOf(VoltDB.DEFAULT_DR_PORT + hostId * 3));
+            retval = proc.waitFor();
+            for (EEProcess eeproc : m_eeProcs.get(procIndex)) {
+                eeproc.waitForShutdown();
+            }
+        } catch (InterruptedException e) {
+            System.out.println("External VoltDB process is acting crazy.");
+        } finally {
+            m_cluster.set(procIndex, null);
+        }
+        // exit code 143 is the forcible shutdown code from .destroy()
+        if (retval != 0 && retval != 143) {
+            System.out.println("External VoltDB process terminated abnormally with return: " + retval);
+        }
+    }
 
-            // voltdb client/native ports move forward from 21212
-            m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
-            m_procBuilder.command().set(m_internalPortOffset, String.valueOf(VoltDB.DEFAULT_INTERNAL_PORT + hostId));
-            // voltdb admin-mode ports move backwards from 21211
-            m_procBuilder.command().set(m_adminPortOffset, String.valueOf(m_baseAdminPort - hostId));
-            m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
-            m_procBuilder.command().set(m_voltStartCmdOffset, "create");
-            m_procBuilder.command().set(m_rejoinOffset, "");
-            if (ReplicationRole.MASTER.toString().equalsIgnoreCase(startMode)
-                || ReplicationRole.REPLICA.toString().equalsIgnoreCase(startMode))
-                m_procBuilder.command().set(m_voltStartModeOffset, startMode);
-            m_procBuilder.command().set(m_licensePathOffset, ServerThread.getTestLicensePath());
-            m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
+    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode)
+    {
+        CommandLine cmdln = (templateCmdLine.makeCopy());
+        try {
+            cmdln.internalPort(portGenerator.next());
+            // set the dragent port. it uses the start value and
+            // the next two sequential port numbers - so burn those two.
+            cmdln.drAgentStartPort(portGenerator.next());
+            portGenerator.next();
+            portGenerator.next();
+
+            cmdln.port(portGenerator.nextClient());
+            cmdln.adminPort(portGenerator.nextAdmin());
+            cmdln.replicaMode(replicaMode);
+            cmdln.timestampSalt(getRandomTimestampSalt());
+
             if (m_debug) {
-                m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
-                m_procBuilder.command().set(
-                        m_debugOffset2,
-                        "-agentlib:jdwp=transport=dt_socket,address="
-                        + m_debugPortOffset++ + ",server=y,suspend=n");
+                cmdln.debugPort(portGenerator.next());
             }
-            if (m_target.isIPC) {
-                m_procBuilder.command().set(m_ipcPortOffset1, "ipcports");
-                String portString = "";
-                for (EEProcess proc : m_eeProcs.get(hostId)) {
-                    if (portString.isEmpty()) {
-                        portString += Integer.valueOf(proc.port());
-                    } else {
-                        portString += "," + Integer.valueOf(proc.port());
-                    }
-                }
-                m_procBuilder.command().set(m_ipcPortOffset2, portString);
-                m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
-            }
-            m_procBuilder.command().set(m_zkPortOffset, Integer.toString(2181 + hostId));
 
-            //If local directories are being cleared
-            //Generate a new subroot, otherwise reuse the existing directory
+            if (cmdln.target().isIPC) {
+                for (EEProcess proc : m_eeProcs.get(hostId)) {
+                    assert(proc != null);
+                    cmdln.ipcPort(portGenerator.next());
+                }
+            }
+
+            cmdln.zkport(portGenerator.next());
+
+            // If local directories are being cleared
+            // generate a new subroot, otherwise reuse the existing directory
             File subroot = null;
             if (clearLocalDataDirectories) {
                 subroot = VoltFile.getNewSubroot();
@@ -708,23 +526,23 @@ public class LocalCluster implements VoltServerConfig {
             } else {
                 subroot = m_subRoots.get(hostId);
             }
-            m_procBuilder.command().set(
-                    m_voltFilePrefixOffset,
-                    "-DVoltFilePrefix=" + subroot.getPath());
+            cmdln.voltFilePrefix(subroot.getPath());
 
-            StringBuilder sb = new StringBuilder();
-            for (String arg : m_procBuilder.command()) {
-                sb.append(arg);
-                sb.append(' ');
-            }
-            System.out.println(sb);
+            m_cmdLines.add(cmdln);
+            m_procBuilder.command().clear();
+            m_procBuilder.command().addAll(cmdln.createCommandLine());
 
+            // for debug, dump the command line to a file.
+            //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
+            System.out.println(cmdln);
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
+
             // write output to obj/release/testoutput/<test name>-n.txt
             // this may need to be more unique? Also very useful to just
             // set this to a hardcoded path and use "tail -f" to debug.
-            String testoutputdir = m_buildDir + File.separator + "testoutput";
+            String testoutputdir = cmdln.buildDir() + File.separator + "testoutput";
+
             // make sure the directory exists
             File dir = new File(testoutputdir);
             if (dir.exists()) {
@@ -743,8 +561,9 @@ public class LocalCluster implements VoltServerConfig {
                     }
                 }
             }
-            PipeToFile ptf = new PipeToFile(testoutputdir + File.separator +
-                    getName() + "-" + hostId + ".txt", proc.getInputStream(),
+
+            PipeToFile ptf = new PipeToFile(testoutputdir + File.separator + getName() +
+                    "-" + hostId + ".txt", proc.getInputStream(),
                     PipeToFile.m_initToken, false, proc);
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
@@ -778,22 +597,21 @@ public class LocalCluster implements VoltServerConfig {
         return recoverOne( logtime, startTime, hostId, null, "localhost");
     }
 
-    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer portOffset, String rejoinHost) {
-        // port for the new node
-        int portNo = VoltDB.DEFAULT_PORT + hostId;
-        int adminPortNo = m_baseAdminPort - hostId;
+    // Re-start a (dead) process. HostId is the enumberation of the host
+    // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
+    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId, String rejoinHost) {
 
-        // port to connect to (not too simple, eh?)
-        int portNoToRejoin = VoltDB.DEFAULT_INTERNAL_PORT + ((hostId + 1) % getNodeCount());
-        if (m_hasLocalServer) portNoToRejoin = VoltDB.DEFAULT_INTERNAL_PORT;
-
-        if (portOffset != null) {
-            portNoToRejoin = VoltDB.DEFAULT_INTERNAL_PORT + portOffset;
-            // adminPortNo = m_baseAdminPort - portOffset;
+        // Lookup the client interface port of the rejoin host
+        // I have no idea why this code ignores the user's input
+        // based on other state in this class except to say that whoever wrote
+        // it this way originally probably eats kittens and hates cake.
+        if (rejoinHostId == null || m_hasLocalServer) {
+            rejoinHostId = 0;
         }
-        System.out.println("Rejoining " + hostId + " to hostID: " + portOffset);
+        int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
+        System.out.println("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
-        System.out.println("Starting recovery command " + m_procBuilder.command());
+        // rebuild the EE proc set.
         ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
         for (EEProcess proc : eeProcs) {
             try {
@@ -803,64 +621,31 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
         eeProcs.clear();
-
         for (int ii = 0; ii < m_siteCount; ii++) {
             String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
-            eeProcs.add(new EEProcess(m_target, logfile));
+            eeProcs.add(new EEProcess(templateCmdLine.target(), logfile));
         }
-
-        if (m_target.isIPC) {
-            m_procBuilder.command().set(m_ipcPortOffset1, "ipcports");
-            String portString = "";
-            for (EEProcess proc : m_eeProcs.get(hostId)) {
-                if (portString.isEmpty()) {
-                    portString += Integer.valueOf(proc.port());
-                } else {
-                    portString += "," + Integer.valueOf(proc.port());
-                }
-            }
-            m_procBuilder.command().set(m_ipcPortOffset2, portString);
-            m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
-        }
-
-        //When recovering reuse the root from the original
-        m_procBuilder.command().set(
-                m_voltFilePrefixOffset,
-                "-DVoltFilePrefix=" + m_subRoots.get(hostId).getPath());
 
         PipeToFile ptf = null;
         long start = 0;
         try {
-            //The start mode ends up being clobbered by rejoinOffset
-            // Rejoin should never need to be told the operating mode
-            //m_procBuilder.command().set(m_voltStartModeOffset, "");
-            m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
-            m_procBuilder.command().set(m_internalPortOffset, String.valueOf(VoltDB.DEFAULT_INTERNAL_PORT + hostId) );
-            m_procBuilder.command().set(m_adminPortOffset, String.valueOf(adminPortNo));
-            m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
-            m_procBuilder.command().set(m_voltStartCmdOffset, "rejoinhost");
-            m_procBuilder.command().set(m_rejoinOffset, rejoinHost + ":" + String.valueOf(portNoToRejoin));
-            m_procBuilder.command().set(m_licensePathOffset, "");
-            m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
+            CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
+            // This shouldn't collide but apparently it sucks.
+            // Bump it to avoid collisions on rejoin.
             if (m_debug) {
-                System.out.println("Debug port is " + m_debugPortOffset);
-                m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
-                m_procBuilder.command().set(
-                        m_debugOffset2,
-                        "-agentlib:jdwp=transport=dt_socket,address="
-                        + m_debugPortOffset++ + ",server=y,suspend=n");
+                rejoinCmdLn.debugPort(portGenerator.next());
             }
-            m_procBuilder.command().set(m_zkPortOffset, Integer.toString(2181 + hostId));
+            rejoinCmdLn.rejoinHostAndPort(rejoinHost + ":" + String.valueOf(portNoToRejoin));
 
-            System.out.println("Rejoin command " + m_procBuilder.command());
-
+            m_procBuilder.command().clear();
+            m_procBuilder.command().addAll(rejoinCmdLn.createCommandLine());
             Process proc = m_procBuilder.start();
             start = System.currentTimeMillis();
 
             // write output to obj/release/testoutput/<test name>-n.txt
             // this may need to be more unique? Also very useful to just
             // set this to a hardcoded path and use "tail -f" to debug.
-            String testoutputdir = m_buildDir + File.separator + "testoutput";
+            String testoutputdir = rejoinCmdLn.buildDir() + File.separator + "testoutput";
             // make sure the directory exists
             File dir = new File(testoutputdir);
             if (dir.exists()) {
@@ -1011,7 +796,7 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
 
-        if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+        if (templateCmdLine.target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             if (!EEProcess.m_valgrindErrors.isEmpty()) {
                 String failString = "";
                 for (final String error : EEProcess.m_valgrindErrors) {
@@ -1040,8 +825,10 @@ public class LocalCluster implements VoltServerConfig {
         if (m_failureState == FailureState.ONE_RECOVERING)
             prefix += "OneRecov";
 
-        return prefix + "-" + String.valueOf(m_siteCount) + "-" +
-            String.valueOf(m_hostCount) + "-" + m_target.display.toUpperCase();
+        return prefix +
+            "-" + String.valueOf(m_siteCount) +
+            "-" + String.valueOf(m_hostCount) +
+            "-" + templateCmdLine.target().display.toUpperCase();
     }
 
     @Override
@@ -1132,7 +919,27 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public boolean isHSQL() {
-        return m_target == BackendTarget.HSQLDB_BACKEND;
+        return templateCmdLine.target() == BackendTarget.HSQLDB_BACKEND;
+    }
+
+    public void setMaxHeap(int heap) {
+        templateCmdLine.setMaxHeap(heap);
+    }
+
+    public String getPathToDeployment() {
+        return templateCmdLine.pathToDeployment();
+    }
+
+    public String zkinterface(int hostId) {
+        return m_cmdLines.get(hostId).zkinterface();
+    }
+
+    public int drAgentStartPort(int hostId) {
+        return m_cmdLines.get(hostId).drAgentStartPort();
+    }
+
+    public int internalPort(int hostId) {
+        return m_cmdLines.get(hostId).internalPort();
     }
 
     @Override
@@ -1144,14 +951,6 @@ public class LocalCluster implements VoltServerConfig {
         return buildType.startsWith("memcheck");
     }
 
-    int getRandomTimestampSalt() {
-        Random r = new Random();
-        // if variance is 3, get a range between 0 and 6 inclusive
-        int retval = r.nextInt(TIMESTAMP_SALT_VARIANCE * 2 + 1);
-        // shift that range so it goes from -3 to 3 inclusive
-        retval -= TIMESTAMP_SALT_VARIANCE;
-        return retval;
-    }
 
     @Override
     public void createDirectory(File path) throws IOException {
@@ -1183,8 +982,5 @@ public class LocalCluster implements VoltServerConfig {
         return files;
     }
 
-    public ArrayList<File> getSubRoots() {
-        return m_subRoots;
-    }
 
 }

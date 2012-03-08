@@ -29,6 +29,8 @@ import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
 
+import org.voltdb.licensetool.LicenseApi;
+
 public interface VoltDBInterface
 {
     public boolean recovering();
@@ -200,4 +202,9 @@ public interface VoltDBInterface
      * tasks.
      */
     public ExecutorService getComputationService();
+
+    /**
+     * Return the license api. This may be null in community editions!
+     */
+     public LicenseApi getLicenseApi();
 }

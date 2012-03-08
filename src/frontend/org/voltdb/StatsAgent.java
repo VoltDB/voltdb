@@ -39,8 +39,10 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 
+import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
+
 import org.voltdb.utils.CompressionService;
 
 /**
@@ -97,25 +99,7 @@ public class StatsAgent {
     }
 
     public void getMailbox(final HostMessenger hostMessenger, final long hsId) {
-        m_mailbox = new Mailbox() {
-
-            @Override
-            public void send(long destinationHSId, VoltMessage message)
-                    throws MessagingException {
-                assert(message != null);
-                message.m_sourceHSId = hsId;
-                hostMessenger.send(destinationHSId, message);
-            }
-
-            @Override
-            public void send(long[] desinationHSIds, VoltMessage message)
-                    throws MessagingException {
-                assert(message != null);
-                assert(desinationHSIds != null);
-                message.m_sourceHSId = hsId;
-                hostMessenger.send(desinationHSIds, message);
-            }
-
+        m_mailbox = new LocalMailbox(hostMessenger, hsId) {
             @Override
             public void deliver(final VoltMessage message) {
                 m_es.submit(new Runnable() {
@@ -124,51 +108,6 @@ public class StatsAgent {
                         handleMailboxMessage(message);
                     }
                 });
-            }
-
-            @Override
-            public void deliverFront(VoltMessage message) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recv() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(long timeout) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recv(Subject[] s) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s, long timeout) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public long getHSId() {
-                return hsId;
-            }
-
-            @Override
-            public void setHSId(long hsId) {
-                throw new UnsupportedOperationException();
             }
         };
         hostMessenger.registerMailbox(m_mailbox);

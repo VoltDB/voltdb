@@ -20,6 +20,8 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 
+import org.voltdb.licensetool.LicenseApi;
+
 /**
  * Stub class that provides a gateway to the InvocationBufferServer when
  * WAN-based DR is enabled. If no DR, then it acts as a noop stub.
@@ -39,13 +41,14 @@ public class PartitionDRGateway {
                                                  boolean replicationActive,
                                                  File overflowDir)
     {
-        PartitionDRGateway pdrg = null;
-
-        VoltDBInterface vdb = VoltDB.instance();
+        final VoltDBInterface vdb = VoltDB.instance();
+        LicenseApi api = vdb.getLicenseApi();
+        final boolean licensedToWAN = api.isWanReplicationAllowed();
 
         // if this is a primary cluster in a DR-enabled scenario
         //  try to load the real version of this class
-        if (vdb.getReplicationRole() == ReplicationRole.MASTER) {
+        PartitionDRGateway pdrg = null;
+        if (licensedToWAN) {
             try {
                 Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
                 Object obj = pdrgiClass.newInstance();
@@ -61,8 +64,7 @@ public class PartitionDRGateway {
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, rejoiningAtStartup, replicationActive,
-                      overflowDir);
+            pdrg.init(partitionId, rejoiningAtStartup, replicationActive, overflowDir);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
@@ -76,6 +78,7 @@ public class PartitionDRGateway {
                         File overflowDir) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
     public void tick(long txnId) {}
+    public void start() {}
     public void setActive(boolean active) {}
     public boolean isActive() { return false; }
     public void shutdown() {}

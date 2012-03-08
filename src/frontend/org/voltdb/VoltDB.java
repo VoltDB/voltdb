@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -47,7 +48,7 @@ public class VoltDB {
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
-    public static enum START_ACTION {
+    public enum START_ACTION {
         CREATE, RECOVER, START
     }
 
@@ -66,7 +67,7 @@ public class VoltDB {
 
         public List<Integer> m_ipcPorts = Collections.synchronizedList(new LinkedList<Integer>());
 
-        private static final VoltLogger hostLog = new VoltLogger("HOST");
+        protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
         /** use normal JNI backend or optional IPC or HSQLDB backends */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
@@ -125,7 +126,7 @@ public class VoltDB {
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
 
-        /** replication role: master, replica */
+        /** replication role. */
         public ReplicationRole m_replicationRole = ReplicationRole.NONE;
 
         /**
@@ -153,7 +154,7 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        public Integer m_leaderPort = null;
+        public Integer m_leaderPort = DEFAULT_PORT;
 
         public Configuration() { }
 
@@ -265,10 +266,11 @@ public class VoltDB {
                     m_startAction = START_ACTION.START;
                 }
 
-                else if (arg.equals("master")) {
-                    m_replicationRole = ReplicationRole.MASTER;
-                } else if (arg.equals("replica")) {
+                else if (arg.equals("replica")) {
                     m_replicationRole = ReplicationRole.REPLICA;
+                }
+                else if (arg.equals("dragentportstart")) {
+                    m_drAgentPortStart = Integer.parseInt(args[++i]);
                 }
 
                 // handle timestampsalt
@@ -301,11 +303,7 @@ public class VoltDB {
                     usage();
                     System.exit(-1);
                 }
-            }
 
-            // set the dr agent's port config from properties
-            if (System.getenv().containsKey("dragentportoffset")) {
-                m_drAgentPortStart = Integer.parseInt(System.getenv("dragentportoffset"));
             }
         }
 
@@ -358,11 +356,15 @@ public class VoltDB {
          * Prints a usage message as a fatal error.
          */
         public void usage() {
-            // This text is user visible. Make it match the documentation PDF
-            hostLog.fatal("Usage: org.voltdb.VoltDB start|recover|create leader|rejoinhost <hostname> " +
-                          "deployment <deployment.xml> license <license.xml> [catalog <catalog.jar>]");
-            hostLog.fatal("The _Getting Started With VoltDB_ book explains how " +
-                          "to run VoltDB from the command line.");
+            // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
+            // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
+            // GettingStarted.pdf).
+            if (org.voltdb.utils.MiscUtils.isPro()) {
+                hostLog.fatal("Usage: org.voltdb.VoltDB [create|recover|replica] leader <hostname> deployment <deployment.xml> license <license.xml> catalog <catalog.jar>");
+            } else {
+                hostLog.fatal("Usage: org.voltdb.VoltDB [create|recover] leader <hostname> deployment <deployment.xml> catalog <catalog.jar>");
+            }
+            hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 
         /**

@@ -345,7 +345,7 @@ public class TestExecutionSite extends TestCase {
     Map<Long, StringWriter> m_siteResults = new HashMap<Long, StringWriter>();
     Random m_rand;
 
-    private void setUp(int siteCount, int partitionCount, int kFactor) throws Exception {
+    private void start(int siteCount, int partitionCount, int kFactor) throws Exception {
         long seed = System.currentTimeMillis();
         m_rand = new Random(seed);
         m_checker = new ExecutionSiteFuzzChecker();
@@ -425,15 +425,6 @@ public class TestExecutionSite extends TestCase {
             registerMailbox(siteId, m_mboxes.get(siteId));
         }
     }
-    @Override
-    protected void setUp() throws Exception
-    {
-        if (m_voltdb != null) {
-            tearDown();
-        }
-        super.setUp();
-        setUp( SITE_COUNT, PARTITION_COUNT, K_FACTOR);
-    }
 
     @Override
     protected void tearDown() throws Exception
@@ -442,8 +433,10 @@ public class TestExecutionSite extends TestCase {
         super.tearDown();
         m_sites.clear();
         m_mboxes.clear();
-        m_voltdb.shutdown(null);
-        m_voltdb = null;
+        if (m_voltdb != null) {
+            m_voltdb.shutdown(null);
+            m_voltdb = null;
+        }
         System.out.println("Shutdown ZK");
         m_checker = null;
     }
@@ -752,12 +745,13 @@ public class TestExecutionSite extends TestCase {
         }
     }
 
-    /*public void testFuzzedTransactions() throws Exception
+    public void testFuzzedTransactions() throws Exception
     {
         for (int ii = 0; ii < 1; ii++) {
             tearDown();
             System.gc();
-            setUp();
+            start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
+
             final int totalTransactions = 20000;
             final long firstTxnId = 10000;
             for (int i=0; i < SITE_COUNT; ++i) {
@@ -790,14 +784,15 @@ public class TestExecutionSite extends TestCase {
             m_checker.dumpLogs();
             assertTrue(m_checker.validateLogs());
         }
-    }*/
+    }
 
     /*
      * SinglePartition basecase. Show that recursableRun completes a
      * single partition transaction.
      */
-    public void testSinglePartitionTxn()
+    public void testSinglePartitionTxn() throws Exception
     {
+        start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         final boolean readOnly = false;
         final boolean singlePartition = true;
 
@@ -834,8 +829,9 @@ public class TestExecutionSite extends TestCase {
     /*
      * Single partition read-only
      */
-    public void testROSinglePartitionTxn()
+    public void testROSinglePartitionTxn() throws Exception
     {
+        start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         final boolean readOnly = true;
         final boolean singlePartition = true;
 
@@ -866,7 +862,7 @@ public class TestExecutionSite extends TestCase {
      */
     public void testMultiPartitionTxn() throws Exception {
         tearDown();
-        setUp( 2, 2, 0);
+        start( 2, 2, 0);
         final boolean readOnly = false, singlePartition = false;
         Thread es1, es2;
 
@@ -938,7 +934,7 @@ public class TestExecutionSite extends TestCase {
     throws Exception
     {
         tearDown();
-        setUp( 2, 2, 0);
+        start( 2, 2, 0);
         // cause the coordinator to die before committing.
         TestExecutionSite.MockMPProcedureRunner.
         simulate_coordinator_dies_during_commit = true;
@@ -966,7 +962,7 @@ public class TestExecutionSite extends TestCase {
     throws Exception
     {
         tearDown();
-        setUp( 2, 2, 0);
+        start( 2, 2, 0);
         // cause the coordinator to die before committing.
         TestExecutionSite.MockMPProcedureRunner.
         simulate_coordinator_dies_during_commit = true;
@@ -1069,7 +1065,8 @@ public class TestExecutionSite extends TestCase {
      * ExecutionSite and Mailbox are necessary to construct a MP txn state.
      */
     @SuppressWarnings("deprecation")
-    public void testMultiPartitionParticipantTxnState_handleSiteFaults() {
+    public void testMultiPartitionParticipantTxnState_handleSiteFaults() throws Exception {
+        start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");
@@ -1137,7 +1134,7 @@ public class TestExecutionSite extends TestCase {
      */
     public void testFailedMultiPartitionParticipant() throws Exception {
         tearDown();
-        setUp( 2, 2, 0);
+        start( 2, 2, 0);
         final boolean readOnly = false, singlePartition = false;
         Thread es1;
 
@@ -1391,6 +1388,8 @@ public class TestExecutionSite extends TestCase {
      */
     public void testENG1617() throws Exception {
         System.out.println("Starting testENG1617");
+        start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
+
         for (RussianRouletteMailbox m : m_mboxes.values()) {
              m.setFailureLikelihood(0);
         }
