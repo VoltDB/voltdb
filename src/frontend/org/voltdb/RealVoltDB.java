@@ -231,7 +231,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
     private OperationMode m_startMode = null;
-    private ReplicationRole m_replicationRole = null;
 
     volatile String m_localMetadata = "";
     final Map<Integer, String> m_clusterMetadata = Collections.synchronizedMap(new HashMap<Integer, String>());
@@ -294,7 +293,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_hasCatalog = new CountDownLatch(1);
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
-            m_replicationRole = m_config.m_replicationRole;
             m_replicationActive = false;
 
             m_computationService = Executors.newFixedThreadPool(
@@ -477,7 +475,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         ClientInterface.create(m_network,
                                                m_messenger,
                                                m_catalogContext,
-                                               m_replicationRole,
+                                               m_config.m_replicationRole,
                                                initiator,
                                                m_catalogContext.numberOfNodes,
                                                currSiteId,
@@ -973,8 +971,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
         }
 
-        if (m_replicationRole == ReplicationRole.REPLICA) {
-            hostLog.info("Started as " + m_replicationRole.toString().toLowerCase() + " cluster. " +
+        if (m_config.m_replicationRole == ReplicationRole.REPLICA) {
+            hostLog.info("Started as " + m_config.m_replicationRole.toString().toLowerCase() + " cluster. " +
                              "Clients can only call read-only procedures.");
         }
         if (httpPortExtraLogMessage != null) {
@@ -1778,25 +1776,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void setReplicationRole(ReplicationRole role)
     {
-        if (m_replicationRole == null) {
-            m_replicationRole = role;
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.setReplicationRole(m_replicationRole);
-            }
-        }
-        else if (role != ReplicationRole.REPLICA && m_replicationRole == ReplicationRole.REPLICA) {
+        if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
             hostLog.info("Promoting replication role from replica to master.");
-            m_replicationRole = role;
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.setReplicationRole(m_replicationRole);
-            }
+        }
+        m_config.m_replicationRole = role;
+        for (ClientInterface ci : m_clientInterfaces) {
+            ci.setReplicationRole(m_config.m_replicationRole);
         }
     }
 
     @Override
     public ReplicationRole getReplicationRole()
     {
-        return m_replicationRole;
+        return m_config.m_replicationRole;
     }
 
     /**
