@@ -301,6 +301,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/ProcInfo.java" />
+            <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>
 
@@ -333,6 +334,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
             <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
             <include name="src/frontend/org/voltdb/client/exampleutils/*.java" />
+            <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>
 </target>

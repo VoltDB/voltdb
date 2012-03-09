@@ -88,7 +88,7 @@ public enum VoltType {
             new Class[] {double.class, Double.class, float.class, Float.class}, 'f'),
 
     /**
-     * 8-byte long value representing milliseconds after the epoch.
+     * 8-byte long value representing microseconds after the epoch.
      * The epoch is Jan. 1 1970 00:00:00 GMT. Negative values represent
      * time before the epoch. This covers roughly 4000BC to 8000AD.
      */
