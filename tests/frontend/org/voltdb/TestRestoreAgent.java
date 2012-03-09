@@ -614,7 +614,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
-                                               TEST_SERVER_BASE_PORT,
+                                               TEST_SERVER_BASE_PORT + 2,
+                                               TEST_SERVER_BASE_PORT + 1,
                                                TEST_ZK_BASE_PORT,
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
@@ -649,6 +650,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
+                                               TEST_SERVER_BASE_PORT + 2,
                                                TEST_SERVER_BASE_PORT,
                                                TEST_ZK_BASE_PORT,
                                                BackendTarget.NATIVE_EE_JNI);
@@ -685,6 +687,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
                                                deploymentPath,
+                                               TEST_SERVER_BASE_PORT + 2,
                                                TEST_SERVER_BASE_PORT,
                                                TEST_ZK_BASE_PORT,
                                                BackendTarget.NATIVE_EE_JNI);

@@ -73,7 +73,16 @@ public class ServerThread extends Thread {
     }
 
     public ServerThread(String pathToCatalog,
+            String pathToDeployment,
+            int internalPort,
+            int zkPort,
+            BackendTarget target) {
+        this(pathToCatalog, pathToDeployment, VoltDB.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
+    }
+
+    public ServerThread(String pathToCatalog,
                         String pathToDeployment,
+                        int leaderPort,
                         int internalPort,
                         int zkPort,
                         BackendTarget target)
@@ -85,6 +94,7 @@ public class ServerThread extends Thread {
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "localhost";
         m_config.m_internalPort = internalPort;
+        m_config.m_leaderPort = leaderPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
 
         if (!m_config.validate()) {
