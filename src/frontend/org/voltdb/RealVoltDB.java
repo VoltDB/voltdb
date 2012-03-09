@@ -268,6 +268,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             m_config = config;
+            m_startMode = null;
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
