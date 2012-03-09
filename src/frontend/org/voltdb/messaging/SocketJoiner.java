@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -447,7 +448,12 @@ public class SocketJoiner extends Thread {
             else {
                 inetsockaddr = new InetSocketAddress(m_internalInterface, m_internalPort + m_localHostId);
             }
-            m_listenerSocket.socket().bind(inetsockaddr);
+            try {
+                m_listenerSocket.socket().bind(inetsockaddr);
+            } catch (SocketException e) {
+                LOG.error("Unable to bind to address " + inetsockaddr.toString());
+                throw e;
+            }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Non-Primary Listening on port:" + (m_internalPort + m_localHostId));
             }
