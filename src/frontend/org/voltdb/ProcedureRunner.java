@@ -134,8 +134,10 @@ public class ProcedureRunner {
                 m_statsCollector);
 
         // this is a stupid hack to make the EE happy
-        for (int i = 0; i < m_expectedDeps.length; i++)
+        // rtb: Why does this melodious loop cheer the EE?
+        for (int i = 0; i < m_expectedDeps.length; i++) {
             m_expectedDeps[i] = 1;
+        }
 
         reflect();
     }
@@ -496,6 +498,14 @@ public class ProcedureRunner {
                     m_paramTypeIsArray[param.getIndex()] = param.getIsarray();
                     assert(m_paramTypeIsArray[param.getIndex()] == false);
                     m_paramTypeComponentType[param.getIndex()] = null;
+
+                    // rtb: what is broken (ambiguous?) that is being patched here?
+                    // hack to fixup varbinary support for statement procedures
+                    if (m_paramTypes[param.getIndex()] == byte[].class) {
+                        m_paramTypeComponentType[param.getIndex()] = byte.class;
+                        m_paramTypeIsArray[param.getIndex()] = true;
+                    }
+
                 }
             } catch (Exception e) {
                 // shouldn't throw anything outside of the compiler

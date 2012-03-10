@@ -39,9 +39,9 @@ public class ParameterConverter {
      */
     public static Object tryToMakeCompatible(
             final boolean isPrimitive,
-            boolean isArray,
+            final boolean isArray,
             final Class<?> paramType,
-            Class<?> paramTypeComponentType,
+            final Class<?> paramTypeComponentType,
             final Object param)
     throws Exception
     {
@@ -69,16 +69,6 @@ public class ParameterConverter {
 
         if (param instanceof ExecutionSite.SystemProcedureExecutionContext) {
             return param;
-        }
-
-        // rtb: wonder why this can't be calculated exactly once
-        // for the parameter set -- all inputs to tryToMakeCompatible
-        // could be final.
-
-        // hack to fixup varbinary support for statement procs
-        if (paramType == byte[].class) {
-            paramTypeComponentType = byte.class;
-            isArray = true;
         }
 
         Class<?> pclass = param.getClass();
