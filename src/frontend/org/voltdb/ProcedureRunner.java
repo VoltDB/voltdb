@@ -21,13 +21,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
@@ -50,9 +47,7 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
-import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
 
 public class ProcedureRunner {
 
