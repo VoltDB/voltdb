@@ -45,11 +45,12 @@ public class TestTheHashinator extends TestCase {
 
     public void testExpectNonZeroHash() {
         ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
-
         int partitionCount = 3;
         long valueToHash = 2;
+        TheHashinator.initialize(partitionCount);
+
         int eehash = ee.hashinate(valueToHash, partitionCount);
-        int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        int javahash = TheHashinator.hashinateLong(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -63,11 +64,12 @@ public class TestTheHashinator extends TestCase {
 
     public void testSameLongHash1() {
         ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
-
         int partitionCount = 2;
+        TheHashinator.initialize(partitionCount);
+
         long valueToHash = 0;
         int eehash = ee.hashinate(valueToHash, partitionCount);
-        int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        int javahash = TheHashinator.hashinateLong(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -75,10 +77,9 @@ public class TestTheHashinator extends TestCase {
         assertTrue(eehash < partitionCount);
         assertTrue(eehash >= 0);
 
-        partitionCount = 2;
         valueToHash = 1;
         eehash = ee.hashinate(valueToHash, partitionCount);
-        javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        javahash = TheHashinator.hashinateLong(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -86,10 +87,9 @@ public class TestTheHashinator extends TestCase {
         assertTrue(eehash < partitionCount);
         assertTrue(eehash >= 0);
 
-        partitionCount = 2;
         valueToHash = 2;
         eehash = ee.hashinate(valueToHash, partitionCount);
-        javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        javahash = TheHashinator.hashinateLong(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -97,10 +97,9 @@ public class TestTheHashinator extends TestCase {
         assertTrue(eehash < partitionCount);
         assertTrue(eehash >= 0);
 
-        partitionCount = 2;
         valueToHash = 3;
         eehash = ee.hashinate(valueToHash, partitionCount);
-        javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+        javahash = TheHashinator.hashinateLong(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -123,9 +122,10 @@ public class TestTheHashinator extends TestCase {
             long[] values = new long[] {
                     Long.MIN_VALUE, Long.MAX_VALUE, Long.MAX_VALUE - 1, Long.MIN_VALUE + 1
             };
+            TheHashinator.initialize(partitionCount);
             for (long valueToHash : values) {
                 int eehash = ee.hashinate(valueToHash, partitionCount);
-                int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+                int javahash = TheHashinator.hashinateLong(valueToHash);
                 if (eehash != javahash) {
                     System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
                 }
@@ -147,10 +147,11 @@ public class TestTheHashinator extends TestCase {
          */
         for (int i = 0; i < 100000; i++) {
             int partitionCount = r.nextInt(1000) + 1;
+            TheHashinator.initialize(partitionCount);
             // this will produce negative values, which is desired here.
             long valueToHash = r.nextLong();
             int eehash = ee.hashinate(valueToHash, partitionCount);
-            int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+            int javahash = TheHashinator.hashinateLong(valueToHash);
             if (eehash != javahash) {
                 System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
             }
@@ -168,9 +169,10 @@ public class TestTheHashinator extends TestCase {
         for (int i = 0; i < 100000; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             String valueToHash = Long.toString(r.nextLong());
+            TheHashinator.initialize(partitionCount);
 
             int eehash = ee.hashinate(valueToHash, partitionCount);
-            int javahash = TheHashinator.hashinate(valueToHash, partitionCount);
+            int javahash = TheHashinator.hashinateString(valueToHash);
             if (eehash != javahash) {
                 partitionCount++;
             }
@@ -185,37 +187,38 @@ public class TestTheHashinator extends TestCase {
     public void testNulls() {
         ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
 
-        int jHash = TheHashinator.hashToPartition(new Byte(VoltType.NULL_TINYINT), 2);
+        TheHashinator.initialize(2);
+        int jHash = TheHashinator.hashToPartition(new Byte(VoltType.NULL_TINYINT));
         int cHash = ee.hashinate(VoltType.NULL_TINYINT, 2);
         assertEquals(0, jHash);
         assertEquals(jHash, cHash);
         System.out.println("jhash " + jHash + " chash " + cHash);
 
-        jHash = TheHashinator.hashToPartition(new Short(VoltType.NULL_SMALLINT), 2);
+        jHash = TheHashinator.hashToPartition(new Short(VoltType.NULL_SMALLINT));
         cHash = ee.hashinate(VoltType.NULL_SMALLINT, 2);
         assertEquals(0, jHash);
         assertEquals(jHash, cHash);
         System.out.println("jhash " + jHash + " chash " + cHash);
 
-        jHash = TheHashinator.hashToPartition(new Integer(VoltType.NULL_INTEGER), 2);
+        jHash = TheHashinator.hashToPartition(new Integer(VoltType.NULL_INTEGER));
         cHash = ee.hashinate(VoltType.NULL_INTEGER, 2);
         assertEquals(0, jHash);
         assertEquals(jHash, cHash);
         System.out.println("jhash " + jHash + " chash " + cHash);
 
-        jHash = TheHashinator.hashToPartition(new Long(VoltType.NULL_BIGINT), 2);
+        jHash = TheHashinator.hashToPartition(new Long(VoltType.NULL_BIGINT));
         cHash = ee.hashinate(VoltType.NULL_BIGINT, 2);
         assertEquals(0, jHash);
         assertEquals(jHash, cHash);
         System.out.println("jhash " + jHash + " chash " + cHash);
 
-        jHash = TheHashinator.hashToPartition(VoltType.NULL_STRING_OR_VARBINARY, 2);
+        jHash = TheHashinator.hashToPartition(VoltType.NULL_STRING_OR_VARBINARY);
         cHash = ee.hashinate(VoltType.NULL_STRING_OR_VARBINARY, 2);
         assertEquals(0, jHash);
         assertEquals(jHash, cHash);
         System.out.println("jhash " + jHash + " chash " + cHash);
 
-        jHash = TheHashinator.hashToPartition(null, 2);
+        jHash = TheHashinator.hashToPartition(null);
         cHash = ee.hashinate(null, 2);
         assertEquals(0, jHash);
         assertEquals(jHash, cHash);

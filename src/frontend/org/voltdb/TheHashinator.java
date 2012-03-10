@@ -33,7 +33,6 @@ public abstract class TheHashinator {
 
     /**
      * Initialize TheHashinator
-     * @param catalog A pointer to the catalog data structure.
      */
     public static void initialize(int partitionCount) {
         catalogPartitionCount = partitionCount;
@@ -47,7 +46,9 @@ public abstract class TheHashinator {
      * @return A value between 0 and partitionCount-1, hopefully pretty evenly
      * distributed.
      */
-    static int hashinate(long value, int partitionCount) {
+    static int hashinateLong(long value) {
+        int partitionCount = TheHashinator.catalogPartitionCount;
+
         // special case this hard to hash value to 0 (in both c++ and java)
         if (value == Long.MIN_VALUE) return 0;
 
@@ -64,7 +65,9 @@ public abstract class TheHashinator {
      * @return A value between 0 and partitionCount-1, hopefully pretty evenly
      * distributed.
      */
-    static int hashinate(Object value, int partitionCount) {
+    static int hashinateString(Object value) {
+        int partitionCount = TheHashinator.catalogPartitionCount;
+
         if (value instanceof String) {
             String string = (String) value;
             try {
@@ -92,16 +95,6 @@ public abstract class TheHashinator {
      * @return The id of the partition desired.
      */
     public static int hashToPartition(Object obj) {
-        return (hashToPartition(obj, TheHashinator.catalogPartitionCount));
-    }
-
-    /**
-     * Given an object and a number of partitions, map the object to a partition.
-     * @param obj The object to be mapped to a partition.
-     * @param partitionCount The number of partitions TheHashinator will use
-     * @return The id of the partition desired.
-     */
-    public static int hashToPartition(Object obj, int partitionCount) {
         int index = 0;
         if (obj == null || VoltType.isNullVoltType(obj))
         {
@@ -109,18 +102,18 @@ public abstract class TheHashinator {
         }
         else if (obj instanceof Long) {
             long value = ((Long) obj).longValue();
-            index = hashinate(value, partitionCount);
+            index = hashinateLong(value);
         } else if (obj instanceof String) {
-            index = hashinate(obj, partitionCount);
+            index = hashinateString(obj);
         } else if (obj instanceof Integer) {
             long value = ((Integer)obj).intValue();
-            index = hashinate(value, partitionCount);
+            index = hashinateLong(value);
         } else if (obj instanceof Short) {
             long value = ((Short)obj).shortValue();
-            index = hashinate(value, partitionCount);
+            index = hashinateLong(value);
         } else if (obj instanceof Byte) {
             long value = ((Byte)obj).byteValue();
-            index = hashinate(value, partitionCount);
+            index = hashinateLong(value);
         }
         return index;
     }
