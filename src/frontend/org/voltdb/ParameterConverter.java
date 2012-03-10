@@ -49,8 +49,8 @@ public class ParameterConverter {
             param == VoltType.NULL_STRING_OR_VARBINARY ||
             param == VoltType.NULL_DECIMAL)
         {
-            VoltType type = VoltType.typeFromClass(paramType);
             if (isPrimitive) {
+                VoltType type = VoltType.typeFromClass(paramType);
                 switch (type) {
                 case TINYINT:
                 case SMALLINT:
