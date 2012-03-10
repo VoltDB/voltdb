@@ -85,11 +85,11 @@ public class ParameterConverter {
             return Encoder.hexDecode((String) param);
         }
 
-        boolean slotIsArray = isArray;
-        if (slotIsArray != pclass.isArray())
+        if (isArray != pclass.isArray()) {
             throw new Exception("Array / Scalar parameter mismatch");
+        }
 
-        if (slotIsArray) {
+        if (isArray) {
             Class<?> pSubCls = pclass.getComponentType();
             Class<?> sSubCls = paramTypeComponentType;
             if (pSubCls == sSubCls) {
@@ -189,20 +189,29 @@ public class ParameterConverter {
                 return ((Number) param).byteValue();
         }
 
-//        if (pclass == String.class) {
-//            if (slot == byte.class) {
-//                return Byte.parseByte((String) param);
-//            }
-//            if (slot == short.class) {
-//                return Short.parseShort((String) param);
-//            }
-//            if (slot == int.class) {
-//                return Integer.parseInt((String) param);
-//            }
-//            if (slot == long.class) {
-//                return Long.parseLong((String) param);
-//            }
-//        }
+        // Coerce strings to primitive numbers.
+        if (pclass == String.class) {
+            try {
+                if (slot == byte.class) {
+                    return Byte.parseByte((String) param);
+                }
+                if (slot == short.class) {
+                    return Short.parseShort((String) param);
+                }
+                if (slot == int.class) {
+                    return Integer.parseInt((String) param);
+                }
+                if (slot == long.class) {
+                    return Long.parseLong((String) param);
+                }
+            }
+            catch (NumberFormatException nfe) {
+                throw new Exception(
+                        "tryToMakeCompatible: Unable to convert string "
+                        + (String)param + " to "  + slot.getName()
+                        + " value for target parameter " + slot.getName());
+            }
+        }
 
         throw new Exception(
                 "tryToMakeCompatible: Unable to match parameters or out of range for taget param: "
