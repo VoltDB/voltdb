@@ -1,0 +1,222 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2012 VoltDB Inc.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb;
+
+import java.lang.reflect.Array;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Date;
+
+import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.Encoder;
+
+/**
+ * ParameterConverter provides a static helper to convert a deserialized
+ * procedure invocation parameter to the correct Object required by a
+ * stored procedure's parameter type.
+ *
+ */
+public class ParameterConverter {
+
+    /**
+     * @throws Exception with a message describing why the types are incompatible.
+     */
+    public static Object tryToMakeCompatible(
+            final boolean isPrimitive,
+            boolean isArray,
+            final Class<?> paramType,
+            Class<?> paramTypeComponentType,
+            final Object param)
+    throws Exception
+    {
+        if (param == null ||
+            param == VoltType.NULL_STRING_OR_VARBINARY ||
+            param == VoltType.NULL_DECIMAL)
+        {
+            VoltType type = VoltType.typeFromClass(paramType);
+            if (isPrimitive) {
+                switch (type) {
+                case TINYINT:
+                case SMALLINT:
+                case INTEGER:
+                case BIGINT:
+                case FLOAT:
+                    return type.getNullValue();
+                }
+            }
+
+            // Pass null reference to the procedure run() method. These null values will be
+            // converted to a serialize-able NULL representation for the EE in getCleanParams()
+            // when the parameters are serialized for the plan fragment.
+            return null;
+        }
+
+        if (param instanceof ExecutionSite.SystemProcedureExecutionContext) {
+            return param;
+        }
+
+        // rtb: wonder why this can't be calculated exactly once
+        // for the parameter set -- all inputs to tryToMakeCompatible
+        // could be final.
+
+        // hack to fixup varbinary support for statement procs
+        if (paramType == byte[].class) {
+            paramTypeComponentType = byte.class;
+            isArray = true;
+        }
+
+        Class<?> pclass = param.getClass();
+
+        // hack to make strings work with input as byte[]
+        if ((paramType == String.class) && (pclass == byte[].class)) {
+            String sparam = null;
+            sparam = new String((byte[]) param, "UTF-8");
+            return sparam;
+        }
+
+        // hack to make varbinary work with input as string
+        if ((paramType == byte[].class) && (pclass == String.class)) {
+            return Encoder.hexDecode((String) param);
+        }
+
+        boolean slotIsArray = isArray;
+        if (slotIsArray != pclass.isArray())
+            throw new Exception("Array / Scalar parameter mismatch");
+
+        if (slotIsArray) {
+            Class<?> pSubCls = pclass.getComponentType();
+            Class<?> sSubCls = paramTypeComponentType;
+            if (pSubCls == sSubCls) {
+                return param;
+            }
+            // if it's an empty array, let it through
+            // this is a bit ugly as it might hide passing
+            //  arrays of the wrong type, but it "does the right thing"
+            //  more often that not I guess...
+            else if (Array.getLength(param) == 0) {
+                return Array.newInstance(sSubCls, 0);
+            }
+            else {
+                /*
+                 * Arrays can be quite large so it doesn't make sense to silently do the conversion
+                 * and incur the performance hit. The client should serialize the correct invocation
+                 * parameters
+                 */
+                throw new Exception(
+                        "tryScalarMakeCompatible: Unable to match parameter array:"
+                        + sSubCls.getName() + " to provided " + pSubCls.getName());
+            }
+        }
+
+        /*
+         * inline tryScalarMakeCompatible so we can save on reflection
+         */
+        final Class<?> slot = paramType;
+        if ((slot == long.class) && (pclass == Long.class || pclass == Integer.class || pclass == Short.class || pclass == Byte.class)) return param;
+        if ((slot == int.class) && (pclass == Integer.class || pclass == Short.class || pclass == Byte.class)) return param;
+        if ((slot == short.class) && (pclass == Short.class || pclass == Byte.class)) return param;
+        if ((slot == byte.class) && (pclass == Byte.class)) return param;
+        if ((slot == double.class) && (param instanceof Number)) return ((Number)param).doubleValue();
+        if ((slot == String.class) && (pclass == String.class)) return param;
+        if (slot == TimestampType.class) {
+            if (pclass == Long.class) return new TimestampType((Long)param);
+            if (pclass == TimestampType.class) return param;
+            if (pclass == Date.class) return new TimestampType((Date) param);
+            // if a string is given for a date, use java's JDBC parsing
+            if (pclass == String.class) {
+                try {
+                    return new TimestampType((String)param);
+                }
+                catch (IllegalArgumentException e) {
+                    // ignore errors if it's not the right format
+                }
+            }
+        }
+        if (slot == BigDecimal.class) {
+            if ((pclass == Long.class) || (pclass == Integer.class) ||
+                (pclass == Short.class) || (pclass == Byte.class)) {
+                BigInteger bi = new BigInteger(param.toString());
+                BigDecimal bd = new BigDecimal(bi);
+                bd.setScale(4, BigDecimal.ROUND_HALF_EVEN);
+                return bd;
+            }
+            if (pclass == BigDecimal.class) {
+                BigDecimal bd = (BigDecimal) param;
+                bd.setScale(4, BigDecimal.ROUND_HALF_EVEN);
+                return bd;
+            }
+            if (pclass == String.class) {
+                BigDecimal bd = VoltDecimalHelper.deserializeBigDecimalFromString((String) param);
+                return bd;
+            }
+        }
+        if (slot == VoltTable.class && pclass == VoltTable.class) {
+            return param;
+        }
+
+        // handle truncation for integers
+
+        // Long targeting int parameter
+        if ((slot == int.class) && (pclass == Long.class)) {
+            long val = ((Number) param).longValue();
+
+            // if it's in the right range, and not null (target null), crop the value and return
+            if ((val <= Integer.MAX_VALUE) && (val >= Integer.MIN_VALUE) && (val != VoltType.NULL_INTEGER))
+                return ((Number) param).intValue();
+        }
+
+        // Long or Integer targeting short parameter
+        if ((slot == short.class) && (pclass == Long.class || pclass == Integer.class)) {
+            long val = ((Number) param).longValue();
+
+            // if it's in the right range, and not null (target null), crop the value and return
+            if ((val <= Short.MAX_VALUE) && (val >= Short.MIN_VALUE) && (val != VoltType.NULL_SMALLINT))
+                return ((Number) param).shortValue();
+        }
+
+        // Long, Integer or Short targeting byte parameter
+        if ((slot == byte.class) && (pclass == Long.class || pclass == Integer.class || pclass == Short.class)) {
+            long val = ((Number) param).longValue();
+
+            // if it's in the right range, and not null (target null), crop the value and return
+            if ((val <= Byte.MAX_VALUE) && (val >= Byte.MIN_VALUE) && (val != VoltType.NULL_TINYINT))
+                return ((Number) param).byteValue();
+        }
+
+//        if (pclass == String.class) {
+//            if (slot == byte.class) {
+//                return Byte.parseByte((String) param);
+//            }
+//            if (slot == short.class) {
+//                return Short.parseShort((String) param);
+//            }
+//            if (slot == int.class) {
+//                return Integer.parseInt((String) param);
+//            }
+//            if (slot == long.class) {
+//                return Long.parseLong((String) param);
+//            }
+//        }
+
+        throw new Exception(
+                "tryToMakeCompatible: Unable to match parameters or out of range for taget param: "
+                + slot.getName() + " to provided " + pclass.getName());
+    }
+
+}
