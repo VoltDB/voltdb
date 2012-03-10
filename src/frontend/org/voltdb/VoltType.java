@@ -463,6 +463,19 @@ public enum VoltType {
         }
     }
 
+    public boolean isNumber() {
+        switch (this) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     /**
      * Get a char that uniquely identifies a type. Used to create
      * concise schema signatures.

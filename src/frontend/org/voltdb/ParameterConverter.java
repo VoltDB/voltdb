@@ -218,4 +218,35 @@ public class ParameterConverter {
                 + slot.getName() + " to provided " + pclass.getName());
     }
 
+
+    /**
+     * Convert string inputs to Longs for TheHashinator if possible
+     * @param param
+     * @param slot
+     * @return Object parsed as Number or null if types not compatible
+     * @throws Exception if a parse error occurs (consistent with above).
+     */
+    public static Object stringToLong(Object param, Class<?> slot)
+    throws Exception
+    {
+        try {
+            if (slot == byte.class ||
+                slot == short.class ||
+                slot == int.class ||
+                slot == long.class)
+            {
+                return Long.parseLong((String)param);
+            }
+            return null;
+        }
+        catch (NumberFormatException nfe) {
+            throw new Exception(
+                    "tryToMakeCompatible: Unable to convert string "
+                    + (String)param + " to "  + slot.getName()
+                    + " value for target parameter " + slot.getName());
+        }
+    }
+
+
 }
+
