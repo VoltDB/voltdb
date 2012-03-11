@@ -1592,14 +1592,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     throws Exception
     {
         Object invocationParameter = task.getParameterAtIndex(partitionIndex);
-        final Class<?> invocationParamClass = VoltType.get((byte)partitionType).classFromType();
         final VoltType partitionParamType = VoltType.get((byte)partitionType);
 
         // Special case: if the user supplied a string for a number column,
         // try to do the conversion. This makes it substantially easier to
         // load CSV data or other untyped inputs that match DDL without
         // requiring the loader to know precise the schema.
-        if (invocationParamClass == String.class && partitionParamType.isNumber()) {
+        if (invocationParameter.getClass() == String.class && partitionParamType.isNumber()) {
             invocationParameter = ParameterConverter.stringToLong(
                     invocationParameter,
                     partitionParamType.classFromType());
