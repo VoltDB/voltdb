@@ -1362,8 +1362,8 @@ public class TestVoltCompiler extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertFalse(success);
-    } 
-    
+    }
+
     public void testOmittedProcedureList() {
         final String simpleSchema =
                 "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
