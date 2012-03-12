@@ -534,7 +534,7 @@ public class VoltCompiler {
                 procedures.add(getProcedure(proc));
             }
         }
-        
+
         // classdependencies/classdependency
         if (database.getClassdependencies() != null) {
             for (Classdependency dep : database.getClassdependencies().getClassdependency()) {
