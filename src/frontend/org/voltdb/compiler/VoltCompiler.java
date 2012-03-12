@@ -529,10 +529,12 @@ public class VoltCompiler {
         }
 
         // procedures/procedure
-        for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
-            procedures.add(getProcedure(proc));
+        if (database.getProcedures() != null) {
+            for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
+                procedures.add(getProcedure(proc));
+            }
         }
-
+        
         // classdependencies/classdependency
         if (database.getClassdependencies() != null) {
             for (Classdependency dep : database.getClassdependencies().getClassdependency()) {
