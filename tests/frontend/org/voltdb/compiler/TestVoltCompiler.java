@@ -1362,5 +1362,28 @@ public class TestVoltCompiler extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertFalse(success);
-    }
+    } 
+    
+    public void testOmittedProcedureList() {
+        final String simpleSchema =
+                "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
+
+            final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            final String schemaPath = schemaFile.getPath();
+
+            final String simpleProject =
+                "<?xml version=\"1.0\"?>\n" +
+                "<project>" +
+                "<database>" +
+                "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+                "</database>" +
+                "</project>";
+
+            final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+            final String projectPath = projectFile.getPath();
+
+            final VoltCompiler compiler = new VoltCompiler();
+            final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
+            assertTrue(success);
+        }
 }
