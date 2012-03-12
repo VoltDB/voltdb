@@ -206,7 +206,7 @@ public class Rejoin extends VoltSystemProcedure {
         return retval;
     }
 
-    VoltTable phaseThreeRollback(int hostId) {
+    VoltTable phaseThreeRollback(int hostId, long txnId) {
         VoltTable retval = new VoltTable(
                 new ColumnInfo("HostId", VoltType.INTEGER),
                 new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
@@ -219,7 +219,7 @@ public class Rejoin extends VoltSystemProcedure {
                 e.printStackTrace();
             }
         }
-        String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), false);
+        String error = VoltDB.instance().doRejoinCommitOrRollback( txnId, false);
         if (debugFlag) {
             try {
                 Thread.sleep(250);
@@ -268,7 +268,7 @@ public class Rejoin extends VoltSystemProcedure {
             return new DependencyPair(DEP_rejoinAllNodeWork, depResult);
         }
         else if (fragmentId == SysProcFragmentId.PF_rejoinRollback) {
-            depResult = phaseThreeRollback(hostId);
+            depResult = phaseThreeRollback(hostId, m_runner.getTxnState().txnId);
             return new DependencyPair(DEP_rejoinAllNodeWork, depResult);
         }
         else if (fragmentId == SysProcFragmentId.PF_rejoinAggregate) {
