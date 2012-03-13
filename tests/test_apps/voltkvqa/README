@@ -16,6 +16,7 @@ Many attributes of the application are customizable through arguments passed to 
 
 These attributes can be adjusted by modifying the arguments to the "async-benchmark" and "sync-benchmark" targets in run.sh.
 
+
 Additional arguments allow the client to automatically tune itself for optimal performance ("client" target only).
 
   - Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
