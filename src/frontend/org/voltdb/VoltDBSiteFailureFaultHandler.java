@@ -50,6 +50,19 @@ class VoltDBSiteFailureFaultHandler implements FaultHandler {
 
     private void handleSiteFailureFault(SiteFailureFault site_fault) {
         hostLog.error("Sites failed, site ids: " + MiscUtils.hsIdCollectionToString(site_fault.getSiteIds()));
+
+        // kill the cluster if this all happened too soon
+        if (m_rvdb.getHostMessenger().isLocalHostReady() == false) {
+            // check that this isn't a rejoining node
+            if (m_rvdb.getConfig().m_rejoinToHostAndPort == null) {
+                String message = "Node fault detected before all nodes finished " +
+                                 "initializing. Cluster will not start.";
+                VoltDB.crashGlobalVoltDB(message, false, null);
+            }
+        }
+        if (m_rvdb.recovering()) {
+            VoltDB.crashLocalVoltDB("Detected a node failure during recovery", false, null);
+        }
         /*
          * Use a new thread since this is a asynchronous (and infrequent)
          * task and locks are being held by the fault distributor.
@@ -62,16 +75,6 @@ class VoltDBSiteFailureFaultHandler implements FaultHandler {
                 if (ExportManager.instance() != null) {
                     //Notify the export manager the cluster topology has changed
                     ExportManager.instance().notifyOfClusterTopologyChange();
-                }
-
-                // kill the cluster if this all happened too soon
-                if (m_rvdb.getHostMessenger().isLocalHostReady() == false) {
-                    // check that this isn't a rejoining node
-                    if (m_rvdb.getConfig().m_rejoinToHostAndPort == null) {
-                        String message = "Node fault detected before all nodes finished " +
-                                         "initializing. Cluster will not start.";
-                        VoltDB.crashGlobalVoltDB(message, false, null);
-                    }
                 }
             }
         }.start();

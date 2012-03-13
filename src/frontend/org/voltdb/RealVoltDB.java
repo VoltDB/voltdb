@@ -1396,114 +1396,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
     }
 
-    /** Last transaction ID at which the rejoin commit took place.
-     * Also, use the intrinsic lock to safeguard access from multiple
-     * execution site threads */
-    private static Long lastNodeRejoinPrepare_txnId = 0L;
-    @Override
-    public synchronized String doRejoinPrepare(
-            long currentTxnId,
-            int rejoinHostId,
-            String rejoiningHostname,
-            int portToConnect,
-            Set<Integer> liveHosts)
-    {
-        return lastNodeRejoinPrepare_txnId.toString();
-    }
-
-    /** Last transaction ID at which the rejoin commit took place.
-     * Also, use the intrinsic lock to safeguard access from multiple
-     * execution site threads */
-    // private static Long lastNodeRejoinFinish_txnId = 0L;
-    @Override
-    public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
-        throw new UnsupportedOperationException();
-        //        if (m_recovering) {
-        //            recoveryLog.fatal("Concurrent rejoins are not supported");
-        //            VoltDB.crashVoltDB();
-        //        }
-        //        // another site already did this work.
-        //        if (currentTxnId == lastNodeRejoinFinish_txnId) {
-        //            return null;
-        //        }
-        //        else if (currentTxnId < lastNodeRejoinFinish_txnId) {
-        //            throw new RuntimeException("Trying to rejoin (commit/rollback) with an old transaction.");
-        //        }
-        //        recoveryLog.info("Rejoining commit node with txnid: " + currentTxnId +
-        //                         " lastNodeRejoinFinish_txnId: " + lastNodeRejoinFinish_txnId);
-        //        HostMessenger messenger = getHostMessenger();
-        //        if (commit) {
-        //            // put the foreign host into the set of active ones
-        //            HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
-        //            m_faultManager.reportFaultCleared(
-        //                    new NodeFailureFault(
-        //                            joinNodeInfo.hostId,
-        //                            m_siteTracker.getNonExecSitesForHost(joinNodeInfo.hostId),
-        //                            joinNodeInfo.hostName));
-        //            try {
-        //                m_faultHandler.m_waitForFaultClear.acquire();
-        //            } catch (InterruptedException e) {
-        //                VoltDB.crashVoltDB();//shouldn't happen
-        //            }
-        //
-        //            ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
-        //            ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
-        //            Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
-        //            for (Site site : cluster.getSites()) {
-        //                int siteId = Integer.parseInt(site.getTypeName());
-        //                int hostId = Integer.parseInt(site.getHost().getTypeName());
-        //                if (hostId == joinNodeInfo.hostId) {
-        //                    assert(site.getIsup() == false);
-        //                    rejoiningSiteIds.add(siteId);
-        //                    if (site.getIsexec() == true) {
-        //                        rejoiningExecSiteIds.add(siteId);
-        //                    }
-        //                }
-        //            }
-        //            assert(rejoiningSiteIds.size() > 0);
-        //
-        //            // get a string list of all the new sites
-        //            StringBuilder newIds = new StringBuilder();
-        //            for (int siteId : rejoiningSiteIds) {
-        //                newIds.append(siteId).append(",");
-        //            }
-        //            // trim the last comma
-        //            newIds.setLength(newIds.length() - 1);
-        //
-        //            // change the catalog to reflect this change
-        //            hostLog.info("Host joined, host id: " + joinNodeInfo.hostId + " hostname: " + joinNodeInfo.hostName);
-        //            hostLog.info("  Adding sites to cluster: " + newIds);
-        //            StringBuilder sb = new StringBuilder();
-        //            for (int siteId : rejoiningSiteIds)
-        //            {
-        //                sb.append("set ");
-        //                String site_path = VoltDB.instance().getCatalogContext().catalog.
-        //                                   getClusters().get("cluster").getSites().
-        //                                   get(Integer.toString(siteId)).getPath();
-        //                sb.append(site_path).append(" ").append("isUp true");
-        //                sb.append("\n");
-        //            }
-        //            String catalogDiffCommands = sb.toString();
-        //            clusterUpdate(catalogDiffCommands);
-        //
-        //            // update the SafteyState in the initiators
-        //            for (SimpleDtxnInitiator dtxn : m_dtxns) {
-        //                dtxn.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
-        //            }
-        //
-        //            //Notify the export manager the cluster topology has changed
-        //            ExportManager.instance().notifyOfClusterTopologyChange();
-        //        }
-        //        else {
-        //            // clean up any connections made
-        //            messenger.rejoinForeignHostRollback();
-        //        }
-        //        recoveryLog.info("Setting lastNodeRejoinFinish_txnId to: " + currentTxnId);
-        //        lastNodeRejoinFinish_txnId = currentTxnId;
-        //
-        //        return null;
-    }
-
     /** Last transaction ID at which the logging config updated.
      * Also, use the intrinsic lock to safeguard access from multiple
      * execution site threads */
@@ -1903,7 +1795,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public void handleMailboxUpdate(Map<MailboxType, List<MailboxNodeContent>> mailboxes) {
         SiteTracker oldTracker = m_siteTracker;
-        m_siteTracker = new SiteTracker(m_myHostId, mailboxes);
+        m_siteTracker = new SiteTracker(m_myHostId, mailboxes, oldTracker != null ? oldTracker.m_version + 1 : 0);
 
         if (m_validateConfiguredNumberOfPartitionsOnMailboxUpdate) {
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
@@ -1928,36 +1820,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             deltaRemoved.removeAll(m_siteTracker.m_allSitesImmutable);
             if (!deltaRemoved.isEmpty()) {
                 m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(deltaRemoved)));
+                /*
+                 * Let fault detection handle the sites being added if any
+                 */
+                return;
             }
 
             HashSet<Long> deltaAdded = new HashSet<Long>(m_siteTracker.m_allSitesImmutable);
             deltaAdded.removeAll(oldTracker.m_allSitesImmutable);
-            List<Future<?>> updateTasks = new ArrayList<Future<?>>();
             if (!deltaAdded.isEmpty()) {
                 for (ClientInterface ci : getClientInterfaces()) {
                     ci.notifySitesAdded(deltaAdded);
                 }
                 for (ExecutionSite es : getLocalSites().values()) {
-                    updateTasks.add(es.notifySitesAdded());
+                    es.notifySitesAdded(m_siteTracker);
                 }
-            }
-
-            /*
-             * Waiting for the entire node to be notified could cause issues
-             * If the join occurs during failure detection it is possible
-             * for things to deadlock
-             */
-            boolean hadException = false;
-            for (Future<?> task : updateTasks) {
-                try {
-                    task.get();
-                } catch (Exception e) {
-                    hadException = true;
-                    hostLog.fatal("Error processing topology update at execution site", e);
-                }
-            }
-            if (hadException) {
-                VoltDB.crashLocalVoltDB("Error processing topology update", false, null);
             }
         }
     }

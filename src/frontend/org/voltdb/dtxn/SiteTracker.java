@@ -36,6 +36,8 @@ public class SiteTracker {
     private final int m_hostId;
     private boolean m_isFirstHost;
 
+    public final int m_version;
+
     private final Set<Integer> m_allHosts = new HashSet<Integer>();
     public final Set<Integer> m_allHostsImmutable = Collections.unmodifiableSet(m_allHosts);
 
@@ -92,9 +94,15 @@ public class SiteTracker {
         m_numberOfPartitions = 0;
         m_otherHSIdsImmutable = null;
         m_sitesToPartitionsImmutable = null;
+        m_version = 0;
     }
 
     public SiteTracker(int hostId, Map<MailboxType, List<MailboxNodeContent>> mailboxes) {
+        this(hostId, mailboxes, 0);
+    }
+
+    public SiteTracker(int hostId, Map<MailboxType, List<MailboxNodeContent>> mailboxes, int version) {
+        m_version = version;
         m_hostId = hostId;
         Map<Integer, List<Long>> hostsToSites =
             new HashMap<Integer, List<Long>>();

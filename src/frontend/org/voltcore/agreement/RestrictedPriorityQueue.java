@@ -20,6 +20,7 @@ package org.voltcore.agreement;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.PriorityQueue;
 
 import org.voltcore.logging.VoltLogger;
@@ -27,6 +28,7 @@ import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.MiscUtils;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state
@@ -465,5 +467,23 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
             // bingo - have a real transaction to return as the recovery point
             return next.txnId;
         }
+    }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("State: ").append(m_state);
+        for (Map.Entry<Long, LastInitiatorData> entry : m_initiatorData.entrySet()) {
+            LastInitiatorData lid = entry.getValue();
+            sb.append(' ');
+            sb.append(MiscUtils.hsIdToString(entry.getKey()));
+            sb.append("==");
+            sb.append(lid.m_lastSeenTxnId);
+            sb.append(':');
+            sb.append(lid.m_lastSafeTxnId);
+            sb.append(' ');
+        }
+        sb.append('\n');
+        sb.append(super.toString());
+        return sb.toString();
     }
 }
