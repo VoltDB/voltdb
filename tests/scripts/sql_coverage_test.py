@@ -23,6 +23,10 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
+# add the path to the volt python client, just based on knowing
+# where we are now
+sys.path.append('../../src/py_client')
+
 import random
 import time
 import subprocess
