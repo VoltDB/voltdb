@@ -527,6 +527,20 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     };
 
     public void tick() {
+        /*
+         * poke the PartitionDRGateway regularly even if we are not idle. In the
+         * case where we only have multipart work to do and we are not the
+         * coordinator, we still need to send heartbeat buffers.
+         *
+         * If the txnId is from before the process started, caused by command
+         * log replay, then ignore it.
+         */
+        long seenTxnId = m_transactionQueue.getEarliestSeenTxnIdAcrossInitiators();
+        long seenTxnTime = TransactionIdManager.getTimestampFromTransactionId(seenTxnId);
+        if (seenTxnTime > m_startupTime) {
+            m_partitionDRGateway.tick(seenTxnId);
+        }
+
         // invoke native ee tick if at least one second has passed
         final long time = EstTime.currentTimeMillis();
         final long prevLastTickTime = lastTickTime;
@@ -1071,20 +1085,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
                 m_currentTransactionState = currentTxnState;
                 if (currentTxnState == null) {
-                    /*
-                     * check if we got no response because the queue is empty
-                     * and, if so... get a txnid with which to poke the
-                     * PartitionDRGateway.
-                     *
-                     * If the txnId is from before the process started, caused by command
-                     * log replay, then ignore it.
-                     */
-                    long seenTxnId = m_transactionQueue.getEarliestSeenTxnIdAcrossInitiatorsWhenEmpty();
-                    long seenTxnTime = TransactionIdManager.getTimestampFromTransactionId(seenTxnId);
-                    if (seenTxnTime > m_startupTime) {
-                        m_partitionDRGateway.tick(seenTxnId);
-                    }
-
                     // poll the messaging layer for a while as this site has nothing to do
                     // this will likely have a message/several messages immediately in a heavy workload
                     // Before blocking record the starvation
