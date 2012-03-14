@@ -18,8 +18,6 @@
 package org.voltdb;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
@@ -27,7 +25,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.ByteArrayUtils;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Packages up the data to be sent back to the client as a stored
@@ -331,21 +329,12 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
      */
     public int getHashOfTableResults() {
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
+            long cheesyChecksum = 0;
             for (int i = 0; i < results.length; ++i) {
-                final ByteBuffer buf = results[i].m_buffer.duplicate();
-                buf.position(0);
-                int len = buf.limit();
-                assert(len > 0);
-                if (len > MAX_HASH_BYTES) {
-                    len = MAX_HASH_BYTES;
-                    buf.limit(MAX_HASH_BYTES);
-                }
-                md.update(buf);
+                cheesyChecksum += MiscUtils.cheesyBufferCheckSum(results[i].m_buffer);
             }
-            byte[] digest = md.digest();
-            return ByteArrayUtils.bytesToInt(digest, 0);
-        } catch (NoSuchAlgorithmException e) {
+            return (int)cheesyChecksum;
+        } catch (Exception e) {
             e.printStackTrace();
             return 0;
         }

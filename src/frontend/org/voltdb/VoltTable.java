@@ -37,6 +37,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 
 /*
  * The primary representation of a result set (of tuples) or a temporary
@@ -1132,34 +1133,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         if (mypos != theirpos) {
             return false;
         }
-        long checksum1 = cheesyCheckSum();
-        long checksum2 = other.cheesyCheckSum();
+        long checksum1 = MiscUtils.cheesyBufferCheckSum(m_buffer);
+        long checksum2 = MiscUtils.cheesyBufferCheckSum(other.m_buffer);
         boolean checksum = (checksum1 == checksum2);
-        assert(verifyTableInvariants());
-        return checksum;
-    }
-
-    /**
-     * I heart commutativity
-     * @return the cheesy checksum of this VoltTable
-     */
-    private final long cheesyCheckSum() {
-        final int mypos = m_buffer.position();
-        m_buffer.position(0);
-        long checksum = 0;
-        if (m_buffer.hasArray()) {
-            final byte bytes[] = m_buffer.array();
-            final int end = m_buffer.arrayOffset() + mypos;
-            for (int ii = m_buffer.arrayOffset(); ii < end; ii++) {
-                checksum += bytes[ii];
-            }
-        } else {
-            final int remaining = m_buffer.remaining();
-            for (int ii = 0; ii < remaining; ii++) {
-                checksum += m_buffer.get();
-            }
-        }
-        m_buffer.position(mypos);
         assert(verifyTableInvariants());
         return checksum;
     }

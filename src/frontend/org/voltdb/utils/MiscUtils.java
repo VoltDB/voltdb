@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
@@ -36,9 +37,9 @@ import java.util.regex.Pattern;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltcore.logging.VoltLogger;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -469,5 +470,29 @@ public class MiscUtils {
             assert(parts.length == 2);
             return server;
         }
+    }
+
+    /**
+     * I heart commutativity
+     * @param buffer ByteBuffer assumed position is at end of data
+     * @return the cheesy checksum of this VoltTable
+     */
+    public static final long cheesyBufferCheckSum(ByteBuffer buffer) {
+        final int mypos = buffer.position();
+        buffer.position(0);
+        long checksum = 0;
+        if (buffer.hasArray()) {
+            final byte bytes[] = buffer.array();
+            final int end = buffer.arrayOffset() + mypos;
+            for (int ii = buffer.arrayOffset(); ii < end; ii++) {
+                checksum += bytes[ii];
+            }
+        } else {
+            for (int ii = 0; ii < mypos; ii++) {
+                checksum += buffer.get();
+            }
+        }
+        buffer.position(mypos);
+        return checksum;
     }
 }
