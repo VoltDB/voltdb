@@ -27,13 +27,10 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1162,7 +1159,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private void handleMailboxMessageNonRecursable(VoltMessage message)
     {
         /*
-         * Drop messages from beyond the grave
+         * Don't listen to messages from unknown sources. The expectation is that they are from beyond
+         * the grave
          */
         if (!m_tracker.m_allSitesImmutable.contains(message.m_sourceHSId)) {
             hostLog.warn("Dropping message " + message + " because it is from an unkown site id");
@@ -1271,8 +1269,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             final long recoveringPartitionTxnId = rm.txnId();
             m_recoveryStartTime = System.currentTimeMillis();
             m_recoveryLog.info(
-                    "Recovery initiate received at site " + m_siteId +
-                    " from site " + rm.sourceSite() + " requesting recovery start before txnid " +
+                    "Recovery initiate received at site " + MiscUtils.hsIdToString(m_siteId) +
+                    " from site " + MiscUtils.hsIdToString(rm.sourceSite()) + " requesting recovery start before txnid " +
                     recoveringPartitionTxnId);
             m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
                     this,
@@ -1424,7 +1422,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * are concurrent faults. New faults are added to this set.
      */
     private final HashSet<Long> m_pendingFailedSites = new HashSet<Long>();
-    private final List<Runnable> m_joinsToCommitPostFailure = new LinkedList<Runnable>();
 
     /**
      * Find the global multi-partition commit point and the global initiator point for the
@@ -1470,9 +1467,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          * from the fault distributor that will contain a set that matches the new site tracker
          * Should the site tracker be versioned and come with the fault set?
          */
-        if (!delta.equals(m_pendingFailedSites)) {
-            return;
-        }
+//        if (!delta.equals(m_pendingFailedSites)) {
+//            System.out.println("Bailing out because delta does not = pending failed sites");
+//            return;
+//        }
 
         HashMap<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
         discoverGlobalFaultData_send(newTracker);
@@ -1504,15 +1502,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         m_tracker = newTracker;//Get a snapshot of the site tracker
-        m_pendingFailedSites.clear();
-        Iterator<Runnable> iter = m_joinsToCommitPostFailure.iterator();
-        while (iter.hasNext()) {
-            try {
-                iter.next().run();
-            } finally {
-                iter.remove();
-            }
+
+        // make sure the restricted priority queue knows about all of the up initiators
+        // for most catalog changes this will do nothing
+        // for rejoin, it will matter
+        for (Long initiator : m_tracker.m_allInitiatorsImmutable) {
+            m_transactionQueue.ensureInitiatorIsKnown(initiator);
         }
+
+        m_pendingFailedSites.clear();
     }
 
     private Long extractGlobalFaultData(
@@ -1559,7 +1557,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             }
         }
         assert(commitPoint != Long.MIN_VALUE);
-        assert(!initiatorSafeInitPoint.containsValue(Long.MIN_VALUE));
         return commitPoint;
     }
 
@@ -1586,16 +1583,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                  * since recovery of this node began.
                  */
                 Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
-                if (txnId != null) {
-                    FailureSiteUpdateMessage srcmsg =
-                        new FailureSiteUpdateMessage(
-                                                     m_pendingFailedSites,
-                                                     site,
-                                                     txnId != null ? txnId : Long.MIN_VALUE,
-                                                     lastKnownGloballyCommitedMultiPartTxnId);
+                FailureSiteUpdateMessage srcmsg =
+                    new FailureSiteUpdateMessage(
+                                                 m_pendingFailedSites,
+                                                 site,
+                                                 txnId != null ? txnId : Long.MIN_VALUE,
+                                                 lastKnownGloballyCommitedMultiPartTxnId);
 
-                    m_mailbox.send(MiscUtils.toLongArray(survivors), srcmsg);
-                }
+                m_mailbox.send(MiscUtils.toLongArray(survivors), srcmsg);
             }
         }
         catch (MessagingException e) {
@@ -1675,9 +1670,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             for (Long failingInitiator : failingInitiators) {
                 Pair<Long, Long> key = Pair.of( otherSite, failingInitiator);
                 if (!m_failureSiteUpdateLedger.containsKey(key)) {
-                    System.out.println("Can't conclude failure detection because there is " +
-                            "no failure entry for other site " + MiscUtils.hsIdToString(key.getFirst()) +
-                            " failing initiator " + MiscUtils.hsIdToString(key.getSecond()));
                     return false;
                 }
             }
@@ -1745,13 +1737,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                       true));
         }
 
-
         // Fix safe transaction scoreboard in transaction queue
+        // Not all of these are initiators, but it is safe...
         for (Long i : failedSites)
         {
-            if (m_tracker.getAllInitiators().contains(i)) {
-                m_transactionQueue.gotFaultForInitiator(i);
-            }
+            m_transactionQueue.gotFaultForInitiator(i);
         }
 
         /*
@@ -2347,16 +2337,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         return m_tracker.m_numberOfPartitions;
     }
 
-    public Future<?> notifySitesAdded() {
+    public void notifySitesAdded(final SiteTracker st) {
         Runnable r = new Runnable() {
             @Override
             public void run() {
                 if (!m_pendingFailedSites.isEmpty()) {
-                    m_joinsToCommitPostFailure.add(this);
                     return;
                 }
-                m_tracker = VoltDB.instance().getSiteTracker();
 
+                /*
+                 * Failure processing may pick up the site tracker eagerly
+                 */
+                if (st.m_version <= m_tracker.m_version){
+                    return;
+                }
+
+                m_tracker = st;
                 // make sure the restricted priority queue knows about all of the up initiators
                 // for most catalog changes this will do nothing
                 // for rejoin, it will matter
@@ -2365,10 +2361,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
             }
         };
-        FutureTask<Object> fut = new FutureTask<Object>(r, null);
-        LocalObjectMessage lom = new LocalObjectMessage(fut);
+        LocalObjectMessage lom = new LocalObjectMessage(r);
         lom.m_sourceHSId = m_siteId;
         m_mailbox.deliver(lom);
-        return fut;
     }
 }

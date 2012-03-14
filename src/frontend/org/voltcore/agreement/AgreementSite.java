@@ -602,6 +602,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 " initiatorSafeInitPoints " + initiatorSafeInitPoint);
         // Fix safe transaction scoreboard in transaction queue
         for (Long siteId : newFailedSiteIds) {
+            m_safetyState.removeState(siteId);
             m_txnQueue.gotFaultForInitiator(siteId);
             m_server.closeSessions(siteId);
         }
@@ -622,6 +623,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     newFailedSiteIds.contains(ts.initiatorHSId))
             {
                 m_recoveryLog.info("Faulting non-globally initiated transaction " + ts.txnId);
+                it.remove();
                 m_txnQueue.faultTransaction(ts);
             }
         }
@@ -750,21 +752,16 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             final Long safeTxnId = entry.getValue();
 
             if (!m_hsIds.contains(key.getFirst())) {
-                iter.remove();
                 continue;
             }
 
-            try {
-                Long initiatorId = key.getSecond();
-                if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
-                    initiatorSafeInitPoint.put( initiatorId, Long.MIN_VALUE);
-                }
-
-                initiatorSafeInitPoint.put( initiatorId,
-                        Math.max(initiatorSafeInitPoint.get(initiatorId), safeTxnId));
-            } finally {
-                iter.remove();
+            Long initiatorId = key.getSecond();
+            if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
+                initiatorSafeInitPoint.put( initiatorId, Long.MIN_VALUE);
             }
+
+            initiatorSafeInitPoint.put( initiatorId,
+                    Math.max(initiatorSafeInitPoint.get(initiatorId), safeTxnId));
         }
         assert(!initiatorSafeInitPoint.containsValue(Long.MIN_VALUE));
     }
@@ -862,6 +859,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             public void run() {
                 try {
                     final long txnId = m_idManager.getNextUniqueTransactionId();
+
                     for (long initiatorHSId : m_hsIds) {
                         if (initiatorHSId == m_hsId) continue;
                         JSONObject jsObj = new JSONObject();

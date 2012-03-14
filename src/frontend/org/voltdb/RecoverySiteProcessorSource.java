@@ -38,6 +38,7 @@ import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.MiscUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 
@@ -369,7 +370,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             destinationSite = table.m_destinationIds[0];
         }
         if (failedSites.contains(destinationSite)) {
-            recoveryLog.error("Failing recovery of " + destinationSite + " at source site " + m_siteId);
+            recoveryLog.error("Failing recovery of " + MiscUtils.hsIdToString(destinationSite) +
+                    " at source site " + MiscUtils.hsIdToString(m_siteId));
             m_ackTracker.ignoreAcks();
             final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_bufferLength);
             try {
@@ -491,8 +493,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         if (!m_sentSkipPastMultipartMsg && !m_sentInitiateResponse) {
             m_sentSkipPastMultipartMsg = true;
             recoveryLog.info(
-                    "Sending blocked on multi-part notification from " + m_siteId +
-                    " at txnId " + currentTxnId + " to site " + m_destinationSiteId);
+                    "Sending blocked on multi-part notification from " + MiscUtils.hsIdToString(m_siteId) +
+                    " at txnId " + currentTxnId + " to site " + MiscUtils.hsIdToString(m_destinationSiteId));
             ByteBuffer buf = ByteBuffer.allocate(25);
             BBContainer cont = DBBPool.wrapBB(buf);
             buf.putInt(21);//Length prefix
@@ -537,8 +539,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         if (!m_sentInitiateResponse) {
             m_stopBeforeTxnId = Math.max(nextTxnId, m_destinationStoppedBeforeTxnId);
             recoveryLog.info(
-                    "Sending recovery initiate response from " + m_siteId +
-                    " before txnId " + nextTxnId + " to site " + m_destinationSiteId +
+                    "Sending recovery initiate response from " + MiscUtils.hsIdToString(m_siteId) +
+                    " before txnId " + nextTxnId + " to site " + MiscUtils.hsIdToString(m_destinationSiteId) +
                     " choosing to stop before txnId " + m_stopBeforeTxnId);
             m_sentInitiateResponse = true;
 
@@ -589,7 +591,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             return;
         }
         recoveryLog.info(
-                "Starting recovery of " + m_destinationSiteId + " work before txnId " + nextTxnId);
+                "Starting recovery of " + MiscUtils.hsIdToString(m_destinationSiteId) + " work before txnId " + nextTxnId);
         while (true) {
             while (m_allowedBuffers.get() > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
                 /*
@@ -724,7 +726,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             if (message instanceof RecoveryMessage) {
                 RecoveryMessage rm = (RecoveryMessage)message;
                 if (!rm.recoveryMessagesAvailable()) {
-                    recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
+                    recoveryLog.error("Received a recovery initiate request from " +
+                            MiscUtils.hsIdToString(rm.sourceSite()) +
                             " while a recovery was already in progress. Ignoring it.");
                 }
             } else {
@@ -801,7 +804,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                               "The recovery message is: txnId -> " + rm.txnId() +
                               ", address -> " + ip +
                               ", port -> " + rm.port() +
-                              ", source site -> " + rm.sourceSite(), e);
+                              ", source site -> " + MiscUtils.hsIdToString(rm.sourceSite()), e);
             return null;
         }
         return source;

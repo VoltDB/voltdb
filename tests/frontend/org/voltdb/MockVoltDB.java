@@ -396,17 +396,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
-        return null;
-    }
-
-    @Override
-    public String doRejoinPrepare(long currentTxnId, int rejoinHostId,
-            String rejoiningHostname, int portToConnect, Set<Integer> liveHosts) {
-        return null;
-    }
-
-    @Override
     public void onExecutionSiteRecoveryCompletion(long transferred) {
     }
 

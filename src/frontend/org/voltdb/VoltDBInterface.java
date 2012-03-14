@@ -85,32 +85,6 @@ public interface VoltDBInterface
     public String getLocalMetadata();
     public MailboxPublisher getMailboxPublisher();
 
-    /**
-     * Open a connection to a rejoining node and create a foreign host for it.
-     *
-     * @param currentTxnId The current transaction doing the rejoin.
-     * @param rejoinHostId The host id of the node joining the cluster.
-     * @param rejoiningHostname The IP hostname of the joining node.
-     * @param portToConnect The port to connect to the joining node on.
-     * @param liveHosts Set of live hosts in the cluster
-     * @return Null on success and an error string on failure.
-     */
-    public String doRejoinPrepare(
-            long currentTxnId,
-            int rejoinHostId,
-            String rejoiningHostname,
-            int portToConnect,
-            Set<Integer> liveHosts);
-
-    /**
-     * Either integrate the created forign host for the rejoining node into
-     * the set of active ones, or throw it out and clean up.
-     *
-     * @param currentTxnId The current transaction doing the rejoin.
-     * @param commit Add the new node in, or throw it out.
-     * @return Null on success and an error string on failure.
-     */
-    public String doRejoinCommitOrRollback(long currentTxnId, boolean commit);
 
     /**
      * Update the global logging context in the server.
