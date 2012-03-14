@@ -72,10 +72,11 @@ public class TestZK extends ZKTestBase {
 
     public void recoverSite(int site) throws Exception {
         HostMessenger.Config config = new HostMessenger.Config();
+        int recoverPort = config.internalPort + NUM_AGREEMENT_SITES - 1;
         config.internalPort += site;
         config.zkInterface = "127.0.0.1:" + (2182 + site);
         config.networkThreads = 1;
-        config.coordinatorIp = new InetSocketAddress("127.0.0.1", config.internalPort + NUM_AGREEMENT_SITES - 1);
+        config.coordinatorIp = new InetSocketAddress( recoverPort );
         HostMessenger hm = new HostMessenger(config);
         hm.start();
         m_messengers.set(site, hm);

@@ -80,11 +80,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public int networkThreads =  Runtime.getRuntime().availableProcessors() / 2;
 
         public Config(String coordIp, int coordPort) {
-            coordinatorIp = new InetSocketAddress(coordIp, coordPort);
+            if (coordIp == null || coordIp.length() == 0) {
+                coordinatorIp = new InetSocketAddress(coordPort);
+            } else {
+                coordinatorIp = new InetSocketAddress(coordIp, coordPort);
+            }
         }
 
         public Config() {
-            this("127.0.0.1", 3021);
+            this(null, 3021);
         }
     }
 
