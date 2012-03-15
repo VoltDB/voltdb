@@ -18,6 +18,8 @@
 package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  *  Message containing recovery data for a partition/table pair.
@@ -36,7 +38,7 @@ public class RecoveryMessage extends VoltMessage {
     }
 
     private long m_txnId;
-    private byte m_address[];
+    private List<byte[]> m_addresses;
     private int m_port;
 
     /**
@@ -64,7 +66,7 @@ public class RecoveryMessage extends VoltMessage {
      * decided to stop after before syncing so that the recovering partition can start executing stored procedures
      * at the correct txnId.
      */
-    public RecoveryMessage(long sourceHSId, long txnId, byte address[], int port) {
+    public RecoveryMessage(long sourceHSId, long txnId, List<byte[]> addresses, int port) {
         m_subject = Subject.DEFAULT.getId();
         if (sourceHSId == -1) {
             throw new RuntimeException("No way");
@@ -72,14 +74,17 @@ public class RecoveryMessage extends VoltMessage {
         m_sourceHSId = sourceHSId;
         m_recoveryMessagesAvailable = false;
         m_txnId = txnId;
-        m_address = address;
+        m_addresses = addresses;
         m_port = port;
     }
 
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
-        msgsize += 24 + m_address.length;
+        msgsize += 24 + (4 * m_addresses.size());
+        for (byte address[] : m_addresses) {
+            msgsize += address.length;
+        }
         return msgsize;
     }
 
@@ -88,8 +93,11 @@ public class RecoveryMessage extends VoltMessage {
         buf.put(VoltMessageFactory.RECOVERY_ID);
         buf.putLong( m_sourceHSId);
         buf.putLong( m_txnId);
-        buf.putInt(m_address.length);
-        buf.put(m_address);
+        buf.putInt(m_addresses.size());
+        for (byte address[] : m_addresses) {
+            buf.putInt(address.length);
+            buf.put(address);
+        }
         buf.putInt( m_port);
 
         assert(buf.capacity() == buf.position());
@@ -104,8 +112,8 @@ public class RecoveryMessage extends VoltMessage {
         return m_sourceHSId;
     }
 
-    public byte[] address() {
-        return m_address;
+    public List<byte[]> addresses() {
+        return m_addresses;
     }
 
     public int port() {
@@ -117,8 +125,13 @@ public class RecoveryMessage extends VoltMessage {
         m_recoveryMessagesAvailable = false;
         m_sourceHSId = buf.getLong();
         m_txnId = buf.getLong();
-        m_address = new byte[buf.getInt()];
-        buf.get(m_address);
+        int numAddresses = buf.getInt();
+        m_addresses = new ArrayList<byte[]>(numAddresses);
+        for (int ii = 0; ii < numAddresses; ii++) {
+            byte address[] = new byte[buf.getInt()];
+            buf.get(address);
+            m_addresses.add(address);
+        }
         m_port = buf.getInt();
 
         assert(buf.capacity() == buf.position());

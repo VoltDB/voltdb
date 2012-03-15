@@ -16,14 +16,18 @@
  */
 package org.voltdb;
 
+import java.util.List;
 import java.io.EOFException;
 import java.io.IOException;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -471,12 +475,59 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
     public void sendInitiateMessage(long txnId) throws IOException {
         ServerSocketChannel ssc = ServerSocketChannel.open();
         ssc.configureBlocking(false);
-        InetAddress addr = InetAddress.getByName(VoltDB.instance().getConfig().m_selectedRejoinInterface);
-        InetSocketAddress sockAddr = new InetSocketAddress( addr, 0);
+        InetSocketAddress sockAddr = null;
+        boolean allInterfaces = false;
+        String internalInterface = VoltDB.instance().getConfig().m_internalInterface;
+        if ( internalInterface != null && !internalInterface.isEmpty()) {
+            recoveryLog.debug("An internal interface was specified (" + internalInterface + ")" +
+                    " binding to an ephemeral port to receive recovery connection");
+            sockAddr = new InetSocketAddress( internalInterface, 0);
+        } else {
+            recoveryLog.debug("No internal interface was specified (" + internalInterface + ")" +
+                    " binding to all interfaces with an ephemeral port to receive recovery connection");
+            allInterfaces = true;
+            sockAddr = new InetSocketAddress(0);
+        }
         ssc.socket().bind(sockAddr);
         final int port = ssc.socket().getLocalPort();
-        final byte address[] = ssc.socket().getInetAddress().getAddress();
-        RecoveryMessage recoveryMessage = new RecoveryMessage(m_HSId, txnId, address, port);
+
+        List<byte[]> addresses = new ArrayList<byte[]>();
+        List<InetAddress> inetAddresses = new ArrayList<InetAddress>();
+        List<byte[]> loopbackInterfaces = new ArrayList<byte[]>();
+        List<InetAddress> loopbackAddresses = new ArrayList<InetAddress>();
+
+        /*
+         * If no internal interface was specified, bind on everything and then ship
+         * over every possible public address. Yikes!
+         */
+        if (allInterfaces) {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface intf = interfaces.nextElement();
+                if (!intf.isUp()) {
+                    continue;
+                }
+                Enumeration<InetAddress> addressesEnum = intf.getInetAddresses();
+                while (addressesEnum.hasMoreElements()) {
+                    InetAddress address = addressesEnum.nextElement();
+                    if (intf.isLoopback()) {
+                        loopbackAddresses.add(address);
+                        loopbackInterfaces.add(address.getAddress());
+                    } else {
+                        inetAddresses.add(address);
+                        addresses.add(address.getAddress());
+                    }
+                }
+            }
+        } else {
+            addresses.add(ssc.socket().getInetAddress().getAddress());
+        }
+        inetAddresses.addAll(loopbackAddresses);
+        addresses.addAll(loopbackInterfaces);
+
+        recoveryLog.debug("Advertising interfaces " + inetAddresses);
+
+        RecoveryMessage recoveryMessage = new RecoveryMessage(m_HSId, txnId, addresses, port);
         recoveryLog.trace(
                 "Sending recovery initiate request before txnid " + txnId +
                 " from site " + MiscUtils.hsIdToString(m_HSId) + " to " + MiscUtils.hsIdToString(m_sourceHSId));
@@ -494,6 +545,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                     break;
                 }
             } catch (IOException e) {
+                recoveryLog.error("Exception while attempting to accept recovery connection", e);
                 ssc.close();
             }
             Thread.yield();

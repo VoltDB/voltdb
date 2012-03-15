@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -577,6 +578,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             buf.put(exportUSOBytes);
 
             buf.flip();
+            System.out.println("Offering initiate response");
             m_outgoing.offer(cont);
         }
 
@@ -780,7 +782,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
         RecoverySiteProcessorSource source = null;
         try {
-            SocketChannel sc = createRecoveryConnection(rm.address(), rm.port());
+            SocketChannel sc = createRecoveryConnection(rm.addresses(), rm.port());
 
             final long destinationTxnId = rm.txnId();
             source = new RecoverySiteProcessorSource(
@@ -795,14 +797,20 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     messageHandler,
                     sc);
         } catch (IOException e) {
-            String ip = "invalid";
-            try {
-                InetAddress addr = InetAddress.getByAddress(rm.address());
-                ip = addr.getHostAddress();
-            } catch (UnknownHostException ignore) {}
+            StringBuilder sb = new StringBuilder();
+            sb.append(" attempted addresses -> ");
+
+            for (byte address[] : rm.addresses()) {
+                String ip = "invalid";
+                try {
+                    InetAddress addr = InetAddress.getByAddress(address);
+                    ip = addr.getHostAddress();
+                } catch (UnknownHostException ignore) {}
+                sb.append(ip).append(',');
+            }
             recoveryLog.error("Unable to create recovery connection, aborting. " +
                               "The recovery message is: txnId -> " + rm.txnId() +
-                              ", address -> " + ip +
+                              ", " + sb.toString() +
                               ", port -> " + rm.port() +
                               ", source site -> " + MiscUtils.hsIdToString(rm.sourceSite()), e);
             return null;
@@ -810,12 +818,33 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         return source;
     }
 
-    public static SocketChannel createRecoveryConnection(byte address[], int port) throws IOException {
-        InetAddress inetAddr = InetAddress.getByAddress(address);
-        InetSocketAddress inetSockAddr = new InetSocketAddress(inetAddr, port);
-        SocketChannel sc = SocketChannel.open(inetSockAddr);
+    public static SocketChannel createRecoveryConnection(List<byte[]> addresses, int port) throws IOException {
+        SocketChannel sc = null;
+        List<Exception> exceptions = new ArrayList<Exception>();
+
+        for (byte address[] : addresses) {
+            try {
+                InetAddress inetAddr = InetAddress.getByAddress(address);
+                InetSocketAddress inetSockAddr = new InetSocketAddress(inetAddr, port);
+                recoveryLog.debug("Attempting to create recovery connection to " + inetSockAddr);
+                sc = SocketChannel.open(inetSockAddr);
+                break;
+            } catch (Exception e) {
+                recoveryLog.debug("Failed to create a recovery connection", e);
+                exceptions.add(e);
+            }
+        }
+
+        if (sc == null) {
+            for (Exception e : exceptions) {
+                recoveryLog.fatal("Connection error", e);
+            }
+            throw new IOException("Unable to create recovery connection due to previously logged exceptions");
+        }
+
         sc.configureBlocking(true);
         sc.socket().setTcpNoDelay(true);
+
         return sc;
     }
 

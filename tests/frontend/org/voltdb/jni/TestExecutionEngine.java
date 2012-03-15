@@ -252,7 +252,7 @@ public class TestExecutionEngine extends TestCase {
                     assertTrue(message != null);
                     assertTrue(message instanceof RecoveryMessage);
                     RecoveryMessage rm = (RecoveryMessage)message;
-                    SocketChannel sc = RecoverySiteProcessorSource.createRecoveryConnection(rm.address(), rm.port());
+                    SocketChannel sc = RecoverySiteProcessorSource.createRecoveryConnection(rm.addresses(), rm.port());
                     final RecoverySiteProcessorSource sourceProcessor =
                         new RecoverySiteProcessorSource(
                                 null,
