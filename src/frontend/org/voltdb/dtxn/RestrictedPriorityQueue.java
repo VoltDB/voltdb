@@ -245,14 +245,14 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
     /**
      * Used to poke the PartitionDRGateway with a number that should increase with
-     * time as a lower bound on the txnid of the next real work the EE is going to see.
+     * time as a lower bound on the txnid of the last real work the EE has seen.
      * @return a valid txnid
      */
-    public long getEarliestSeenTxnIdAcrossInitiators() {
+    public long getEarliestSafeTxnIdAcrossInitiators() {
         long txnId = Long.MAX_VALUE;
         for (LastInitiatorData lid : m_initiatorData.values()) {
-            if (txnId > lid.m_lastSeenTxnId)
-                txnId = lid.m_lastSeenTxnId;
+            if (txnId > lid.m_lastSafeTxnId)
+                txnId = lid.m_lastSafeTxnId;
         }
         txnId = Math.max(0, txnId);
         return txnId;
