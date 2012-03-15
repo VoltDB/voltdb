@@ -486,10 +486,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          * If the txnId is from before the process started, caused by command
          * log replay, then ignore it.
          */
-        long seenTxnId = m_transactionQueue.getEarliestSeenTxnIdAcrossInitiators();
-        long seenTxnTime = TransactionIdManager.getTimestampFromTransactionId(seenTxnId);
-        if (seenTxnTime > m_startupTime) {
-            m_partitionDRGateway.tick(seenTxnId);
+        long safeTxnId = m_transactionQueue.getEarliestSafeTxnIdAcrossInitiators();
+        long safeTxnTime = TransactionIdManager.getTimestampFromTransactionId(safeTxnId);
+        if (safeTxnTime > m_startupTime) {
+            m_partitionDRGateway.tick(safeTxnId);
         }
 
         // invoke native ee tick if at least one second has passed
