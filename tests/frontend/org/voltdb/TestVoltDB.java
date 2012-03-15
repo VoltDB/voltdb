@@ -114,11 +114,6 @@ public class TestVoltDB extends TestCase {
         config = new VoltDB.Configuration(args3);
         assertFalse(config.validate());
 
-        // empty leader
-        String[] argsyo = {"leader", "", "catalog", "sdfs", "deployment", "sdfsd"};
-        config = new VoltDB.Configuration(argsyo);
-        assertFalse(config.validate());
-
         // empty deployment
         String[] args6 = {"leader", "hola", "catalog", "teststring6", "deployment", ""};
         config = new VoltDB.Configuration(args6);

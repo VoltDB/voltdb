@@ -17,8 +17,6 @@
 package org.voltdb.utils;
 
 import java.io.FileWriter;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 

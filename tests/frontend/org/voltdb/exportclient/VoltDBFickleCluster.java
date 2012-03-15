@@ -53,7 +53,7 @@ public class VoltDBFickleCluster extends LocalCluster {
     }
 
     public static void rejoinNode() throws Exception {
-        m_cluster.recoverOne(1, 0, "localhost");
+        m_cluster.recoverOne(1, 0, "");
     }
 
     public void mutateCatalog() throws Exception {

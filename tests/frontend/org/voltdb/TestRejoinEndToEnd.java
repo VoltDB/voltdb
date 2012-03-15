@@ -162,7 +162,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 VoltDB.Configuration config = new VoltDB.Configuration();
                 config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
                 config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-                config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
+                config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
                 config.m_isRejoinTest = true;
                 localServer = new ServerThread(config);
 
@@ -294,7 +294,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-            config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
+            config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
             config.m_isRejoinTest = true;
             localServer = new ServerThread(config);
 
@@ -346,7 +346,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             for (int ii = 0; ii < 3; ii++) {
                 cluster.shutDownSingleHost(1);
                 Thread.sleep(1000);
-                cluster.recoverOne( 1, 0, "localhost");
+                cluster.recoverOne( 1, 0, "");
 
                 File newCatalog = new File(Configuration.getPathToCatalogForTest("rejoin.jar"));
                 File deployment = new File(Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -448,7 +448,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         cluster.shutDownSingleHost(0);
-        cluster.recoverOne( 0, 1, "localhost");
+        cluster.recoverOne( 0, 1, "");
 
         cluster.shutDown();
     }
@@ -497,7 +497,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
+        config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
         config.m_zkInterface = "127.0.0.1:2179";
         config.m_isRejoinTest = true;
         ServerThread localServer = new ServerThread(config);
@@ -562,7 +562,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
+        config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
         config.m_isRejoinTest = true;
         config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);
@@ -679,7 +679,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
+        config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
         config.m_isRejoinTest = true;
         config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);
@@ -760,7 +760,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:" + cluster.internalPort(1);
+        config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
         config.m_isRejoinTest = true;
         config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);

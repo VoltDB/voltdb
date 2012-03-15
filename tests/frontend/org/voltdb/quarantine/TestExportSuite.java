@@ -582,7 +582,7 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(threwException);
 
         //Reconnect, then do work and expect failure, after a recovery
-        ((LocalCluster)m_config).recoverOne(1, null, "admin:admin@localhost");
+        ((LocalCluster)m_config).recoverOne(1, null, "");
         Thread.sleep(500);
         threwException = false;
         try {
@@ -626,7 +626,7 @@ public class TestExportSuite extends RegressionSuite {
             modifiedTimes[ii++] = f.lastModified();
         }
 
-        ((LocalCluster)m_config).recoverOne(1, null, "admin:admin@localhost");
+        ((LocalCluster)m_config).recoverOne(1, null, "");
         Thread.sleep(500);
         File filesAfterRejoin[] = exportOverflowDir.listFiles();
         ii = 0;

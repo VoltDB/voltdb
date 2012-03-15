@@ -1024,15 +1024,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * site are synched to the existing cluster.
      */
     void buildClusterMesh(boolean isRejoin) {
-        String leaderAddress = m_config.m_leader;
-        InetAddress leader = null;
-        try {
-            leader = InetAddress.getByName(leaderAddress);
-        } catch (UnknownHostException ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(),
-                    new Object[] { leaderAddress }, null);
-            VoltDB.crashLocalVoltDB("Failed to resolve leader address.", false, null);
-        }
+        final String leaderAddress = m_config.m_leader;
 
         org.voltcore.messaging.HostMessenger.Config hmconfig;
 
@@ -1043,7 +1035,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_config.m_rejoinToHostAndPort, m_config.m_internalPort));
         } else {
             hmconfig = new org.voltcore.messaging.HostMessenger.Config(
-                    leader.getHostAddress(),
+                    leaderAddress,
                     m_config.m_leaderPort != null ? m_config.m_leaderPort : m_config.m_internalPort);
         }
         hmconfig.internalPort = m_config.m_internalPort;

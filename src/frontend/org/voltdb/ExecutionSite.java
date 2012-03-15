@@ -1163,7 +1163,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          * the grave
          */
         if (!m_tracker.m_allSitesImmutable.contains(message.m_sourceHSId)) {
-            hostLog.warn("Dropping message " + message + " because it is from an unkown site id");
+            hostLog.warn("Dropping message " + message + " because it is from a unknown site id " +
+                    MiscUtils.hsIdToString(message.m_sourceHSId));
             return;
         }
         if (message instanceof TransactionInfoBaseMessage) {

@@ -1369,7 +1369,7 @@ public class TestExecutionSite extends TestCase {
                public void run() {
                    m_sites.get(site_id).runLoop(loopUntilPoison);
                }
-            }, "Site: " + site_id));
+            }, "Site: " + MiscUtils.hsIdToString(site_id)));
         }
 
         for (int i=0; i < SITE_COUNT; ++i) {
@@ -1454,6 +1454,12 @@ public class TestExecutionSite extends TestCase {
          * Kill the two initiators
          */
         m_mboxes.get(involvedSites2.get(0)).deliver(lom);
+        lom = new LocalObjectMessage(new Runnable() {
+            @Override
+            public void run() {
+                throw new Error();
+            }
+        });
         lom.m_sourceHSId = involvedSites2.get(1);
         m_mboxes.get(involvedSites2.get(1)).deliver(lom);
 
@@ -1508,6 +1514,12 @@ public class TestExecutionSite extends TestCase {
 
         for (RussianRouletteMailbox mailbox : m_mboxes.values()) {
             if (mailbox != null) {
+                lom = new LocalObjectMessage(new Runnable() {
+                    @Override
+                    public void run() {
+                        throw new Error();
+                    }
+                });
                 lom.m_sourceHSId = mailbox.getHSId();
                 mailbox.deliver(lom);
             }

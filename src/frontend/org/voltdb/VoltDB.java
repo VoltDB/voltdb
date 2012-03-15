@@ -238,24 +238,14 @@ public class VoltDB {
                 }
                 else if (arg.equals("leader")) {
                     m_leader = args[++i].trim();
-                    if (m_leader.compareTo("") == 0) {
-                        m_leader = null;
-                    }
                 } else if (arg.startsWith("leader")) {
                     m_leader = arg.substring("leader ".length()).trim();
-                    if (m_leader.compareTo("") == 0) {
-                        m_leader = null;
-                    }
                 }
                 else if (arg.equals("rejoinhost")) {
                     m_rejoinToHostAndPort = args[++i].trim();
-                    if (m_rejoinToHostAndPort.compareTo("") == 0)
-                        m_rejoinToHostAndPort = null;
                 }
                 else if (arg.startsWith("rejoinhost ")) {
                     m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
-                    if (m_rejoinToHostAndPort.compareTo("") == 0)
-                        m_rejoinToHostAndPort = null;
                 }
 
                 else if (arg.equals("create")) {

@@ -200,7 +200,7 @@ public class LocalCluster implements VoltServerConfig {
         // Create the base command line that each process can makeCopy and modify
         this.templateCmdLine.
             addTestOptions(true).
-            leader("localhost").
+            leader("").
             target(target).
             startCommand("create").
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(jarFileName)).
@@ -594,7 +594,7 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId) {
-        return recoverOne( logtime, startTime, hostId, null, "localhost");
+        return recoverOne( logtime, startTime, hostId, null, "");
     }
 
     // Re-start a (dead) process. HostId is the enumberation of the host
