@@ -241,6 +241,7 @@ public class StatementInsert extends StatementDML {
     {
         VoltXMLElement columns = new VoltXMLElement("columns");
         xml.children.add(columns);
+        assert(columns != null);
 
         for (int i = 0; i < insertColumnMap.length; i++)
         {
@@ -256,6 +257,7 @@ public class StatementInsert extends StatementDML {
 
         VoltXMLElement params = new VoltXMLElement("parameters");
         xml.children.add(params);
+        assert(params != null);
 
         for (int i = 0; i < parameters.length; i++) {
             VoltXMLElement parameter = new VoltXMLElement("parameter");

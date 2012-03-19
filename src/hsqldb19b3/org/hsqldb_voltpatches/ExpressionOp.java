@@ -555,7 +555,9 @@ public class ExpressionOp extends Expression {
             exp.attributes.put("alias", getAlias());
         }
         for (Expression expr : nodes) {
-            exp.children.add(expr.voltGetXML(session));
+            VoltXMLElement vxmle = expr.voltGetXML(session);
+            exp.children.add(vxmle);
+            assert(vxmle != null);
         }
 
         return exp;

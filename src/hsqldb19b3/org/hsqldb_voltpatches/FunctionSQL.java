@@ -1903,8 +1903,11 @@ public class FunctionSQL extends Expression {
         exp.attributes.put("type", dataType.getNameString());
 
         for (Expression expr : nodes) {
-            if (expr != null)
-                exp.children.add(expr.voltGetXML(session));
+            if (expr != null) {
+                VoltXMLElement vxmle = expr.voltGetXML(session);
+                exp.children.add(vxmle);
+                assert(vxmle != null);
+            }
         }
 
         return exp;

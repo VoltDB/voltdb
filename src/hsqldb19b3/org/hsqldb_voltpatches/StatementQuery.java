@@ -239,6 +239,7 @@ public class StatementQuery extends StatementDMQL {
         // columns that need to be output by the scans
         VoltXMLElement scanCols = new VoltXMLElement("scan_columns");
         query.children.add(scanCols);
+        assert(scanCols != null);
 
         // Just gather a mish-mash of every possible relevant expression
         // and uniq them later
@@ -290,12 +291,15 @@ public class StatementQuery extends StatementDMQL {
         }
         for (int i = 0; i < uniq_col_list.size(); i++)
         {
-            scanCols.children.add(((Expression)uniq_col_list.get(i)).voltGetXML(session));
+            VoltXMLElement xml = ((Expression)uniq_col_list.get(i)).voltGetXML(session);
+            scanCols.children.add(xml);
+            assert(xml != null);
         }
 
         // columns
         VoltXMLElement cols = new VoltXMLElement("columns");
         query.children.add(cols);
+        assert(cols != null);
 
         ArrayList<Expression> orderByCols = new ArrayList<Expression>();
         ArrayList<Expression> groupByCols = new ArrayList<Expression>();
@@ -408,7 +412,9 @@ public class StatementQuery extends StatementDMQL {
                              (otherCol.columnIndex == expr.columnIndex))
                     {
                         // serialize the column this simple column stands-in for
-                        cols.children.add(otherCol.voltGetXML(session));
+                        VoltXMLElement xml = otherCol.voltGetXML(session);
+                        cols.children.add(xml);
+                        assert(xml != null);
                         // null-out otherCol to not serialize it twice
                         displayCols.set(ii, null);
                         // quit seeking simple_column's replacement
@@ -417,17 +423,21 @@ public class StatementQuery extends StatementDMQL {
                 }
             }
             else {
-                cols.children.add(expr.voltGetXML(session));
+                VoltXMLElement xml = expr.voltGetXML(session);
+                cols.children.add(xml);
+                assert(xml != null);
             }
         }
 
         // parameters
         VoltXMLElement params = new VoltXMLElement("parameters");
         query.children.add(params);
+        assert(params != null);
 
         for (int i = 0; i < parameters.length; i++) {
             VoltXMLElement parameter = new VoltXMLElement("parameter");
             params.children.add(parameter);
+            assert(parameter != null);
 
             parameter.attributes.put("index", String.valueOf(i));
             ExpressionColumn param = parameters[i];
@@ -438,6 +448,7 @@ public class StatementQuery extends StatementDMQL {
         // scans
         VoltXMLElement scans = new VoltXMLElement("tablescans");
         query.children.add(scans);
+        assert(scans != null);
 
         for (RangeVariable rangeVariable : rangeVariables)
             scans.children.add(rangeVariable.voltGetXML(session));
@@ -446,6 +457,7 @@ public class StatementQuery extends StatementDMQL {
         if (select.queryCondition != null) {
             VoltXMLElement condition = new VoltXMLElement("querycondition");
             query.children.add(condition);
+            assert(condition != null);
             condition.children.add(select.queryCondition.voltGetXML(session));
         }
         else {

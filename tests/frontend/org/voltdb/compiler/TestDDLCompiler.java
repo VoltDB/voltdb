@@ -148,5 +148,51 @@ public class TestDDLCompiler extends TestCase {
         hsql.close();
     }
 
+    /**
+     * Before fixing ENG-2345, the VIEW definition wouldn't compile if it were
+     * containing single quote characters.
+     */
+    public void testFKsAndChecksGiveWarnings() throws HSQLParseException {
+        // ensure the test cleans up
+        File jarOut = new File("checkCompilerWarnings.jar");
+        jarOut.deleteOnExit();
 
+        // schema with a foreign key constraint and a check constraint
+        String schema =  "create table t0 (id bigint not null, primary key (id));\n";
+               schema += "create table t1 (name varchar(32), user varchar(32), " +
+                         "id bigint references t0, primary key (name, user), CHECK (id>0));";
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        final String schemaPath = schemaFile.getPath();
+
+        // boilerplate for making a project
+        final String simpleProject =
+                "<?xml version=\"1.0\"?>\n" +
+                "<project><database><schemas>" +
+                "<schema path='" + schemaPath + "' />" +
+                "</schemas></database></project>";
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        // compile successfully (but with two warnings hopefully)
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compile(projectPath, jarOut.getPath(), System.out, null);
+        assertTrue(success);
+
+        // verify the warnings exist
+        int foundCheckWarnings = 0;
+        int foundFKWarnings = 0;
+        for (VoltCompiler.Feedback f : compiler.m_warnings) {
+            if (f.message.toLowerCase().contains("check")) {
+                foundCheckWarnings++;
+            }
+            if (f.message.toLowerCase().contains("foreign")) {
+                foundFKWarnings++;
+            }
+        }
+        assertEquals(1, foundCheckWarnings);
+        assertEquals(1, foundFKWarnings);
+
+        // cleanup after the test
+        jarOut.delete();
+    }
 }

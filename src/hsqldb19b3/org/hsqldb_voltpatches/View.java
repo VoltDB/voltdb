@@ -245,26 +245,36 @@ public class View extends TableDerived {
         // read all the columns
         VoltXMLElement columns = new VoltXMLElement("columns");
         table.children.add(columns);
+        assert(columns != null);
         int[] columnIndices = getColumnMap();
         for (int i : columnIndices) {
             ColumnSchema column = getColumn(i);
-            columns.children.add(column.voltGetXML(session));
+            VoltXMLElement colChild = column.voltGetXML(session);
+            columns.children.add(colChild);
+            assert(colChild != null);
         }
 
         // read all the indexes
         VoltXMLElement indexes = new VoltXMLElement("indexes");
         table.children.add(indexes);
+        assert(indexes != null);
         for (Index index : getIndexes()) {
-            indexes.children.add(index.voltGetXML(session));
+            VoltXMLElement indexChild = index.voltGetXML(session);
+            indexes.children.add(indexChild);
+            assert(indexChild != null);
         }
 
         // read all the constraints
         VoltXMLElement constraints = new VoltXMLElement("constraints");
         table.children.add(constraints);
+        assert(constraints != null);
         for (Constraint constraint : getConstraints()) {
             // giant hack to ignore "CHECK" constraint
-            if (constraint.getConstraintType() != Constraint.CHECK)
-                constraints.children.add(constraint.voltGetXML(session));
+            if (constraint.getConstraintType() != Constraint.CHECK) {
+                VoltXMLElement constraintChild = constraint.voltGetXML(session);
+                constraints.children.add(constraintChild);
+                assert(constraintChild != null);
+            }
         }
 
         return table;
