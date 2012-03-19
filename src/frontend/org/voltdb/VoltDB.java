@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.util.Collections;
@@ -475,16 +474,16 @@ public class VoltDB {
         for (StackTraceElement ste : myTrace) {
             stacktrace_sb.append(ste.toString()).append("\n");
         }
-        
+
         // Create a special dump file to hold the stack trace
         try
         {
             TimestampType ts = new TimestampType(new java.util.Date());
             String root = VoltDB.instance().getCatalogContext().cluster.getVoltroot();
             PrintWriter writer = new PrintWriter(root + File.separator + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
-            writer.println("Time: " + ts); 
+            writer.println("Time: " + ts);
             writer.println("Message: " + errMsg);
-            
+
             writer.println();
             writer.println("Platform Properties:");
             PlatformProperties pp = PlatformProperties.getPlatformProperties();
@@ -492,7 +491,7 @@ public class VoltDB {
             for (String line : lines) {
                 writer.println(line.trim());
             }
-            
+
             writer.println();
             writer.println("****** Current Thread ****** ");
             writer.println(stacktrace_sb);
@@ -504,7 +503,7 @@ public class VoltDB {
                 writer.println();
                 StackTraceElement[] st = traces.get(key);
                 writer.println("****** " + key + " ******");
-                for (StackTraceElement ste : st) 
+                for (StackTraceElement ste : st)
                     writer.println(ste);
             }
             writer.close();
@@ -529,11 +528,11 @@ public class VoltDB {
                 log.fatal(errMsg, t);
             else
                 log.fatal(errMsg);
-    
-            if (stackTrace) 
+
+            if (stackTrace)
                 log.fatal(stacktrace_sb);
         }
-        
+
         System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
         System.err.println("The log may contain additional information.");
         System.exit(-1);
