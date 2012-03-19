@@ -38,4 +38,21 @@ public interface ReplicaProcCaller {
             String procName,
             Object... parameters)
             throws IOException, NoConnectionsException;
+
+    /**
+     * Synchronously invoke a replicated procedure.  Used only to serialized adhoc
+     * invocations properly on the replica.
+     * @param originalTxnId
+     * @param procName
+     * @param parameters
+     * @return
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    public ClientResponse callProcedure(
+            long originalTxnId,
+            String procName,
+            Object... parameters)
+            throws IOException, NoConnectionsException, ProcCallException;
 }

@@ -306,4 +306,23 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     {
         m_nextReturn = retval;
     }
+
+    @Override
+    public ClientResponse callProcedure(long originalTxnId, String procName,
+                                        Object... parameters)
+    throws IOException, NoConnectionsException, ProcCallException
+    {
+        numCalls += 1;
+        calledName = procName;
+        calledParameters = parameters;
+        if (originalTxnId <= lastOrigTxnId)
+        {
+            origTxnIdOrderCorrect = false;
+        }
+        else
+        {
+            lastOrigTxnId = originalTxnId;
+        }
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
+    }
 }
