@@ -316,6 +316,11 @@ public class VoltCompiler {
         // use this map as default annotation values
         m_procInfoOverrides = procInfoOverrides;
 
+        // clear out the warnigns and errors
+        m_warnings.clear();
+        m_infos.clear();
+        m_errors.clear();
+
         // do all the work to get the catalog
         final Catalog catalog = compileCatalog(projectFileURL);
         if (catalog == null) {

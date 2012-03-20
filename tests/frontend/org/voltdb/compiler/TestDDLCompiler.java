@@ -149,8 +149,9 @@ public class TestDDLCompiler extends TestCase {
     }
 
     /**
-     * Before fixing ENG-2345, the VIEW definition wouldn't compile if it were
-     * containing single quote characters.
+     * ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
+     * but warn the user, rather than silently ignoring the stuff VoltDB
+     * doesn't support.
      */
     public void testFKsAndChecksGiveWarnings() throws HSQLParseException {
         // ensure the test cleans up
@@ -158,24 +159,33 @@ public class TestDDLCompiler extends TestCase {
         jarOut.deleteOnExit();
 
         // schema with a foreign key constraint and a check constraint
-        String schema =  "create table t0 (id bigint not null, primary key (id));\n";
-               schema += "create table t1 (name varchar(32), user varchar(32), " +
-                         "id bigint references t0, primary key (name, user), CHECK (id>0));";
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        final String schemaPath = schemaFile.getPath();
+        String schema1 =  "create table t0 (id bigint not null, primary key (id));\n";
+               schema1 += "create table t1 (name varchar(32), user varchar(32), " +
+                          "id bigint references t0, primary key (name, user), CHECK (id>0));";
+
+        // similar schema with not null and unique constraints (should have no warnings)
+        String schema2 =  "create table t0 (id bigint not null, primary key (id));\n";
+               //schema2 += "create table t1 (name varchar(32), user varchar(32), " +
+               //                  "id bigint, primary key (name, user);";
 
         // boilerplate for making a project
         final String simpleProject =
                 "<?xml version=\"1.0\"?>\n" +
                 "<project><database><schemas>" +
-                "<schema path='" + schemaPath + "' />" +
+                "<schema path='%s' />" +
                 "</schemas></database></project>";
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
+
+        // RUN EXPECTING WARNINGS
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
+        String schemaPath = schemaFile.getPath();
+
+        File projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        String projectPath = projectFile.getPath();
 
         // compile successfully (but with two warnings hopefully)
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(projectPath, jarOut.getPath(), System.out, null);
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compile(projectPath, jarOut.getPath(), System.out, null);
         assertTrue(success);
 
         // verify the warnings exist
@@ -191,6 +201,27 @@ public class TestDDLCompiler extends TestCase {
         }
         assertEquals(1, foundCheckWarnings);
         assertEquals(1, foundFKWarnings);
+
+        // cleanup after the test
+        jarOut.delete();
+
+        // RUN EXPECTING NO WARNINGS
+        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema2);
+        schemaPath = schemaFile.getPath();
+
+        projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        projectPath = projectFile.getPath();
+
+        // don't reinitialize the compiler to test that it can be re-called
+        //compiler = new VoltCompiler();
+
+        // compile successfully with no warnings
+        success = compiler.compile(projectPath, jarOut.getPath(), System.out, null);
+        assertTrue(success);
+
+        // verify no warnings
+        assertEquals(0, compiler.m_warnings.size());
 
         // cleanup after the test
         jarOut.delete();
