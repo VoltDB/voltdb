@@ -1466,6 +1466,7 @@ public class Expression {
         else if (getType() == OpTypes.ASTERISK) {
             VoltXMLElement asterisk = new VoltXMLElement("asterisk");
             exp.children.add(asterisk);
+            assert(asterisk != null);
         }
         // catch unexpected types
         // XXX Should this throw HSQLParseException instead?
@@ -1473,6 +1474,7 @@ public class Expression {
             System.err.println("UNSUPPORTED EXPR TYPE: " + String.valueOf(getType()));
             VoltXMLElement unknown = new VoltXMLElement("unknown");
             exp.children.add(unknown);
+            assert(unknown != null);
         }
 
         return exp;

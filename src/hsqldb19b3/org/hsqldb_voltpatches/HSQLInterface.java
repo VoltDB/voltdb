@@ -177,6 +177,7 @@ public class HSQLInterface {
 
         VoltXMLElement statement = new VoltXMLElement("statement");
         statement.children.add(xml);
+        assert(xml != null);
 
         return statement;
     }
@@ -226,7 +227,9 @@ public class HSQLInterface {
         HashMappedList hsqlTables = schemaManager.getTables(schemaName);
         for (int i = 0; i < hsqlTables.size(); i++) {
             Table table = (Table) hsqlTables.get(i);
-            xml.children.add(table.voltGetXML(sessionProxy));
+            VoltXMLElement vxmle = table.voltGetXML(sessionProxy);
+            xml.children.add(vxmle);
+            assert(vxmle != null);
         }
 
         return xml;

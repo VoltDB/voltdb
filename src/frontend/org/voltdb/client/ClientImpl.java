@@ -171,6 +171,24 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         return callProcedure(cb, invocation);
     }
 
+    /**
+     * The synchronous procedure call method for DR replication
+     */
+    @Override
+    public ClientResponse callProcedure(
+            long originalTxnId,
+            String procName,
+            Object... parameters)
+            throws IOException, NoConnectionsException, ProcCallException
+    {
+        final SyncCallback cb = new SyncCallback();
+        cb.setArgs(parameters);
+        final ProcedureInvocation invocation =
+            new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
+                                    procName, parameters);
+        return callProcedure(cb, invocation);
+    }
+
     private final ClientResponse callProcedure(SyncCallback cb, ProcedureInvocation invocation)
         throws IOException, NoConnectionsException, ProcCallException
     {

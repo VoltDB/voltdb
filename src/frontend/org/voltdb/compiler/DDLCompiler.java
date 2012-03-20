@@ -37,7 +37,6 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
-import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
@@ -619,7 +618,35 @@ public class DDLCompiler {
         String typeName = node.attributes.get("type");
         ConstraintType type = ConstraintType.valueOf(typeName);
         if (type == null) {
-            throw this.m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");
+            throw m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");
+        }
+
+        if (type == ConstraintType.CHECK) {
+            String msg = "VoltDB does not enforce check constraints. ";
+            msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
+            m_compiler.addWarn(msg);
+            return;
+        }
+        else if (type == ConstraintType.FOREIGN_KEY) {
+            String msg = "VoltDB does not enforce foreign key references and constraints. ";
+            msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
+            m_compiler.addWarn(msg);
+            return;
+        }
+        else if (type == ConstraintType.PRIMARY_KEY) {
+            // create the unique index below
+            // primary key code is in other places as well
+        }
+        else if (type == ConstraintType.UNIQUE) {
+            // just create the unique index below
+        }
+        else if (type == ConstraintType.MAIN) {
+            // should never see these
+            assert(false);
+        }
+        else if (type == ConstraintType.NOT_NULL) {
+            // these get handled by table metadata inspection
+            return;
         }
 
         // The constraint is backed by an index, therefore we need to create it
@@ -649,38 +676,10 @@ public class DDLCompiler {
         }
         catalog_const.setType(type.getValue());
 
-        // Foreign Keys
-        if (type == ConstraintType.FOREIGN_KEY) {
-            String fkey_table_name = node.attributes.get("foreignkeytable");
-            Table catalog_fkey_tbl = ((Database)table.getParent()).getTables().getIgnoreCase(fkey_table_name);
-            if (catalog_fkey_tbl == null) {
-                throw this.m_compiler.new VoltCompilerException("Invalid foreign key table '" + fkey_table_name + "'");
-            }
-            catalog_const.setForeignkeytable(catalog_fkey_tbl);
+        // NO ADDITIONAL WORK
+        // since we only really support unique constraints, setting up a
+        // unique index above is all we need to do to make that work
 
-            // Column mappings
-            for (VoltXMLElement child : node.children) {
-                if (child.name.equals("reference")) {
-                    String from_colname = child.attributes.get("from");
-                    Column from_col = table.getColumns().get(from_colname);
-
-                    String to_colname = child.attributes.get("to");
-                    Column to_col = catalog_fkey_tbl.getColumns().get(to_colname);
-
-                    // Make a reference in the fromcolumn to their column in the constraint
-                    // We store the name of from_olumn as the name of the reference in the catalog
-                    ColumnRef cref = catalog_const.getForeignkeycols().add(from_col.getTypeName());
-                    cref.setColumn(to_col);
-
-                    // Add a ConstraintRef for the from_column
-                    ConstraintRef const_ref = from_col.getConstraints().add(catalog_const.getTypeName());
-                    const_ref.setConstraint(catalog_const);
-                }
-            }
-        // All other constraints
-        } else {
-            // Nothing for now...
-        }
         return;
     }
 

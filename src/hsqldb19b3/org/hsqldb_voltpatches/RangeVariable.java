@@ -1216,7 +1216,10 @@ final class RangeVariable {
         if (indexEndCondition != null) {
             VoltXMLElement postexp = new VoltXMLElement("postexp");
             scan.children.add(postexp);
-            postexp.children.add(cond.voltGetXML(session));
+            assert(postexp != null);
+            VoltXMLElement postexpchild = cond.voltGetXML(session);
+            postexp.children.add(postexpchild);
+            assert(postexpchild != null);
         }
 
         return scan;

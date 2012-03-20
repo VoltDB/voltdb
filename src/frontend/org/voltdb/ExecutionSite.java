@@ -483,13 +483,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          * case where we only have multipart work to do and we are not the
          * coordinator, we still need to send heartbeat buffers.
          *
+         * If the last seen txnId is larger than the current txnId, use the
+         * current txnId, or otherwise we'll end up closing a buffer
+         * prematurely.
+         *
          * If the txnId is from before the process started, caused by command
          * log replay, then ignore it.
          */
-        long safeTxnId = m_transactionQueue.getEarliestSafeTxnIdAcrossInitiators();
-        long safeTxnTime = TransactionIdManager.getTimestampFromTransactionId(safeTxnId);
-        if (safeTxnTime > m_startupTime) {
-            m_partitionDRGateway.tick(safeTxnId);
+        long seenTxnId = m_transactionQueue.getEarliestSeenTxnIdAcrossInitiatorsWhenEmpty();
+        if (m_currentTransactionState != null) {
+            if (seenTxnId == 0 || seenTxnId > m_currentTransactionState.txnId) {
+                seenTxnId = m_currentTransactionState.txnId;
+            }
+        }
+        long seenTxnTime = TransactionIdManager.getTimestampFromTransactionId(seenTxnId);
+        if (seenTxnTime > m_startupTime) {
+            m_partitionDRGateway.tick(seenTxnId);
         }
 
         // invoke native ee tick if at least one second has passed
