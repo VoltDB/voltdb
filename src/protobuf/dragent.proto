@@ -80,7 +80,8 @@ message CtrlEnvelope {
         QUERY = 4;
         RESPONSE = 5;
         SNAPSHOT_REQ = 6;
-        STOP_SYNC = 7;
+        SNAPSHOT_TERM = 7;
+        STOP_SYNC = 8;
     }
     required Type type = 1;
     required UUID id = 2;
