@@ -95,6 +95,15 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
+    public void testPromoteMaster() throws Exception {
+        Client client = getClient();
+        VoltTable results[] = null;
+        results = client.callProcedure("@Promote").getResults();
+        for (VoltTable result : results) {
+            assertEquals(-1, result.asScalarLong());
+        }
+    }
+
     public void testStatistics_Table() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
