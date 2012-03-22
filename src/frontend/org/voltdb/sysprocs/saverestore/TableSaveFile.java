@@ -597,14 +597,7 @@ public class TableSaveFile
                      * be sucked straight in. There is a little funny business to overwrite the
                      * partition id that is not part of the serialization format
                      */
-                    Container c = m_buffers.poll();
-                    if (c == null) {
-                        final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
-                        final ByteBuffer b = originContainer.b;
-                        final long pointer = org.voltdb.utils.DBBPool.getBufferAddress(b);
-                        c = new Container(b, pointer, originContainer, nextChunkPartitionId);
-                    }
-                    c = new Container(c.b, c.address, c.m_origin, nextChunkPartitionId);
+                    Container c = getOutputBuffer(nextChunkPartitionId);
 
                     /*
                      * If the length value is wrong or not all data made it to disk this read will
@@ -753,6 +746,22 @@ public class TableSaveFile
                     }
                 }
             }
+        }
+        private Container getOutputBuffer(final int nextChunkPartitionId) {
+            Container c = m_buffers.poll();
+            if (c == null) {
+                final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
+                final ByteBuffer b = originContainer.b;
+                final long pointer = org.voltdb.utils.DBBPool.getBufferAddress(b);
+                c = new Container(b, pointer, originContainer, nextChunkPartitionId);
+            }
+            /*
+             * Need to reconstruct the container with the partition id of the next
+             * chunk so it can be a final public field. The buffer, address, and origin
+             * container remain the same.
+             */
+            c = new Container(c.b, c.address, c.m_origin, nextChunkPartitionId);
+            return c;
         }
         @Override
         public void run() {

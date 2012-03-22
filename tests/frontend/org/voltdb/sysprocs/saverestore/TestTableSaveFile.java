@@ -279,21 +279,7 @@ public class TestTableSaveFile extends TestCase {
                     reaggregate_table.add(test_table);
                 }
             } finally {
-                /*
-                 * Causes ENG-2660 to reproduce
-                 */
-                new Thread() {
-                    @Override
-                    public void run() {
-                        try {
-                            Thread.sleep(2);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        c.discard();
-                    }
-                }.start();
-                Thread.sleep(1);
+                c.discard();
             }
         }
         assertEquals(table, reaggregate_table);
