@@ -60,7 +60,8 @@ public class TestTableSaveFile extends TestCase {
     }
 
     private void serializeChunk(VoltTable chunk,
-            DefaultSnapshotDataTarget target) throws Exception {
+            DefaultSnapshotDataTarget target,
+            int partitionId) throws Exception {
         FastSerializer fs = new FastSerializer();
 
         chunk.writeExternal(fs);
@@ -75,7 +76,7 @@ public class TestTableSaveFile extends TestCase {
         chunkBuffer.position(target.getHeaderSize());
         chunkBuffer.mark();
         final CRC32 partitionIdCRC = new CRC32();
-        chunkBuffer.putInt(2);
+        chunkBuffer.putInt(partitionId);
         chunkBuffer.reset();
         byte partitionIdBytes[] = new byte[4];
         chunkBuffer.get(partitionIdBytes);
@@ -118,16 +119,17 @@ public class TestTableSaveFile extends TestCase {
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
                 columnInfo.length);
+        int partitionId = 0;
         for (int i = 0; i < numberOfItems; i++) {
             if (i % 1000 == 0 && i > 0) {
-                serializeChunk(currentChunkTable, dsdt);
+                serializeChunk(currentChunkTable, dsdt, partitionId++);
                 currentChunkTable = new VoltTable(columnInfo, columnInfo.length);
             }
             Object[] row = new Object[] { i, "name_" + i, i, new Double(i) };
             currentChunkTable.addRow(row);
             table.addRow(row);
         }
-        serializeChunk(currentChunkTable, dsdt);
+        serializeChunk(currentChunkTable, dsdt, partitionId++);
         dsdt.close();
 
         return new Pair<VoltTable, File>(table, f, false);
@@ -259,10 +261,14 @@ public class TestTableSaveFile extends TestCase {
         FileInputStream fis = new FileInputStream(f);
         TableSaveFile savefile = new TableSaveFile(fis.getChannel(), 3, null);
 
+        int expectedPartitionId = 0;
         VoltTable test_table = null;
         VoltTable reaggregate_table = null;
         while (savefile.hasMoreChunks()) {
-            BBContainer c = savefile.getNextChunk();
+            final BBContainer c = savefile.getNextChunk();
+            TableSaveFile.Container cont = (TableSaveFile.Container)c;
+            assertEquals(expectedPartitionId, cont.partitionId);
+            expectedPartitionId++;
             try {
                 test_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, false);
                 if (reaggregate_table == null) {
@@ -273,7 +279,21 @@ public class TestTableSaveFile extends TestCase {
                     reaggregate_table.add(test_table);
                 }
             } finally {
-                c.discard();
+                /*
+                 * Causes ENG-2660 to reproduce
+                 */
+                new Thread() {
+                    @Override
+                    public void run() {
+                        try {
+                            Thread.sleep(2);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        c.discard();
+                    }
+                }.start();
+                Thread.sleep(1);
             }
         }
         assertEquals(table, reaggregate_table);
