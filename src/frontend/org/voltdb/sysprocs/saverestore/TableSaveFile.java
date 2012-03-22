@@ -604,6 +604,7 @@ public class TableSaveFile
                         final long pointer = org.voltdb.utils.DBBPool.getBufferAddress(b);
                         c = new Container(b, pointer, originContainer, nextChunkPartitionId);
                     }
+                    c = new Container(c.b, c.address, c.m_origin, nextChunkPartitionId);
 
                     /*
                      * If the length value is wrong or not all data made it to disk this read will
