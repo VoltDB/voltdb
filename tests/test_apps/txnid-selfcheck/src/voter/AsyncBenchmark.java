@@ -145,7 +145,7 @@ public class AsyncBenchmark
                 },
                  "doTxn",
                 (byte)r.nextInt(127));
-                
+
                 // Use the limiter to throttle client activity
                 limiter.throttle();
             }
