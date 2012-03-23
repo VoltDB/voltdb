@@ -52,24 +52,16 @@ public class Promote extends VoltSystemProcedure {
     {
         // Choose the lowest site ID on this host to actually flip the bit
         int host_id = ctx.getExecutionSite().getCorrespondingHostId();
-        long retcode = VoltSystemProcedure.STATUS_OK;
         Integer lowest_site_id =
             VoltDB.instance().getCatalogContext().siteTracker.
             getLowestLiveExecSiteIdForHost(host_id);
-        if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE)
+        if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
         {
-            retcode = -1;
-        }
-        else
-        {
-            if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
-            {
-                VoltDB.instance().setReplicationRole(ReplicationRole.NONE);
-            }
+            VoltDB.instance().setReplicationRole(ReplicationRole.NONE);
         }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-        t.addRow(retcode);
+        t.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {t});
     }
 }
