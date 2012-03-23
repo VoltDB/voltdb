@@ -37,7 +37,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 public class doTxn extends VoltProcedure {
 
     public final SQLStmt getLastTxnId = new SQLStmt(
-            "SELECT txnid FROM transactions WHERE txnid < ? ORDER BY txnid LIMIT 1;");
+            "SELECT txnid FROM transactions WHERE txnid < ? ORDER BY txnid DESC LIMIT 1;");
 
     public final SQLStmt insertTxnid = new SQLStmt(
             "INSERT INTO transactions VALUES (?, ?);");
