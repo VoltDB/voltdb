@@ -142,6 +142,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public String abortMessage;
     public long lastOrigTxnId = Long.MIN_VALUE;
     public boolean origTxnIdOrderCorrect = true;
+    private long m_startTime;
 
     @Override
     public boolean callProcedure(ProcedureCallback callback, String procName,
@@ -200,8 +201,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     @Override
     public Object[] getInstanceId() {
-        // TODO Auto-generated method stub
-        return null;
+        Object[] dumb = new Object[2];
+        dumb[0] = (Long)m_startTime;
+        dumb[1] = (Integer)0;
+        return dumb;
     }
 
     @Override
@@ -305,6 +308,11 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public void setNextReturn(boolean retval)
     {
         m_nextReturn = retval;
+    }
+
+    public void setInstanceStartTime(long time)
+    {
+        m_startTime = time;
     }
 
     @Override
