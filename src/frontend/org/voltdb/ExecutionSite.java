@@ -744,8 +744,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
         File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "dr_overflow");
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, m_recovering,
-                                           replicationActive, overflowDir);
+            PartitionDRGateway.getInstance(partitionId, replicationActive, overflowDir);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
