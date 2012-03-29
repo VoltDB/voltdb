@@ -134,7 +134,9 @@ public class ParameterConverter {
                     return new TimestampType((String)param);
                 }
                 catch (IllegalArgumentException e) {
-                    // ignore errors if it's not the right format
+                    throw new Exception(
+                            "tryToMakeCompatible: IllegalArgumentException was thrown -- the provided string (" +
+                            (String)param + ") -- does not satisfy the TimestampType's JDBC format requirement.");
                 }
             }
         }
@@ -214,8 +216,9 @@ public class ParameterConverter {
         }
 
         throw new Exception(
-                "tryToMakeCompatible: Unable to match parameters or out of range for taget param: "
-                + slot.getName() + " to provided " + pclass.getName());
+                "tryToMakeCompatible: Unable to match or convert to the type (" + slot.getName()
+                + ") or value out of range for the target parameter from the provided " + pclass.getName()
+                + " (" + param.toString() + ").");
     }
 
 
