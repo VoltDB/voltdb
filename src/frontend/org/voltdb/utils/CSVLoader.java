@@ -112,7 +112,7 @@ class CSVLoader {
                 // Keep these sync'ed with line numbers.
                 outCount.incrementAndGet();
                 inCount.incrementAndGet();
-               }
+            }
 
             while ((limitRows-- > 0) && (line = reader.readNext()) != null) {
                 long counter = outCount.incrementAndGet();
@@ -199,15 +199,15 @@ class CSVLoader {
                     }
                 }
             } else if (optionPrefix.equalsIgnoreCase(waitMatch)) {
-                   if (argsUsed < args.length) {
-                       try {
-                           waitSeconds = Integer.parseInt(args[argsUsed++]);
-                           if (waitSeconds >= 0) {
-                               continue;
-                           }
+                if (argsUsed < args.length) {
+                    try {
+                        waitSeconds = Integer.parseInt(args[argsUsed++]);
+                        if (waitSeconds >= 0) {
+                            continue;
+                        }
                     } catch (NumberFormatException e) {
                     }
-                   }
+                }
             } else if (optionPrefix.equalsIgnoreCase(auditMatch)) {
                 if (argsUsed < args.length) {
                     try {
@@ -216,45 +216,45 @@ class CSVLoader {
                     } catch (NumberFormatException e) {
                     }
                 }
-               } else if (optionPrefix.equalsIgnoreCase(limitMatch)) {
-                   if (argsUsed < args.length) {
-                       try {
-                           limitRows = Integer.parseInt(args[argsUsed++]);
-                           continue;
+            } else if (optionPrefix.equalsIgnoreCase(limitMatch)) {
+                if (argsUsed < args.length) {
+                    try {
+                        limitRows = Integer.parseInt(args[argsUsed++]);
+                        continue;
                     } catch (NumberFormatException e) {
                     }
-                   }
-               } else if (optionPrefix.equalsIgnoreCase(skipMatch)) {
-                   if (argsUsed < args.length) {
-                       try {
-                           skipRows = Integer.parseInt(args[argsUsed++]);
-                           continue;
+                }
+            } else if (optionPrefix.equalsIgnoreCase(skipMatch)) {
+                if (argsUsed < args.length) {
+                    try {
+                        skipRows = Integer.parseInt(args[argsUsed++]);
+                        continue;
                     } catch (NumberFormatException e) {
                     }
-                   }
-               } else if (optionPrefix.equalsIgnoreCase(reportMatch)) {
-                   if (argsUsed < args.length) {
-                       try {
-                           reportEveryNRows = Integer.parseInt(args[argsUsed++]);
-                           if (reportEveryNRows > 0) {
-                               continue;
-                           }
-                       } catch (NumberFormatException e) {
+                }
+            } else if (optionPrefix.equalsIgnoreCase(reportMatch)) {
+                if (argsUsed < args.length) {
+                    try {
+                        reportEveryNRows = Integer.parseInt(args[argsUsed++]);
+                        if (reportEveryNRows > 0) {
+                            continue;
+                        }
+                    } catch (NumberFormatException e) {
                     }
-                   }
+                }
             } else if (optionPrefix.equalsIgnoreCase(stripMatch)) {
                 stripQuotes = true;
                 continue;
             }
             // Fall through means an error.
             System.err.println("Option arguments are invalid, expected csv filename and insert procedure name (required) and optionally" +
-            " '" + columnsMatch + " " + columnsStyle + "'," +
-            " '" + waitMatch + " s (default=10 seconds)'," +
-            " '" + auditMatch + " n (default=0 rows)'," +
-            " '" + limitMatch + " n (default=all rows)'," +
-            " '" + skipMatch + " n (default=0 rows)'," +
-            " '" + reportMatch + " n (default=10000)'," +
-            " and/or '" + stripMatch + " (disabled by default)'");
+                    " '" + columnsMatch + " " + columnsStyle + "'," +
+                    " '" + waitMatch + " s (default=10 seconds)'," +
+                    " '" + auditMatch + " n (default=0 rows)'," +
+                    " '" + limitMatch + " n (default=all rows)'," +
+                    " '" + skipMatch + " n (default=0 rows)'," +
+                    " '" + reportMatch + " n (default=10000)'," +
+                    " and/or '" + stripMatch + " (disabled by default)'");
             System.exit(2);
         }
     }
