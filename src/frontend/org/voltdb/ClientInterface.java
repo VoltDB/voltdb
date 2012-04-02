@@ -371,13 +371,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         socket.socket().setKeepAlive(true);
 
                                         if (handler instanceof ClientInputHandler) {
+                                            Connection c = m_network.registerChannel(socket, handler, 0);
                                             synchronized (m_connections){
-                                                Connection c = null;
                                                 if (!m_hasDTXNBackPressure) {
-                                                    c = m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
-                                                }
-                                                else {
-                                                    c = m_network.registerChannel(socket, handler, 0);
+                                                    c.enableReadSelection();
                                                 }
                                                 m_connections.add(c);
                                             }
