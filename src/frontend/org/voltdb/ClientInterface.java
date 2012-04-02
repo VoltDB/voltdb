@@ -1106,6 +1106,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     new VoltTable[0], e.getMessage(), task.clientHandle);
         }
         assert(involvedPartitions != null);
+        // XXX-ZOMG This really should pass in the SystemProcedureCatalog.Config object
+        // and read these settings out of it rather than hardwiring them here.
         createTransaction(handler.connectionId(), handler.m_hostname,
                 handler.isAdmin(),
                 task,
@@ -1145,6 +1147,33 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    ClientResponseImpl dispatchPromote(Config sysProc,
+                                       ByteBuffer buf,
+                                       StoredProcedureInvocation task,
+                                       ClientInputHandler handler,
+                                       Connection ccxn)
+    {
+        if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE)
+        {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0], "@Promote issued on master cluster." +
+                    " No action taken.",
+                    task.clientHandle);
+        }
+
+        // the shared dispatch for sysprocs
+        int[] involvedPartitions = m_allPartitions;
+        createTransaction(handler.connectionId(), handler.m_hostname,
+                          handler.isAdmin(),
+                          task,
+                          sysProc.getReadonly(),
+                          sysProc.getSinglepartition(),
+                          sysProc.getEverysite(),
+                          involvedPartitions, involvedPartitions.length,
+                          ccxn, buf.capacity(),
+                          System.currentTimeMillis());
+        return null;
+    }
 
     /**
      *
@@ -1218,6 +1247,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             } else if (task.procName.equals("@Statistics")) {
                 return dispatchStatistics(sysProc, buf, task, handler, ccxn);
+            } else if (task.procName.equals("@Promote")) {
+                return dispatchPromote(sysProc, buf, task, handler, ccxn);
             }
 
             // If you're going to copy and paste something, CnP the pattern

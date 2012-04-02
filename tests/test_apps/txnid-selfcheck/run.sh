@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-APPNAME="voltkv"
+APPNAME="voter"
 CLASSPATH="`ls -x ../../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../../lib/*.jar | tr '[:space:]' ':'`"
 VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"
-LOG4J="`pwd`/../../../voltdb/log4j.xml"
 LICENSE="../../../voltdb/license.xml"
+LOG4J="`pwd`/../../../voltdb/log4j.xml"
 LEADER="localhost"
 
 # remove build artifacts
@@ -17,8 +17,8 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -classpath $CLASSPATH -d obj \
-        src/voltkvqa/*.java \
-        src/voltkvqa/procedures/*.java
+        src/voter/*.java \
+        src/voter/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -49,34 +49,65 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltkvqa.AsyncBenchmark --help
+    java -classpath obj:$CLASSPATH:obj voter.AsyncBenchmark --help
 }
 
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkvqa.AsyncBenchmark \
+        voter.AsyncBenchmark \
         --display-interval=5 \
-        --duration=60 \
+        --duration=120 \
         --servers=localhost \
         --port=21212 \
-        --pool-size=100000 \
-        --preload=true \
-        --get-put-ratio=0.9 \
-        --key-size=32 \
-        --min-value-size=1024 \
-        --max-value-size=1024 \
-        --entropy=127 \
-        --use-compression=false \
         --rate-limit=100000 \
         --auto-tune=false \
         --latency-target=10.0
 }
 
+# Multi-threaded synchronous benchmark sample
+# Use this target for argument help
+function sync-benchmark-help() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj voter.SyncBenchmark --help
+}
 
+function sync-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.SyncBenchmark \
+        --threads=40 \
+        --display-interval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --port=21212 \
+        --contestants=6 \
+        --max-votes=2
+}
+
+# JDBC benchmark sample
+# Use this target for argument help
+function jdbc-benchmark-help() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj voter.JDBCBenchmark --help
+}
+
+function jdbc-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.JDBCBenchmark \
+        --threads=40 \
+        --display-interval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --port=21212 \
+        --contestants=6 \
+        --max-votes=2
+}
 
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
+    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line

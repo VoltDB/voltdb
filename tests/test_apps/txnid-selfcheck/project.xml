@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='voter.procedures.doTxn' />
+        </procedures>
+        <partitions>
+            <partition table='transactions' column='pid' />
+        </partitions>
+    </database>
+</project>

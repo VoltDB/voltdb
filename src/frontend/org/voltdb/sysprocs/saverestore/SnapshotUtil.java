@@ -801,6 +801,7 @@ public class SnapshotUtil {
 
     public static boolean didSnapshotRequestSucceed(VoltTable results[]) {
         final VoltTable result = results[0];
+        result.resetRowPosition();
         if (result.getColumnCount() == 1) {
             return false;
         }
@@ -813,5 +814,21 @@ public class SnapshotUtil {
             }
         }
         return success;
+    }
+
+    public static boolean isSnapshotInProgress(VoltTable results[]) {
+        final VoltTable result = results[0];
+        result.resetRowPosition();
+        if (result.getColumnCount() == 1) {
+            return false;
+        }
+
+        boolean inprogress = false;
+        while (result.advanceRow()) {
+            if (result.getString("ERR_MSG").contains("IN PROGRESS")) {
+                inprogress = true;
+            }
+        }
+        return inprogress;
     }
 }

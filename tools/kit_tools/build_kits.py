@@ -185,8 +185,8 @@ with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key
     assert version == version2
     buildCommunity()
     copyCommunityFilesToReleaseDir(releaseDir, version, "MAC")
-    #buildPro()
-    #copyEnterpriseFilesToReleaseDir(releaseDir, version, "MAC")
+    buildPro()
+    copyEnterpriseFilesToReleaseDir(releaseDir, version, "MAC")
 
 
 computeChecksums(releaseDir)
