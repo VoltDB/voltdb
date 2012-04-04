@@ -205,6 +205,13 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 
+<target name="killstragglers"
+        description="Run the killstragglers script">
+    <exec executable="tools/killstragglers.sh"
+          failonerror="true" timeout="1800000">
+    </exec>
+</target>
+
 <target name="all"
     depends="compile, ee, junit, eecheck, javadoc, jars"
     description="Do all tasks."
