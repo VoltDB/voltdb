@@ -17,13 +17,15 @@
 
 package org.voltdb.expressions;
 
+import java.util.ArrayList;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 /**
  *
@@ -236,6 +238,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return true;
     }
 
+    @Override
     public String toJSONString() {
         JSONStringer stringer = new JSONStringer();
         try {
@@ -315,4 +318,32 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         return expr;
     }
+
+    public ArrayList<AbstractExpression> findBaseTVEs() {
+        return findAllSubexpressionsOfType(ExpressionType.VALUE_TUPLE);
+    }
+
+    /**
+     * @param type plan node type to search for
+     * @return a list of nodes that are eventual successors of this node of the desired type
+     */
+    public ArrayList<AbstractExpression> findAllSubexpressionsOfType(ExpressionType type) {
+        ArrayList<AbstractExpression> collected = new ArrayList<AbstractExpression>();
+        findAllSubexpressionsOfType_recurse(type, collected);
+        return collected;
+    }
+
+    public void findAllSubexpressionsOfType_recurse(ExpressionType type,ArrayList<AbstractExpression> collected)
+    {
+        if (getExpressionType() == type)
+            collected.add(this);
+
+        if (m_left != null) {
+            m_left.findAllSubexpressionsOfType_recurse(type, collected);
+        }
+        if (m_right != null) {
+            m_left.findAllSubexpressionsOfType_recurse(type, collected);
+        }
+    }
+
 }

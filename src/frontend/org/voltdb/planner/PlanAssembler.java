@@ -17,8 +17,13 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.Stack;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -87,7 +92,7 @@ public class PlanAssembler {
     ParsedSelectStmt m_parsedSelect = null;
 
     /** does the statement touch more than one partition? */
-    boolean m_singlePartition;
+    final boolean m_singlePartition;
 
     /** The number of partitions (fetched from the cluster info) */
     final int m_partitionCount;
@@ -101,7 +106,7 @@ public class PlanAssembler {
     /**
      * Counter for the number of plans generated to date for a single statement.
      */
-    int plansGenerated = 0;
+    boolean m_insertPlanWasGenerated = false;
 
     /**
      * Whenever a parameter has its type changed during compilation, the new type is stored
@@ -116,10 +121,11 @@ public class PlanAssembler {
      * @param catalogDb
      *            Catalog info about schema, metadata and procedures.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb) {
+    PlanAssembler(Cluster catalogCluster, Database catalogDb, boolean singlePartition) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
         m_partitionCount = m_catalogCluster.getPartitions().size();
+        m_singlePartition = singlePartition;
     }
 
     String getSQLText() {
@@ -192,10 +198,8 @@ public class PlanAssembler {
      * @param singlePartition
      *            Does the SQL statement use only a single partition?
      */
-    void setupForNewPlans(AbstractParsedStmt parsedStmt, boolean singlePartition)
+    void setupForNewPlans(AbstractParsedStmt parsedStmt)
     {
-        m_singlePartition = singlePartition;
-
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                 throw new RuntimeException(
@@ -204,7 +208,7 @@ public class PlanAssembler {
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             subAssembler =
                 new SelectSubPlanAssembler(m_catalogDb,
-                                           parsedStmt, singlePartition,
+                                           parsedStmt, m_singlePartition,
                                            m_partitionCount);
         } else {
             // check that no modification happens to views
@@ -222,7 +226,7 @@ public class PlanAssembler {
                 }
                 m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
                 subAssembler =
-                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, singlePartition, m_partitionCount);
+                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition, m_partitionCount);
             } else if (parsedStmt instanceof ParsedDeleteStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
@@ -230,7 +234,7 @@ public class PlanAssembler {
                 }
                 m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
                 subAssembler =
-                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, singlePartition, m_partitionCount);
+                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition, m_partitionCount);
             } else
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");
@@ -252,59 +256,50 @@ public class PlanAssembler {
         CompiledPlan retval = new CompiledPlan();
         CompiledPlan.Fragment fragment = new CompiledPlan.Fragment();
         retval.fragments.add(fragment);
-        if (m_parsedInsert != null) {
-            retval.fullWhereClause = m_parsedInsert.where;
-            fragment.planGraph = getNextInsertPlan();
-            retval.fullWinnerPlan = fragment.planGraph;
-            addParameters(retval, m_parsedInsert);
-            assert (m_parsedInsert.tableList.size() == 1);
-            if (m_parsedInsert.tableList.get(0).getIsreplicated())
-                retval.replicatedTableDML = true;
-        } else if (m_parsedUpdate != null) {
-            retval.fullWhereClause = m_parsedUpdate.where;
-            fragment.planGraph = getNextUpdatePlan();
-            retval.fullWinnerPlan = fragment.planGraph;
-            addParameters(retval, m_parsedUpdate);
-            // note that for replicated tables, multi-fragment plans
-            // need to divide the result by the number of partitions
-            assert (m_parsedUpdate.tableList.size() == 1);
-            if (m_parsedUpdate.tableList.get(0).getIsreplicated())
-                retval.replicatedTableDML = true;
-        } else if (m_parsedDelete != null) {
-            retval.fullWhereClause = m_parsedDelete.where;
-            fragment.planGraph = getNextDeletePlan();
-            retval.fullWinnerPlan = fragment.planGraph;
-            addParameters(retval, m_parsedDelete);
-            // note that for replicated tables, multi-fragment plans
-            // need to divide the result by the number of partitions
-            assert (m_parsedDelete.tableList.size() == 1);
-            if (m_parsedDelete.tableList.get(0).getIsreplicated())
-                retval.replicatedTableDML = true;
-        } else if (m_parsedSelect != null) {
-            retval.fullWhereClause = m_parsedSelect.where;
+        AbstractParsedStmt nextStmt = null;
+        if (m_parsedSelect != null) {
+            nextStmt = m_parsedSelect;
             fragment.planGraph = getNextSelectPlan();
-            retval.fullWinnerPlan = fragment.planGraph;
-            addParameters(retval, m_parsedSelect);
             if (fragment.planGraph != null)
             {
                 // only add the output columns if we actually have a plan
                 // avoid PlanColumn resource leakage
                 addColumns(retval, m_parsedSelect);
             }
-        } else
-            throw new RuntimeException(
-                    "setupForNewPlans not called or not successfull.");
+        } else {
+            if (m_parsedInsert != null) {
+                nextStmt = m_parsedInsert;
+                fragment.planGraph = getNextInsertPlan();
+            } else if (m_parsedUpdate != null) {
+                nextStmt = m_parsedUpdate;
+                fragment.planGraph = getNextUpdatePlan();
+                // note that for replicated tables, multi-fragment plans
+                // need to divide the result by the number of partitions
+            } else if (m_parsedDelete != null) {
+                nextStmt = m_parsedDelete;
+                fragment.planGraph = getNextDeletePlan();
+                // note that for replicated tables, multi-fragment plans
+                // need to divide the result by the number of partitions
+            } else {
+                throw new RuntimeException(
+                        "setupForNewPlans not called or not successfull.");
+            }
+            assert (nextStmt.tableList.size() == 1);
+            if (nextStmt.tableList.get(0).getIsreplicated())
+                retval.replicatedTableDML = true;
+        }
 
-        plansGenerated++;
         if (fragment.planGraph == null)
         {
             return null;
         }
-        else
-        {
-            // Do a final generateOutputSchema pass.
-            fragment.planGraph.generateOutputSchema(m_catalogDb);
-        }
+
+        assert (nextStmt != null);
+        addParameters(retval, nextStmt);
+        retval.fullWhereClause = nextStmt.where;
+        retval.fullWinnerPlan = fragment.planGraph;
+        // Do a final generateOutputSchema pass.
+        fragment.planGraph.generateOutputSchema(m_catalogDb);
 
         return retval;
     }
@@ -611,8 +606,9 @@ public class PlanAssembler {
     private AbstractPlanNode getNextInsertPlan() {
         // there's really only one way to do an insert, so just
         // do it the right way once, then return null after that
-        if (plansGenerated > 0)
+        if (m_insertPlanWasGenerated)
             return null;
+        m_insertPlanWasGenerated = true;
 
         // figure out which table we're inserting into
         assert (m_parsedInsert.tableList.size() == 1);

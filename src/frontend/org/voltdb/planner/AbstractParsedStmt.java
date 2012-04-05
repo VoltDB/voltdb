@@ -454,31 +454,19 @@ public abstract class AbstractParsedStmt {
         ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
         in.add(where);
 
-        int loopOps;
-        do {
-            loopOps = 0;
-
-            AbstractExpression inExpr = null;
-            while ((inExpr = in.poll()) != null) {
-                if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
-                    out.add(inExpr.getLeft());
-                    out.add(inExpr.getRight());
-                    loopOps++;
-                }
-                else {
-                    out.add(inExpr);
-                }
+        AbstractExpression inExpr = null;
+        while ((inExpr = in.poll()) != null) {
+            if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
+                in.add(inExpr.getLeft());
+                in.add(inExpr.getRight());
             }
-
-            // swap the input/output
-            ArrayDeque<AbstractExpression> temp = in;
-            in = out;
-            out = temp;
-        // continue until a loop occurs that finds no ands
-        } while (loopOps > 0);
+            else {
+                out.add(inExpr);
+            }
+        }
 
         // the where selection list contains all the clauses
-        whereSelectionList.addAll(in);
+        whereSelectionList.addAll(out);
 
         // This next bit of code identifies which tables get classified how
         HashSet<Table> tableSet = new HashSet<Table>();
