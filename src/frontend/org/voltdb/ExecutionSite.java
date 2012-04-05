@@ -742,19 +742,18 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          snapshotPriority);
 
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
-        m_starvationTracker = new StarvationTracker( getCorrespondingSiteId());
+        m_starvationTracker = new StarvationTracker(getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.STARVATION,
-                                       SiteTracker.getHostForSite(m_siteId),
+                                       getCorrespondingSiteId(),
                                        m_starvationTracker);
         m_tableStats = new TableStats( getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.TABLE,
-                                       SiteTracker.getHostForSite(m_siteId),
+                                       getCorrespondingSiteId(),
                                        m_tableStats);
         m_indexStats = new IndexStats(getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.INDEX,
-                                       SiteTracker.getHostForSite(m_siteId),
+                                       getCorrespondingSiteId(),
                                        m_indexStats);
-
     }
 
     private RestrictedPriorityQueue initializeTransactionQueue(final long siteId)
