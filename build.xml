@@ -1622,9 +1622,7 @@ TEST CASES
 </target>
 
 
-<dirset id="findbugs.lib.id" dir="${vendor.lib.dir}" includes="findbugs*"/>
-<property name="findbugs.lib" refid="findbugs.lib.id"/>
-<property name="findbugs.home" value="${vendor.lib.dir}/${findbugs.lib}" />
+<property name="findbugs.home" value="${vendor.lib.dir}/findbugs-2.0.0" />
 
 <taskdef name="findbugs" classname="edu.umd.cs.findbugs.anttask.FindBugsTask" >
   <classpath>
