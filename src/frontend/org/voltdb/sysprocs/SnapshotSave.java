@@ -29,6 +29,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -71,7 +72,7 @@ public class SnapshotSave extends VoltSystemProcedure
         new ColumnInfo[] {
                           new ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
                           new ColumnInfo("HOSTNAME", VoltType.STRING),
-                          new ColumnInfo(CNAME_SITE_ID, CTYPE_LONG_ID),
+                          new ColumnInfo(CNAME_SITE_ID, CTYPE_ID),
                           new ColumnInfo("RESULT", VoltType.STRING),
                           new ColumnInfo("ERR_MSG", VoltType.STRING)
     };
@@ -167,7 +168,7 @@ public class SnapshotSave extends VoltSystemProcedure
                  * result table consistent?
                  */
                 if (result == null) {
-                    if (table.getColumnType(2).equals(VoltType.BIGINT))
+                    if (table.getColumnType(2).equals(VoltType.INTEGER))
                         result = constructPartitionResultsTable();
                     else
                         result = constructNodeResultsTable();

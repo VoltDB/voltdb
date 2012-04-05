@@ -38,11 +38,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 public abstract class VoltSystemProcedure extends VoltProcedure {
 
-    /** Standard column type for host/partition columns */
-    public static final VoltType CTYPE_ID = VoltType.INTEGER;
-
-    /** Standard column type for site ID column */
-    public static final VoltType CTYPE_LONG_ID = VoltType.BIGINT;
+    /** Standard column type for host/partition/site id columns */
+    public static final VoltType CTYPE_ID = VoltType.BIGINT;
 
     /** Standard column name for a host id column */
     public static final String CNAME_HOST_ID = "HOST_ID";
