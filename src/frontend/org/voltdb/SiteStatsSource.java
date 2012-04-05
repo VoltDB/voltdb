@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.util.ArrayList;
 
+import org.voltcore.utils.MiscUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 
 /**
@@ -43,7 +44,7 @@ public abstract class SiteStatsSource extends StatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = m_siteId;
+        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = MiscUtils.getSiteIdFromHSId(m_siteId);
         super.updateStatsRow(rowKey, rowValues);
     }
 }
