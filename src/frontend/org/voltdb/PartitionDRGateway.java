@@ -45,18 +45,11 @@ public class PartitionDRGateway {
         final boolean licensedToDR = api.isDrReplicationAllowed();
 
         // if this is a primary cluster in a DR-enabled scenario
-        //  try to load the real version of this class
+        // try to load the real version of this class
         PartitionDRGateway pdrg = null;
         if (licensedToDR) {
-            try {
-                Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
-                Object obj = pdrgiClass.newInstance();
-                pdrg = (PartitionDRGateway) obj;
-            } catch (Exception e) {
-            }
+            pdrg = tryToLoadProVersion();
         }
-
-        // create a stub instance
         if (pdrg == null) {
             pdrg = new PartitionDRGateway();
         }
@@ -70,6 +63,32 @@ public class PartitionDRGateway {
         return pdrg;
     }
 
+    /**
+     * shutdown is a global method to gracefully terminate the underlying
+     * gateway infrastructure. It stops anything started by getInstance().
+     */
+    public static void shutdown()
+    {
+        // intentionally avoid a license check to shutdown.
+        PartitionDRGateway pdrg = null;
+        pdrg = tryToLoadProVersion();
+        if (pdrg == null) {
+            pdrg = new PartitionDRGateway();
+        }
+        pdrg.shutdownInternal();
+    }
+
+    private static PartitionDRGateway tryToLoadProVersion()
+    {
+        try {
+            Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
+            Object obj = pdrgiClass.newInstance();
+            return (PartitionDRGateway) obj;
+        } catch (Exception e) {
+        }
+        return null;
+    }
+
     // empty methods for community edition
     protected void init(int partitionId,
                         boolean replicationActive,
@@ -79,6 +98,6 @@ public class PartitionDRGateway {
     public void start() {}
     public void setActive(boolean active) {}
     public boolean isActive() { return false; }
-    public void shutdown() {}
+    protected void shutdownInternal() {}
 
 }
