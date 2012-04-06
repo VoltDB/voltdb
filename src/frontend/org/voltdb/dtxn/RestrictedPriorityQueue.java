@@ -150,8 +150,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
             }
             super.poll();
             m_txnsPopped++;
-            // not BLOCKED_EMPTY
-            assert(retval != null);
         }
         return retval;
     }
@@ -168,8 +166,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
             if (!retval.isDurable()) {
                 return null;
             }
-            // not BLOCKED_EMPTY
-            assert(retval != null);
         }
         return retval;
     }
