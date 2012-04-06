@@ -200,7 +200,7 @@ public class ExportDataSink {
                 ExportProtoMessage m = rx_conn.getValue().poll();
                 if (m != null && m.isPollResponse()) {
                     // john thinks this should never require assignment
-                    assert(m_activeConnection == rx_conn.getKey());
+                    assert(m_activeConnection.equals(rx_conn.getKey()));
                     //m_activeConnection = rx_conn.getKey();
                     handlePollResponse(m);
                 }
