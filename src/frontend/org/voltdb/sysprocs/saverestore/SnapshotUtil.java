@@ -586,7 +586,7 @@ public class SnapshotUtil {
             for (Integer partitionCount : entry.getValue().m_totalPartitionCounts){
                 if (totalPartitionCount == null) {
                     totalPartitionCount = partitionCount;
-                } else if (totalPartitionCount != partitionCount) {
+                } else if (totalPartitionCount.equals(partitionCount)) {
                     snapshotConsistent = false;
                     pw.println(indentString + "Partition count is not consistent throughout snapshot files for "
                             + entry.getKey() + ". Saw "
