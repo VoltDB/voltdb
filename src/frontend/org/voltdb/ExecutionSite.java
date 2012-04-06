@@ -408,7 +408,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
 
                 m_transactionQueue.shutdown();
-                m_partitionDRGateway.shutdown();
+
+                // Forget the m_partitionDrGateway. InvocationBufferServer
+                // will be shutdown after all sites have terminated.
+                m_partitionDRGateway = null;
 
                 if (hsql != null) {
                     hsql.shutdown();
