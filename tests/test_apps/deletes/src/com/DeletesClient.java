@@ -202,13 +202,14 @@ public class DeletesClient
 
     static void insertBatch(Client client, boolean max_batch)
     {
-        System.out.println("Total rows currently: " + m_totalRows);
+        Date date = new Date();
+        System.out.println(date.toString() + "\n\tTotal rows currently: " + m_totalRows);
         int to_insert = m_rand.nextInt(m_averageBatchSize * 2) + 1;
         if (max_batch)
         {
             to_insert = m_averageBatchSize * 2;
         }
-        System.out.println("Inserting: " + to_insert + " rows");
+        System.out.println("\tInserting: " + to_insert + " rows");
         m_expectedInserts = to_insert;
         long start_time = System.currentTimeMillis();
         for (int j = 0; j < to_insert; j++)
@@ -224,10 +225,10 @@ public class DeletesClient
         long elapsed = System.currentTimeMillis() - start_time;
         m_totalInserts += to_insert;
         m_totalInsertTime += elapsed;
-        System.out.println("Batch: " + to_insert + " took " +
+        System.out.println("\tBatch: " + to_insert + " took " +
                            elapsed + " millis");
-        System.out.println("\t (" + ((to_insert * 1000)/elapsed) + " tps)");
-        System.out.println("Total insert TPS: " + (m_totalInserts * 1000)/m_totalInsertTime);
+        System.out.println("\t\t (" + ((to_insert * 1000)/elapsed) + " tps)");
+        System.out.println("\tTotal insert TPS: " + (m_totalInserts * 1000)/m_totalInsertTime);
     }
 
 
@@ -293,7 +294,8 @@ public class DeletesClient
     static void deleteBatch(Client client, long batchesToKeep)
     {
         long prune_ts = m_batchNumber - batchesToKeep;
-        System.out.println("Pruning batches older than batch: " + prune_ts);
+        Date date = new Date();
+        System.out.println(date.toString() + "\n\tPruning batches older than batch: " + prune_ts);
         m_expectedDeletes = NUM_NAMES;
         long start_time = System.currentTimeMillis();
         for (int i = 0; i < NUM_NAMES; i++)
@@ -346,17 +348,18 @@ public class DeletesClient
         long elapsed = System.currentTimeMillis() - start_time;
         m_totalDeletes += NUM_NAMES;
         m_totalDeleteTime += elapsed;
-        System.out.println("After delete, total rows: " + m_totalRows);
-        System.out.println("Deleting batch: " + NUM_NAMES + " took " +
+        System.out.println("\tAfter delete, total rows: " + m_totalRows);
+        System.out.println("\tDeleting batch: " + NUM_NAMES + " took " +
                            elapsed + " millis");
-        System.out.println("\t (" + ((NUM_NAMES * 1000)/elapsed) + " tps)");
-        System.out.println("Total delete TPS: " + (m_totalDeletes * 1000)/m_totalDeleteTime);
-        System.out.println("Total delete RPS: " + (m_totalDeletedRows * 1000)/m_totalDeleteTime);
+        System.out.println("\t\t (" + ((NUM_NAMES * 1000)/elapsed) + " tps)");
+        System.out.println("\tTotal delete TPS: " + (m_totalDeletes * 1000)/m_totalDeleteTime);
+        System.out.println("\tTotal delete RPS: " + (m_totalDeletedRows * 1000)/m_totalDeleteTime);
     }
 
     static void deleteDeceased(Client client)
     {
-        System.out.println("Deleting deceased records...");
+        Date date = new Date();
+        System.out.println(date.toString() + "\n\tDeleting deceased records...");
         m_expectedDeadDeletes = NUM_NAMES;
         long start_time = System.currentTimeMillis();
         for (int i = 0; i < NUM_NAMES; i++)
@@ -407,16 +410,17 @@ public class DeletesClient
         long elapsed = System.currentTimeMillis() - start_time;
         m_totalDeadDeletes += NUM_NAMES;
         m_totalDeadDeleteTime += elapsed;
-        System.out.println("After dead deletes, total rows: " + m_totalRows);
-        System.out.println("Deleting deceased: " + NUM_NAMES + " took " +
+        System.out.println("\tAfter dead deletes, total rows: " + m_totalRows);
+        System.out.println("\tDeleting deceased: " + NUM_NAMES + " took " +
                            elapsed + " millis");
-        System.out.println("\t (" + ((NUM_NAMES * 1000)/elapsed) + " tps)");
-        System.out.println("Total delete TPS: " + (m_totalDeadDeletes * 1000)/m_totalDeadDeleteTime);
+        System.out.println("\t\t (" + ((NUM_NAMES * 1000)/elapsed) + " tps)");
+        System.out.println("\tTotal delete TPS: " + (m_totalDeadDeletes * 1000)/m_totalDeadDeleteTime);
     }
 
     static void countBatch(Client client, long batch)
     {
-        System.out.println("Counting batch: " + batch);
+        Date date = new Date();
+        System.out.println(date.toString() + "\n\tCounting batch: " + batch);
         m_expectedCounts = 1;
         long start_time = System.currentTimeMillis();
         for (int i = 0; i < 1; i++)
@@ -433,7 +437,7 @@ public class DeletesClient
                         }
                         else
                         {
-                            System.out.println("Batch has " +
+                            System.out.println("\tBatch has " +
                                                response.getResults()[0].asScalarLong() +
                                                " items");
                             m_expectedCounts--;
