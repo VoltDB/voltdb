@@ -40,7 +40,6 @@ import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
@@ -371,8 +370,7 @@ public class PlanAssembler {
             root = addProjection(root);
         }
 
-        if ((m_parsedSelect.limit != -1) || (m_parsedSelect.limitParameterId != -1) ||
-            (m_parsedSelect.offset > 0) || (m_parsedSelect.offsetParameterId != -1))
+        if (m_parsedSelect.hasLimitOrOffset())
         {
             root = handleLimitOperator(root);
         }
@@ -834,48 +832,38 @@ public class PlanAssembler {
         return orderByNode;
     }
 
-    AbstractPlanNode addOffsetAndLimit(AbstractPlanNode root) {
-        return null;
-    }
-
     /**
      * Add a limit, pushed-down if possible, and return the new root.
      * @param root top of the original plan
      * @return new plan's root node
      */
     AbstractPlanNode handleLimitOperator(AbstractPlanNode root) {
-        // Whether or not we can push the limit node down
-        boolean canPushDown = true;
-
         // The nodes that need to be applied at the coordinator
         Stack<AbstractPlanNode> coordGraph = new Stack<AbstractPlanNode>();
 
         // The nodes that need to be applied at the distributed plan.
         Stack<AbstractPlanNode> distGraph = new Stack<AbstractPlanNode>();
 
+        int limitParamIndex = m_parsedSelect.getLimitParameterIndex();
+        int offsetParamIndex = m_parsedSelect.getOffsetParameterIndex();
+
         // The coordinator's top limit graph fragment for a MP plan.
         // If planning "order by ... limit", getNextSelectPlan()
         // will have already added an order by to the coordinator frag.
-        LimitPlanNode coordLimit = new LimitPlanNode();
-        coordLimit.setLimit((int)m_parsedSelect.limit);
-        coordLimit.setOffset((int) m_parsedSelect.offset);
-        if (m_parsedSelect.offsetParameterId != -1) {
-            ParameterInfo parameterInfo =
-                m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
-            coordLimit.setOffsetParameterIndex(parameterInfo.index);
-        }
-        if (m_parsedSelect.limitParameterId != -1) {
-            ParameterInfo parameterInfo =
-                m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
-            coordLimit.setLimitParameterIndex(parameterInfo.index);
-        }
-
-        coordGraph.push(coordLimit);
+        // This is the only limit node in a SP plan
+        LimitPlanNode topLimit = new LimitPlanNode();
+        topLimit.setLimit((int)m_parsedSelect.limit);
+        topLimit.setOffset((int) m_parsedSelect.offset);
+        topLimit.setLimitParameterIndex(limitParamIndex);
+        topLimit.setOffsetParameterIndex(offsetParamIndex);
 
         /*
          * TODO: allow push down limit with distinct (select distinct C from T limit 5)
          * or distinct in aggregates.
          */
+        // Whether or not we can push the limit node down
+        boolean canPushDown = true;
+
         if (m_parsedSelect.distinct || checkPushDownViability(root) == null) {
             canPushDown = false;
         }
@@ -889,79 +877,42 @@ public class PlanAssembler {
             }
         }
 
-        // The distributed limit and the only limit node in a SP plan
-        LimitPlanNode distLimit = new LimitPlanNode();
-        distLimit.setLimit((int) m_parsedSelect.limit);
-        distLimit.setOffset((int) m_parsedSelect.offset);
-        if (m_parsedSelect.offsetParameterId != -1) {
-            ParameterInfo parameterInfo =
-                m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
-            distLimit.setOffsetParameterIndex(parameterInfo.index);
-        }
-        if (m_parsedSelect.limitParameterId != -1) {
-            ParameterInfo parameterInfo =
-                m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
-            distLimit.setLimitParameterIndex(parameterInfo.index);
-        }
-        distGraph.push(distLimit);
-
         /*
          * Push down the limit plan node when possible even if offset is set. If
          * the plan is for a partitioned table, do the push down. Otherwise,
          * there is no need to do the push down work, the limit plan node will
          * be run in the partition.
          */
-        if (root.findAllNodesOfType(PlanNodeType.RECEIVE).isEmpty() || !canPushDown) {
+        if ((canPushDown == false) || (root.hasAnyNodeOfType(PlanNodeType.RECEIVE) == false)) {
             // not for partitioned table or cannot push down
-            coordGraph.clear();
+            distGraph.push(topLimit);
         } else {
             /*
-             * For partitioned table, the pushed-down limit plan node contains
-             * an expression for the limit, and the offset is always 0. The
-             * expression for the limit is the original (limit + offset). The
-             * top level limit plan node remains the same, with the original
-             * limit and offset values.
+             * For partitioned table, the pushed-down limit plan node has a limit based
+             * on the combined limit and offset, which may require an expression if either of these was not hard-coded.
+             * The top level limit plan node remains the same, with the original limit and offset values.
              */
-            distGraph.clear();
+            coordGraph.push(topLimit);
 
-            distLimit = new LimitPlanNode();
-            distLimit.setLimit((int) (m_parsedSelect.limit + m_parsedSelect.offset));
-            distLimit.setOffset(0);
-
-            AbstractExpression left = new ConstantValueExpression();
-            ((ConstantValueExpression) left).setValue(Long.toString(m_parsedSelect.offset));
-            left.setValueType(VoltType.INTEGER);
-
-            AbstractExpression right = new ConstantValueExpression();
-            ((ConstantValueExpression) right).setValue(Long.toString(m_parsedSelect.limit));
-            right.setValueType(VoltType.INTEGER);
-
-            if (m_parsedSelect.offsetParameterId != -1 ||
-                    m_parsedSelect.limitParameterId != -1) {
-                if (m_parsedSelect.offsetParameterId != -1) {
-                    left = new ParameterValueExpression();
-                    ParameterInfo paramInfo =
-                        m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
-                    ((ParameterValueExpression) left).setParameterId(paramInfo.index);
-                    left.setValueType(paramInfo.type);
-                    left.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
-                }
-
-                if (m_parsedSelect.limitParameterId != -1) {
-                    right = new ParameterValueExpression();
-                    ParameterInfo paramInfo =
-                        m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
-                    ((ParameterValueExpression) right).setParameterId(paramInfo.index);
-                    right.setValueType(paramInfo.type);
-                    right.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
-                }
+            LimitPlanNode distLimit = new LimitPlanNode();
+            // The offset defaults to 0.
+            if (m_parsedSelect.limit != -1) {
+                distLimit.setLimit((int) (m_parsedSelect.limit + m_parsedSelect.offset));
             }
 
-            OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_PLUS,
-                                                             left, right);
-            expr.setValueType(VoltType.INTEGER);
-            expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
-            distLimit.setLimitExpression(expr);
+            if (m_parsedSelect.hasLimitOrOffsetParameters()) {
+
+                AbstractExpression left = m_parsedSelect.getOffsetExpression();
+                assert (left != null);
+                AbstractExpression right = m_parsedSelect.getLimitExpression();
+                assert (right != null);
+                OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_PLUS, left, right);
+                expr.setValueType(VoltType.INTEGER);
+                expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
+                distLimit.setLimitExpression(expr);
+            }
+            // else the parameter forms of offset/limit default to invalid/unused
+
             distGraph.push(distLimit);
         }
 
@@ -974,13 +925,9 @@ public class PlanAssembler {
 
         /* Check if any aggregate expressions are present */
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
-            if (col.expression.getExpressionType() == ExpressionType.AGGREGATE_SUM ||
-                col.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT ||
-                col.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ||
-                col.expression.getExpressionType() == ExpressionType.AGGREGATE_MIN ||
-                col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX ||
-                col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
                 containsAggregateExpression = true;
+                break;
             }
         }
 
@@ -988,12 +935,7 @@ public class PlanAssembler {
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        if (m_parsedSelect.grouped)
-        {
-            containsAggregateExpression = true;
-        }
-
-        if (containsAggregateExpression) {
+        if (containsAggregateExpression || m_parsedSelect.grouped) {
             AggregatePlanNode topAggNode;
             if (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID) {
@@ -1010,6 +952,7 @@ public class PlanAssembler {
             NodeSchema topAggSchema = new NodeSchema();
             boolean hasAggregates = false;
             boolean isPushDownAgg = true;
+            // TODO: Aggregates could theoretically ONLY appear in the ORDER BY clause, but we don't support that.
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns)
             {
                 AbstractExpression rootExpr = col.expression;
@@ -1017,13 +960,11 @@ public class PlanAssembler {
                 SchemaColumn schema_col = null;
                 SchemaColumn topSchemaCol = null;
                 ExpressionType agg_expression_type = rootExpr.getExpressionType();
-                if (rootExpr.getExpressionType() == ExpressionType.AGGREGATE_SUM ||
-                    rootExpr.getExpressionType() == ExpressionType.AGGREGATE_MIN ||
-                    rootExpr.getExpressionType() == ExpressionType.AGGREGATE_MAX ||
-                    rootExpr.getExpressionType() == ExpressionType.AGGREGATE_AVG ||
-                    rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT ||
-                    rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR)
-                {
+                if (rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    // If the rootExpr is not itself an AggregateExpression but simply contains one
+                    // (or more) like "MAX(counter)+1" or "MAX(col)/MIN(col)",
+                    // it will get classified for now as a non-push-down-able aggregate.
+                    // That beats getting it confused with a pass-through column.
                     agg_input_expr = rootExpr.getLeft();
                     hasAggregates = true;
 
@@ -1041,6 +982,7 @@ public class PlanAssembler {
                         // just pick something innocuous
                         // At some point we should special-case count-star so
                         // we don't go digging for TVEs
+                        // XXX: Danger: according to standard SQL, if first_col has nulls, COUNT(first_col) < COUNT(*)
                         SchemaColumn first_col = root.getOutputSchema().getColumns().get(0);
                         TupleValueExpression tve = new TupleValueExpression();
                         tve.setValueType(first_col.getType());
@@ -1144,6 +1086,7 @@ public class PlanAssembler {
                     {
                         /*
                          * Unsupported aggregate (AVG for example)
+                         * or some expression of aggregates.
                          */
                         isPushDownAgg = false;
                     }

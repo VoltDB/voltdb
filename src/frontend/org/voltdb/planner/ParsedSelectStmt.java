@@ -18,15 +18,16 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
@@ -55,8 +56,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public long limit = -1;
     public long offset = 0;
-    public long limitParameterId = -1;
-    public long offsetParameterId = -1;
+    private long limitParameterId = -1;
+    private long offsetParameterId = -1;
     public boolean grouped = false;
     public boolean distinct = false;
 
@@ -324,6 +325,51 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public List<ParsedColInfo> orderByColumns() {
         return Collections.unmodifiableList(orderColumns);
+    }
+
+    public boolean hasLimitOrOffset() {
+        if ((limit != -1) || (limitParameterId != -1) ||
+            (offset > 0) || (offsetParameterId != -1)) {
+            return true;
+        }
+        return false;
+    }
+
+    public boolean hasLimitOrOffsetParameters() {
+        return limitParameterId != -1 || offsetParameterId != -1;
+    }
+
+    public int getLimitParameterIndex() {
+        return paramIndexById(limitParameterId);
+    }
+
+    public int getOffsetParameterIndex() {
+        return paramIndexById(offsetParameterId);
+    }
+
+    private AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
+        if (id != -1) {
+            ParameterValueExpression parameter = new ParameterValueExpression();
+            ParameterInfo paramInfo = paramsById.get(id);
+            parameter.setParameterIndex(paramInfo.index);
+            parameter.setValueType(paramInfo.type);
+            parameter.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
+            return parameter;
+        }
+        else {
+            ConstantValueExpression constant = new ConstantValueExpression();
+            constant.setValue(Long.toString(value));
+            constant.setValueType(VoltType.INTEGER);
+            return constant;
+        }
+    }
+
+    public AbstractExpression getOffsetExpression() {
+        return getParameterOrConstantAsExpression(offsetParameterId, offset);
+    }
+
+    public AbstractExpression getLimitExpression() {
+        return getParameterOrConstantAsExpression(limitParameterId, limit);
     }
 
 }

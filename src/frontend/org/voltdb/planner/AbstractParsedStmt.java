@@ -221,11 +221,11 @@ public abstract class AbstractParsedStmt {
         if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
             ParameterValueExpression expr = new ParameterValueExpression();
             long id = Long.parseLong(exprNode.attributes.get("id"));
-            ParameterInfo param = paramsById.get(id);
+            int paramIndex = paramIndexById(id);
 
             expr.setValueType(vt);
             expr.setValueSize(size);
-            expr.setParameterId(param.index);
+            expr.setParameterIndex(paramIndex);
 
             return expr;
         }
@@ -592,6 +592,15 @@ public abstract class AbstractParsedStmt {
             }
         }
         return retval;
+    }
+
+    public int paramIndexById(long paramId) {
+        if (paramId == -1) {
+            return -1;
+        }
+        ParameterInfo param = paramsById.get(paramId);
+        assert(param != null);
+        return param.index;
     }
 
 }

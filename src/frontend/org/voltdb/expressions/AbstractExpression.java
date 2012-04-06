@@ -324,8 +324,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * @param type plan node type to search for
-     * @return a list of nodes that are eventual successors of this node of the desired type
+     * @param type expression type to search for
+     * @return a list of contained expressions that are of the desired type
      */
     public ArrayList<AbstractExpression> findAllSubexpressionsOfType(ExpressionType type) {
         ArrayList<AbstractExpression> collected = new ArrayList<AbstractExpression>();
@@ -333,8 +333,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return collected;
     }
 
-    public void findAllSubexpressionsOfType_recurse(ExpressionType type,ArrayList<AbstractExpression> collected)
-    {
+    private void findAllSubexpressionsOfType_recurse(ExpressionType type,ArrayList<AbstractExpression> collected) {
         if (getExpressionType() == type)
             collected.add(this);
 
@@ -342,8 +341,69 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             m_left.findAllSubexpressionsOfType_recurse(type, collected);
         }
         if (m_right != null) {
-            m_left.findAllSubexpressionsOfType_recurse(type, collected);
+            m_right.findAllSubexpressionsOfType_recurse(type, collected);
         }
+    }
+
+    /**
+     * @param type expression type to search for
+     * @return whether the expression or any contained expressions are of the desired type
+     */
+    public boolean hasAnySubexpressionOfType(ExpressionType type) {
+        if (getExpressionType() == type) {
+            return true;
+        }
+
+        if (m_left != null && m_left.hasAnySubexpressionOfType(type)) {
+            return true;
+        }
+
+        if (m_right != null && m_right.hasAnySubexpressionOfType(type)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param type expression type to search for
+     * @return a list of contained expressions that are of the desired type
+     */
+    public ArrayList<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        ArrayList<AbstractExpression> collected = new ArrayList<AbstractExpression>();
+        findAllSubexpressionsOfClass_recurse(aeClass, collected);
+        return collected;
+    }
+
+    public void findAllSubexpressionsOfClass_recurse(Class< ? extends AbstractExpression> aeClass,
+            ArrayList<AbstractExpression> collected) {
+        if (aeClass.isInstance(this))
+            collected.add(this);
+
+        if (m_left != null) {
+            m_left.findAllSubexpressionsOfClass_recurse(aeClass, collected);
+        }
+        if (m_right != null) {
+            m_right.findAllSubexpressionsOfClass_recurse(aeClass, collected);
+        }
+    }
+
+    /**
+     * @param aeClass expression class to search for
+     * @return whether the expression or any contained expressions are of the desired type
+     */
+    public boolean hasAnySubexpressionOfClass(Class< ? extends AbstractExpression> aeClass) {
+        if (aeClass.isInstance(this)) {
+            return true;
+        }
+
+        if (m_left != null && m_left.hasAnySubexpressionOfClass(aeClass)) {
+            return true;
+        }
+
+        if (m_right != null && m_right.hasAnySubexpressionOfClass(aeClass)) {
+            return true;
+        }
+        return false;
     }
 
 }
