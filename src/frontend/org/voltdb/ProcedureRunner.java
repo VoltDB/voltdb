@@ -740,7 +740,7 @@ public class ProcedureRunner {
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
-           if (ste.getClassName() == m_procedure.getClass().getName())
+           if (ste.getClassName().equals(m_procedure.getClass().getName()))
                matches.add(ste);
        }
 
