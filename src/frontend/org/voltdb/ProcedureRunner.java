@@ -679,12 +679,12 @@ public class ProcedureRunner {
                 (pclass == Short.class) || (pclass == Byte.class)) {
                 BigInteger bi = new BigInteger(param.toString());
                 BigDecimal bd = new BigDecimal(bi);
-                bd = bd.setScale(4, BigDecimal.ROUND_HALF_EVEN);
+                bd = bd.setScale(VoltDecimalHelper.kDefaultScale, BigDecimal.ROUND_HALF_EVEN);
                 return bd;
             }
             if (pclass == BigDecimal.class) {
                 BigDecimal bd = (BigDecimal) param;
-                bd = bd.setScale(4, BigDecimal.ROUND_HALF_EVEN);
+                bd = bd.setScale(VoltDecimalHelper.kDefaultScale, BigDecimal.ROUND_HALF_EVEN);
                 return bd;
             }
             if (pclass == String.class) {
