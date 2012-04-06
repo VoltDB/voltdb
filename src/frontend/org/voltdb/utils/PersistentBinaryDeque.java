@@ -416,7 +416,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             throw new IOException("Closed");
         }
         if (!m_finishedSegments.isEmpty()) {
-            assert(m_finishedSegments.firstKey() == m_currentPollSegmentIndex);
+            assert(m_finishedSegments.firstKey().equals(m_currentPollSegmentIndex));
         }
         ArrayDeque<ArrayDeque<BBContainer[]>> segments = new ArrayDeque<ArrayDeque<BBContainer[]>>();
         ArrayDeque<BBContainer[]> currentSegment = new ArrayDeque<BBContainer[]>();
