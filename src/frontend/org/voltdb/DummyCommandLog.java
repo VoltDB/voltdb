@@ -38,7 +38,9 @@ public class DummyCommandLog implements CommandLog {
     public void shutdown() throws InterruptedException {}
 
     @Override
-    public Semaphore logFault(Set<Integer> failedSites, Set<Long> faultedTxns) {
+    public Semaphore logFault(Set<Integer> failedInitiators,
+                              Set<Integer> failedSites,
+                              Set<Long> faultedTxns) {
         return new Semaphore(1);
     }
 
