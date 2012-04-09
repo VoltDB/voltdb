@@ -74,6 +74,10 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertTrue(foundLineMatching(lines, ".*\\[RW].*NondeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[RW].*DeterministicRWProc.*"));
 
+        assertTrue(countLinesMatching(lines, ".*\\[NDC].*NDC=true.*") == 2);
+
+        assertFalse(foundLineMatching(lines, ".*\\[NDC].*NDC=false.*"));
+
         assertFalse(foundLineMatching(lines, ".*\\[RW].*NondeterministicROProc.*"));
         assertFalse(foundLineMatching(lines, ".*\\[RW].*DeterministicRONonSeqProc.*"));
         assertFalse(foundLineMatching(lines, ".*\\[RW].*\\[Seq].*DeterministicROSeqProc.*"));
@@ -94,5 +98,15 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
             }
         }
         return false;
+    }
+
+    private int countLinesMatching(String[] lines, String pattern) {
+        int count = 0;
+        for (String string : lines) {
+            if (string.matches(pattern)) {
+                ++count;
+            }
+        }
+        return count;
     }
 }
