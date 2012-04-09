@@ -26,7 +26,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -91,7 +90,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 config.m_expectedOutgoingMessageSize,
                 config.m_maxArenaSizes,
                 config.m_heavyweight,
-                config.m_statsSettings,
                 config.m_procedureCallTimeoutMS,
                 config.m_connectionResponseTimeoutMS);
         m_distributer.addClientStatusListener(new CSL());
@@ -470,38 +468,18 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public VoltTable getIOStats() {
-        return m_distributer.getConnectionStats(false);
+    public ClientStats[] getStats(boolean interval, boolean rollupConnections, boolean rollupProcedures) {
+        return m_distributer.getStats(interval, rollupConnections, rollupProcedures);
     }
 
     @Override
-    public VoltTable getIOStatsInterval() {
-        return m_distributer.getConnectionStats(true);
+    public void resetGlobalStats() {
+        m_distributer.resetGlobalStats();
     }
 
     @Override
     public Object[] getInstanceId() {
         return m_distributer.getInstanceId();
-    }
-
-    @Override
-    public VoltTable getProcedureStats() {
-        return m_distributer.getProcedureStats(false);
-    }
-
-    @Override
-    public VoltTable getProcedureStatsInterval() {
-        return m_distributer.getProcedureStats(true);
-    }
-
-    @Override
-    public VoltTable getClientRTTLatencies() {
-        return m_distributer.getClientRTTLatencies(false);
-    }
-
-    @Override
-    public VoltTable getClusterRTTLatencies() {
-        return m_distributer.getClusterRTTLatencies(false);
     }
 
     @Override

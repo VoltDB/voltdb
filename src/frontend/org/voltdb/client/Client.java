@@ -21,8 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
 
-import org.voltdb.VoltTable;
-
 /**
  *  <p>
  *  A <code>Client</code> that connects to one or more nodes in a volt cluster
@@ -215,47 +213,9 @@ public interface Client {
      * Get IO stats for each connection as well as globally
      * @return Table containing IO stats
      */
-    public VoltTable getIOStats();
+    public ClientStats[] getStats(boolean interval, boolean rollupConnections, boolean rollupProcedures);
 
-    /**
-     * Get IO stats for each connection as well as globally counting since the last
-     * time this method was called. Don't call this interval version
-     * if the client API is uploading stats via JDBC, it messes up the counters
-     * @return Table containing IO states
-     */
-    public VoltTable getIOStatsInterval();
-
-    /**
-     * Get procedure invocation counts and round trip time stats for each connection
-     * @return Table containing procedure stats
-     */
-    public VoltTable getProcedureStats();
-
-    /**
-     * Get procedure invocation counts and round trip time stats for each connection
-     * since the last time this method was called. Don't call this interval version
-     * if the client API is uploading stats via JDBC, it messes up the counters
-     * @return Table containing procedure stats
-     */
-    public VoltTable getProcedureStatsInterval();
-
-    /**
-     * Get client round trip latency bucket values for each connection and procedure.
-     * Bucket 1 contains transactions completed in 0-9ms, bucket 2 10ms-19ms. The
-     * final bucket includes all remaining, unaccounted, transactions.
-     * @return Table containing latency bucket stats.
-     */
-    VoltTable getClientRTTLatencies();
-
-    /**
-     * Get cluster round trip latency bucket values for each connection and procedure.
-     * This RTT is calculated by the cluster and represents the time from initiation
-     * to transaction completion within the VoltDB process.
-     * Bucket 1 contains transactions completed in 0-9ms, bucket 2 10ms-19ms. The
-     * final bucket includes all remaining, unaccounted, transactions.
-     * @return Table containing latency bucket stats.
-     */
-    VoltTable getClusterRTTLatencies();
+    public void resetGlobalStats();
 
     /**
      * Get an identifier for the cluster that this client is currently connected to.

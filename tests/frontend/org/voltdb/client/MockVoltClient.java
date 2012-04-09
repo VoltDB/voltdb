@@ -188,35 +188,11 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public VoltTable getIOStats() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getIOStatsInterval() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
     public Object[] getInstanceId() {
         Object[] dumb = new Object[2];
         dumb[0] = (Long)m_startTime;
         dumb[1] = (Integer)0;
         return dumb;
-    }
-
-    @Override
-    public VoltTable getProcedureStats() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getProcedureStatsInterval() {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     @Override
@@ -247,18 +223,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public void createConnection(String host, int port) throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
 
-    }
-
-    @Override
-    public VoltTable getClientRTTLatencies() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getClusterRTTLatencies() {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     @Override
@@ -332,5 +296,15 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
             lastOrigTxnId = originalTxnId;
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
+    }
+
+    @Override
+    public ClientStats[] getStats(boolean interval, boolean rollupConnections, boolean rollupProcedures) {
+        return null;
+    }
+
+    @Override
+    public void resetGlobalStats() {
+
     }
 }
