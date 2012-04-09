@@ -108,7 +108,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         // but before everything else (to prevent any new work for bad sites)
         registerFaultHandler(SiteFailureFault.SITE_FAILURE_INITIATOR,
                              new InitiatorNodeFailureFaultHandler(),
-                             FaultType.NODE_FAILURE);
+                             FaultType.SITE_FAILURE);
     }
 
     public ExecutorTxnIdSafetyState getSafetyState() {

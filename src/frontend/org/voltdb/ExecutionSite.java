@@ -695,7 +695,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         VoltDB.instance().getFaultDistributor().
         registerFaultHandler(SiteFailureFault.SITE_FAILURE_EXECUTION_SITE,
                              m_faultHandler,
-                             FaultType.NODE_FAILURE);
+                             FaultType.SITE_FAILURE);
 
         // initialize the DR gateway
         File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "dr_overflow");

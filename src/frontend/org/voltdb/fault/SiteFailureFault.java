@@ -31,7 +31,7 @@ public class SiteFailureFault extends VoltFault
 
     public SiteFailureFault(List<Long> siteIds)
     {
-        super(FaultType.NODE_FAILURE);
+        super(FaultType.SITE_FAILURE);
         m_siteIds = siteIds;
     }
 

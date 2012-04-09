@@ -115,14 +115,14 @@ public class TestFaultDistributor extends TestCase
     {
         FaultDistributor dut = new FaultDistributor(m_voltdb);
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.UNKNOWN);
-        MockFaultHandler node_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
+        MockFaultHandler node_handler = new MockFaultHandler(FaultType.SITE_FAILURE);
         dut.registerFaultHandler(1, unk_handler, FaultType.UNKNOWN);
-        dut.registerFaultHandler(1, node_handler, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(1, node_handler, FaultType.SITE_FAILURE);
         dut.reportFault(new VoltFault(FaultType.UNKNOWN));
         unk_handler.m_handledFaults.acquire();
         assertTrue(unk_handler.m_gotFault);
         assertFalse(node_handler.m_gotFault);
-        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        dut.reportFault(new VoltFault(FaultType.SITE_FAILURE));
         node_handler.m_handledFaults.acquire();
         assertTrue(node_handler.m_gotFault);
     }
@@ -131,11 +131,11 @@ public class TestFaultDistributor extends TestCase
     public void testMultiHandler() throws Exception
     {
         FaultDistributor dut = new FaultDistributor(m_voltdb);
-        MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(1, node_handler1, FaultType.NODE_FAILURE);
-        MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(1, node_handler2, FaultType.NODE_FAILURE);
-        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(1, node_handler1, FaultType.SITE_FAILURE);
+        MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(1, node_handler2, FaultType.SITE_FAILURE);
+        dut.reportFault(new VoltFault(FaultType.SITE_FAILURE));
         node_handler1.m_handledFaults.acquire();
         node_handler2.m_handledFaults.acquire();
         assertTrue(node_handler1.m_gotFault);
@@ -148,9 +148,9 @@ public class TestFaultDistributor extends TestCase
         FaultDistributor dut = new FaultDistributor(m_voltdb);
         // We lie a little bit here to get the NODE_FAILURE routed to UNKNOWN
         // but still set the checking bool correctly
-        MockFaultHandler unk_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
+        MockFaultHandler unk_handler = new MockFaultHandler(FaultType.SITE_FAILURE);
         dut.registerDefaultHandler(unk_handler);
-        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        dut.reportFault(new VoltFault(FaultType.SITE_FAILURE));
         unk_handler.m_handledFaults.acquire();
         assertTrue(unk_handler.m_gotFault);
     }
@@ -160,26 +160,26 @@ public class TestFaultDistributor extends TestCase
         FaultDistributor dut = new FaultDistributor(m_voltdb);
         OrderTracker order_tracker = new OrderTracker(-1);
         MockFaultHandler node_handler1 =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 1, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 1, order_tracker);
         MockFaultHandler node_handler2 =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 2, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 2, order_tracker);
         MockFaultHandler node_handler2a =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 2, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 2, order_tracker);
         MockFaultHandler node_handler5 =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 5, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 5, order_tracker);
         MockFaultHandler node_handler5a =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 5, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 5, order_tracker);
         MockFaultHandler node_handler7 =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 7, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 7, order_tracker);
         // register handlers in non-sequential order to avoid getting lucky
         // with insertion order
-        dut.registerFaultHandler(7, node_handler7, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(2, node_handler2a, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(5, node_handler5, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(1, node_handler1, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(5, node_handler5a, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(2, node_handler2, FaultType.NODE_FAILURE);
-        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        dut.registerFaultHandler(7, node_handler7, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(2, node_handler2a, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(5, node_handler5, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(1, node_handler1, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(5, node_handler5a, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(2, node_handler2, FaultType.SITE_FAILURE);
+        dut.reportFault(new VoltFault(FaultType.SITE_FAILURE));
         node_handler7.m_handledFaults.acquire();
         assertTrue(node_handler1.m_gotFault);
         assertTrue(node_handler2.m_gotFault);
