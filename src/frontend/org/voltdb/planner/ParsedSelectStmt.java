@@ -18,11 +18,16 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
@@ -51,8 +56,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public long limit = -1;
     public long offset = 0;
-    public long limitParameterId = -1;
-    public long offsetParameterId = -1;
+    private long limitParameterId = -1;
+    private long offsetParameterId = -1;
     public boolean grouped = false;
     public boolean distinct = false;
 
@@ -184,52 +189,55 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         VoltXMLElement child = orderByNode.children.get(0);
         assert(child != null);
 
+        // create the orderby column
+        ParsedColInfo order_col = new ParsedColInfo();
+        order_col.orderBy = true;
+        order_col.ascending = !descending;
+        AbstractExpression order_exp = parseExpressionTree(child, db);
+
         // Cases:
         // inner child could be columnref, in which case it's just a normal
         // column.  Just make a ParsedColInfo object for it and the planner
         // will do the right thing later
         if (child.name.equals("columnref"))
         {
-            String alias = child.attributes.get("alias");
-            // create the orderby column
-            ParsedColInfo col = new ParsedColInfo();
-            col.alias = alias;
-            col.expression = parseExpressionTree(child, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(col.expression);
-            ExpressionUtil.assignOutputValueTypesRecursively(col.expression);
-            col.columnName = child.attributes.get("column");
-            col.tableName = child.attributes.get("table");
-            col.orderBy = true;
-            col.ascending = !descending;
-            orderColumns.add(col);
+            order_col.columnName = child.attributes.get("column");
+            order_col.tableName = child.attributes.get("table");
+            order_col.alias = child.attributes.get("alias");
+
+            ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
+            ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
         }
         // inner child could be an operation, which forks into two subcases:
         else if (child.name.equals("operation"))
         {
-            ParsedColInfo order_col = new ParsedColInfo();
             order_col.columnName = "";
-            order_col.orderBy = true;
-            order_col.ascending = !descending;
             // I'm not sure anyone actually cares about this table name
             order_col.tableName = "VOLT_TEMP_TABLE";
-            AbstractExpression order_exp = parseExpressionTree(child, db);
-            // 2) It's a simplecolumn operation.  This means that the alias that
+
+            // 1) It's a simplecolumn operation.  This means that the alias that
             //    we have should refer to a column that we compute
             //    somewhere else (like an aggregate, mostly).
             //    Look up that column in the displayColumns list,
             //    and then create a new order by column with a magic TVE.  This
             //    means that we can only ORDER BY a pre-computed expression
             //    that is also in the display columns, but I'm not sure there's
-            //    a way to not do that that is valid SQL
+            //    a way to not do that that is valid SQL.
+            // But Paul doesn't think that SQL has any such restriction on what
+            // can be
+            //    in the ORDER BY and not in the display columns,
+            // so it's just a VoltDB limitation.
             if (order_exp instanceof TupleValueExpression)
             {
                 String alias = child.attributes.get("alias");
+                order_col.alias = alias;
                 ParsedColInfo orig_col = null;
                 for (ParsedColInfo col : displayColumns)
                 {
                     if (col.alias.equals(alias))
                     {
                         orig_col = col;
+                        break;
                     }
                 }
                 // We need the original column expression so we can extract
@@ -240,6 +248,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                                                      "column for simplecolumn: " +
                                                      alias);
                 }
+
+                // Tagging the actual display column as being also an order by column
+                // helps later when trying to determine ORDER BY coverage (for determinism).
+                orig_col.orderBy = true;
+                orig_col.ascending = order_col.ascending;
+
                 assert(orig_col.tableName.equals("VOLT_TEMP_TABLE"));
                 // Construct our fake TVE that will point back at the input
                 // column.
@@ -250,24 +264,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 tve.setTableName("VOLT_TEMP_TABLE");
                 tve.setValueSize(orig_col.expression.getValueSize());
                 tve.setValueType(orig_col.expression.getValueType());
-                order_col.alias = alias;
-                order_col.expression = tve;
             }
-            // 1) it's an actual complex expression, which we will (for now)
-            //    compute in the order by node.  Create a new column, hand it the
-            //    parsed expression, and stick it in the order by columns.
+            // 2) it's an actual complex expression, which we will (for now)
+            //    compute in the order by node.
             else
             {
                 ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
                 ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
-                order_col.expression = order_exp;
             }
-            orderColumns.add(order_col);
         }
         else
         {
             throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
         }
+        order_col.expression = order_exp;
+        orderColumns.add(order_col);
     }
 
     @Override
@@ -299,4 +310,66 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         return retval;
     }
+
+    public boolean hasOrderByColumns() {
+        return ! orderColumns.isEmpty();
+    }
+
+    public List<ParsedColInfo> displayColumns() {
+        return Collections.unmodifiableList(displayColumns);
+    }
+
+    public List<ParsedColInfo> groupByColumns() {
+        return Collections.unmodifiableList(groupByColumns);
+    }
+
+    public List<ParsedColInfo> orderByColumns() {
+        return Collections.unmodifiableList(orderColumns);
+    }
+
+    public boolean hasLimitOrOffset() {
+        if ((limit != -1) || (limitParameterId != -1) ||
+            (offset > 0) || (offsetParameterId != -1)) {
+            return true;
+        }
+        return false;
+    }
+
+    public boolean hasLimitOrOffsetParameters() {
+        return limitParameterId != -1 || offsetParameterId != -1;
+    }
+
+    public int getLimitParameterIndex() {
+        return paramIndexById(limitParameterId);
+    }
+
+    public int getOffsetParameterIndex() {
+        return paramIndexById(offsetParameterId);
+    }
+
+    private AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
+        if (id != -1) {
+            ParameterValueExpression parameter = new ParameterValueExpression();
+            ParameterInfo paramInfo = paramsById.get(id);
+            parameter.setParameterIndex(paramInfo.index);
+            parameter.setValueType(paramInfo.type);
+            parameter.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
+            return parameter;
+        }
+        else {
+            ConstantValueExpression constant = new ConstantValueExpression();
+            constant.setValue(Long.toString(value));
+            constant.setValueType(VoltType.INTEGER);
+            return constant;
+        }
+    }
+
+    public AbstractExpression getOffsetExpression() {
+        return getParameterOrConstantAsExpression(offsetParameterId, offset);
+    }
+
+    public AbstractExpression getLimitExpression() {
+        return getParameterOrConstantAsExpression(limitParameterId, limit);
+    }
+
 }

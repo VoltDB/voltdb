@@ -434,7 +434,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return collected;
     }
 
-    public void findAllNodesOfType_recurse(PlanNodeType type,ArrayList<AbstractPlanNode> collected,
+    private void findAllNodesOfType_recurse(PlanNodeType type,ArrayList<AbstractPlanNode> collected,
         HashSet<AbstractPlanNode> visited)
     {
         if (visited.contains(this)) {
@@ -447,6 +447,28 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         for (AbstractPlanNode n : m_children)
             n.findAllNodesOfType_recurse(type, collected, visited);
+
+        // NOTE: ignores inline nodes.
+
+}
+
+    /**
+     * @param type plan node type to search for
+     * @return whether a node of that type is contained in the plan tree
+     */
+    public boolean hasAnyNodeOfType(PlanNodeType type) {
+        if (getPlanNodeType() == type)
+            return true;
+
+        for (AbstractPlanNode n : m_children) {
+            if (n.hasAnyNodeOfType(type)) {
+                return true;
+            }
+        }
+
+        // NOTE: ignores inline nodes.
+
+        return false;
     }
 
     @Override
