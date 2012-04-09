@@ -889,13 +889,14 @@ public class PlanAssembler {
         } else {
             /*
              * For partitioned table, the pushed-down limit plan node has a limit based
-             * on the combined limit and offset, which may require an expression if either of these was not hard-coded.
+             * on the combined limit and offset, which may require an expression if either of these was not a hard-coded constant.
              * The top level limit plan node remains the same, with the original limit and offset values.
              */
             coordGraph.push(topLimit);
 
             LimitPlanNode distLimit = new LimitPlanNode();
-            // The offset defaults to 0.
+            // Offset on a pushed-down limit node makes no sense, just defaults to 0
+            // -- the original offset must be factored into the pushed-down limit as a pad on the limit.
             if (m_parsedSelect.limit != -1) {
                 distLimit.setLimit((int) (m_parsedSelect.limit + m_parsedSelect.offset));
             }
@@ -911,7 +912,7 @@ public class PlanAssembler {
                 expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
                 distLimit.setLimitExpression(expr);
             }
-            // else the parameter forms of offset/limit default to invalid/unused
+            // else let the parameterized forms of offset/limit default to unused/invalid.
 
             distGraph.push(distLimit);
         }
@@ -952,7 +953,7 @@ public class PlanAssembler {
             NodeSchema topAggSchema = new NodeSchema();
             boolean hasAggregates = false;
             boolean isPushDownAgg = true;
-            // TODO: Aggregates could theoretically ONLY appear in the ORDER BY clause, but we don't support that.
+            // TODO: Aggregates could theoretically ONLY appear in the ORDER BY clause but not the display columns, but we don't support that yet.
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns)
             {
                 AbstractExpression rootExpr = col.expression;
@@ -961,10 +962,13 @@ public class PlanAssembler {
                 SchemaColumn topSchemaCol = null;
                 ExpressionType agg_expression_type = rootExpr.getExpressionType();
                 if (rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    // If the rootExpr is not itself an AggregateExpression but simply contains one
-                    // (or more) like "MAX(counter)+1" or "MAX(col)/MIN(col)",
-                    // it will get classified for now as a non-push-down-able aggregate.
+                    // If the rootExpr is not itself an AggregateExpression but simply contains one (or more)
+                    // like "MAX(counter)+1" or "MAX(col)/MIN(col)",
+                    // it gets classified as a non-push-down-able aggregate.
                     // That beats getting it confused with a pass-through column.
+                    // TODO: support expressions of aggregates by greater differentiation of display columns between the top-level
+                    // aggregate (potentially containing aggregate functions and expressions of aggregate functions) and the pushed-down
+                    // aggregate (potentially containing aggregate functions and aggregate functions of expressions).
                     agg_input_expr = rootExpr.getLeft();
                     hasAggregates = true;
 
@@ -982,7 +986,8 @@ public class PlanAssembler {
                         // just pick something innocuous
                         // At some point we should special-case count-star so
                         // we don't go digging for TVEs
-                        // XXX: Danger: according to standard SQL, if first_col has nulls, COUNT(first_col) < COUNT(*)
+                        // XXX: Danger: according to standard SQL, if first_col has nulls, COUNT(first_col) < COUNT(*) 
+                        // -- consider using something non-nullable like TupleAddressExpression?
                         SchemaColumn first_col = root.getOutputSchema().getColumns().get(0);
                         TupleValueExpression tve = new TupleValueExpression();
                         tve.setValueType(first_col.getType());
