@@ -325,6 +325,7 @@ public class VoltCompiler {
         final Catalog catalog = compileCatalog(projectFileURL);
         if (catalog == null) {
             compilerLog.error("Catalog compilation failed.");
+            summarizeErrors();
             return false;
         }
 
@@ -338,6 +339,7 @@ public class VoltCompiler {
             catalogBytes =  catalogCommands.getBytes("UTF-8");
         } catch (final UnsupportedEncodingException e1) {
             addErr("Can't encode the compiled catalog file correctly");
+            summarizeErrors();
             return false;
         }
 
@@ -362,15 +364,18 @@ public class VoltCompiler {
             m_jarOutput.writeToFile(new File(jarOutputPath)).run();
         } catch (final Exception e) {
             e.printStackTrace();
+            summarizeErrors();
             return false;
         }
 
         assert(!hasErrors());
 
         if (hasErrors()) {
+            summarizeErrors();
             return false;
         }
 
+        summarizeSuccess();
         return true;
     }
 
@@ -1211,11 +1216,7 @@ public class VoltCompiler {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compile(projectPath, outputJar, System.out, null);
         if (!success) {
-            compiler.summarizeErrors();
             System.exit(-1);
-        }
-        else {
-            compiler.summarizeSuccess();
         }
     }
 
@@ -1238,17 +1239,27 @@ public class VoltCompiler {
                 if (p.getSystemproc()) {
                     continue;
                 }
-                m_outputStream.printf("[%s][%s] %s\n",
+                m_outputStream.printf("[%s][%s]%s %s\n",
                                       p.getSinglepartition() ? "SP" : "MP",
                                       p.getReadonly() ? "RO" : "RW",
+                                      p.getHasseqscans() ? "[Seq]" : "",
                                       p.getTypeName());
                 for (Statement s : p.getStatements()) {
-                    if (s.getSqltext().length() > 80) {
-                        m_outputStream.println("  " + s.getSqltext().substring(0, 80) + "...");
+                    String seqScanTag;
+                    if (s.getSeqscancount() > 0) {
+                        seqScanTag = "[Seq] ";
+                    } else {
+                        seqScanTag = "";
                     }
-                    else {
-                        m_outputStream.println("  " + s.getSqltext());
+                    String statementLine;
+                    if (seqScanTag.length() + s.getSqltext().length() > 80) {
+                        statementLine = "  "
+                                + (seqScanTag + s.getSqltext())
+                                        .substring(0, 80) + "...";
+                    } else {
+                        statementLine = "  " + seqScanTag + s.getSqltext();
                     }
+                    m_outputStream.println(statementLine);
                 }
                 m_outputStream.println();
             }

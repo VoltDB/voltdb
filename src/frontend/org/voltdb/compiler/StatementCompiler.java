@@ -122,6 +122,8 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException(msg);
         }
 
+        catalogStmt.setSeqscancount(plan.countSeqScans());
+
         // Input Parameters
         // We will need to update the system catalogs with this new information
         // If this is an adhoc query then there won't be any parameters

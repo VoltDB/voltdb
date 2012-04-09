@@ -986,7 +986,7 @@ public class PlanAssembler {
                         // just pick something innocuous
                         // At some point we should special-case count-star so
                         // we don't go digging for TVEs
-                        // XXX: Danger: according to standard SQL, if first_col has nulls, COUNT(first_col) < COUNT(*) 
+                        // XXX: Danger: according to standard SQL, if first_col has nulls, COUNT(first_col) < COUNT(*)
                         // -- consider using something non-nullable like TupleAddressExpression?
                         SchemaColumn first_col = root.getOutputSchema().getColumns().get(0);
                         TupleValueExpression tve = new TupleValueExpression();
