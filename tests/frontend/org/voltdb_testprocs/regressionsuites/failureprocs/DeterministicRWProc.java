@@ -32,7 +32,8 @@ import org.voltdb.VoltProcedure;
 )
 public class DeterministicRWProc extends VoltProcedure {
 
-    public static final SQLStmt queryUnambiguousRows = new SQLStmt("select * from blah order by ival, sval limit 2");
+    // Meaningless where clause makes expected output easier to test for.
+    public static final SQLStmt queryUnambiguousRows = new SQLStmt("select * from blah where sval < 'NDC=false' order by ival, sval limit 2");
     public static final SQLStmt updateUnambiguously = new SQLStmt("update blah set sval = ?");
 
     public long run() {

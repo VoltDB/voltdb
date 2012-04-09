@@ -108,6 +108,16 @@ public class CompiledPlan {
      */
     public AbstractPlanNode fullWinnerPlan = null;
 
+    /**
+     * Whether the plan's statement mandates a result with deterministic content;
+     */
+    private boolean m_statementIsContentDeterministic = false;
+
+    /**
+     * Whether the plan's statement mandates a result with deterministic content and order;
+     */
+    private boolean m_statementIsOrderDeterministic = false;
+
     void resetPlanNodeIds() {
         int nextId = 1;
         for (Fragment f : fragments)
@@ -127,6 +137,58 @@ public class CompiledPlan {
         }
 
         return nextId;
+    }
+
+    /**
+     * Mark the level of result determinism imposed by the statement,
+     * which can save us from a difficult determination based on the plan graph.
+     */
+    public void statementGuaranteesDeterminism(boolean content, boolean order) {
+        if (order) {
+            // Can't be order-deterministic without also being content-deterministic.
+            assert (content);
+            m_statementIsContentDeterministic = true;
+            m_statementIsOrderDeterministic = true;
+        } else {
+            assert (m_statementIsOrderDeterministic == false);
+            if (content) {
+                m_statementIsContentDeterministic = true;
+            }
+        }
+    }
+
+    /**
+     * Accessor for flag marking the plan as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return the corresponding value from the first fragment
+     */
+    public boolean isOrderDeterministic() {
+        if (m_statementIsOrderDeterministic) {
+            return true;
+        }
+        AbstractPlanNode apn = fragments.get(0).planGraph;
+        return apn.isOrderDeterministic();
+    }
+
+    /**
+     * Accessor for flag marking the plan as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return the corresponding value from the first fragment
+     */
+    public boolean isContentDeterministic() {
+        if (m_statementIsContentDeterministic) {
+            return true;
+        }
+        AbstractPlanNode apn = fragments.get(0).planGraph;
+        return apn.isContentDeterministic();
+    }
+
+    /**
+     * Accessor for description of plan non-determinism.
+     * @return the corresponding value from the first fragment
+     */
+    public String nondeterminismDetail() {
+        return fragments.get(0).planGraph.nondeterminismDetail();
     }
 
     public int countSeqScans() {

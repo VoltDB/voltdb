@@ -229,6 +229,32 @@ public abstract class ProcedureCompiler {
 
         procedure.setHasseqscans(procHasSeqScans);
 
+        for (Statement catalogStmt : procedure.getStatements()) {
+            if (catalogStmt.getIscontentdeterministic() == false) {
+                String potentialErrMsg =
+                    "Procedure " + shortName + " has a statement with a non-deterministic result - statement: \"" +
+                    catalogStmt.getSqltext() + "\" , reason: " + catalogStmt.getNondeterminismdetail();
+                // throw compiler.new VoltCompilerException(potentialErrMsg);
+                compiler.addWarn(potentialErrMsg);
+            }
+            else if (catalogStmt.getIsorderdeterministic() == false) {
+                String warnMsg;
+                if (procHasWriteStmts) {
+                    String rwPotentialErrMsg = "Procedure " + shortName +
+                            " is RW and has a statement whose result has a non-deterministic ordering - statement: \"" +
+                            catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
+                    // throw compiler.new VoltCompilerException(rwPotentialErrMsg);
+                    warnMsg = rwPotentialErrMsg;
+                }
+                else {
+                    warnMsg = "Procedure " + shortName +
+                        " has a statement with a non-deterministic result - statement: \"" +
+                        catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
+                }
+                compiler.addWarn(warnMsg);
+            }
+        }
+
         // find the run() method and get the params
         Method procMethod = null;
         Method[] methods = procClass.getDeclaredMethods();

@@ -32,7 +32,8 @@ import org.voltdb.VoltProcedure;
 )
 public class NondeterministicROProc extends VoltProcedure {
 
-    public static final SQLStmt queryAmbiguousRows = new SQLStmt("select * from blah limit 2");
+    // Meaningless where clause makes expected output easier to test for.
+    public static final SQLStmt queryAmbiguousRows = new SQLStmt("select * from blah where sval > 'NDC=true' limit 2");
 
     public long run() {
         // insert sample data

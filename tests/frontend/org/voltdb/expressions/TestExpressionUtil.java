@@ -22,19 +22,18 @@
  */
 package org.voltdb.expressions;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
+import java.util.Vector;
+
+import junit.framework.TestCase;
 
 import org.voltdb.VoltType;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
-import org.voltdb.expressions.ConjunctionExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.types.*;
-
-import junit.framework.*;
+import org.voltdb.types.ExpressionType;
+import org.voltdb.types.TimestampType;
 
 public class TestExpressionUtil extends TestCase {
     /**

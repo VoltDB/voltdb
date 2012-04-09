@@ -1245,19 +1245,22 @@ public class VoltCompiler {
                                       p.getHasseqscans() ? "[Seq]" : "",
                                       p.getTypeName());
                 for (Statement s : p.getStatements()) {
-                    String seqScanTag;
+                    String seqScanTag = "";
                     if (s.getSeqscancount() > 0) {
                         seqScanTag = "[Seq] ";
-                    } else {
-                        seqScanTag = "";
+                    }
+                    String determinismTag = "";
+                    if (s.getIscontentdeterministic() == false) {
+                        determinismTag = "[NDC] ";
+                    }
+                    else if (s.getIsorderdeterministic() == false) {
+                        determinismTag = "[NDO] ";
                     }
                     String statementLine;
-                    if (seqScanTag.length() + s.getSqltext().length() > 80) {
-                        statementLine = "  "
-                                + (seqScanTag + s.getSqltext())
-                                        .substring(0, 80) + "...";
+                    if (seqScanTag.length() + determinismTag.length() +s.getSqltext().length() > 80) {
+                        statementLine = "  " + (seqScanTag + determinismTag + s.getSqltext()).substring(0, 80) + "...";
                     } else {
-                        statementLine = "  " + seqScanTag + s.getSqltext();
+                        statementLine = "  " + seqScanTag + determinismTag + s.getSqltext();
                     }
                     m_outputStream.println(statementLine);
                 }

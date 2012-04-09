@@ -68,6 +68,22 @@ public class LimitPlanNode extends AbstractPlanNode {
     }
 
     /**
+     * Accessor for flag marking the plan as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return true only if child is order-deterministic
+     */
+    @Override
+    public boolean isContentDeterministic() {
+        boolean precondition = m_children.get(0).isOrderDeterministic();
+        if (precondition) {
+            return true;
+        }
+        m_nondeterminismDetail = "a limit on unordered content may return different rows: " +
+            m_children.get(0).nondeterminismDetail();
+        return false;
+    }
+
+    /**
      * @return the limit
      */
     public int getLimit() {
