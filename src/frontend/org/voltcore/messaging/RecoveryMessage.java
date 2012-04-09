@@ -81,7 +81,12 @@ public class RecoveryMessage extends VoltMessage {
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
-        msgsize += 24 + (4 * m_addresses.size());
+        msgsize +=
+            8 + // m_sourceHSId
+            8 + // m_txnId
+            4 + // address count
+            (4 * m_addresses.size()) + // 4 bytes per address
+            4; // m_port
         for (byte address[] : m_addresses) {
             msgsize += address.length;
         }
