@@ -771,4 +771,27 @@ public class TestVoltTable extends TestCase {
         assertTrue(t1.equals(t2));
     }
 
+    /**
+     * Java won't let you pass >255 args to a method. Verify it's possible
+     * to make a big table using vararg methods and arrays.
+     */
+    public void test300Columns() {
+        VoltTable.ColumnInfo[] schema = new VoltTable.ColumnInfo[300];
+        for (int i = 0; i < schema.length; ++i) {
+            schema[i] = new VoltTable.ColumnInfo(String.valueOf(i), VoltType.BIGINT);
+        }
+        VoltTable t = new VoltTable(schema);
+        assertNotNull(t);
+        assertEquals(300, t.getColumnCount());
+
+        Object[] row = new Object[schema.length];
+        for (int i = 0; i < schema.length; ++i) {
+            row[i] = new Long(i);
+        }
+
+        t.addRow(row);
+        assertEquals(1, t.getRowCount());
+        assertEquals(schema.length - 1, t.fetchRow(0).getLong(schema.length - 1));
+    }
+
 }

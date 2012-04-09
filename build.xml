@@ -1621,6 +1621,33 @@ TEST CASES
     </exec>
 </target>
 
+
+<property name="findbugs.home" value="${vendor.lib.dir}/findbugs-2.0.0" />
+
+<taskdef name="findbugs" classname="edu.umd.cs.findbugs.anttask.FindBugsTask" >
+  <classpath>
+    <fileset dir="${findbugs.home}/lib" includes="**/*.jar"/>
+  </classpath>
+</taskdef>
+
+<target name="findbugs" depends="voltdb.jar">
+  <property name="findbugs.dir" location="${build.dir}/findbugs" />
+  <mkdir dir="${findbugs.dir}" />
+  <findbugs home="${findbugs.home}"
+            excludeFilter="tools/findbugs-exclude.xml"
+            output="xml"
+            outputFile="${build.dir}/findbugs/findbugs.xml">
+    <class location="voltdb/voltdb-${dist.version}.jar" />
+    <auxClasspath>
+      <fileset dir="${lib.dir}" includes ="*.jar" />
+      <fileset dir="${vendor.lib.dir}" includes="*.jar" />
+      <fileset dir="${build.test.dir}" includes="**/*.class" />
+    </auxClasspath>
+    <sourcePath path="${src.gpl.dir}" />
+  </findbugs>
+</target>
+
+
 <!--
 ***************************************
 BENCHMARKS
