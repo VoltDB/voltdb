@@ -57,7 +57,10 @@ public class FailureSiteUpdateMessage extends VoltMessage {
 
     @Override
     public int getSerializedSize() {
-        int msgsize = 4 + 3 * 8 + (8 * m_failedHSIds.size()); // 3 ints, 2 longs, 1 byte, 4 byte failed host count + 4 bytes per failed host
+        int msgsize =
+            3 * 8 + // 3 longs (initiatorForSafeTxnId, safeTxnId, committedTxnId)
+            4 + // failed host count int
+            (8 * m_failedHSIds.size()); // one long per failed host
         msgsize += super.getSerializedSize();
         return msgsize;
     }
