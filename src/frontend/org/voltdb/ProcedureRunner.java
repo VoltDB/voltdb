@@ -679,12 +679,12 @@ public class ProcedureRunner {
                 (pclass == Short.class) || (pclass == Byte.class)) {
                 BigInteger bi = new BigInteger(param.toString());
                 BigDecimal bd = new BigDecimal(bi);
-                bd.setScale(4, BigDecimal.ROUND_HALF_EVEN);
+                bd = bd.setScale(VoltDecimalHelper.kDefaultScale, BigDecimal.ROUND_HALF_EVEN);
                 return bd;
             }
             if (pclass == BigDecimal.class) {
                 BigDecimal bd = (BigDecimal) param;
-                bd.setScale(4, BigDecimal.ROUND_HALF_EVEN);
+                bd = bd.setScale(VoltDecimalHelper.kDefaultScale, BigDecimal.ROUND_HALF_EVEN);
                 return bd;
             }
             if (pclass == String.class) {
@@ -740,7 +740,7 @@ public class ProcedureRunner {
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
-           if (ste.getClassName() == m_procedure.getClass().getName())
+           if (ste.getClassName().equals(m_procedure.getClass().getName()))
                matches.add(ste);
        }
 

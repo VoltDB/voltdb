@@ -236,7 +236,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public int getDatabaseMajorVersion() throws SQLException
     {
         checkClosed();
-        return Integer.valueOf(versionString.split(".")[0]);
+        System.out.println("\n\n\nVERSION: " + versionString);
+        return Integer.valueOf(versionString.split("\\.")[0]);
     }
 
     // Retrieves the minor version number of the underlying database.
@@ -244,7 +245,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public int getDatabaseMinorVersion() throws SQLException
     {
         checkClosed();
-        return Integer.valueOf(versionString.split(".")[1]);
+        return Integer.valueOf(versionString.split("\\.")[1]);
     }
 
     // Retrieves the name of this database product.
@@ -252,7 +253,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getDatabaseProductName() throws SQLException
     {
         checkClosed();
-        return "VoltDB"; // TODO: Would prefer not hard-coding this...
+        return "VoltDB";
     }
 
     // Retrieves the version number of this database product.
