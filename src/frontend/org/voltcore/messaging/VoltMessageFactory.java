@@ -65,27 +65,9 @@ public class VoltMessageFactory {
         VoltMessage message = null;
 
         switch (messageType) {
-//        case INITIATE_TASK_ID:
-//            message = new InitiateTaskMessage();
-//            break;
-//        case INITIATE_RESPONSE_ID:
-//            message = new InitiateResponseMessage();
-//            break;
-//        case FRAGMENT_TASK_ID:
-//            message = new FragmentTaskMessage();
-//            break;
-//        case FRAGMENT_RESPONSE_ID:
-//            message = new FragmentResponseMessage();
-//            break;
-//        case PARTICIPANT_NOTICE_ID:
-//            message = new MultiPartitionParticipantMessage();
-//            break;
-            case HEARTBEAT_ID:
-                message = new HeartbeatMessage();
-                break;
-//        case COALESCED_HEARTBEAT_ID:
-//            message = new CoalescedHeartbeatMessage();
-//            break;
+        case HEARTBEAT_ID:
+            message = new HeartbeatMessage();
+            break;
         case HEARTBEAT_RESPONSE_ID:
             message = new HeartbeatResponseMessage();
             break;
@@ -95,12 +77,6 @@ public class VoltMessageFactory {
         case RECOVERY_ID:
             message = new RecoveryMessage();
             break;
-//        case COMPLETE_TRANSACTION_ID:
-//            message = new CompleteTransactionMessage();
-//            break;
-//        case COMPLETE_TRANSACTION_RESPONSE_ID:
-//            message = new CompleteTransactionResponseMessage();
-//            break;
         case AGREEMENT_TASK_ID:
             message = new AgreementTaskMessage();
             break;
