@@ -133,6 +133,42 @@ public class CoreUtils {
         }
     }
 
+    /**
+     * Return the local IP address, if it's resolvable.  If not,
+     * return the IPv4 address on the first interface we find, if it exists.
+     * If not, returns whatever address exists on the first interface.
+     * @return the String representation of some valid host or IP address,
+     *         if we can find one; the empty string otherwise
+     */
+    public static InetAddress getLocalAddress() {
+        try {
+            final InetAddress addr = InetAddress.getLocalHost();
+            return addr;
+        } catch (UnknownHostException e) {
+            try {
+                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                if (interfaces == null) {
+                    return null;
+                }
+                NetworkInterface intf = interfaces.nextElement();
+                Enumeration<InetAddress> addresses = intf.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    if (address instanceof Inet4Address) {
+                        return address;
+                    }
+                }
+                addresses = intf.getInetAddresses();
+                if (addresses.hasMoreElements()) {
+                    return addresses.nextElement();
+                }
+                return null;
+            } catch (SocketException e1) {
+                return null;
+            }
+        }
+    }
+
     public static long getHSIdFromHostAndSite(int host, int site) {
         long HSId = site;
         HSId = (HSId << 32) + host;

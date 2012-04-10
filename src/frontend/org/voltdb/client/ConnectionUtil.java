@@ -20,17 +20,11 @@ package org.voltdb.client;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.net.Inet4Address;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -142,35 +136,6 @@ public class ConnectionUtil {
             {
         return getAuthenticatedConnection("export", address, username, hashedPassword);
             }
-
-    public static InetAddress getLocalAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr;
-        } catch (UnknownHostException e) {
-            try {
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return null;
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address;
-                    }
-                }
-                interfaces = NetworkInterface.getNetworkInterfaces();
-                while (addresses.hasMoreElements()) {
-                    return addresses.nextElement();
-                }
-                return null;
-            } catch (SocketException e1) {
-                return null;
-            }
-        }
-    }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host, String username, byte[] hashedPassword, int port)

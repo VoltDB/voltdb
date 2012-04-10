@@ -329,7 +329,7 @@ public class SystemInformation extends VoltSystemProcedure
         int hostId = VoltDB.instance().getHostMessenger().getHostId();
 
         // host name and IP address.
-        InetAddress addr = org.voltdb.client.ConnectionUtil.getLocalAddress();
+        InetAddress addr = org.voltcore.utils.CoreUtils.getLocalAddress();
         vt.addRow(hostId, "IPADDRESS", addr.getHostAddress());
         vt.addRow(hostId, "HOSTNAME", addr.getHostName());
 
