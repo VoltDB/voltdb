@@ -294,8 +294,50 @@ public class TestMessaging extends TestCase {
         assertTrue(false);
     }
 
+    public void testJoinerLeaderAddressAndInternalInterface() throws InterruptedException
+    {
+        MockVoltDB mockVoltDB = new MockVoltDB();
+        mockVoltDB.shouldIgnoreCrashes = true;
+        VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
+
+        // Default config should work
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        mockVoltDB.setConfig(config);
+        SocketJoiner joiner = new SocketJoiner(ConnectionUtil.getLocalAddress(), 1, 0, 0, null);
+        joiner.start();
+        joiner.join();
+        assertTrue(mockVoltDB.getCrashCount() == 0);
+
+        // Matching IP address should work
+        config.m_internalInterface = ConnectionUtil.getLocalAddress().getHostAddress();
+        mockVoltDB.setConfig(config);
+        joiner = new SocketJoiner(ConnectionUtil.getLocalAddress(), 1, 0, 0, null);
+        joiner.start();
+        joiner.join();
+        assertTrue(mockVoltDB.getCrashCount() == 0);
+
+        // Matching host name should work
+        config.m_internalInterface = ConnectionUtil.getLocalAddress().getHostName();
+        mockVoltDB.setConfig(config);
+        joiner = new SocketJoiner(ConnectionUtil.getLocalAddress(), 1, 0, 0, null);
+        joiner.start();
+        joiner.join();
+        assertTrue(mockVoltDB.getCrashCount() == 0);
+
+        // Non-match should crash
+        config.m_internalInterface = "255.255.255.255"; //not a valid IP
+        mockVoltDB.setConfig(config);
+        joiner = new SocketJoiner(ConnectionUtil.getLocalAddress(), 1, 0, 0, null);
+        joiner.start();
+        joiner.join();
+        assertTrue(mockVoltDB.getCrashCount() == 1);
+        mockVoltDB.shutdown(null);
+    }
+
     public void testJoinerBadCRC() {
         MockVoltDB mockVoltDB = new MockVoltDB();
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        mockVoltDB.setConfig(config);
         mockVoltDB.shouldIgnoreCrashes = true;
         VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
 
