@@ -483,8 +483,8 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                     " binding to an ephemeral port to receive recovery connection");
             sockAddr = new InetSocketAddress( internalInterface, 0);
         } else {
-            recoveryLog.debug("No internal interface was specified (" + internalInterface + ")" +
-                    " binding to all interfaces with an ephemeral port to receive recovery connection");
+            recoveryLog.debug("No internal interface was specified. " +
+                    "Binding to all interfaces with an ephemeral port to receive recovery connection");
             allInterfaces = true;
             sockAddr = new InetSocketAddress(0);
         }
