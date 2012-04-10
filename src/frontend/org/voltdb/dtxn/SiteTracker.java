@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
 
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK.MailboxType;
@@ -131,17 +131,17 @@ public class SiteTracker {
             }
         }
 
-        m_hostsToSitesImmutable = MiscUtils.unmodifiableMapCopy(hostsToSites);
-        m_hostsToPartitionsImmutable = MiscUtils.unmodifiableMapCopy(hostsToPartitions);
-        m_partitionsToSitesImmutable = MiscUtils.unmodifiableMapCopy(partitionsToSites);
+        m_hostsToSitesImmutable = CoreUtils.unmodifiableMapCopy(hostsToSites);
+        m_hostsToPartitionsImmutable = CoreUtils.unmodifiableMapCopy(hostsToPartitions);
+        m_partitionsToSitesImmutable = CoreUtils.unmodifiableMapCopy(partitionsToSites);
         m_sitesToPartitionsImmutable = Collections.unmodifiableMap(sitesToPartitions);
-        m_hostsToInitiatorsImmutable = MiscUtils.unmodifiableMapCopy(hostsToInitiators);
-        m_otherHSIdsImmutable = MiscUtils.unmodifiableMapCopy(otherHSIds);
+        m_hostsToInitiatorsImmutable = CoreUtils.unmodifiableMapCopy(hostsToInitiators);
+        m_otherHSIdsImmutable = CoreUtils.unmodifiableMapCopy(otherHSIds);
 
         Map<MailboxType, Map<Integer, List<Long>>> hostsToOtherHSIdsReplacement =
             new HashMap<MailboxType, Map<Integer, List<Long>>>();
         for (Map.Entry<MailboxType, Map<Integer, List<Long>>> e : hostsToOtherHSIds.entrySet()) {
-            hostsToOtherHSIds.put(e.getKey(), MiscUtils.unmodifiableMapCopy(e.getValue()));
+            hostsToOtherHSIds.put(e.getKey(), CoreUtils.unmodifiableMapCopy(e.getValue()));
         }
         m_hostsToOtherHSIdsImmutable = Collections.unmodifiableMap(hostsToOtherHSIdsReplacement);
         m_allExecutionSitesArray = new long[m_allExecutionSites.size()];
@@ -189,7 +189,7 @@ public class SiteTracker {
             Map<Long, Integer> sitesToPartitions) {
         int firstHostId = -1;
         for (MailboxNodeContent obj : objs) {
-            int hostId = MiscUtils.getHostIdFromHSId(obj.HSId);
+            int hostId = CoreUtils.getHostIdFromHSId(obj.HSId);
 
             if (firstHostId == -1) {
                 firstHostId = hostId;
@@ -227,7 +227,7 @@ public class SiteTracker {
 
     private void populateInitiators(List<MailboxNodeContent> objs, Map<Integer, List<Long>> hostsToInitiators) {
         for (MailboxNodeContent obj : objs) {
-            int hostId = MiscUtils.getHostIdFromHSId(obj.HSId);
+            int hostId = CoreUtils.getHostIdFromHSId(obj.HSId);
 
             List<Long> initiators = hostsToInitiators.get(hostId);
             if (initiators == null) {
@@ -257,7 +257,7 @@ public class SiteTracker {
         }
 
         for (MailboxNodeContent obj : objs) {
-            int hostId = MiscUtils.getHostIdFromHSId(obj.HSId);
+            int hostId = CoreUtils.getHostIdFromHSId(obj.HSId);
 
             hsids.add(obj.HSId);
 
@@ -377,7 +377,7 @@ public class SiteTracker {
      * @return Integer host id for that site
      */
     public static int getHostForSite(long siteId) {
-        return MiscUtils.getHostIdFromHSId(siteId);
+        return CoreUtils.getHostIdFromHSId(siteId);
     }
 
     /**

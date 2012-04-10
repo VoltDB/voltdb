@@ -469,7 +469,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_configuredNumberOfPartitions);
                     m_runners.add(runner);
                     Thread runnerThread = new Thread(runner, "Site " +
-                            org.voltcore.utils.MiscUtils.hsIdToString(site));
+                            org.voltcore.utils.CoreUtils.hsIdToString(site));
                     runnerThread.start();
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
                     m_siteThreads.put(site, runnerThread);
@@ -588,7 +588,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
                 for (Map.Entry<Integer, List<Long>> entry : m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
                     System.out.println(entry.getKey() + " -- "
-                            + org.voltcore.utils.MiscUtils.hsIdCollectionToString(entry.getValue()));
+                            + org.voltcore.utils.CoreUtils.hsIdCollectionToString(entry.getValue()));
                 }
                 VoltDB.crashGlobalVoltDB("Mismatch between configured number of partitions (" +
                         m_configuredNumberOfPartitions + ") and actual (" +
@@ -842,7 +842,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
          */
         try {
             ZooKeeper zk = m_messenger.getZK();
-            byte deploymentBytes[] = org.voltcore.utils.MiscUtils.urlToBytes(m_config.m_pathToDeployment);
+            byte deploymentBytes[] = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
 
             try {
                 if (deploymentBytes != null) {
@@ -1270,7 +1270,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
         catch (Throwable t)
         {
-            String errmsg = "ExecutionSite: " + org.voltcore.utils.MiscUtils.hsIdToString(m_currentThreadSite.m_siteId) +
+            String errmsg = "ExecutionSite: " + org.voltcore.utils.CoreUtils.hsIdToString(m_currentThreadSite.m_siteId) +
             " encountered an " +
             "unexpected error and will die, taking this VoltDB node down.";
             System.err.println(errmsg);

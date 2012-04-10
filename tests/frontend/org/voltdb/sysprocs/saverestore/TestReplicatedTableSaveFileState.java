@@ -29,7 +29,7 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
@@ -124,11 +124,11 @@ public class TestReplicatedTableSaveFileState extends TestCase
         for (int i = 0; i < number_of_sites; ++i)
         {
             addHostToTestData(i);
-            catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( i, i), i);
+            catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( i, i), i);
         }
         // Add some non-exec sites for more test coverage
-        catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( 0, number_of_sites), MailboxType.Initiator);
-        catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( 1, number_of_sites + 1), MailboxType.Initiator);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( 0, number_of_sites), MailboxType.Initiator);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( 1, number_of_sites + 1), MailboxType.Initiator);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -181,13 +181,13 @@ public class TestReplicatedTableSaveFileState extends TestCase
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
             addHostToTestData(i);
-            catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( i, i), i);
+            catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( i, i), i);
         }
-        catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( number_of_sites - 1, number_of_sites - 1),
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( number_of_sites - 1, number_of_sites - 1),
                                 number_of_sites - 1);
         // Add some non-exec sites for more test coverage
-        catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( 0, number_of_sites), MailboxType.Initiator);
-        catalog_creator.addSite(MiscUtils.getHSIdFromHostAndSite( 1, number_of_sites + 1), MailboxType.Initiator);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( 0, number_of_sites), MailboxType.Initiator);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( 1, number_of_sites + 1), MailboxType.Initiator);
 
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
@@ -214,7 +214,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
             assertEquals(test_plan[i].fragmentId,
                          SysProcFragmentId.PF_restoreLoadReplicatedTable);
             assertFalse(test_plan[i].multipartition);
-            assertEquals(test_plan[i].siteId, MiscUtils.getHSIdFromHostAndSite( i, i));
+            assertEquals(test_plan[i].siteId, CoreUtils.getHSIdFromHostAndSite( i, i));
             assertEquals(test_plan[i].parameters.toArray()[0], TABLE_NAME);
         }
         assertEquals(test_plan[number_of_sites - 1].fragmentId,
@@ -223,7 +223,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertFalse(test_plan[number_of_sites - 1].multipartition);
         assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[0],
                      TABLE_NAME);
-        assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[1],  MiscUtils.getHSIdFromHostAndSite( 3, 3));
+        assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[1],  CoreUtils.getHSIdFromHostAndSite( 3, 3));
 
         assertEquals(test_plan[number_of_sites].fragmentId,
                      SysProcFragmentId.PF_restoreLoadReplicatedTableResults);

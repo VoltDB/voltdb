@@ -85,7 +85,7 @@ public class SocketJoiner {
     private static final VoltLogger LOG = new VoltLogger(SocketJoiner.class.getName());
 
     private final ExecutorService m_es = Executors.newSingleThreadExecutor(
-            org.voltcore.utils.MiscUtils.getThreadFactory("Socket Joiner", 1024 * 128));
+            org.voltcore.utils.CoreUtils.getThreadFactory("Socket Joiner", 1024 * 128));
 
     InetSocketAddress m_coordIp = null;
     int m_localHostId = 0;

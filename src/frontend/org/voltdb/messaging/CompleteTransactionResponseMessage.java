@@ -20,7 +20,7 @@ package org.voltdb.messaging;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 public class CompleteTransactionResponseMessage extends VoltMessage
 {
@@ -81,7 +81,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
 
         sb.append("COMPLETE_TRANSACTION_RESPONSE");
         sb.append(" (FROM EXEC SITE: ");
-        sb.append(MiscUtils.hsIdToString(m_executionHSId));
+        sb.append(CoreUtils.hsIdToString(m_executionHSId));
         sb.append(") FOR TXN ID: ");
         sb.append(m_txnId);
 

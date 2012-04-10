@@ -20,7 +20,7 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 public class HeartbeatMessage extends TransactionInfoBaseMessage {
 
@@ -70,7 +70,7 @@ public class HeartbeatMessage extends TransactionInfoBaseMessage {
         StringBuilder sb = new StringBuilder();
 
         sb.append("HEARTBEAT (FROM ");
-        sb.append(MiscUtils.hsIdToString(m_sourceHSId));
+        sb.append(CoreUtils.hsIdToString(m_sourceHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
         sb.append(" and LAST SAFE ");

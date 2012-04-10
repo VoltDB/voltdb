@@ -52,7 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.MessagingException;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.StoredProcedureInvocation;
@@ -114,7 +114,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_siteId = m_mailbox.getHSId();
         m_safetyState.setHSId(m_siteId);
         hostLog.info("Initializing initiator ID: " + initiatorId  +
-                ", SiteID: " + MiscUtils.hsIdToString(m_siteId));
+                ", SiteID: " + CoreUtils.hsIdToString(m_siteId));
 
         m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);
         m_hostId = hostId;

@@ -28,7 +28,7 @@ import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state
@@ -475,7 +475,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         for (Map.Entry<Long, LastInitiatorData> entry : m_initiatorData.entrySet()) {
             LastInitiatorData lid = entry.getValue();
             sb.append(' ');
-            sb.append(MiscUtils.hsIdToString(entry.getKey()));
+            sb.append(CoreUtils.hsIdToString(entry.getKey()));
             sb.append("==");
             sb.append(lid.m_lastSeenTxnId);
             sb.append(':');

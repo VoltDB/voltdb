@@ -48,7 +48,7 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
@@ -987,7 +987,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public void run() {
         // enumerate site id (pad to 4 digits for sort)
         String name = "ExecutionSite: ";
-        name += MiscUtils.hsIdToString(getSiteId());
+        name += CoreUtils.hsIdToString(getSiteId());
         Thread.currentThread().setName(name);
 
         try {
@@ -1175,7 +1175,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          */
         if (!m_tracker.m_allSitesImmutable.contains(message.m_sourceHSId)) {
             hostLog.warn("Dropping message " + message + " because it is from a unknown site id " +
-                    MiscUtils.hsIdToString(message.m_sourceHSId));
+                    CoreUtils.hsIdToString(message.m_sourceHSId));
             return;
         }
         if (message instanceof TransactionInfoBaseMessage) {
@@ -1281,8 +1281,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             final long recoveringPartitionTxnId = rm.txnId();
             m_recoveryStartTime = System.currentTimeMillis();
             m_recoveryLog.info(
-                    "Recovery initiate received at site " + MiscUtils.hsIdToString(m_siteId) +
-                    " from site " + MiscUtils.hsIdToString(rm.sourceSite()) + " requesting recovery start before txnid " +
+                    "Recovery initiate received at site " + CoreUtils.hsIdToString(m_siteId) +
+                    " from site " + CoreUtils.hsIdToString(rm.sourceSite()) + " requesting recovery start before txnid " +
                     recoveringPartitionTxnId);
             m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
                     this,
@@ -1470,8 +1470,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         delta.removeAll(newTracker.m_allSitesImmutable);
 
         System.out.println("Failure delta is " +
-                MiscUtils.hsIdCollectionToString(delta) + " with failures " +
-                MiscUtils.hsIdCollectionToString(m_pendingFailedSites));
+                CoreUtils.hsIdCollectionToString(delta) + " with failures " +
+                CoreUtils.hsIdCollectionToString(m_pendingFailedSites));
 
         /*
          * In this case there were concurrent failures and the necessary matching site trackers
@@ -1582,8 +1582,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private void discoverGlobalFaultData_send(SiteTracker newTracker)
     {
         Set<Long> survivors = newTracker.getAllSites();
-        m_recoveryLog.info("Sending fault data " + MiscUtils.hsIdCollectionToString(m_pendingFailedSites) + " to "
-                + MiscUtils.hsIdCollectionToString(survivors) +
+        m_recoveryLog.info("Sending fault data " + CoreUtils.hsIdCollectionToString(m_pendingFailedSites) + " to "
+                + CoreUtils.hsIdCollectionToString(survivors) +
                 " survivors with lastKnownGloballyCommitedMultiPartTxnId "
                 + lastKnownGloballyCommitedMultiPartTxnId);
 
@@ -1602,7 +1602,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                  txnId != null ? txnId : Long.MIN_VALUE,
                                                  lastKnownGloballyCommitedMultiPartTxnId);
 
-                m_mailbox.send(MiscUtils.toLongArray(survivors), srcmsg);
+                m_mailbox.send(CoreUtils.toLongArray(survivors), srcmsg);
             }
         }
         catch (MessagingException e) {
@@ -1658,14 +1658,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
                 m_mailbox.deliverFront(m);
                 m_recoveryLog.info("Detected a concurrent failure from FaultDistributor, new failed sites "
-                        + MiscUtils.hsIdCollectionToString(newFailedSiteIds));
+                        + CoreUtils.hsIdCollectionToString(newFailedSiteIds));
                 return false;
             }
 
-            m_recoveryLog.info("Received failure message  from " + MiscUtils.hsIdToString(fm.m_sourceHSId) +
+            m_recoveryLog.info("Received failure message  from " + CoreUtils.hsIdToString(fm.m_sourceHSId) +
                     " for failed sites " +
-                    MiscUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
-                    MiscUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
+                    CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
+                    CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
                     " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
         } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites));
 

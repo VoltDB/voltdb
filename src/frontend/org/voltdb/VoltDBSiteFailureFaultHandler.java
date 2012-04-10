@@ -20,7 +20,7 @@ package org.voltdb;
 import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
@@ -49,7 +49,7 @@ class VoltDBSiteFailureFaultHandler implements FaultHandler {
     }
 
     private void handleSiteFailureFault(SiteFailureFault site_fault) {
-        hostLog.error("Sites failed, site ids: " + MiscUtils.hsIdCollectionToString(site_fault.getSiteIds()));
+        hostLog.error("Sites failed, site ids: " + CoreUtils.hsIdCollectionToString(site_fault.getSiteIds()));
 
         // kill the cluster if this all happened too soon
         if (m_rvdb.getHostMessenger().isLocalHostReady() == false) {

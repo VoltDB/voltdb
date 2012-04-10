@@ -28,7 +28,7 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltZK.MailboxType;
 
@@ -38,10 +38,10 @@ public class TestSiteTracker extends TestCase
     {
         MockVoltDB helper = new MockVoltDB();
 
-        Long site1 = MiscUtils.getHSIdFromHostAndSite( 0, 1);
-        Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
-        Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
-        Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
+        Long site1 = CoreUtils.getHSIdFromHostAndSite( 0, 1);
+        Long site2 = CoreUtils.getHSIdFromHostAndSite( 0, 2);
+        Long site101 = CoreUtils.getHSIdFromHostAndSite( 1, 101);
+        Long site102 = CoreUtils.getHSIdFromHostAndSite( 1, 102);
         helper.addSite(site1, 0);
         helper.addSite(site2, 1);
         helper.addSite(site101, 2);
@@ -74,10 +74,10 @@ public class TestSiteTracker extends TestCase
     {
         MockVoltDB helper = new MockVoltDB();
 
-        Long site1 = MiscUtils.getHSIdFromHostAndSite( 0, 1);
-        Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
-        Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
-        Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
+        Long site1 = CoreUtils.getHSIdFromHostAndSite( 0, 1);
+        Long site2 = CoreUtils.getHSIdFromHostAndSite( 0, 2);
+        Long site101 = CoreUtils.getHSIdFromHostAndSite( 1, 101);
+        Long site102 = CoreUtils.getHSIdFromHostAndSite( 1, 102);
         helper.addSite(site1, 0);
         helper.addSite(site2, 1);
         helper.addSite(site101, 0);
@@ -109,14 +109,14 @@ public class TestSiteTracker extends TestCase
     {
         MockVoltDB helper = new MockVoltDB();
 
-        Long site0 = MiscUtils.getHSIdFromHostAndSite( 0, 0);
-        Long site1 = MiscUtils.getHSIdFromHostAndSite( 0, 1);
-        Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
-        Long site3 = MiscUtils.getHSIdFromHostAndSite( 0, 3);
-        Long site100 = MiscUtils.getHSIdFromHostAndSite( 1, 100);
-        Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
-        Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
-        Long site103 = MiscUtils.getHSIdFromHostAndSite( 1, 103);
+        Long site0 = CoreUtils.getHSIdFromHostAndSite( 0, 0);
+        Long site1 = CoreUtils.getHSIdFromHostAndSite( 0, 1);
+        Long site2 = CoreUtils.getHSIdFromHostAndSite( 0, 2);
+        Long site3 = CoreUtils.getHSIdFromHostAndSite( 0, 3);
+        Long site100 = CoreUtils.getHSIdFromHostAndSite( 1, 100);
+        Long site101 = CoreUtils.getHSIdFromHostAndSite( 1, 101);
+        Long site102 = CoreUtils.getHSIdFromHostAndSite( 1, 102);
+        Long site103 = CoreUtils.getHSIdFromHostAndSite( 1, 103);
         helper.addSite(site0, MailboxType.Initiator);
         helper.addSite(site1, 0);
         helper.addSite(site2, 1);
@@ -147,12 +147,12 @@ public class TestSiteTracker extends TestCase
     {
         MockVoltDB helper = new MockVoltDB();
 
-        Long site0 = MiscUtils.getHSIdFromHostAndSite( 0, 0);
-        Long site1 = MiscUtils.getHSIdFromHostAndSite( 0, 1);
-        Long site2 = MiscUtils.getHSIdFromHostAndSite( 0, 2);
-        Long site100 = MiscUtils.getHSIdFromHostAndSite( 1, 100);
-        Long site101 = MiscUtils.getHSIdFromHostAndSite( 1, 101);
-        Long site102 = MiscUtils.getHSIdFromHostAndSite( 1, 102);
+        Long site0 = CoreUtils.getHSIdFromHostAndSite( 0, 0);
+        Long site1 = CoreUtils.getHSIdFromHostAndSite( 0, 1);
+        Long site2 = CoreUtils.getHSIdFromHostAndSite( 0, 2);
+        Long site100 = CoreUtils.getHSIdFromHostAndSite( 1, 100);
+        Long site101 = CoreUtils.getHSIdFromHostAndSite( 1, 101);
+        Long site102 = CoreUtils.getHSIdFromHostAndSite( 1, 102);
 
         helper.addSite(site0, MailboxType.Initiator);
         helper.addSite(site1, 0);

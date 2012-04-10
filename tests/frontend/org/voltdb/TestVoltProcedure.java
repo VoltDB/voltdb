@@ -55,7 +55,7 @@ import java.util.Date;
 
 import junit.framework.TestCase;
 
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
@@ -250,7 +250,7 @@ public class TestVoltProcedure extends TestCase {
     {
         manager = new MockVoltDB();
 
-        final long executionSiteId = MiscUtils.getHSIdFromHostAndSite( 0, 42);
+        final long executionSiteId = CoreUtils.getHSIdFromHostAndSite( 0, 42);
         this.executionSiteId = executionSiteId;
         manager.addSite(executionSiteId, 0);
         agent = new MockStatsAgent();

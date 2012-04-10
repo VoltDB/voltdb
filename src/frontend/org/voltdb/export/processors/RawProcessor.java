@@ -225,7 +225,7 @@ public class RawProcessor implements ExportDataProcessor {
                 try {
                     VoltZK.updateClusterMetadata(m_clusterMetadata);
                 } catch (Exception e) {
-                    protocolError(m, org.voltcore.utils.MiscUtils.throwableToString(e));
+                    protocolError(m, org.voltcore.utils.CoreUtils.throwableToString(e));
                 }
 
                 // Respond by advertising the full data source set and

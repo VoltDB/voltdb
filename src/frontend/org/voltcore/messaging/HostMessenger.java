@@ -49,7 +49,7 @@ import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.InstanceId;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -166,7 +166,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             return;
         }
         m_knownFailedHosts.add(hostId);
-        long initiatorSiteId = MiscUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
+        long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         removeForeignHost(hostId);
         m_agreementSite.reportFault(initiatorSiteId);
     }
@@ -416,7 +416,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * This node is the one to create the txn that will add the new host to the list of hosts
              * with agreement sites across the cluster.
              */
-            long hsId = MiscUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
+            long hsId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
             if (!m_agreementSite.requestJoin(hsId).await(60, TimeUnit.SECONDS)) {
                 reportForeignHostFailed(hostId);
             }
@@ -509,7 +509,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         for (int ii = 0; ii < hosts.length; ii++) {
             System.out.println(yourHostId + " Notified of host " + hosts[ii]);
-            agreementSites.add(MiscUtils.getHSIdFromHostAndSite(hosts[ii], AGREEMENT_SITE_ID));
+            agreementSites.add(CoreUtils.getHSIdFromHostAndSite(hosts[ii], AGREEMENT_SITE_ID));
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;
             try {
@@ -596,11 +596,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public long getHSIdForLocalSite(int site) {
-        return MiscUtils.getHSIdFromHostAndSite(getHostId(), site);
+        return CoreUtils.getHSIdFromHostAndSite(getHostId(), site);
     }
 
     public String getHostname() {
-        String hostname = org.voltcore.utils.MiscUtils.getHostnameOrAddress();
+        String hostname = org.voltcore.utils.CoreUtils.getHostnameOrAddress();
         return hostname;
     }
 
@@ -667,7 +667,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             //java.io.PrintWriter pw = new java.io.PrintWriter(sw);
             //t.printStackTrace(pw);
             //pw.flush();
-            m_logger.warn("Attempted delivery of message to failed site: " + MiscUtils.hsIdToString(hsId));
+            m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
             //m_logger.warn(sw.toString());
             return null;
         }
@@ -706,7 +706,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 throws MessagingException {}
                 @Override
                 public void deliver(VoltMessage message) {
-                    hostLog.warn("No-op mailbox(" + MiscUtils.hsIdToString(hsId) + ") dropped message " + message);
+                    hostLog.warn("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
                 }
                 @Override
                 public void deliverFront(VoltMessage message) {}
@@ -844,7 +844,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             if (m_siteMailboxes.get().containsKey(proposedHSId)) {
                 org.voltdb.VoltDB.crashLocalVoltDB(
                         "Attempted to create a mailbox for site " +
-                        MiscUtils.hsIdToString(proposedHSId) + " twice", true, null);
+                        CoreUtils.hsIdToString(proposedHSId) + " twice", true, null);
             }
             hsId = proposedHSId;
         } else {

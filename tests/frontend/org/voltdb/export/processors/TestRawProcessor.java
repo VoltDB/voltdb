@@ -42,7 +42,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltcore.utils.DeferredSerialization;
 
@@ -97,7 +97,7 @@ public class TestRawProcessor extends TestCase {
 
         static {
 
-            m_mockVoltDB.addSite(MiscUtils.getHSIdFromHostAndSite( m_host, m_site), m_part);
+            m_mockVoltDB.addSite(CoreUtils.getHSIdFromHostAndSite( m_host, m_site), m_part);
             m_mockVoltDB.addTable("TableName", false);
             m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
             m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);

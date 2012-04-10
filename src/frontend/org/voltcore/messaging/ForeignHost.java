@@ -31,7 +31,7 @@ import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -241,9 +241,9 @@ public class ForeignHost {
          */
         if (mailbox == null) {
             System.err.printf("Message (%s) sent to unknown site id: %s @ (%s) at " +
-                    m_hostMessenger.getHostId() + " from " + MiscUtils.hsIdToString(message.m_sourceHSId) + "\n",
+                    m_hostMessenger.getHostId() + " from " + CoreUtils.hsIdToString(message.m_sourceHSId) + "\n",
                     message.getClass().getSimpleName(),
-                    MiscUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString());
+                    CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString());
             /*
              * If it is for the wrong host, that definitely isn't cool
              */

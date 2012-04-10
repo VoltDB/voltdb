@@ -29,7 +29,7 @@ import java.io.File;
 
 import junit.framework.TestCase;
 
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.*;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.VoltFault.FaultType;
@@ -199,13 +199,13 @@ public class TestFaultDistributor extends TestCase
         voltdb.setFaultDistributor(dut);
         VoltDB.replaceVoltDBInstanceForTest(voltdb);
 
-        Long site100 = MiscUtils.getHSIdFromHostAndSite(0, 100);
-        Long site1000 = MiscUtils.getHSIdFromHostAndSite(0, 1000);
+        Long site100 = CoreUtils.getHSIdFromHostAndSite(0, 100);
+        Long site1000 = CoreUtils.getHSIdFromHostAndSite(0, 1000);
         voltdb.addSite(site100, 1);
         voltdb.addSite(site1000, MailboxType.Initiator);
 
-        Long site101 = MiscUtils.getHSIdFromHostAndSite(0, 101);
-        Long site1010 = MiscUtils.getHSIdFromHostAndSite(0, 1010);
+        Long site101 = CoreUtils.getHSIdFromHostAndSite(0, 101);
+        Long site1010 = CoreUtils.getHSIdFromHostAndSite(0, 1010);
         voltdb.addSite(site101, 1);
         voltdb.addSite(site1010, MailboxType.Initiator);
         voltdb.getCatalogContext();
@@ -234,13 +234,13 @@ public class TestFaultDistributor extends TestCase
         voltdb.setFaultDistributor(dut);
         VoltDB.replaceVoltDBInstanceForTest(voltdb);
 
-        Long site100 = MiscUtils.getHSIdFromHostAndSite(0, 100);
-        Long site1000 = MiscUtils.getHSIdFromHostAndSite(0, 1000);
+        Long site100 = CoreUtils.getHSIdFromHostAndSite(0, 100);
+        Long site1000 = CoreUtils.getHSIdFromHostAndSite(0, 1000);
         voltdb.addSite(site100, 1);
         voltdb.addSite(site1000, MailboxType.Initiator);
 
-        Long site101 = MiscUtils.getHSIdFromHostAndSite(1, 101);
-        Long site1010 = MiscUtils.getHSIdFromHostAndSite(1, 1010);
+        Long site101 = CoreUtils.getHSIdFromHostAndSite(1, 101);
+        Long site1010 = CoreUtils.getHSIdFromHostAndSite(1, 1010);
         voltdb.addSite(site101, 1);
         voltdb.addSite(site1010, MailboxType.Initiator);
         voltdb.getCatalogContext();

@@ -33,7 +33,7 @@ import junit.framework.TestCase;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
@@ -255,9 +255,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
         m_mockVolt = new MockVoltDB();
         m_mockVolt.shouldIgnoreCrashes = true;
 
-        Long site1 = MiscUtils.getHSIdFromHostAndSite(HOST_ID, 1);
-        Long site0 = MiscUtils.getHSIdFromHostAndSite(HOST_ID, 0);
-        Long site2 = MiscUtils.getHSIdFromHostAndSite(HOST_ID, 2);
+        Long site1 = CoreUtils.getHSIdFromHostAndSite(HOST_ID, 1);
+        Long site0 = CoreUtils.getHSIdFromHostAndSite(HOST_ID, 0);
+        Long site2 = CoreUtils.getHSIdFromHostAndSite(HOST_ID, 2);
         m_mockVolt.addSite( site1, 0);
         m_mockVolt.addSite( site0, 0);
         m_mockVolt.addSite( site2, MailboxType.Initiator);

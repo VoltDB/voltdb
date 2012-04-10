@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 
 /**
@@ -146,8 +146,8 @@ public class InitiateResponseMessage extends VoltMessage {
 
         sb.append("INITITATE_RESPONSE FOR TXN ");
         sb.append(m_txnId);
-        sb.append("\n INITIATOR HSID: " + MiscUtils.hsIdToString(m_initiatorHSId));
-        sb.append("\n COORDINATOR HSID: " + MiscUtils.hsIdToString(m_coordinatorHSId));
+        sb.append("\n INITIATOR HSID: " + CoreUtils.hsIdToString(m_initiatorHSId));
+        sb.append("\n COORDINATOR HSID: " + CoreUtils.hsIdToString(m_coordinatorHSId));
 
         if (m_commit)
             sb.append("\n  COMMIT");

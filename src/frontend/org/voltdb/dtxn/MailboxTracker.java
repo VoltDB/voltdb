@@ -41,7 +41,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.agreement.ZKUtil;
 import org.voltcore.agreement.ZKUtil.ByteArrayCallback;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltZK;
@@ -51,7 +51,7 @@ public class MailboxTracker {
     private final ZooKeeper m_zk;
     private final MailboxUpdateHandler m_handler;
     private final ExecutorService m_es =
-            Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Mailbox tracker", 1024 * 128));
+            Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Mailbox tracker", 1024 * 128));
 
     private byte m_lastChecksum[] = null;
 

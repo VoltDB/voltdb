@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage {
 
@@ -62,7 +62,7 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
         StringBuilder sb = new StringBuilder();
 
         sb.append("MULTI_PARTITION_PARTICIPANT (FROM ");
-        sb.append(MiscUtils.hsIdToString(getCoordinatorHSId()));
+        sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 

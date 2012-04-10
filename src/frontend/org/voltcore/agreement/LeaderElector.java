@@ -28,7 +28,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 public class LeaderElector {
     private final static VoltLogger LOG = new VoltLogger("HOST");
@@ -41,7 +41,7 @@ public class LeaderElector {
 
     private volatile boolean isLeader = false;
     private static final ExecutorService es =
-        Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Leader elector", 1024 * 128));
+        Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Leader elector", 1024 * 128));
 
     private final Runnable eventHandler = new Runnable() {
         @Override

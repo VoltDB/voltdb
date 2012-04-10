@@ -61,7 +61,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKTestBase;
 import org.voltdb.RestoreAgent.SnapshotInfo;
 import org.voltdb.VoltDB.START_ACTION;
@@ -367,7 +367,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                 List<Integer> localPartitions = ClusterConfig.partitionsForHost(topology, j);
                 for (int zz = 0; zz < localPartitions.size(); zz++) {
                     MailboxNodeContent mnc =
-                        new MailboxNodeContent(MiscUtils.getHSIdFromHostAndSite(j, zz), localPartitions.get(zz));
+                        new MailboxNodeContent(CoreUtils.getHSIdFromHostAndSite(j, zz), localPartitions.get(zz));
                     hosts.add(mnc);
                 }
             }

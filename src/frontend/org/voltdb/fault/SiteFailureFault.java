@@ -19,7 +19,7 @@ package org.voltdb.fault;
 
 import java.util.List;
 
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 
 public class SiteFailureFault extends VoltFault
 {
@@ -46,7 +46,7 @@ public class SiteFailureFault extends VoltFault
         StringBuilder sb = new StringBuilder();
 
         sb.append("SiteFailureFault:\n");
-        sb.append("  Site Ids: " + MiscUtils.hsIdCollectionToString(m_siteIds) + "\n");
+        sb.append("  Site Ids: " + CoreUtils.hsIdCollectionToString(m_siteIds) + "\n");
         sb.append(super.toString());
 
         return sb.toString();

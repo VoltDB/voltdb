@@ -48,7 +48,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -302,12 +302,12 @@ public class TestExecutionSite extends TestCase {
         void killSite()
         {
             // Log breadcrumbs for validator
-            m_siteLogger.get(m_siteId).trace("FUZZTEST selfNodeFailure " + MiscUtils.getHostIdFromHSId(m_siteId));
+            m_siteLogger.get(m_siteId).trace("FUZZTEST selfNodeFailure " + CoreUtils.getHostIdFromHSId(m_siteId));
             // mark the site as down in the catalog
             //System.out.println("KILLING SITE: " + m_siteId);
             m_sites.get(m_siteId).shutdown();
             m_voltdb.killSite(m_siteId);
-            long initiatorId = getInitiatorIds()[MiscUtils.getSiteIdFromHSId(m_siteId)];
+            long initiatorId = getInitiatorIds()[CoreUtils.getSiteIdFromHSId(m_siteId)];
             m_voltdb.killSite(initiatorId);
 
             /*
@@ -355,7 +355,7 @@ public class TestExecutionSite extends TestCase {
 
         // one host and one initiator per site
         for (int ss=0; ss < siteCount; ss++) {
-            final long siteId = MiscUtils.getHSIdFromHostAndSite(getHostIdForSiteId(ss), getInitiatorIdForSiteId(ss));
+            final long siteId = CoreUtils.getHSIdFromHostAndSite(getHostIdForSiteId(ss), getInitiatorIdForSiteId(ss));
             m_voltdb.addSite( siteId, MailboxType.Initiator);
             // Configure log4j so that ExecutionSite generates FUZZTEST output
             String logname = ExecutionSite.class.getName() + "." + ss;
@@ -372,9 +372,9 @@ public class TestExecutionSite extends TestCase {
         int siteIndex = 0;
         for (int pp=0; pp < partitionCount; pp++) {
             for (int kk=0; kk < (kFactor + 1); kk++) {
-                final long siteId = MiscUtils.getHSIdFromHostAndSite(getHostIdForSiteId(siteIndex), siteIndex);
+                final long siteId = CoreUtils.getHSIdFromHostAndSite(getHostIdForSiteId(siteIndex), siteIndex);
                 m_voltdb.addSite(siteId, pp);
-                m_checker.addSite(siteId, pp, m_siteResults.get(MiscUtils.getHSIdFromHostAndSite( siteIndex, getInitiatorIdForSiteId(siteIndex))));
+                m_checker.addSite(siteId, pp, m_siteResults.get(CoreUtils.getHSIdFromHostAndSite( siteIndex, getInitiatorIdForSiteId(siteIndex))));
                 ++siteIndex;
             }
         }
@@ -405,11 +405,11 @@ public class TestExecutionSite extends TestCase {
 
         // Create the real objects
         for (int ss=0; ss < siteCount; ++ss) {
-            long siteId = MiscUtils.getHSIdFromHostAndSite( ss, ss);
+            long siteId = CoreUtils.getHSIdFromHostAndSite( ss, ss);
             m_mboxes.put(siteId, new RussianRouletteMailbox( siteId ));
             m_siteLogger.put(
                     siteId,
-                    m_siteLogger.get(MiscUtils.getHSIdFromHostAndSite( ss, getInitiatorIdForSiteId(ss))));
+                    m_siteLogger.get(CoreUtils.getHSIdFromHostAndSite( ss, getInitiatorIdForSiteId(ss))));
             m_rpqs.put( siteId, new RestrictedPriorityARRR(getInitiatorIds(), ss, m_mboxes.get(siteId)));
             m_sites.put(siteId,
                 new ExecutionSite(
@@ -453,20 +453,20 @@ public class TestExecutionSite extends TestCase {
 
     /* Get a site on the same "host" as the initiator */
     long getSiteIdForInitiatorId(long initiatorId) {
-        int siteId = MiscUtils.getSiteIdFromHSId(initiatorId) - 1000;
-        assert(MiscUtils.getHSIdFromHostAndSite( siteId, getInitiatorIdForSiteId(siteId)) == initiatorId);
-        return MiscUtils.getHSIdFromHostAndSite( siteId, siteId);
+        int siteId = CoreUtils.getSiteIdFromHSId(initiatorId) - 1000;
+        assert(CoreUtils.getHSIdFromHostAndSite( siteId, getInitiatorIdForSiteId(siteId)) == initiatorId);
+        return CoreUtils.getHSIdFromHostAndSite( siteId, siteId);
     }
 
     long getHSIdForES(int siteId) {
-        return MiscUtils.getHSIdFromHostAndSite(getHostIdForSiteId(siteId), siteId);
+        return CoreUtils.getHSIdFromHostAndSite(getHostIdForSiteId(siteId), siteId);
     }
 
     /* return a new array of initiator ids */
     long[] getInitiatorIds() {
         long[] ids = new long[SITE_COUNT];
         for (int ss=0; ss < SITE_COUNT; ss++) {
-            ids[ss] = MiscUtils.getHSIdFromHostAndSite( getHostIdForSiteId(ss), getInitiatorIdForSiteId(ss));
+            ids[ss] = CoreUtils.getHSIdFromHostAndSite( getHostIdForSiteId(ss), getInitiatorIdForSiteId(ss));
         }
         return ids;
     }
@@ -474,7 +474,7 @@ public class TestExecutionSite extends TestCase {
     /* Random initiator */
     private long selectRandomInitiator(Random rand) {
         int site =  rand.nextInt(SITE_COUNT);
-        return MiscUtils.getHSIdFromHostAndSite(getHostIdForSiteId(site), getInitiatorIdForSiteId(site));
+        return CoreUtils.getHSIdFromHostAndSite(getHostIdForSiteId(site), getInitiatorIdForSiteId(site));
     }
 
     /* Given a partition, return a coordinator by value
@@ -1041,12 +1041,12 @@ public class TestExecutionSite extends TestCase {
         // push a fault notice to the participant. Must supply the host id
         // corresponding to the coordinator site id.
         m_voltdb.killSite(0);
-        m_voltdb.killSite(MiscUtils.getHSIdFromHostAndSite( 0, getInitiatorIdForSiteId(0)));
+        m_voltdb.killSite(CoreUtils.getHSIdFromHostAndSite( 0, getInitiatorIdForSiteId(0)));
         m_voltdb.getFaultDistributor().reportFault(
                 new SiteFailureFault(
                         Arrays.asList(
                                 new Long[] {
-                                        MiscUtils.getHSIdFromHostAndSite(
+                                        CoreUtils.getHSIdFromHostAndSite(
                                                 0, getInitiatorIdForSiteId(0)), getHSIdForES(0)})));
 
         es2.join();
@@ -1369,7 +1369,7 @@ public class TestExecutionSite extends TestCase {
                public void run() {
                    m_sites.get(site_id).runLoop(loopUntilPoison);
                }
-            }, "Site: " + MiscUtils.hsIdToString(site_id)));
+            }, "Site: " + CoreUtils.hsIdToString(site_id)));
         }
 
         for (int i=0; i < SITE_COUNT; ++i) {
@@ -1406,7 +1406,7 @@ public class TestExecutionSite extends TestCase {
         List<Long> involvedSites2 = getSiteIdsForPartitionId(1);
 
         //This initiator will initiate the txn with the lower id that is partially replicated to just one site
-        int initiatorToDie1 = getInitiatorIdForSiteId(MiscUtils.getSiteIdFromHSId(involvedSites2.get(0)));
+        int initiatorToDie1 = getInitiatorIdForSiteId(CoreUtils.getSiteIdFromHSId(involvedSites2.get(0)));
 
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
@@ -1424,7 +1424,7 @@ public class TestExecutionSite extends TestCase {
         m_mboxes.get(involvedSites1.get(2)).deliver(itm);
 
         //This initiator will initiate the txn with the higher txn id that is fully replicated
-        int initiatorToDie2 = getInitiatorIdForSiteId(MiscUtils.getSiteIdFromHSId(involvedSites2.get(1)));
+        int initiatorToDie2 = getInitiatorIdForSiteId(CoreUtils.getSiteIdFromHSId(involvedSites2.get(1)));
 
         for (int ii = 0; ii < 3; ii++) {
             spi = new StoredProcedureInvocation();
@@ -1471,7 +1471,7 @@ public class TestExecutionSite extends TestCase {
         m_voltdb.getFaultDistributor().reportFault(
                 new SiteFailureFault(
                         Arrays.asList( new Long[] {
-                                MiscUtils.getHSIdFromHostAndSite(
+                                CoreUtils.getHSIdFromHostAndSite(
                                         involvedSites2.get(0).intValue(),
                                         (int)(involvedSites2.get(0).longValue() >> 32) + 1000),
                                         involvedSites2.get(0)})));
@@ -1483,7 +1483,7 @@ public class TestExecutionSite extends TestCase {
         m_voltdb.getFaultDistributor().reportFault(
                 new SiteFailureFault(
                         Arrays.asList(new Long[]{
-                                MiscUtils.getHSIdFromHostAndSite(
+                                CoreUtils.getHSIdFromHostAndSite(
                                         involvedSites2.get(1).intValue(),
                                         (int)(involvedSites2.get(1).longValue() >> 32) + 1000),
                                         involvedSites2.get(1)})));

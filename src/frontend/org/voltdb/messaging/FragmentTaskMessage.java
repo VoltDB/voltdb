@@ -23,7 +23,7 @@ import java.util.ArrayList;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 
 /**
@@ -319,7 +319,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         StringBuilder sb = new StringBuilder();
 
         sb.append("FRAGMENT_TASK (FROM ");
-        sb.append(MiscUtils.hsIdToString(m_coordinatorHSId));
+        sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 
@@ -328,7 +328,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             sb.append("  READ, COORD ");
         else
             sb.append("  WRITE, COORD ");
-        sb.append(MiscUtils.hsIdToString(m_coordinatorHSId));
+        sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
         if ((m_fragmentIds != null) && (m_fragmentIds.length > 0)) {
             sb.append("\n");

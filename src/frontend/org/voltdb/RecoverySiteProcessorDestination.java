@@ -41,7 +41,7 @@ import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
 import org.voltdb.catalog.Database;
@@ -133,7 +133,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         private volatile boolean closed = false;
         private volatile Exception m_lastException = null;
         private final Thread m_inThread = new Thread("Recovery in thread for site " +
-                MiscUtils.hsIdToString(m_HSId)) {
+                CoreUtils.hsIdToString(m_HSId)) {
             @Override
             public void run() {
                 try {
@@ -276,7 +276,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             m_engine.processRecoveryMessage( message, pointer);
             long endTime = System.currentTimeMillis();
             m_timeSpentHandlingData += endTime - startTime;
-            recoveryLog.trace("Received tuple data at site " + MiscUtils.hsIdToString(m_HSId) +
+            recoveryLog.trace("Received tuple data at site " + CoreUtils.hsIdToString(m_HSId) +
                     " for table " + m_tables.get(tableId).m_name);
         } else if (type == RecoveryMessageType.Complete) {
             message.position(messageTypeOffset + 5);
@@ -294,7 +294,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
 //            }
 //            assert(seqNo >= -1);
             RecoveryTable table = m_tables.remove(tableId);
-            recoveryLog.info("Received completion message at site " + MiscUtils.hsIdToString(m_HSId) +
+            recoveryLog.info("Received completion message at site " + CoreUtils.hsIdToString(m_HSId) +
                     " for table " + table.m_name );//+ " with export info (" + seqNo +
             if (m_tables.isEmpty()) {
                 /*
@@ -332,7 +332,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 VoltDB.crashLocalVoltDB("Unable to write ack message", false, null);
             }
         }
-        recoveryLog.trace("Writing ack for block " + blockIndex + " from " + MiscUtils.hsIdToString(m_HSId));
+        recoveryLog.trace("Writing ack for block " + blockIndex + " from " + CoreUtils.hsIdToString(m_HSId));
     }
 
     /**
@@ -375,7 +375,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
 
         recoveryLog.info(
                 "Starting recovery before txnid " + txnId +
-                " for site " + MiscUtils.hsIdToString(m_HSId) + " from " + MiscUtils.hsIdToString(m_sourceHSId));
+                " for site " + CoreUtils.hsIdToString(m_HSId) + " from " + CoreUtils.hsIdToString(m_sourceHSId));
 
 
         while (true) {
@@ -420,7 +420,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 RecoveryMessage rm = (RecoveryMessage)message;
                 if (!rm.recoveryMessagesAvailable()) {
                     recoveryLog.error("Received a recovery initiate request from " +
-                            MiscUtils.hsIdToString(rm.sourceSite()) +
+                            CoreUtils.hsIdToString(rm.sourceSite()) +
                             " while a recovery was already in progress. Ignoring it.");
                 }
             } else {
@@ -530,7 +530,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         RecoveryMessage recoveryMessage = new RecoveryMessage(m_HSId, txnId, addresses, port);
         recoveryLog.trace(
                 "Sending recovery initiate request before txnid " + txnId +
-                " from site " + MiscUtils.hsIdToString(m_HSId) + " to " + MiscUtils.hsIdToString(m_sourceHSId));
+                " from site " + CoreUtils.hsIdToString(m_HSId) + " to " + CoreUtils.hsIdToString(m_sourceHSId));
         try {
             m_mailbox.send( m_sourceHSId, recoveryMessage);
         } catch (MessagingException e) {
@@ -598,13 +598,13 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         final boolean stopBeforeOrSkipPast = ackMessage.get() == 0 ? true : false;
         if (stopBeforeOrSkipPast) {
             m_stopBeforeTxnId = ackMessage.getLong();
-            recoveryLog.info("Recovery initiate ack received at site " + MiscUtils.hsIdToString(m_HSId) +
-                    " from site " + MiscUtils.hsIdToString(sourceSite) +
+            recoveryLog.info("Recovery initiate ack received at site " + CoreUtils.hsIdToString(m_HSId) +
+                    " from site " + CoreUtils.hsIdToString(sourceSite) +
                     " will sync before txnId " + m_stopBeforeTxnId);
         } else {
             m_skipPastTxnId = ackMessage.getLong();
-            recoveryLog.info("Recovery initiate ack received at site " + MiscUtils.hsIdToString(m_HSId) +
-                    " from site " + MiscUtils.hsIdToString(sourceSite) +
+            recoveryLog.info("Recovery initiate ack received at site " + CoreUtils.hsIdToString(m_HSId) +
+                    " from site " + CoreUtils.hsIdToString(sourceSite) +
                     " will delay sync until after executing txnId " + m_skipPastTxnId);
         }
 
@@ -640,8 +640,8 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             SiteTracker tracker) {
         for (Map.Entry<Integer, RecoveryTable> entry : m_tables.entrySet()) {
             if (failedSites.contains(entry.getValue().m_sourceHSId)) {
-                VoltDB.crashLocalVoltDB("Node fault during recovery of Site " + MiscUtils.hsIdToString(m_HSId) +
-                        " resulted in source Site " + MiscUtils.hsIdToString(entry.getValue().m_sourceHSId) +
+                VoltDB.crashLocalVoltDB("Node fault during recovery of Site " + CoreUtils.hsIdToString(m_HSId) +
+                        " resulted in source Site " + CoreUtils.hsIdToString(entry.getValue().m_sourceHSId) +
                         " becoming unavailable. Failing recovering node.", false, null);
             }
         }
@@ -668,7 +668,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         sourceSites.remove(new Long(HSId));
 
         if (sourceSites.isEmpty()) {
-            VoltDB.crashLocalVoltDB("Could not find a source site for HSId " + MiscUtils.hsIdToString(HSId) +
+            VoltDB.crashLocalVoltDB("Could not find a source site for HSId " + CoreUtils.hsIdToString(HSId) +
                     " partition id " + partitionId, false, null);
         }
 

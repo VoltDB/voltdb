@@ -51,7 +51,7 @@ import org.voltcore.logging.VoltLogger;
 
 //import org.voltdb.ReplicationRole;
 
-public class MiscUtils {
+public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /**
@@ -383,7 +383,7 @@ public class MiscUtils {
     }
 
     public static boolean isPro() {
-        return null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        return null != CoreUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
     }
 
     public static String getHostnameOrAddress() {

@@ -23,7 +23,7 @@ import java.util.ArrayList;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
 
@@ -215,9 +215,9 @@ public class FragmentResponseMessage extends VoltMessage {
         StringBuilder sb = new StringBuilder();
 
         sb.append("FRAGMENT_RESPONSE (FROM ");
-        sb.append(MiscUtils.hsIdToString(m_executorHSId));
+        sb.append(CoreUtils.hsIdToString(m_executorHSId));
         sb.append(" TO ");
-        sb.append(MiscUtils.hsIdToString(m_destinationHSId));
+        sb.append(CoreUtils.hsIdToString(m_destinationHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 

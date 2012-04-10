@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
 
 
@@ -144,9 +144,9 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         StringBuilder sb = new StringBuilder();
 
         sb.append("INITITATE_TASK (FROM ");
-        sb.append(MiscUtils.hsIdToString(getInitiatorHSId()));
+        sb.append(CoreUtils.hsIdToString(getInitiatorHSId()));
         sb.append(" TO ");
-        sb.append(MiscUtils.hsIdToString(getCoordinatorHSId()));
+        sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 
@@ -160,7 +160,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         else
             sb.append("MULTI PARTITION, ");
         sb.append("COORD ");
-        sb.append(MiscUtils.hsIdToString(getCoordinatorHSId()));
+        sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
 
         sb.append("\n  PROCEDURE: ");
         sb.append(m_invocation.getProcName());

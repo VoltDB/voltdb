@@ -38,7 +38,7 @@ import org.junit.Test;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.*;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.client.ClientResponse;
 
@@ -73,8 +73,8 @@ public class TestStatsAgent {
     @Before
     public void setUp() throws Exception {
         m_mvoltdb = new MockVoltDB();
-        m_mvoltdb.addSite( MiscUtils.getHSIdFromHostAndSite( 0, 1), MailboxType.Initiator);
-        m_mvoltdb.addSite( MiscUtils.getHSIdFromHostAndSite( 1, 2), MailboxType.Initiator);
+        m_mvoltdb.addSite( CoreUtils.getHSIdFromHostAndSite( 0, 1), MailboxType.Initiator);
+        m_mvoltdb.addSite( CoreUtils.getHSIdFromHostAndSite( 1, 2), MailboxType.Initiator);
         VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);
         m_secondAgent = new StatsAgent();
         long secondAgentHSId = VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42);
