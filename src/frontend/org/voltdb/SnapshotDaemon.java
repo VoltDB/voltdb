@@ -47,6 +47,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -684,7 +685,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              */
             VoltTable result = SnapshotSave.constructNodeResultsTable();
             result.addRow(-1,
-                    org.voltdb.client.ConnectionUtil.getHostnameOrAddress(),
+                    CoreUtils.getHostnameOrAddress(),
                     "",
                     "SUCCESS",
                     "SNAPSHOT REQUEST QUEUED");
@@ -1418,7 +1419,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (requestExists) {
             VoltTable result = org.voltdb.sysprocs.SnapshotSave.constructNodeResultsTable();
             result.addRow(-1,
-                    org.voltdb.client.ConnectionUtil.getHostnameOrAddress(),
+                    CoreUtils.getHostnameOrAddress(),
                     "",
                     "FAILURE",
                     "SNAPSHOT IN PROGRESS");

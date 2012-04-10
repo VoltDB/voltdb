@@ -95,12 +95,20 @@ public class CoreUtils {
         };
     }
 
+    /**
+     * Return the local hostname, if it's resolvable.  If not,
+     * return the IPv4 address on the first interface we find, if it exists.
+     * If not, returns whatever address exists on the first interface.
+     * @return the String representation of some valid host or IP address,
+     *         if we can find one; the empty string otherwise
+     */
     public static String getHostnameOrAddress() {
         try {
             final InetAddress addr = InetAddress.getLocalHost();
             return addr.getHostName();
         } catch (UnknownHostException e) {
             try {
+                // XXX-izzy Won't we randomly pull localhost here sometimes?
                 Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
                 if (interfaces == null) {
                     return "";
@@ -113,8 +121,9 @@ public class CoreUtils {
                         return address.getHostAddress();
                     }
                 }
-                interfaces = NetworkInterface.getNetworkInterfaces();
-                while (addresses.hasMoreElements()) {
+                addresses = intf.getInetAddresses();
+                if (addresses.hasMoreElements())
+                {
                     return addresses.nextElement().getHostAddress();
                 }
                 return "";

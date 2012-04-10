@@ -143,35 +143,6 @@ public class ConnectionUtil {
         return getAuthenticatedConnection("export", address, username, hashedPassword);
             }
 
-    public static String getHostnameOrAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr.getHostName();
-        } catch (UnknownHostException e) {
-            try {
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return "";
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address.getHostAddress();
-                    }
-                }
-                interfaces = NetworkInterface.getNetworkInterfaces();
-                while (addresses.hasMoreElements()) {
-                    return addresses.nextElement().getHostAddress();
-                }
-                return "";
-            } catch (SocketException e1) {
-                return "";
-            }
-        }
-    }
-
     public static InetAddress getLocalAddress() {
         try {
             final InetAddress addr = InetAddress.getLocalHost();

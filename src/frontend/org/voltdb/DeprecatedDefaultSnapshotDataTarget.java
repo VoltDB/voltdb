@@ -35,10 +35,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.CRC32;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.client.ConnectionUtil;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 
 public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
@@ -141,7 +141,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
             final long txnId,
             int version[]
             ) throws IOException {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         m_file = file;
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);

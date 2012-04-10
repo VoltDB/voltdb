@@ -24,28 +24,28 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.CountDownLatch;
 import java.util.zip.CRC32;
 
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.client.ConnectionUtil;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.CompressionService;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.CompressionService;
 
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
@@ -152,7 +152,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final long txnId,
             int version[]
             ) throws IOException {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         m_file = file;
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);

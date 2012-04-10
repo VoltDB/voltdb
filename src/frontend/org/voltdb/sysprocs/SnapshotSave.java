@@ -23,21 +23,20 @@ import java.util.List;
 import java.util.Map;
 
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 @ProcInfo(singlePartition = false)
@@ -106,7 +105,7 @@ public class SnapshotSave extends VoltSystemProcedure
                         ParameterSet params,
                         SystemProcedureExecutionContext context)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_saveTest)
         {
             assert(params.toArray()[0] != null);

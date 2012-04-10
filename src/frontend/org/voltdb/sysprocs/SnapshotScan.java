@@ -29,19 +29,18 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.json_voltpatches.JSONArray;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.utils.VoltFile;
@@ -87,7 +86,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                         final SystemProcedureExecutionContext context)
     {
         errorString = null;
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_snapshotScan)
         {
             final VoltTable results = constructFragmentResultsTable();

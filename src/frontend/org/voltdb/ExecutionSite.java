@@ -47,8 +47,8 @@ import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.EstTime;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
@@ -61,7 +61,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
@@ -810,7 +809,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private ExecutionEngine
     initializeEE(BackendTarget target, String serializedCatalog, final long txnId, int configuredNumberOfPartitions)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
 
         ExecutionEngine eeTemp = null;
         try {
@@ -1370,7 +1369,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                       (byte) 0x1,
                                       snapshotMsg.m_roadblockTransactionId,
                                       m_systemProcedureContext,
-                                      ConnectionUtil.getHostnameOrAddress());
+                                      CoreUtils.getHostnameOrAddress());
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
                 snapshotMsg.crash) {
                 String msg = "Executing local snapshot. Finished final snapshot. Shutting down. " +

@@ -46,6 +46,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
@@ -53,7 +54,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -206,7 +206,7 @@ public class SnapshotUtil {
             if (4 != bis.read(crcBuffer.array())) {
                 throw new EOFException(
                         "EOF while attempting to read CRC from snapshot digest " + f +
-                        " on host " + ConnectionUtil.getHostnameOrAddress());
+                        " on host " + CoreUtils.getHostnameOrAddress());
             }
             final int crc = crcBuffer.getInt();
             final InputStreamReader isr = new InputStreamReader(bis, "UTF-8");

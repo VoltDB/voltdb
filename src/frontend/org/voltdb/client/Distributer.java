@@ -540,7 +540,7 @@ class Distributer {
                 m_useMultipleThreads ? Runtime.getRuntime().availableProcessors() / 2 : 1,
                         null);
         m_network.start();
-        m_hostname = ConnectionUtil.getHostnameOrAddress();
+        m_hostname = CoreUtils.getHostnameOrAddress();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
 

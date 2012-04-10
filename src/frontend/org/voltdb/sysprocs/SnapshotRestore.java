@@ -45,8 +45,8 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
@@ -63,7 +63,6 @@ import org.voltdb.VoltTypeException;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
@@ -382,7 +381,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
-            String hostname = ConnectionUtil.getHostnameOrAddress();
+            String hostname = CoreUtils.getHostnameOrAddress();
             VoltTable result = ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
@@ -504,7 +503,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (IOException e)
             {
-                String hostname = ConnectionUtil.getHostnameOrAddress();
+                String hostname = CoreUtils.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), table_name, -1, "FAILURE",
                         "Unable to load table: " + table_name +
@@ -558,14 +557,14 @@ public class SnapshotRestore extends VoltSystemProcedure
                 }
 
             } catch (IOException e) {
-                String hostname = ConnectionUtil.getHostnameOrAddress();
+                String hostname = CoreUtils.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), table_name, -1, "FAILURE",
                         "Unable to load table: " + table_name +
                         " error: " + e.getMessage());
                 return new DependencyPair(dependency_id, result);
             } catch (VoltTypeException e) {
-                String hostname = ConnectionUtil.getHostnameOrAddress();
+                String hostname = CoreUtils.getHostnameOrAddress();
                 VoltTable result = constructResultsTable();
                 result.addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), table_name, -1, "FAILURE",
                         "Unable to load table: " + table_name +
@@ -573,7 +572,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 return new DependencyPair(dependency_id, result);
             }
 
-            String hostname = ConnectionUtil.getHostnameOrAddress();
+            String hostname = CoreUtils.getHostnameOrAddress();
             VoltTable result = constructResultsTable();
             result.addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), table_name, -1, result_str,
                     error_msg);
@@ -1250,7 +1249,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     private VoltTable performDistributeReplicatedTable(String tableName,
             int siteId)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         TableSaveFile savefile = null;
         try
         {
@@ -1349,7 +1348,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             int relevantPartitionIds[],
             SystemProcedureExecutionContext ctx)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         // XXX This is all very similar to the splitting code in
         // LoadMultipartitionTable.  Consider ways to consolidate later
         Map<Long, Integer> sites_to_partitions =
