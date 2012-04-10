@@ -25,13 +25,6 @@ import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -61,15 +54,6 @@ public class MiscUtils {
 
         in.close();
         out.close();
-    }
-
-    public static final int[] toArray(Set<Integer> set) {
-        int retval[] = new int[set.size()];
-        int ii = 0;
-        for (Integer i : set) {
-            retval[ii++] = i;
-        }
-        return retval;
     }
 
     /**
@@ -287,42 +271,6 @@ public class MiscUtils {
         }
         return build;
 
-    }
-
-    /*
-     * Have shutdown actually means shutdown. Tasks that need to complete should use
-     * futures.
-     */
-    public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize, int stackSize) {
-        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
-        ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
-        ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-        return ses;
-    }
-
-    /**
-     * Create a bounded single threaded executor that rejects requests if more than capacity
-     * requests are outstanding.
-     */
-    public static ExecutorService getBoundedSingleThreadExecutor(String name, int capacity) {
-        LinkedBlockingQueue<Runnable> lbq = new LinkedBlockingQueue<Runnable>(capacity);
-        ThreadPoolExecutor tpe = new ThreadPoolExecutor(1, 1, Long.MAX_VALUE, TimeUnit.DAYS, lbq, getThreadFactory(name));
-        return tpe;
-    }
-
-    public static ThreadFactory getThreadFactory(String name) {
-        return getThreadFactory(name, 1024 * 1024);
-    }
-
-    public static ThreadFactory getThreadFactory(final String name, final int stackSize) {
-        return new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(null, r, name, stackSize);
-                t.setDaemon(true);
-                return t;
-            }
-        };
     }
 
     private static String checkForJavaHomeInEnvironment() throws Exception {

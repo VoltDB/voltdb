@@ -64,6 +64,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
@@ -323,7 +324,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (availableProcessors > 4) {
                 poolSize = 2;
             }
-            m_periodicWorkThread = MiscUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize, 1024 * 128);
+            m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize, 1024 * 128);
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
             if (m_licenseApi == null) {

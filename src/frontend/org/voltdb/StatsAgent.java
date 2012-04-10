@@ -58,7 +58,7 @@ public class StatsAgent {
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
     private final ScheduledThreadPoolExecutor m_es =
-        org.voltdb.utils.MiscUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, 1024 * 128);
+        org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, 1024 * 128);
 
     private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
         new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();

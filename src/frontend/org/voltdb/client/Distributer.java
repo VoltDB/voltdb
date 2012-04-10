@@ -39,13 +39,13 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
-import org.voltdb.utils.MiscUtils;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -79,7 +79,7 @@ class Distributer {
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
         Executors.newSingleThreadScheduledExecutor(
-                MiscUtils.getThreadFactory("VoltDB Client Reaper Thread"));
+                CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
     ScheduledFuture<?> m_timeoutReaperHandle;
 
     /**

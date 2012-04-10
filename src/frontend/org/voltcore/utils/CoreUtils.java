@@ -37,8 +37,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 
@@ -52,6 +56,17 @@ public class CoreUtils {
             retval[ii++] = i;
         }
         return retval;
+    }
+
+
+    /**
+     * Create a bounded single threaded executor that rejects requests if more than capacity
+     * requests are outstanding.
+     */
+    public static ExecutorService getBoundedSingleThreadExecutor(String name, int capacity) {
+        LinkedBlockingQueue<Runnable> lbq = new LinkedBlockingQueue<Runnable>(capacity);
+        ThreadPoolExecutor tpe = new ThreadPoolExecutor(1, 1, Long.MAX_VALUE, TimeUnit.DAYS, lbq, CoreUtils.getThreadFactory(name));
+        return tpe;
     }
 
     /*

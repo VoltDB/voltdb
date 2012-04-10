@@ -28,10 +28,10 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
@@ -51,7 +51,7 @@ public class AsyncCompilerAgent {
 
     // do work in this executor service
     final ExecutorService m_es =
-        MiscUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
+        CoreUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
 
     // wraps the VoltPlanner and does the actual query planning
     private PlannerTool m_ptool = null;
