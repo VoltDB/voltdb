@@ -188,7 +188,7 @@ public class TestExpressionUtil extends TestCase {
             case VALUE_PARAMETER:
                 ParameterValueExpression out_param_exp = (ParameterValueExpression)out_exp;
                 ParameterValueExpression in_param_exp = (ParameterValueExpression)in_exp;
-                assertEquals(out_param_exp.getParameterId(), in_param_exp.getParameterId());
+                assertEquals(out_param_exp.getParameterIndex(), in_param_exp.getParameterIndex());
                 break;
             case VALUE_TUPLE:
                 TupleValueExpression out_tuple_exp = (TupleValueExpression)out_exp;

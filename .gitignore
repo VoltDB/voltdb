@@ -2,6 +2,7 @@
 /.depcache
 /.project
 /.settings
+/hs_err_pid*.log
 /last_junit_suite.log
 *.pyc
 *.swp

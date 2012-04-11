@@ -51,14 +51,14 @@ public class ParameterValueExpression extends AbstractValueExpression {
     /**
      * @return the param
      */
-    public Integer getParameterId() {
+    public Integer getParameterIndex() {
         return m_paramIndex;
     }
 
     /**
      * @param paramIndex The index of the parameter to set
      */
-    public void setParameterId(Integer paramIndex) {
+    public void setParameterIndex(Integer paramIndex) {
         m_paramIndex = paramIndex;
     }
 
