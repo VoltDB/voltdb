@@ -59,7 +59,7 @@ public class QueryPlanner {
      * @param HSQL HSQLInterface pointer used for parsing SQL into XML.
      * @param useGlobalIds
      */
-    public QueryPlanner(Cluster catalogCluster, Database catalogDb,
+    public QueryPlanner(Cluster catalogCluster, Database catalogDb, boolean singlePartition,
                         HSQLInterface HSQL, DatabaseEstimates estimates,
                         boolean useGlobalIds, boolean suppressDebugOutput) {
         assert(HSQL != null);
@@ -67,7 +67,7 @@ public class QueryPlanner {
         assert(catalogDb != null);
 
         m_HSQL = HSQL;
-        m_assembler = new PlanAssembler(catalogCluster, catalogDb);
+        m_assembler = new PlanAssembler(catalogCluster, catalogDb, singlePartition);
         m_db = catalogDb;
         m_cluster = catalogCluster;
         m_estimates = estimates;
@@ -94,7 +94,6 @@ public class QueryPlanner {
             String joinOrder,
             String stmtName,
             String procName,
-            boolean singlePartition,
             int maxTablesPerJoin,
             ScalarValueHints[] paramHints) {
         assert(costModel != null);
@@ -120,28 +119,24 @@ public class QueryPlanner {
         }
 
         if (!m_quietPlanner && m_fullDebug) {
-            // output the xml from hsql to disk for debugging
-            PrintStream xmlDebugOut =
-                BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-xml", procName + "_" + stmtName + ".xml");
-            xmlDebugOut.println(xmlSQL.toString());
-            xmlDebugOut.close();
+            outputCompiledStatement(stmtName, procName, xmlSQL);
         }
 
         // get a parsed statement from the xml
-        AbstractParsedStmt initialParsedStmt = null;
+        AbstractParsedStmt parsedStmt = null;
         try {
-            initialParsedStmt = AbstractParsedStmt.parse(sql, xmlSQL, m_db, joinOrder);
+            parsedStmt = AbstractParsedStmt.parse(sql, xmlSQL, m_db, joinOrder);
         }
         catch (Exception e) {
             m_recentErrorMsg = e.getMessage();
             return null;
         }
-        if (initialParsedStmt == null)
+        if (parsedStmt == null)
         {
             m_recentErrorMsg = "Failed to parse SQL statement: " + sql;
             return null;
         }
-        if ((initialParsedStmt.tableList.size() > maxTablesPerJoin) && (initialParsedStmt.joinOrder == null)) {
+        if ((parsedStmt.tableList.size() > maxTablesPerJoin) && (parsedStmt.joinOrder == null)) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + sql + " because a join of > 5 tables was requested"
                                + " without specifying a join order. See documentation for instructions on manually" +
                                  " specifying a join order";
@@ -149,11 +144,7 @@ public class QueryPlanner {
         }
 
         if (!m_quietPlanner && m_fullDebug) {
-            // output a description of the parsed stmt
-            PrintStream parsedDebugOut =
-                BuildDirectoryUtils.getDebugOutputPrintStream("statement-parsed", procName + "_" + stmtName + ".txt");
-            parsedDebugOut.println(initialParsedStmt.toString());
-            parsedDebugOut.close();
+            outputParsedStatement(stmtName, procName, parsedStmt);
         }
 
         // get ready to find the plan with minimal cost
@@ -162,16 +153,14 @@ public class QueryPlanner {
         String bestFilename = null;
         double minCost = Double.MAX_VALUE;
 
-        // index of the currently being "costed" plan
-        int i = 0;
+        // index of the plan currently being "costed"
+        int planCounter = 0;
 
         PlanStatistics stats = null;
 
-        // iterate though all the variations on the abstract parsed stmts
-        for (AbstractParsedStmt parsedStmt : ExpressionEquivalenceProcessor.getEquivalentStmts(initialParsedStmt)) {
-
-            // set up the plan assembler for this particular plan
-            m_assembler.setupForNewPlans(parsedStmt, singlePartition);
+        {   // XXX: remove this brace and reformat the code when ready to open a whole new can of whitespace diffs.
+            // set up the plan assembler for this statement
+            m_assembler.setupForNewPlans(parsedStmt);
 
             // loop over all possible plans
             while (true) {
@@ -213,7 +202,7 @@ public class QueryPlanner {
                     plan.cost = costModel.getPlanCost(stats);
 
                     // filename for debug output
-                    String filename = String.valueOf(i++);
+                    String filename = String.valueOf(planCounter++);
 
                     // find the minimum cost plan
                     if (plan.cost < minCost) {
@@ -223,65 +212,18 @@ public class QueryPlanner {
                         bestFilename = filename;
                     }
 
-                    // GENERATE JSON DEBUGGING OUTPUT BEFORE WE CLEAN UP THE
-                    // PlanColumns
-                    // convert a tree into an execution list
-                    PlanNodeList nodeList = new PlanNodeList(planGraph);
-
-                    // get the json serialized version of the plan
-                    String json = null;
-
                     if (!m_quietPlanner) {
                         if (m_fullDebug) {
-                            try {
-                                String crunchJson = nodeList.toJSONString();
-                                //System.out.println(crunchJson);
-                                //System.out.flush();
-                                JSONObject jobj = new JSONObject(crunchJson);
-                                json = jobj.toString(4);
-                            } catch (JSONException e2) {
-                                // Any plan that can't be serialized to JSON to
-                                // write to debugging output is also going to fail
-                                // to get written to the catalog, to sysprocs, etc.
-                                // Just bail.
-                                m_recentErrorMsg = "Plan for sql: '" + sql +
-                                                   "' can't be serialized to JSON";
-                                return null;
-                            }
-
-                            // output a description of the parsed stmt
-                            json = "PLAN:\n" + json;
-                            json = "COST: " + String.valueOf(plan.cost) + "\n" + json;
-                            assert (plan.sql != null);
-                            json = "SQL: " + plan.sql + "\n" + json;
-
-                            // write json to disk
-                            PrintStream candidatePlanOut =
-                                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                                                  filename + "-json.txt");
-                            candidatePlanOut.println(json);
-                            candidatePlanOut.close();
-
-                            // create a graph friendly version
-                            candidatePlanOut =
-                                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                                                  filename + ".dot");
-                            candidatePlanOut.println(nodeList.toDOTString("name"));
-                            candidatePlanOut.close();
+                            outputPlanFullDebug(plan, planGraph, stmtName, procName, filename);
                         }
 
                         // get the explained plan for the node
                         plan.explainedPlan = planGraph.toExplainPlanString();
-                        PrintStream candidatePlanOut =
-                                BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                                              filename + ".txt");
-
-                        candidatePlanOut.println(plan.explainedPlan);
-                        candidatePlanOut.close();
+                        outputExplainedPlan(stmtName, procName, plan, filename);
                     }
                 }
             }
-        }
+        }   // XXX: remove this brace and reformat the code when ready to open a whole new can of whitespace diffs.
 
         // make sure we got a winner
         if (bestPlan == null) {
@@ -295,44 +237,7 @@ public class QueryPlanner {
 
         if (!m_quietPlanner)
         {
-            // find out where debugging is going
-            String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
-                    "/" + BuildDirectoryUtils.rootPath + "statement-all-plans/" +
-                    procName + "_" + stmtName + "/";
-            String winnerFilename, winnerFilenameRenamed;
-            File winnerFile, winnerFileRenamed;
-
-            // if outputting full stuff
-            if (m_fullDebug) {
-                // rename the winner json plan
-                winnerFilename = prefix + bestFilename + "-json.txt";
-                winnerFile = new File(winnerFilename);
-                winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + "-json.txt";
-                winnerFileRenamed = new File(winnerFilenameRenamed);
-                winnerFile.renameTo(winnerFileRenamed);
-
-                // rename the winner dot plan
-                winnerFilename = prefix + bestFilename + ".dot";
-                winnerFile = new File(winnerFilename);
-                winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + ".dot";
-                winnerFileRenamed = new File(winnerFilenameRenamed);
-                winnerFile.renameTo(winnerFileRenamed);
-            }
-
-            // rename the winner explain plan
-            winnerFilename = prefix + bestFilename + ".txt";
-            winnerFile = new File(winnerFilename);
-            winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + ".txt";
-            winnerFileRenamed = new File(winnerFilenameRenamed);
-            winnerFile.renameTo(winnerFileRenamed);
-
-            if (m_fullDebug) {
-                // output the plan statistics to disk for debugging
-                PrintStream plansOut =
-                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-stats", procName + "_" + stmtName + ".txt");
-                plansOut.println(stats.toString());
-                plansOut.close();
-            }
+            finalizeOutput(stmtName, procName, bestFilename, stats);
         }
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
@@ -349,6 +254,155 @@ public class QueryPlanner {
         }
 
         return bestPlan;
+    }
+
+    /**
+     * @param stmtName
+     * @param procName
+     * @param plan
+     * @param filename
+     */
+    private void outputExplainedPlan(String stmtName, String procName, CompiledPlan plan, String filename) {
+        PrintStream candidatePlanOut =
+                BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
+                                                              filename + ".txt");
+
+        candidatePlanOut.println(plan.explainedPlan);
+        candidatePlanOut.close();
+    }
+
+    /**
+     * @param stmtName
+     * @param procName
+     * @param parsedStmt
+     */
+    private void outputParsedStatement(String stmtName, String procName, AbstractParsedStmt parsedStmt) {
+        // output a description of the parsed stmt
+        PrintStream parsedDebugOut =
+            BuildDirectoryUtils.getDebugOutputPrintStream("statement-parsed", procName + "_" + stmtName + ".txt");
+        parsedDebugOut.println(parsedStmt.toString());
+        parsedDebugOut.close();
+    }
+
+    /**
+     * @param stmtName
+     * @param procName
+     * @param xmlSQL
+     */
+    private void outputCompiledStatement(String stmtName, String procName, VoltXMLElement xmlSQL) {
+        // output the xml from hsql to disk for debugging
+        PrintStream xmlDebugOut =
+            BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-xml", procName + "_" + stmtName + ".xml");
+        xmlDebugOut.println(xmlSQL.toString());
+        xmlDebugOut.close();
+    }
+
+    /**
+     * @param plan
+     * @param planGraph
+     * @param stmtName
+     * @param procName
+     * @param filename
+     */
+    private void outputPlanFullDebug(CompiledPlan plan, AbstractPlanNode planGraph, String stmtName, String procName, String filename) {
+        // GENERATE JSON DEBUGGING OUTPUT BEFORE WE CLEAN UP THE
+        // PlanColumns
+        // convert a tree into an execution list
+        PlanNodeList nodeList = new PlanNodeList(planGraph);
+
+        // get the json serialized version of the plan
+        String json = null;
+
+        try {
+            String crunchJson = nodeList.toJSONString();
+            //System.out.println(crunchJson);
+            //System.out.flush();
+            JSONObject jobj = new JSONObject(crunchJson);
+            json = jobj.toString(4);
+        } catch (JSONException e2) {
+            // Any plan that can't be serialized to JSON to
+            // write to debugging output is also going to fail
+            // to get written to the catalog, to sysprocs, etc.
+            // Just bail.
+            m_recentErrorMsg = "Plan for sql: '" + plan.sql +
+                               "' can't be serialized to JSON";
+            // This case used to exit the planner
+            // -- a strange behavior for something that only gets called when full debug output is enabled.
+            // For now, just skip the output and go on to the next plan.
+            return;
+        }
+
+        // output a description of the parsed stmt
+        json = "PLAN:\n" + json;
+        json = "COST: " + String.valueOf(plan.cost) + "\n" + json;
+        assert (plan.sql != null);
+        json = "SQL: " + plan.sql + "\n" + json;
+
+        // write json to disk
+        PrintStream candidatePlanOut =
+                BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
+                                                              filename + "-json.txt");
+        candidatePlanOut.println(json);
+        candidatePlanOut.close();
+
+        // create a graph friendly version
+        candidatePlanOut =
+                BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
+                                                              filename + ".dot");
+        candidatePlanOut.println(nodeList.toDOTString("name"));
+        candidatePlanOut.close();
+    }
+
+    /**
+     * @param filename
+     * @param filenameRenamed
+     */
+    private void renameFile(String filename, String filenameRenamed) {
+        File file;
+        File fileRenamed;
+        file = new File(filename);
+        fileRenamed = new File(filenameRenamed);
+        file.renameTo(fileRenamed);
+    }
+
+    /**
+     * @param stmtName
+     * @param procName
+     * @param bestFilename
+     * @param stats
+     */
+    private void finalizeOutput(String stmtName, String procName, String bestFilename, PlanStatistics stats) {
+        // find out where debugging is going
+        String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
+                "/" + BuildDirectoryUtils.rootPath + "statement-all-plans/" +
+                procName + "_" + stmtName + "/";
+        String winnerFilename, winnerFilenameRenamed;
+
+        // if outputting full stuff
+        if (m_fullDebug) {
+            // rename the winner json plan
+            winnerFilename = prefix + bestFilename + "-json.txt";
+            winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + "-json.txt";
+            renameFile(winnerFilename, winnerFilenameRenamed);
+
+            // rename the winner dot plan
+            winnerFilename = prefix + bestFilename + ".dot";
+            winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + ".dot";
+            renameFile(winnerFilename, winnerFilenameRenamed);
+        }
+
+        // rename the winner explain plan
+        winnerFilename = prefix + bestFilename + ".txt";
+        winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + ".txt";
+        renameFile(winnerFilename, winnerFilenameRenamed);
+
+        if (m_fullDebug) {
+            // output the plan statistics to disk for debugging
+            PrintStream plansOut =
+                BuildDirectoryUtils.getDebugOutputPrintStream("statement-stats", procName + "_" + stmtName + ".txt");
+            plansOut.println(stats.toString());
+            plansOut.close();
+        }
     }
 
     public String getErrorMessage() {

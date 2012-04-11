@@ -101,14 +101,12 @@ public abstract class StatementCompiler {
         TrivialCostModel costModel = new TrivialCostModel();
 
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, hsql, estimates, true,
-                false);
+                catalog.getClusters().get("cluster"), db, catalogStmt.getSinglepartition(), hsql, estimates, true, false);
 
         CompiledPlan plan = null;
         try {
             plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
-                    catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(),
-                    catalogStmt.getSinglepartition(), DEFAULT_MAX_JOIN_TABLES, null);
+                    catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(), DEFAULT_MAX_JOIN_TABLES, null);
         } catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
