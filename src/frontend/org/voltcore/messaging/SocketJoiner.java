@@ -129,6 +129,22 @@ public class SocketJoiner {
         }
 
         if (!m_listenerSockets.isEmpty()) {
+            // if an internal interface was specified, see if it matches any
+            // of the forms of the leader address we've bound to.
+            if (m_internalInterface != null && !m_internalInterface.equals("")) {
+                if (!m_internalInterface.equals(m_coordIp.getHostName()) &&
+                    !m_internalInterface.equals(m_coordIp.getAddress().getCanonicalHostName()) &&
+                    !m_internalInterface.equals(m_coordIp.getAddress().getHostAddress()))
+                {
+                    String msg = "The provided internal interface (" + m_internalInterface +
+                    ") does not match the specified leader address (" +
+                    m_coordIp.getHostName() + ", " + m_coordIp.getAddress().getHostAddress() +
+                    "). This will result in either a cluster which fails to start" +
+                    " or an unintended network topology. The leader will now exit;" +
+                    " correct your specified leader and interface and try restarting.";
+                    org.voltdb.VoltDB.crashLocalVoltDB(msg, false, null);
+                }
+            }
             retval = true;
             if (m_hostLog != null)
                 m_hostLog.info("Connecting to VoltDB cluster as the leader...");
