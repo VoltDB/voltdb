@@ -190,8 +190,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     @Override
     public Object[] getInstanceId() {
         Object[] dumb = new Object[2];
-        dumb[0] = (Long)m_startTime;
-        dumb[1] = (Integer)0;
+        dumb[0] = m_startTime;
+        dumb[1] = 0;
         return dumb;
     }
 
@@ -306,5 +306,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     @Override
     public void resetGlobalStats() {
 
+    }
+
+    @Override
+    public int[] getThroughputAndOutstandingTxnLimits() {
+        return null;
     }
 }

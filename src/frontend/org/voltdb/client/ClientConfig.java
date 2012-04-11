@@ -54,6 +54,9 @@ public class ClientConfig {
     };
     boolean m_heavyweight = false;
     int m_maxOutstandingTxns = 3000;
+    int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
+    boolean m_autoTune = false;
+    int m_autoTuneTargetInternalLatency = 5;
     StatsUploaderSettings m_statsSettings = null;
     long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
@@ -180,15 +183,6 @@ public class ClientConfig {
     }
 
     /**
-     * Provide configuration information for uploading statistics about client performance
-     * via JDBC
-     * @param statsSettings
-     */
-    public void setStatsUploaderSettings(StatsUploaderSettings statsSettings) {
-        m_statsSettings = statsSettings;
-    }
-
-    /**
      * Set the maximum number of outstanding requests that will be submitted before
      * blocking. Similar to the number of concurrent connections in a traditional synchronous API.
      * Defaults to 2k.
@@ -200,5 +194,43 @@ public class ClientConfig {
                     "Max outstanding must be greater than 0, " + maxOutstanding + " was specified");
         }
         m_maxOutstandingTxns = maxOutstanding;
+    }
+
+    /**
+     * Set the maximum number of transactions that can be run in 1 second. Note this
+     * specified a rate, not a ceiling. If the limit is set to 10, you can't send 10 in
+     * the first half of the second and 5 in the later half; the client will let you send
+     * about 1 transaction every 100ms. Default is {@see Integer#MAX_VALUE}.
+     * @param maxTxnsPerSecond Requested ceiling on rate of call in transaction per second.
+     */
+    public void setMaxTransactionsPerSecond(int maxTxnsPerSecond) {
+        if (maxTxnsPerSecond < 1) {
+            throw new IllegalArgumentException(
+                    "Max TPS must be greater than 0, " + maxTxnsPerSecond + " was specified");
+        }
+    }
+
+    /**
+     * Enable the Auto Tuning feature, which dynamically adjusts the maximum
+     * allowable transaction number with the goal of maintaining a target latency.
+     * The latency value used is the internal latency as reported by the servers.
+     * The internal latency is a good measure of system saturation.
+     * {@see ClientConfig#setAutoTuneTargetInternalLatency(int) setAutoTuneTargetInternalLatency}
+     */
+    public void enableAutoTune() {
+        m_autoTune = true;
+    }
+
+    /**
+     * Set the target latency for the Auto Tune feature. Note this represents internal
+     * latency as reported by the server(s), not round-trip latency measured by the
+     * client. Default value is 5 if this is not called.
+     * @param targetLatency New target latency in milliseconds.
+     */
+    public void setAutoTuneTargetInternalLatency(int targetLatency) {
+        if (targetLatency < 1) {
+            throw new IllegalArgumentException(
+                    "Max auto tune latency must be greater than 0, " + targetLatency + " was specified");
+        }
     }
 }

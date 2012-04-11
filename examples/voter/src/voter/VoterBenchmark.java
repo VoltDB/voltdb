@@ -1,3 +1,43 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2012 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+/*
+ * This samples uses the native asynchronous request processing protocol
+ * to post requests to the VoltDB server, thus leveraging to the maximum
+ * VoltDB's ability to run requests in parallel on multiple database
+ * partitions, and multiple servers.
+ *
+ * While asynchronous processing is (marginally) more convoluted to work
+ * with and not adapted to all workloads, it is the preferred interaction
+ * model to VoltDB as it guarantees blazing performance.
+ *
+ * Because there is a risk of 'firehosing' a database cluster (if the
+ * cluster is too slow (slow or too few CPUs), this sample performs
+ * auto-tuning to target a specific latency (5ms by default).
+ * This tuning process, as demonstrated here, is important and should be
+ * part of your pre-launch evaluation so you can adequately provision your
+ * VoltDB cluster with the number of servers required for your needs.
+ */
+
 package voter;
 
 import java.util.Timer;
@@ -40,7 +80,7 @@ public class VoterBenchmark {
 
         @Option(opt = "rate-limit",
                 desc = "Interval for performance feedback, in seconds.")
-        int rateLimit = 1000000;
+        int rateLimit = 100000;
 
         @Option(opt = "auto-tune",
                 desc = "Interval for performance feedback, in seconds.")
@@ -48,7 +88,7 @@ public class VoterBenchmark {
 
         @Option(opt = "latency-target",
                 desc = "Interval for performance feedback, in seconds.")
-        double latencyTarget = 10.0d;
+        int latencyTarget = 5;
 
         @Override
         public void validate() {
@@ -116,8 +156,14 @@ public class VoterBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.autoTune) {
+            clientConfig.enableAutoTune();
+            clientConfig.setAutoTuneTargetInternalLatency(config.latencyTarget);
+        }
+        else {
+            clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
+        }
         client = ClientFactory.createClient(clientConfig);
-
         switchboard = new PhoneCallGenerator(config.contestantCount);
     }
 
@@ -171,7 +217,6 @@ public class VoterBenchmark {
                                  call.phoneNumber,
                                  call.contestantNumber,
                                  config.maxVoteCount);
-            Thread.sleep(1);
         }
 
         timer.cancel(); // cancel periodic stats printing

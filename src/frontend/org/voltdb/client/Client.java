@@ -237,12 +237,19 @@ public interface Client {
      * immediately if it is not possible to queue the procedure invocation due to backpressure.
      * @param blocking
      */
-    void configureBlocking(boolean blocking);
+    public void configureBlocking(boolean blocking);
 
     /**
      * Whether callProcedure will return immediately if a an async procedure invocation could not be queued
      * due to backpressure
      * @return true if callProcedure will block until backpressure ceases and false otherwise
      */
-    boolean blocking();
+    public boolean blocking();
+
+    /**
+     * Get the instantaneous values of the rate limiting values for this client.
+     * @return A length-2 array of integers representing max throughput/sec and
+     * max outstanding txns.
+     */
+    public int[] getThroughputAndOutstandingTxnLimits();
 }

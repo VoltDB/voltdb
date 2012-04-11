@@ -77,6 +77,8 @@ class Distributer {
     private final long m_procedureCallTimeoutMS;
     private final long m_connectionResponseTimeoutMS;
 
+    public final RateLimiter m_rateLimiter = new RateLimiter();
+
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
             Executors.newSingleThreadScheduledExecutor(
@@ -185,7 +187,11 @@ class Distributer {
             m_connectionId = ids[1];
         }
 
-        public void createWork(long handle, String name, BBContainer c, ProcedureCallback callback) {
+        public void createWork(long handle, String name, BBContainer c,
+                ProcedureCallback callback, boolean ignoreBackpressure) {
+            long now = System.currentTimeMillis();
+            now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
+                    now, ignoreBackpressure);
             synchronized (this) {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
@@ -200,14 +206,18 @@ class Distributer {
                     c.discard();
                     return;
                 }
-                long now = System.currentTimeMillis();
+
                 m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
                 m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(c);
         }
 
-        public void createWork(long handle, String name, FastSerializable f, ProcedureCallback callback) {
+        public void createWork(long handle, String name, FastSerializable f,
+                ProcedureCallback callback, boolean ignoreBackpressure) {
+            long now = System.currentTimeMillis();
+            now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
+                    now, ignoreBackpressure);
             synchronized (this) {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
@@ -221,7 +231,6 @@ class Distributer {
                     }
                     return;
                 }
-                long now = System.currentTimeMillis();
                 m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
                 m_callbacksToInvoke.incrementAndGet();
             }
@@ -307,7 +316,9 @@ class Distributer {
                     } else if (status != ClientResponse.SUCCESS) {
                         error = true;
                     }
-                    updateStats(stuff.name, delta, response.getClusterRoundtrip(), abort, error);
+                    int clusterRoundTrip = response.getClusterRoundtrip();
+                    m_rateLimiter.transactionResponseReceived(now, clusterRoundTrip);
+                    updateStats(stuff.name, delta, clusterRoundTrip, abort, error);
                 }
             }
 
@@ -368,6 +379,7 @@ class Distributer {
                     } catch (Exception e) {
                         uncaughtException(callBk.callback, r, e);
                     }
+                    m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
                     m_callbacksToInvoke.decrementAndGet();
                 }
             }
@@ -568,7 +580,8 @@ class Distributer {
          */
         if (cxn != null) {
             if (m_useMultipleThreads) {
-                cxn.createWork(invocation.getHandle(), invocation.getProcName(), invocation, cb);
+                cxn.createWork(invocation.getHandle(), invocation.getProcName(),
+                        invocation, cb, ignoreBackpressure);
             } else {
                 final FastSerializer fs = new FastSerializer(m_pool, expectedSerializedSize);
                 BBContainer c = null;
@@ -578,20 +591,9 @@ class Distributer {
                     fs.getBBContainer().discard();
                     throw new RuntimeException(e);
                 }
-                cxn.createWork(invocation.getHandle(), invocation.getProcName(), c, cb);
+                cxn.createWork(invocation.getHandle(), invocation.getProcName(),
+                        c, cb, ignoreBackpressure);
             }
-//            final String invocationName = invocation.getProcName();
-//            if (reportedSizes.containsKey(invocationName)) {
-//                if (reportedSizes.get(invocationName) < c.b.remaining()) {
-//                    System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining() + " which is greater then last value of " + reportedSizes.get(invocationName));
-//                    reportedSizes.put(invocationName, (long)c.b.remaining());
-//                }
-//            } else {
-//                reportedSizes.put(invocationName, (long)c.b.remaining());
-//                System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining());
-//            }
-
-
         }
 
         return !backpressure;
