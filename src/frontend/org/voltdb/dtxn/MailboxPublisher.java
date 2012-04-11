@@ -32,6 +32,14 @@ public class MailboxPublisher {
         m_publishPath = publishPath;
     }
 
+    // Mailbox JSON looks like:
+    // ['ExecutionSite':[{'HSId':hsid,
+    //                    'partitionId':partitionid}, ...]
+    //  'ClientInterface':[{'HSId':hsid}, ...],
+    //  'Initiator':[{'HSId':hsid}, ...],
+    //  'StatsAgent':[{'HSId':hsid}, ...]
+    // ]
+
     public synchronized void publish(ZooKeeper zk) {
         try {
             byte payload[] = m_mailboxes.toString(4).getBytes("UTF-8");

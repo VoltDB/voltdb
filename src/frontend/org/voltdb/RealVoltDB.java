@@ -669,6 +669,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         System.out.println(zk.getChildren("/db", false));
         JSONObject topology = new JSONObject(new String(zk.getData(VoltZK.topology, false, stat), "UTF-8"));
 
+        // We're waiting for m_mailboxTracker to start(), which will
+        // cause it to do an initial read of the mailboxes from ZK and
+        // then create a new and up-to-date m_siteTracker when handleMailboxUpdate()
+        // gets called
         while (m_siteTracker == null) {
             Thread.sleep(1);
         }
