@@ -1384,12 +1384,13 @@ public class PlanAssembler {
                 // --izzy
                 if (col.expression instanceof TupleValueExpression)
                 {
-                    root = addDistinctNode(root, col.expression);
+                    // Add distinct node(s) to the plan
+                    root = addDistinctNodes(root, col.expression);
                     // aggregate handlers are expected to produce the required projection.
                     // the other aggregates do this inherently but distinct may need a
                     // projection node.
                     root = addProjection(root);
-                }
+                 }
                 else
                 {
                     throw new PlanningErrorException("DISTINCT of an expression currently unsupported");
@@ -1400,12 +1401,46 @@ public class PlanAssembler {
         return root;
     }
 
-    AbstractPlanNode addDistinctNode(AbstractPlanNode root,
-                                     AbstractExpression expr)
+    /**
+     * If plan is distributed than add distinct nodes to each partition and the coordinator.
+     * Otherwise simply add the distinct node on top of the current root
+     *
+     * @param root The root node
+     * @param expr The distinct expression
+     * @return The new root node.
+     */
+    AbstractPlanNode addDistinctNodes(AbstractPlanNode root, AbstractExpression expr)
+    {
+        assert(root != null);
+        AbstractPlanNode accessPlanTemp = root;
+        if (root instanceof ReceivePlanNode) {
+            // Temporarily strip send/receive pair
+            accessPlanTemp = root.getChild(0).getChild(0);
+            accessPlanTemp.clearParents();
+            root.getChild(0).unlinkChild(accessPlanTemp);
+
+            // Add new distinct node to each partition
+            AbstractPlanNode distinctNode = addDistinctNode(accessPlanTemp, expr);
+            // Add send/receive pair back
+            root.getChild(0).addAndLinkChild(distinctNode);
+        }
+
+        // Add new distinct node to the coordinator
+        root = addDistinctNode(root, expr);
+        return root;
+    }
+
+    /**
+     * Build new distinct node and put it on top of the current root
+     *
+     * @param root The root node
+     * @param expr The distinct expression
+     * @return The new root node.
+     */
+    AbstractPlanNode addDistinctNode(AbstractPlanNode root, AbstractExpression expr)
     {
         DistinctPlanNode distinctNode = new DistinctPlanNode();
         distinctNode.setDistinctExpression(expr);
-
         distinctNode.addAndLinkChild(root);
         distinctNode.generateOutputSchema(m_catalogDb);
         return distinctNode;
