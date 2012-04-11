@@ -57,6 +57,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.ZKUtil;
@@ -759,6 +760,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     private JSONObject registerClusterConfig(ClusterConfig config)
     {
+        // First, race to write the topology to ZK using Highlander rules
+        // (In the end, there can be only one)
         JSONObject topo = null;
         try
         {
@@ -767,15 +770,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_messenger.getZK().create(VoltZK.topology, payload,
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT);
-            byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, null);
-            topo = new JSONObject(new String(data, "UTF-8"));
         }
         catch (KeeperException.NodeExistsException nee)
         {
+            // It's fine if we didn't win, we'll pick up the topology below
         }
         catch (Exception e)
         {
             VoltDB.crashLocalVoltDB("Unable to write topology to ZK, dying",
+                    true, e);
+        }
+
+        // Then, have everyone read the topology data back from ZK
+        try
+        {
+            byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, null);
+            topo = new JSONObject(new String(data, "UTF-8"));
+        }
+        catch (Exception e)
+        {
+            VoltDB.crashLocalVoltDB("Unable to read topology from ZK, dying",
                     true, e);
         }
         return topo;
