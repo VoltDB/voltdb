@@ -108,6 +108,7 @@ public class MockVoltDB implements VoltDBInterface
     public boolean shouldIgnoreCrashes = false;
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
+    VoltDB.Configuration voltconfig = null;
     private final ExecutorService m_es = Executors.newSingleThreadExecutor();
 
     public MockVoltDB() {
@@ -327,10 +328,19 @@ public class MockVoltDB implements VoltDBInterface
         return null;
     }
 
+    public void setConfig(VoltDB.Configuration config)
+    {
+        voltconfig = config;
+    }
+
     @Override
     public Configuration getConfig()
     {
-        return new VoltDB.Configuration();
+        if (voltconfig == null)
+        {
+            voltconfig = new VoltDB.Configuration();
+        }
+        return voltconfig;
     }
 
     public void setFaultDistributor(FaultDistributorInterface distributor)

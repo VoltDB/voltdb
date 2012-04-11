@@ -325,4 +325,13 @@ public class TestJDBCDriver {
         assertTrue(meta.isCaseSensitive(1));
         assertFalse(meta.isSigned(1));
     }
+
+    @Test
+    public void testVersionMetadata() throws SQLException {
+        int major = conn.getMetaData().getDatabaseMajorVersion();
+        int minor = conn.getMetaData().getDatabaseMinorVersion();
+        assertTrue(major >= 2);
+        assertTrue(minor >= 0);
+    }
+
 }
