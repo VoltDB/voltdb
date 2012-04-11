@@ -101,11 +101,10 @@ public class VoltCompiler {
     ArrayList<Feedback> m_errors = new ArrayList<Feedback>();
 
     // set of annotations by procedure name
-    Map<String, ProcInfoData> m_procInfoOverrides;
+    private Map<String, ProcInfoData> m_procInfoOverrides = null;
 
     String m_projectFileURL = null;
     String m_jarOutputPath = null;
-    PrintStream m_outputStream = null;
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
 
@@ -307,14 +306,10 @@ public class VoltCompiler {
      * @param output Where to print status/errors to, usually stdout.
      * @param procInfoOverrides Optional overridden values for procedure annotations.
      */
-    public boolean compile(final String projectFileURL, final String jarOutputPath, final PrintStream output,
-                           final Map<String, ProcInfoData> procInfoOverrides) {
+    public boolean compile(final String projectFileURL, final String jarOutputPath) {
         m_hsql = null;
         m_projectFileURL = projectFileURL;
         m_jarOutputPath = jarOutputPath;
-        m_outputStream = output;
-        // use this map as default annotation values
-        m_procInfoOverrides = procInfoOverrides;
 
         // clear out the warnigns and errors
         m_warnings.clear();
@@ -325,7 +320,6 @@ public class VoltCompiler {
         final Catalog catalog = compileCatalog(projectFileURL);
         if (catalog == null) {
             compilerLog.error("Catalog compilation failed.");
-            summarizeErrors();
             return false;
         }
 
@@ -339,7 +333,6 @@ public class VoltCompiler {
             catalogBytes =  catalogCommands.getBytes("UTF-8");
         } catch (final UnsupportedEncodingException e1) {
             addErr("Can't encode the compiled catalog file correctly");
-            summarizeErrors();
             return false;
         }
 
@@ -364,18 +357,15 @@ public class VoltCompiler {
             m_jarOutput.writeToFile(new File(jarOutputPath)).run();
         } catch (final Exception e) {
             e.printStackTrace();
-            summarizeErrors();
             return false;
         }
 
         assert(!hasErrors());
 
         if (hasErrors()) {
-            summarizeErrors();
             return false;
         }
 
-        summarizeSuccess();
         return true;
     }
 
@@ -683,8 +673,7 @@ public class VoltCompiler {
             } else {
                 m_currentFilename = procedureName;
             }
-            ProcedureCompiler.compile(this, m_hsql, m_estimates,
-                    m_catalog, db, procedureDescriptor);
+            ProcedureCompiler.compile(this, m_hsql, m_estimates, m_catalog, db, procedureDescriptor);
         }
 
         // Add all the class dependencies to the output jar
@@ -1214,32 +1203,34 @@ public class VoltCompiler {
 
         // Compile and exit with error code if we failed
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(projectPath, outputJar, System.out, null);
+        final boolean success = compiler.compile(projectPath, outputJar);
         if (!success) {
+            compiler.summarizeErrors(System.out);
             System.exit(-1);
         }
+        compiler.summarizeSuccess(System.out);
     }
 
-    private void summarizeSuccess() {
-        if (m_outputStream != null) {
+    public void summarizeSuccess(PrintStream outputStream) {
+        if (outputStream != null) {
 
             Database database = m_catalog.getClusters().get("cluster").
             getDatabases().get("database");
 
-            m_outputStream.println("------------------------------------------");
-            m_outputStream.println("Successfully created " + m_jarOutputPath);
+            outputStream.println("------------------------------------------");
+            outputStream.println("Successfully created " + m_jarOutputPath);
 
             for (String ddl : m_ddlFilePaths.keySet()) {
-                m_outputStream.println("Includes schema: " + m_ddlFilePaths.get(ddl));
+                outputStream.println("Includes schema: " + m_ddlFilePaths.get(ddl));
             }
 
-            m_outputStream.println();
+            outputStream.println();
 
             for (Procedure p : database.getProcedures()) {
                 if (p.getSystemproc()) {
                     continue;
                 }
-                m_outputStream.printf("[%s][%s]%s %s\n",
+                outputStream.printf("[%s][%s]%s %s\n",
                                       p.getSinglepartition() ? "SP" : "MP",
                                       p.getReadonly() ? "RO" : "RW",
                                       p.getHasseqscans() ? "[Seq]" : "",
@@ -1257,24 +1248,37 @@ public class VoltCompiler {
                         determinismTag = "[NDO] ";
                     }
                     String statementLine;
-                    if (seqScanTag.length() + determinismTag.length() +s.getSqltext().length() > 80) {
-                        statementLine = "  " + (seqScanTag + determinismTag + s.getSqltext()).substring(0, 80) + "...";
+                    String sqlText = s.getSqltext();
+                    sqlText = squeezeWhitespace(sqlText);
+                    if (seqScanTag.length() + determinismTag.length() + sqlText.length() > 80) {
+                        statementLine = "  " + (seqScanTag + determinismTag + sqlText).substring(0, 80) + "...";
                     } else {
-                        statementLine = "  " + seqScanTag + determinismTag + s.getSqltext();
+                        statementLine = "  " + seqScanTag + determinismTag + sqlText;
                     }
-                    m_outputStream.println(statementLine);
+                    outputStream.println(statementLine);
                 }
-                m_outputStream.println();
+                outputStream.println();
             }
-            m_outputStream.println("------------------------------------------");
+            outputStream.println("------------------------------------------");
         }
     }
 
-    private void summarizeErrors() {
-        if (m_outputStream != null) {
-            m_outputStream.println("------------------------------------------");
-            m_outputStream.println("Project compilation failed. See log for errors.");
-            m_outputStream.println("------------------------------------------");
+    /**
+     * Return a copy of the input sqltext with each run of successive whitespace characters replaced by a single space.
+     * This is just for informal feedback purposes, so quoting is not respected.
+     * @param sqltext
+     * @return a possibly modified copy of the input sqltext
+     **/
+    private static String squeezeWhitespace(String sqltext) {
+        String compact = sqltext.replaceAll("\\s+", " ");
+        return compact;
+    }
+
+    private void summarizeErrors(PrintStream outputStream) {
+        if (outputStream != null) {
+            outputStream.println("------------------------------------------");
+            outputStream.println("Project compilation failed. See log for errors.");
+            outputStream.println("------------------------------------------");
         }
     }
 
@@ -1382,5 +1386,12 @@ public class VoltCompiler {
         byte[] bytes = InMemoryJarfile.readFromJarEntry(jarIn, catEntry);
 
         return new String(bytes, "UTF-8");
+    }
+
+    /**
+     * @param m_procInfoOverrides the m_procInfoOverrides to set
+     */
+    public void setProcInfoOverrides(Map<String, ProcInfoData> procInfoOverrides) {
+        m_procInfoOverrides = procInfoOverrides;
     }
 }

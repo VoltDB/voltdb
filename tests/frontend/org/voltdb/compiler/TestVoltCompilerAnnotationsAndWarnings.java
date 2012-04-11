@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb;
+package org.voltdb.compiler;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -55,7 +55,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.setCompilerDebugPrintStream(capturing);
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
+        builder.addStmtProcedure("Insert",
+                // Include lots of filthy whitespace to test output cleanup.
+                "insert                            into\t \tblah values\n\n(? \t ,\t\t\t?)                           ;", null);
         builder.addProcedures(NondeterministicROProc.class);
         builder.addProcedures(NondeterministicRWProc.class);
         builder.addProcedures(DeterministicRONonSeqProc.class);
@@ -88,6 +90,14 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertFalse(foundLineMatching(lines, ".*\\[Seq].*BLAH.insert.*"));
         assertFalse(foundLineMatching(lines, ".*\\[RO].*NondeterministicRWProc.*"));
         assertFalse(foundLineMatching(lines, ".*\\[RO].*DeterministicRWProc.*"));
+
+        // test prettying-up of statement in feedback output.
+        assertFalse(foundLineMatching(lines, ".*values.*  .*")); // includes 2 embedded or trailing spaces.
+        assertFalse(foundLineMatching(lines, ".*nsert.*  .*values.*")); // includes 2 embedded spaces.
+        assertFalse(foundLineMatching(lines, ".*values.*\u0009.*")); // that's an embedded or trailing unicode tab.
+        assertFalse(foundLineMatching(lines, ".*nsert.*\u0009.*values.*")); // that's an embedded unicode tab.
+        assertFalse(foundLineMatching(lines, ".*values.*\\s\\s.*")); // includes 2 successive embedded or trailing whitespace of any kind
+        assertFalse(foundLineMatching(lines, ".*nsert.*\\s\\s.*values.*")); // includes 2 successive embedded whitespace of any kind
 
     }
 
