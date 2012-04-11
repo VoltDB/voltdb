@@ -131,7 +131,17 @@ public class TestPushDownAggregates extends TestCase {
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
-    public void testAllPushDownAggregates() {
+    public void testDistinctOnPartitionedTable() {
+        List<AbstractPlanNode> pn = compile("SELECT DISTINCT A1 from T1", 0, false);
+        checkPushedDownDistinct(pn, true);
+    }
+
+    public void testDistinctOnReplicatedTable() {
+        List<AbstractPlanNode> pn = compile("SELECT DISTINCT D1_NAME from D1", 0, false);
+        checkPushedDownDistinct(pn, false);
+    }
+
+   public void testAllPushDownAggregates() {
         List<AbstractPlanNode> pn =
             compile("SELECT A1, count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY)" +
                     " FROM T1 GROUP BY A1", 0, false);
@@ -263,6 +273,29 @@ public class TestPushDownAggregates extends TestCase {
             }
         } else {
             assertTrue(p instanceof AbstractScanPlanNode);
+        }
+    }
+
+    /**
+     * Check if the distinct node is pushed-down in the given plan.
+     *
+     * @param np
+     *            The generated plan
+     * @param isMultiPart
+     *            Whether or not the plan is distributed
+     */
+    private void checkPushedDownDistinct(List<AbstractPlanNode> pn, boolean isMultiPart) {
+        assertTrue(pn.size() > 0);
+
+        AbstractPlanNode p = pn.get(0).getChild(0).getChild(0);
+        assertTrue(p instanceof DistinctPlanNode);
+        assertTrue(p.toJSONString().contains("\"DISTINCT\""));
+
+        if (isMultiPart) {
+            assertTrue(pn.size() == 2);
+            p = pn.get(1).getChild(0);
+            assertTrue(p instanceof DistinctPlanNode);
+            assertTrue(p.toJSONString().contains("\"DISTINCT\""));
         }
     }
 }
