@@ -51,6 +51,26 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     /**
+     * Accessor for flag marking the plan as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return true, since statement does not produce a query result
+     */
+    @Override
+    public boolean isOrderDeterministic() {
+        return true;
+    }
+
+    /**
+     * Accessor for flag marking the plan as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return true, since statement does not produce a query result
+     */
+    @Override
+    public boolean isContentDeterministic() {
+        return true;
+    }
+
+    /**
      * @return the target_table_name
      */
     public final String getTargetTableName() {

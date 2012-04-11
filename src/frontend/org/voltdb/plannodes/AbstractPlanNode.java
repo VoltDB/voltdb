@@ -98,6 +98,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     protected boolean m_isInline = false;
 
     /**
+     * The textual explanation of why the plan may fail to have a deterministic result or effect when replayed.
+     */
+    protected String  m_nondeterminismDetail = "the query result does not guarantee a consistent ordering";
+
+    /**
      * Instantiates a new plan node.
      */
     protected AbstractPlanNode() {
@@ -201,6 +206,47 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 node.validate();
             }
         }
+    }
+
+    /**
+     * Does the (sub)plan guarantee an identical result/effect when "replayed"
+     * against the same database state, such as during replication or CL recovery.
+     * @return
+     */
+    public boolean isOrderDeterministic() {
+        // Leaf nodes need to re-implement this test.
+        assert(m_children != null);
+        for (AbstractPlanNode child : m_children) {
+            if (! child.isOrderDeterministic()) {
+                m_nondeterminismDetail = child.m_nondeterminismDetail;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Does the (sub)plan guarantee an identical result/effect (except possibly for ordering)
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return
+     */
+    public boolean isContentDeterministic() {
+        // Leaf nodes need to re-implement this test.
+        assert(m_children != null);
+        for (AbstractPlanNode child : m_children) {
+            if (! child.isContentDeterministic()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Accessor for description of plan non-determinism.
+     * @return the field
+     */
+    public String nondeterminismDetail() {
+        return m_nondeterminismDetail;
     }
 
     @Override

@@ -122,6 +122,16 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException(msg);
         }
 
+        // Check order determinism before accessing the detail which it caches.
+        boolean orderDeterministic = plan.isOrderDeterministic();
+        catalogStmt.setIsorderdeterministic(orderDeterministic);
+        boolean contentDeterministic = plan.isContentDeterministic();
+        catalogStmt.setIscontentdeterministic(contentDeterministic);
+        String nondeterminismDetail = plan.nondeterminismDetail();
+        catalogStmt.setNondeterminismdetail(nondeterminismDetail);
+
+        catalogStmt.setSeqscancount(plan.countSeqScans());
+
         // Input Parameters
         // We will need to update the system catalogs with this new information
         // If this is an adhoc query then there won't be any parameters

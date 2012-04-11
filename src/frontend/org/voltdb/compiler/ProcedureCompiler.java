@@ -184,8 +184,9 @@ public abstract class ProcedureCompiler {
             e1.printStackTrace();
         }
 
-        // track if there are any writer stmts
+        // track if there are any writer statements and/or sequential scans
         boolean procHasWriteStmts = false;
+        boolean procHasSeqScans = false;
 
         // iterate through the fields and deal with
         Map<String, Field> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, true);
@@ -217,10 +218,42 @@ public abstract class ProcedureCompiler {
             // if a single stmt is not read only, then the proc is not read only
             if (catalogStmt.getReadonly() == false)
                 procHasWriteStmts = true;
+
+            if (catalogStmt.getSeqscancount() > 0) {
+                procHasSeqScans = true;
+            }
         }
 
         // set the read onlyness of a proc
         procedure.setReadonly(procHasWriteStmts == false);
+
+        procedure.setHasseqscans(procHasSeqScans);
+
+        for (Statement catalogStmt : procedure.getStatements()) {
+            if (catalogStmt.getIscontentdeterministic() == false) {
+                String potentialErrMsg =
+                    "Procedure " + shortName + " has a statement with a non-deterministic result - statement: \"" +
+                    catalogStmt.getSqltext() + "\" , reason: " + catalogStmt.getNondeterminismdetail();
+                // throw compiler.new VoltCompilerException(potentialErrMsg);
+                compiler.addWarn(potentialErrMsg);
+            }
+            else if (catalogStmt.getIsorderdeterministic() == false) {
+                String warnMsg;
+                if (procHasWriteStmts) {
+                    String rwPotentialErrMsg = "Procedure " + shortName +
+                            " is RW and has a statement whose result has a non-deterministic ordering - statement: \"" +
+                            catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
+                    // throw compiler.new VoltCompilerException(rwPotentialErrMsg);
+                    warnMsg = rwPotentialErrMsg;
+                }
+                else {
+                    warnMsg = "Procedure " + shortName +
+                        " has a statement with a non-deterministic result - statement: \"" +
+                        catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
+                }
+                compiler.addWarn(warnMsg);
+            }
+        }
 
         // find the run() method and get the params
         Method procMethod = null;
@@ -406,6 +439,9 @@ public abstract class ProcedureCompiler {
 
         // set the read onlyness of a proc
         procedure.setReadonly(procHasWriteStmts == false);
+
+        int seqs = catalogStmt.getSeqscancount();
+        procedure.setHasseqscans(seqs > 0);
 
         // set procedure parameter types
         CatalogMap<ProcParameter> params = procedure.getParameters();

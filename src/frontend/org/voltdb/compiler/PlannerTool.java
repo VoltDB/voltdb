@@ -127,6 +127,14 @@ public class PlannerTool {
             throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
         }
 
+        if (plan.isContentDeterministic() == false) {
+            String potentialErrMsg =
+                "Statement has a non-deterministic result - statement: \"" +
+                sql + "\" , reason: " + plan.nondeterminismDetail();
+            // throw new RuntimeException(potentialErrMsg);
+            hostLog.warn(potentialErrMsg);
+        }
+
         //log("finished planning stmt:");
         //log("SQL: " + plan.sql);
         //log("COST: " + Double.toString(plan.cost));

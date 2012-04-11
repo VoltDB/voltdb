@@ -75,7 +75,7 @@ public class TestMilestoneOneCompile extends TestCase {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "milestoneOneCatalog.jar";
         VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compile(projectPath, catalogJar, System.out, null);
+        boolean success = compiler.compile(projectPath, catalogJar);
 
         assertTrue(success);
     }

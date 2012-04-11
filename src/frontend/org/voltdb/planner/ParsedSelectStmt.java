@@ -18,13 +18,16 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -370,6 +373,114 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public AbstractExpression getLimitExpression() {
         return getParameterOrConstantAsExpression(limitParameterId, limit);
+    }
+
+    public boolean isOrderDeterministic() {
+        if (orderByColumnsDetermineAllDisplayColumns()) {
+            return true;
+        }
+        if (orderByColumnsDetermineUniqueColumns()) {
+            return true;
+        }
+        if (guaranteesUniqueRow()) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean orderByColumnsDetermineAllDisplayColumns() {
+        HashSet<AbstractExpression> orderByExprs = null;
+        ArrayList<AbstractExpression> displayExprHardCases = null;
+        // First try to get away with a brute force N by M search for exact equalities.
+        for (ParsedColInfo displayCol : displayColumns)
+        {
+            if (displayCol.orderBy) {
+                continue;
+            }
+            AbstractExpression displayExpr = displayCol.expression;
+            if (orderByExprs == null) {
+                orderByExprs = new HashSet<AbstractExpression>();
+                for (ParsedColInfo orderByCol : orderColumns) {
+                    orderByExprs.add(orderByCol.expression);
+                }
+            }
+            if (orderByExprs.contains(displayExpr)) {
+                continue;
+            }
+            if (displayExpr instanceof TupleValueExpression) {
+                // Simple column references can only be exactly equal to but not "based on" an ORDER BY.
+                return false;
+            }
+
+            if (displayExprHardCases == null) {
+                displayExprHardCases = new ArrayList<AbstractExpression>();
+            }
+            displayExprHardCases.add(displayExpr);
+        }
+
+        if (displayExprHardCases == null) {
+            return true;
+        }
+
+        // Plan B. profile the ORDER BY list and try to include/exclude the hard cases on that basis.
+        HashSet<AbstractExpression> orderByTVEs = new HashSet<AbstractExpression>();
+        ArrayList<AbstractExpression> orderByNonTVEs = new ArrayList<AbstractExpression>();
+        ArrayList<List<AbstractExpression>> orderByNonTVEBaseTVEs = new ArrayList<List<AbstractExpression>>();
+        HashSet<AbstractExpression> orderByAllBaseTVEs = new HashSet<AbstractExpression>();
+
+        for (AbstractExpression orderByExpr : orderByExprs) {
+            if (orderByExpr instanceof TupleValueExpression) {
+                orderByTVEs.add(orderByExpr);
+                orderByAllBaseTVEs.add(orderByExpr);
+            } else {
+                orderByNonTVEs.add(orderByExpr);
+                List<AbstractExpression> baseTVEs = orderByExpr.findBaseTVEs();
+                orderByNonTVEBaseTVEs.add(baseTVEs);
+                orderByAllBaseTVEs.addAll(baseTVEs);
+            }
+        }
+
+        for (AbstractExpression displayExpr : displayExprHardCases)
+        {
+            Collection<AbstractExpression> displayBases = displayExpr.findBaseTVEs();
+            if (orderByTVEs.containsAll(displayBases)) {
+                continue;
+            }
+            if (orderByAllBaseTVEs.containsAll(displayBases) == false) {
+                return false;
+            }
+            // At this point, if he displayExpr is a match,
+            // then it is based on but not equal to one or more orderByNonTVE(s) and optionally orderByTVE(s).
+            // The simplest example is like "SELECT a+(b-c) ... ORDER BY a, b-c;"
+            // If it is a non-match, it is an original expression based on orderByAllBaseTVEs
+            // The simplest example is like "SELECT a+b ... ORDER BY a, b-c;"
+            // TODO: process REALLY HARD CASES
+            // TODO: issue a warning, short-term?
+            // For now, err on the side of non-determinism.
+            return false;
+        }
+        return true;
+    }
+
+    private boolean orderByColumnsDetermineUniqueColumns() {
+        // TODO Are there any easy cases?
+        return false;
+    }
+
+    private boolean guaranteesUniqueRow() {
+        if (((grouped == false) || groupByColumns.isEmpty() ) && displaysAgg()) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean displaysAgg() {
+        for (ParsedColInfo displayCol : displayColumns) {
+            if (displayCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }
