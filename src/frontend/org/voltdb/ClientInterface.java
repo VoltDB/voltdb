@@ -27,11 +27,9 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
@@ -49,6 +47,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -77,11 +77,8 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.LocalMailbox;
@@ -1789,12 +1786,5 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public SnapshotDaemon getSnapshotDaemon() {
         return m_snapshotDaemon;
-    }
-
-    public void notifySitesAdded(Set<Long> deltaAdded) {
-        SiteTracker st = VoltDB.instance().getSiteTracker();
-        Set<Long> copy = new HashSet<Long>(st.m_allExecutionSitesImmutable);
-        copy.retainAll(deltaAdded);
-        m_initiator.notifyExecutionSiteRejoin(new ArrayList<Long>(copy));
     }
 }

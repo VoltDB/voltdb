@@ -1841,8 +1841,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             HashSet<Long> deltaAdded = new HashSet<Long>(m_siteTracker.m_allSitesImmutable);
             deltaAdded.removeAll(oldTracker.m_allSitesImmutable);
             if (!deltaAdded.isEmpty()) {
-                for (ClientInterface ci : getClientInterfaces()) {
-                    ci.notifySitesAdded(deltaAdded);
+                for (SimpleDtxnInitiator dtxn : m_dtxns)
+                {
+                    Set<Long> copy = new HashSet<Long>(m_siteTracker.m_allExecutionSitesImmutable);
+                    copy.retainAll(deltaAdded);
+                    dtxn.notifyExecutionSiteRejoin(new ArrayList<Long>(copy));
                 }
                 for (ExecutionSite es : getLocalSites().values()) {
                     es.notifySitesAdded(m_siteTracker);
