@@ -208,7 +208,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             // store only partitions that are NOT the coordinator or coordinator replica
             // this is a bit too slow
             long[] allSiteIds =
-                VoltDB.instance().getSiteTracker().getSitesForPartitionsAsArray(partitions);
+                tracker.getSitesForPartitionsAsArray(partitions);
 
             for (int i = 0; i < allSiteIds.length; i++)
             {
