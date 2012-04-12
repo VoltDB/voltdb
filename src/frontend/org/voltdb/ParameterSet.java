@@ -43,6 +43,14 @@ import org.voltdb.types.VoltDecimalHelper;
 
     static final byte ARRAY = -99;
 
+    /*
+     * The same ParameterSet instance could be accessed by multiple threads to
+     * serialize the parameters. These two member variables keeps the encoded
+     * copy of strings and string arrays besides the decoded versions in
+     * m_params. There should only be one thread that adds the encoded strings.
+     * Once created, they are not mutated. So it should be safe to not
+     * synchronize on them.
+     */
     private final LinkedList<byte[]> m_encodedStrings = new LinkedList<byte[]>();
     private final LinkedList<byte[][]> m_encodedStringArrays = new LinkedList<byte[][]>();
 
@@ -62,6 +70,8 @@ import org.voltdb.types.VoltDecimalHelper;
     /** Sets the internal array to params. Note: this does *not* copy the argument. */
     public void setParameters(Object... params) {
         this.m_params = params;
+        // create encoded copies of strings
+        getSerializedSize();
     }
 
     public Object[] toArray() {
@@ -90,6 +100,24 @@ import org.voltdb.types.VoltDecimalHelper;
 
         for (int i = 0; i < paramLen; i++) {
             m_params[i] = readOneParameter(in);
+
+            // store encoded copies of strings
+            Class<?> cls = m_params[i].getClass();
+            if (cls.isArray()) {
+                if (VoltType.typeFromClass(cls.getComponentType()).equals(VoltType.STRING)) {
+                    String[] strArray = (String[]) m_params[i];
+                    int len = strArray.length;
+                    byte[][] bytes = new byte[len][];
+                    for (int strIdx = 0; strIdx < len; strIdx++) {
+                        bytes[strIdx] = strArray[strIdx].getBytes("UTF-8");
+                    }
+                    m_encodedStringArrays.add(bytes);
+                }
+            } else {
+                if (VoltType.typeFromClass(cls).equals(VoltType.STRING)) {
+                    m_encodedStrings.add(((String) m_params[i]).getBytes("UTF-8"));
+                }
+            }
         }
     }
 
@@ -350,6 +378,8 @@ import org.voltdb.types.VoltDecimalHelper;
         for (int i = 0; i < paramArray.length(); i++) {
             pset.m_params[i] = paramFromPossibleJSON(paramArray.get(i));
         }
+        // create encoded copies of strings
+        pset.getSerializedSize();
         return pset;
     }
 
@@ -431,6 +461,9 @@ import org.voltdb.types.VoltDecimalHelper;
     }
 
     public int getSerializedSize() {
+        boolean shouldEncodeStrings = m_encodedStringArrays.isEmpty() && m_encodedStrings.isEmpty();
+        int stringArrayIndex = 0;
+        int stringIndex = 0;
         int size = 2;
 
         for (int ii = 0; ii < m_params.length; ii++) {
@@ -474,21 +507,32 @@ import org.voltdb.types.VoltDecimalHelper;
                         size += 8 * ((double[])obj).length;
                         break;
                     case STRING:
-                        String strings[] = (String[]) obj;
-                        byte encodedStrings[][] = new byte[strings.length][];
-                        for (int zz = 0; zz < strings.length; zz++) {
-                            if (strings[zz] == null) {
-                                size += 4;
-                            } else {
-                                try {
-                                    encodedStrings[zz] = strings[zz].getBytes("UTF-8");
-                                } catch (UnsupportedEncodingException e) {
-                                    VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                        if (shouldEncodeStrings) {
+                            String strings[] = (String[]) obj;
+                            byte encodedStrings[][] = new byte[strings.length][];
+                            for (int zz = 0; zz < strings.length; zz++) {
+                                if (strings[zz] == null) {
+                                    size += 4;
+                                } else {
+                                    try {
+                                        encodedStrings[zz] = strings[zz].getBytes("UTF-8");
+                                    } catch (UnsupportedEncodingException e) {
+                                        VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                                    }
+                                    size += 4 + encodedStrings[zz].length;
                                 }
-                                size += 4 + encodedStrings[zz].length;
+                            }
+                            m_encodedStringArrays.add(encodedStrings);
+                        } else {
+                            byte[][] strArray = m_encodedStringArrays.get(stringArrayIndex++);
+                            for (int strIdx = 0; strIdx < strArray.length; strIdx++) {
+                                if (strArray[strIdx] == null) {
+                                    size += 4;
+                                } else {
+                                    size += 4 + strArray[strIdx].length;
+                                }
                             }
                         }
-                        m_encodedStringArrays.add(encodedStrings);
                         break;
                     case TIMESTAMP:
                         size += 8 * ((TimestampType[])obj).length;
@@ -539,12 +583,17 @@ import org.voltdb.types.VoltDecimalHelper;
                     size += 8;
                     break;
                 case STRING:
-                    try {
-                        byte encodedString[] = ((String)obj).getBytes("UTF-8");
-                        size += 4 + encodedString.length;
-                        m_encodedStrings.add(encodedString);
-                    } catch (UnsupportedEncodingException e) {
-                        VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                    if (shouldEncodeStrings) {
+                        try {
+                            byte encodedString[] = ((String)obj).getBytes("UTF-8");
+                            size += 4 + encodedString.length;
+                            m_encodedStrings.add(encodedString);
+                        } catch (UnsupportedEncodingException e) {
+                            VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                        }
+                    } else {
+                        byte[] string = m_encodedStrings.get(stringIndex++);
+                        size += 4 + string.length;
                     }
                     break;
                 case TIMESTAMP:
@@ -565,6 +614,8 @@ import org.voltdb.types.VoltDecimalHelper;
     }
 
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
+        int stringArrayIndex = 0;
+        int stringIndex = 0;
         buf.putShort((short)m_params.length);
 
         for (Object obj : m_params) {
@@ -619,7 +670,7 @@ import org.voltdb.types.VoltDecimalHelper;
                         FastSerializer.writeArray((double[]) obj, buf);
                         break;
                     case STRING:
-                        byte encodedStrings[][] = m_encodedStringArrays.poll();
+                        byte encodedStrings[][] = m_encodedStringArrays.get(stringArrayIndex++);
                         // This check used to be done by FastSerializer.writeArray(), but things changed?
                         if (encodedStrings.length > Short.MAX_VALUE) {
                             throw new IOException("Array exceeds maximum length of "
@@ -687,7 +738,7 @@ import org.voltdb.types.VoltDecimalHelper;
                         throw new RuntimeException("Can't cast paramter type to Double");
                     break;
                 case STRING:
-                    FastSerializer.writeString(m_encodedStrings.poll(), buf);
+                    FastSerializer.writeString(m_encodedStrings.get(stringIndex++), buf);
                     break;
                 case TIMESTAMP:
                     buf.putLong(((TimestampType) obj).getTime());

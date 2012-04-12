@@ -188,15 +188,18 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         buf.putLong(clientHandle);
         if (serializedParams != null)
         {
-            if (!serializedParams.isReadOnly())
+            // duplicate for thread-safety
+            ByteBuffer dup = serializedParams.duplicate();
+            dup.rewind();
+            if (!dup.isReadOnly())
             {
-                buf.put(serializedParams.array(),
-                        serializedParams.position() + serializedParams.arrayOffset(),
-                        serializedParams.remaining());
+                buf.put(dup.array(),
+                        dup.position() + dup.arrayOffset(),
+                        dup.remaining());
             }
             else
             {
-                buf.put(serializedParams);
+                buf.put(dup);
             }
         }
         else if (params != null) {
