@@ -57,13 +57,6 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     // True if a partition detection occurred. All future faults are ignored
     private volatile boolean m_partitionDetectionTriggered;
 
-    // Pairs a fault handlers to its specific unhandled fault set
-    class FaultHandlerData {
-
-        FaultHandlerData(FaultHandler handler) { m_handler = handler; }
-        FaultHandler m_handler;
-    }
-
     /**
      * Create a FaultDistributor with default fault processing policies
      * @param voltdb
