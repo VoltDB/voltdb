@@ -75,6 +75,50 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     /**
+     * Accessor for flag marking the plan as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return child's value
+     */
+    @Override
+    public boolean isOrderDeterministic() {
+        AbstractPlanNode child = m_children.get(0);
+        if (child.isContentDeterministic()) {
+            if (orderingByAllColumns()) {
+                return true;
+            }
+            if (orderingByUniqueColumns()) {
+                return true;
+            }
+            m_nondeterminismDetail = "insufficient ordering criteria.";
+        } else {
+            m_nondeterminismDetail = m_children.get(0).nondeterminismDetail();
+        }
+        return false;
+    }
+
+    private boolean orderingByAllColumns() {
+        NodeSchema schema = getOutputSchema();
+        for (SchemaColumn col : schema.getColumns()) {
+            boolean found = false;
+            for (AbstractExpression expr : m_sortExpressions) {
+                if (col.getExpression().equals(expr)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean orderingByUniqueColumns() {
+        // NodeSchema schema = getOutputSchema();
+        return false; // TODO: for real, figure out if child guarantees a unique column (or combo).
+    }
+
+    /**
      * Add a sort to the order-by
      * @param sortExpr  The input expression on which to order the rows
      * @param sortDir

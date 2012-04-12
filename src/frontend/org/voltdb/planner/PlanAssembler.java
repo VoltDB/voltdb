@@ -260,6 +260,9 @@ public class PlanAssembler {
                 // only add the output columns if we actually have a plan
                 // avoid PlanColumn resource leakage
                 addColumns(retval, m_parsedSelect);
+                boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
+                boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
+                retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
             }
         } else {
             if (m_parsedInsert != null) {
@@ -282,6 +285,7 @@ public class PlanAssembler {
             assert (nextStmt.tableList.size() == 1);
             if (nextStmt.tableList.get(0).getIsreplicated())
                 retval.replicatedTableDML = true;
+            retval.statementGuaranteesDeterminism(true, true); // Until we support DML w/ subqueries/limits
         }
 
         if (fragment.planGraph == null)
