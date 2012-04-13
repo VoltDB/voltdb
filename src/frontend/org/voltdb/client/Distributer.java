@@ -443,6 +443,10 @@ class Distributer {
 
             return stats;
         }
+
+        public void resetStats() {
+            m_stats.clear();
+        }
     }
 
     void drain() throws NoConnectionsException, InterruptedException {
@@ -649,15 +653,17 @@ class Distributer {
         final Long since = System.currentTimeMillis();
         Map<String, ArrayList<ClientStats>> stats = new TreeMap<String, ArrayList<ClientStats>>();
 
-        for (NodeConnection conn : m_connections) {
-            ArrayList<ClientStats> connStats = conn.getStats(interval, rollupProcedures, since);
-            for (ClientStats cs : connStats) {
-                ArrayList<ClientStats> procStats = stats.get(cs.name);
-                if (procStats == null) {
-                    procStats = new ArrayList<ClientStats>();
-                    stats.put(cs.name, procStats);
+        synchronized (this) {
+            for (NodeConnection conn : m_connections) {
+                ArrayList<ClientStats> connStats = conn.getStats(interval, rollupProcedures, since);
+                for (ClientStats cs : connStats) {
+                    ArrayList<ClientStats> procStats = stats.get(cs.name);
+                    if (procStats == null) {
+                        procStats = new ArrayList<ClientStats>();
+                        stats.put(cs.name, procStats);
+                    }
+                    procStats.add(cs);
                 }
-                procStats.add(cs);
             }
         }
 
@@ -676,7 +682,11 @@ class Distributer {
     }
 
     public void resetGlobalStats() {
-
+        synchronized (this) {
+            for (NodeConnection conn : m_connections) {
+                conn.resetStats();
+            }
+        }
     }
 
     public Object[] getInstanceId() {

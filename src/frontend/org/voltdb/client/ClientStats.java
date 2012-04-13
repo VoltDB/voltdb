@@ -204,46 +204,6 @@ public class ClientStats {
         return clusterRoundTripTime / invocationsCompleted;
     }
 
-    public String benchmarkUpdate(long now) {
-        if (now < since) {
-            now = since + 1; // 1 ms duration is sorta cheatin'
-        }
-        long durationMs = now - since;
-
-        StringBuilder sb = new StringBuilder();
-
-        sb.append("Duration (").append(durationMs).append("ms) ");
-
-        // rolled up by connection or no?
-        if (connectionId >= 0) {
-            sb.append(String.format("Connection (%s:%d) ", hostname, port));
-        }
-        if (name.length() > 0) {
-            sb.append("Procedure (").append(name).append(") ");
-        }
-        sb.append(String.format("Calls/Aborts/Failures (%d/%d/%d) ",
-                invocationsCompleted, invocationAborts, invocationErrors));
-
-        if (invocationsCompleted > 0) {
-            sb.append(String.format("Throughput (%d/s) ", throughput(now)));
-
-            sb.append("Avg/95% Latency (");
-            sb.append(roundTripTime / invocationsCompleted).append("/");
-            int ninetyFive = kPercentileLatency(0.95);
-            if (ninetyFive == Integer.MAX_VALUE) {
-                sb.append(">1s)");
-            }
-            else if (ninetyFive == -1) {
-                sb.append("NA)");
-            }
-            else {
-                sb.append(ninetyFive).append("ms)");
-            }
-        }
-
-        return sb.toString();
-    }
-
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("Since %s - Procedure: %s - ConnectionId: %d {\n",

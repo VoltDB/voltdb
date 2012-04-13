@@ -80,6 +80,8 @@ public class VoterBenchmark {
     VoterCallback callback = new VoterCallback();
     // Timer for periodic stats printing
     Timer timer;
+    // Benchmark start time
+    long benchmarkStartTS;
 
     // voter benchmark state
     AtomicLong acceptedVotes = new AtomicLong(0);
@@ -98,6 +100,9 @@ public class VoterBenchmark {
 
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 30;
+
+        @Option(desc = "Warmup duration in seconds.")
+        int warmup = 5;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -118,11 +123,12 @@ public class VoterBenchmark {
         int latencytarget = 5;
 
         @Option(desc = "Filename to write raw summary statistics to.")
-        String stats = null;
+        String stats = "";
 
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (duration < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("display-interval must be > 0");
             if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
             if (maxvotes <= 0) exitWithMessageAndUsage("max-votes must be > 0");
@@ -138,7 +144,7 @@ public class VoterBenchmark {
     class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            System.out.printf("Connection to %s:%d was lost.\n", hostname, port);
+            System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
         }
     }
 
@@ -270,7 +276,15 @@ public class VoterBenchmark {
      */
     public synchronized void printStatistics() {
         ClientStats stats = client.getStats(true, true, true)[0];
-        System.err.println(stats.benchmarkUpdate(System.currentTimeMillis()));
+        long now = System.currentTimeMillis();
+        long time = Math.round((System.currentTimeMillis() - benchmarkStartTS) / 1000.0);
+        long window = now - stats.since;
+
+        System.out.printf("T=%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Througput %.0f/s, ", stats.invocationsCompleted / (window / 1000.0));
+        System.out.printf("Aborts/Failures %d/%d, ", stats.invocationAborts, stats.invocationErrors);
+        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.averageLatency(),
+                stats.kPercentileLatency(0.95));
     }
 
     /**
@@ -319,7 +333,7 @@ public class VoterBenchmark {
                 stats.kPercentileLatency(.95), stats.kPercentileLatency(.99));
 
         // 4. Write stats to file if requested
-        if ((config.stats != null) && (config.stats.length() > 0)) {
+        if (config.stats.length() > 0) {
             client.writeSummaryCSV(config.stats);
         }
     }
@@ -346,13 +360,34 @@ public class VoterBenchmark {
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
+        // Run the benchmark loop for the requested warmup time
+        // The throughput may be throttled depending on client configuration
+        System.out.println("Warming up...");
+        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
+        while (warmupEndTime > System.currentTimeMillis()) {
+            // Get the next phone call
+            PhoneCallGenerator.PhoneCall call = switchboard.receive();
+
+            // asynchronously call the "Vote" procedure
+            client.callProcedure(callback,
+                                 "Vote",
+                                 call.phoneNumber,
+                                 call.contestantNumber,
+                                 config.maxvotes);
+        }
+
+        // reset the stats after warmup
+        client.resetGlobalStats();
+
         // print periodic statistics to the console
+        benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
-        final long endTime = System.currentTimeMillis() + (1000l * config.duration);
-        while (endTime > System.currentTimeMillis()) {
+        System.out.println("\nRunning benchmark...");
+        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        while (benchmarkEndTime > System.currentTimeMillis()) {
             // Get the next phone call
             PhoneCallGenerator.PhoneCall call = switchboard.receive();
 
