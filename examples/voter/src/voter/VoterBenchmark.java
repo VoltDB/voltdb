@@ -93,9 +93,8 @@ public class VoterBenchmark {
      * and validation.
      */
     static class VoterConfig extends Configuration {
-        @Option(opt = "displayinterval",
-                desc = "Interval for performance feedback, in seconds.")
-        long displayInterval = 5;
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 30;
@@ -103,25 +102,20 @@ public class VoterBenchmark {
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
-        @Option(opt = "contestants",
-                desc = "Number of contestants in the voting contest (from 1 to 10).")
-        int contestantCount = 6;
+        @Option(desc = "Number of contestants in the voting contest (from 1 to 10).")
+        int contestants = 6;
 
-        @Option(opt = "maxvotes",
-                desc = "Interval for performance feedback, in seconds.")
-        int maxVoteCount = 10;
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        int maxvotes = 10;
 
-        @Option(opt = "ratelimit",
-                desc = "Maximum TPS rate for benchmark.")
-        int rateLimit = 100000;
+        @Option(desc = "Maximum TPS rate for benchmark.")
+        int ratelimit = 100000;
 
-        @Option(opt = "autotune",
-                desc = "Determine transaction rate dynamically based on latency.")
-        boolean autoTune = true;
+        @Option(desc = "Determine transaction rate dynamically based on latency.")
+        boolean autotune = true;
 
-        @Option(opt = "latencytarget",
-                desc = "Server-side latency target for auto-tuning.")
-        int latencyTarget = 5;
+        @Option(desc = "Server-side latency target for auto-tuning.")
+        int latencytarget = 5;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String stats = null;
@@ -129,11 +123,11 @@ public class VoterBenchmark {
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (displayInterval <= 0) exitWithMessageAndUsage("display-interval must be > 0");
-            if (contestantCount <= 0) exitWithMessageAndUsage("contestants must be > 0");
-            if (maxVoteCount <= 0) exitWithMessageAndUsage("max-votes must be > 0");
-            if (rateLimit <= 0) exitWithMessageAndUsage("rate-limit must be > 0");
-            if (latencyTarget <= 0) exitWithMessageAndUsage("latency-target must be > 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("display-interval must be > 0");
+            if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
+            if (maxvotes <= 0) exitWithMessageAndUsage("max-votes must be > 0");
+            if (ratelimit <= 0) exitWithMessageAndUsage("rate-limit must be > 0");
+            if (latencytarget <= 0) exitWithMessageAndUsage("latency-target must be > 0");
         }
     }
 
@@ -149,7 +143,8 @@ public class VoterBenchmark {
     }
 
     /**
-     *
+     * Callback to handle the response to a stored procedure call.
+     * Tracks response types.
      *
      */
     class VoterCallback implements ProcedureCallback {
@@ -175,22 +170,24 @@ public class VoterBenchmark {
     }
 
     /**
+     * Constructor for benchmark instance.
+     * Configures VoltDB client and prints configuration.
      *
-     * @param config
+     * @param config Parsed & validated CLI options.
      */
     public VoterBenchmark(VoterConfig config) {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-        if (config.autoTune) {
+        if (config.autotune) {
             clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencyTarget);
+            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
         }
         else {
-            clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
+            clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         }
         client = ClientFactory.createClient(clientConfig);
-        switchboard = new PhoneCallGenerator(config.contestantCount);
+        switchboard = new PhoneCallGenerator(config.contestants);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
@@ -199,8 +196,11 @@ public class VoterBenchmark {
     }
 
     /**
+     * Connect to a single server with retry. Limited exponential backoff.
+     * No timeout. This will run until the process is killed if it's not
+     * able to connect.
      *
-     * @param server
+     * @param server hostname:port or just hostname (hostname can be ip).
      */
     void connectToOneServerWithRetry(String server) {
         int port = MiscUtils.getPortFromHostnameColonPort(server, Client.VOLTDB_SERVER_PORT);
@@ -222,15 +222,20 @@ public class VoterBenchmark {
     }
 
     /**
+     * Connect to a set of servers in parallel. Each will retry until
+     * connection. This call will block until all have connected.
      *
-     * @param servers
-     * @throws InterruptedException
+     * @param servers A comma separated list of servers using the hostname:port
+     * syntax (where :port is optional).
+     * @throws InterruptedException if anything bad happens with the threads.
      */
     void connect(String servers) throws InterruptedException {
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
         final CountDownLatch connections = new CountDownLatch(serverArray.length);
+
+        // use a new thread to connect to each server
         for (final String server : serverArray) {
             new Thread(new Runnable() {
                 @Override
@@ -240,6 +245,7 @@ public class VoterBenchmark {
                 }
             }).start();
         }
+        // block until all have connected
         connections.await();
     }
 
@@ -254,21 +260,24 @@ public class VoterBenchmark {
             public void run() { printStatistics(); }
         };
         timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayInterval * 1000,
-                                  config.displayInterval * 1000);
+                                  config.displayinterval * 1000,
+                                  config.displayinterval * 1000);
     }
 
     /**
-     *
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
         ClientStats stats = client.getStats(true, true, true)[0];
-        System.out.println(stats.benchmarkUpdate(System.currentTimeMillis()));
+        System.err.println(stats.benchmarkUpdate(System.currentTimeMillis()));
     }
 
     /**
+     * Prints the results of the voting simulation and statistics
+     * about performance.
      *
-     * @throws Exception
+     * @throws Exception if anything unexpected happens.
      */
     public synchronized void printResults() throws Exception {
         ClientStats stats = client.getStats(false, true, true)[0];
@@ -316,20 +325,22 @@ public class VoterBenchmark {
     }
 
     /**
+     * Core benchmark code.
+     * Connect. Initialize. Run the loop. Cleanup. Print Results.
      *
-     * @throws Exception
+     * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
 
-        // connect
+        // connect to one or more servers, loop until success
         connect(config.servers);
 
         // initialize using synchronous call
         System.out.println("\nPopulating Static Tables\n");
-        client.callProcedure("Initialize", config.contestantCount, CONTESTANT_NAMES_CSV);
+        client.callProcedure("Initialize", config.contestants, CONTESTANT_NAMES_CSV);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println("Starting Benchmark");
@@ -339,20 +350,25 @@ public class VoterBenchmark {
         schedulePeriodicStats();
 
         // Run the benchmark loop for the requested duration
+        // The throughput may be throttled depending on client configuration
         final long endTime = System.currentTimeMillis() + (1000l * config.duration);
         while (endTime > System.currentTimeMillis()) {
             // Get the next phone call
             PhoneCallGenerator.PhoneCall call = switchboard.receive();
 
+            // asynchronously call the "Vote" procedure
             client.callProcedure(callback,
                                  "Vote",
                                  call.phoneNumber,
                                  call.contestantNumber,
-                                 config.maxVoteCount);
+                                 config.maxvotes);
         }
 
         // cancel periodic stats printing
         timer.cancel();
+
+        // block until all outstanding txns return
+        client.drain();
 
         // print the summary results
         printResults();
@@ -361,7 +377,15 @@ public class VoterBenchmark {
         client.close();
     }
 
+    /**
+     * Main routine creates a benchmark instance and kicks off the run method.
+     *
+     * @param args Command line arguments.
+     * @throws Exception if anything goes wrong.
+     * @see {@link VoterConfig}
+     */
     public static void main(String[] args) throws Exception {
+        // create a configuration from the arguments
         VoterConfig config = new VoterConfig();
         config.parse(args);
 
