@@ -18,6 +18,7 @@
 package org.voltdb.client;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
@@ -500,5 +501,21 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public int[] getThroughputAndOutstandingTxnLimits() {
         return m_distributer.m_rateLimiter.getLimits();
+    }
+
+    @Override
+    public void writeSummaryCSV(String path) throws IOException {
+        ClientStats stats = getStats(false, true, true)[0];
+
+        FileWriter fw = new FileWriter(path);
+        fw.append(String.format("%d,%d,%d,%d,%d,%d,%d\n",
+                stats.since,
+                System.currentTimeMillis() - stats.since,
+                stats.invocationsCompleted,
+                stats.kPercentileLatency(0.0),
+                stats.maxRoundTripTime,
+                stats.kPercentileLatency(0.95),
+                stats.kPercentileLatency(0.99)));
+        fw.close();
     }
 }

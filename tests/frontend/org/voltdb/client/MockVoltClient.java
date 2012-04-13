@@ -312,4 +312,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public int[] getThroughputAndOutstandingTxnLimits() {
         return null;
     }
+
+    @Override
+    public void writeSummaryCSV(String path) throws IOException {
+        // TODO Auto-generated method stub
+
+    }
 }

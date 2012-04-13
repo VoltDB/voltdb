@@ -28,6 +28,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -45,7 +48,10 @@ public abstract class Configuration {
         String desc() default "";
     }
 
+    // Apache Commons CLI API - requires JAR
     protected final Options options = new Options();
+
+    protected String configDump;
 
     public void exitWithMessageAndUsage(String msg) {
         System.exit(-1);
@@ -84,7 +90,7 @@ public abstract class Configuration {
 
     public void parse(String[] args) {
         try {
-            for (Field field : getClass().getFields()) {
+            for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class) == false) {
                     continue;
                 }
@@ -100,7 +106,10 @@ public abstract class Configuration {
             CommandLineParser parser = new GnuParser();
             CommandLine cmd = parser.parse(options, args);
 
-            for (Field field : getClass().getFields()) {
+            // string key-value pairs
+            Map<String, String> kvMap = new TreeMap<String, String>();
+
+            for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class) == false) {
                     continue;
                 }
@@ -108,7 +117,9 @@ public abstract class Configuration {
                 Option option = field.getAnnotation(Option.class);
 
                 String opt = option.opt();
-                if (opt == null) opt = field.getName();
+                if ((opt == null) || (opt.length() == 0)) {
+                    opt = field.getName();
+                }
 
                 if (cmd.hasOption(opt)) {
                     if (option.hasArg()) {
@@ -132,11 +143,20 @@ public abstract class Configuration {
                         printUsage();
                     }
                 }
+
+                kvMap.put(opt, field.get(this).toString());
             }
 
             // check that the values read are valid
             // this code is specific to your app
             validate();
+
+            // build a debug string
+            StringBuilder sb = new StringBuilder();
+            for (Entry<String, String> e : kvMap.entrySet()) {
+                sb.append(e.getKey()).append(" = ").append(e.getValue()).append("\n");
+            }
+            configDump = sb.toString();
         }
 
         catch (Exception e) {
@@ -145,5 +165,9 @@ public abstract class Configuration {
         }
     }
 
-    public abstract void validate();
+    public void validate() {}
+
+    public String getConfigDumpString() {
+        return configDump;
+    }
 }

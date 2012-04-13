@@ -18,6 +18,7 @@
 package org.voltdb.client;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
 
@@ -252,4 +253,19 @@ public interface Client {
      * max outstanding txns.
      */
     public int[] getThroughputAndOutstandingTxnLimits();
+
+    /**
+     * Write a single line of comma separated values to the file specified.
+     * Used mainly for collecting results from benchmarks.
+     * Format:
+     * 1) Timestamp (ms) of creation of this client, or last call to {@link Client#resetGlobalStats()}.
+     * 2) Duration from first procedure call until this call in ms.
+     * 3) 1-percentile round trip latency estimate in ms.
+     * 4) Max measure round trip latency in ms.
+     * 5) 95-percentile round trip latency estimate in ms.
+     * 6) 99-percentile round trip latency estimate in ms.
+     * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
+     * @throws IOException on any file write error.
+     */
+    public void writeSummaryCSV(String path) throws IOException;
 }

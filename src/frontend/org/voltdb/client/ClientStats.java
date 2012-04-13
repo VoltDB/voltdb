@@ -146,6 +146,7 @@ public class ClientStats {
 
         // find the number of calls with less than percentile latency
         long k = (long) (invocationsCompleted * percentile);
+        if (k == 0) ++k; // ensure k=0 gives min latency
 
         long sum = 0;
         // check if the latency requested is in the 0-100ms bins
