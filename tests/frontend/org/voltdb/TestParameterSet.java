@@ -177,6 +177,6 @@ public class TestParameterSet extends TestCase {
         json = json.replace("[10,26,10]", "\"0a1A0A\"");
         p2 = ParameterSet.fromJSONString(json);
 
-        assertEquals("0a1A0A", p2.m_params[6]);
+        assertEquals("0a1A0A", p2.toArray()[6]);
     }
 }

@@ -408,8 +408,7 @@ public class TestVoltProcedure extends TestCase {
                 null);
 
         ParameterSet params = new ParameterSet();
-        params.m_params = new Object[1];
-        params.m_params[0] = new Long(1);
+        params.setParameters(1L);
         assertNotNull(agent.m_selector);
         assertNotNull(agent.m_source);
         assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);
@@ -420,7 +419,7 @@ public class TestVoltProcedure extends TestCase {
         assertEquals( 0, statsRow.length);
         for (int ii = 1; ii < 200; ii++) {
             runner.setupTransaction(null);
-            runner.call(1, params.m_params);
+            runner.call(1, params.toArray());
             statsRow = agent.m_source.getStatsRows(false, 0L);
             assertEquals(statsRow[0][6], new Long(ii));
         }

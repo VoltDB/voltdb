@@ -38,14 +38,14 @@ public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
 
         ParameterSet params = invocation.getParams();
         // note the second secret param
-        if (params.m_params.length > 2) {
+        if (params.toArray().length > 2) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Adhoc system procedure requires exactly one or two parameters, " +
                     "the SQL statement to execute with an optional partitioning value.",
                     invocation.clientHandle);
         }
         // check the types are both strings
-        if ((params.m_params[0] instanceof String) == false) {
+        if ((params.toArray()[0] instanceof String) == false) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0],
                     "Adhoc system procedure requires sql in the String type only.",

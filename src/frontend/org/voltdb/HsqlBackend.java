@@ -224,7 +224,7 @@ public class HsqlBackend {
 
         int lastIndex = 0;
         String sql = stmt.getText();
-        Object[] paramObjs = params.m_params;
+        Object[] paramObjs = params.toArray();
         for (int i = 0; i < paramObjs.length; i++) {
             int nextIndex = sql.indexOf('?', lastIndex);
             if (nextIndex == -1)

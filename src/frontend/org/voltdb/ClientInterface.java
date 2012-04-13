@@ -1003,19 +1003,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
-        String sql = (String) params.m_params[0];
+        String sql = (String) params.toArray()[0];
 
         // get the partition param if it exists
         // null means MP-txn
         Object partitionParam = null;
-        if (params.m_params.length > 1) {
-            if (params.m_params[1] == null) {
+        if (params.toArray().length > 1) {
+            if (params.toArray()[1] == null) {
                 // nulls map to zero
                 partitionParam = new Long(0);
                 // skip actual null value because it means MP txn
             }
             else {
-                partitionParam = params.m_params[1];
+                partitionParam = params.toArray()[1];
             }
         }
 
@@ -1058,10 +1058,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         ParameterSet params = task.getParams();
         byte[] catalogBytes = null;
-        if (params.m_params[0] instanceof String) {
-            catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
-        } else if (params.m_params[0] instanceof byte[]) {
-            catalogBytes = (byte[]) params.m_params[0];
+        if (params.toArray()[0] instanceof String) {
+            catalogBytes = Encoder.hexDecode((String) params.toArray()[0]);
+        } else if (params.toArray()[0] instanceof byte[]) {
+            catalogBytes = (byte[]) params.toArray()[0];
         } else {
             // findbugs triggers a NPE alert here... and the
             // policy check is pretty far away from here.
@@ -1072,7 +1072,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     " Catalog content must be passed as string or byte[].",
                     task.clientHandle);
         }
-        String deploymentString = (String) params.m_params[1];
+        String deploymentString = (String) params.toArray()[1];
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     m_siteId,
@@ -1126,7 +1126,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
         // DR uses the new StatsAgent. Other stats do not.
-        if ((params.m_params.length != 0) && (((String)params.toArray()[0]).equals("DR"))) {
+        if ((params.toArray().length != 0) && (((String)params.toArray()[0]).equals("DR"))) {
             try {
                 VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "DR");
                 return null;
@@ -1270,9 +1270,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 ParameterSet params = task.getParams();
                 // hacky: support old @SystemInformation behavior by
                 // filling in a missing selector to get the overview key/value info
-                if (params.m_params.length == 0) {
-                    params.m_params = new Object[1];
-                    params.m_params[0] = new String("OVERVIEW");
+                if (params.toArray().length == 0) {
+                    task.setParams("OVERVIEW");
                 }
                 //So that the modified version is reserialized, null out the lazy copy
                 task.serializedParams = null;
@@ -1354,16 +1353,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             partitions = m_allPartitions;
         }
 
-        task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-            @Override
-            public ParameterSet call() {
-                ParameterSet params = new ParameterSet();
-                params.m_params = new Object[] {
-                        plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                        plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0};
-                return params;
-            }
-        });
+        task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                       plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         task.clientHandle = plannedStmt.clientHandle;
 
         /*
@@ -1449,18 +1440,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // create the execution site task
                     StoredProcedureInvocation task = new StoredProcedureInvocation();
                     task.procName = "@UpdateApplicationCatalog";
-                    task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-                        @Override
-                        public ParameterSet call() {
-                            ParameterSet params = new ParameterSet();
-                            params.m_params = new Object[] {
-                                    changeResult.encodedDiffCommands, changeResult.catalogBytes,
-                                    changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                    changeResult.deploymentCRC
-                            };
-                            return params;
-                        }
-                    });
+                    task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
+                                   changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                                   changeResult.deploymentCRC);
                     task.clientHandle = changeResult.clientHandle;
 
                     /*

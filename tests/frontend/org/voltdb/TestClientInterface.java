@@ -363,7 +363,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@SystemInformation");
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "@SystemInformation", 1, false, true, false, false);
-        assertEquals("OVERVIEW", invocation.getParams().m_params[0]);
+        assertEquals("OVERVIEW", invocation.getParams().toArray()[0]);
     }
 
     /**

@@ -129,7 +129,7 @@ public class TestTwoSitePlans extends TestCase {
         for (PlanFragment f : insertStmt.getFragments())
             insertFrag = f;
         ParameterSet params = new ParameterSet();
-        params.m_params = new Object[] { 1L, 1L, 1L };
+        params.setParameters(1L, 1L, 1L);
 
         VoltTable[] results = ee2.executeQueryPlanFragmentsAndGetResults(
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) }, 1,
@@ -140,7 +140,8 @@ public class TestTwoSitePlans extends TestCase {
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
 
-        params.m_params = new Object[] { 2L, 2L, 2L };
+        params = new ParameterSet();
+        params.setParameters(2L, 2L, 2L);
 
         results = ee1.executeQueryPlanFragmentsAndGetResults(
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) }, 1,
@@ -154,7 +155,7 @@ public class TestTwoSitePlans extends TestCase {
 
     public void testMultiSiteSelectAll() {
         ParameterSet params = new ParameterSet();
-        params.m_params = new Object[] { };
+        params.setParameters();
 
         int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         VoltTable dependency1 = ee1.executePlanFragment(

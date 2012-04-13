@@ -67,7 +67,7 @@ import org.voltdb.types.VoltDecimalHelper;
 
         return o;
     }
-    Object m_params[] = new Object[0];
+    private Object m_params[] = new Object[0];
 
     /** Sets the internal array to params. Note: this does *not* copy the argument. */
     public void setParameters(Object... params) {
@@ -76,6 +76,10 @@ import org.voltdb.types.VoltDecimalHelper;
         m_serializedSize = calculateSerializedSize();
     }
 
+    /**
+     * Returns the parameters. Don't modify the returned array!
+     * @return
+     */
     public Object[] toArray() {
         return m_params;
     }
