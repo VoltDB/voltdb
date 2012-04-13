@@ -124,7 +124,7 @@ public class VoterBenchmark {
         int latencyTarget = 5;
 
         @Option(desc = "Filename to write raw summary statistics to.")
-        String stats = NULL;
+        String stats = null;
 
         @Override
         public void validate() {
