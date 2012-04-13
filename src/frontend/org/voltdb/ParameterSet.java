@@ -111,9 +111,6 @@ import org.voltdb.types.VoltDecimalHelper;
         for (int i = 0; i < paramLen; i++) {
             m_params[i] = readOneParameter(in);
         }
-
-        // encode strings and string arrays and calculate size
-        m_serializedSize = calculateSerializedSize();
     }
 
     @Override
@@ -602,6 +599,12 @@ import org.voltdb.types.VoltDecimalHelper;
     }
 
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
+        if (m_serializedSize == -1) {
+            throw new RuntimeException("Invalid use of parameter set. If the " +
+                                       "parameter set was constructed by readExternal(), " +
+                                       "writeExternal() should be used for serialization.");
+        }
+
         Iterator<byte[][]> strArrayIter = m_encodedStringArrays.iterator();
         Iterator<byte[]> strIter = m_encodedStrings.iterator();
         buf.putShort((short)m_params.length);
