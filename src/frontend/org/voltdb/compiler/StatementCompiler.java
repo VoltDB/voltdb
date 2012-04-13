@@ -101,14 +101,12 @@ public abstract class StatementCompiler {
         TrivialCostModel costModel = new TrivialCostModel();
 
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, hsql, estimates, true,
-                false);
+                catalog.getClusters().get("cluster"), db, catalogStmt.getSinglepartition(), hsql, estimates, true, false);
 
         CompiledPlan plan = null;
         try {
             plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
-                    catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(),
-                    catalogStmt.getSinglepartition(), DEFAULT_MAX_JOIN_TABLES, null);
+                    catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(), DEFAULT_MAX_JOIN_TABLES, null);
         } catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
@@ -123,6 +121,16 @@ public abstract class StatementCompiler {
             }
             throw compiler.new VoltCompilerException(msg);
         }
+
+        // Check order determinism before accessing the detail which it caches.
+        boolean orderDeterministic = plan.isOrderDeterministic();
+        catalogStmt.setIsorderdeterministic(orderDeterministic);
+        boolean contentDeterministic = plan.isContentDeterministic();
+        catalogStmt.setIscontentdeterministic(contentDeterministic);
+        String nondeterminismDetail = plan.nondeterminismDetail();
+        catalogStmt.setNondeterminismdetail(nondeterminismDetail);
+
+        catalogStmt.setSeqscancount(plan.countSeqScans());
 
         // Input Parameters
         // We will need to update the system catalogs with this new information

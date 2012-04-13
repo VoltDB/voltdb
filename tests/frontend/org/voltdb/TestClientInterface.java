@@ -298,6 +298,16 @@ public class TestClientInterface {
         assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
     }
 
+    @Test
+    public void testNegativeUpdateCatalog() throws IOException, MessagingException {
+        ByteBuffer msg = createMsg("@UpdateApplicationCatalog", new Integer(1), new Long(0));
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        // expect an error response from handleRead.
+        assertNotNull(resp);
+        assertTrue(resp.getStatus() != 0);
+    }
+
+
     /**
      * Fake a catalog diff compiler result and send it back to the CI, see if CI
      * initiates a new txn.
