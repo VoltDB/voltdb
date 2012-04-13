@@ -181,11 +181,12 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             m_pendingFaults = new ArrayDeque<VoltFault>();
         }
 
-        // Examine the known faults and the new faults
+        // Group the new faults by FaultType
         HashMap<FaultType, HashSet<VoltFault>> postFilterFaults =
             organizeNewFaults(pendingFaults);
 
         // No action if all faults were known/filtered
+        // xxx-izzy I don't think the .isEmpty() predicate is possible now
         if (postFilterFaults == null || postFilterFaults.isEmpty()) {
             return;
         }
@@ -214,8 +215,9 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
 
 
     /*
-     * Pre-process the pending faults list. Update known faults and return a
-     * map of FaultType -> fault set containing the new faults (post-filtering).
+     * Return a map of FaultType -> fault set containing the new faults
+     * Short-circuit the process if we've already triggered partition detection
+     * due to a prior set of faults
      */
     private HashMap<FaultType, HashSet<VoltFault>>
     organizeNewFaults(ArrayDeque<VoltFault> pendingFaults)
