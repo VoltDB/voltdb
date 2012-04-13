@@ -78,8 +78,8 @@ public class Pair<T, U> {
         @SuppressWarnings("unchecked")
         Pair<T, U> other = (Pair<T, U>) o;
 
-        return (m_first == null ? other.m_first == null : m_first.equals(other.m_first))
-                && (m_second == null ? other.m_second == null : m_second.equals(m_second));
+        return (m_first == null ? other.m_first == null : m_first.equals(other.m_first)) &&
+               (m_second == null ? other.m_second == null : m_second.equals(other.m_second));
     }
 
     /**

@@ -363,6 +363,13 @@ public class TestJDBCDriver {
         }
     }
 
+    public void testVersionMetadata() throws SQLException {
+        int major = conn.getMetaData().getDatabaseMajorVersion();
+        int minor = conn.getMetaData().getDatabaseMinorVersion();
+        assertTrue(major >= 2);
+        assertTrue(minor >= 0);
+    }
+
     // IMPORTANT: This must be the last test because it destroys the connection.
     @Test
     public void testLostConnection() throws SQLException {

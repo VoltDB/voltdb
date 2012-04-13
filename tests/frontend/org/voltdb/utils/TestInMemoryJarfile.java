@@ -74,7 +74,7 @@ public class TestInMemoryJarfile extends TestCase {
         File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
         String projectPath = projectFile.getPath();
         VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compile(projectPath, jarFileName, System.out, null));
+        assertTrue(compiler.compile(projectPath, jarFileName));
         return compiler.getCatalog();
     }
 

@@ -80,6 +80,7 @@ public class Fragmentizer {
 
             // disconnect the send and receive nodes
             sendNode.clearParents();
+            recvNode.cacheDeterminism();
             recvNode.clearChildren();
 
             // make a new plan fragment rooted at the send

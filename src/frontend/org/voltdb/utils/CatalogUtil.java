@@ -639,16 +639,18 @@ public abstract class CatalogUtil {
         byte[] data = null;
         try {
             data = sb.toString().getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {}
+        } catch (UnsupportedEncodingException e) {
+            hostLog.error("CRCing deployment file to determine" +
+                    " compatibility and determined deployment file is"+
+                    " not valid UTF-8. File must be UTF-8 encoded.");
+            data = new byte[]{0x0}; // should generate a CRC mismatch.
+        }
 
         CRC32 crc = new CRC32();
         crc.update(data);
 
         long retval = crc.getValue();
-        retval = Math.abs(retval);
-        if (retval < 0)
-            return 0;
-        return retval;
+        return Math.abs(retval);
     }
 
     /**

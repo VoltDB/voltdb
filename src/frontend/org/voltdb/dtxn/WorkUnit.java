@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -44,7 +45,8 @@ class WorkUnit
 {
     class DependencyTracker
     {
-        HashMap<Integer, VoltTable> m_results;
+        // needs to be a TreeMap so iterator has deterministic order
+        TreeMap<Integer, VoltTable> m_results;
         int m_depId;
         int m_expectedDeps;
         HashSet<Integer> m_expectedSites;
@@ -53,7 +55,7 @@ class WorkUnit
                           HashSet<Integer> expectedSites)
         {
             m_depId = depId;
-            m_results = new HashMap<Integer, VoltTable>();
+            m_results = new TreeMap<Integer, VoltTable>();
             m_expectedDeps = expectedDeps;
             m_expectedSites = expectedSites;
         }

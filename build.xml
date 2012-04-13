@@ -44,10 +44,9 @@
     <isset property="env.VOLTPRO"/>
 </condition>
 
-<!-- stub the voltpro classpath fileset so a fileset with this id always exists -->
-<fileset id="voltpro.classpath" file="build.xml">
-  <exclude name="build.xml"/>
-</fileset>
+<!-- stub the voltpro classpath and src.dir fileset so a fileset with this id always exists -->
+<fileset id="voltpro.classpath" file="." excludes="**"/>
+<fileset id="voltpro.src.dir" file="." excludes="**"/>
 
 <!-- import the pro build.xml if it exists and is requested -->
 <import file="${voltpro}/build.xml" optional="true"/>
@@ -1641,9 +1640,11 @@ TEST CASES
     <auxClasspath>
       <fileset dir="${lib.dir}" includes ="*.jar" />
       <fileset dir="${vendor.lib.dir}" includes="*.jar" />
-      <fileset dir="${build.test.dir}" includes="**/*.class" />
+      <pathelement location="${build.test.dir}" />
+      <fileset refid="voltpro.classpath"/>
     </auxClasspath>
     <sourcePath path="${src.gpl.dir}" />
+    <sourcePath path="${voltpro.src.dir}"/>
   </findbugs>
 </target>
 

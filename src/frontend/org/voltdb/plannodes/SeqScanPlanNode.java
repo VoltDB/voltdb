@@ -37,6 +37,16 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         return PlanNodeType.SEQSCAN;
     }
 
+    /**
+     * Accessor for flag marking the plan as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return false
+     */
+    @Override
+    public boolean isOrderDeterministic() {
+        return false; // TODO: enhance to return true for any supportable cases of in-order storage
+    }
+
     @Override
     public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         Table target = db.getTables().getIgnoreCase(m_targetTableName);

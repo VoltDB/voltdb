@@ -1068,9 +1068,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
         } else if (params.m_params[0] instanceof byte[]) {
             catalogBytes = (byte[]) params.m_params[0];
+        } else {
+            // findbugs triggers a NPE alert here... and the
+            // policy check is pretty far away from here.
+            // assert and satisfy findbugs, and the casual reader.
+            assert false : "Expected to catch invalid parameters in UpdateCatalogAcceptancePolicy.";
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
+                    " Catalog content must be passed as string or byte[].",
+                    task.clientHandle);
         }
         String deploymentString = (String) params.m_params[1];
-
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
@@ -1512,8 +1520,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_tickCounter % 20 == 0) {
             checkForDeadConnections(time);
         }
-        //System.out.printf("Sending tick after %d ms pause.\n", delta);
-        //System.out.flush();
 
         // check for catalog updates
         if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
