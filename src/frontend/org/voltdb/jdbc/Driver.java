@@ -28,8 +28,6 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.voltdb.client.exampleutils.ClientConnectionPool;
-
 public class Driver implements java.sql.Driver
 {
     //Driver URL prefix.
@@ -85,7 +83,7 @@ public class Driver implements java.sql.Driver
                     }
 
                     // Return JDBC connection wrapper for the client
-                    return new JDBC4Connection(ClientConnectionPool.get(servers,port,user,password,heavyweight,maxoutstandingtxns), user);
+                    return new JDBC4Connection(JDBC4ClientConnectionPool.get(servers,port,user,password,heavyweight,maxoutstandingtxns), user);
                 }
             }
             catch(Exception x)

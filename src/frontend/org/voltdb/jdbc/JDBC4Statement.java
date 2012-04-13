@@ -17,6 +17,7 @@
 
 package org.voltdb.jdbc;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.BatchUpdateException;
 import java.sql.Connection;
@@ -35,7 +36,8 @@ import java.util.regex.Pattern;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.client.exampleutils.ClientConnection;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 
 public class JDBC4Statement implements java.sql.Statement
 {
@@ -90,7 +92,7 @@ public class JDBC4Statement implements java.sql.Statement
             return false;
         }
 
-        protected VoltTable[] execute(ClientConnection connection) throws SQLException
+        protected VoltTable[] execute(JDBC4ClientConnection connection) throws SQLException
         {
             try
             {
@@ -99,9 +101,35 @@ public class JDBC4Statement implements java.sql.Statement
                 else
                     return connection.execute("@AdHoc", this.sql[0]).getResults();
             }
-            catch(Exception x)
+            catch(ProcCallException e)
             {
-                throw SQLError.get(x, SQLError.GENERAL_ERROR);
+                ClientResponse response = e.getClientResponse();
+                if (response != null) {
+                    // Map response status to specific JDBC exception, mostly GENERAL_ERROR except
+                    // for connection problems.
+                    switch (response.getStatus()) {
+                    case ClientResponse.CONNECTION_LOST:
+                        throw SQLError.get(e, SQLError.CONNECTION_CLOSED, "CONNECTION_LOST", e.getMessage());
+                    case ClientResponse.CONNECTION_TIMEOUT:
+                        throw SQLError.get(e, SQLError.CONNECTION_FAILURE, "CONNECTION_TIMEOUT", e.getMessage());
+                    case ClientResponse.SERVER_UNAVAILABLE:
+                        throw SQLError.get(e, SQLError.CONNECTION_FAILURE, "CONNECTION_UNAVAILABLE", e.getMessage());
+                    case ClientResponse.USER_ABORT:
+                        throw SQLError.get(e, SQLError.GENERAL_ERROR, "USER_ABORT", e.getMessage());
+                    case ClientResponse.UNEXPECTED_FAILURE:
+                        throw SQLError.get(e, SQLError.GENERAL_ERROR, "UNEXPECTED_FAILURE", e.getMessage());
+                    case ClientResponse.GRACEFUL_FAILURE:
+                        throw SQLError.get(e, SQLError.GENERAL_ERROR, "GRACEFUL_FAILURE", e.getMessage());
+                    default:
+                        throw SQLError.get(e, SQLError.GENERAL_ERROR, String.format("status=%d", (int)response.getStatus()), e.getMessage());
+                    }
+                } else {
+                    throw SQLError.get(e, SQLError.GENERAL_ERROR, e.getMessage());
+                }
+            }
+            catch(IOException e)
+            {
+                throw SQLError.get(e, SQLError.CONNECTION_FAILURE, e.getMessage());
             }
         }
 
@@ -200,12 +228,12 @@ public class JDBC4Statement implements java.sql.Statement
         private static final Pattern IsInsert = Pattern.compile("^insert\\s.+", Pattern.CASE_INSENSITIVE);
         private static final Pattern IsUpdate = Pattern.compile("^update\\s.+", Pattern.CASE_INSENSITIVE);
         private static final Pattern IsDelete = Pattern.compile("^delete\\s.+", Pattern.CASE_INSENSITIVE);
-        public static VoltSQL parseSQL(String query) throws SQLException
+        public static VoltSQL parseSQL(String queryIn) throws SQLException
         {
-            if (query == null || query.length() == 0)
+            if (queryIn == null || queryIn.length() == 0)
                 throw SQLError.get(SQLError.ILLEGAL_STATEMENT);
 
-            query = SingleLineComments.matcher(query).replaceAll("");
+            String query = SingleLineComments.matcher(queryIn).replaceAll("");
             query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
             Matcher stringFragmentMatcher = Extract.matcher(query);
             ArrayList<String> stringFragments = new ArrayList<String>();
@@ -321,7 +349,7 @@ public class JDBC4Statement implements java.sql.Statement
     {
         if (this.openResults != null)
         {
-            for (Iterator iter = this.openResults.iterator(); iter.hasNext();)
+            for (Iterator<JDBC4ResultSet> iter = this.openResults.iterator(); iter.hasNext();)
             {
                 JDBC4ResultSet element = (JDBC4ResultSet)iter.next();
 
@@ -388,22 +416,15 @@ public class JDBC4Statement implements java.sql.Statement
     protected boolean execute(VoltSQL query) throws SQLException
     {
         checkClosed();
-        try
+        if (query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
         {
-            if (query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
-            {
-                setCurrentResult(query.execute(sourceConnection.NativeConnection), -1);
-                return true;
-            }
-            else
-            {
-                setCurrentResult(null, (int)query.execute(sourceConnection.NativeConnection)[0].fetchRow(0).getLong(0));
-                return false;
-            }
+            setCurrentResult(query.execute(this.sourceConnection.NativeConnection), -1);
+            return true;
         }
-        catch(Exception x)
+        else
         {
-            throw SQLError.get(x);
+            setCurrentResult(null, (int)query.execute(this.sourceConnection.NativeConnection)[0].fetchRow(0).getLong(0));
+            return false;
         }
     }
 
@@ -459,7 +480,7 @@ public class JDBC4Statement implements java.sql.Statement
                 setCurrentResult(null, (int)batch.get(i).execute(sourceConnection.NativeConnection)[0].fetchRow(0).getLong(0));
                 updateCounts[i] = this.lastUpdateCount;
             }
-            catch(Exception x)
+            catch(SQLException x)
             {
                 updateCounts[i] = EXECUTE_FAILED;
                 throw new BatchUpdateException(Arrays.copyOf(updateCounts, i+1), x);
@@ -470,15 +491,8 @@ public class JDBC4Statement implements java.sql.Statement
 
     protected ResultSet executeQuery(VoltSQL query) throws SQLException
     {
-        try
-        {
-            setCurrentResult(query.execute(sourceConnection.NativeConnection), -1);
-            return this.result;
-        }
-        catch(Exception x)
-        {
-            throw SQLError.get(x);
-        }
+        setCurrentResult(query.execute(this.sourceConnection.NativeConnection), -1);
+        return this.result;
     }
 
     // Executes the given SQL statement, which returns a single ResultSet object.
@@ -494,15 +508,8 @@ public class JDBC4Statement implements java.sql.Statement
 
     protected int executeUpdate(VoltSQL query) throws SQLException
     {
-        try
-        {
-            setCurrentResult(null, (int)query.execute(sourceConnection.NativeConnection)[0].fetchRow(0).getLong(0));
-            return this.lastUpdateCount;
-        }
-        catch(Exception x)
-        {
-            throw SQLError.get(x);
-        }
+        setCurrentResult(null, (int)query.execute(this.sourceConnection.NativeConnection)[0].fetchRow(0).getLong(0));
+        return this.lastUpdateCount;
     }
 
     // Executes the given SQL statement, which may be an INSERT, UPDATE, or DELETE statement or an SQL statement that returns nothing, such as an SQL DDL statement.
