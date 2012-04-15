@@ -109,6 +109,8 @@ class AbstractExecutor {
 
     // cache to avoid runtime virtual function call
     bool needs_outputtable_clear_cached;
+    
+    //@TODO pullexec prototype
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
