@@ -54,7 +54,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
      * This ByteBuffer is accessed from multiple threads concurrently.
      * Always duplicate it before reading
      */
-    ByteBuffer serializedParams = null;
+    private ByteBuffer serializedParams = null;
 
     FutureTask<ParameterSet> params;
 

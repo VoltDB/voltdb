@@ -1273,8 +1273,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (params.toArray().length == 0) {
                     task.setParams("OVERVIEW");
                 }
-                //So that the modified version is reserialized, null out the lazy copy
-                task.serializedParams = null;
             }
 
             // the shared dispatch for sysprocs
