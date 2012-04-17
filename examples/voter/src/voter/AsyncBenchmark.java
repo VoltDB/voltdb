@@ -99,7 +99,7 @@ public class AsyncBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 30;
+        int duration = 120;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 5;
@@ -110,8 +110,8 @@ public class AsyncBenchmark {
         @Option(desc = "Number of contestants in the voting contest (from 1 to 10).")
         int contestants = 6;
 
-        @Option(desc = "Interval for performance feedback, in seconds.")
-        int maxvotes = 10;
+        @Option(desc = "Maximum number of votes cast per voter.")
+        int maxvotes = 2;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = 100000;
@@ -128,12 +128,12 @@ public class AsyncBenchmark {
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (duration < 0) exitWithMessageAndUsage("warmup must be >= 0");
-            if (displayinterval <= 0) exitWithMessageAndUsage("display-interval must be > 0");
+            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
-            if (maxvotes <= 0) exitWithMessageAndUsage("max-votes must be > 0");
-            if (ratelimit <= 0) exitWithMessageAndUsage("rate-limit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latency-target must be > 0");
+            if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
+            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
+            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
         }
     }
 
@@ -145,33 +145,6 @@ public class AsyncBenchmark {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-        }
-    }
-
-    /**
-     * Callback to handle the response to a stored procedure call.
-     * Tracks response types.
-     *
-     */
-    class VoterCallback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            if (response.getStatus() == ClientResponse.SUCCESS) {
-                long resultCode = response.getResults()[0].asScalarLong();
-                if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
-                    badContestantVotes.incrementAndGet();
-                }
-                else if (resultCode == Vote.ERR_VOTER_OVER_VOTE_LIMIT) {
-                    badVoteCountVotes.incrementAndGet();
-                }
-                else {
-                    assert(resultCode == Vote.VOTE_SUCCESSFUL);
-                    acceptedVotes.incrementAndGet();
-                }
-            }
-            else {
-                failedVotes.incrementAndGet();
-            }
         }
     }
 
@@ -332,6 +305,33 @@ public class AsyncBenchmark {
         // 4. Write stats to file if requested
         if (config.stats.length() > 0) {
             client.writeSummaryCSV(config.stats);
+        }
+    }
+
+    /**
+     * Callback to handle the response to a stored procedure call.
+     * Tracks response types.
+     *
+     */
+    class VoterCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            if (response.getStatus() == ClientResponse.SUCCESS) {
+                long resultCode = response.getResults()[0].asScalarLong();
+                if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
+                    badContestantVotes.incrementAndGet();
+                }
+                else if (resultCode == Vote.ERR_VOTER_OVER_VOTE_LIMIT) {
+                    badVoteCountVotes.incrementAndGet();
+                }
+                else {
+                    assert(resultCode == Vote.VOTE_SUCCESSFUL);
+                    acceptedVotes.incrementAndGet();
+                }
+            }
+            else {
+                failedVotes.incrementAndGet();
+            }
         }
     }
 
