@@ -56,15 +56,16 @@ function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
-        --display-interval=5 \
+        --displayinterval=5 \
+        --warmup=5 \
         --duration=120 \
-        --servers=localhost \
-        --port=21212 \
+        --servers=localhost:21212 \
         --contestants=6 \
-        --max-votes=2 \
-        --rate-limit=100000 \
-        --auto-tune=true \
-        --latency-target=10.0
+        --maxvotes=2 \
+        --ratelimit=100000 \
+        --autotune=true \
+        --latencytarget=6 \
+        --stats=stats.csv
 }
 
 # Multi-threaded synchronous benchmark sample

@@ -1,27 +1,21 @@
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2012 VoltDB Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package voter;
+package org.voltdb;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -34,10 +28,11 @@ import java.util.TreeMap;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.commons.cli.PosixParser;
 
-public abstract class Configuration {
+public abstract class CLIConfig {
 
     @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
     @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
@@ -50,15 +45,22 @@ public abstract class Configuration {
 
     // Apache Commons CLI API - requires JAR
     protected final Options options = new Options();
+    protected String cmdName = "command";
 
     protected String configDump;
+    protected String usage;
 
     public void exitWithMessageAndUsage(String msg) {
+        System.err.println(msg);
+        printUsage();
         System.exit(-1);
     }
 
     public void printUsage() {
-
+        // automatically generate the help statement
+        HelpFormatter formatter = new HelpFormatter();
+        formatter.setOptPrefix("--");
+        formatter.printHelp(cmdName, options, false);
     }
 
     private void assignValueToField(Field field, String value) throws Exception {
@@ -66,7 +68,8 @@ public abstract class Configuration {
             return;
         }
 
-        Class<?> cls = field.getClass();
+        field.setAccessible(true);
+        Class<?> cls = field.getType();
 
         if ((cls == boolean.class) || (cls == Boolean.class))
             field.set(this, Boolean.parseBoolean(value));
@@ -88,8 +91,13 @@ public abstract class Configuration {
             assert(false);
     }
 
-    public void parse(String[] args) {
+    public void parse(String cmdName, String[] args) {
+        this.cmdName = cmdName;
+
         try {
+            options.addOption("help", false, "Print this message");
+
+            // add all of the declared options to the cli
             for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class) == false) {
                     continue;
@@ -98,13 +106,20 @@ public abstract class Configuration {
                 Option option = field.getAnnotation(Option.class);
 
                 String opt = option.opt();
-                if (opt == null) opt = field.getName();
+                if ((opt == null) || (opt.trim().length() == 0)) {
+                    opt = field.getName();
+                }
 
                 options.addOption(opt, option.hasArg(), option.desc());
             }
 
-            CommandLineParser parser = new GnuParser();
+            CommandLineParser parser = new PosixParser();
             CommandLine cmd = parser.parse(options, args);
+
+            if (cmd.hasOption("help")) {
+                printUsage();
+                System.exit(0);
+            }
 
             // string key-value pairs
             Map<String, String> kvMap = new TreeMap<String, String>();
@@ -144,6 +159,7 @@ public abstract class Configuration {
                     }
                 }
 
+                field.setAccessible(true);
                 kvMap.put(opt, field.get(this).toString());
             }
 
@@ -162,6 +178,7 @@ public abstract class Configuration {
         catch (Exception e) {
             System.err.println("Parsing failed. Reason: " + e.getMessage());
             printUsage();
+            System.exit(-1);
         }
     }
 
