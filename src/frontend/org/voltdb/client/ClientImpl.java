@@ -29,6 +29,7 @@ import java.util.logging.Logger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.MiscUtils;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -486,7 +487,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        createConnectionWithHashedCredentials( host, Client.VOLTDB_SERVER_PORT, m_username, m_passwordHash);
+        int port = MiscUtils.getPortFromHostnameColonPort(host, Client.VOLTDB_SERVER_PORT);
+        host = MiscUtils.getHostnameFromHostnameColonPort(host);
+        createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
     }
 
     @Override
@@ -495,7 +498,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        createConnectionWithHashedCredentials( host, port, m_username, m_passwordHash);
+        createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
     }
 
     @Override

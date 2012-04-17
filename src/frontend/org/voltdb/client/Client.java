@@ -76,7 +76,8 @@ public interface Client {
 
     /**
      * Create a connection to another VoltDB node.
-     * @param host Hostname or IP address of the host to connect to.
+     * @param host Hostname or IP address of the host to connect to including
+     * optional port int hostname:port format.
      * @throws UnknownHostException
      * @throws IOException
      */
