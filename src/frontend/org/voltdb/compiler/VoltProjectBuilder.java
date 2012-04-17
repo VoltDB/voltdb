@@ -611,8 +611,11 @@ public class VoltProjectBuilder {
         final File projectFile =
             writeStringToTempFile(result.getWriter().toString());
         final String projectPath = projectFile.getPath();
-
-        boolean success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides);
+        compiler.setProcInfoOverrides(m_procInfoOverrides);
+        boolean success = compiler.compile(projectPath, jarPath);
+        if (success && m_compilerDebugPrintStream != null) {
+            compiler.summarizeSuccess(m_compilerDebugPrintStream);
+        }
         try {
             m_pathToDeployment = writeDeploymentFile(
                     hostCount, sitesPerHost,

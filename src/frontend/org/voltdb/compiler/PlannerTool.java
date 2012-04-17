@@ -107,12 +107,10 @@ public class PlannerTool {
 
         TrivialCostModel costModel = new TrivialCostModel();
         QueryPlanner planner = new QueryPlanner(
-                m_context.cluster, m_context.database, m_hsql, new DatabaseEstimates(), false, true);
+                m_context.cluster, m_context.database, singlePartition, m_hsql, new DatabaseEstimates(), false, true);
         CompiledPlan plan = null;
         try {
-            plan = planner.compilePlan(
-                    costModel, sql, null, "PlannerTool", "PlannerToolProc",
-                    singlePartition, AD_HOC_JOINED_TABLE_LIMIT, null);
+            plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
         } catch (Exception e) {
             throw new RuntimeException("Error creating planner: " + e.getMessage(), e);
         }
@@ -127,6 +125,14 @@ public class PlannerTool {
         }
         if (plan.parameters.size() > 0) {
             throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
+        }
+
+        if (plan.isContentDeterministic() == false) {
+            String potentialErrMsg =
+                "Statement has a non-deterministic result - statement: \"" +
+                sql + "\" , reason: " + plan.nondeterminismDetail();
+            // throw new RuntimeException(potentialErrMsg);
+            hostLog.warn(potentialErrMsg);
         }
 
         //log("finished planning stmt:");

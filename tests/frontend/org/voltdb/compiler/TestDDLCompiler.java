@@ -185,7 +185,7 @@ public class TestDDLCompiler extends TestCase {
 
         // compile successfully (but with two warnings hopefully)
         VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compile(projectPath, jarOut.getPath(), System.out, null);
+        boolean success = compiler.compile(projectPath, jarOut.getPath());
         assertTrue(success);
 
         // verify the warnings exist
@@ -217,7 +217,7 @@ public class TestDDLCompiler extends TestCase {
         //compiler = new VoltCompiler();
 
         // compile successfully with no warnings
-        success = compiler.compile(projectPath, jarOut.getPath(), System.out, null);
+        success = compiler.compile(projectPath, jarOut.getPath());
         assertTrue(success);
 
         // verify no warnings

@@ -43,7 +43,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         projectFile.deleteOnExit();
         final String projectPath = projectFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
+        boolean success = compiler.compile(projectPath, testout_jar);
         assertTrue("Catalog compile failed!", success);
         return compiler;
     }

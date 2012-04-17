@@ -73,7 +73,7 @@ public class TestVerbotenPlans extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar");
 
         assertFalse(success);
     }

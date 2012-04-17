@@ -61,6 +61,10 @@ public class PlannerTestAideDeCamp {
     private final Database db;
     int compileCounter = 0;
 
+    private Statement m_currentCatalogStmt = null;
+    private CompiledPlan m_currentPlan = null;
+    private List<AbstractPlanNode> m_planNodes = null;
+
     /**
      * Loads the schema at ddlurl and setups a voltcompiler / hsql instance.
      * @param ddlurl URL to the schema/ddl file.
@@ -95,6 +99,17 @@ public class PlannerTestAideDeCamp {
         return catalog;
     }
 
+    /**
+     * Compile a statement and return the head of the plan.
+     * @param sql
+     * @param paramCount
+     */
+    public CompiledPlan compilePlan(String sql, int paramCount, boolean singlePartition, String joinOrder)
+    {
+        compile(sql, paramCount, singlePartition, joinOrder);
+        return m_currentPlan;
+    }
+
     public List<AbstractPlanNode> compile(String sql, int paramCount)
     {
         return compile(sql, paramCount, false);
@@ -103,8 +118,9 @@ public class PlannerTestAideDeCamp {
     public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {
         return compile(sql, paramCount, singlePartition, null);
     }
+
     /**
-     * Compile a statement and return the final plan graph.
+     * Compile and cache the statement and plan and return the final plan graph.
      * @param sql
      * @param paramCount
      */
@@ -138,12 +154,12 @@ public class PlannerTestAideDeCamp {
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
         QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, hsql,
-                             estimates, true, false);
+            new QueryPlanner(catalog.getClusters().get("cluster"), db, catalogStmt.getSinglepartition(),
+                             hsql, estimates, true, false);
 
         CompiledPlan plan = null;
         plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(), catalogStmt.getSinglepartition(),
+                                   catalogStmt.getParent().getTypeName(),
                                    StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
 
         if (plan == null)
@@ -228,6 +244,9 @@ public class PlannerTestAideDeCamp {
             plannodes.add(nodeList.getRootPlanNode());
         }
 
+        m_currentCatalogStmt = catalogStmt;
+        m_currentPlan = plan;
+        m_planNodes = plannodes;
         return plannodes;
     }
 
