@@ -80,12 +80,13 @@ function sync-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.SyncBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
+        --warmup=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
         --contestants=6 \
-        --max-votes=2
+        --maxvotes=2
 }
 
 # JDBC benchmark sample
@@ -100,12 +101,13 @@ function jdbc-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.JDBCBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
+        --warmup=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
         --contestants=6 \
-        --max-votes=2
+        --maxvotes=2
 }
 
 function help() {
