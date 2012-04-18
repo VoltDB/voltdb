@@ -22,6 +22,8 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.voltcore.utils.CoreUtils;
+
 public class FailureSiteUpdateMessage extends VoltMessage {
 
     /** Site id of the failed sites */
@@ -102,7 +104,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         sb.append((int)m_sourceHSId).append(" SITE ").append((int)(m_sourceHSId >> 32));
         sb.append(" for failed hosts: ");
         for (Long hsId : m_failedHSIds) {
-            sb.append(hsId.intValue()).append(':').append((hsId.intValue() >> 32)).append(' ');
+            sb.append(CoreUtils.hsIdToString(hsId)).append(' ');
         }
         sb.append(" initiator for safe txn:").
         append((int)m_initiatorForSafeTxnId).append(':').append((int)(m_initiatorForSafeTxnId >> 32));
