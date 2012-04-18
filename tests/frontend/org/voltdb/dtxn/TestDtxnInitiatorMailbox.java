@@ -248,7 +248,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void setUp()
     {
         m_mockVolt = new MockVoltDB();
-        m_mockVolt.shouldIgnoreCrashes = true;
+        VoltDB.crashMessage = null;
+        VoltDB.wasCrashCalled = false;
+        VoltDB.ignoreCrash = true;
         m_mockVolt.addHost(HOST_ID);
         m_mockVolt.addPartition(0);
         m_mockVolt.addSite(1, HOST_ID, 0, true);

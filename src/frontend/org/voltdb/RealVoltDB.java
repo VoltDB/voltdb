@@ -1672,11 +1672,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public boolean ignoreCrash() {
-        return false;
-    }
-
-    @Override
     public Object[] getInstanceId() {
         return m_instanceId;
     }
