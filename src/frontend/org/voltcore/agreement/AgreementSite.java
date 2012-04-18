@@ -653,16 +653,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                  * since recovery of this node began.
                  */
                 Long txnId = m_txnQueue.getNewestSafeTransactionForInitiator(site);
-                if (txnId != null) {
-                    FailureSiteUpdateMessage srcmsg =
-                        new FailureSiteUpdateMessage(
-                                m_pendingFailedSites,
-                                site,
-                                txnId != null ? txnId : Long.MIN_VALUE,
-                                        site);
+                FailureSiteUpdateMessage srcmsg =
+                    new FailureSiteUpdateMessage(m_pendingFailedSites,
+                                                 site,
+                                                 txnId != null ? txnId : Long.MIN_VALUE,
+                                                 site);
 
-                    m_mailbox.send(survivors, srcmsg);
-                }
+                m_mailbox.send(survivors, srcmsg);
             }
         }
         catch (MessagingException e) {
