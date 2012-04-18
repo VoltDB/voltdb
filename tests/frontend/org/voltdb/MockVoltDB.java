@@ -70,7 +70,6 @@ public class MockVoltDB implements VoltDBInterface
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
-    int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = new HostMessenger() {
         @Override
@@ -105,7 +104,6 @@ public class MockVoltDB implements VoltDBInterface
     final AgreementSite m_agreementSite;
     private final ZooKeeper m_zk;
     boolean m_noLoadLib = false;
-    public boolean shouldIgnoreCrashes = false;
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     VoltDB.Configuration voltconfig = null;
@@ -270,10 +268,6 @@ public class MockVoltDB implements VoltDBInterface
         return m_catalog.getClusters().get(m_clusterName);
     }
 
-    public int getCrashCount() {
-        return m_howManyCrashes;
-    }
-
     public Database getDatabase()
     {
         return getCluster().getDatabases().get(m_databaseName);
@@ -409,17 +403,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean ignoreCrash()
-    {
-        if (shouldIgnoreCrashes) {
-            m_howManyCrashes++;
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    @Override
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
@@ -444,6 +427,8 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void shutdown(Thread mainSiteThread) throws InterruptedException
     {
+        VoltDB.wasCrashCalled = false;
+        VoltDB.crashMessage = null;
         m_snapshotCompletionMonitor.shutdown();
         m_zk.close();
         m_es.shutdown();
