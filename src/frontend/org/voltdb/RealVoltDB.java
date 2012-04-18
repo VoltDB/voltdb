@@ -382,8 +382,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 // This will set up site tracker
                 initiatorHSId = registerInitiatorMailbox();
                 final long statsHSId = m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
-                m_messenger.generateMailboxId(m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
-                System.out.println("Registering stats mailbox id " + m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
+                m_messenger.generateMailboxId(statsHSId);
+                System.out.println("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
                 m_mailboxPublisher.publish(m_messenger.getZK());
