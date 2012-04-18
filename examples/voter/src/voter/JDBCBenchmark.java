@@ -154,30 +154,7 @@ public class JDBCBenchmark
             VoterConfig config = new VoterConfig();
             config.parse(JDBCBenchmark.class.getName(), args);
 
-            // Retrieve parameters
-            /*int threadCount      = apph.intValue("threads");
-            long displayInterval = apph.longValue("display-interval");
-            long duration        = apph.longValue("duration");
-            String servers       = apph.stringValue("servers");
-            int port             = apph.intValue("port");
-            int contestantCount  = apph.intValue("contestants");
-            int maxVoteCount     = apph.intValue("max-votes");
-            final String csv     = apph.stringValue("stats");
-
-            // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("threads", (threadCount > 0))
-                .validate("contestants", (contestantCount > 0))
-                .validate("max-votes", (maxVoteCount > 0))
-            ;
-
-            // Display actual parameters, for reference
-            apph.printActualUsage();*/
-
             System.out.println(config.getConfigDumpString());
-
-
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 

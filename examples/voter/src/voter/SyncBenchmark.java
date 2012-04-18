@@ -74,7 +74,8 @@ public class SyncBenchmark {
     Timer timer;
     // Benchmark start time
     long benchmarkStartTS;
-    // Flag to tell the worker threads to stop or go
+    // Flags to tell the worker threads to stop or go
+    AtomicBoolean warmupComplete = new AtomicBoolean(false);
     AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
 
     // voter benchmark state
@@ -298,6 +299,18 @@ public class SyncBenchmark {
 
         @Override
         public void run() {
+            while (warmupComplete.get() == false) {
+                // Get the next phone call
+                PhoneCallGenerator.PhoneCall call = switchboard.receive();
+
+                // synchronously call the "Vote" procedure
+                try {
+                    client.callProcedure("Vote", call.phoneNumber,
+                            call.contestantNumber, config.maxvotes);
+                }
+                catch (Exception e) {}
+            }
+
             while (benchmarkComplete.get() == false) {
                 // Get the next phone call
                 PhoneCallGenerator.PhoneCall call = switchboard.receive();
@@ -362,6 +375,9 @@ public class SyncBenchmark {
         // Run the benchmark loop for the requested warmup time
         System.out.println("Warming up...");
         Thread.sleep(1000l * config.warmup);
+
+        // signal to threads to end the warmup phase
+        warmupComplete.set(true);
 
         // reset the stats after warmup
         client.resetGlobalStats();

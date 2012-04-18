@@ -56,21 +56,20 @@ function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.AsyncBenchmark \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --preload=true \
-        --get-put-ratio=0.90 \
-        --key-size=32 \
-        --min-value-size=1024 \
-        --max-value-size=1024 \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
         --entropy=127 \
-        --use-compression=false \
-        --rate-limit=100000 \
-        --auto-tune=true \
-        --latency-target=10.0
+        --usecompression=false \
+        --ratelimit=100000 \
+        --autotune=true \
+        --latencytarget=6.0
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -85,17 +84,16 @@ function sync-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.SyncBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --preload=true \
-        --get-put-ratio=0.90 \
-        --key-size=32 \
-        --min-value-size=1024 \
-        --max-value-size=1024 \
-        --use-compression=false
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false
 }
 
 # JDBC benchmark sample
@@ -110,17 +108,16 @@ function jdbc-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.JDBCBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --preload=true \
-        --get-put-ratio=0.90 \
-        --key-size=32 \
-        --min-value-size=1024 \
-        --max-value-size=1024 \
-        --use-compression=false
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvalue-size=1024 \
+        --maxvalue-size=1024 \
+        --usecompression=false
 }
 
 function help() {

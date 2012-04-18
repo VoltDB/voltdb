@@ -53,6 +53,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 
 import voter.procedures.Vote;
@@ -76,8 +77,6 @@ public class AsyncBenchmark {
     final Client client;
     // Phone number generator
     PhoneCallGenerator switchboard;
-    // Callback for asynchronous "Vote" procedure calls
-    VoterCallback callback = new VoterCallback();
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
@@ -366,7 +365,7 @@ public class AsyncBenchmark {
             PhoneCallGenerator.PhoneCall call = switchboard.receive();
 
             // asynchronously call the "Vote" procedure
-            client.callProcedure(callback,
+            client.callProcedure(new NullCallback(),
                                  "Vote",
                                  call.phoneNumber,
                                  call.contestantNumber,
@@ -389,7 +388,7 @@ public class AsyncBenchmark {
             PhoneCallGenerator.PhoneCall call = switchboard.receive();
 
             // asynchronously call the "Vote" procedure
-            client.callProcedure(callback,
+            client.callProcedure(new VoterCallback(),
                                  "Vote",
                                  call.phoneNumber,
                                  call.contestantNumber,

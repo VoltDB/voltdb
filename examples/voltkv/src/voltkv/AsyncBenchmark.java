@@ -37,286 +37,473 @@
  * part of your pre-launch evalution so you can adequately provision your
  * VoltDB cluster with the number of servers required for your needs.
  */
+
 package voltkv;
 
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 
-import org.voltdb.client.exampleutils.AppHelper;
-import org.voltdb.client.exampleutils.ClientConnection;
-import org.voltdb.client.exampleutils.ClientConnectionPool;
-import org.voltdb.client.exampleutils.IRateLimiter;
-import org.voltdb.client.exampleutils.LatencyLimiter;
-import org.voltdb.client.exampleutils.RateLimiter;
+public class AsyncBenchmark {
 
-public class AsyncBenchmark
-{
-    // Initialize some common constants and variables
-    private static final AtomicLongArray GetStoreResults = new AtomicLongArray(2);
-    private static final AtomicLongArray GetCompressionResults = new AtomicLongArray(2);
-    private static final AtomicLongArray PutStoreResults = new AtomicLongArray(2);
-    private static final AtomicLongArray PutCompressionResults = new AtomicLongArray(2);
+    // handy, rather than typing this out several times
+    static final String HORIZONTAL_RULE =
+            "-------------------------------------------" +
+            "------------------------------------------\n";
 
+    // validated command line configuration
+    final KVConfig config;
     // Reference to the database connection we will use
-    private static ClientConnection Con;
+    final Client client;
+    // Timer for periodic stats printing
+    Timer timer;
+    // Benchmark start time
+    long benchmarkStartTS;
+    // Get a payload generator to create random Key-Value pairs to store in the database
+    //  and process (uncompress) pairs retrieved from the database.
+    final PayloadProcessor processor;
+    // random number generator with constant seed
+    final Random rand = new Random(0);
 
-    // Application entry point
-    public static void main(String[] args)
-    {
-        try
-        {
+    // kv benchmark state
+    final AtomicLong successfulGets = new AtomicLong(0);
+    final AtomicLong missedGets = new AtomicLong(0);
+    final AtomicLong failedGets = new AtomicLong(0);
+    final AtomicLong rawGetData = new AtomicLong(0);
+    final AtomicLong networkGetData = new AtomicLong(0);
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+    final AtomicLong successfulPuts = new AtomicLong(0);
+    final AtomicLong failedPuts = new AtomicLong(0);
+    final AtomicLong rawPutData = new AtomicLong(0);
+    final AtomicLong networkPutData = new AtomicLong(0);
 
-            // Use the AppHelper utility class to retrieve command line application parameters
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class KVConfig extends CLIConfig {
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        long displayinterval = 5;
 
-            // Define parameters and pull from command line
-            AppHelper apph = new AppHelper(AsyncBenchmark.class.getCanonicalName())
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
-                .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
-                .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
-                .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("pool-size", "pool_size", "Size of the pool of keys to work with (10,00, 10,000, 100,000 items, etc.).", 100000)
-                .add("preload", "preload", "Whether the data store should be initialized with default values before the benchmark is run (true|false).", true)
-                .add("get-put-ratio", "get_put_ratio", "Ratio of GET versus PUT operations: 1.0 => 100% GETs; 0.0 => 0% GETs; 0.95 => 95% GETs, 5% PUTs. Value between 0 and 1", 0.95)
-                .add("key-size", "key_size", "Size of the keys in number of characters. Max: 250", 50)
-                .add("min-value-size", "min_value_size", "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576", 1000)
-                .add("max-value-size", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
-                .add("entropy", "entropy", "How compressible the payload should be, lower is more compressible", 127)
-                .add("use-compression", "use_compression", "Whether value blobs should be compressed (GZip) for storage in the database (true|false).", false)
-                .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
-                .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
-                .setArguments(args)
-            ;
+        @Option(desc = "Benchmark duration, in seconds.")
+        int duration = 120;
 
-            // Retrieve parameters
-            long displayInterval   = apph.longValue("display-interval");
-            long duration          = apph.longValue("duration");
-            String servers         = apph.stringValue("servers");
-            int port               = apph.intValue("port");
-            double getPutRatio     = apph.doubleValue("get-put-ratio");
-            int poolSize           = apph.intValue("pool-size");
-            boolean preload        = apph.booleanValue("preload");
-            int keySize            = apph.intValue("key-size");
-            int minValueSize       = apph.intValue("min-value-size");
-            int maxValueSize       = apph.intValue("max-value-size");
-            boolean useCompression = apph.booleanValue("use-compression");
-            long rateLimit         = apph.longValue("rate-limit");
-            boolean autoTune       = apph.booleanValue("auto-tune");
-            double latencyTarget   = apph.doubleValue("latency-target");
-            final String csv       = apph.stringValue("stats");
-            final int entropy      = apph.intValue("entropy");
+        @Option(desc = "Warmup duration in seconds.")
+        int warmup = 5;
 
-            // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("pool-size", (poolSize > 0))
-                .validate("get-put-ratio", (getPutRatio >= 0) && (getPutRatio <= 1))
-                .validate("key-size", (keySize > 0) && (keySize < 251))
-                .validate("min-value-size", (minValueSize > 0) && (minValueSize < 1048576))
-                .validate("max-value-size", (maxValueSize > 0) && (maxValueSize < 1048576) && (maxValueSize >= minValueSize))
-                .validate("rate-limit", (rateLimit > 0))
-                .validate("latency-target", (latencyTarget > 0))
-            ;
+        @Option(desc = "Comma separated list of the form server[:port] to connect to.")
+        String servers = "localhost";
 
-            // Display actual parameters, for reference
-            apph.printActualUsage();
+        @Option(desc = "Number of keys to preload.")
+        int poolsize = 100000;
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+        @Option(desc = "Whether to preload a specified number of keys and values.")
+        boolean preload = true;
 
-            // Get a client connection - we retry for a while in case the server hasn't started yet
-            Con = ClientConnectionPool.getWithRetry(servers, port);
+        @Option(desc = "Fraction of ops that are gets (vs puts).")
+        double getputratio = 0.90;
 
-            // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
-            final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, entropy, poolSize, useCompression);
+        @Option(desc = "Size of keys in bytes.")
+        int keysize = 32;
 
-            // Initialize the store
-            if (preload)
-            {
-                System.out.print("Initializing data store... ");
-                for(int i=0;i<poolSize;i++) {
-                    Con.executeAsync(
-                            new NullCallback(),
-                            "Put",
-                            String.format(processor.KeyFormat, i),
-                            processor.generateForStore().getStoreValue());
-                }
-                Con.drain();
-                System.out.println(" Done.");
+        @Option(desc = "Minimum value size in bytes.")
+        int minvaluesize = 1024;
+
+        @Option(desc = "Maximum value size in bytes.")
+        int maxvaluesize = 1024;
+
+        @Option(desc = "Number of values considered for each value byte.")
+        int entropy = 127;
+
+        @Option(desc = "Compress values on the client side.")
+        boolean usecompression= false;
+
+        @Option(desc = "Maximum TPS rate for benchmark.")
+        int ratelimit = 100000;
+
+        @Option(desc = "Determine transaction rate dynamically based on latency.")
+        boolean autotune = true;
+
+        @Option(desc = "Server-side latency target for auto-tuning.")
+        int latencytarget = 5;
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String stats = "";
+
+        @Override
+        public void validate() {
+            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (poolsize <= 0) exitWithMessageAndUsage("poolsize must be > 0");
+            if (getputratio < 0) exitWithMessageAndUsage("getputratio must be >= 0");
+            if (getputratio > 1) exitWithMessageAndUsage("getputratio must be <= 1");
+
+            if (keysize <= 0) exitWithMessageAndUsage("keysize must be > 0");
+            if (keysize > 250) exitWithMessageAndUsage("keysize must be <= 250");
+            if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
+            if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
+            if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
+            if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
+
+            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
+            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
+        }
+    }
+
+    /**
+     * Provides a callback to be notified on node failure.
+     * This example only logs the event.
+     */
+    class StatusListener extends ClientStatusListenerExt {
+        @Override
+        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+        }
+    }
+
+    /**
+     * Constructor for benchmark instance.
+     * Configures VoltDB client and prints configuration.
+     *
+     * @param config Parsed & validated CLI options.
+     */
+    public AsyncBenchmark(KVConfig config) {
+        this.config = config;
+
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.autotune) {
+            clientConfig.enableAutoTune();
+            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
+        }
+        else {
+            clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+        }
+        client = ClientFactory.createClient(clientConfig);
+
+        processor = new PayloadProcessor(config.keysize, config.minvaluesize,
+                config.maxvaluesize, config.entropy, config.poolsize, config.usecompression);
+
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Command Line Configuration");
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println(config.getConfigDumpString());
+    }
+
+    /**
+     * Connect to a single server with retry. Limited exponential backoff.
+     * No timeout. This will run until the process is killed if it's not
+     * able to connect.
+     *
+     * @param server hostname:port or just hostname (hostname can be ip).
+     */
+    void connectToOneServerWithRetry(String server) {
+        int sleep = 1000;
+        while (true) {
+            try {
+                client.createConnection(server);
+                break;
             }
+            catch (Exception e) {
+                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
+                try { Thread.sleep(sleep); } catch (Exception interruted) {}
+                if (sleep < 8000) sleep += sleep;
+            }
+        }
+        System.out.printf("Connected to VoltDB node at: %s.\n", server);
+    }
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+    /**
+     * Connect to a set of servers in parallel. Each will retry until
+     * connection. This call will block until all have connected.
+     *
+     * @param servers A comma separated list of servers using the hostname:port
+     * syntax (where :port is optional).
+     * @throws InterruptedException if anything bad happens with the threads.
+     */
+    void connect(String servers) throws InterruptedException {
+        System.out.println("Connecting to VoltDB...");
 
-            // Create a Timer task to display performance data on the operating procedures
-            Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
+        String[] serverArray = servers.split(",");
+        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+
+        // use a new thread to connect to each server
+        for (final String server : serverArray) {
+            new Thread(new Runnable() {
                 @Override
-                public void run()
-                {
-                    System.out.print(Con.getStatistics("Get", "Put"));
+                public void run() {
+                    connectToOneServerWithRetry(server);
+                    connections.countDown();
+                }
+            }).start();
+        }
+        // block until all have connected
+        connections.await();
+    }
+
+    /**
+     * Create a Timer task to display performance data on the Vote procedure
+     * It calls printStatistics() every displayInterval seconds
+     */
+    public void schedulePeriodicStats() {
+        timer = new Timer();
+        TimerTask statsPrinting = new TimerTask() {
+            @Override
+            public void run() { printStatistics(); }
+        };
+        timer.scheduleAtFixedRate(statsPrinting,
+                                  config.displayinterval * 1000,
+                                  config.displayinterval * 1000);
+    }
+
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    public synchronized void printStatistics() {
+        ClientStats stats = client.getStats(true, true, true)[0];
+        long now = System.currentTimeMillis();
+        long time = Math.round((System.currentTimeMillis() - benchmarkStartTS) / 1000.0);
+        long window = now - stats.since;
+
+        System.out.printf("T=%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Througput %.0f/s, ", stats.invocationsCompleted / (window / 1000.0));
+        System.out.printf("Aborts/Failures %d/%d, ", stats.invocationAborts, stats.invocationErrors);
+        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.averageLatency(),
+                stats.kPercentileLatency(0.95));
+    }
+
+    /**
+     * Prints the results of the voting simulation and statistics
+     * about performance.
+     *
+     * @throws Exception if anything unexpected happens.
+     */
+    public synchronized void printResults() throws Exception {
+        ClientStats stats = client.getStats(false, true, true)[0];
+
+        // 1. Get/Put performance results
+        String display = "\n" +
+                         HORIZONTAL_RULE +
+                         " KV Store Results\n" +
+                         HORIZONTAL_RULE +
+                         "\nA total of %,d operations were posted...\n" +
+                         " - GETs: %,9d Operations (%,d Misses and %,d Failures)\n" +
+                         "         %,9d MB in compressed store data\n" +
+                         "         %,9d MB in uncompressed application data\n" +
+                         "         Network Throughput: %6.3f Gbps*\n" +
+                         " - PUTs: %,9d Operations (%,d Failures)\n" +
+                         "         %,9d MB in compressed store data\n" +
+                         "         %,9d MB in uncompressed application data\n" +
+                         "         Network Throughput: %6.3f Gbps*\n" +
+                         " - Total Network Throughput: %6.3f Gbps*\n\n" +
+                         "* Figure includes key & value traffic but not database protocol overhead.\n\n";
+
+        double oneGigabit = (1024 * 1024 * 1024) / 8;
+        long oneMB = (1024 * 1024);
+        double getThroughput = networkGetData.get() + (successfulGets.get() * config.keysize);
+               getThroughput /= (oneGigabit * config.duration);
+        long totalPuts = successfulPuts.get() + failedPuts.get();
+        double putThroughput = networkGetData.get() + (totalPuts * config.keysize);
+               putThroughput /= (oneGigabit * config.duration);
+
+        System.out.printf(display,
+                stats.invocationsCompleted,
+                successfulGets.get(), missedGets.get(), failedGets.get(),
+                networkGetData.get() / oneMB,
+                rawGetData.get() / oneMB,
+                getThroughput,
+                successfulPuts.get(), failedPuts.get(),
+                networkPutData.get() / oneMB,
+                rawPutData.get() / oneMB,
+                putThroughput,
+                getThroughput + putThroughput);
+
+        // 2. Performance statistics
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" System Statistics");
+        System.out.println(HORIZONTAL_RULE);
+
+        long now = System.currentTimeMillis();
+        System.out.printf("For %.1f seconds, an average throughput of %d txns/sec was sustained.\n",
+                (now - stats.since) / 1000.0, stats.throughput(now));
+        System.out.printf("Average latency was %d ms per procedure.\n", stats.averageLatency());
+        System.out.printf("Average internal latency, as reported by the server(s) was %d ms.\n", stats.averageInternalLatency());
+        System.out.printf("Measured 95th and 99th percentile latencies were %d and %d ms respectively\n",
+                stats.kPercentileLatency(.95), stats.kPercentileLatency(.99));
+
+        // 4. Write stats to file if requested
+        if (config.stats.length() > 0) {
+            client.writeSummaryCSV(config.stats);
+        }
+    }
+
+    /**
+     * Callback to handle the response to a stored procedure call.
+     * Tracks response types.
+     *
+     */
+    class GetCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            // Track the result of the operation (Success, Failure, Payload traffic...)
+            if (response.getStatus() == ClientResponse.SUCCESS) {
+                final VoltTable pairData = response.getResults()[0];
+                // Cache miss (Key does not exist)
+                if (pairData.getRowCount() == 0) {
+                    missedGets.incrementAndGet();
+                }
+                else {
+                    final PayloadProcessor.Pair pair =
+                            processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
+                                                        pairData.fetchRow(0).getVarbinary(1));
+                    successfulGets.incrementAndGet();
+                    networkGetData.addAndGet(pair.getStoreValueLength());
+                    rawGetData.addAndGet(pair.getRawValueLength());
                 }
             }
-            , displayInterval*1000l
-            , displayInterval*1000l
-            );
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
-            IRateLimiter limiter = null;
-            if (autoTune)
-                limiter = new LatencyLimiter(Con, "Get", latencyTarget, rateLimit);
-            else
-                limiter = new RateLimiter(rateLimit);
-
-            // Run the benchmark loop for the requested duration
-            long endTime = System.currentTimeMillis() + (1000l * duration);
-            Random rand = new Random();
-            while (endTime > System.currentTimeMillis())
-            {
-                // Decide whether to perform a GET or PUT operation
-                if (rand.nextDouble() < getPutRatio)
-                {
-                    // Get a key/value pair, asynchronously
-                    Con.executeAsync(new ProcedureCallback()
-                    {
-                        @Override
-                        public void clientCallback(ClientResponse response) throws Exception
-                        {
-                            // Track the result of the operation (Success, Failure, Payload traffic...)
-                            if (response.getStatus() == ClientResponse.SUCCESS)
-                            {
-                                final VoltTable pairData = response.getResults()[0];
-                                // Cache miss (Key does not exist)
-                                if (pairData.getRowCount() == 0)
-                                    GetStoreResults.incrementAndGet(1);
-                                else
-                                {
-                                    final PayloadProcessor.Pair pair = processor.retrieveFromStore(pairData.fetchRow(0).getString(0), pairData.fetchRow(0).getVarbinary(1));
-                                    GetStoreResults.incrementAndGet(0);
-                                    GetCompressionResults.addAndGet(0, pair.getStoreValueLength());
-                                    GetCompressionResults.addAndGet(1, pair.getRawValueLength());
-                                }
-                            }
-                            else
-                                GetStoreResults.incrementAndGet(1);
-                        }
-                    }
-                    , "Get"
-                    , processor.generateRandomKeyForRetrieval()
-                    );
-                }
-                else
-                {
-                    // Put a key/value pair, asynchronously
-                    final PayloadProcessor.Pair pair = processor.generateForStore();
-                    Con.executeAsync(new ProcedureCallback()
-                    {
-                        final long StoreValueLength;
-                        final long RawValueLength;
-                        {
-                            this.StoreValueLength = pair.getStoreValueLength();
-                            this.RawValueLength = pair.getRawValueLength();
-                        }
-                        @Override
-                        public void clientCallback(ClientResponse response) throws Exception
-                        {
-                            // Track the result of the operation (Success, Failure, Payload traffic...)
-                            if (response.getStatus() == ClientResponse.SUCCESS)
-                                PutStoreResults.incrementAndGet(0);
-                            else
-                                PutStoreResults.incrementAndGet(1);
-                            PutCompressionResults.addAndGet(0, this.StoreValueLength);
-                            PutCompressionResults.addAndGet(1, this.RawValueLength);
-                        }
-                    }
-                    , "Put"
-                    , pair.Key
-                    , pair.getStoreValue()
-                    );
-                }
-
-                // Use the limiter to throttle client activity
-                limiter.throttle();
+            else {
+                failedGets.incrementAndGet();
             }
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // We're done - stop the performance statistics display task
-            timer.cancel();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Now print application results:
-
-            // 1. Store statistics as tracked by the application (ops counts, payload traffic)
-            System.out.printf(
-              "\n-------------------------------------------------------------------------------------\n"
-            + " Store Results\n"
-            + "-------------------------------------------------------------------------------------\n\n"
-            + "A total of %,d operations was posted...\n"
-            + " - GETs: %,9d Operations (%,9d Misses/Failures)\n"
-            + "         %,9d MB in compressed store data\n"
-            + "         %,9d MB in uncompressed application data\n"
-            + "         Network Throughput: %6.3f Gbps*\n\n"
-            + " - PUTs: %,9d Operations (%,9d Failures)\n"
-            + "         %,9d MB in compressed store data\n"
-            + "         %,9d MB in uncompressed application data\n"
-            + "         Network Throughput: %6.3f Gbps*\n\n"
-            + " - Total Network Throughput: %6.3f Gbps*\n\n"
-            + "* Figure includes key & value traffic but not database protocol overhead.\n"
-            + "\n"
-            + "-------------------------------------------------------------------------------------\n"
-            , GetStoreResults.get(0)+GetStoreResults.get(1)+PutStoreResults.get(0)+PutStoreResults.get(1)
-            , GetStoreResults.get(0)
-            , GetStoreResults.get(1)
-            , GetCompressionResults.get(0)/1048576l
-            , GetCompressionResults.get(1)/1048576l
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
-            , PutStoreResults.get(0)
-            , PutStoreResults.get(1)
-            , PutCompressionResults.get(0)/1048576l
-            , PutCompressionResults.get(1)/1048576l
-            , ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
-            + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
-            );
-
-            // 2. Overall performance statistics for GET/PUT operations
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " System Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics("Get", "Put").toString(false));
-
-            // 3. Per-procedure detailed performance statistics
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " Detailed Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics().toString(false));
-
-            // Dump statistics to a CSV file
-            Con.saveStatistics(csv);
-
-            Con.close();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
         }
-        catch(Exception x)
-        {
-            System.out.println("Exception: " + x);
-            x.printStackTrace();
+    }
+
+    class PutCallback implements ProcedureCallback {
+        final long storeValueLength;
+        final long rawValueLength;
+
+        PutCallback(PayloadProcessor.Pair pair) {
+            storeValueLength = pair.getStoreValueLength();
+            rawValueLength = pair.getRawValueLength();
         }
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            // Track the result of the operation (Success, Failure, Payload traffic...)
+            if (response.getStatus() == ClientResponse.SUCCESS) {
+                successfulPuts.incrementAndGet();
+            }
+            else {
+                failedPuts.incrementAndGet();
+            }
+            networkPutData.addAndGet(storeValueLength);
+            rawPutData.addAndGet(rawValueLength);
+        }
+    }
+
+    /**
+     * Core benchmark code.
+     * Connect. Initialize. Run the loop. Cleanup. Print Results.
+     *
+     * @throws Exception if anything unexpected happens.
+     */
+    public void runBenchmark() throws Exception {
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Setup & Initialization");
+        System.out.println(HORIZONTAL_RULE);
+
+        // connect to one or more servers, loop until success
+        connect(config.servers);
+
+        // preload keys if requested
+        System.out.println();
+        if (config.preload) {
+            System.out.println("Preloading data store...");
+            for(int i=0; i < config.poolsize; i++) {
+                client.callProcedure(new NullCallback(),
+                                     "Put",
+                                     String.format(processor.KeyFormat, i),
+                                     processor.generateForStore().getStoreValue());
+            }
+            client.drain();
+            System.out.println("Preloading complete.\n");
+        }
+
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println("Starting Benchmark");
+        System.out.println(HORIZONTAL_RULE);
+
+        // Run the benchmark loop for the requested warmup time
+        // The throughput may be throttled depending on client configuration
+        System.out.println("Warming up...");
+        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
+        while (warmupEndTime > System.currentTimeMillis()) {
+            // Decide whether to perform a GET or PUT operation
+            if (rand.nextDouble() < config.getputratio) {
+                // Get a key/value pair, asynchronously
+                client.callProcedure(new NullCallback(), "Get", processor.generateRandomKeyForRetrieval());
+            }
+            else {
+                // Put a key/value pair, asynchronously
+                final PayloadProcessor.Pair pair = processor.generateForStore();
+                client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
+            }
+        }
+
+        // reset the stats after warmup
+        client.resetGlobalStats();
+
+        // print periodic statistics to the console
+        benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+
+        // Run the benchmark loop for the requested duration
+        // The throughput may be throttled depending on client configuration
+        System.out.println("\nRunning benchmark...");
+        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        while (benchmarkEndTime > System.currentTimeMillis()) {
+            // Decide whether to perform a GET or PUT operation
+            if (rand.nextDouble() < config.getputratio) {
+                // Get a key/value pair, asynchronously
+                client.callProcedure(new GetCallback(), "Get", processor.generateRandomKeyForRetrieval());
+            }
+            else {
+                // Put a key/value pair, asynchronously
+                final PayloadProcessor.Pair pair = processor.generateForStore();
+                client.callProcedure(new PutCallback(pair), "Put", pair.Key, pair.getStoreValue());
+            }
+        }
+
+        // cancel periodic stats printing
+        timer.cancel();
+
+        // block until all outstanding txns return
+        client.drain();
+
+        // print the summary results
+        printResults();
+
+        // close down the client connections
+        client.close();
+    }
+
+    /**
+     * Main routine creates a benchmark instance and kicks off the run method.
+     *
+     * @param args Command line arguments.
+     * @throws Exception if anything goes wrong.
+     * @see {@link KVConfig}
+     */
+    public static void main(String[] args) throws Exception {
+        // create a configuration from the arguments
+        KVConfig config = new KVConfig();
+        config.parse(AsyncBenchmark.class.getName(), args);
+
+        AsyncBenchmark benchmark = new AsyncBenchmark(config);
+        benchmark.runBenchmark();
     }
 }
