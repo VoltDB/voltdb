@@ -708,14 +708,15 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 Long newFault = ((FaultMessage)m).failedSite;
                 m_mailbox.deliverFront(m);
                 m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
-                        + newFault);
+                        + CoreUtils.hsIdToString(newFault));
                 return false;
             }
 
             m_recoveryLog.info("Agreement, Received failure message " + responses +
                     " from " + CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
                     CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) +
-                    " safe txn id " + fm.m_safeTxnId + " failed site " + fm.m_initiatorForSafeTxnId);
+                    " safe txn id " + fm.m_safeTxnId + " failed site " +
+                    CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId));
         } while(!haveNecessaryFaultInfo(survivorSet));
         return true;
     }
