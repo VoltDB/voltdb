@@ -332,6 +332,7 @@ public class ZKUtil {
             return event;
         }
 
+        /** @returns null if the timeout expired. */
         public WatchedEvent get(long timeout, TimeUnit unit) throws InterruptedException {
             done.await(timeout, unit);
             return event;
