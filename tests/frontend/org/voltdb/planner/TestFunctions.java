@@ -60,7 +60,7 @@ public class TestFunctions extends TestCase {
             aide.compile("update ENG913 set name = 'tim' where user = ?;", 0);
             fail();
         }
-        catch (NullPointerException ex) {}
+        catch (PlanningErrorException ex) {}
     }
 
 }

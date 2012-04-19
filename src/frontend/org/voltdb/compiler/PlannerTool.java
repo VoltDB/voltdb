@@ -112,7 +112,7 @@ public class PlannerTool {
         try {
             plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
         } catch (Exception e) {
-            throw new RuntimeException("Error creating planner: " + e.getMessage(), e);
+            throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
         }
         if (plan == null) {
             String plannerMsg = planner.getErrorMessage();
