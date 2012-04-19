@@ -508,6 +508,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     @Override
     public void writeSummaryCSV(String path) throws IOException {
+        // don't do anything (be silent) if empty path
+        if ((path == null) || (path.length() == 0)) {
+            return;
+        }
+
         ClientStats stats = getStats(false, true, true)[0];
 
         FileWriter fw = new FileWriter(path);

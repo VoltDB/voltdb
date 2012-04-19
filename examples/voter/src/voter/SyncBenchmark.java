@@ -287,9 +287,7 @@ public class SyncBenchmark {
                 stats.kPercentileLatency(.95), stats.kPercentileLatency(.99));
 
         // 4. Write stats to file if requested
-        if (config.stats.length() > 0) {
-            client.writeSummaryCSV(config.stats);
-        }
+        client.writeSummaryCSV(config.stats);
     }
 
     /**
