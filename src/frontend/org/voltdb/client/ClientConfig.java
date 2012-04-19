@@ -57,7 +57,6 @@ public class ClientConfig {
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
-    StatsUploaderSettings m_statsSettings = null;
     long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
 
