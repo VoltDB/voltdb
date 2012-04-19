@@ -17,6 +17,8 @@
 
 package org.voltdb.client;
 
+import org.voltdb.LatencyBucketSet;
+
 public class ProcedureStatsTracker {
 
     class Stats {
@@ -34,9 +36,12 @@ public class ProcedureStatsTracker {
         int m_maxRoundTripTime = Integer.MIN_VALUE; // microsecs
         int m_maxClusterRoundTripTime = Integer.MIN_VALUE; // microsecs
 
-        long m_latencyBy1ms[] = new long[ClientStats.NUMBER_OF_BUCKETS];
-        long m_latencyBy10ms[] = new long[ClientStats.NUMBER_OF_BUCKETS];
-        final long m_latencyBy100ms[] = new long[ClientStats.NUMBER_OF_BUCKETS];
+        LatencyBucketSet m_latencyBy1ms =
+                new LatencyBucketSet(1, ClientStats.ONE_MS_BUCKET_COUNT);
+        LatencyBucketSet m_latencyBy10ms =
+                new LatencyBucketSet(10, ClientStats.TEN_MS_BUCKET_COUNT);
+        LatencyBucketSet m_latencyBy100ms =
+                new LatencyBucketSet(100, ClientStats.HUNDRED_MS_BUCKET_COUNT);
 
         public Stats(long since) {
             this.since = since;
@@ -59,18 +64,9 @@ public class ProcedureStatsTracker {
             m_clusterRoundTripTime += clusterRoundTripTime;
 
             // calculate the latency buckets to increment and increment.
-            int bucket = roundTripTime;
-            if (bucket < ClientStats.NUMBER_OF_BUCKETS) {
-                m_latencyBy1ms[bucket]++;
-            }
-            bucket /= 10;
-            if (bucket < ClientStats.NUMBER_OF_BUCKETS) {
-                m_latencyBy10ms[bucket]++;
-            }
-            bucket /= 10;
-            if (bucket < ClientStats.NUMBER_OF_BUCKETS) {
-                m_latencyBy100ms[bucket]++;
-            }
+            m_latencyBy1ms.update(roundTripTime);
+            m_latencyBy10ms.update(roundTripTime);
+            m_latencyBy100ms.update(roundTripTime);
         }
     }
 

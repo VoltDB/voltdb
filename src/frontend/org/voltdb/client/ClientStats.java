@@ -20,6 +20,8 @@ package org.voltdb.client;
 import java.util.Date;
 import java.util.Iterator;
 
+import org.voltdb.LatencyBucketSet;
+
 public class ClientStats {
     final String name;
     final long since; // java.util.Date compatible microseconds since epoch
@@ -40,11 +42,13 @@ public class ClientStats {
     final int maxRoundTripTime; // microsecs
     final int maxClusterRoundTripTime; // microsecs
 
-    public static final int NUMBER_OF_BUCKETS = 10;
+    final public static int ONE_MS_BUCKET_COUNT = 50;
+    final public static int TEN_MS_BUCKET_COUNT = 20;
+    final public static int HUNDRED_MS_BUCKET_COUNT = 10;
 
-    final long latencyBy1ms[] = new long[NUMBER_OF_BUCKETS];
-    final long latencyBy10ms[] = new long[NUMBER_OF_BUCKETS];
-    final long latencyBy100ms[] = new long[NUMBER_OF_BUCKETS];
+    final LatencyBucketSet latencyBy1ms;
+    final LatencyBucketSet latencyBy10ms;
+    final LatencyBucketSet latencyBy100ms;
 
     ClientStats() {
         name = "";
@@ -55,6 +59,9 @@ public class ClientStats {
         invocationsCompleted = invocationAborts = invocationErrors = 0;
         roundTripTime = clusterRoundTripTime = 0;
         maxRoundTripTime = maxClusterRoundTripTime = 0;
+        latencyBy1ms = new LatencyBucketSet(1, ONE_MS_BUCKET_COUNT);
+        latencyBy10ms = new LatencyBucketSet(10, TEN_MS_BUCKET_COUNT);
+        latencyBy100ms = new LatencyBucketSet(100, HUNDRED_MS_BUCKET_COUNT);
     }
 
     ClientStats(ProcedureStatsTracker stats, boolean interval, long since) {
@@ -74,11 +81,9 @@ public class ClientStats {
         clusterRoundTripTime = core.m_clusterRoundTripTime;
         maxRoundTripTime = core.m_maxRoundTripTime;
         maxClusterRoundTripTime = core.m_maxClusterRoundTripTime;
-        for (int i = 0; i < NUMBER_OF_BUCKETS; ++i) {
-            latencyBy1ms[i] = core.m_latencyBy1ms[i];
-            latencyBy10ms[i] = core.m_latencyBy10ms[i];
-            latencyBy100ms[i] = core.m_latencyBy100ms[i];
-        }
+        latencyBy1ms = (LatencyBucketSet) core.m_latencyBy1ms.clone();
+        latencyBy10ms = (LatencyBucketSet) core.m_latencyBy10ms.clone();
+        latencyBy100ms = (LatencyBucketSet) core.m_latencyBy100ms.clone();
 
         if (interval) {
             stats.resetInterval(since);
@@ -131,11 +136,9 @@ public class ClientStats {
         maxRoundTripTime = Math.max(ps1.maxRoundTripTime, ps2.maxRoundTripTime);
         maxClusterRoundTripTime = Math.max(ps1.maxClusterRoundTripTime, ps2.maxClusterRoundTripTime);
 
-        for (int i = 0; i < NUMBER_OF_BUCKETS; ++i) {
-            latencyBy1ms[i] = ps1.latencyBy1ms[i] + ps2.latencyBy1ms[i];
-            latencyBy10ms[i] = ps1.latencyBy10ms[i] + ps2.latencyBy10ms[i];
-            latencyBy100ms[i] = ps1.latencyBy100ms[i] + ps2.latencyBy100ms[i];
-        }
+        latencyBy1ms = LatencyBucketSet.merge(ps1.latencyBy1ms, ps2.latencyBy1ms);
+        latencyBy10ms = LatencyBucketSet.merge(ps1.latencyBy10ms, ps2.latencyBy10ms);
+        latencyBy100ms = LatencyBucketSet.merge(ps1.latencyBy100ms, ps2.latencyBy100ms);
     }
 
     public String getProcedureName() {
@@ -187,66 +190,31 @@ public class ClientStats {
     }
 
     public long[] getLatencyBucketsBy1ms() {
-        return latencyBy1ms.clone();
+        return latencyBy1ms.buckets.clone();
     }
 
     public long[] getLatencyBucketsBy10ms() {
-        return latencyBy10ms.clone();
+        return latencyBy10ms.buckets.clone();
     }
 
     public long[] getLatencyBucketsBy100ms() {
-        return latencyBy100ms.clone();
+        return latencyBy100ms.buckets.clone();
     }
 
     public int kPercentileLatency(double percentile) {
-        if ((percentile >= 1.0) || (percentile < 0.0)) {
-            throw new RuntimeException(
-                    "KPercentileLatency accepts values greater than 0 and less than 1");
-        }
-        if (invocationsCompleted == 0) return -1;
+        int kpl;
 
-        // find the number of calls with less than percentile latency
-        long k = (long) (invocationsCompleted * percentile);
-        if (k == 0) ++k; // ensure k=0 gives min latency
-
-        long sum = 0;
-        // check if the latency requested is in the 0-100ms bins
-        if (k <= latencyBy100ms[0]) {
-
-            // check if the latency requested is in the 0-10ms bins
-            if (k <= latencyBy10ms[0]) {
-                // sum up the counts in the bins until k is subsumed
-                for (int i = 0; i < NUMBER_OF_BUCKETS; i++) {
-                    sum += latencyBy1ms[i];
-                    if (sum >= k) {
-                        return i+1;
-                    }
-                }
-                // should have found it by now
-                assert(false);
-            }
-
-            // sum up the counts in the bins until k is subsumed
-            for (int i = 0; i < NUMBER_OF_BUCKETS; i++) {
-                sum += latencyBy10ms[i];
-                if (sum >= k) {
-                    return i * 10 + 5;
-                }
-            }
-            // should have found it by now
-            assert(false);
+        kpl = latencyBy1ms.kPercentileLatency(percentile);
+        if (kpl != Integer.MAX_VALUE) {
+            return kpl;
         }
 
-        // sum up the counts in the bins until k is subsumed
-        for (int i = 0; i < NUMBER_OF_BUCKETS; i++) {
-            sum += latencyBy100ms[i];
-            if (sum >= k) {
-                return i * 100 + 50;
-            }
+        kpl = latencyBy10ms.kPercentileLatency(percentile);
+        if (kpl != Integer.MAX_VALUE) {
+            return kpl;
         }
 
-        // too much latency
-        return Integer.MAX_VALUE;
+        return latencyBy100ms.kPercentileLatency(percentile);
     }
 
     public long getThroughput(long now) {
@@ -270,36 +238,9 @@ public class ClientStats {
                     roundTripTime / invocationsCompleted, clusterRoundTripTime / invocationsCompleted));
             sb.append(String.format("    max latency client/internal: %d/%d\n",
                     maxRoundTripTime, maxClusterRoundTripTime));
-            sb.append("    0-10ms by 1ms:\n      [");
-            for (int i = 0; i < NUMBER_OF_BUCKETS; i++) {
-                sb.append(latencyBy1ms[i]);
-                if (i == (NUMBER_OF_BUCKETS - 1)) {
-                    sb.append("]\n");
-                }
-                else {
-                    sb.append(", ");
-                }
-            }
-            sb.append("    0-100ms by 10ms:\n      [");
-            for (int i = 0; i < NUMBER_OF_BUCKETS; i++) {
-                sb.append(latencyBy10ms[i]);
-                if (i == (NUMBER_OF_BUCKETS - 1)) {
-                    sb.append("]\n");
-                }
-                else {
-                    sb.append(", ");
-                }
-            }
-            sb.append("    0-1000ms by 100ms:\n      [");
-            for (int i = 0; i < NUMBER_OF_BUCKETS; i++) {
-                sb.append(latencyBy100ms[i]);
-                if (i == (NUMBER_OF_BUCKETS - 1)) {
-                    sb.append("]\n");
-                }
-                else {
-                    sb.append(", ");
-                }
-            }
+            sb.append(latencyBy1ms).append("\n");
+            sb.append(latencyBy10ms).append("\n");
+            sb.append(latencyBy100ms).append("\n");
         }
 
         return sb.toString();
