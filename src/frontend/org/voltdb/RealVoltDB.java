@@ -35,7 +35,6 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -183,8 +182,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     final HashSet<Integer> m_downHosts = new HashSet<Integer>();
     final Set<Integer> m_downNonExecSites = new HashSet<Integer>();
-    //For command log only, will also mark self as faulted
-    final Set<Integer> m_downSites = new HashSet<Integer>();
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -522,8 +519,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (m_commandLog != null && isRejoin) {
                 m_commandLog.initForRejoin(
                         m_catalogContext, Long.MIN_VALUE,
-                        m_messenger.getDiscoveredFaultSequenceNumber(),
-                        m_downSites);
+                        m_messenger.getDiscoveredFaultSequenceNumber(), isRejoin);
             }
 
             // tell other booting nodes that this node is ready. Primary purpose is to publish a hostname
@@ -808,7 +804,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              */
             for (Integer downHost : m_downHosts) {
                 m_downNonExecSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
-                m_downSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
                 m_faultManager.reportFault(
                         new NodeFailureFault(
                             downHost,
@@ -822,7 +817,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             ExecutionSite.recoveringSiteCount.set(
                     m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size());
-            m_downSites.addAll(m_catalogContext.siteTracker.getAllSitesForHost(m_messenger.getHostId()));
         }
 
         m_catalogContext.m_transactionId = m_messenger.getDiscoveredCatalogTxnId();
@@ -1709,9 +1703,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 megabytesPerSecond + " megabytes/sec");
         try {
             boolean logRecoveryCompleted = false;
-            try {
-                m_zk.create("/unfaulted_hosts", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            } catch (KeeperException.NodeExistsException e) {}
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
                 try {
                     m_zk.create("/request_truncation_snapshot", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -1719,12 +1710,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             } else {
                 logRecoveryCompleted = true;
             }
-            ByteBuffer txnIdBuffer = ByteBuffer.allocate(8);
-            txnIdBuffer.putLong(TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
-            m_zk.create(
-                    "/unfaulted_hosts/" + m_messenger.getHostId(),
-                    txnIdBuffer.array(),
-                    Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
             if (logRecoveryCompleted) {
                 m_recovering = false;
                 hostLog.info("Node recovery completed");
