@@ -106,6 +106,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLEONLY");
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
     static class RejoinCallback implements ProcedureCallback {
@@ -265,7 +266,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         m_mode = OperationMode.INITIALIZING;
 
         synchronized(m_startAndStopLock) {
-            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             m_config = config;
             m_startMode = null;
