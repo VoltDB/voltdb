@@ -21,29 +21,30 @@ import java.util.Date;
 import java.util.Iterator;
 
 public class ClientStats {
-    public final String name;
-    public final long since; // java.util.Date compatible microseconds since epoch
+    final String name;
+    final long since; // java.util.Date compatible microseconds since epoch
 
     public final long connectionId;
     public final String hostname;
     public final int port;
 
-    public final long invocationsCompleted;
-    public final long invocationAborts;
-    public final long invocationErrors;
+    final long invocationsCompleted;
+    final long invocationAborts;
+    final long invocationErrors;
 
     // cumulative latency measured by client, used to calculate avg. lat.
-    protected final long roundTripTime; // microsecs
+    final long roundTripTime; // microsecs
     // cumulative latency measured by the cluster, used to calculate avg lat.
-    protected final long clusterRoundTripTime; // microsecs
+    final long clusterRoundTripTime; // microsecs
 
-    public final int maxRoundTripTime; // microsecs
-    public final int maxClusterRoundTripTime; // microsecs
+    final int maxRoundTripTime; // microsecs
+    final int maxClusterRoundTripTime; // microsecs
 
     public static final int NUMBER_OF_BUCKETS = 10;
-    public final long latencyBy1ms[] = new long[NUMBER_OF_BUCKETS];
-    public final long latencyBy10ms[] = new long[NUMBER_OF_BUCKETS];
-    public final long latencyBy100ms[] = new long[NUMBER_OF_BUCKETS];
+
+    final long latencyBy1ms[] = new long[NUMBER_OF_BUCKETS];
+    final long latencyBy10ms[] = new long[NUMBER_OF_BUCKETS];
+    final long latencyBy100ms[] = new long[NUMBER_OF_BUCKETS];
 
     ClientStats() {
         name = "";
@@ -137,6 +138,66 @@ public class ClientStats {
         }
     }
 
+    public String getProcedureName() {
+        return name;
+    }
+
+    public long getStartTimestamp() {
+        return since;
+    }
+
+    public long getConnectionId() {
+        return connectionId;
+    }
+
+    public String getHostname() {
+        return hostname;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public long getInvocationsCompleted() {
+        return invocationsCompleted;
+    }
+
+    public long getInvocationAborts() {
+        return invocationAborts;
+    }
+
+    public long getInvocationErrors() {
+        return invocationErrors;
+    }
+
+    public long getAverageLatency() {
+        return roundTripTime / invocationsCompleted;
+    }
+
+    public long getAverageInternalLatency() {
+        return clusterRoundTripTime / invocationsCompleted;
+    }
+
+    public int maxLatency() {
+        return maxRoundTripTime;
+    }
+
+    public int maxIntraClusterLatency() {
+        return maxClusterRoundTripTime;
+    }
+
+    public long[] getLatencyBucketsBy1ms() {
+        return latencyBy1ms.clone();
+    }
+
+    public long[] getLatencyBucketsBy10ms() {
+        return latencyBy10ms.clone();
+    }
+
+    public long[] getLatencyBucketsBy100ms() {
+        return latencyBy100ms.clone();
+    }
+
     public int kPercentileLatency(double percentile) {
         if ((percentile >= 1.0) || (percentile < 0.0)) {
             throw new RuntimeException(
@@ -188,20 +249,12 @@ public class ClientStats {
         return Integer.MAX_VALUE;
     }
 
-    public long throughput(long now) {
+    public long getThroughput(long now) {
         if (now < since) {
             now = since + 1; // 1 ms duration is sorta cheatin'
         }
         long durationMs = now - since;
         return (long) (invocationsCompleted / (durationMs / 1000.0));
-    }
-
-    public long averageLatency() {
-        return roundTripTime / invocationsCompleted;
-    }
-
-    public long averageInternalLatency() {
-        return clusterRoundTripTime / invocationsCompleted;
     }
 
     public String toString() {

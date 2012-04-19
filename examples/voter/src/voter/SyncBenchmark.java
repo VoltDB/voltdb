@@ -230,12 +230,13 @@ public class SyncBenchmark {
         ClientStats stats = client.getStats(true, true, true)[0];
         long now = System.currentTimeMillis();
         long time = Math.round((System.currentTimeMillis() - benchmarkStartTS) / 1000.0);
-        long window = now - stats.since;
+        long window = now - stats.getStartTimestamp();
 
         System.out.printf("T=%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Througput %.0f/s, ", stats.invocationsCompleted / (window / 1000.0));
-        System.out.printf("Aborts/Failures %d/%d, ", stats.invocationAborts, stats.invocationErrors);
-        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.averageLatency(),
+        System.out.printf("Througput %.0f/s, ", stats.getInvocationsCompleted() / (window / 1000.0));
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
     }
 
@@ -258,7 +259,7 @@ public class SyncBenchmark {
                          " - %,9d Rejected (Invalid Contestant)\n" +
                          " - %,9d Rejected (Maximum Vote Count Reached)\n" +
                          " - %,9d Failed (Transaction Error)\n\n";
-        System.out.printf(display, stats.invocationsCompleted,
+        System.out.printf(display, stats.getInvocationsCompleted(),
                 acceptedVotes.get(), badContestantVotes.get(),
                 badVoteCountVotes.get(), failedVotes.get());
 
@@ -278,9 +279,10 @@ public class SyncBenchmark {
 
         long now = System.currentTimeMillis();
         System.out.printf("For %.1f seconds, an average throughput of %d txns/sec was sustained.\n",
-                (now - stats.since) / 1000.0, stats.throughput(now));
-        System.out.printf("Average latency was %d ms per procedure.\n", stats.averageLatency());
-        System.out.printf("Average internal latency, as reported by the server(s) was %d ms.\n", stats.averageInternalLatency());
+                (now - stats.getStartTimestamp()) / 1000.0, stats.getThroughput(now));
+        System.out.printf("Average latency was %d ms per procedure.\n", stats.getAverageLatency());
+        System.out.printf("Average internal latency, as reported by the server(s) was %d ms.\n",
+                stats.getAverageInternalLatency());
         System.out.printf("Measured 95th and 99th percentile latencies were %d and %d ms respectively\n",
                 stats.kPercentileLatency(.95), stats.kPercentileLatency(.99));
 
