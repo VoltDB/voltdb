@@ -21,7 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 /**
  *
@@ -47,14 +47,6 @@ public class NullValueExpression extends AbstractValueExpression {
         if (m_valueType != VoltType.NULL) {
             throw new Exception("ERROR: The output ValueType for '" + this + "' is '" + m_valueType + "'");
         }
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof NullValueExpression == false) return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
     }
 
     @Override

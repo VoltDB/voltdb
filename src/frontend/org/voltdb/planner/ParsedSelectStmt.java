@@ -206,32 +206,43 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         {
             order_col.columnName = child.attributes.get("column");
             order_col.tableName = child.attributes.get("table");
-            order_col.alias = child.attributes.get("alias");
+            String alias = child.attributes.get("alias");
+            order_col.alias = alias;
 
-            ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
-            ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
+            // The ORDER BY column MAY be identical to a simple display column, in which case,
+            // tagging the actual display column as being also an order by column
+            // helps later when trying to determine ORDER BY coverage (for determinism).
+            if (order_exp instanceof TupleValueExpression)
+            {
+                ParsedColInfo orig_col = null;
+                for (ParsedColInfo col : displayColumns)
+                {
+                    if (col.expression.equals(order_exp)) {
+                        orig_col = col;
+                        break;
+                    }
+                }
+                if (orig_col != null) {
+                    orig_col.orderBy = true;
+                    orig_col.ascending = order_col.ascending;
+                }
+            }
         }
-        // inner child could be an operation, which forks into two subcases:
         else if (child.name.equals("operation"))
         {
             order_col.columnName = "";
             // I'm not sure anyone actually cares about this table name
             order_col.tableName = "VOLT_TEMP_TABLE";
 
-            // 1) It's a simplecolumn operation.  This means that the alias that
+            // If it's a simplecolumn operation.  This means that the alias that
             //    we have should refer to a column that we compute
             //    somewhere else (like an aggregate, mostly).
             //    Look up that column in the displayColumns list,
-            //    and then create a new order by column with a magic TVE.  This
-            //    means that we can only ORDER BY a pre-computed expression
-            //    that is also in the display columns, but I'm not sure there's
-            //    a way to not do that that is valid SQL.
-            // But Paul doesn't think that SQL has any such restriction on what
-            // can be
-            //    in the ORDER BY and not in the display columns,
-            // so it's just a VoltDB limitation.
-            if (order_exp instanceof TupleValueExpression)
-            {
+            //    and then create a new order by column with a magic TVE.
+            // This case seems to be the result of cross-referencing a display column
+            // by its position, as in "ORDER BY 2, 3". Otherwise the ORDER BY column
+            // is a columnref as handled in the prior code block.
+            if (order_exp instanceof TupleValueExpression) {
                 String alias = child.attributes.get("alias");
                 order_col.alias = alias;
                 ParsedColInfo orig_col = null;
@@ -244,7 +255,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     }
                 }
                 // We need the original column expression so we can extract
-                // the value size and type for our TVE that refers back to it
+                // the value size and type for our TVE that refers back to it.
+                // XXX: This check runs into problems for some cases where a display column expression gets re-used in the ORDER BY.
+                // I THINK one problem case was "select x, max(y) from t group by x order by max(y);" --paul
                 if (orig_col == null)
                 {
                     throw new PlanningErrorException("Unable to find source " +
@@ -268,18 +281,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 tve.setValueSize(orig_col.expression.getValueSize());
                 tve.setValueType(orig_col.expression.getValueType());
             }
-            // 2) it's an actual complex expression, which we will (for now)
-            //    compute in the order by node.
-            else
-            {
-                ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
-                ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
-            }
         }
         else
         {
             throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
         }
+        ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
+        ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
         order_col.expression = order_exp;
         orderColumns.add(order_col);
     }
@@ -376,49 +384,93 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public boolean isOrderDeterministic() {
-        if (orderByColumnsDetermineAllDisplayColumns()) {
-            return true;
-        }
-        if (orderByColumnsDetermineUniqueColumns()) {
-            return true;
-        }
         if (guaranteesUniqueRow()) {
+            return true;
+        }
+        ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
+        if (orderByColumnsDetermineUniqueColumns(nonOrdered)) {
+            return true;
+        }
+        if (orderByColumnsDetermineAllDisplayColumns(nonOrdered)) {
             return true;
         }
         return false;
     }
 
-    private boolean orderByColumnsDetermineAllDisplayColumns() {
-        HashSet<AbstractExpression> orderByExprs = null;
-        ArrayList<AbstractExpression> displayExprHardCases = null;
-        // First try to get away with a brute force N by M search for exact equalities.
-        for (ParsedColInfo displayCol : displayColumns)
-        {
+    /**
+     * Does the ordering of a statements's GROUP BY columns ensure determinism.
+     * All display columns are functionally dependent on the GROUP BY columns
+     * even if the display column's values are not ordered or unique, so ordering by GROUP BY columns is enough to get determinism.
+     * @param outNonOrdered - list of non-matching GROUP BY columns, populated as a side effect
+     * @return whether there are GROUP BY columns and they are all order-determined by ORDER BY columns
+     */
+    private boolean orderByColumnsDetermineUniqueColumns(ArrayList<AbstractExpression> outNonOrdered) {
+        if ((grouped == false) || groupByColumns.isEmpty()) {
+            // TODO: Are there other ways to determine a unique set of columns without considering every display column?
+            return false;
+        }
+        if (orderByColumnsDetermineAllColumns(groupByColumns, outNonOrdered)) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean orderByColumnsDetermineAllDisplayColumns(ArrayList<AbstractExpression> nonOrdered) {
+        ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
+        for (ParsedColInfo displayCol : displayColumns) {
             if (displayCol.orderBy) {
                 continue;
             }
-            AbstractExpression displayExpr = displayCol.expression;
+            if (displayCol.groupBy) {
+                AbstractExpression displayExpr = displayCol.expression;
+                // Round up the usual suspects -- if there were uncooperative GROUP BY expressions, they will
+                // often also be display column expressions.
+                for (AbstractExpression nonStarter : nonOrdered) {
+                     if (displayExpr.equals(nonStarter)) {
+                         return false;
+                     }
+                }
+                // A GROUP BY expression that was not nonOrdered must be covered.
+                continue;
+            }
+            candidateColumns.add(displayCol);
+        }
+        return orderByColumnsDetermineAllColumns(candidateColumns, null);
+    }
+
+
+    private boolean orderByColumnsDetermineAllColumns(ArrayList<ParsedColInfo> candidateColumns,
+                                                      ArrayList<AbstractExpression> outNonOrdered) {
+        HashSet<AbstractExpression> orderByExprs = null;
+        ArrayList<AbstractExpression> candidateExprHardCases = null;
+        // First try to get away with a brute force N by M search for exact equalities.
+        for (ParsedColInfo candidateCol : candidateColumns)
+        {
+            if (candidateCol.orderBy) {
+                continue;
+            }
+            AbstractExpression candidateExpr = candidateCol.expression;
             if (orderByExprs == null) {
                 orderByExprs = new HashSet<AbstractExpression>();
                 for (ParsedColInfo orderByCol : orderColumns) {
                     orderByExprs.add(orderByCol.expression);
                 }
             }
-            if (orderByExprs.contains(displayExpr)) {
+            if (orderByExprs.contains(candidateExpr)) {
                 continue;
             }
-            if (displayExpr instanceof TupleValueExpression) {
+            if (candidateExpr instanceof TupleValueExpression) {
                 // Simple column references can only be exactly equal to but not "based on" an ORDER BY.
                 return false;
             }
 
-            if (displayExprHardCases == null) {
-                displayExprHardCases = new ArrayList<AbstractExpression>();
+            if (candidateExprHardCases == null) {
+                candidateExprHardCases = new ArrayList<AbstractExpression>();
             }
-            displayExprHardCases.add(displayExpr);
+            candidateExprHardCases.add(candidateExpr);
         }
 
-        if (displayExprHardCases == null) {
+        if (candidateExprHardCases == null) {
             return true;
         }
 
@@ -440,16 +492,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
 
-        for (AbstractExpression displayExpr : displayExprHardCases)
+        boolean result = true;
+
+        for (AbstractExpression candidateExpr : candidateExprHardCases)
         {
-            Collection<AbstractExpression> displayBases = displayExpr.findBaseTVEs();
-            if (orderByTVEs.containsAll(displayBases)) {
+            Collection<AbstractExpression> candidateBases = candidateExpr.findBaseTVEs();
+            if (orderByTVEs.containsAll(candidateBases)) {
                 continue;
             }
-            if (orderByAllBaseTVEs.containsAll(displayBases) == false) {
-                return false;
+            if (orderByAllBaseTVEs.containsAll(candidateBases) == false) {
+                if (outNonOrdered == null) {
+                    // Short-circuit if the remaining non-qualifying expressions are not of interest.
+                    return false;
+                }
+                result = false;
+                outNonOrdered.add(candidateExpr);
+                continue;
             }
-            // At this point, if he displayExpr is a match,
+            // At this point, if the candidateExpr is a match,
             // then it is based on but not equal to one or more orderByNonTVE(s) and optionally orderByTVE(s).
             // The simplest example is like "SELECT a+(b-c) ... ORDER BY a, b-c;"
             // If it is a non-match, it is an original expression based on orderByAllBaseTVEs
@@ -457,14 +517,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // TODO: process REALLY HARD CASES
             // TODO: issue a warning, short-term?
             // For now, err on the side of non-determinism.
-            return false;
+            if (outNonOrdered == null) {
+                // Short-circuit if the remaining non-qualifying expressions are not of interest.
+                return false;
+            }
+            outNonOrdered.add(candidateExpr);
+            result = false;
         }
-        return true;
-    }
-
-    private boolean orderByColumnsDetermineUniqueColumns() {
-        // TODO Are there any easy cases?
-        return false;
+        return result;
     }
 
     private boolean guaranteesUniqueRow() {

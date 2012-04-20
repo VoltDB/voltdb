@@ -38,6 +38,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase;
 
+import org.junit.Before;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
@@ -45,6 +46,13 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
 
 public class TestMessaging extends TestCase {
+    @Before
+    public void setUp() {
+        VoltDB.crashMessage = null;
+        VoltDB.wasCrashCalled = false;
+        VoltDB.ignoreCrash = false;
+    }
+
     public static class MsgTest extends VoltMessage {
 
         public static final byte MSG_TEST_ID = 127;
@@ -297,7 +305,7 @@ public class TestMessaging extends TestCase {
     public void testJoinerLeaderAddressAndInternalInterface() throws InterruptedException
     {
         MockVoltDB mockVoltDB = new MockVoltDB();
-        mockVoltDB.shouldIgnoreCrashes = true;
+        VoltDB.ignoreCrash = true;
         VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
 
         // Default config should work
@@ -306,7 +314,7 @@ public class TestMessaging extends TestCase {
         SocketJoiner joiner = new SocketJoiner(ConnectionUtil.getLocalAddress(), 1, 0, 0, null);
         joiner.start();
         joiner.join();
-        assertTrue(mockVoltDB.getCrashCount() == 0);
+        assertFalse(VoltDB.wasCrashCalled);
 
         // Matching IP address should work
         config.m_internalInterface = ConnectionUtil.getLocalAddress().getHostAddress();
@@ -314,23 +322,21 @@ public class TestMessaging extends TestCase {
         joiner = new SocketJoiner(ConnectionUtil.getLocalAddress(), 1, 0, 0, null);
         joiner.start();
         joiner.join();
-        assertTrue(mockVoltDB.getCrashCount() == 0);
-
+        assertFalse(VoltDB.wasCrashCalled);
         // Matching host name should work
         config.m_internalInterface = ConnectionUtil.getLocalAddress().getHostName();
         mockVoltDB.setConfig(config);
         joiner = new SocketJoiner(ConnectionUtil.getLocalAddress(), 1, 0, 0, null);
         joiner.start();
         joiner.join();
-        assertTrue(mockVoltDB.getCrashCount() == 0);
-
+        assertFalse(VoltDB.wasCrashCalled);
         // Non-match should crash
         config.m_internalInterface = "255.255.255.255"; //not a valid IP
         mockVoltDB.setConfig(config);
         joiner = new SocketJoiner(ConnectionUtil.getLocalAddress(), 1, 0, 0, null);
         joiner.start();
         joiner.join();
-        assertTrue(mockVoltDB.getCrashCount() == 1);
+        assertTrue(VoltDB.wasCrashCalled);
         mockVoltDB.shutdown(null);
     }
 
@@ -338,7 +344,7 @@ public class TestMessaging extends TestCase {
         MockVoltDB mockVoltDB = new MockVoltDB();
         VoltDB.Configuration config = new VoltDB.Configuration();
         mockVoltDB.setConfig(config);
-        mockVoltDB.shouldIgnoreCrashes = true;
+        VoltDB.ignoreCrash = true;
         VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
 
         // test catalog crcs
@@ -355,11 +361,11 @@ public class TestMessaging extends TestCase {
             joiner2.join();
             joiner3.join();
 
-            assertTrue(mockVoltDB.getCrashCount() > 0);
+            assertTrue(VoltDB.wasCrashCalled);
         } catch (InterruptedException e) {
             fail();
         }
-
+        VoltDB.wasCrashCalled = false;
         // test deployment crcs
         try {
             SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
@@ -374,7 +380,7 @@ public class TestMessaging extends TestCase {
             joiner2.join();
             joiner3.join();
 
-            assertTrue(mockVoltDB.getCrashCount() > 0);
+            assertTrue(VoltDB.wasCrashCalled);
             mockVoltDB.shutdown(null);
             return;
         } catch (InterruptedException e) {

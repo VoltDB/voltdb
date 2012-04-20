@@ -38,7 +38,7 @@ public interface CommandLog {
     *            Long.MIN if there was none.
     */
     public abstract void initForRejoin(CatalogContext context, long txnId,
-                                       long faultSequenceNumber, Set<Integer> failedSites);
+                                       long faultSequenceNumber, boolean isRejoin);
 
     public abstract boolean needsInitialization();
 
@@ -48,12 +48,11 @@ public interface CommandLog {
 
     /**
      * @param failedInitiators
-     * @param failedSites
      * @param faultedTxns
      * @return null if the logger is not initialized
      */
     public abstract Semaphore logFault(Set<Integer> failedInitiators,
-                                       Set<Integer> failedSites, Set<Long> faultedTxns);
+                                       Set<Long> faultedTxns);
 
     public abstract void logHeartbeat(final long txnId);
 
