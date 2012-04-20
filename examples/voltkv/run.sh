@@ -69,7 +69,7 @@ function async-benchmark() {
         --usecompression=false \
         --ratelimit=100000 \
         --autotune=true \
-        --latencytarget=6.0
+        --latencytarget=6
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -83,7 +83,6 @@ function sync-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.SyncBenchmark \
-        --threads=40 \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -93,7 +92,8 @@ function sync-benchmark() {
         --keysize=32 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
-        --usecompression=false
+        --usecompression=false \
+        --threads=40
 }
 
 # JDBC benchmark sample
@@ -107,17 +107,17 @@ function jdbc-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.JDBCBenchmark \
-        --threads=40 \
         --displayinterval=5 \
         --duration=120 \
-        --servers=localhost \
+        --servers=localhost:21212 \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \
         --keysize=32 \
-        --minvalue-size=1024 \
-        --maxvalue-size=1024 \
-        --usecompression=false
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+        --threads=40
 }
 
 function help() {
