@@ -65,7 +65,7 @@ function async-benchmark() {
         --ratelimit=100000 \
         --autotune=true \
         --latencytarget=6 \
-        --stats=stats.csv
+        --statsfile=stats.csv
 }
 
 # Multi-threaded synchronous benchmark sample

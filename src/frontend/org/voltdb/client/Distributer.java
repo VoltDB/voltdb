@@ -657,10 +657,10 @@ class Distributer {
             for (NodeConnection conn : m_connections) {
                 ArrayList<ClientStats> connStats = conn.getStats(interval, rollupProcedures, since);
                 for (ClientStats cs : connStats) {
-                    ArrayList<ClientStats> procStats = stats.get(cs.name);
+                    ArrayList<ClientStats> procStats = stats.get(cs.procName);
                     if (procStats == null) {
                         procStats = new ArrayList<ClientStats>();
-                        stats.put(cs.name, procStats);
+                        stats.put(cs.procName, procStats);
                     }
                     procStats.add(cs);
                 }

@@ -61,8 +61,8 @@ public class SyncBenchmark {
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
-            "-------------------------------------------" +
-            "------------------------------------------\n";
+            "----------" + "----------" + "----------" + "----------" +
+            "----------" + "----------" + "----------" + "----------" + "\n";
 
     // validated command line configuration
     final VoterConfig config;
@@ -109,7 +109,7 @@ public class SyncBenchmark {
         int maxvotes = 2;
 
         @Option(desc = "Filename to write raw summary statistics to.")
-        String stats = "";
+        String statsfile = "";
 
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
@@ -133,7 +133,10 @@ public class SyncBenchmark {
     class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+            // if the benchmark is still active
+            if (benchmarkComplete.get() == false) {
+                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+            }
         }
     }
 
@@ -232,8 +235,8 @@ public class SyncBenchmark {
         long time = Math.round((System.currentTimeMillis() - benchmarkStartTS) / 1000.0);
         long window = now - stats.getStartTimestamp();
 
-        System.out.printf("T=%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Througput %.0f/s, ", stats.getInvocationsCompleted() / (window / 1000.0));
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Throughput %.0f/s, ", stats.getInvocationsCompleted() / (window / 1000.0));
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
@@ -274,20 +277,23 @@ public class SyncBenchmark {
 
         // 3. Performance statistics
         System.out.print(HORIZONTAL_RULE);
-        System.out.println(" System Statistics");
+        System.out.println(" Client Workload Statistics");
         System.out.println(HORIZONTAL_RULE);
 
         long now = System.currentTimeMillis();
-        System.out.printf("For %.1f seconds, an average throughput of %d txns/sec was sustained.\n",
-                (now - stats.getStartTimestamp()) / 1000.0, stats.getThroughput(now));
-        System.out.printf("Average latency was %d ms per procedure.\n", stats.getAverageLatency());
-        System.out.printf("Average internal latency, as reported by the server(s) was %d ms.\n",
-                stats.getAverageInternalLatency());
-        System.out.printf("Measured 95th and 99th percentile latencies were %d and %d ms respectively\n",
-                stats.kPercentileLatency(.95), stats.kPercentileLatency(.99));
+        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getThroughput(now));
+        System.out.printf("Average latency:               %,9d ms\n", stats.getAverageLatency());
+        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
+        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
+
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" System Server Statistics");
+        System.out.println(HORIZONTAL_RULE);
+
+        System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
-        client.writeSummaryCSV(config.stats);
+        client.writeSummaryCSV(config.statsfile);
     }
 
     /**

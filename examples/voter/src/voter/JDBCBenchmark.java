@@ -70,7 +70,7 @@ public class JDBCBenchmark
         int maxvotes = 2;
 
         @Option(desc = "Filename to write raw summary statistics to.")
-        String stats = "";
+        String statsfile = "";
 
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
@@ -277,7 +277,7 @@ public class JDBCBenchmark
             System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Vote").toString(false));
 
             // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.stats);
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.statsfile);
 
             Con.close();
 

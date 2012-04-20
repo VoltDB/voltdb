@@ -23,7 +23,7 @@ import java.util.Iterator;
 import org.voltdb.LatencyBucketSet;
 
 public class ClientStats {
-    final String name;
+    final String procName;
     final long since; // java.util.Date compatible microseconds since epoch
 
     public final long connectionId;
@@ -51,7 +51,7 @@ public class ClientStats {
     final LatencyBucketSet latencyBy100ms;
 
     ClientStats() {
-        name = "";
+        procName = "";
         connectionId = -1;
         hostname = "";
         port = -1;
@@ -65,7 +65,7 @@ public class ClientStats {
     }
 
     ClientStats(ProcedureStatsTracker stats, boolean interval, long since) {
-        name = stats.name;
+        procName = stats.name;
         connectionId = stats.connectionId;
         hostname = stats.hostname;
         port = stats.port;
@@ -112,8 +112,8 @@ public class ClientStats {
     }
 
     ClientStats(ClientStats ps1, ClientStats ps2) {
-        if (ps1.name.equals(ps2.name)) name = ps1.name;
-        else name = "";
+        if (ps1.procName.equals(ps2.procName)) procName = ps1.procName;
+        else procName = "";
 
         if (ps1.connectionId == ps2.connectionId) connectionId = ps1.connectionId;
         else connectionId = -1;
@@ -142,7 +142,7 @@ public class ClientStats {
     }
 
     public String getProcedureName() {
-        return name;
+        return procName;
     }
 
     public long getStartTimestamp() {
@@ -228,7 +228,7 @@ public class ClientStats {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("Since %s - Procedure: %s - ConnectionId: %d {\n",
-                new Date(since).toString(), name, connectionId));
+                new Date(since).toString(), procName, connectionId));
         sb.append(String.format("    hostname: %s:%d\n",
                 hostname, port));
         sb.append(String.format("    invocations completed/aborted/errors: %d/%d/%d\n",

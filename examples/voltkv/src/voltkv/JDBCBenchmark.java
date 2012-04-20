@@ -100,7 +100,7 @@ public class JDBCBenchmark
         int threads = 40;
 
         @Option(desc = "Filename to write raw summary statistics to.")
-        String stats = "";
+        String statsfile = "";
 
         @Override
         public void validate() {
@@ -354,7 +354,7 @@ public class JDBCBenchmark
             System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics().toString(false));
 
             // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.stats);
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.statsfile);
 
             Con.close();
 
