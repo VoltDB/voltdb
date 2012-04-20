@@ -92,7 +92,7 @@ public class LatencyBucketSet {
         }
 
         LatencyBucketSet retval = new LatencyBucketSet(lbs1.msPerBucket, lbs1.numberOfBuckets);
-        for (int i = 0; i < lbs1.msPerBucket; ++i) {
+        for (int i = 0; i < lbs1.numberOfBuckets; ++i) {
             retval.buckets[i] = lbs1.buckets[i] + lbs2.buckets[i];
         }
         retval.totalTxns = lbs1.totalTxns + lbs2.totalTxns;
