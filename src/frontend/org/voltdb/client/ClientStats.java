@@ -224,6 +224,14 @@ public class ClientStats {
         return m_latencyBy100ms.buckets.clone();
     }
 
+    public long getBytesWritten() {
+        return m_bytesSent;
+    }
+
+    public long getBytesRead() {
+        return m_bytesReceived;
+    }
+
     public int kPercentileLatency(double percentile) {
         int kpl;
 
