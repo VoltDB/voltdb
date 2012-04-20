@@ -347,11 +347,8 @@ public class VoltDB {
                 }
             }
 
-            // require deployment file location
-            if (m_pathToDeployment == null) {
-                isValid = false;
-                hostLog.fatal("The deployment file location is missing.");
-            } else if (m_pathToDeployment.equals("")) {
+            // require deployment file location (null is allowed to receive default deployment)
+            if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                 isValid = false;
                 hostLog.fatal("The deployment file location is empty.");
             }
@@ -376,10 +373,11 @@ public class VoltDB {
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
             if (MiscUtils.isPro()) {
-                hostLog.fatal("Usage: org.voltdb.VoltDB [create|recover|replica] leader <hostname> deployment <deployment.xml> license <license.xml> catalog <catalog.jar>");
+                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover|replica) leader <hostname> [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>");
             } else {
-                hostLog.fatal("Usage: org.voltdb.VoltDB [create|recover] leader <hostname> deployment <deployment.xml> catalog <catalog.jar>");
+                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover) leader <hostname> [deployment <deployment.xml>] catalog <catalog.jar>");
             }
+            hostLog.fatal("Defaults will be used if no deployment is specified.");
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 
@@ -432,6 +430,7 @@ public class VoltDB {
             assert(testObj.canWrite());
             return testObj.getAbsolutePath() + File.separator + jarname;
         }
+
     }
 
     private static VoltDB.Configuration m_config = new VoltDB.Configuration();
