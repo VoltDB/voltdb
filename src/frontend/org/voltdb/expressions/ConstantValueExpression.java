@@ -40,11 +40,6 @@ public class ConstantValueExpression extends AbstractValueExpression {
     public ConstantValueExpression() {
         super(ExpressionType.VALUE_CONSTANT);
     }
-    public ConstantValueExpression(AbstractExpression left, AbstractExpression right) {
-        super(ExpressionType.VALUE_CONSTANT, null, null);
-        assert(left == null);
-        assert(right == null);
-    }
 
     @Override
     public Object clone() throws CloneNotSupportedException {
@@ -109,6 +104,17 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
         // if all seems well, defer to the superclass, which checks kids
         return super.equals(obj);
+    }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = 0;
+        if (m_isNull) {
+            result += 1;
+        }
+        result += m_value.hashCode();
+        return result += super.hashCode();
     }
 
     @Override

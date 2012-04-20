@@ -917,10 +917,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         // make sure the restricted priority queue knows about all of the up initiators
         // for most catalog changes this will do nothing
         // for rejoin, it will matter
-        int newInitiators = 0;
         for (Site s : m_context.catalog.getClusters().get("cluster").getSites()) {
             if (s.getIsexec() == false && s.getIsup()) {
-                newInitiators += m_transactionQueue.ensureInitiatorIsKnown(Integer.parseInt(s.getTypeName()));
+                m_transactionQueue.ensureInitiatorIsKnown(Integer.parseInt(s.getTypeName()));
             }
         }
 
@@ -1660,7 +1659,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         final int localPartitionId =
             m_context.siteTracker.getPartitionForSite(m_siteId);
         int responses = 0;
-        int responsesFromSamePartition = 0;
         long commitPoint = Long.MIN_VALUE;
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
         do {
@@ -1762,7 +1760,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
                 initiatorSafeInitPoint.put(
                         initiatorId, Math.max(initiatorSafeInitPoint.get(initiatorId), fm.m_safeTxnId));
-                responsesFromSamePartition++;
             }
         } while(responses < expectedResponses);
 
@@ -1931,7 +1928,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         try {
             //Log it and acquire the completion permit from the semaphore
-            VoltDB.instance().getCommandLog().logFault( failedSites, faultedTxns).acquire();
+            VoltDB.instance().getCommandLog().logFault(faultedTxns).acquire();
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while attempting to log a fault", true, e);
         }
