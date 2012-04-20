@@ -215,9 +215,7 @@ public interface Client {
      * Get IO stats for each connection as well as globally
      * @return Table containing IO stats
      */
-    public ClientStats[] getStats(boolean interval, boolean rollupConnections, boolean rollupProcedures);
-
-    public void resetGlobalStats();
+    public ClientStatsContext createStatsContext();
 
     /**
      * Get an identifier for the cluster that this client is currently connected to.
@@ -268,5 +266,5 @@ public interface Client {
      * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
      * @throws IOException on any file write error.
      */
-    public void writeSummaryCSV(String path) throws IOException;
+    public void writeSummaryCSV(ClientStats stats, String path) throws IOException;
 }

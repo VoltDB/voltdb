@@ -60,6 +60,9 @@ public class LatencyBucketSet {
                     "and less than 1");
         }
 
+        // 0 for no txns?
+        if (totalTxns == 0) return 0;
+
         // find the number of calls with less than percentile latency
         long k = (long) (totalTxns * percentile);
         // ensure k=0 gives min latency
@@ -86,18 +89,31 @@ public class LatencyBucketSet {
     }
 
     public static LatencyBucketSet merge(LatencyBucketSet lbs1, LatencyBucketSet lbs2) {
-        if ((lbs1.msPerBucket != lbs2.msPerBucket) || (lbs1.numberOfBuckets != lbs2.numberOfBuckets)) {
+        LatencyBucketSet retval = (LatencyBucketSet) lbs1.clone();
+        retval.add(lbs2);
+        return retval;
+    }
+
+    public void add(LatencyBucketSet other) {
+        if ((msPerBucket != other.msPerBucket) || (numberOfBuckets != other.numberOfBuckets)) {
             throw new IllegalArgumentException(
-                    "Merging LatencyBucketSet instances requires both cover the same range.");
+                    "Adding LatencyBucketSet instances requires both cover the same range.");
         }
 
-        LatencyBucketSet retval = new LatencyBucketSet(lbs1.msPerBucket, lbs1.numberOfBuckets);
-        for (int i = 0; i < lbs1.numberOfBuckets; ++i) {
-            retval.buckets[i] = lbs1.buckets[i] + lbs2.buckets[i];
+        for (int i = 0; i < numberOfBuckets; ++i) {
+            buckets[i] += other.buckets[i];
         }
-        retval.totalTxns = lbs1.totalTxns + lbs2.totalTxns;
-        retval.unaccountedTxns = lbs1.totalTxns + lbs2.totalTxns;
+        totalTxns += other.totalTxns;
+        unaccountedTxns += other.unaccountedTxns;
+    }
 
+    public static LatencyBucketSet diff(LatencyBucketSet newer, LatencyBucketSet older) {
+        LatencyBucketSet retval = (LatencyBucketSet) newer.clone();
+        for (int i = 0; i < retval.numberOfBuckets; i++) {
+            retval.buckets[i] -= older.buckets[i];
+        }
+        retval.totalTxns -= older.totalTxns;
+        retval.unaccountedTxns -= older.unaccountedTxns;
         return retval;
     }
 

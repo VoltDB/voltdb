@@ -53,6 +53,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
@@ -77,6 +78,9 @@ public class AsyncBenchmark {
     final PayloadProcessor processor;
     // random number generator with constant seed
     final Random rand = new Random(0);
+    // Statistics manager objects from the client
+    final ClientStatsContext periodicStatsContext;
+    final ClientStatsContext fullStatsContext;
 
     // kv benchmark state
     final AtomicLong successfulGets = new AtomicLong(0);
@@ -198,6 +202,9 @@ public class AsyncBenchmark {
         }
         client = ClientFactory.createClient(clientConfig);
 
+        periodicStatsContext = client.createStatsContext();
+        fullStatsContext = client.createStatsContext();
+
         processor = new PayloadProcessor(config.keysize, config.minvaluesize,
                 config.maxvaluesize, config.entropy, config.poolsize, config.usecompression);
 
@@ -278,13 +285,12 @@ public class AsyncBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-        ClientStats stats = client.getStats(true, true, true)[0];
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
         long now = System.currentTimeMillis();
         long time = Math.round((System.currentTimeMillis() - benchmarkStartTS) / 1000.0);
-        long window = now - stats.getStartTimestamp();
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Throughput %.0f/s, ", stats.getInvocationsCompleted() / (window / 1000.0));
+        System.out.printf("Throughput %d/s, ", stats.getThroughput(now));
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
@@ -298,7 +304,7 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized void printResults() throws Exception {
-        ClientStats stats = client.getStats(false, true, true)[0];
+        ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Get/Put performance results
         String display = "\n" +
@@ -358,7 +364,7 @@ public class AsyncBenchmark {
         System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
 
         // 3. Write stats to file if requested
-        client.writeSummaryCSV(config.statsfile);
+        client.writeSummaryCSV(stats, config.statsfile);
     }
 
     /**
@@ -464,7 +470,8 @@ public class AsyncBenchmark {
         }
 
         // reset the stats after warmup
-        client.resetGlobalStats();
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();

@@ -170,8 +170,7 @@ class Distributer {
     class NodeConnection extends VoltProtocolHandler implements org.voltdb.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final HashMap<Long, CallbackBookeeping> m_callbacks;
-        private final HashMap<String, ProcedureStatsTracker> m_stats
-            = new HashMap<String, ProcedureStatsTracker>();
+        private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
         private final long m_connectionId;
         private Connection m_connection;
         private String m_hostname;
@@ -253,22 +252,27 @@ class Distributer {
 
         /**
          * Update the procedures statistics
-         * @param name Name of procedure being updated
+         * @param procName Name of procedure being updated
          * @param roundTrip round trip from client queued to client response callback invocation
          * @param clusterRoundTrip round trip measured within the VoltDB cluster
          * @param abort true of the procedure was aborted
          * @param failure true if the procedure failed
          */
         private void updateStats(
-                String name,
+                String procName,
                 int roundTrip,
                 int clusterRoundTrip,
                 boolean abort,
                 boolean failure) {
-            ProcedureStatsTracker stats = m_stats.get(name);
+            ClientStats stats = m_stats.get(procName);
             if (stats == null) {
-                stats = new ProcedureStatsTracker(name, m_connectionId, m_hostname, m_port);
-                m_stats.put(name, stats);
+                stats = new ClientStats();
+                stats.m_connectionId = connectionId();
+                stats.m_hostname = m_hostname;
+                stats.m_port = m_port;
+                stats.m_procName = procName;
+                stats.m_since = System.currentTimeMillis();
+                m_stats.put(procName, stats);
             }
             stats.update(roundTrip, clusterRoundTrip, abort, failure);
         }
@@ -424,28 +428,6 @@ class Distributer {
                 return true;
             }
             return false;
-        }
-
-        ArrayList<ClientStats> getStats(boolean interval, boolean rollupByProc, long since) {
-            ArrayList<ClientStats> stats = new ArrayList<ClientStats>();
-
-            for (ProcedureStatsTracker pst : m_stats.values()) {
-                ClientStats s = new ClientStats(pst, interval, since);
-                stats.add(s);
-            }
-
-            if (rollupByProc) {
-                ClientStats s = ClientStats.merge(stats);
-                //s = new ClientStats(s, new ClientStats(s.since))
-                stats.clear();
-                stats.add(s);
-            }
-
-            return stats;
-        }
-
-        public void resetStats() {
-            m_stats.clear();
         }
     }
 
@@ -648,45 +630,25 @@ class Distributer {
         return m_listeners.remove(listener);
     }
 
-    ClientStats[] getStats(boolean interval, boolean rollupConnections, boolean rollupProcedures)
-    {
-        final Long since = System.currentTimeMillis();
-        Map<String, ArrayList<ClientStats>> stats = new TreeMap<String, ArrayList<ClientStats>>();
-
-        synchronized (this) {
-            for (NodeConnection conn : m_connections) {
-                ArrayList<ClientStats> connStats = conn.getStats(interval, rollupProcedures, since);
-                for (ClientStats cs : connStats) {
-                    ArrayList<ClientStats> procStats = stats.get(cs.procName);
-                    if (procStats == null) {
-                        procStats = new ArrayList<ClientStats>();
-                        stats.put(cs.procName, procStats);
-                    }
-                    procStats.add(cs);
-                }
-            }
-        }
-
-        ArrayList<ClientStats> retval = new ArrayList<ClientStats>();
-        for (ArrayList<ClientStats> cslist : stats.values()) {
-            if (rollupConnections) {
-                ClientStats s = ClientStats.merge(cslist);
-                retval.add(s);
-            }
-            else {
-                retval.addAll(cslist);
-            }
-        }
-
-        return retval.toArray(new ClientStats[0]);
+    ClientStatsContext createStatsContext() {
+        return new ClientStatsContext(this, getStatsSnapshot());
     }
 
-    public void resetGlobalStats() {
+    Map<Long, Map<String, ClientStats>> getStatsSnapshot() {
+        Map<Long, Map<String, ClientStats>> retval =
+                new TreeMap<Long, Map<String, ClientStats>>();
+
         synchronized (this) {
             for (NodeConnection conn : m_connections) {
-                conn.resetStats();
+                Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
+                for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
+                    connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
+                }
+                retval.put(conn.connectionId(), connMap);
             }
         }
+
+        return retval;
     }
 
     public Object[] getInstanceId() {

@@ -299,13 +299,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public ClientStats[] getStats(boolean interval, boolean rollupConnections, boolean rollupProcedures) {
+    public ClientStatsContext createStatsContext() {
         return null;
-    }
-
-    @Override
-    public void resetGlobalStats() {
-
     }
 
     @Override
@@ -314,7 +309,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public void writeSummaryCSV(String path) throws IOException {
+    public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
         // TODO Auto-generated method stub
 
     }

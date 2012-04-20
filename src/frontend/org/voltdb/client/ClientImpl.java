@@ -457,13 +457,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public ClientStats[] getStats(boolean interval, boolean rollupConnections, boolean rollupProcedures) {
-        return m_distributer.getStats(interval, rollupConnections, rollupProcedures);
-    }
-
-    @Override
-    public void resetGlobalStats() {
-        m_distributer.resetGlobalStats();
+    public ClientStatsContext createStatsContext() {
+        return m_distributer.createStatsContext();
     }
 
     @Override
@@ -507,21 +502,19 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public void writeSummaryCSV(String path) throws IOException {
+    public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
         // don't do anything (be silent) if empty path
         if ((path == null) || (path.length() == 0)) {
             return;
         }
 
-        ClientStats stats = getStats(false, true, true)[0];
-
         FileWriter fw = new FileWriter(path);
         fw.append(String.format("%d,%d,%d,%d,%d,%d,%d\n",
-                stats.since,
-                System.currentTimeMillis() - stats.since,
-                stats.invocationsCompleted,
+                stats.m_since,
+                System.currentTimeMillis() - stats.m_since,
+                stats.m_invocationsCompleted,
                 stats.kPercentileLatency(0.0),
-                stats.maxRoundTripTime,
+                stats.kPercentileLatency(.99999),
                 stats.kPercentileLatency(0.95),
                 stats.kPercentileLatency(0.99)));
         fw.close();

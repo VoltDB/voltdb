@@ -47,6 +47,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 
 import voter.procedures.Vote;
@@ -77,6 +78,9 @@ public class SyncBenchmark {
     // Flags to tell the worker threads to stop or go
     AtomicBoolean warmupComplete = new AtomicBoolean(false);
     AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
+    // Statistics manager objects from the client
+    final ClientStatsContext periodicStatsContext;
+    final ClientStatsContext fullStatsContext;
 
     // voter benchmark state
     AtomicLong acceptedVotes = new AtomicLong(0);
@@ -151,6 +155,10 @@ public class SyncBenchmark {
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         client = ClientFactory.createClient(clientConfig);
+
+        periodicStatsContext = client.createStatsContext();
+        fullStatsContext = client.createStatsContext();
+
         switchboard = new PhoneCallGenerator(config.contestants);
 
         System.out.print(HORIZONTAL_RULE);
@@ -230,13 +238,12 @@ public class SyncBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-        ClientStats stats = client.getStats(true, true, true)[0];
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
         long now = System.currentTimeMillis();
         long time = Math.round((System.currentTimeMillis() - benchmarkStartTS) / 1000.0);
-        long window = now - stats.getStartTimestamp();
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Throughput %.0f/s, ", stats.getInvocationsCompleted() / (window / 1000.0));
+        System.out.printf("Throughput %d/s, ", stats.getThroughput(now));
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
@@ -250,7 +257,7 @@ public class SyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized void printResults() throws Exception {
-        ClientStats stats = client.getStats(false, true, true)[0];
+        ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Voting Board statistics, Voting results and performance statistics
         String display = "\n" +
@@ -293,7 +300,7 @@ public class SyncBenchmark {
         System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
-        client.writeSummaryCSV(config.statsfile);
+        client.writeSummaryCSV(stats, config.statsfile);
     }
 
     /**
@@ -386,7 +393,8 @@ public class SyncBenchmark {
         warmupComplete.set(true);
 
         // reset the stats after warmup
-        client.resetGlobalStats();
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();

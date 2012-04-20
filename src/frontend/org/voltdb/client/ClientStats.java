@@ -23,71 +23,83 @@ import java.util.Iterator;
 import org.voltdb.LatencyBucketSet;
 
 public class ClientStats {
-    final String procName;
-    final long since; // java.util.Date compatible microseconds since epoch
+    String m_procName;
+    long m_since; // java.util.Date compatible microseconds since epoch
 
-    public final long connectionId;
-    public final String hostname;
-    public final int port;
+    long m_connectionId;
+    String m_hostname;
+    int m_port;
 
-    final long invocationsCompleted;
-    final long invocationAborts;
-    final long invocationErrors;
+    long m_invocationsCompleted;
+    long m_invocationAborts;
+    long m_invocationErrors;
 
     // cumulative latency measured by client, used to calculate avg. lat.
-    final long roundTripTime; // microsecs
+    long m_roundTripTime; // microsecs
     // cumulative latency measured by the cluster, used to calculate avg lat.
-    final long clusterRoundTripTime; // microsecs
-
-    final int maxRoundTripTime; // microsecs
-    final int maxClusterRoundTripTime; // microsecs
+    long m_clusterRoundTripTime; // microsecs
 
     final public static int ONE_MS_BUCKET_COUNT = 50;
     final public static int TEN_MS_BUCKET_COUNT = 20;
     final public static int HUNDRED_MS_BUCKET_COUNT = 10;
 
-    final LatencyBucketSet latencyBy1ms;
-    final LatencyBucketSet latencyBy10ms;
-    final LatencyBucketSet latencyBy100ms;
+    LatencyBucketSet m_latencyBy1ms;
+    LatencyBucketSet m_latencyBy10ms;
+    LatencyBucketSet m_latencyBy100ms;
 
     ClientStats() {
-        procName = "";
-        connectionId = -1;
-        hostname = "";
-        port = -1;
-        since = Long.MAX_VALUE;
-        invocationsCompleted = invocationAborts = invocationErrors = 0;
-        roundTripTime = clusterRoundTripTime = 0;
-        maxRoundTripTime = maxClusterRoundTripTime = 0;
-        latencyBy1ms = new LatencyBucketSet(1, ONE_MS_BUCKET_COUNT);
-        latencyBy10ms = new LatencyBucketSet(10, TEN_MS_BUCKET_COUNT);
-        latencyBy100ms = new LatencyBucketSet(100, HUNDRED_MS_BUCKET_COUNT);
+        m_procName = "";
+        m_connectionId = -1;
+        m_hostname = "";
+        m_port = -1;
+        m_since = Long.MAX_VALUE;
+        m_invocationsCompleted = m_invocationAborts = m_invocationErrors = 0;
+        m_roundTripTime = m_clusterRoundTripTime = 0;
+        m_latencyBy1ms = new LatencyBucketSet(1, ONE_MS_BUCKET_COUNT);
+        m_latencyBy10ms = new LatencyBucketSet(10, TEN_MS_BUCKET_COUNT);
+        m_latencyBy100ms = new LatencyBucketSet(100, HUNDRED_MS_BUCKET_COUNT);
     }
 
-    ClientStats(ProcedureStatsTracker stats, boolean interval, long since) {
-        procName = stats.name;
-        connectionId = stats.connectionId;
-        hostname = stats.hostname;
-        port = stats.port;
+    ClientStats(ClientStats other) {
+        m_procName = other.m_procName;
+        m_connectionId = other.m_connectionId;
+        m_hostname = other.m_hostname;
+        m_port = other.m_port;
+        m_since = other.m_since;
+        m_invocationsCompleted = other.m_invocationsCompleted;
+        m_invocationAborts = other.m_invocationAborts;
+        m_invocationErrors = other.m_invocationErrors;
+        m_roundTripTime = other.m_roundTripTime;
+        m_clusterRoundTripTime = other.m_clusterRoundTripTime;
+        m_latencyBy1ms = (LatencyBucketSet) other.m_latencyBy1ms.clone();
+        m_latencyBy10ms = (LatencyBucketSet) other.m_latencyBy10ms.clone();
+        m_latencyBy100ms = (LatencyBucketSet) other.m_latencyBy100ms.clone();
+    }
 
-        ProcedureStatsTracker.Stats core = interval ?
-                stats.m_intervalStats : stats.m_lifetimeStats;
-
-        this.since = core.since;
-        invocationsCompleted = core.m_invocationsCompleted;
-        invocationAborts = core.m_invocationAborts;
-        invocationErrors = core.m_invocationErrors;
-        roundTripTime = core.m_roundTripTime;
-        clusterRoundTripTime = core.m_clusterRoundTripTime;
-        maxRoundTripTime = core.m_maxRoundTripTime;
-        maxClusterRoundTripTime = core.m_maxClusterRoundTripTime;
-        latencyBy1ms = (LatencyBucketSet) core.m_latencyBy1ms.clone();
-        latencyBy10ms = (LatencyBucketSet) core.m_latencyBy10ms.clone();
-        latencyBy100ms = (LatencyBucketSet) core.m_latencyBy100ms.clone();
-
-        if (interval) {
-            stats.resetInterval(since);
+    public static ClientStats diff(ClientStats newer, ClientStats older) {
+        if ((newer.m_procName != older.m_procName) || (newer.m_connectionId != older.m_connectionId)) {
+            throw new IllegalArgumentException("Can't diff these ClientStats instances.");
         }
+
+        ClientStats retval = new ClientStats();
+        retval.m_procName = older.m_procName;
+        retval.m_connectionId = older.m_connectionId;
+        retval.m_hostname = older.m_hostname;
+        retval.m_port = older.m_port;
+        retval.m_since = older.m_since;
+
+        retval.m_invocationsCompleted = newer.m_invocationsCompleted - older.m_invocationsCompleted;
+        retval.m_invocationAborts = newer.m_invocationAborts - older.m_invocationAborts;
+        retval.m_invocationErrors = newer.m_invocationErrors - older.m_invocationErrors;
+
+        retval.m_roundTripTime = newer.m_roundTripTime - older.m_roundTripTime;
+        retval.m_clusterRoundTripTime = newer.m_clusterRoundTripTime - older.m_clusterRoundTripTime;
+
+        retval.m_latencyBy1ms = LatencyBucketSet.diff(newer.m_latencyBy1ms, older.m_latencyBy1ms);
+        retval.m_latencyBy10ms = LatencyBucketSet.diff(newer.m_latencyBy10ms, older.m_latencyBy10ms);
+        retval.m_latencyBy100ms = LatencyBucketSet.diff(newer.m_latencyBy100ms, older.m_latencyBy100ms);
+
+        return retval;
     }
 
     static ClientStats merge(Iterable<ClientStats> statsIterable) {
@@ -103,146 +115,157 @@ public class ClientStats {
         // seed the grouping by the first element
         ClientStats seed = statsIter.next();
         assert(seed != null);
+        // non-destructive
+        seed = (ClientStats) seed.clone();
 
         // add in all the other elements
         while (statsIter.hasNext()) {
-            seed = new ClientStats(seed, statsIter.next());
+            seed.add(statsIter.next());
         }
         return seed;
     }
 
-    ClientStats(ClientStats ps1, ClientStats ps2) {
-        if (ps1.procName.equals(ps2.procName)) procName = ps1.procName;
-        else procName = "";
+    void add(ClientStats other) {
+        if (m_procName.equals(other.m_procName) == false)  m_procName = "";
+        if (m_connectionId != other.m_connectionId) m_connectionId = -1;
+        if (m_hostname.equals(other.m_hostname) == false) m_hostname = "";
+        if (m_port != other.m_port) m_port = -1;
 
-        if (ps1.connectionId == ps2.connectionId) connectionId = ps1.connectionId;
-        else connectionId = -1;
+        m_since = Math.min(other.m_since, m_since);
 
-        if (ps1.hostname.equals(ps2.hostname)) hostname = ps1.hostname;
-        else hostname = "";
+        m_invocationsCompleted = other.m_invocationsCompleted;
+        m_invocationAborts = other.m_invocationAborts;
+        m_invocationErrors = other.m_invocationErrors;
 
-        if (ps1.port == ps2.port) port = ps1.port;
-        else port = -1;
+        m_roundTripTime += other.m_roundTripTime;
+        m_clusterRoundTripTime += other.m_clusterRoundTripTime;
 
-        since = Math.min(ps1.since, ps2.since);
+        m_latencyBy1ms.add(other.m_latencyBy1ms);
+        m_latencyBy10ms.add(other.m_latencyBy10ms);
+        m_latencyBy100ms.add(other.m_latencyBy100ms);
+    }
 
-        invocationsCompleted = ps1.invocationsCompleted + ps2.invocationsCompleted;
-        invocationAborts = ps1.invocationAborts + ps2.invocationAborts;
-        invocationErrors = ps1.invocationErrors + ps2.invocationErrors;
+    void update(int roundTripTime, int clusterRoundTripTime, boolean abort, boolean error) {
+        m_invocationsCompleted++;
+        if (abort) m_invocationAborts++;
+        if (error) m_invocationErrors++;
+        m_roundTripTime += roundTripTime;
+        m_clusterRoundTripTime += clusterRoundTripTime;
 
-        roundTripTime = ps1.roundTripTime + ps2.roundTripTime;
-        clusterRoundTripTime = ps1.clusterRoundTripTime + ps2.clusterRoundTripTime;
-
-        maxRoundTripTime = Math.max(ps1.maxRoundTripTime, ps2.maxRoundTripTime);
-        maxClusterRoundTripTime = Math.max(ps1.maxClusterRoundTripTime, ps2.maxClusterRoundTripTime);
-
-        latencyBy1ms = LatencyBucketSet.merge(ps1.latencyBy1ms, ps2.latencyBy1ms);
-        latencyBy10ms = LatencyBucketSet.merge(ps1.latencyBy10ms, ps2.latencyBy10ms);
-        latencyBy100ms = LatencyBucketSet.merge(ps1.latencyBy100ms, ps2.latencyBy100ms);
+        // calculate the latency buckets to increment and increment.
+        m_latencyBy1ms.update(roundTripTime);
+        m_latencyBy10ms.update(roundTripTime);
+        m_latencyBy100ms.update(roundTripTime);
     }
 
     public String getProcedureName() {
-        return procName;
+        return m_procName;
     }
 
     public long getStartTimestamp() {
-        return since;
+        return m_since;
     }
 
     public long getConnectionId() {
-        return connectionId;
+        return m_connectionId;
     }
 
     public String getHostname() {
-        return hostname;
+        return m_hostname;
     }
 
     public int getPort() {
-        return port;
+        return m_port;
     }
 
     public long getInvocationsCompleted() {
-        return invocationsCompleted;
+        return m_invocationsCompleted;
     }
 
     public long getInvocationAborts() {
-        return invocationAborts;
+        return m_invocationAborts;
     }
 
     public long getInvocationErrors() {
-        return invocationErrors;
+        return m_invocationErrors;
     }
 
     public long getAverageLatency() {
-        return roundTripTime / invocationsCompleted;
+        if (m_invocationsCompleted == 0) return 0;
+        return m_roundTripTime / m_invocationsCompleted;
     }
 
     public long getAverageInternalLatency() {
-        return clusterRoundTripTime / invocationsCompleted;
-    }
-
-    public int maxLatency() {
-        return maxRoundTripTime;
-    }
-
-    public int maxIntraClusterLatency() {
-        return maxClusterRoundTripTime;
+        if (m_invocationsCompleted == 0) return 0;
+        return m_clusterRoundTripTime / m_invocationsCompleted;
     }
 
     public long[] getLatencyBucketsBy1ms() {
-        return latencyBy1ms.buckets.clone();
+        return m_latencyBy1ms.buckets.clone();
     }
 
     public long[] getLatencyBucketsBy10ms() {
-        return latencyBy10ms.buckets.clone();
+        return m_latencyBy10ms.buckets.clone();
     }
 
     public long[] getLatencyBucketsBy100ms() {
-        return latencyBy100ms.buckets.clone();
+        return m_latencyBy100ms.buckets.clone();
     }
 
     public int kPercentileLatency(double percentile) {
         int kpl;
 
-        kpl = latencyBy1ms.kPercentileLatency(percentile);
+        kpl = m_latencyBy1ms.kPercentileLatency(percentile);
         if (kpl != Integer.MAX_VALUE) {
             return kpl;
         }
 
-        kpl = latencyBy10ms.kPercentileLatency(percentile);
+        kpl = m_latencyBy10ms.kPercentileLatency(percentile);
         if (kpl != Integer.MAX_VALUE) {
             return kpl;
         }
 
-        return latencyBy100ms.kPercentileLatency(percentile);
+        kpl = m_latencyBy100ms.kPercentileLatency(percentile);
+        if (kpl != Integer.MAX_VALUE) {
+            return kpl;
+        }
+
+        return m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets * 2;
     }
 
     public long getThroughput(long now) {
-        if (now < since) {
-            now = since + 1; // 1 ms duration is sorta cheatin'
+        if (m_invocationsCompleted == 0) return 0;
+        if (now < m_since) {
+            now = m_since + 1; // 1 ms duration is sorta cheatin'
         }
-        long durationMs = now - since;
-        return (long) (invocationsCompleted / (durationMs / 1000.0));
+        long durationMs = now - m_since;
+        return (long) (m_invocationsCompleted / (durationMs / 1000.0));
     }
 
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("Since %s - Procedure: %s - ConnectionId: %d {\n",
-                new Date(since).toString(), procName, connectionId));
+                new Date(m_since).toString(), m_procName, m_connectionId));
         sb.append(String.format("    hostname: %s:%d\n",
-                hostname, port));
+                m_hostname, m_port));
         sb.append(String.format("    invocations completed/aborted/errors: %d/%d/%d\n",
-                invocationsCompleted, invocationAborts, invocationErrors));
-        if (invocationsCompleted > 0) {
+                m_invocationsCompleted, m_invocationAborts, m_invocationErrors));
+        if (m_invocationsCompleted > 0) {
             sb.append(String.format("    avg latency client/internal: %d/%d\n",
-                    roundTripTime / invocationsCompleted, clusterRoundTripTime / invocationsCompleted));
-            sb.append(String.format("    max latency client/internal: %d/%d\n",
-                    maxRoundTripTime, maxClusterRoundTripTime));
-            sb.append(latencyBy1ms).append("\n");
-            sb.append(latencyBy10ms).append("\n");
-            sb.append(latencyBy100ms).append("\n");
+                    m_roundTripTime / m_invocationsCompleted, m_clusterRoundTripTime / m_invocationsCompleted));
+            sb.append(m_latencyBy1ms).append("\n");
+            sb.append(m_latencyBy10ms).append("\n");
+            sb.append(m_latencyBy100ms).append("\n");
         }
 
         return sb.toString();
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#clone()
+     */
+    @Override
+    protected Object clone() {
+        return new ClientStats(this);
     }
 }
