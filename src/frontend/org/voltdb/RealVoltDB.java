@@ -1346,7 +1346,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
         String ipAddr = addr.getAddress().toString();
 
-        recoveryLog.info("Rejoining node with host id: " + rejoinHostId +
+        consoleLog.info("Rejoining node with host id: " + rejoinHostId +
                          ", hostname: " + ipAddr +
                          " at txnid: " + currentTxnId);
         lastNodeRejoinPrepare_txnId = currentTxnId;
@@ -1697,7 +1697,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         for (ClientInterface intf : getClientInterfaces()) {
             intf.mayActivateSnapshotDaemon();
         }
-        hostLog.info(
+        consoleLog.info(
                 "Node data recovery completed after " + delta + " seconds with " + megabytes +
                 " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
@@ -1763,7 +1763,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public void setReplicationRole(ReplicationRole role)
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
-            hostLog.info("Promoting replication role from replica to master.");
+            consoleLog.info("Promoting replication role from replica to master.");
         }
         m_config.m_replicationRole = role;
         for (ClientInterface ci : m_clientInterfaces) {

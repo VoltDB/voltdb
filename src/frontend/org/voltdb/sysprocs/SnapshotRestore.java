@@ -79,6 +79,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotRestore.class.getName());
 
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+    private static final VoltLogger CONSOLE_LOG = new VoltLogger("CONSOLE");
 
     private static final int DEP_restoreScan = (int)
             SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -804,7 +805,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         }
 
         final long startTime = System.currentTimeMillis();
-        HOST_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
+        CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
 
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
@@ -948,13 +949,12 @@ public class SnapshotRestore extends VoltSystemProcedure
         final PrintWriter pw = new PrintWriter(sw);
         pw.toString();
         pw.printf("%.2f", duration);
-        HOST_LOG.info("Finished restore of " + path + " with nonce: "
+        CONSOLE_LOG.info("Finished restore of " + path + " with nonce: "
                 + nonce + " in " + sw.toString() + " seconds");
         //        m_sampler.setShouldStop();
         //        try {
         //            m_sampler.join();
         //        } catch (InterruptedException e) {
-        //            // TODO Auto-generated catch block
         //            e.printStackTrace();
         //        }
         return results;
