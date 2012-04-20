@@ -28,28 +28,34 @@ public class ClientStatsContext {
     protected final Distributer m_distributor;
     protected Map<Long, Map<String, ClientStats>> m_baseline;
     protected Map<Long, Map<String, ClientStats>> m_current;
+    protected Map<Long, ClientIOStats> m_baselineIO;
+    protected Map<Long, ClientIOStats> m_currentIO;
     protected long m_baselineTS;
     protected long m_currentTS;
 
-    ClientStatsContext(Distributer distributor, Map<Long, Map<String, ClientStats>> current) {
+    ClientStatsContext(Distributer distributor,
+                       Map<Long, Map<String, ClientStats>> current,
+                       Map<Long, ClientIOStats> currentIO) {
         m_distributor = distributor;
         m_baseline = new TreeMap<Long, Map<String, ClientStats>>();
+        m_baselineIO = new TreeMap<Long, ClientIOStats>();
         m_current = current;
+        m_currentIO = currentIO;
         m_baselineTS = m_currentTS = System.currentTimeMillis();
-
     }
 
     public ClientStatsContext fetch() {
         m_current = m_distributor.getStatsSnapshot();
+        m_currentIO = m_distributor.getIOStatsSnapshot();
         m_currentTS = System.currentTimeMillis();
         return this;
     }
 
     public ClientStatsContext fetchAndResetBaseline() {
         m_baseline = m_current;
+        m_baselineIO = m_currentIO;
         m_baselineTS = m_currentTS;
-        m_current = m_distributor.getStatsSnapshot();
-        m_currentTS = System.currentTimeMillis();
+        fetch();
         return this;
     }
 
@@ -73,9 +79,16 @@ public class ClientStatsContext {
 
     public Map<Long, ClientStats> getStatsByConnection() {
         Map<Long, Map<String, ClientStats>> complete = getCompleteStats();
+        Map<Long, ClientIOStats> completeIO = diffIO(m_currentIO, m_baselineIO);
         Map<Long, ClientStats> retval = new TreeMap<Long, ClientStats>();
         for (Entry<Long, Map<String, ClientStats>> e : complete.entrySet()) {
-            retval.put(e.getKey(), ClientStats.merge(e.getValue().values()));
+            ClientStats cs = ClientStats.merge(e.getValue().values());
+            ClientIOStats cios = completeIO.get(e.getKey());
+            if (cios != null) {
+                cs.m_bytesReceived = cios.m_bytesReceived;
+                cs.m_bytesSent = cios.m_bytesSent;
+            }
+            retval.put(e.getKey(), cs);
         }
         return retval;
     }
@@ -123,7 +136,20 @@ public class ClientStatsContext {
         return ClientStats.merge(getStatsByConnection().values());
     }
 
-    public Map<String, ClientStats> diff(Map<String, ClientStats> newer, Map<String, ClientStats> older) {
+    Map<Long, ClientIOStats> diffIO(Map<Long, ClientIOStats> newer, Map<Long, ClientIOStats> older) {
+        Map<Long, ClientIOStats> retval = new TreeMap<Long, ClientIOStats>();
+        for (Entry<Long, ClientIOStats> e : newer.entrySet()) {
+            if (older.containsKey(e.getKey())) {
+                retval.put(e.getKey(), ClientIOStats.diff(e.getValue(), older.get(e.getKey())));
+            }
+            else {
+                retval.put(e.getKey(), (ClientIOStats) e.getValue().clone());
+            }
+        }
+        return retval;
+    }
+
+    Map<String, ClientStats> diff(Map<String, ClientStats> newer, Map<String, ClientStats> older) {
         Map<String, ClientStats> retval = new TreeMap<String, ClientStats>();
         for (Entry<String, ClientStats> e : newer.entrySet()) {
             if (older.containsKey(e.getKey())) {
@@ -136,7 +162,7 @@ public class ClientStatsContext {
         return retval;
     }
 
-    public Map<String, ClientStats> dup(Map<String, ClientStats> x) {
+    Map<String, ClientStats> dup(Map<String, ClientStats> x) {
         Map<String, ClientStats> retval = new TreeMap<String, ClientStats>();
         for (Entry<String, ClientStats> e : x.entrySet()) {
             retval.put(e.getKey(), (ClientStats) e.getValue().clone());

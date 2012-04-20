@@ -47,6 +47,9 @@ public class ClientStats {
     LatencyBucketSet m_latencyBy10ms;
     LatencyBucketSet m_latencyBy100ms;
 
+    long m_bytesSent;
+    long m_bytesReceived;
+
     ClientStats() {
         m_procName = "";
         m_connectionId = -1;
@@ -58,6 +61,7 @@ public class ClientStats {
         m_latencyBy1ms = new LatencyBucketSet(1, ONE_MS_BUCKET_COUNT);
         m_latencyBy10ms = new LatencyBucketSet(10, TEN_MS_BUCKET_COUNT);
         m_latencyBy100ms = new LatencyBucketSet(100, HUNDRED_MS_BUCKET_COUNT);
+        m_bytesSent = m_bytesReceived = 0;
     }
 
     ClientStats(ClientStats other) {
@@ -74,6 +78,8 @@ public class ClientStats {
         m_latencyBy1ms = (LatencyBucketSet) other.m_latencyBy1ms.clone();
         m_latencyBy10ms = (LatencyBucketSet) other.m_latencyBy10ms.clone();
         m_latencyBy100ms = (LatencyBucketSet) other.m_latencyBy100ms.clone();
+        m_bytesSent = other.m_bytesSent;
+        m_bytesReceived = other.m_bytesReceived;
     }
 
     public static ClientStats diff(ClientStats newer, ClientStats older) {
@@ -98,6 +104,9 @@ public class ClientStats {
         retval.m_latencyBy1ms = LatencyBucketSet.diff(newer.m_latencyBy1ms, older.m_latencyBy1ms);
         retval.m_latencyBy10ms = LatencyBucketSet.diff(newer.m_latencyBy10ms, older.m_latencyBy10ms);
         retval.m_latencyBy100ms = LatencyBucketSet.diff(newer.m_latencyBy100ms, older.m_latencyBy100ms);
+
+        retval.m_bytesSent = newer.m_bytesSent - older.m_bytesSent;
+        retval.m_bytesReceived = newer.m_bytesReceived - older.m_bytesReceived;
 
         return retval;
     }
@@ -143,6 +152,9 @@ public class ClientStats {
         m_latencyBy1ms.add(other.m_latencyBy1ms);
         m_latencyBy10ms.add(other.m_latencyBy10ms);
         m_latencyBy100ms.add(other.m_latencyBy100ms);
+
+        m_bytesSent += other.m_bytesSent;
+        m_bytesReceived += other.m_bytesReceived;
     }
 
     void update(int roundTripTime, int clusterRoundTripTime, boolean abort, boolean error) {
@@ -233,13 +245,23 @@ public class ClientStats {
         return m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets * 2;
     }
 
-    public long getThroughput(long now) {
+    public long getTxnThroughput(long now) {
         if (m_invocationsCompleted == 0) return 0;
         if (now < m_since) {
             now = m_since + 1; // 1 ms duration is sorta cheatin'
         }
         long durationMs = now - m_since;
         return (long) (m_invocationsCompleted / (durationMs / 1000.0));
+    }
+
+    public long getIOWriteThroughput(long now) {
+        long durationMs = now - m_since;
+        return (long) (m_bytesSent / (durationMs / 1000.0));
+    }
+
+    public long getIOReadThroughput(long now) {
+        long durationMs = now - m_since;
+        return (long) (m_bytesReceived / (durationMs / 1000.0));
     }
 
     public String toString() {

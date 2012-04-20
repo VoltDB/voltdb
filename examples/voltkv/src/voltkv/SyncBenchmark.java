@@ -273,7 +273,7 @@ public class SyncBenchmark {
         long time = Math.round((System.currentTimeMillis() - benchmarkStartTS) / 1000.0);
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Throughput %.0f/s, ", stats.getThroughput(now));
+        System.out.printf("Throughput %.0f/s, ", stats.getTxnThroughput(now));
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
@@ -332,7 +332,7 @@ public class SyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         long now = System.currentTimeMillis();
-        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getThroughput(now));
+        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput(now));
         System.out.printf("Average latency:               %,9d ms\n", stats.getAverageLatency());
         System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
         System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));

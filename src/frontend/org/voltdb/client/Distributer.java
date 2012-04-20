@@ -45,6 +45,7 @@ import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.Pair;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -631,7 +632,7 @@ class Distributer {
     }
 
     ClientStatsContext createStatsContext() {
-        return new ClientStatsContext(this, getStatsSnapshot());
+        return new ClientStatsContext(this, getStatsSnapshot(), getIOStatsSnapshot());
     }
 
     Map<Long, Map<String, ClientStats>> getStatsSnapshot() {
@@ -645,6 +646,26 @@ class Distributer {
                     connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
                 }
                 retval.put(conn.connectionId(), connMap);
+            }
+        }
+
+        return retval;
+    }
+
+    Map<Long, ClientIOStats> getIOStatsSnapshot() {
+        Map<Long, ClientIOStats> retval = new TreeMap<Long, ClientIOStats>();
+
+        synchronized (this) {
+            Map<Long, Pair<String, long[]>> ioStats = m_network.getIOStats(false);
+            for (NodeConnection conn : m_connections) {
+                Pair<String, long[]> perConnIOStats = ioStats.get(conn.connectionId());
+                if (perConnIOStats == null) continue;
+
+                long read = perConnIOStats.getSecond()[0];
+                long write = perConnIOStats.getSecond()[2];
+
+                ClientIOStats cios = new ClientIOStats(conn.connectionId(), read, write);
+                retval.put(conn.connectionId(), cios);
             }
         }
 
