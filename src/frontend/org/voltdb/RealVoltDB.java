@@ -1712,7 +1712,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             if (logRecoveryCompleted) {
                 m_recovering = false;
-                hostLog.info("Node recovery completed");
+                consoleLog.info("Node recovery completed");
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host recovery completion to ZK", true, e);
@@ -1858,7 +1858,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public synchronized void recoveryComplete() {
         m_recovering = false;
-        hostLog.info("Node recovery completed");
+        consoleLog.info("Node recovery completed");
     }
 
     @Override
