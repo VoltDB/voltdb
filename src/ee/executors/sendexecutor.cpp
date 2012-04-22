@@ -62,6 +62,28 @@
 
 namespace voltdb {
 
+namespace detail {
+
+struct SendExecutorState
+{   
+    SendExecutorState(SendPlanNode* node) :
+        m_child(NULL) 
+    {
+        std::vector<AbstractPlanNode*>& children = node->getChildren();
+        assert(children.size() == 1);
+        m_child = children[0];
+    }
+
+    AbstractPlanNode* m_child;
+};
+
+} // namespace detail
+
+SendExecutor::SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
+    : AbstractExecutor(engine, abstractNode), 
+      m_inputTable(NULL), m_engine(engine), m_state()
+{}
+
 bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
                           TempTableLimits* limits)
 {
@@ -77,6 +99,10 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
     // Just pass our input table on through...
     //
     node->setOutputTable(node->getInputTables()[0]);
+    
+    //
+    //@TODO pullexec prototype
+    m_state.reset(new detail::SendExecutorState(node));
 
     return true;
 }
@@ -94,6 +120,56 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());
 
     return true;
+}
+
+
+//@TODO pullexec prototype
+TableTuple SendExecutor::p_next_pull(const NValueArray &params, bool& status) 
+{
+    // Simply get the next tuple from the child executor
+    return m_state->m_child->getExecutor()->p_next_pull(params, status);
+}
+
+bool SendExecutor::p_pre_execute_pull(const NValueArray &params) {
+    //
+    // Initialize children
+    //
+    return AbstractExecutor::p_pre_execute_pull(m_abstractNode, params);
+}
+
+bool SendExecutor::p_post_execute_pull(const NValueArray &params) 
+{
+    //
+    // Recurs to children.
+    //
+    if (AbstractExecutor::p_post_execute_pull(m_abstractNode, params) != true)
+        return false;
+    
+    // Just blast the input table on through VoltDBEngine!
+    if (!m_engine->send(m_inputTable)) {
+        VOLT_ERROR("Failed to send table '%s'", m_inputTable->name().c_str());
+        return false;
+    }
+    VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());
+
+    return true;
+    
+}
+
+bool SendExecutor::p_insert_output_table_pull(TableTuple& tuple)
+{
+    bool status = m_inputTable->insertTuple(tuple);
+    if (!status)
+    {
+        VOLT_ERROR("Failed to insert tuple into output table '%s'",
+                   m_inputTable->name().c_str());
+    }
+    return true;
+}
+
+bool SendExecutor::is_enabled_pull() const
+{
+    return AbstractExecutor::p_is_enabled_pull(m_abstractNode);
 }
 
 }

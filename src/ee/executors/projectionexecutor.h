@@ -55,6 +55,12 @@
 
 namespace voltdb {
 
+// Aggregate Struct to keep Executor state in between iteration 
+namespace detail
+{
+    struct ProjectionExecutorState;
+} //namespace detail
+
 class AbstractExpression;
 class TempTable;
 class Table;
@@ -64,10 +70,10 @@ class Table;
  */
 class ProjectionExecutor : public AbstractExecutor {
     public:
-        ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
-            output_table = NULL;
-        }
+        ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        
         ~ProjectionExecutor();
+    
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
@@ -87,6 +93,20 @@ class ProjectionExecutor : public AbstractExecutor {
 
         boost::shared_array<AbstractExpression*> expression_array_ptr;
         AbstractExpression** expression_array;
+        
+    //@TODO pullexec prototype
+    public:
+        TableTuple p_next_pull(const NValueArray& params, bool& status);
+        bool is_enabled_pull() const;
+
+    protected:
+
+        boost::shared_ptr<detail::ProjectionExecutorState> m_state;
+
+        bool p_pre_execute_pull(const NValueArray& params);
+        bool p_post_execute_pull(const NValueArray& params);
+        bool p_insert_output_table_pull(TableTuple& tuple);
+        
 };
 
 }

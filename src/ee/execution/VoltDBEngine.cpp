@@ -358,7 +358,11 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
     size_t ttl = execsForFrag->list.size();
-    for (int ctr = 0; ctr < ttl; ++ctr) {
+
+//@TODO pullexec prototype
+// need to refactor
+    bool isPullEnabled = (ttl > 0) ? execsForFrag->list[ttl - 1]->is_enabled_pull() : false;   
+    for (size_t ctr = (isPullEnabled)? ttl - 1 : 0; ctr < ttl; ++ctr) {
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
 
@@ -369,7 +373,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute(params)) {
+            bool result = (isPullEnabled)?
+                executor->execute_pull(params) : executor->execute(params);
+            if (!result) {
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
@@ -395,6 +401,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             return ENGINE_ERRORCODE_ERROR;
         }
     }
+    
+    
     if (cleanUpTable != NULL)
         cleanUpTable->deleteAllTuples(false);
 
