@@ -69,6 +69,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     private final ExecutorTxnIdSafetyState m_safetyState;
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private ClientInterface m_clientInterface;
     public void setClientInterface(ClientInterface ci) {
@@ -106,7 +107,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                long timestampTestingSalt)
     {
         assert(messenger != null);
-        hostLog.info("Initializing initiator ID: " + initiatorId  + ", SiteID: " + siteId);
+        consoleLog.info("Initializing initiator ID: " + initiatorId  + ", SiteID: " + siteId);
 
         m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);
         m_hostId = hostId;

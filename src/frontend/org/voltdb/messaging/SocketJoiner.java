@@ -54,6 +54,7 @@ public class SocketJoiner extends Thread {
 
     private static final VoltLogger LOG = new VoltLogger(SocketJoiner.class.getName());
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     //static final int BASE_PORT = 3021;
     static final int COORD_HOSTID = 0;
     static final int COMMAND_NONE = 0;
@@ -166,8 +167,7 @@ public class SocketJoiner extends Thread {
 
         // if the cluster has already started and this is a rejoin
         if (m_listenerSocket != null) {
-            if (m_hostLog != null)
-                m_hostLog.info("Connecting to existing VoltDB cluster as a replacement...");
+            consoleLog.info("Connecting to existing VoltDB cluster as a replacement...");
             runJoinExisting();
         }
         // join a new cluster as primary or existing
