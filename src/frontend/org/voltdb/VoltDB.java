@@ -322,7 +322,11 @@ public class VoltDB {
                     usage();
                     System.exit(-1);
                 }
-
+            }
+            // ENG-2815 If deployment is null (the user wants the default) and
+            // leader is null, supply the only valid leader value ("localhost").
+            if (m_leader == null && m_pathToDeployment == null) {
+                m_leader = "localhost";
             }
         }
 
@@ -333,6 +337,13 @@ public class VoltDB {
          */
         public boolean validate() {
             boolean isValid = true;
+
+            if (m_startAction != START_ACTION.START &&
+                m_rejoinToHostAndPort != null &&
+                m_pathToCatalog == null) {
+                isValid = false;
+                hostLog.fatal("The catalog location is missing.");
+            }
 
             if (m_leader == null && m_rejoinToHostAndPort == null) {
                 isValid = false;
