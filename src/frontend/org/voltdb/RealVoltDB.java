@@ -1947,7 +1947,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         String pathToDeployment = voltDbRoot.getPath() + File.separator + "deployment.xml";
         File deploymentXMLFile = new File(pathToDeployment);
 
-        // Only create the file if it doesn't exist, otherwise reuse it.
         hostLog.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
         BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
         for (String line : defaultDeploymentXML) {

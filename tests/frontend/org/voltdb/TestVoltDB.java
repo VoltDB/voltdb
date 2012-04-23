@@ -99,12 +99,14 @@ public class TestVoltDB extends TestCase {
     public void testConfigurationValidate() {
         VoltDB.Configuration config;
 
-        // missing leader, catalog and missing deployment
+        // missing leader, catalog and missing deployment:
+        // implied START with all defaults.
         String[] args1 = {};
         config = new VoltDB.Configuration(args1);
-        assertFalse(config.validate());
+        assertTrue(config.validate());
+        assertEquals(START_ACTION.START, config.m_startAction);
 
-        // missing leader
+        // missing leader provided deployment - not okay.
         String[] argsya = {"catalog", "qwerty", "deployment", "qwerty"};
         config = new VoltDB.Configuration(argsya);
         assertFalse(config.validate());
@@ -112,6 +114,10 @@ public class TestVoltDB extends TestCase {
         // missing deployment (it's okay now that a default deployment is supported)
         String[] args3 = {"leader", "hola", "catalog", "teststring2"};
         config = new VoltDB.Configuration(args3);
+        assertTrue(config.validate());
+
+        // default deployment with default leader -- okay.
+        config = new VoltDB.Configuration(new String[]{"catalog", "catalog.jar"});
         assertTrue(config.validate());
 
         // empty leader
@@ -128,21 +134,29 @@ public class TestVoltDB extends TestCase {
         String[] args7 = {"leader", "hola", "deployment", "teststring4", "replica", "recover"};
         config = new VoltDB.Configuration(args7);
         assertFalse(config.validate());
+        // rtb: START is idiotic -- here it always implies CREATE.
+        config = new VoltDB.Configuration(new String[]{"leader", "l", "deployment", "d.xml", "replica", "start"});
+        assertTrue(config.validate());
+        assertEquals(START_ACTION.CREATE, config.m_startAction);
 
-        // replica with create
-        String[] args8 = {"leader", "hola", "deployment", "teststring4", "replica", "create"};
+        // replica with explicit create
+        String[] args8 = {"leader", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica", "create"};
         config = new VoltDB.Configuration(args8);
         assertTrue(config.validate());
 
-        // replica with default
-        String[] args9 = {"leader", "hola", "deployment", "teststring4", "replica"};
+        // replica with default action of create
+        String[] args9 = {"leader", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica"};
         config = new VoltDB.Configuration(args9);
         assertTrue(config.validate());
         assertEquals(START_ACTION.CREATE, config.m_startAction);
 
         // valid config
-        String[] args100 = {"leader", "hola", "deployment", "teststring4"};
+        String[] args100 = {"leader", "hola", "deployment", "teststring4", "catalog", "catalog.jar"};
         config = new VoltDB.Configuration(args100);
+        assertTrue(config.validate());
+
+        // valid config -- assumes start, so catalog is correctly optional
+        config = new VoltDB.Configuration(new String[]{"leader", "ldr", "deployment", "d.xml"});
         assertTrue(config.validate());
     }
 
