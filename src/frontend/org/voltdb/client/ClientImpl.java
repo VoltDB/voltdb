@@ -18,18 +18,18 @@
 package org.voltdb.client;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.MiscUtils;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -72,8 +72,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                         Public API
      ****************************************************/
 
-    private final Semaphore m_maxOutstanding = new Semaphore(0);
-
     private volatile boolean m_isShutdown = false;
 
     /**
@@ -91,7 +89,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 config.m_expectedOutgoingMessageSize,
                 config.m_maxArenaSizes,
                 config.m_heavyweight,
-                config.m_statsSettings,
                 config.m_procedureCallTimeoutMS,
                 config.m_connectionResponseTimeoutMS);
         m_distributer.addClientStatusListener(new CSL());
@@ -101,8 +98,15 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             m_distributer.addClientStatusListener(config.m_listener);
         }
         assert(config.m_maxOutstandingTxns > 0);
-        m_maxOutstanding.release(config.m_maxOutstandingTxns);
         m_blessedThreadIds.addAll(m_distributer.getThreadIds());
+        if (config.m_autoTune) {
+            m_distributer.m_rateLimiter.enableAutoTuning(
+                    config.m_autoTuneTargetInternalLatency);
+        }
+        else {
+            m_distributer.m_rateLimiter.setLimits(
+                    config.m_maxTransactionsPerSecond, config.m_maxOutstandingTxns);
+        }
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
@@ -312,27 +316,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
-        if (!isBlessed) {
-            try {
-                m_maxOutstanding.acquire();
-            } catch (InterruptedException e) {
-                throw new java.io.InterruptedIOException(e.toString());
-            }
-        }
-        final ProcedureCallback userCallback = callback;
-        ProcedureCallback callbackToReturnPermit = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                m_maxOutstanding.release();
-                userCallback.clientCallback(clientResponse);
-            }
-
-        };
         if (m_blockingQueue) {
             while (!m_distributer.queue(
                     invocation,
-                    callbackToReturnPermit,
+                    callback,
                     expectedSerializedSize,
                     isBlessed)) {
                 try {
@@ -345,7 +332,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         } else {
             return m_distributer.queue(
                     invocation,
-                    callbackToReturnPermit,
+                    callback,
                     expectedSerializedSize,
                     isBlessed);
         }
@@ -470,38 +457,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public VoltTable getIOStats() {
-        return m_distributer.getConnectionStats(false);
-    }
-
-    @Override
-    public VoltTable getIOStatsInterval() {
-        return m_distributer.getConnectionStats(true);
+    public ClientStatsContext createStatsContext() {
+        return m_distributer.createStatsContext();
     }
 
     @Override
     public Object[] getInstanceId() {
         return m_distributer.getInstanceId();
-    }
-
-    @Override
-    public VoltTable getProcedureStats() {
-        return m_distributer.getProcedureStats(false);
-    }
-
-    @Override
-    public VoltTable getProcedureStatsInterval() {
-        return m_distributer.getProcedureStats(true);
-    }
-
-    @Override
-    public VoltTable getClientRTTLatencies() {
-        return m_distributer.getClientRTTLatencies(false);
-    }
-
-    @Override
-    public VoltTable getClusterRTTLatencies() {
-        return m_distributer.getClusterRTTLatencies(false);
     }
 
     @Override
@@ -520,7 +482,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        createConnectionWithHashedCredentials( host, Client.VOLTDB_SERVER_PORT, m_username, m_passwordHash);
+        int port = MiscUtils.getPortFromHostnameColonPort(host, Client.VOLTDB_SERVER_PORT);
+        host = MiscUtils.getHostnameFromHostnameColonPort(host);
+        createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
     }
 
     @Override
@@ -529,6 +493,30 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        createConnectionWithHashedCredentials( host, port, m_username, m_passwordHash);
+        createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
+    }
+
+    @Override
+    public int[] getThroughputAndOutstandingTxnLimits() {
+        return m_distributer.m_rateLimiter.getLimits();
+    }
+
+    @Override
+    public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        // don't do anything (be silent) if empty path
+        if ((path == null) || (path.length() == 0)) {
+            return;
+        }
+
+        FileWriter fw = new FileWriter(path);
+        fw.append(String.format("%d,%d,%d,%d,%d,%d,%d\n",
+                stats.getStartTimestamp(),
+                stats.getDuration(),
+                stats.getInvocationsCompleted(),
+                stats.kPercentileLatency(0.0),
+                stats.kPercentileLatency(1.0),
+                stats.kPercentileLatency(0.95),
+                stats.kPercentileLatency(0.99)));
+        fw.close();
     }
 }
