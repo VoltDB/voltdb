@@ -969,8 +969,24 @@ public class SnapshotRestore extends VoltSystemProcedure
          * the command logging is enabled and the database start action
          * was create
          */
-        if (VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl") &&
-                VoltDB.instance().getConfig().m_startAction == VoltDB.START_ACTION.CREATE) {
+        final VoltDB.START_ACTION startAction = VoltDB.instance().getConfig().m_startAction;
+        final org.voltdb.OperationMode mode = VoltDB.instance().getMode();
+
+        /*
+         * Is this the start action and no recovery is being performed. The mode
+         * will not be INITIALIZING, it will PAUSED or RUNNING. If that is the case,
+         * we do want a truncation snapshot if CL is enabled.
+         */
+        final boolean isStartWithNoAutomatedRestore =
+            startAction == VoltDB.START_ACTION.START && mode != org.voltdb.OperationMode.INITIALIZING;
+
+        final boolean isCLEnabled =
+            VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl");
+
+        final boolean isStartedWithCreateAction = startAction == VoltDB.START_ACTION.CREATE;
+
+        if ( isCLEnabled && (isStartedWithCreateAction || isStartWithNoAutomatedRestore)) {
+
             final ZooKeeper zk = VoltDB.instance().getZK();
             HOST_LOG.info("Requesting truncation snapshot to make data loaded by snapshot restore durable.");
             zk.create(
@@ -984,8 +1000,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 String name) {
                             if (rc != 0) {
                                 KeeperException.Code code = KeeperException.Code.get(rc);
-                                if (code == KeeperException.Code.NODEEXISTS) {
-                                } else {
+                                if (code != KeeperException.Code.NODEEXISTS) {
                                     HOST_LOG.warn(
                                             "Don't expect this ZK response when requesting a truncation snapshot "
                                             + code);
