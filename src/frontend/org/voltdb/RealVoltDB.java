@@ -18,9 +18,11 @@
 package org.voltdb;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -107,6 +109,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
+
+    /** Default deployment file contents if path to deployment is null */
+    private static final String[] defaultDeploymentXML = {
+        "<?xml version=\"1.0\"?>",
+        "<!-- IMPORTANT: This file is an auto-generated default deployment configuration.",
+        "                Changes to this file will be overwritten. Copy it elsewhere if you",
+        "                want to use it as a starting point for a custom configuration. -->",
+        "<deployment>",
+        "   <cluster hostcount=\"1\" sitesperhost=\"2\" />",
+        "   <httpd enabled=\"true\">",
+        "      <jsonapi enabled=\"true\" />",
+        "   </httpd>",
+        "</deployment>"
+    };
 
     static class RejoinCallback implements ProcedureCallback {
         ClientResponse response;
@@ -264,6 +280,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         synchronized(m_startAndStopLock) {
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+            // If there's no deployment provide a default and put it under voltdbroot.
+            if (config.m_pathToDeployment == null) {
+                try {
+                    config.m_pathToDeployment = setupDefaultDeployment();
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
+                }
+            }
 
             m_config = config;
             m_startMode = null;
@@ -1906,4 +1931,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     {
         return m_replicationActive;
     }
+
+    /**
+     * Create default deployment.xml file in voltdbroot if the deployment path is null.
+     *
+     * @return path to default deployment file
+     * @throws IOException
+     */
+    private static String setupDefaultDeployment() throws IOException {
+
+        // Since there's apparently no deployment to override the path to voltdbroot it should be
+        // safe to assume it's under the working directory.
+        // CatalogUtil.getVoltDbRoot() creates the voltdbroot directory as needed.
+        File voltDbRoot = CatalogUtil.getVoltDbRoot(null);
+        String pathToDeployment = voltDbRoot.getPath() + File.separator + "deployment.xml";
+        File deploymentXMLFile = new File(pathToDeployment);
+
+        // Only create the file if it doesn't exist, otherwise reuse it.
+        hostLog.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
+        BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
+        for (String line : defaultDeploymentXML) {
+            bw.write(line);
+            bw.newLine();
+        }
+        bw.flush();
+        bw.close();
+
+        return deploymentXMLFile.getAbsolutePath();
+    }
+
 }
