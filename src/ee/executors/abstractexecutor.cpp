@@ -145,3 +145,96 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
 }
 
 AbstractExecutor::~AbstractExecutor() {}
+
+
+
+//@TODO pullexec prototype
+
+bool AbstractExecutor::execute_pull(const NValueArray& params)
+{    
+    assert(m_abstractNode);
+    VOLT_TRACE("Starting execution of plannode(id=%d)...",
+               m_abstractNode->getPlanNodeId());
+
+    if (m_tmpOutputTable)
+    {
+        VOLT_TRACE("Clearing output table...");
+        m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+    }
+
+    // hook to give executor a chance to perform some initialization if necessary
+    // potentially could be used to call children in push mode
+    // recurs to children
+    if (p_pre_execute_pull(params) != true)
+        return false;
+
+    
+    // run the executor
+    bool status = true;
+    while (true)
+    {
+        // iteration stops when no more tuples are available (tuple with no data set)
+        // or error status is set
+        // Executor specific tuple processing is inside p_next_pull for now
+        TableTuple tuple = p_next_pull(params, status);
+        if (tuple.isNullTuple() || status == false)
+            break;
+        // Insert processed tuple into the output table
+        status = p_insert_output_table_pull(tuple);    
+    }
+    
+    if (status)
+    {
+        // some executors need to do some work after the iteration
+        // send executor, for example
+        // recurs to children
+        status = p_post_execute_pull(params);
+    }
+
+    return status;
+}
+
+
+// need generic iterator over the children
+bool AbstractExecutor::p_pre_execute_pull(AbstractPlanNode* node, const NValueArray& params)
+{
+    assert(node != NULL);
+    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
+    {
+        AbstractExecutor* executor = (*it)->getExecutor();
+        assert(executor != NULL);
+        if (executor->p_pre_execute_pull(params) != true)
+            return false;
+    }
+    return true;
+}
+
+bool AbstractExecutor::p_post_execute_pull(AbstractPlanNode* node, const NValueArray& params)
+{
+    assert(node != NULL);
+    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
+    {
+        AbstractExecutor* executor = (*it)->getExecutor();
+        assert(executor != NULL);
+        if (executor->p_post_execute_pull(params) != true)
+            return false;
+    }
+    return true;
+}
+
+bool AbstractExecutor::p_is_enabled_pull(AbstractPlanNode* node)
+{
+    assert(node != NULL);
+    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
+    {
+        AbstractExecutor* executor = (*it)->getExecutor();
+        assert(executor != NULL);
+        if (executor->is_enabled_pull() != true)
+            return false;
+    }
+    return true;
+}
+

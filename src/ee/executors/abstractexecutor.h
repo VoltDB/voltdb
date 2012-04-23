@@ -109,6 +109,42 @@ class AbstractExecutor {
 
     // cache to avoid runtime virtual function call
     bool needs_outputtable_clear_cached;
+    
+    //@TODO pullexec prototype
+  public:  
+    /** Invoke a plannode's associated executor in pull mode */
+    bool execute_pull(const NValueArray& params);
+    
+  
+  public:
+    // Gets next available tuple from input table 
+    // and also applies executor specific logic. 
+    // Better be two separate methods
+    // needs to be pure
+    virtual TableTuple p_next_pull(const NValueArray& params, bool& status) { return TableTuple(); }
+    // Returns True if executor and all its children are pull enabled
+    // needs to be pure
+    virtual bool is_enabled_pull() const { return false; }
+    
+  protected:
+    
+    // Last minute init before the p_next_pull iteration
+    // needs to be pure
+    virtual bool p_pre_execute_pull(const NValueArray& params) { return false; }
+    
+    // Cleans up after the p_next_pull iteration
+    // needs to be pure
+    virtual bool p_post_execute_pull(const NValueArray& params) { return false; }
+    
+    // Saves processed tuple
+    // needs to be pure
+    virtual bool p_insert_output_table_pull(TableTuple& tuple) { return false; }
+    
+    // Corresponding static methods to recurs to children
+    // Need generic method
+    static bool p_pre_execute_pull(AbstractPlanNode* node, const NValueArray& params);
+    static bool p_post_execute_pull(AbstractPlanNode* node, const NValueArray& params);
+    static bool p_is_enabled_pull(AbstractPlanNode* node);
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)

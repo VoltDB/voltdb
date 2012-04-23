@@ -60,6 +60,36 @@
 
 using namespace voltdb;
 
+namespace voltdb {
+namespace detail {
+
+    struct SeqScanExecutorState
+    {   
+        SeqScanExecutorState(SeqScanPlanNode* node) :
+            m_node(node), 
+            m_outputTable(m_node->getOutputTable()),
+            m_targetTable(dynamic_cast<Table*>(m_node->getTargetTable())),
+            m_iterator(m_targetTable->iterator()),
+            m_predicate(m_node->getPredicate()),
+            m_tupleCtr(0)
+        {}
+            
+        SeqScanPlanNode* m_node;
+        Table* m_outputTable;
+        Table* m_targetTable;
+        TableIterator m_iterator;
+        AbstractExpression* m_predicate;
+        int m_tupleCtr;
+    };
+
+} // namespace detail
+} // namespace voltdb
+
+SeqScanExecutor::SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node), m_state()
+{}
+
+
 bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
 {
@@ -253,4 +283,106 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("Finished Seq scanning");
 
     return true;
+}
+
+
+//@TODO pullexec prototype
+TableTuple SeqScanExecutor::p_next_pull(const NValueArray &params, bool& status) {
+
+    TableTuple tuple(m_state->m_targetTable->schema());
+    bool result = false;
+    //
+    // if there is a predicate find the next tuple which satisfies it
+    //
+    if (m_state->m_node->getPredicate() != NULL)
+    {
+        while (m_state->m_iterator.next(tuple) == true)
+        {
+            VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
+                       tuple.debug(m_state->m_targetTable->name()).c_str(), m_state->m_tupleCtr,
+                       (int)m_state->m_targetTable->activeTupleCount());
+            if ((result = m_state->m_node->getPredicate()->eval(&tuple, NULL).isTrue()) == true)
+                break;
+        }
+    }
+    else
+    {
+        result = m_state->m_iterator.next(tuple);
+    }
+    
+    // set status
+    status = true;
+    if (result == true)
+    {
+        ++m_state->m_tupleCtr;
+        return tuple;
+    }
+    else
+    {
+        // return an empty one
+        return TableTuple(m_state->m_targetTable->schema());
+    }
+}
+
+bool SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
+    //
+    // Initialize children
+    //
+    if (AbstractExecutor::p_pre_execute_pull(m_abstractNode, params) != true)
+        return false;
+        
+    //
+    // Initialize itself
+    //
+    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
+    assert(node);
+    m_state.reset(new detail::SeqScanExecutorState(node));
+    
+    // too late for these two
+    assert(m_state->m_outputTable);
+    assert(m_state->m_targetTable);
+    VOLT_TRACE("Sequential Scanning table :\n %s",
+               m_state->m_targetTable->debug().c_str());
+    VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
+               " allocated, %d used tuples",
+               m_state->m_targetTable->name().c_str(),
+               (int)m_state->m_targetTable->activeTupleCount(),
+               (int)m_state->m_targetTable->allocatedTupleCount(),
+               (int)m_state->m_targetTable->usedTupleCount());
+               
+    VOLT_TRACE("SCAN PREDICATE A:\n%s\n", m_state->m_predicate->debug(true).c_str());
+    if (m_state->m_predicate)
+    {
+        m_state->m_predicate->substitute(params);
+        assert(m_state->m_predicate != NULL);
+        VOLT_DEBUG("SCAN PREDICATE B:\n%s\n",
+                   m_state->m_predicate->debug(true).c_str());
+    }
+    return true;
+}
+
+bool SeqScanExecutor::p_post_execute_pull(const NValueArray &params) 
+{
+    //
+    // Recurs to children. Nothing to do here
+    //
+    return AbstractExecutor::p_post_execute_pull(m_abstractNode, params);
+}
+
+bool SeqScanExecutor::p_insert_output_table_pull(TableTuple& tuple)
+{
+    if (!m_state->m_outputTable->insertTuple(tuple))
+    {
+        VOLT_ERROR("Failed to insert tuple from table '%s' into"
+                   " output table '%s'",
+                   m_state->m_targetTable->name().c_str(),
+                   m_state->m_outputTable->name().c_str());
+        return false;
+    }
+    return true;
+}
+
+bool SeqScanExecutor::is_enabled_pull() const
+{
+    return AbstractExecutor::p_is_enabled_pull(m_abstractNode);
 }

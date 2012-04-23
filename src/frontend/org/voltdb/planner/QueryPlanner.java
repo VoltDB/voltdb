@@ -72,8 +72,10 @@ public class QueryPlanner {
         m_cluster = catalogCluster;
         m_estimates = estimates;
         m_useGlobalIds = useGlobalIds;
-        m_quietPlanner = suppressDebugOutput;
-        m_fullDebug = System.getProperties().contains("compilerdebug");
+        //m_quietPlanner = suppressDebugOutput;
+        //m_fullDebug = System.getProperties().contains("compilerdebug");
+        m_quietPlanner = false;
+        m_fullDebug = true;
     }
 
     /**

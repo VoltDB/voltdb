@@ -53,17 +53,18 @@
 
 namespace voltdb {
 
+// Aggregate Struct to keep Executor state in between iteration 
+namespace detail
+{
+    struct SendExecutorState;
+} //namespace detail
+
 class SendPlanNode;
 
 class SendExecutor : public AbstractExecutor
 {
 public:
-    SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode)
-    {
-        m_inputTable = NULL;
-        m_engine = engine;
-    }
+    SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode);
 
 protected:
     bool p_init(AbstractPlanNode*,
@@ -77,6 +78,21 @@ protected:
 private:
     Table* m_inputTable;
     VoltDBEngine *m_engine;
+    
+    
+//@TODO pullexec prototype
+public:
+    TableTuple p_next_pull(const NValueArray& params, bool& status);
+    bool is_enabled_pull() const;
+
+protected:
+
+    boost::shared_ptr<detail::SendExecutorState> m_state;
+
+    bool p_pre_execute_pull(const NValueArray& params);
+    bool p_post_execute_pull(const NValueArray& params);
+    bool p_insert_output_table_pull(TableTuple& tuple);
+        
 };
 
 }
