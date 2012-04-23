@@ -913,7 +913,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         }
 
         /*
-         * Serialize all the export sequence nubmers and then distribute them in a
+         * Serialize all the export sequence numbers and then distribute them in a
          * plan fragment and each receiver will pull the relevant information for
          * itself
          */
