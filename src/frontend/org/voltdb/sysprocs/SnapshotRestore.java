@@ -38,6 +38,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -957,8 +962,40 @@ public class SnapshotRestore extends VoltSystemProcedure
         //        } catch (InterruptedException e) {
         //            e.printStackTrace();
         //        }
+
+        /*
+         * ENG-1858, make data loaded by snapshot restore durable
+         * immediately by starting a truncation snapshot if
+         * the command logging is enabled and the database start action
+         * was create
+         */
+        if (VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl") &&
+                VoltDB.instance().getConfig().m_startAction == VoltDB.START_ACTION.CREATE) {
+            final ZooKeeper zk = VoltDB.instance().getZK();
+            HOST_LOG.info("Requesting truncation snapshot to make data loaded by snapshot restore durable.");
+            zk.create(
+                    "/request_truncation_snapshot",
+                    null,
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT,
+                    new StringCallback() {
+                        @Override
+                        public void processResult(int rc, String path, Object ctx,
+                                String name) {
+                            if (rc != 0) {
+                                KeeperException.Code code = KeeperException.Code.get(rc);
+                                if (code == KeeperException.Code.NODEEXISTS) {
+                                } else {
+                                    HOST_LOG.warn(
+                                            "Don't expect this ZK response when requesting a truncation snapshot "
+                                            + code);
+                                }
+                            }
+                        }},
+                    null);
+        }
         return results;
-            }
+    }
 
     private VoltTable[] performDistributeExportSequenceNumbers(
             byte[] exportSequenceNumberBytes,
