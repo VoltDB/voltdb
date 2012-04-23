@@ -272,7 +272,8 @@ class Distributer {
                 stats.m_hostname = m_hostname;
                 stats.m_port = m_port;
                 stats.m_procName = procName;
-                stats.m_since = System.currentTimeMillis();
+                stats.m_startTS = System.currentTimeMillis();
+                stats.m_endTS = Long.MIN_VALUE;
                 m_stats.put(procName, stats);
             }
             stats.update(roundTrip, clusterRoundTrip, abort, failure);

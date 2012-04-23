@@ -23,15 +23,27 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+/**
+ * <p>An object to store and manipulate statistics information from
+ * the VoltDB Java client. Each instance has a set of timestamped
+ * baseline statistics and a set of timestamped current statistics.
+ * Given these two sets of data, this object can return statistics
+ * covering the period between the baseline data and current data.</p>
+ *
+ * <p>An instance is created using {@link Client#createStatsContext()}.
+ * Mutliple instances can coexist, each covering a different time
+ * period. See the Voter example in /examples for an example of using
+ * one context for long term stats and another for short term updates.</p>
+ */
 public class ClientStatsContext {
 
-    protected final Distributer m_distributor;
-    protected Map<Long, Map<String, ClientStats>> m_baseline;
-    protected Map<Long, Map<String, ClientStats>> m_current;
-    protected Map<Long, ClientIOStats> m_baselineIO;
-    protected Map<Long, ClientIOStats> m_currentIO;
-    protected long m_baselineTS;
-    protected long m_currentTS;
+    final Distributer m_distributor;
+    Map<Long, Map<String, ClientStats>> m_baseline;
+    Map<Long, Map<String, ClientStats>> m_current;
+    Map<Long, ClientIOStats> m_baselineIO;
+    Map<Long, ClientIOStats> m_currentIO;
+    long m_baselineTS;
+    long m_currentTS;
 
     ClientStatsContext(Distributer distributor,
                        Map<Long, Map<String, ClientStats>> current,
@@ -44,6 +56,14 @@ public class ClientStatsContext {
         m_baselineTS = m_currentTS = System.currentTimeMillis();
     }
 
+    /**
+     * Fetch current statistics from the client internals. Don't
+     * update the baseline. This will increase the range covered
+     * by any {@link ClientStats} instances returned from this
+     * context.
+     *
+     * @return A <code>this</code> pointer for chaining calls.
+     */
     public ClientStatsContext fetch() {
         m_current = m_distributor.getStatsSnapshot();
         m_currentIO = m_distributor.getIOStatsSnapshot();
@@ -51,6 +71,14 @@ public class ClientStatsContext {
         return this;
     }
 
+    /**
+     * Fetch current statistics from the client internals. Update
+     * the baseline to be the previously current statistics. This
+     * will update the range covered by any {@link ClientStats}
+     * instances returned from this context.
+     *
+     * @return A <code>this</code> pointer for chaining calls.
+     */
     public ClientStatsContext fetchAndResetBaseline() {
         m_baseline = m_current;
         m_baselineIO = m_currentIO;
@@ -59,6 +87,25 @@ public class ClientStatsContext {
         return this;
     }
 
+    /**
+     * Return a {@link ClientStats} that covers all procedures and
+     * all connection ids. The {@link ClientStats} instance will
+     * apply to the time period currently covered by the context.
+     *
+     * @return A {@link ClientStats} instance.
+     */
+    public ClientStats getStats() {
+        return ClientStats.merge(getStatsByConnection().values());
+    }
+
+    /**
+     * Return a map of {@link ClientStats} by procedure name. This will
+     * roll up {@link ClientStats} instances by connection id. Each
+     * {@link ClientStats} instance will apply to the time period
+     * currently covered by the context.
+     *
+     * @return A map from procedure name to {@link ClientStats} instances.
+     */
     public Map<String, ClientStats> getStatsByProc() {
         Map<Long, Map<String, ClientStats>> complete = getCompleteStats();
         Map<String, ClientStats> retval = new TreeMap<String, ClientStats>();
@@ -77,6 +124,17 @@ public class ClientStatsContext {
         return retval;
     }
 
+    /**
+     * Return a map of {@link ClientStats} by connection id. This will
+     * roll up {@link ClientStats} instances by procedure name for each
+     * connection. Note that connection id is unique, while hostname and
+     * port may not be. Hostname and port will be included in the
+     * {@link ClientStats} instance data. Each {@link ClientStats}
+     * instance will apply to the time period currently covered by the
+     * context.
+     *
+     * @return A map from connection id to {@link ClientStats} instances.
+     */
     public Map<Long, ClientStats> getStatsByConnection() {
         Map<Long, Map<String, ClientStats>> complete = getCompleteStats();
         Map<Long, ClientIOStats> completeIO = diffIO(m_currentIO, m_baselineIO);
@@ -93,6 +151,17 @@ public class ClientStatsContext {
         return retval;
     }
 
+    /**
+     * Return a map of maps by connection id. Each sub-map maps procedure
+     * names to {@link ClientStats} instances. Note that connection id is
+     * unique, while hostname and port may not be. Hostname and port will
+     * be included in the {@link ClientStats} instance data. Each
+     * {@link ClientStats} instance will apply to the time period currently
+     * covered by the context. This is full set of data available from this
+     * context instance.
+     *
+     * @return A map from connection id to {@link ClientStats} instances.
+     */
     public Map<Long, Map<String, ClientStats>> getCompleteStats() {
         Map<Long, Map<String, ClientStats>> retval =
                 new TreeMap<Long, Map<String, ClientStats>>();
@@ -106,17 +175,26 @@ public class ClientStatsContext {
             }
         }
 
-        // reset the since field to reflect the difference
+        // reset the timestamp fields to reflect the difference
         for (Entry<Long, Map<String, ClientStats>> e : retval.entrySet()) {
             for (Entry<String, ClientStats> e2 : e.getValue().entrySet()) {
                 ClientStats cs = e2.getValue();
-                cs.m_since = Math.max(cs.m_since, m_baselineTS);
+                cs.m_startTS = Math.max(cs.m_startTS, m_baselineTS);
+                cs.m_endTS = Math.min(cs.m_endTS, m_currentTS);
             }
         }
 
         return retval;
     }
 
+    /**
+     * Return a {@link ClientStats} instance for a specific procedure
+     * name. This will be rolled up across all connections. The
+     * {@link ClientStats} instance will apply to the time period
+     * currently covered by the context.
+     *
+     * @return A {@link ClientStats} instance.
+     */
     public ClientStats getStatsForProcedure(String procedureName) {
         Map<Long, Map<String, ClientStats>> complete = getCompleteStats();
         List<ClientStats> statsForProc = new ArrayList<ClientStats>();
@@ -130,10 +208,6 @@ public class ClientStatsContext {
             return null;
         }
         return ClientStats.merge(statsForProc);
-    }
-
-    public ClientStats getStats() {
-        return ClientStats.merge(getStatsByConnection().values());
     }
 
     Map<Long, ClientIOStats> diffIO(Map<Long, ClientIOStats> newer, Map<Long, ClientIOStats> older) {

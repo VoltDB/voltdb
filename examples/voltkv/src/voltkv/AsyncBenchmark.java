@@ -286,11 +286,10 @@ public class AsyncBenchmark {
      */
     public synchronized void printStatistics() {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-        long now = System.currentTimeMillis();
-        long time = Math.round((System.currentTimeMillis() - benchmarkStartTS) / 1000.0);
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput(now));
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
@@ -348,8 +347,7 @@ public class AsyncBenchmark {
         System.out.println(" Client Workload Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        long now = System.currentTimeMillis();
-        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput(now));
+        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9d ms\n", stats.getAverageLatency());
         System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
         System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));

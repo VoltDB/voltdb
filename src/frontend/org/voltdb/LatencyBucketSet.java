@@ -54,10 +54,10 @@ public class LatencyBucketSet {
      * in a bucket.
      */
     public int kPercentileLatency(double percentile) {
-        if ((percentile >= 1.0) || (percentile < 0.0)) {
+        if ((percentile > 1.0) || (percentile < 0.0)) {
             throw new IllegalArgumentException(
-                    "KPercentileLatency accepts values greater or equal to 0 " +
-                    "and less than 1");
+                    "KPercentileLatency accepts values greater or equal to 0.0 " +
+                    "and less than or equal to 1.0");
         }
 
         // 0 for no txns?
@@ -67,6 +67,7 @@ public class LatencyBucketSet {
         long k = (long) (totalTxns * percentile);
         // ensure k=0 gives min latency
         if (k == 0) ++k;
+        if (k > totalTxns) k = totalTxns; // this shouldn't happen but FP math is iffy
 
         // if 0 or outside the range of buckets, return MAX_VALUE
         if ((totalTxns == 0) || (k > (totalTxns - unaccountedTxns))) {

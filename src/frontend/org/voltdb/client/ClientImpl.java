@@ -510,11 +510,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
         FileWriter fw = new FileWriter(path);
         fw.append(String.format("%d,%d,%d,%d,%d,%d,%d\n",
-                stats.m_since,
-                System.currentTimeMillis() - stats.m_since,
-                stats.m_invocationsCompleted,
+                stats.getStartTimestamp(),
+                stats.getDuration(),
+                stats.getInvocationsCompleted(),
                 stats.kPercentileLatency(0.0),
-                stats.kPercentileLatency(.99999),
+                stats.kPercentileLatency(1.0),
                 stats.kPercentileLatency(0.95),
                 stats.kPercentileLatency(0.99)));
         fw.close();
