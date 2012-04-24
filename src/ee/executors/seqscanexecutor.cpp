@@ -328,7 +328,8 @@ bool SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
     //
     // Initialize children
     //
-    if (AbstractExecutor::p_pre_execute_pull(m_abstractNode, params) != true)
+    detail::Method m = &AbstractExecutor::p_pre_execute_pull;
+    if (detail::iterate_children_pull(m, m_abstractNode, params) != true)
         return false;
         
     //
@@ -366,7 +367,8 @@ bool SeqScanExecutor::p_post_execute_pull(const NValueArray &params)
     //
     // Recurs to children. Nothing to do here
     //
-    return AbstractExecutor::p_post_execute_pull(m_abstractNode, params);
+    detail::Method m = &AbstractExecutor::p_post_execute_pull;
+    return detail::iterate_children_pull(m, m_abstractNode, params);
 }
 
 bool SeqScanExecutor::p_insert_output_table_pull(TableTuple& tuple)
@@ -382,7 +384,14 @@ bool SeqScanExecutor::p_insert_output_table_pull(TableTuple& tuple)
     return true;
 }
 
+/*
 bool SeqScanExecutor::is_enabled_pull() const
 {
     return AbstractExecutor::p_is_enabled_pull(m_abstractNode);
+}
+*/
+bool SeqScanExecutor::is_enabled_pull(const NValueArray& params) const
+{
+    detail::MethodC m = &AbstractExecutor::is_enabled_pull;
+    return detail::iterate_children_pull(m, m_abstractNode, params);
 }

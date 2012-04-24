@@ -114,7 +114,7 @@ class AbstractExecutor {
   public:  
     /** Invoke a plannode's associated executor in pull mode */
     bool execute_pull(const NValueArray& params);
-    
+    bool clearOutputTable_pull(const NValueArray& params);
   
   public:
     // Gets next available tuple from input table 
@@ -124,9 +124,9 @@ class AbstractExecutor {
     virtual TableTuple p_next_pull(const NValueArray& params, bool& status) { return TableTuple(); }
     // Returns True if executor and all its children are pull enabled
     // needs to be pure
-    virtual bool is_enabled_pull() const { return false; }
+    virtual bool is_enabled_pull(const NValueArray&) const { return false; }
     
-  protected:
+  //protected:
     
     // Last minute init before the p_next_pull iteration
     // needs to be pure
@@ -140,11 +140,13 @@ class AbstractExecutor {
     // needs to be pure
     virtual bool p_insert_output_table_pull(TableTuple& tuple) { return false; }
     
+    /*
     // Corresponding static methods to recurs to children
     // Need generic method
     static bool p_pre_execute_pull(AbstractPlanNode* node, const NValueArray& params);
     static bool p_post_execute_pull(AbstractPlanNode* node, const NValueArray& params);
     static bool p_is_enabled_pull(AbstractPlanNode* node);
+    */
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
@@ -162,6 +164,27 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     // run the executor
     return p_execute(params);
 }
+
+namespace detail {
+typedef bool (AbstractExecutor::*Method)(const NValueArray&);
+typedef bool (AbstractExecutor::*MethodC)(const NValueArray&) const;
+
+template <typename Method>
+bool iterate_children_pull(Method m, AbstractPlanNode* node, const NValueArray& params)
+{
+    assert(node != NULL);
+    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
+    {
+        AbstractExecutor* executor = (*it)->getExecutor();
+        assert(executor != NULL);
+        if ((executor->*m)(params) != true)
+            return false;
+    }
+    return true;
+}
+
+} //namespace detail 
 
 }
 

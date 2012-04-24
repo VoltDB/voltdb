@@ -361,7 +361,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
 
 //@TODO pullexec prototype
 // need to refactor
-    bool isPullEnabled = (ttl > 0) ? execsForFrag->list[ttl - 1]->is_enabled_pull() : false;   
+    bool isPullEnabled = (ttl > 0) ? execsForFrag->list[ttl - 1]->is_enabled_pull(params) : false;   
     for (size_t ctr = (isPullEnabled)? ttl - 1 : 0; ctr < ttl; ++ctr) {
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
@@ -379,7 +379,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
-                if (cleanUpTable != NULL)
+                if (isPullEnabled)
+                    executor->clearOutputTable_pull(params);
+                else if (cleanUpTable != NULL)
                     cleanUpTable->deleteAllTuples(false);
                 // set these back to -1 for error handling
                 m_currentOutputDepId = -1;
@@ -390,7 +392,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-            if (cleanUpTable != NULL)
+            if (isPullEnabled)
+                executor->clearOutputTable_pull(params);
+            else if (cleanUpTable != NULL)
                 cleanUpTable->deleteAllTuples(false);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
@@ -402,8 +406,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         }
     }
     
-    
-    if (cleanUpTable != NULL)
+    if (isPullEnabled)
+        execsForFrag->list[ttl-1]->clearOutputTable_pull(params);
+    else if (cleanUpTable != NULL)
         cleanUpTable->deleteAllTuples(false);
 
     // assume this is sendless dml

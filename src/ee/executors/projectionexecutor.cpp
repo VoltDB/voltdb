@@ -255,7 +255,8 @@ bool ProjectionExecutor::p_pre_execute_pull(const NValueArray &params) {
     assert (input_table);
 
     // Init children
-    if (AbstractExecutor::p_pre_execute_pull(m_abstractNode, params) != true)
+    detail::Method m = &AbstractExecutor::p_pre_execute_pull;
+    if (detail::iterate_children_pull(m, m_abstractNode, params) != true)
         return false;
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
@@ -283,7 +284,8 @@ bool ProjectionExecutor::p_post_execute_pull(const NValueArray &params)
     //
     // Recurs to children.
     //
-    return AbstractExecutor::p_post_execute_pull(m_abstractNode, params);
+    detail::Method m = &AbstractExecutor::p_post_execute_pull;
+    return detail::iterate_children_pull(m, m_abstractNode, params);
 }
 
 bool ProjectionExecutor::p_insert_output_table_pull(TableTuple& tuple)
@@ -301,9 +303,16 @@ bool ProjectionExecutor::p_insert_output_table_pull(TableTuple& tuple)
     return true;
 }
 
+/*
 bool ProjectionExecutor::is_enabled_pull() const
 {
     return AbstractExecutor::p_is_enabled_pull(m_abstractNode);
+}
+*/
+bool ProjectionExecutor::is_enabled_pull(const NValueArray& params) const
+{
+    detail::MethodC m = &AbstractExecutor::is_enabled_pull;
+    return detail::iterate_children_pull(m, m_abstractNode, params);
 }
 
 }

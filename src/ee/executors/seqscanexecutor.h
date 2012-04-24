@@ -78,9 +78,9 @@ namespace voltdb
     //@TODO pullexec prototype
     public:
         TableTuple p_next_pull(const NValueArray& params, bool& status);
-        bool is_enabled_pull() const;
+        bool is_enabled_pull(const NValueArray&) const;
         
-    protected:
+    //protected:
     
         boost::shared_ptr<detail::SeqScanExecutorState> m_state;
         

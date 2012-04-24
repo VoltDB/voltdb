@@ -194,7 +194,21 @@ bool AbstractExecutor::execute_pull(const NValueArray& params)
     return status;
 }
 
+bool AbstractExecutor::clearOutputTable_pull(const NValueArray& params)
+{
+    detail::Method m = &AbstractExecutor::clearOutputTable_pull;
+    detail::iterate_children_pull(m, m_abstractNode, params);
+    if (this->needsOutputTableClear())
+    {
+        Table *cleanUpTable = 
+            dynamic_cast<Table*>(this->getPlanNode()->getOutputTable());
+        assert(cleanUpTable);
+        cleanUpTable->deleteAllTuples(false);
+    }
+    return true;
+}
 
+/*
 // need generic iterator over the children
 bool AbstractExecutor::p_pre_execute_pull(AbstractPlanNode* node, const NValueArray& params)
 {
@@ -237,4 +251,4 @@ bool AbstractExecutor::p_is_enabled_pull(AbstractPlanNode* node)
     }
     return true;
 }
-
+*/

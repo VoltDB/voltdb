@@ -97,9 +97,12 @@ class ProjectionExecutor : public AbstractExecutor {
     //@TODO pullexec prototype
     public:
         TableTuple p_next_pull(const NValueArray& params, bool& status);
-        bool is_enabled_pull() const;
+        bool is_enabled_pull(const NValueArray&) const;
 
-    protected:
+        //@TODO just a hack
+        bool needsPostExecuteClear() { return true; }
+        
+    //protected:
 
         boost::shared_ptr<detail::ProjectionExecutorState> m_state;
 
