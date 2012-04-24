@@ -104,6 +104,7 @@ class ProjectionExecutor : public AbstractExecutor {
         
     //protected:
 
+ //@TODO Should "own" this pointer? (same comment applies to other executors) --paul
         boost::shared_ptr<detail::ProjectionExecutorState> m_state;
 
         bool p_pre_execute_pull(const NValueArray& params);

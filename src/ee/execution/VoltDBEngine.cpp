@@ -353,6 +353,13 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     assert (iter != m_executorMap.end());
     boost::shared_ptr<ExecutorVector> execsForFrag = iter->second;
 
+//@TODO One suggestion for streamlining this code is to ASSUME pull support.
+// Any node that does not actually implement an optimized execute_pull instead inherits a sub-optimal default behavior from AbstractExecutor that:
+// Implements p_pre_execute_pull to do the following:
+// - Recursively constructs a (depth-first) list of its child(ren).
+// - Calls execute on each of them, and finally itself.
+// Implements p_next_pull to retrieve each row from its output table (previously populated by its execute method).
+
     // Walk through the queue and execute each plannode.  The query
     // planner guarantees that for a given plannode, all of its
     // children are positioned before it in this list, therefore

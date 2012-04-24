@@ -113,6 +113,7 @@ class AbstractExecutor {
     //@TODO pullexec prototype
   public:  
     /** Invoke a plannode's associated executor in pull mode */
+//@TODO I don't envision a need for params in these functions (that can't be easily optimized out into p_pre_execute_pull). --paul
     bool execute_pull(const NValueArray& params);
     bool clearOutputTable_pull(const NValueArray& params);
   
@@ -121,29 +122,36 @@ class AbstractExecutor {
     // and also applies executor specific logic. 
     // Better be two separate methods
     // needs to be pure
+//@TODO See the suggestion in VoltDBEngine.cpp for sub-optimal but simplifying default behavior for this function: --paul
     virtual TableTuple p_next_pull(const NValueArray& params, bool& status) { return TableTuple(); }
     // Returns True if executor and all its children are pull enabled
     // needs to be pure
     virtual bool is_enabled_pull(const NValueArray&) const { return false; }
     
   //protected:
-    
+
+//@TODO See the suggestion in VoltDBEngine.cpp for sub-optimal but simplifying default behavior for this function: --paul
     // Last minute init before the p_next_pull iteration
     // needs to be pure
     virtual bool p_pre_execute_pull(const NValueArray& params) { return false; }
-    
+
+//@TODO Would this make sense to default to the pass-through recursive call? --paul
     // Cleans up after the p_next_pull iteration
     // needs to be pure
     virtual bool p_post_execute_pull(const NValueArray& params) { return false; }
     
     // Saves processed tuple
     // needs to be pure
+//@TODO Would it be possible to have a "smarter" default implementation for this that generically inserted into a node's (optional) output table? --paul
+// Specific executors could STILL refine/override that behavior.
     virtual bool p_insert_output_table_pull(TableTuple& tuple) { return false; }
     
     /*
+//@TODO These would be slightly simpler as member functions that always operated on m_abstractNode instead of always having that exact value passed into them. --paul
     // Corresponding static methods to recurs to children
     // Need generic method
     static bool p_pre_execute_pull(AbstractPlanNode* node, const NValueArray& params);
+//@TODO I don't envision a need for params in these functions (that can't be easily optimized out). --paul
     static bool p_post_execute_pull(AbstractPlanNode* node, const NValueArray& params);
     static bool p_is_enabled_pull(AbstractPlanNode* node);
     */
@@ -165,6 +173,13 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     return p_execute(params);
 }
 
+//@TODO: The details of this template function are a little at cross-purposes to my suggestions about simplifying the method signatures. --paul
+// I suggest generalizing the Method parameter to allow Method m to be a generic "single-argument function object" that can be called
+// via "m(executor)" and can contain/encapsulate any other arguments (like params) it may need.
+// Since I don't envision specific executor classes needing to define and apply new generic abstract executor methods,
+// I'd go (back) to wrapping this functionality inside easy-to-call abstract executor member functions,
+// and further (in most cases) provide them as default "pass-through" implementations of virtual functions for classes that don't have
+// specific behavior requirements beyond cooperation with the recursion protocol.
 namespace detail {
 typedef bool (AbstractExecutor::*Method)(const NValueArray&);
 typedef bool (AbstractExecutor::*MethodC)(const NValueArray&) const;

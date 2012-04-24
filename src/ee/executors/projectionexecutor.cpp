@@ -68,6 +68,9 @@ struct ProjectionExecutorState
         assert(children.size() == 1);
         m_child = children[0];
     }
+//@TODO These members seem a little abstract. --paul
+// It seems like more details could be pre-computed and cached here  for better "inner loop" performance in p_next_pull.
+//  (same comment applies to other executors)
     ProjectionPlanNode* m_node;
     AbstractPlanNode* m_child;
 };
@@ -224,6 +227,7 @@ TableTuple ProjectionExecutor::p_next_pull(const NValueArray &params, bool& stat
             }
         } else if (all_param_array != NULL) {
             VOLT_TRACE("sweet, all params");
+//@TODO The all-params temp tuple could be initialized once in pre_execute and cached on the state.
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
                 temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
             }
