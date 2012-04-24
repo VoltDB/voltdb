@@ -167,9 +167,9 @@ public class ClientStats {
         m_startTS = Math.min(other.m_startTS, m_startTS);
         m_endTS = Math.max(other.m_endTS, m_endTS);
 
-        m_invocationsCompleted = other.m_invocationsCompleted;
-        m_invocationAborts = other.m_invocationAborts;
-        m_invocationErrors = other.m_invocationErrors;
+        m_invocationsCompleted += other.m_invocationsCompleted;
+        m_invocationAborts += other.m_invocationAborts;
+        m_invocationErrors += other.m_invocationErrors;
 
         m_roundTripTime += other.m_roundTripTime;
         m_clusterRoundTripTime += other.m_clusterRoundTripTime;

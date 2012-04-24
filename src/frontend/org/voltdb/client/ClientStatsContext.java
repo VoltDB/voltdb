@@ -179,8 +179,8 @@ public class ClientStatsContext {
         for (Entry<Long, Map<String, ClientStats>> e : retval.entrySet()) {
             for (Entry<String, ClientStats> e2 : e.getValue().entrySet()) {
                 ClientStats cs = e2.getValue();
-                cs.m_startTS = Math.min(cs.m_startTS, m_baselineTS);
-                cs.m_endTS = Math.max(cs.m_endTS, m_currentTS);
+                cs.m_startTS = m_baselineTS;
+                cs.m_endTS = m_currentTS;
                 assert(cs.m_startTS != Long.MAX_VALUE);
                 assert(cs.m_endTS != Long.MIN_VALUE);
             }
