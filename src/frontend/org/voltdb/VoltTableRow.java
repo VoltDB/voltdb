@@ -28,8 +28,6 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 /**
- * <h3>Summary</h3>
- *
  * <p>Represents the interface to a row in a VoltTable result set.</p>
  *
  * <h3>Accessing Row Fields</h3>
