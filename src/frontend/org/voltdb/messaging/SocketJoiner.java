@@ -211,12 +211,12 @@ public class SocketJoiner extends Thread {
                     }
                 }
                 if (m_hostLog != null)
-                    m_hostLog.info("Connecting to VoltDB cluster as the leader...");
+                    consoleLog.info("Connecting to VoltDB cluster as the leader...");
                 runPrimary();
             }
             else {
                 if (m_hostLog != null) {
-                    m_hostLog.info("Connecting to the VoltDB cluster leader "
+                    consoleLog.info("Connecting to the VoltDB cluster leader "
                             + m_coordIp + ":" + m_internalPort);
                 }
                 runNonPrimary();
@@ -384,19 +384,19 @@ public class SocketJoiner extends Thread {
             }
 
             if (m_hostLog != null)
-                m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to leader)");
+                consoleLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to leader)");
             if ((errors & NTP_FAILURE) != 0) {
                 if (m_hostLog != null)
-                    m_hostLog.error("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
+                    m_hostLog.fatal("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
                                    "% higher than allowable limit");
             }
             if ((errors & CRC_FAILURE) != 0) {
                 if (m_hostLog != null)
-                    m_hostLog.error("Catalog checksums do not match across cluster");
+                    m_hostLog.fatal("Catalog checksums do not match across cluster");
             }
             if ((errors & DEPCRC_FAILURE) != 0) {
                 if (m_hostLog != null)
-                    m_hostLog.error("Deployment file checksums do not match across cluster");
+                    m_hostLog.fatal("Deployment file checksums do not match across cluster");
             }
             if (errors != 0) {
                 VoltDB.crashLocalVoltDB("Errors found", false, null);
