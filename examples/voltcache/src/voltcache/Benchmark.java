@@ -185,7 +185,7 @@ public class Benchmark
             int minValueSize       = apph.intValue("minvaluesize");
             int maxValueSize       = apph.intValue("maxvaluesize");
             boolean useCompression = apph.booleanValue("usecompression");
-            final String csv       = apph.stringValue("stats");
+            final String csv       = apph.stringValue("statsfile");
 
 
             // Validate parameters
