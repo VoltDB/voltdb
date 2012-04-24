@@ -440,7 +440,7 @@ public class Inits {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpPort);
                 } catch (Exception e1) {
-                    hostLog.info("HTTP admin console unable to bind to port " + httpPort + ". Exiting.");
+                    hostLog.fatal("HTTP admin console unable to bind to port " + httpPort + ". Exiting.");
                     System.exit(-1);
                 }
             }
