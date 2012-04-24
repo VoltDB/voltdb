@@ -81,10 +81,10 @@ public class AsyncBenchmark
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
                 .add("contestants", "contestant_count", "Number of contestants in the voting contest (from 1 to 10).", 6)
                 .add("voter", "voter_count", "Max number of voters (from 305 to 3050000000)", 3050000000l)
-                .add("max-votes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
+                .add("maxvotes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
+                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
                 .setArguments(args)
             ;
 
@@ -95,10 +95,10 @@ public class AsyncBenchmark
             int port             = apph.intValue("port");
             int contestantCount  = apph.intValue("contestants");
             long voterCount      = apph.longValue("voter");
-            int maxVoteCount     = apph.intValue("max-votes");
+            int maxVoteCount     = apph.intValue("maxvotes");
             long rateLimit       = apph.longValue("ratelimit");
             boolean autoTune     = apph.booleanValue("autotune");
-            double latencyTarget = apph.doubleValue("latency-target");
+            double latencyTarget = apph.doubleValue("latencytarget");
             final String csv     = apph.stringValue("stats");
 
 
@@ -106,7 +106,7 @@ public class AsyncBenchmark
             apph.validate("duration", (duration > 0))
                 .validate("displayinterval", (displayInterval > 0))
                 .validate("contestants", (contestantCount > 0))
-                .validate("max-votes", (maxVoteCount > 0))
+                .validate("maxvotes", (maxVoteCount > 0))
                 .validate("ratelimit", (rateLimit > 0))
                 .validate("latency-target", (latencyTarget > 0))
             ;
