@@ -212,8 +212,11 @@ public interface Client {
     public void backpressureBarrier() throws InterruptedException;
 
     /**
-     * Get IO stats for each connection as well as globally
-     * @return Table containing IO stats
+     * Get a {@link ClientStatsContext} instance to fetch and process performance
+     * statistics. Each instance is linked to this client, but provides a custom
+     * view of statistics for a desired time period.
+     *
+     * @return Statistics context object linked to this client.
      */
     public ClientStatsContext createStatsContext();
 
