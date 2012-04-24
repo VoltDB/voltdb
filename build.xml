@@ -338,8 +338,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatusListenerExt.java" />
             <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
-            <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
-            <include name="src/frontend/org/voltdb/client/exampleutils/*.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStats.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>

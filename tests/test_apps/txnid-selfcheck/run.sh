@@ -56,12 +56,12 @@ function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
-        --rate-limit=100000 \
-        --auto-tune=false \
+        --ratelimit=100000 \
+        --autotune=false \
         --latency-target=10.0
 }
 
@@ -77,12 +77,12 @@ function sync-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.SyncBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
         --contestants=6 \
-        --max-votes=2
+        --maxvotes=2
 }
 
 # JDBC benchmark sample
@@ -97,12 +97,12 @@ function jdbc-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.JDBCBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
         --contestants=6 \
-        --max-votes=2
+        --maxvotes=2
 }
 
 function help() {

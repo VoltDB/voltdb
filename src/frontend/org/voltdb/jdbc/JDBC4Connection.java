@@ -373,7 +373,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setAutoCommit(boolean autoCommit) throws SQLException
     {
         checkClosed();
-    if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
+        if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
             throw SQLError.noSupport();
     }
 

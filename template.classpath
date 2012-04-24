@@ -12,6 +12,7 @@
 	<classpathentry kind="src" path="src/hsqldb19b3"/>
 	<classpathentry kind="src" path="third_party/java/src"/>
 	<classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
+	<classpathentry kind="lib" path="lib/commons-cli-1.2.jar"/>
 	<classpathentry kind="lib" path="lib/jline-1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>

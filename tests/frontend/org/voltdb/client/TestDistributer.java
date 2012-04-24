@@ -316,7 +316,7 @@ public class TestDistributer extends TestCase {
 
             CSL csl = new CSL();
 
-            Distributer dist = new Distributer(128, null, false, null,
+            Distributer dist = new Distributer(128, null, false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS);
             dist.addClientStatusListener(csl);
@@ -403,7 +403,7 @@ public class TestDistributer extends TestCase {
         volt.start();
 
         // create distributer and connect it to the client
-        Distributer dist = new Distributer(128, null, false, null,
+        Distributer dist = new Distributer(128, null, false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 1000 /* One second connection timeout */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -458,7 +458,7 @@ public class TestDistributer extends TestCase {
         volt.start();
 
         // create distributer and connect it to the client
-        Distributer dist = new Distributer(128, null, false, null,
+        Distributer dist = new Distributer(128, null, false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 CONNECTION_TIMEOUT /* six second connection timeout */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());

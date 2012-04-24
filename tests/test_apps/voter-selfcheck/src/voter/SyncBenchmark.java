@@ -117,7 +117,7 @@ public class SyncBenchmark
             // Define parameters and pull from command line
             AppHelper apph = new AppHelper(SyncBenchmark.class.getCanonicalName())
                 .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
+                .add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
@@ -129,7 +129,7 @@ public class SyncBenchmark
 
             // Retrieve parameters
             int threadCount      = apph.intValue("threads");
-            long displayInterval = apph.longValue("display-interval");
+            long displayInterval = apph.longValue("displayinterval");
             long duration        = apph.longValue("duration");
             String servers       = apph.stringValue("servers");
             int port             = apph.intValue("port");
@@ -140,7 +140,7 @@ public class SyncBenchmark
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
+                .validate("displayinterval", (displayInterval > 0))
                 .validate("threads", (threadCount > 0))
                 .validate("contestants", (contestantCount > 0))
                 .validate("max-votes", (maxVoteCount > 0))

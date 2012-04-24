@@ -76,8 +76,6 @@ the direct ByteBuffers used by the EE are expensive to allocate and free, so we 
 rely on the garbage collector.
  */
 /**
- * <h3>Summary</h3>
- *
  * <p>The primary representation of a result set (of tuples) or a temporary
  * table in VoltDB. VoltTable has arbitrary schema, is serializable,
  * and is used from within Stored Procedures and from the client library.</p>

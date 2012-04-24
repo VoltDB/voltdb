@@ -107,8 +107,8 @@ public class MyLoader
         m_helpah.add("scale-factor", "scale_factor", "Scale factor", 1.0);
         m_helpah.add("skew-factor", "skew_factor", "Skew factor", 0.0);
         m_helpah.add("load-threads", "number_of_load_threads", "Number of load threads", 4);
-        m_helpah.add("rate-limit", "rate_limit", "Rate limit to start from (tps)", 200000);
-        m_helpah.add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10);
+        m_helpah.add("ratelimit", "rate_limit", "Rate limit to start from (tps)", 200000);
+        m_helpah.add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10);
         m_helpah.add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost");
         m_helpah.setArguments(args);
 

@@ -56,7 +56,7 @@ function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.AsyncBenchmark \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=60 \
         --servers=localhost \
         --port=21212 \
@@ -68,8 +68,7 @@ function async-benchmark() {
         --max-value-size=1024 \
         --entropy=127 \
         --use-compression=false \
-        --rate-limit=100000 \
-        --auto-tune=false \
+        --ratelimit=100000 \
         --latency-target=10.0
 }
 
