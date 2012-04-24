@@ -48,11 +48,11 @@ function adhoc-smash() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         adhocsmash.AdhocSmash \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120000 \
         --servers=10.10.180.144 \
         --port=21212 \
-        --rate-limit=4000
+        --ratelimit=4000
 }
 
 function help() {

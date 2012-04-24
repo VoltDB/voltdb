@@ -60,15 +60,15 @@ function async-benchmark-help() {
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj eng1969.AsyncBenchmark \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
         --procedure=UpdateKey \
         --pool-size=100000 \
         --wait=0 \
-        --rate-limit=25000 \
-        --auto-tune=true \
+        --ratelimit=25000 \
+        --autotune=true \
         --latency-target=12.0 \
         --run-loader=false
 }
@@ -78,13 +78,13 @@ function async-export() {
     rm -rf $CLIENTLOG/*
     mkdir $CLIENTLOG
     java -classpath obj:$CLASSPATH:obj eng1969.AsyncExportClient \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=6000 \
         --servers=localhost \
         --port=21212 \
         --pool-size=100000 \
-        --rate-limit=10000 \
-        --auto-tune=false \
+        --ratelimit=10000 \
+        --autotune=false \
         --latency-target=10.0
 }
 
@@ -99,7 +99,7 @@ function sync-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj eng1969.SyncBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
@@ -119,7 +119,7 @@ function jdbc-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj eng1969.JDBCBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \

@@ -87,7 +87,7 @@ public class AsyncBenchmark
             // Use the AppHelper utility class to retrieve command line application parameters
 
             // Define parameters and pull from command line
-            apph.add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
+            apph.add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
@@ -99,14 +99,14 @@ public class AsyncBenchmark
                 .add("max-value-size", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
                 .add("entropy", "entropy", "How compressible the payload should be, lower is more compressible", 127)
                 .add("use-compression", "use_compression", "Whether value blobs should be compressed (GZip) for storage in the database (true|false).", false)
-                .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
-                .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
+                .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
+                .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
                 .setArguments(args)
             ;
 
             // Retrieve parameters
-            long displayInterval   = apph.longValue("display-interval");
+            long displayInterval   = apph.longValue("displayinterval");
             long duration          = apph.longValue("duration");
             String servers         = apph.stringValue("servers");
             int port               = apph.intValue("port");
@@ -117,21 +117,21 @@ public class AsyncBenchmark
             int minValueSize       = apph.intValue("min-value-size");
             int maxValueSize       = apph.intValue("max-value-size");
             boolean useCompression = apph.booleanValue("use-compression");
-            long rateLimit         = apph.longValue("rate-limit");
-            boolean autoTune       = apph.booleanValue("auto-tune");
+            long rateLimit         = apph.longValue("ratelimit");
+            boolean autoTune       = apph.booleanValue("autotune");
             double latencyTarget   = apph.doubleValue("latency-target");
             final String csv       = apph.stringValue("stats");
             final int entropy      = apph.intValue("entropy");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
+                .validate("displayinterval", (displayInterval > 0))
                 .validate("pool-size", (poolSize > 0))
                 .validate("get-put-ratio", (getPutRatio >= 0) && (getPutRatio <= 1))
                 .validate("key-size", (keySize > 0) && (keySize < 251))
                 .validate("min-value-size", (minValueSize > 0) && (minValueSize < 1048576))
                 .validate("max-value-size", (maxValueSize > 0) && (maxValueSize < 1048576) && (maxValueSize >= minValueSize))
-                .validate("rate-limit", (rateLimit > 0))
+                .validate("ratelimit", (rateLimit > 0))
                 .validate("latency-target", (latencyTarget > 0))
             ;
 
