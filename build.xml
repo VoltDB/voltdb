@@ -1128,6 +1128,44 @@ TEST CASES
     <junitreport-macro testoutput="${build.testoutput.dir}"/>
 </target>
 
+<target
+    name="junit_iv2"
+    description="Tests exclusive to IV2 functionality.">
+
+    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <run_junit timeout="${timeoutLength}" printsummary="no">
+        <formatters>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
+        </formatters>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <include name='org/voltdb/**/Iv2Test*.class'/>
+                <exclude name="**/*$*.class"/>
+            </fileset>
+        </tests>
+    </run_junit>
+
+    <junitreport-macro testoutput="${build.testoutput.dir}"/>
+
+    <!-- Fail the build if there were any problems.
+        This runs all the tests before failing. -->
+    <fail
+        if="junit.failures"
+        unless="emma.enabled"
+        message="JUnit had failures"
+    />
+</target>
+
 <!-- Junit tests that run quickly -->
 <target
     name="junit_quick"

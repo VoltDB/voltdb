@@ -159,6 +159,9 @@ public class VoltDB {
 
         public Integer m_leaderPort = DEFAULT_INTERNAL_PORT;
 
+        /** set to true to run with iv2 initiation. Good Luck! */
+        public boolean m_enableIV2 = false;
+
         public Configuration() { }
 
         public Configuration(String args[]) {
@@ -291,6 +294,8 @@ public class VoltDB {
                     for (String port : ports) {
                         m_ipcPorts.add(Integer.valueOf(port));
                     }
+                } else if (arg.equals("enableiv2")) {
+                    m_enableIV2 = true;
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();

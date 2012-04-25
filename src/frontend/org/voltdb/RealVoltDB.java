@@ -214,6 +214,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return m_licenseApi;
     }
 
+    @Override
+    public boolean isIV2Enabled() {
+        return m_config.m_enableIV2;
+    }
 
     /**
      * Initialize all the global components, then initialize all the m_sites.

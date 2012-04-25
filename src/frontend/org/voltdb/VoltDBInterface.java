@@ -18,7 +18,6 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -181,4 +180,6 @@ public interface VoltDBInterface
      * Return the license api. This may be null in community editions!
      */
      public LicenseApi getLicenseApi();
+
+     public boolean isIV2Enabled();
 }
