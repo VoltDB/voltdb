@@ -73,7 +73,7 @@ function async-benchmark() {
         --wait=0 \
         --ratelimit=100000 \
         --autotune=true \
-        --latency-target=10.0
+        --latencytarget=10
 }
 
 function async-export() {
@@ -85,11 +85,11 @@ function async-export() {
         --duration=900 \
         --servers=localhost \
         --port=21212 \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --ratelimit=10000 \
         --autotune=false \
-        --catalog-swap=false \
-        --latency-target=10.0
+        --catalogswap=false \
+        --latencytarget=10
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -128,7 +128,7 @@ function jdbc-benchmark() {
         --servers=localhost \
         --port=21212 \
         --procedure=JiggleSinglePartition \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --wait=0
 }
 
