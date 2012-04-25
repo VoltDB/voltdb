@@ -185,14 +185,14 @@ public class AsyncExportClient
             final long rateLimit       = apph.longValue("ratelimit");
             final boolean autoTune     = apph.booleanValue("autotune");
             final double latencyTarget = apph.doubleValue("latencytarget");
-            final boolean catalogSwap  = apph.booleanValue("catalog-swap");
+            final boolean catalogSwap  = apph.booleanValue("catalogswap");
             final String csv           = apph.stringValue("statsfile");
 
             TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("pool-size", (duration > 0))
+                .validate("poolsize", (duration > 0))
                 .validate("ratelimit", (rateLimit > 0))
                 .validate("latencytarget", (latencyTarget > 0))
             ;
