@@ -1128,6 +1128,9 @@ TEST CASES
     name="junit_quick"
     description="Tests and suites that run in under 3 minutes under memcheck"
 >
+    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+        <isset property="timeoutLength"/>
+    </condition>
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
             <formatter type="plain" unless="hudson"/>
