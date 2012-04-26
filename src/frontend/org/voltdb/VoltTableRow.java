@@ -28,8 +28,6 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 /**
- * <h3>Summary</h3>
- *
  * <p>Represents the interface to a row in a VoltTable result set.</p>
  *
  * <h3>Accessing Row Fields</h3>
@@ -79,47 +77,47 @@ public abstract class VoltTableRow {
     static final int INVALID_ROW_INDEX = -1;
 
     /** Stores the row data (and possibly much more) */
-    protected ByteBuffer m_buffer;
+    ByteBuffer m_buffer;
     /** Was the last value retrieved null? */
-    protected boolean m_wasNull = false;
+    boolean m_wasNull = false;
     /** Where in the buffer is the start of the active row's data */
-    protected int m_position = -1;
+    int m_position = -1;
     /** Offsets of each column in the buffer */
-    protected int[] m_offsets;
+    int[] m_offsets;
     /** Have the offsets been calculated */
-    protected boolean m_hasCalculatedOffsets = false;
+    boolean m_hasCalculatedOffsets = false;
 
-    protected int m_activeRowIndex = INVALID_ROW_INDEX;
+    int m_activeRowIndex = INVALID_ROW_INDEX;
 
-    protected VoltTableRow() {}
+    VoltTableRow() {}
 
     /**
      * Return the {@link VoltType type} of the column with the specified index.
      * @param columnIndex Index of the column
      * @return {@link VoltType VoltType} of the column
      */
-    protected abstract VoltType getColumnType(int columnIndex);
+    abstract VoltType getColumnType(int columnIndex);
 
     /**
      * Return the index of the column with the specified index.
      * @param columnName Name of the column
      * @return Index of the column
      */
-    protected abstract int getColumnIndex(String columnName);
+    abstract int getColumnIndex(String columnName);
 
     /**
      * Returns the number of columns in the table schema
      * @return Number of columns in the table schema
      */
-    protected abstract int getColumnCount();
+    abstract int getColumnCount();
 
     /**
      * Returns the number of rows.
      * @return Number of rows in the table
      */
-    protected abstract int getRowCount();
+    abstract int getRowCount();
 
-    protected abstract int getRowStart();
+    abstract int getRowStart();
 
     /**
      * Clone a row. The new instance returned will have an independent
@@ -152,7 +150,7 @@ public abstract class VoltTableRow {
         m_hasCalculatedOffsets = true;
     }
 
-    protected final int getOffset(int index) {
+    final int getOffset(int index) {
         ensureCalculatedOffsets();
         assert(index >= 0);
         assert(index < m_offsets.length);
@@ -675,7 +673,7 @@ public abstract class VoltTableRow {
     }
 
     /** Validates that type and columnIndex match and are valid. */
-    protected final void validateColumnType(int columnIndex, VoltType... types) {
+    final void validateColumnType(int columnIndex, VoltType... types) {
         if (m_position < 0)
             throw new RuntimeException("VoltTableRow is in an invalid state. Consider calling advanceRow().");
 
@@ -690,7 +688,7 @@ public abstract class VoltTableRow {
     }
 
     /** Reads a string from a buffer with a specific encoding. */
-    protected final String readString(int position, String encoding) {
+    final String readString(int position, String encoding) {
         final int len = m_buffer.getInt(position);
         //System.out.println(len);
 

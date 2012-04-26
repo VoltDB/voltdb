@@ -362,9 +362,9 @@ public class VoltDB {
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover|replica) leader <hostname> [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>");
+                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover|replica) [leader <hostname> [deployment <deployment.xml>]] license <license.xml> catalog <catalog.jar>");
             } else {
-                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover) leader <hostname> [deployment <deployment.xml>] catalog <catalog.jar>");
+                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover) [leader <hostname> [deployment <deployment.xml>]] catalog <catalog.jar>");
             }
             hostLog.fatal("Defaults will be used if no deployment is specified.");
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");

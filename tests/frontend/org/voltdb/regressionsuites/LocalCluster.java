@@ -97,7 +97,7 @@ public class LocalCluster implements VoltServerConfig {
     // Produce a (presumably) available IP port number.
     PortGenerator portGenerator = new PortGenerator();
     static class PortGenerator {
-        private final AtomicInteger nextPort = new AtomicInteger(10000);
+        private final AtomicInteger nextPort = new AtomicInteger(50000);
         private final AtomicInteger nextCport = new AtomicInteger(VoltDB.DEFAULT_PORT);
         private final AtomicInteger nextAport = new AtomicInteger(VoltDB.DEFAULT_ADMIN_PORT);
         public int next() {

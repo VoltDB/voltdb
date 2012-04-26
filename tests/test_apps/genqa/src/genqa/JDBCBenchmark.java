@@ -123,7 +123,7 @@ public class JDBCBenchmark
             // Define parameters and pull from command line
             AppHelper apph = new AppHelper(JDBCBenchmark.class.getCanonicalName())
                 .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
+                .add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
@@ -135,7 +135,7 @@ public class JDBCBenchmark
 
             // Retrieve parameters
             final int threadCount      = apph.intValue("threads");
-            final long displayInterval = apph.longValue("display-interval");
+            final long displayInterval = apph.longValue("displayinterval");
             final long duration        = apph.longValue("duration");
             final String servers       = apph.stringValue("servers");
             final int port             = apph.intValue("port");
