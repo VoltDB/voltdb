@@ -24,7 +24,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.agreement.BabySitter;
 import org.voltcore.agreement.BabySitter.Callback;
 import org.voltcore.agreement.LeaderElector;
-import org.voltcore.agreement.LeaderNoticeHandler;
+import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
