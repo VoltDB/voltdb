@@ -28,8 +28,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
-import org.voltcore.agreement.LeaderElector;
-import org.voltcore.agreement.ZKUtil;
 import org.voltcore.messaging.HostMessenger;
 import org.apache.zookeeper_voltpatches.*;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;

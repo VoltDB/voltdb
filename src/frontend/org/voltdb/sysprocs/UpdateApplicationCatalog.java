@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.agreement.ZKUtil;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
