@@ -119,6 +119,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
         "<?xml version=\"1.0\"?>",
+        "<!-- IMPORTANT: This file is an auto-generated default deployment configuration.",
+        "                Changes to this file will be overwritten. Copy it elsewhere if you",
+        "                want to use it as a starting point for a custom configuration. -->",
         "<deployment>",
         "   <cluster hostcount=\"1\" sitesperhost=\"2\" />",
         "   <httpd enabled=\"true\">",
@@ -241,7 +244,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 try {
                     config.m_pathToDeployment = setupDefaultDeployment();
                 } catch (IOException e) {
-                    hostLog.fatal("Failed to write default deployment.", e);
+                    VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
                 }
             }
 
@@ -1897,18 +1900,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         File deploymentXMLFile = new File(pathToDeployment);
 
         // Only create the file if it doesn't exist, otherwise reuse it.
-        if (!deploymentXMLFile.exists()) {
-            hostLog.warn("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
-            BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
-            for (String line : defaultDeploymentXML) {
-                bw.write(line);
-                bw.newLine();
-            }
-            bw.flush();
-            bw.close();
-        } else {
-            hostLog.warn("Using default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
+        hostLog.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
+        BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
+        for (String line : defaultDeploymentXML) {
+            bw.write(line);
+            bw.newLine();
         }
+        bw.flush();
+        bw.close();
 
         return deploymentXMLFile.getAbsolutePath();
     }
