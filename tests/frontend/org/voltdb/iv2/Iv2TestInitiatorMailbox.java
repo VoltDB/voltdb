@@ -132,7 +132,6 @@ public class Iv2TestInitiatorMailbox extends ZKTestBase {
 //                        mb.deliver(message);
 //                    }
 //                }
-                throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
             }
         };
 
@@ -177,7 +176,6 @@ public class Iv2TestInitiatorMailbox extends ZKTestBase {
 //        for (InitiateTaskMessage task : messages) {
 //            assertEquals(txnId++, task.getTransactionId());
 //        }
-        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     @Test
@@ -253,7 +251,6 @@ public class Iv2TestInitiatorMailbox extends ZKTestBase {
 //        }
 //
 //        assertEquals(2999, ((PrimaryRole) mb.role).lastRespondedTxnId);
-        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     @Test
@@ -286,7 +283,6 @@ public class Iv2TestInitiatorMailbox extends ZKTestBase {
 //            return;
 //        }
 //        fail("Should throw an exception earlier");
-        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     @Test
@@ -319,7 +315,6 @@ public class Iv2TestInitiatorMailbox extends ZKTestBase {
 //            return;
 //        }
 //        fail("Should throw an exception earlier");
-        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     @Test
@@ -350,6 +345,5 @@ public class Iv2TestInitiatorMailbox extends ZKTestBase {
 //        mb.deliver(message);
 //        // anything before transaction 1001 should be removed
 //        assertEquals(1001, role.getOldestInFlightTxnId());
-        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 }
