@@ -1890,7 +1890,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * @return path to default deployment file
      * @throws IOException
      */
-    private static String setupDefaultDeployment() throws IOException {
+    static String setupDefaultDeployment() throws IOException {
 
         // Since there's apparently no deployment to override the path to voltdbroot it should be
         // safe to assume it's under the working directory.

@@ -26,13 +26,14 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.utils.CatalogUtil;
+
 import junit.framework.TestCase;
 
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.VoltDB.Configuration;
 
 public class TestDefaultDeployment extends TestCase {
 
@@ -52,36 +53,23 @@ public class TestDefaultDeployment extends TestCase {
                 org.voltdb.compiler.procedures.MilestoneOneCombined.class);
 
         // compileWithDefaultDeployment() generates no deployment.xml so that the default is used.
-        assertTrue(builder.compileWithDefaultDeployment("test.jar"));
-
-        final File jar = new File("test.jar");
+        String jarPath = Configuration.getPathToCatalogForTest("test.jar");
+        assertTrue(builder.compileWithDefaultDeployment(jarPath));
+        final File jar = new File(jarPath);
         jar.deleteOnExit();
 
         String pathToDeployment = builder.getPathToDeployment();
         assertEquals(pathToDeployment, null);
 
-        // start VoltDB server using hsqlsb backend
-        ServerThread server = new ServerThread("test.jar", null, BackendTarget.HSQLDB_BACKEND);
-        server.start();
-        server.waitForInitialization();
+        // the default deployment file includes an http server on port 8080.
+        // do some verification without starting VoltDB, since that port
+        // number conflicts with jenkins on some test servers.
+        String absolutePath = RealVoltDB.setupDefaultDeployment();
 
-        // run the test
-        ClientConfig config = new ClientConfig("program", "none");
-        Client client = ClientFactory.createClient(config);
-        client.createConnection("localhost");
+        DeploymentType dflt = CatalogUtil.parseDeployment(absolutePath);
+        assertTrue(dflt != null);
 
-        // call the insert procedure
-        VoltTable[] results = client.callProcedure("MilestoneOneCombined", 99L, "TEST").getResults();
-        // check one table was returned
-        assertTrue(results.length == 1);
-        // check one tuple was modified
-        VoltTable result = results[0];
-        VoltTableRow row = result.fetchRow(0);
-        String resultStr = row.getString(0);
-        assertTrue(resultStr.equals("TEST"));
-
-        server.shutdown();
-        server.join();
+        assertTrue(dflt.getCluster().getHostcount() == 1);
+        assertTrue(dflt.getCluster().getSitesperhost() == 2);
     }
-
 }

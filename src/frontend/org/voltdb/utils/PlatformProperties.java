@@ -23,10 +23,13 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.Serializable;
 
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.processtools.ShellTools;
 
 
 public class PlatformProperties implements Serializable {
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /////////////////////////////////
     // ACTUAL PLATFORM PROPERTIES
@@ -126,7 +129,7 @@ public class PlatformProperties implements Serializable {
             }
         }
         catch (Exception e) {
-            System.err.println("Unable to read /proc/meminfo. Stopping.");
+            hostLog.fatal("Unable to read /proc/meminfo. Exiting.");
             System.exit(-1);
         }
 
@@ -145,7 +148,7 @@ public class PlatformProperties implements Serializable {
             }
         }
         catch (Exception e) {
-            System.err.println("Unable to read /proc/cpuinfo. Stopping.");
+            hostLog.fatal("Unable to read /proc/cpuinfo. Exiting.");
             System.exit(-1);
         }
 

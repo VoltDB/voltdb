@@ -133,8 +133,8 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="compile, licensecheck, voltdbipc, ee"
-    description="Run Java and C++ JNI testcases and test plan fragments." >
+    depends="licensecheck, compile, voltdbipc, ee"
+    description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
@@ -149,26 +149,21 @@ PRIMARY ENTRY POINTS
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
     </exec>
 </target>
-<target name="newcheck"
-    depends="licensecheck,compile, voltdbipc"
-    description="Run Java and C++ JNI testcases and test plan fragments." >
+<target name="check_noclustering"
+    depends="licensecheck, compile, voltdbipc, ee"
+    description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
 
-    <mkdir dir='${build.dir}/testrunner/' />
-    <copy todir='${build.dir}/testrunner/'>
-        <fileset dir="tests/testrunner">
-            <exclude name="**/.svn" />
-        </fileset>
-    </copy>
-
-    <exec executable="/bin/sh"
-          failonerror="true"
-          timeout="1800000"
-          dir="${build.dir}"
-          newenvironment='true'>
-        <arg value="testrunner/test.py" />
+    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+        <arg value="eecheck" />
+        <arg value="junit_noclustering" />
+        <arg value="distcheck" />
+        <arg value="pythonfser" />
+        <arg value="-Dbuild=${build}" />
+        <arg value="-DtimeoutLength=${timeoutLength}" />
+        <arg value="-DVOLT_REGRESSIONS=localhsql" />
     </exec>
 </target>
 <target name="check_quick"
@@ -1186,6 +1181,64 @@ TEST CASES
         if="junit.failures"
         unless="emma.enabled"
         message="JUnit had failures"
+    />
+</target>
+
+<!-- Junit tests that run quickly -->
+<target
+    name="junit_noclustering"
+    description="Tests and suites that run on a single node"
+>
+    <!-- Run the unit tests -->
+    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+        <isset property="timeoutLength"/>
+    </condition>
+    <run_junit timeout="${timeoutLength}" printsummary="no">
+        <formatters>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
+        </formatters>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltdb/**/Test*.class'/>
+                <exclude name="**/*$*.class"/>
+                <exclude name="**/TestRejoin*.class" />
+                <exclude name="**/TestFailureDetectSuite.class" />
+                <exclude name="**/TestFaultDistributor.class" />
+                <exclude name="**/TestPartitionDetection.class"  />
+                <exclude name="**/TestSecondaryRejoin.class"  />
+                <exclude name="**/TestMaliciousClientSuite.class" />
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
+            </fileset>
+        </tests>
+    </run_junit>
+
+    <junitreport-macro testoutput="${build.testoutput.dir}"/>
+
+    <exec dir="${build.testoutput.dir}" executable='cat'>
+        <arg line="junit-noframes.html"/>
+    </exec>
+    <!-- Fail the build if there were any problems.
+        This runs all the tests before failing. -->
+    <fail
+        if="junit.failures"
+        unless="emma.enabled"
+        message="JUnit had failures"
+    />
+
+    <!-- Regenerate milestoneOneCatalog/ -->
+    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
+    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
+    <unjar
+        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
+        dest='${build.dir}/expanded/milestoneOneCatalog'
     />
 </target>
 
