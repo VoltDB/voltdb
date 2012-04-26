@@ -30,7 +30,6 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
-import org.voltcore.agreement.ZKUtil;
 import org.voltcore.utils.CoreUtils;
 
 /**

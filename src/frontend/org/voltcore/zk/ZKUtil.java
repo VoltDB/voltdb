@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltcore.agreement;
+package org.voltcore.zk;
 
 import java.io.File;
 import java.io.FileInputStream;

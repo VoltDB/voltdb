@@ -32,10 +32,10 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.agreement.ZKUtil;
-import org.voltcore.agreement.ZKUtil.ChildrenCallback;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.MiscUtils;
+import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZKUtil.ChildrenCallback;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 

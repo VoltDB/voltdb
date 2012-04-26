@@ -22,7 +22,7 @@ import java.util.LinkedList;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.agreement.ZKUtil;
+import org.voltcore.zk.ZKUtil;
 
 /**
  * CoreZK provides constants for all voltcore-registered

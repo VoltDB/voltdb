@@ -40,7 +40,6 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -52,6 +51,7 @@ import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.utils.NotImplementedException;
 
 /**

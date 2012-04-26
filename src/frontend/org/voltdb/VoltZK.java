@@ -30,8 +30,8 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.agreement.ZKUtil;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
 
 /**
  * VoltZK provides constants for all voltdb-registered

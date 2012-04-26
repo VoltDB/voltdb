@@ -39,9 +39,9 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.agreement.ZKUtil;
-import org.voltcore.agreement.ZKUtil.ByteArrayCallback;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZKUtil.ByteArrayCallback;
 
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltZK;

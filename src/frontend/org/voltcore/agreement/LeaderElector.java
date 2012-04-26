@@ -29,6 +29,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.ZKUtil;
 
 public class LeaderElector {
     private final static VoltLogger LOG = new VoltLogger("HOST");
