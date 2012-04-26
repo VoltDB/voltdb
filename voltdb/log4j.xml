@@ -68,13 +68,17 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="DRAGENT">
+    <!-- Always let dragent to write to the console. -->
+    <logger name="DRAGENT">
         <level value="INFO"/>
-    </logger -->
+        <appender-ref ref="console"/>
+    </logger>
 
-    <!-- logger name="DRSTATS">
+    <!-- Always let dragent to write to the console. -->
+    <logger name="DRSTATS">
         <level value="INFO"/>
-    </logger -->
+        <appender-ref ref="console"/>
+    </logger>
 
     <!-- logger to route specific informational messages to the console. -->
     <logger name="CONSOLE">

@@ -46,10 +46,12 @@ public interface CommandLog {
     public abstract void shutdown() throws InterruptedException;
 
     /**
+     * @param failedInitiators
      * @param faultedTxns
      * @return null if the logger is not initialized
      */
-    public abstract Semaphore logFault(Set<Long> faultedTxns);
+    public abstract Semaphore logFault(Set<Long> failedInitiators,
+                                       Set<Long> faultedTxns);
 
     public abstract void logHeartbeat(final long txnId);
 

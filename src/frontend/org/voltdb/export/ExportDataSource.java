@@ -413,7 +413,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         int result = 0;
         result += m_database.hashCode();
         result += m_tableName.hashCode();
-        result += m_siteId;
+        result += m_HSId;
         result += m_partitionId;
         // does not factor in replicated / unreplicated.
         // does not factor in column names / schema

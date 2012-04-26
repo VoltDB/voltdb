@@ -1707,6 +1707,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             long globalMultiPartCommitPoint,
             HashMap<Long, Long> initiatorSafeInitiationPoint)
     {
+        HashSet<Long> failedInitiators = new HashSet<Long>();
         HashSet<Integer> failedHosts = new HashSet<Integer>();
         for (Long siteId : failedSites) {
             failedHosts.add(SiteTracker.getHostForSite(siteId));
@@ -1752,6 +1753,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         // Not all of these are initiators, but it is safe...
         for (Long i : failedSites)
         {
+            failedInitiators.add(i);
             m_transactionQueue.gotFaultForInitiator(i);
         }
 
@@ -1847,7 +1849,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         try {
             //Log it and acquire the completion permit from the semaphore
-            VoltDB.instance().getCommandLog().logFault(faultedTxns).acquire();
+            VoltDB.instance().getCommandLog().logFault(failedInitiators, faultedTxns).acquire();
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while attempting to log a fault", true, e);
         }
