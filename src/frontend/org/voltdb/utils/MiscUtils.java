@@ -36,6 +36,7 @@ import org.voltdb.licensetool.LicenseApi;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     /**
      * Simple code to copy a file from one place to another...
@@ -209,7 +210,7 @@ public class MiscUtils {
 
         // print out trial success message
         if (licenseApi.isTrial()) {
-            hostLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
+            consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
             return true;
         }
 
@@ -236,7 +237,7 @@ public class MiscUtils {
                                    (valid ? "" : "invalid "),
                                    licenseApi.maxHostcount(),
                                    expiresStr);
-        hostLog.info(msg);
+        consoleLog.info(msg);
 
         return true;
     }

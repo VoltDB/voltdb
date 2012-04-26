@@ -185,7 +185,7 @@ public class LocalCluster implements VoltServerConfig {
         // First try 'ant' syntax and then 'eclipse' syntax...
         String log4j = System.getProperty("log4j.configuration");
         if (log4j == null) {
-            log4j = "file://" + System.getProperty("user.dir") + "/src/frontend/junit_log4j.properties";
+            log4j = "file://" + System.getProperty("user.dir") + "/voltdb/log4j.xml";
         }
 
         m_procBuilder = new ProcessBuilder();

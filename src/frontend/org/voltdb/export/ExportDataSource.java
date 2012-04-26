@@ -65,7 +65,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
 
-    private int m_nullArrayLength;
+    private final int m_nullArrayLength;
 
     /**
      * Create a new data source.
@@ -406,6 +406,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         return compareTo((ExportDataSource)o) == 0;
     }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of compareTo
+        int result = 0;
+        result += m_database.hashCode();
+        result += m_tableName.hashCode();
+        result += m_siteId;
+        result += m_partitionId;
+        // does not factor in replicated / unreplicated.
+        // does not factor in column names / schema
+        return result;
+    }
+
 
     public long sizeInBytes() {
         return m_committedBuffers.sizeInBytes();

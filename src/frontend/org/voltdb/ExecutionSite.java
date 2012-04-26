@@ -1847,7 +1847,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         try {
             //Log it and acquire the completion permit from the semaphore
-            VoltDB.instance().getCommandLog().logFault( failedSites, faultedTxns).acquire();
+            VoltDB.instance().getCommandLog().logFault(faultedTxns).acquire();
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while attempting to log a fault", true, e);
         }

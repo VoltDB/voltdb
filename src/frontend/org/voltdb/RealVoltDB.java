@@ -114,6 +114,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 {
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
@@ -233,7 +234,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
-            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
@@ -1609,11 +1610,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public boolean ignoreCrash() {
-        return false;
-    }
-
-    @Override
     public BackendTarget getBackendTargetType() {
         return m_config.m_backend;
     }
@@ -1765,7 +1761,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
     }
 
     @Override

@@ -426,7 +426,9 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
-        if (instance().ignoreCrash()) {
+        wasCrashCalled = true;
+        crashMessage = errMsg;
+        if (ignoreCrash) {
             return;
         }
 
@@ -503,12 +505,24 @@ public class VoltDB {
         System.exit(-1);
     }
 
+    /*
+     * For tests that causes failures,
+     * allow them stop the crash and inspect.
+     */
+    public static boolean ignoreCrash = false;
+
+    public static boolean wasCrashCalled = false;
+
+    public static String crashMessage;
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
-        if (instance().ignoreCrash()) {
+        wasCrashCalled = true;
+        crashMessage = errMsg;
+        if (ignoreCrash) {
             return;
         }
         try {
