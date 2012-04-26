@@ -43,34 +43,36 @@ public class PrimaryRole implements InitiatorRole {
     @Override
     public void offerInitiateTask(InitiateTaskMessage message)
     {
-        message.setTransactionId(txnIdSequence++);
-        message.setTruncationTxnId(lastRespondedTxnId);
-        int expectedResponses = replicas.length + 1; // plus the leader
-        InFlightTxnState state = new InFlightTxnState(message, expectedResponses);
-        pendingResponses.put(message.getTransactionId(), state);
-        outstanding.offer(message);
+//        message.setTransactionId(txnIdSequence++);
+//        message.setTruncationTxnId(lastRespondedTxnId);
+//        int expectedResponses = replicas.length + 1; // plus the leader
+//        InFlightTxnState state = new InFlightTxnState(message, expectedResponses);
+//        pendingResponses.put(message.getTransactionId(), state);
+//        outstanding.offer(message);
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY!");
     }
 
     @Override
     public Pair<Long, InitiateResponseMessage> offerResponse(InitiateResponseMessage message)
     {
-        InFlightTxnState state = pendingResponses.get(message.getTxnId());
-        if (state == null) {
-            throw new RuntimeException("Response for transaction " + message.getTxnId() +
-                                       " released before all replicas responded");
-        }
-
-        if (state.addResponse(message)) {
-            pendingResponses.remove(message.getTxnId());
-            if (message.getTxnId() != lastRespondedTxnId + 1) {
-                throw new RuntimeException("Transaction missing, expecting transaction " +
-                                           (lastRespondedTxnId + 1) + ", but got " +
-                                           message.getTxnId());
-            }
-            lastRespondedTxnId = message.getTxnId();
-            return Pair.of(message.getClientInterfaceHSId(), message);
-        }
-        return null;
+//        InFlightTxnState state = pendingResponses.get(message.getTxnId());
+//        if (state == null) {
+//            throw new RuntimeException("Response for transaction " + message.getTxnId() +
+//                                       " released before all replicas responded");
+//        }
+//
+//        if (state.addResponse(message)) {
+//            pendingResponses.remove(message.getTxnId());
+//            if (message.getTxnId() != lastRespondedTxnId + 1) {
+//                throw new RuntimeException("Transaction missing, expecting transaction " +
+//                                           (lastRespondedTxnId + 1) + ", but got " +
+//                                           message.getTxnId());
+//            }
+//            lastRespondedTxnId = message.getTxnId();
+//            return Pair.of(message.getClientInterfaceHSId(), message);
+//        }
+//        return null;
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY!");
     }
 
     @Override

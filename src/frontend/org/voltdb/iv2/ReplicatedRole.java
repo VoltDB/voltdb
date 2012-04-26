@@ -51,19 +51,20 @@ public class ReplicatedRole implements InitiatorRole {
     @Override
     public void offerInitiateTask(InitiateTaskMessage message)
     {
-        long txnId = message.getTransactionId();
-        if (txnId != lastSeenTxnId + 1) {
-            throw new RuntimeException("Transaction missing, expecting transaction " +
-                                       (lastSeenTxnId + 1) + ", but got " + txnId);
-        }
-        lastSeenTxnId = message.getTransactionId();
-        message.setInitiatorHSId(hsid);
-        outstanding.offer(message);
-
-        long truncationTxnId = message.getTruncationTxnId();
-        if (truncationTxnId != -1) {
-            truncate(truncationTxnId);
-        }
+//        long txnId = message.getTransactionId();
+//        if (txnId != lastSeenTxnId + 1) {
+//            throw new RuntimeException("Transaction missing, expecting transaction " +
+//                                       (lastSeenTxnId + 1) + ", but got " + txnId);
+//        }
+//        lastSeenTxnId = message.getTransactionId();
+//        message.setInitiatorHSId(hsid);
+//        outstanding.offer(message);
+//
+//        long truncationTxnId = message.getTruncationTxnId();
+//        if (truncationTxnId != -1) {
+//            truncate(truncationTxnId);
+//        }
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY!");
     }
 
     @Override
@@ -75,21 +76,23 @@ public class ReplicatedRole implements InitiatorRole {
     @Override
     public InitiateTaskMessage poll()
     {
-        InitiateTaskMessage txn = outstanding.poll();
-        if (txn != null) {
-            lastExecutedTxnId = txn.getTransactionId();
-            inflight.offer(txn);
-        }
-        return txn;
+//        InitiateTaskMessage txn = outstanding.poll();
+//        if (txn != null) {
+//            lastExecutedTxnId = txn.getTransactionId();
+//            inflight.offer(txn);
+//        }
+//        return txn;
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     long getOldestInFlightTxnId()
     {
-        InitiateTaskMessage oldest = inflight.peek();
-        if (oldest != null) {
-            return oldest.getTransactionId();
-        }
-        return -1;
+//        InitiateTaskMessage oldest = inflight.peek();
+//        if (oldest != null) {
+//            return oldest.getTransactionId();
+//        }
+//        return -1;
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     /**
@@ -102,23 +105,24 @@ public class ReplicatedRole implements InitiatorRole {
      */
     private void truncate(long txnId)
     {
-        truncationTxnId = txnId;
-        long lastExecuted = lastExecutedTxnId;
-        if (truncationTxnId <= lastExecuted) {
-            /*
-             * scan from beginning of executed queue and remove any transaction
-             * that's before the truncation point
-             */
-            InitiateTaskMessage txn;
-            while ((txn = inflight.peek()) != null) {
-                if (txn.getTransactionId() <= truncationTxnId) {
-                    inflight.remove();
-                }
-                else {
-                    break;
-                }
-            }
-        }
+//        truncationTxnId = txnId;
+//        long lastExecuted = lastExecutedTxnId;
+//        if (truncationTxnId <= lastExecuted) {
+//            /*
+//             * scan from beginning of executed queue and remove any transaction
+//             * that's before the truncation point
+//             */
+//            InitiateTaskMessage txn;
+//            while ((txn = inflight.peek()) != null) {
+//                if (txn.getTransactionId() <= truncationTxnId) {
+//                    inflight.remove();
+//                }
+//                else {
+//                    break;
+//                }
+//            }
+//        }
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 }
 

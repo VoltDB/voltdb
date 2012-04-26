@@ -113,25 +113,26 @@ public class TestInitiatorMailbox extends ZKTestBase {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                latch.countDown();
-                synchronized (lock) {
-                    try {
-                        lock.wait();
-                    } catch (InterruptedException e) {}
-
-                    StoredProcedureInvocation procedure = new StoredProcedureInvocation();
-                    procedure.setProcName("TestProc");
-                    for (int i = 0; i < 1000; i++) {
-                        InitiateTaskMessage message;
-                        if (isPrimary) {
-                            message = new InitiateTaskMessage(100, 100, -1, 0, 0, false, true, procedure);
-                        } else {
-                            message = new InitiateTaskMessage(100, 100, txnId.getAndIncrement(),
-                                                              0, 0, false, true, procedure);
-                        }
-                        mb.deliver(message);
-                    }
-                }
+//                latch.countDown();
+//                synchronized (lock) {
+//                    try {
+//                        lock.wait();
+//                    } catch (InterruptedException e) {}
+//
+//                    StoredProcedureInvocation procedure = new StoredProcedureInvocation();
+//                    procedure.setProcName("TestProc");
+//                    for (int i = 0; i < 1000; i++) {
+//                        InitiateTaskMessage message;
+//                        if (isPrimary) {
+//                            message = new InitiateTaskMessage(100, 100, -1, 0, 0, false, true, procedure);
+//                        } else {
+//                            message = new InitiateTaskMessage(100, 100, txnId.getAndIncrement(),
+//                                                              0, 0, false, true, procedure);
+//                        }
+//                        mb.deliver(message);
+//                    }
+//                }
+                throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
             }
         };
 
@@ -161,189 +162,194 @@ public class TestInitiatorMailbox extends ZKTestBase {
      */
     @Test
     public void testConcurrentDelivery() throws Exception {
-        createElectionNodes(2, true);
-        mb.start(2);
-        generateTasks(true);
-
-        /*
-         * check if the transactions are replicated to the replicas in the
-         * correct order
-         */
-        ArgumentCaptor<InitiateTaskMessage> captor = ArgumentCaptor.forClass(InitiateTaskMessage.class);
-        verify(hm, times(3000)).send(any(long[].class), captor.capture());
-        List<InitiateTaskMessage> messages = captor.getAllValues();
-        long txnId = 0;
-        for (InitiateTaskMessage task : messages) {
-            assertEquals(txnId++, task.getTransactionId());
-        }
+//        createElectionNodes(2, true);
+//        mb.start(2);
+//        generateTasks(true);
+//
+//        /*
+//         * check if the transactions are replicated to the replicas in the
+//         * correct order
+//         */
+//        ArgumentCaptor<InitiateTaskMessage> captor = ArgumentCaptor.forClass(InitiateTaskMessage.class);
+//        verify(hm, times(3000)).send(any(long[].class), captor.capture());
+//        List<InitiateTaskMessage> messages = captor.getAllValues();
+//        long txnId = 0;
+//        for (InitiateTaskMessage task : messages) {
+//            assertEquals(txnId++, task.getTransactionId());
+//        }
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     @Test
     public void testRespondAndTruncationPoint() throws Exception {
-        createElectionNodes(2, true);
-        mb.start(2);
-        generateTasks(true);
-        VoltTable[] results =
-                new VoltTable[] {new VoltTable(new ColumnInfo("T", VoltType.BIGINT))};
-
-        /*
-         * sometimes responses may come before local execution site has polled
-         * the tasks. Return responses for the first 1000 transactions from the
-         * replica
-         */
-        for (int i = 0; i < 1000; i++) {
-            InitiateTaskMessage task =
-                    new InitiateTaskMessage(100, 100, i, 0, 0, false, true, null);
-            InitiateResponseMessage remoteResponse =
-                    new InitiateResponseMessage(task);
-            ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
-            remoteResponse.setResults(resp);
-            mb.deliver(remoteResponse);
-        }
-
-        assertEquals(-1, ((PrimaryRole) mb.role).lastRespondedTxnId);
-
-        // return all responses from local execution site
-        InitiateTaskMessage localTask;
-        while ((localTask = (InitiateTaskMessage) mb.recv()) != null) {
-            InitiateResponseMessage localResponse =
-                    new InitiateResponseMessage(localTask);
-            ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
-            localResponse.setResults(resp);
-            mb.deliver(localResponse);
-        }
-
-        // the first 1000 tasks should be returned to the client interface
-        ArgumentCaptor<InitiateResponseMessage> responseCaptor1 =
-                ArgumentCaptor.forClass(InitiateResponseMessage.class);
-        verify(hm, times(1000)).send(anyLong(), responseCaptor1.capture());
-        List<InitiateResponseMessage> allValues = responseCaptor1.getAllValues();
-        for (InitiateResponseMessage resp : allValues) {
-            assertTrue(resp.getTxnId() < 1000);
-        }
-
-        assertEquals(999, ((PrimaryRole) mb.role).lastRespondedTxnId);
-
-        // reset HostMessenger mock here so that we don't get previous stats
-        reset(hm);
-
-        /*
-         * return the rest of the responses from the replica
-         */
-        for (int i = 1000; i < 3000; i++) {
-            InitiateTaskMessage task =
-                    new InitiateTaskMessage(100, 100, i, 0, 0, false, true, null);
-            InitiateResponseMessage remoteResponse =
-                    new InitiateResponseMessage(task);
-            ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
-            remoteResponse.setResults(resp);
-            mb.deliver(remoteResponse);
-        }
-
-        // the remaining 2000 tasks should be returned to the client interface
-        ArgumentCaptor<InitiateResponseMessage> responseCaptor2 =
-                ArgumentCaptor.forClass(InitiateResponseMessage.class);
-        verify(hm, times(2000)).send(anyLong(), responseCaptor2.capture());
-        List<InitiateResponseMessage> remainingResponses = responseCaptor2.getAllValues();
-        for (InitiateResponseMessage resp : remainingResponses) {
-            assertTrue(Long.toString(resp.getTxnId()), resp.getTxnId() >= 1000);
-            assertTrue(resp.getTxnId() < 3000);
-        }
-
-        assertEquals(2999, ((PrimaryRole) mb.role).lastRespondedTxnId);
+//        createElectionNodes(2, true);
+//        mb.start(2);
+//        generateTasks(true);
+//        VoltTable[] results =
+//                new VoltTable[] {new VoltTable(new ColumnInfo("T", VoltType.BIGINT))};
+//
+//        /*
+//         * sometimes responses may come before local execution site has polled
+//         * the tasks. Return responses for the first 1000 transactions from the
+//         * replica
+//         */
+//        for (int i = 0; i < 1000; i++) {
+//            InitiateTaskMessage task =
+//                    new InitiateTaskMessage(100, 100, i, 0, 0, false, true, null);
+//            InitiateResponseMessage remoteResponse =
+//                    new InitiateResponseMessage(task);
+//            ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
+//            remoteResponse.setResults(resp);
+//            mb.deliver(remoteResponse);
+//        }
+//
+//        assertEquals(-1, ((PrimaryRole) mb.role).lastRespondedTxnId);
+//
+//        // return all responses from local execution site
+//        InitiateTaskMessage localTask;
+//        while ((localTask = (InitiateTaskMessage) mb.recv()) != null) {
+//            InitiateResponseMessage localResponse =
+//                    new InitiateResponseMessage(localTask);
+//            ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
+//            localResponse.setResults(resp);
+//            mb.deliver(localResponse);
+//        }
+//
+//        // the first 1000 tasks should be returned to the client interface
+//        ArgumentCaptor<InitiateResponseMessage> responseCaptor1 =
+//                ArgumentCaptor.forClass(InitiateResponseMessage.class);
+//        verify(hm, times(1000)).send(anyLong(), responseCaptor1.capture());
+//        List<InitiateResponseMessage> allValues = responseCaptor1.getAllValues();
+//        for (InitiateResponseMessage resp : allValues) {
+//            assertTrue(resp.getTxnId() < 1000);
+//        }
+//
+//        assertEquals(999, ((PrimaryRole) mb.role).lastRespondedTxnId);
+//
+//        // reset HostMessenger mock here so that we don't get previous stats
+//        reset(hm);
+//
+//        /*
+//         * return the rest of the responses from the replica
+//         */
+//        for (int i = 1000; i < 3000; i++) {
+//            InitiateTaskMessage task =
+//                    new InitiateTaskMessage(100, 100, i, 0, 0, false, true, null);
+//            InitiateResponseMessage remoteResponse =
+//                    new InitiateResponseMessage(task);
+//            ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
+//            remoteResponse.setResults(resp);
+//            mb.deliver(remoteResponse);
+//        }
+//
+//        // the remaining 2000 tasks should be returned to the client interface
+//        ArgumentCaptor<InitiateResponseMessage> responseCaptor2 =
+//                ArgumentCaptor.forClass(InitiateResponseMessage.class);
+//        verify(hm, times(2000)).send(anyLong(), responseCaptor2.capture());
+//        List<InitiateResponseMessage> remainingResponses = responseCaptor2.getAllValues();
+//        for (InitiateResponseMessage resp : remainingResponses) {
+//            assertTrue(Long.toString(resp.getTxnId()), resp.getTxnId() >= 1000);
+//            assertTrue(resp.getTxnId() < 3000);
+//        }
+//
+//        assertEquals(2999, ((PrimaryRole) mb.role).lastRespondedTxnId);
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     @Test
     public void testResultLengthMismatch() throws Exception {
-        createElectionNodes(2, true);
-        mb.start(2);
-        generateTasks(true);
-        VoltTable[] results =
-                new VoltTable[] {new VoltTable(new ColumnInfo("T", VoltType.BIGINT))};
-        VoltTable[] emptyResults = new VoltTable[0];
-
-        // replica response
-        StoredProcedureInvocation procedure = new StoredProcedureInvocation();
-        procedure.setProcName("TestProc");
-        InitiateTaskMessage task =
-                new InitiateTaskMessage(100, 100, 0, 0, 0, false, true, procedure);
-        InitiateResponseMessage remoteResponse =
-                new InitiateResponseMessage(task);
-        ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
-        remoteResponse.setResults(resp);
-        mb.deliver(remoteResponse);
-
-        // local response
-        InitiateResponseMessage localResponse = new InitiateResponseMessage(task);
-        ClientResponseImpl resp2 = new ClientResponseImpl(ClientResponse.SUCCESS, emptyResults, "");
-        localResponse.setResults(resp2);
-        try {
-            mb.deliver(localResponse);
-        } catch (RuntimeException e) {
-            return;
-        }
-        fail("Should throw an exception earlier");
+//        createElectionNodes(2, true);
+//        mb.start(2);
+//        generateTasks(true);
+//        VoltTable[] results =
+//                new VoltTable[] {new VoltTable(new ColumnInfo("T", VoltType.BIGINT))};
+//        VoltTable[] emptyResults = new VoltTable[0];
+//
+//        // replica response
+//        StoredProcedureInvocation procedure = new StoredProcedureInvocation();
+//        procedure.setProcName("TestProc");
+//        InitiateTaskMessage task =
+//                new InitiateTaskMessage(100, 100, 0, 0, 0, false, true, procedure);
+//        InitiateResponseMessage remoteResponse =
+//                new InitiateResponseMessage(task);
+//        ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
+//        remoteResponse.setResults(resp);
+//        mb.deliver(remoteResponse);
+//
+//        // local response
+//        InitiateResponseMessage localResponse = new InitiateResponseMessage(task);
+//        ClientResponseImpl resp2 = new ClientResponseImpl(ClientResponse.SUCCESS, emptyResults, "");
+//        localResponse.setResults(resp2);
+//        try {
+//            mb.deliver(localResponse);
+//        } catch (RuntimeException e) {
+//            return;
+//        }
+//        fail("Should throw an exception earlier");
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     @Test
     public void testResultMismatch() throws Exception {
-        createElectionNodes(2, true);
-        mb.start(2);
-        generateTasks(true);
-        VoltTable[] results =
-                new VoltTable[] {new VoltTable(new ColumnInfo("T", VoltType.BIGINT))};
-        VoltTable[] results2 = new VoltTable[] {new VoltTable(new ColumnInfo("A", VoltType.STRING))};
-
-        // replica response
-        StoredProcedureInvocation procedure = new StoredProcedureInvocation();
-        procedure.setProcName("TestProc");
-        InitiateTaskMessage task =
-                new InitiateTaskMessage(100, 100, 0, 0, 0, false, true, procedure);
-        InitiateResponseMessage remoteResponse =
-                new InitiateResponseMessage(task);
-        ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
-        remoteResponse.setResults(resp);
-        mb.deliver(remoteResponse);
-
-        // local response
-        InitiateResponseMessage localResponse = new InitiateResponseMessage(task);
-        ClientResponseImpl resp2 = new ClientResponseImpl(ClientResponse.SUCCESS, results2, "");
-        localResponse.setResults(resp2);
-        try {
-            mb.deliver(localResponse);
-        } catch (RuntimeException e) {
-            return;
-        }
-        fail("Should throw an exception earlier");
+//        createElectionNodes(2, true);
+//        mb.start(2);
+//        generateTasks(true);
+//        VoltTable[] results =
+//                new VoltTable[] {new VoltTable(new ColumnInfo("T", VoltType.BIGINT))};
+//        VoltTable[] results2 = new VoltTable[] {new VoltTable(new ColumnInfo("A", VoltType.STRING))};
+//
+//        // replica response
+//        StoredProcedureInvocation procedure = new StoredProcedureInvocation();
+//        procedure.setProcName("TestProc");
+//        InitiateTaskMessage task =
+//                new InitiateTaskMessage(100, 100, 0, 0, 0, false, true, procedure);
+//        InitiateResponseMessage remoteResponse =
+//                new InitiateResponseMessage(task);
+//        ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
+//        remoteResponse.setResults(resp);
+//        mb.deliver(remoteResponse);
+//
+//        // local response
+//        InitiateResponseMessage localResponse = new InitiateResponseMessage(task);
+//        ClientResponseImpl resp2 = new ClientResponseImpl(ClientResponse.SUCCESS, results2, "");
+//        localResponse.setResults(resp2);
+//        try {
+//            mb.deliver(localResponse);
+//        } catch (RuntimeException e) {
+//            return;
+//        }
+//        fail("Should throw an exception earlier");
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 
     @Test
     public void testReplicaTruncation() throws Exception {
-        createElectionNodes(2, false);
-        mb.start(2);
-        generateTasks(false);
-
-        // execute all transactions
-        VoltTable[] results =
-                new VoltTable[] {new VoltTable(new ColumnInfo("T", VoltType.BIGINT))};
-        InitiateTaskMessage localTask;
-        while ((localTask = (InitiateTaskMessage) mb.recv()) != null) {
-            InitiateResponseMessage localResponse =
-                    new InitiateResponseMessage(localTask);
-            ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
-            localResponse.setResults(resp);
-            mb.deliver(localResponse);
-        }
-
-        // nothing should be truncated
-        ReplicatedRole role = (ReplicatedRole) mb.role;
-        assertEquals(0, role.getOldestInFlightTxnId());
-
-        InitiateTaskMessage message =
-                new InitiateTaskMessage(100, 100, 3000, 0, 0, false, true, null);
-        message.setTruncationTxnId(1000);
-        mb.deliver(message);
-        // anything before transaction 1001 should be removed
-        assertEquals(1001, role.getOldestInFlightTxnId());
+//        createElectionNodes(2, false);
+//        mb.start(2);
+//        generateTasks(false);
+//
+//        // execute all transactions
+//        VoltTable[] results =
+//                new VoltTable[] {new VoltTable(new ColumnInfo("T", VoltType.BIGINT))};
+//        InitiateTaskMessage localTask;
+//        while ((localTask = (InitiateTaskMessage) mb.recv()) != null) {
+//            InitiateResponseMessage localResponse =
+//                    new InitiateResponseMessage(localTask);
+//            ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.SUCCESS, results, "");
+//            localResponse.setResults(resp);
+//            mb.deliver(localResponse);
+//        }
+//
+//        // nothing should be truncated
+//        ReplicatedRole role = (ReplicatedRole) mb.role;
+//        assertEquals(0, role.getOldestInFlightTxnId());
+//
+//        InitiateTaskMessage message =
+//                new InitiateTaskMessage(100, 100, 3000, 0, 0, false, true, null);
+//        message.setTruncationTxnId(1000);
+//        mb.deliver(message);
+//        // anything before transaction 1001 should be removed
+//        assertEquals(1001, role.getOldestInFlightTxnId());
+        throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY");
     }
 }
