@@ -1289,14 +1289,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     try {
                         m_zk.close();
                     } catch (InterruptedException e) {
+                        log.warn("Failure while closing internal ZooKeeper connection.", e);
                     }
                 }
             };
+            m_zk = null;
             t.start();
             m_agreementSite.shutdown();
             t.join();
-
             m_agreementSite = null;
+
             // shut down the network/messaging stuff
             // Close the host messenger first, which should close down all of
             // the ForeignHost sockets cleanly

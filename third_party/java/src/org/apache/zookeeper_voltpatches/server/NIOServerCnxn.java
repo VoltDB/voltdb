@@ -148,7 +148,8 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
                 ss.configureBlocking(false);
                 ss.register(selector, SelectionKey.OP_ACCEPT);
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to bind to ZooKeeper client socket", true, e);
+                String msg = "ZooKeeper server failed to bind to address: " + addr.toString();
+                VoltDB.crashLocalVoltDB(msg, true, e);
             }
         }
 
