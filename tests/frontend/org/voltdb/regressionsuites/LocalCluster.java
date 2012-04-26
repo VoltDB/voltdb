@@ -37,6 +37,7 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -68,6 +69,8 @@ public class LocalCluster implements VoltServerConfig {
     // how long to wait for startup of external procs
     static final long PIPE_WAIT_MAX_TIMEOUT = 60 * 1000;
 
+    String m_callingClassName = "";
+    String m_callingMethodName = "";
     boolean m_compiled = false;
     int m_siteCount;
     int m_hostCount;
@@ -124,16 +127,16 @@ public class LocalCluster implements VoltServerConfig {
     public LocalCluster(String jarFileName, int siteCount,
             int hostCount, int kfactor, BackendTarget target) {
         this(jarFileName, siteCount,
-            hostCount, kfactor, target,
-            FailureState.ALL_RUNNING, false, false);
+             hostCount, kfactor, target,
+             FailureState.ALL_RUNNING, false, false);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
                         int hostCount, int kfactor, BackendTarget target,
                         boolean isRejoinTest) {
-                    this(jarFileName, siteCount,
-                        hostCount, kfactor, target,
-                        FailureState.ALL_RUNNING, false, isRejoinTest);
+        this(jarFileName, siteCount,
+             hostCount, kfactor, target,
+             FailureState.ALL_RUNNING, false, isRejoinTest);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
@@ -149,12 +152,28 @@ public class LocalCluster implements VoltServerConfig {
                         FailureState failureState,
                         boolean debug, boolean isRejoinTest)
     {
-        System.out.println("Instantiating LocalCluster for " + jarFileName);
-        System.out.println("Sites: " + siteCount + " hosts: " + hostCount + " replication factor: " + kfactor);
-
         assert (jarFileName != null);
         assert (siteCount > 0);
         assert (hostCount > 0);
+
+        // get the name of the calling class
+        StackTraceElement[] traces = Thread.currentThread().getStackTrace();
+        m_callingClassName = "UnknownClass";
+        m_callingMethodName = "unknownMethod";
+        //ArrayUtils.reverse(traces);
+        int i;
+        // skip all stack frames below this method
+        for (i = 0; traces[i].getClassName().equals(getClass().getName()) == false; i++);
+        // skip all stack frames from localcluster itself
+        for (;      traces[i].getClassName().equals(getClass().getName()); i++);
+        // skip the package name
+        int dot = traces[i].getClassName().lastIndexOf('.');
+        m_callingClassName = traces[i].getClassName().substring(dot + 1);
+        m_callingMethodName = traces[i].getMethodName();
+
+        System.out.println("Instantiating LocalCluster for " + jarFileName + " with class.method: " +
+                m_callingClassName + "." + m_callingMethodName);
+        System.out.println("Sites: " + siteCount + " hosts: " + hostCount + " replication factor: " + kfactor);
 
         m_cluster.ensureCapacity(hostCount);
 
@@ -210,6 +229,10 @@ public class LocalCluster implements VoltServerConfig {
             log4j(log4j);
     }
 
+    @Override
+    public void setCallingMethodName(String name) {
+        m_callingMethodName = name;
+    }
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
@@ -273,7 +296,7 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         // Make the local Configuration object...
-        CommandLine cmdln = (CommandLine)(templateCmdLine.makeCopy());
+        CommandLine cmdln = (templateCmdLine.makeCopy());
         cmdln.voltFilePrefix(subroot.getPath());
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
@@ -486,7 +509,7 @@ public class LocalCluster implements VoltServerConfig {
 
     private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode)
     {
-        CommandLine cmdln = (CommandLine)(templateCmdLine.makeCopy());
+        CommandLine cmdln = (templateCmdLine.makeCopy());
         try {
             // set the dragent port. it uses the start value and
             // the next two sequential port numbers - so burn those two.
@@ -557,8 +580,17 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
-            PipeToFile ptf = new PipeToFile(testoutputdir + File.separator + getName() +
-                    "-" + hostId + ".txt", proc.getInputStream(),
+            String timestampStr = MiscUtils.getCompactStringTimestamp(System.currentTimeMillis());
+
+            PipeToFile ptf = new PipeToFile(
+                    testoutputdir +
+                    File.separator +
+                    "LC-" +
+                    timestampStr + "-" +
+                    getFileName() + "-" +
+                    hostId +
+                    ".txt",
+                    proc.getInputStream(),
                     PipeToFile.m_initToken, false, proc);
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
@@ -819,6 +851,19 @@ public class LocalCluster implements VoltServerConfig {
             prefix += "OneFail";
         if (m_failureState == FailureState.ONE_RECOVERING)
             prefix += "OneRecov";
+
+        return prefix +
+            "-" + String.valueOf(m_siteCount) +
+            "-" + String.valueOf(m_hostCount) +
+            "-" + templateCmdLine.target().display.toUpperCase();
+    }
+
+    String getFileName() {
+        String prefix = m_callingClassName + "-" + m_callingMethodName;
+        if (m_failureState == FailureState.ONE_FAILURE)
+            prefix += "-OneFail";
+        if (m_failureState == FailureState.ONE_RECOVERING)
+            prefix += "-OneRecov";
 
         return prefix +
             "-" + String.valueOf(m_siteCount) +

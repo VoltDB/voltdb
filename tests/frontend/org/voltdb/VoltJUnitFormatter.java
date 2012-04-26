@@ -84,7 +84,7 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
         // roughly how long you've been running a test
         assert(m_updateTimer == null);
         DurationUpdater updateTask = new DurationUpdater();
-        m_updateTimer = new Timer("Dot Printer from JUnit Results Formatter");
+        m_updateTimer = new Timer("Duration Printer from JUnit Results Formatter");
         int duration = DURATION_UPDATE_PERIOD_MIN * 60 * 1000; // ms
         m_updateTimer.schedule(updateTask, duration, duration);
     }

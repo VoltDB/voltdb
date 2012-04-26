@@ -23,10 +23,11 @@
 
 package org.voltdb.regressionsuites;
 
-import java.util.List;
-import org.voltdb.compiler.VoltProjectBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+
+import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
  * Interface allowing for the use of a particular configuration/topology
@@ -79,6 +80,8 @@ public interface VoltServerConfig {
      * @return The name of this config.
      */
     public String getName();
+
+    public void setCallingMethodName(String name);
 
     /**
      * Get the number of nodes running in this test suite

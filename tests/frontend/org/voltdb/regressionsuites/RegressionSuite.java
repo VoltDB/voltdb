@@ -54,6 +54,7 @@ public class RegressionSuite extends TestCase {
     protected String m_password = "password";
     private final ArrayList<Client> m_clients = new ArrayList<Client>();
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<SocketChannel>();
+    protected final String m_methodName;
 
     /**
      * Trivial constructor that passes parameter on to superclass.
@@ -61,6 +62,7 @@ public class RegressionSuite extends TestCase {
      */
     public RegressionSuite(final String name) {
         super(name);
+        m_methodName = name;
     }
 
     /**
@@ -71,6 +73,7 @@ public class RegressionSuite extends TestCase {
     public void setUp() throws Exception {
         //New tests means a new server thread that hasn't done a restore
         SnapshotRestore.m_haveDoneRestore = false;
+        m_config.setCallingMethodName(m_methodName);
         m_config.startUp(true);
     }
 

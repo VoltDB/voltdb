@@ -23,6 +23,7 @@ import java.io.FileWriter;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -470,5 +471,12 @@ public class MiscUtils {
             assert(parts.length == 2);
             return server;
         }
+    }
+
+    public static String getCompactStringTimestamp(long timestamp) {
+        SimpleDateFormat sdf =
+                new SimpleDateFormat("MMddHHmmss");
+        Date tsDate = new Date(timestamp);
+        return sdf.format(tsDate);
     }
 }
