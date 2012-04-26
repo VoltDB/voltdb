@@ -1639,8 +1639,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
         try {
-            m_commandLog.setTxnIdViableForRecovery(
-                    TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {

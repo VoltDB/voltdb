@@ -56,6 +56,4 @@ public interface CommandLog {
     public abstract void logHeartbeat(final long txnId);
 
     public abstract long getFaultSequenceNumber();
-
-    public abstract void setTxnIdViableForRecovery(long txnId);
 }
