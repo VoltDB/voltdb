@@ -15,14 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore;
+package org.voltcore.zk;
 
 import java.util.LinkedList;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.zk.ZKUtil;
 
 /**
  * CoreZK provides constants for all voltcore-registered

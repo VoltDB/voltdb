@@ -48,8 +48,8 @@ import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltcore.CoreZK;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.zk.CoreZK;
 
 public class HTTPAdminListener {
 

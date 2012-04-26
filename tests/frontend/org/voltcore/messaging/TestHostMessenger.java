@@ -29,8 +29,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.voltcore.CoreZK;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.zk.CoreZK;
+
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 

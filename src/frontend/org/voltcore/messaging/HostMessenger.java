@@ -42,13 +42,13 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.CoreZK;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 
 /**
