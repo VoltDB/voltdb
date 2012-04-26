@@ -17,8 +17,11 @@
 
 package org.voltdb;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -57,7 +60,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.ZKUtil;
@@ -113,6 +115,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    /** Default deployment file contents if path to deployment is null */
+    private static final String[] defaultDeploymentXML = {
+        "<?xml version=\"1.0\"?>",
+        "<deployment>",
+        "   <cluster hostcount=\"1\" sitesperhost=\"2\" />",
+        "   <httpd enabled=\"true\">",
+        "      <jsonapi enabled=\"true\" />",
+        "   </httpd>",
+        "</deployment>"
+    };
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     private volatile boolean m_validateConfiguredNumberOfPartitionsOnMailboxUpdate;
@@ -222,6 +234,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+            // If there's no deployment provide a default and put it under voltdbroot.
+            if (config.m_pathToDeployment == null) {
+                try {
+                    config.m_pathToDeployment = setupDefaultDeployment();
+                } catch (IOException e) {
+                    hostLog.fatal("Failed to write default deployment.", e);
+                }
+            }
 
             // set the mode first thing
             m_mode = OperationMode.INITIALIZING;
@@ -1862,5 +1883,37 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public MailboxPublisher getMailboxPublisher() {
         return m_mailboxPublisher;
+    }
+
+    /**
+     * Create default deployment.xml file in voltdbroot if the deployment path is null.
+     *
+     * @return path to default deployment file
+     * @throws IOException
+     */
+    private static String setupDefaultDeployment() throws IOException {
+
+        // Since there's apparently no deployment to override the path to voltdbroot it should be
+        // safe to assume it's under the working directory.
+        // CatalogUtil.getVoltDbRoot() creates the voltdbroot directory as needed.
+        File voltDbRoot = CatalogUtil.getVoltDbRoot(null);
+        String pathToDeployment = voltDbRoot.getPath() + File.separator + "deployment.xml";
+        File deploymentXMLFile = new File(pathToDeployment);
+
+        // Only create the file if it doesn't exist, otherwise reuse it.
+        if (!deploymentXMLFile.exists()) {
+            hostLog.warn("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
+            BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
+            for (String line : defaultDeploymentXML) {
+                bw.write(line);
+                bw.newLine();
+            }
+            bw.flush();
+            bw.close();
+        } else {
+            hostLog.warn("Using default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
+        }
+
+        return deploymentXMLFile.getAbsolutePath();
     }
 }

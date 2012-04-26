@@ -1051,18 +1051,8 @@ public abstract class CatalogUtil {
                                      boolean printLog) {
         File voltDbRoot;
         final Cluster cluster = catalog.getClusters().get("cluster");
-        // Handle default voltdbroot (and completely missing "paths" element).
-        if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null) {
-            voltDbRoot = new VoltFile("voltdbroot");
-            if (!voltDbRoot.exists()) {
-                hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
-                if (!voltDbRoot.mkdir()) {
-                    hostLog.fatal("Failed to create voltdbroot directory \"" + voltDbRoot + "\"");
-                }
-            }
-        } else {
-            voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
-        }
+        // Handles default voltdbroot (and completely missing "paths" element).
+        voltDbRoot = getVoltDbRoot(paths);
 
         validateDirectory("volt root", voltDbRoot, crashOnFailedValidation);
         if (printLog) {
@@ -1146,6 +1136,29 @@ public abstract class CatalogUtil {
         final org.voltdb.catalog.CommandLog commandLogConfig = cluster.getLogconfig().add("log");
         commandLogConfig.setInternalsnapshotpath(commandLogSnapshotPath.getPath());
         commandLogConfig.setLogpath(commandLogPath.getPath());
+    }
+
+    /**
+     * Get a File object representing voltdbroot. Create directory if missing.
+     * Use paths if non-null to get override default location.
+     *
+     * @param paths override paths or null
+     * @return File object for voltdbroot
+     */
+    public static File getVoltDbRoot(PathsType paths) {
+        File voltDbRoot;
+        if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null) {
+            voltDbRoot = new VoltFile("voltdbroot");
+            if (!voltDbRoot.exists()) {
+                hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
+                if (!voltDbRoot.mkdir()) {
+                    hostLog.fatal("Failed to create voltdbroot directory \"" + voltDbRoot.getAbsolutePath() + "\"");
+                }
+            }
+        } else {
+            voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
+        }
+        return voltDbRoot;
     }
 
     /**

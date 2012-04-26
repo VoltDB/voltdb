@@ -109,10 +109,10 @@ public class TestVoltDB extends TestCase {
         config = new VoltDB.Configuration(argsya);
         assertFalse(config.validate());
 
-        // missing deployment
+        // missing deployment (it's okay now that a default deployment is supported)
         String[] args3 = {"leader", "hola", "catalog", "teststring2"};
         config = new VoltDB.Configuration(args3);
-        assertFalse(config.validate());
+        assertTrue(config.validate());
 
         // empty deployment
         String[] args6 = {"leader", "hola", "catalog", "teststring6", "deployment", ""};
