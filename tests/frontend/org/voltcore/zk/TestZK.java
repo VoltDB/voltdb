@@ -28,8 +28,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
-import org.voltcore.agreement.LeaderElector;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.zk.LeaderElector;
 import org.apache.zookeeper_voltpatches.*;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
@@ -238,17 +238,20 @@ public class TestZK extends ZKTestBase {
 
         zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
-        LeaderElector elector1 = new LeaderElector(zk, "/election", new byte[0], null);
-        LeaderElector elector2 = new LeaderElector(zk2, "/election", new byte[0], null);
-        LeaderElector elector3 = new LeaderElector(zk3, "/election", new byte[0], null);
+        LeaderElector elector1 = new LeaderElector(zk, "/election", "node", null, null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", null, null);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", null, null);
+        elector1.start(true);
+        elector2.start(true);
+        elector3.start(true);
 
         assertTrue(elector1.isLeader());
         assertFalse(elector2.isLeader());
         assertFalse(elector3.isLeader());
 
-        elector1.done();
-        elector2.done();
-        elector3.done();
+        elector1.shutdown();
+        elector2.shutdown();
+        elector3.shutdown();
 
         zk.close();
         zk2.close();
@@ -264,23 +267,26 @@ public class TestZK extends ZKTestBase {
         zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         final Semaphore sem2 = new Semaphore(0);
-        Runnable r2 = new Runnable() {
+        LeaderNoticeHandler r2 = new LeaderNoticeHandler() {
             @Override
-            public void run() {
+            public void becomeLeader() {
                 sem2.release();
             }
         };
         final Semaphore sem3 = new Semaphore(0);
-        Runnable r3 = new Runnable() {
+        LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
             @Override
-            public void run() {
+            public void becomeLeader() {
                 sem3.release();
             }
         };
 
-        LeaderElector elector1 = new LeaderElector(zk, "/election", new byte[0], null);
-        LeaderElector elector2 = new LeaderElector(zk2, "/election", new byte[0], r2);
-        LeaderElector elector3 = new LeaderElector(zk3, "/election", new byte[0], r3);
+        LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", new byte[0], r2);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", new byte[0], r3);
+        elector1.start(true);
+        elector2.start(true);
+        elector3.start(true);
 
         assertTrue(elector1.isLeader());
         assertFalse(elector2.isLeader());
@@ -309,16 +315,19 @@ public class TestZK extends ZKTestBase {
         zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         final Semaphore sem3 = new Semaphore(0);
-        Runnable r3 = new Runnable() {
+        LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
             @Override
-            public void run() {
+            public void becomeLeader() {
                 sem3.release();
             }
         };
 
-        LeaderElector elector1 = new LeaderElector(zk, "/election", new byte[0], null);
-        LeaderElector elector2 = new LeaderElector(zk2, "/election", new byte[0], null);
-        LeaderElector elector3 = new LeaderElector(zk3, "/election", new byte[0], r3);
+        LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", new byte[0], null);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", new byte[0], r3);
+        elector1.start(true);
+        elector2.start(true);
+        elector3.start(true);
 
         assertTrue(elector1.isLeader());
         assertFalse(elector2.isLeader());
@@ -336,6 +345,34 @@ public class TestZK extends ZKTestBase {
         assertEquals(0, sem3.availablePermits());
 
         zk3.close();
+    }
+
+    @Test
+    public void testBabySitter() throws Exception {
+
+        final Semaphore sem = new Semaphore(0);
+        BabySitter.Callback cb = new BabySitter.Callback() {
+            @Override
+            public void run(List<String> children) {
+                sem.release(1);
+            }
+        };
+
+        ZooKeeper zk = getClient(0);
+        zk.create("/babysitterroot", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create("/babysitterroot/c1", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        BabySitter bs = new BabySitter(zk, "/babysitterroot", cb);
+        assertTrue(bs.lastSeenChildren().size() == 1);
+
+        zk.create("/babysitterroot/c2", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        sem.acquire();
+        assertTrue(bs.lastSeenChildren().size() == 2);
+
+        zk.delete("/babysitterroot/" + bs.lastSeenChildren().get(0), -1);
+        sem.acquire();
+        assertTrue(bs.lastSeenChildren().size() == 1);
+
+        bs.shutdown();
     }
 
 //    @Test
