@@ -107,11 +107,6 @@
     <fileset refid="voltpro.classpath"/>
 </path>
 
-<!-- select which set of regression suite configuration types to run -->
-<condition property="regressions" value="${regressions}" else="all">
-  <isset property="regressions"/>
-</condition>
-
 <!-- Workload Tracer Properties -->
 <condition property="workload.trace.class" value="">
     <not><isset property="workload.trace.class"/></not>
@@ -1131,6 +1126,10 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
+    <!-- select which set of regression suite configuration types to run -->
+    <condition property="regressions" value="${regressions}" else="all">
+        <isset property="regressions"/>
+    </condition>
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
             <formatter type="plain" unless="hudson"/>
@@ -1197,9 +1196,7 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
-    <condition property="regressions" value="${regressions}" else='localhsql'>
-        <isset property="regressions"/>
-    </condition>
+    <property name="regressions" value="localhsql"/>
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
             <formatter type="plain" unless="hudson"/>
@@ -1213,14 +1210,16 @@ TEST CASES
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-                <include name='org/voltdb/**/Test*.class'/>
-                <exclude name="**/*$*.class"/>
+                <include name='org/hsqldb_voltpatches/**/Test*.class' />
+                <include name='org/voltdb/**/Test*.class' />
+                <exclude name="**/*$*.class" />
                 <exclude name="**/TestRejoin*.class" />
                 <exclude name="**/TestFailureDetectSuite.class" />
                 <exclude name="**/TestFaultDistributor.class" />
-                <exclude name="**/TestPartitionDetection.class"  />
-                <exclude name="**/TestSecondaryRejoin.class"  />
+                <exclude name="**/TestPartitionDetection.class" />
+                <exclude name="**/TestSecondaryRejoin.class" />
+                <exclude name="**/TestNonDetermisticSeppuku.class" />
+                <exclude name="**/TestExportOpsEvents.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
             </fileset>
@@ -1254,7 +1253,10 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
-
+    <!-- select which set of regression suite configuration types to run -->
+    <condition property="regressions" value="${regressions}" else="all">
+        <isset property="regressions"/>
+    </condition>
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
             <formatter type="plain" unless="hudson"/>
@@ -1311,6 +1313,10 @@ TEST CASES
     <!-- Run the unit tests -->
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
+    </condition>
+    <!-- select which set of regression suite configuration types to run -->
+    <condition property="regressions" value="${regressions}" else="all">
+        <isset property="regressions"/>
     </condition>
 
     <run_junit timeout="${timeoutLength}" printsummary="no">
