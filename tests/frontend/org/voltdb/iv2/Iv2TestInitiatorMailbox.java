@@ -53,7 +53,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 
-public class TestInitiatorMailbox extends ZKTestBase {
+public class Iv2TestInitiatorMailbox extends ZKTestBase {
     private static VoltDBInterface mockVolt;
     private ZooKeeper zk;
     private HostMessenger hm = mock(HostMessenger.class);
