@@ -38,7 +38,7 @@ public class LoadedProcedureSet {
     final long m_siteId;
     final int m_siteIndex;
     final int m_numberOfPartitions;
-    final ExecutionSite m_site;
+    final SiteProcedureConnection m_site;
 
     public LoadedProcedureSet(ExecutionSite site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex, int numberOfPartitions) {
         m_runnerFactory = runnerFactory;
