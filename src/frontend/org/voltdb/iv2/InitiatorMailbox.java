@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.List;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.voltcore.agreement.LeaderElector;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -30,6 +29,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
+import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
