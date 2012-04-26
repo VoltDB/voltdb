@@ -25,6 +25,9 @@ package org.voltdb;
 
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.Test;
@@ -35,12 +38,25 @@ import org.apache.tools.ant.taskdefs.optional.junit.JUnitTest;
 
 public class VoltJUnitFormatter implements JUnitResultFormatter {
 
+    static final int DURATION_UPDATE_PERIOD_MIN = 2;
+
     PrintStream out = System.out;
     JUnitTest m_currentSuite;
     int m_tests;
     int m_errs;
     int m_failures;
     long m_start;
+    Timer m_updateTimer;
+
+    class DurationUpdater extends TimerTask {
+        AtomicInteger m_minutes = new AtomicInteger(0);
+
+        @Override
+        public void run() {
+            out.printf("    %d minutes have passed.\n", m_minutes.addAndGet(DURATION_UPDATE_PERIOD_MIN));
+            out.flush();
+        }
+    }
 
     @Override
     public void setOutput(OutputStream outputStream) {
@@ -62,13 +78,34 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
         m_currentSuite = suite;
         m_tests = m_errs = m_failures = 0;
         m_start = System.currentTimeMillis();
-        out.println("Running " + suite.getName());
+        out.println("  Running " + suite.getName());
+
+        // print a message to the console every few minutes so you know
+        // roughly how long you've been running a test
+        assert(m_updateTimer == null);
+        DurationUpdater updateTask = new DurationUpdater();
+        m_updateTimer = new Timer("Duration Printer from JUnit Results Formatter");
+        int duration = DURATION_UPDATE_PERIOD_MIN * 60 * 1000; // ms
+        m_updateTimer.schedule(updateTask, duration, duration);
     }
 
     @Override
     public void endTestSuite(JUnitTest suite) throws BuildException {
-        out.printf("Tests run: %3d, Failures: %3d, Errors: %3d, Time elapsed: %.2f sec\n",
-                m_tests, m_failures, m_errs, (System.currentTimeMillis() - m_start) / 1000.0);
+        m_updateTimer.cancel();
+        m_updateTimer = null;
+
+        if ((m_failures > 0) || (m_errs > 0)) {
+            out.print("(FAIL-JUNIT) ");
+        }
+        else {
+            out.print("             ");
+        }
+        synchronized (out) {
+            out.flush();
+            out.printf("Tests run: %3d, Failures: %3d, Errors: %3d, Time elapsed: %.2f sec\n",
+                    m_tests, m_failures, m_errs, (System.currentTimeMillis() - m_start) / 1000.0);
+            out.flush();
+        }
 
     }
 
@@ -92,7 +129,11 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
                 testName = testName.substring(0, testName.indexOf('('));
         }
 
-        out.println("    " + testName + " had an error.");
+        out.println("    " + testName + " had an error:");
+        out.println("    " + arg1.toString());
+        if (arg1.getMessage() != null) {
+            out.println("    \"" + arg1.getMessage() + "\"");
+        }
         StackTraceElement[] st = arg1.getStackTrace();
         int i = 0;
         for (StackTraceElement ste : st) {

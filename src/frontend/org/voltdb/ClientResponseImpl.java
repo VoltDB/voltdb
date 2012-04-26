@@ -33,8 +33,6 @@ import org.voltdb.utils.MiscUtils;
  *
  */
 public class ClientResponseImpl implements ClientResponse, JSONString {
-    private static final int MAX_HASH_BYTES = 1024 * 10; // hash the first 10k
-
     private boolean setProperly = false;
     private byte status = 0;
     private String statusString = null;

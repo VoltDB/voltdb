@@ -36,7 +36,6 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.sysprocs.SnapshotRestore;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -54,6 +53,7 @@ public class RegressionSuite extends TestCase {
     protected String m_password = "password";
     private final ArrayList<Client> m_clients = new ArrayList<Client>();
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<SocketChannel>();
+    protected final String m_methodName;
 
     /**
      * Trivial constructor that passes parameter on to superclass.
@@ -61,6 +61,7 @@ public class RegressionSuite extends TestCase {
      */
     public RegressionSuite(final String name) {
         super(name);
+        m_methodName = name;
     }
 
     /**
@@ -70,6 +71,7 @@ public class RegressionSuite extends TestCase {
     @Override
     public void setUp() throws Exception {
         //New tests means a new server thread that hasn't done a restore
+        m_config.setCallingMethodName(m_methodName);
         m_config.startUp(true);
     }
 
