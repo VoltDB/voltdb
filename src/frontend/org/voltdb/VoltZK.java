@@ -117,6 +117,10 @@ public class VoltZK {
         return ZKUtil.path(leaders_initiators, "partition_" + partition);
     }
 
+    public static int getPartitionFromElectionDir(String partitionDir) {
+        return Integer.parseInt(partitionDir.substring("partition_".length()));
+    }
+
     /**
      * Helper method for parsing mailbox node contents into Java objects.
      * @throws JSONException

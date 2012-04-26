@@ -33,7 +33,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.MiscUtils;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ChildrenCallback;
 import org.voltdb.VoltDB;
@@ -48,7 +48,7 @@ public class InitiatorLeaderMonitor {
 
     private final ZooKeeper zk;
     private final ExecutorService es =
-            Executors.newSingleThreadExecutor(MiscUtils.getThreadFactory("Client Interface"));
+            Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Client Interface"));
     private final Map<Integer, Long> initiatorLeaders =
             Collections.synchronizedMap(new HashMap<Integer, Long>());
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
