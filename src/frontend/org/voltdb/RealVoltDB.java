@@ -1287,16 +1287,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 @Override
                 public void run() {
                     try {
-                        m_zk.close();
-                    } catch (InterruptedException e) {
+                        if (m_zk != null) {
+                            m_zk.close();
+                        }
+                    } catch (Exception e) {
                         log.warn("Failure while closing internal ZooKeeper connection.", e);
                     }
                 }
             };
-            m_zk = null;
             t.start();
             m_agreementSite.shutdown();
             t.join();
+            m_zk = null;
             m_agreementSite = null;
 
             // shut down the network/messaging stuff
