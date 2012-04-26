@@ -31,6 +31,8 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Deque;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -90,6 +92,7 @@ import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.CatalogUtil;
@@ -350,6 +353,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              * Then it does a compare and set of the topology.
              */
             ArrayDeque<Mailbox> siteMailboxes = null;
+            Deque<Mailbox> initiatorMailboxes = null;
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
@@ -375,10 +379,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     createRejoinBarrierAndWatchdog(rejoinCompleteLatch);
 
                     p = createMailboxesForSitesRejoin();
+                    // XXX-IZZY NEED TO FIX REJOIN TO ADD THE INITIATOR MAILBOXES
                     ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
                     System.out.println("Set recovering site count to " + p.getFirst().size());
                 } else {
                     p = createMailboxesForSitesStartup();
+                    // XXX-IZZY HACKY, REFACTOR SOMEHOW
+                    JSONObject topo = registerClusterConfig(p.getSecond());
+                    List<Integer> partitions =
+                        ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
+                    initiatorMailboxes = createInitiatorMailboxes(partitions);
                 }
 
                 siteMailboxes = p.getFirst();
@@ -764,6 +774,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_mailboxPublisher.registerMailbox(MailboxType.ExecutionSite, mnc);
         }
         return Pair.of( mailboxes, clusterConfig);
+    }
+
+    private Deque<Mailbox> createInitiatorMailboxes(Collection<Integer> partitions)
+    {
+        Deque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
+        for (Integer partition : partitions)
+        {
+            Mailbox mailbox = new InitiatorMailbox(m_messenger, partition);
+            m_messenger.createMailbox(null, mailbox);
+            MailboxNodeContent mnc = new MailboxNodeContent(mailbox.getHSId(),
+                                                            partition);
+            m_mailboxPublisher.registerMailbox(MailboxType.Initiator, mnc);
+        }
+        return mailboxes;
     }
 
     private JSONObject registerClusterConfig(ClusterConfig config)

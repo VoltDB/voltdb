@@ -234,9 +234,11 @@ public class SiteTracker {
                 initiators = new ArrayList<Long>();
                 hostsToInitiators.put(hostId, initiators);
             }
-            initiators.add(obj.HSId);
-
-            m_allInitiators.add(obj.HSId);
+            if (obj.partitionId == null)
+            {
+                initiators.add(obj.HSId);
+                m_allInitiators.add(obj.HSId);
+            }
             // TODO: needs to determine if it's the master or replica
         }
     }
