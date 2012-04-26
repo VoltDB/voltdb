@@ -42,14 +42,14 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.CoreZK;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
-import org.voltcore.agreement.ZKUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.CoreZK;
+import org.voltcore.zk.ZKUtil;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -222,7 +222,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                                 m_config.backwardsTimeForgivenessWindow);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
-            m_zk = org.voltcore.agreement.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);
+            m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);
             if (m_zk == null) {
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
@@ -552,7 +552,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * to join the cluster and creating the client
          */
         m_agreementSite.waitForRecovery();
-        m_zk = org.voltcore.agreement.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);
+        m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);
         if (m_zk == null) {
             throw new Exception("Timed out trying to connect local ZooKeeper instance");
         }
