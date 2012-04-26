@@ -72,10 +72,8 @@ public class QueryPlanner {
         m_cluster = catalogCluster;
         m_estimates = estimates;
         m_useGlobalIds = useGlobalIds;
-        //m_quietPlanner = suppressDebugOutput;
-        //m_fullDebug = System.getProperties().contains("compilerdebug");
-        m_quietPlanner = false;
-        m_fullDebug = true;
+        m_quietPlanner = suppressDebugOutput;
+        m_fullDebug = System.getProperties().contains("compilerdebug");
     }
 
     /**
@@ -124,15 +122,9 @@ public class QueryPlanner {
             outputCompiledStatement(stmtName, procName, xmlSQL);
         }
 
-        // get a parsed statement from the xml
-        AbstractParsedStmt parsedStmt = null;
-        try {
-            parsedStmt = AbstractParsedStmt.parse(sql, xmlSQL, m_db, joinOrder);
-        }
-        catch (Exception e) {
-            m_recentErrorMsg = e.getMessage();
-            return null;
-        }
+        // Get a parsed statement from the xml
+        // The callers of compilePlan are ready to catch any exceptions thrown here.
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(sql, xmlSQL, m_db, joinOrder);
         if (parsedStmt == null)
         {
             m_recentErrorMsg = "Failed to parse SQL statement: " + sql;
