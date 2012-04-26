@@ -1050,7 +1050,7 @@ TEST CASES
             <jvmarg value="-Demma.coverage.out.file=${emma.dir}/coverage.emma" />
             <jvmarg value="-Demma.coverage.out.merge=true" />
             <!-- junit log4j settings, generates log output of last suite -->
-            <jvmarg value="-Dlog4j.configuration=file:${base.dir}/voltdb/log4j.xml" />
+            <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml" />
             <!-- -->
             <formatters/>
             <batchtest todir="${build.testoutput.dir}">
