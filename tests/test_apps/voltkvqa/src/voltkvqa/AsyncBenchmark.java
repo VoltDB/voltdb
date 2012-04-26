@@ -242,18 +242,20 @@ public class AsyncBenchmark
                             if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
                                 return;
                             }
-                            final VoltTable pairData = response.getResults()[0];
-                            final VoltTableRow tablerow = pairData.fetchRow(0);
-                            final long counter = tablerow.getLong(0);
-                            hm.put(pair.Key, counter);
-                            //System.out.printf("Key: %s\tCount: %d\n", pair.Key, counter);
-                            // Track the result of the operation (Success, Failure, Payload traffic...)
-                            if (response.getStatus() == ClientResponse.SUCCESS)
+                            if (response.getStatus() == ClientResponse.SUCCESS) {
                                 PutStoreResults.incrementAndGet(0);
-                            else
+                                final VoltTable pairData = response.getResults()[0];
+                                final VoltTableRow tablerow = pairData.fetchRow(0);
+                                final long counter = tablerow.getLong(0);
+                                hm.put(pair.Key, counter);
+                                //System.out.printf("Key: %s\tCount: %d\n", pair.Key, counter);
+                                // Track the result of the operation (Success, Failure, Payload traffic...)
+                                PutCompressionResults.addAndGet(0, this.StoreValueLength);
+                                PutCompressionResults.addAndGet(1, this.RawValueLength);
+                            } else {
+                                System.err.println("Put failed because " + response.getStatusString());
                                 PutStoreResults.incrementAndGet(1);
-                            PutCompressionResults.addAndGet(0, this.StoreValueLength);
-                            PutCompressionResults.addAndGet(1, this.RawValueLength);
+                            }
                         }
                     }
                     , "Put"

@@ -62,10 +62,10 @@ function async-benchmark() {
         --port=21212 \
         --contestants=6 \
         --voter=905000000 \
-        --max-votes=2 \
+        --maxvotes=2 \
         --ratelimit=100000 \
         --autotune=false \
-        --latency-target=10.0
+        --latencytarget=10
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -85,7 +85,7 @@ function sync-benchmark() {
         --servers=localhost \
         --port=21212 \
         --contestants=6 \
-        --max-votes=2
+        --maxvotes=2
 }
 
 # JDBC benchmark sample
@@ -105,7 +105,7 @@ function jdbc-benchmark() {
         --servers=localhost \
         --port=21212 \
         --contestants=6 \
-        --max-votes=2
+        --maxvotes=2
 }
 
 function help() {

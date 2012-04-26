@@ -62,7 +62,7 @@ function async-benchmark() {
         --port=21212 \
         --ratelimit=100000 \
         --autotune=false \
-        --latency-target=10.0
+        --latencytarget=10
 }
 
 # Multi-threaded synchronous benchmark sample

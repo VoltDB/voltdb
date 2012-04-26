@@ -99,7 +99,7 @@ public class AsyncBenchmark
             long rateLimit       = apph.longValue("ratelimit");
             boolean autoTune     = apph.booleanValue("autotune");
             double latencyTarget = apph.doubleValue("latencytarget");
-            final String csv     = apph.stringValue("stats");
+            final String csv     = apph.stringValue("statsfile");
 
 
             // Validate parameters
@@ -108,7 +108,7 @@ public class AsyncBenchmark
                 .validate("contestants", (contestantCount > 0))
                 .validate("maxvotes", (maxVoteCount > 0))
                 .validate("ratelimit", (rateLimit > 0))
-                .validate("latency-target", (latencyTarget > 0))
+                .validate("latencytarget", (latencyTarget > 0))
             ;
 
             // Display actual parameters, for reference

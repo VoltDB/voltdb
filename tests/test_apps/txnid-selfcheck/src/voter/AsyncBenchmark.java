@@ -79,7 +79,7 @@ public class AsyncBenchmark
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
+                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
                 .setArguments(args)
             ;
 
@@ -90,7 +90,7 @@ public class AsyncBenchmark
             int port             = apph.intValue("port");
             long rateLimit       = apph.longValue("ratelimit");
             boolean autoTune     = apph.booleanValue("autotune");
-            double latencyTarget = apph.doubleValue("latency-target");
+            double latencyTarget = apph.doubleValue("latencytarget");
             final String csv     = apph.stringValue("stats");
 
 
@@ -98,7 +98,7 @@ public class AsyncBenchmark
             apph.validate("duration", (duration > 0))
                 .validate("displayinterval", (displayInterval > 0))
                 .validate("ratelimit", (rateLimit > 0))
-                .validate("latency-target", (latencyTarget > 0))
+                .validate("latencytarget", (latencyTarget > 0))
             ;
 
             // Display actual parameters, for reference

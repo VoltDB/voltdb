@@ -124,7 +124,7 @@ public class SyncBenchmark
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("pool-size", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
+                .add("poolsize", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
                 .add("procedure", "procedure_name", "Procedure to call.", "JiggleSinglePartition")
                 .add("wait", "wait_duration", "Wait duration (only when calling one of the Wait procedures), in milliseconds.", 0)
                 .setArguments(args)
@@ -139,12 +139,12 @@ public class SyncBenchmark
             final int poolSize         = apph.intValue("pool-size");
             final String procedure     = apph.stringValue("procedure");
             final long wait            = apph.intValue("wait");
-            final String csv           = apph.stringValue("stats");
+            final String csv           = apph.stringValue("statsfile");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
                 .validate("threads", (threadCount > 0))
-                .validate("pool-size", (poolSize > 0))
+                .validate("poolsize", (poolSize > 0))
                 .validate("wait", (wait >= 0))
             ;
 

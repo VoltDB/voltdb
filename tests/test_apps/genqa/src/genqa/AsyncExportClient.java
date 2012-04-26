@@ -166,12 +166,12 @@ public class AsyncExportClient
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("pool-size", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
+                .add("poolsize", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
                 .add("procedure", "procedure_name", "Procedure to call.", "JiggleExportSinglePartition")
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
-                .add("catalog-swap", "Swap catalogs from the client", "true")
+                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
+                .add("catalogswap", "Swap catalogs from the client", "true")
                 .setArguments(args)
             ;
 
@@ -180,21 +180,21 @@ public class AsyncExportClient
             final long duration        = apph.longValue("duration");
             final String servers       = apph.stringValue("servers");
             final int port             = apph.intValue("port");
-            final int poolSize         = apph.intValue("pool-size");
+            final int poolSize         = apph.intValue("poolsize");
             final String procedure     = apph.stringValue("procedure");
             final long rateLimit       = apph.longValue("ratelimit");
             final boolean autoTune     = apph.booleanValue("autotune");
-            final double latencyTarget = apph.doubleValue("latency-target");
-            final boolean catalogSwap  = apph.booleanValue("catalog-swap");
-            final String csv           = apph.stringValue("stats");
+            final double latencyTarget = apph.doubleValue("latencytarget");
+            final boolean catalogSwap  = apph.booleanValue("catalogswap");
+            final String csv           = apph.stringValue("statsfile");
 
             TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("pool-size", (duration > 0))
+                .validate("poolsize", (duration > 0))
                 .validate("ratelimit", (rateLimit > 0))
-                .validate("latency-target", (latencyTarget > 0))
+                .validate("latencytarget", (latencyTarget > 0))
             ;
 
             // Display actual parameters, for reference

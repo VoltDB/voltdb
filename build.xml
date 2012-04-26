@@ -1193,6 +1193,9 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
+    <condition property="regressions" value="${regressions}" else='localhsql'>
+        <isset property="regressions"/>
+    </condition>
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
             <formatter type="plain" unless="hudson"/>
