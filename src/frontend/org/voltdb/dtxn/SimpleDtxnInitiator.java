@@ -70,6 +70,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     private final ExecutorTxnIdSafetyState m_safetyState;
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private ClientInterface m_clientInterface;
     public void setClientInterface(ClientInterface ci) {
@@ -113,7 +114,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_safetyState = m_mailbox.getSafetyState();
         m_siteId = m_mailbox.getHSId();
         m_safetyState.setHSId(m_siteId);
-        hostLog.info("Initializing initiator ID: " + initiatorId  +
+        consoleLog.info("Initializing initiator ID: " + initiatorId  +
                 ", SiteID: " + CoreUtils.hsIdToString(m_siteId));
 
         m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);

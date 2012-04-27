@@ -24,18 +24,14 @@ package org.voltdb;
 
 import java.io.File;
 
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
@@ -66,14 +62,12 @@ public class MockVoltDB implements VoltDBInterface
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
-    int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config());
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
     boolean m_noLoadLib = false;
-    public boolean shouldIgnoreCrashes = false;
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     VoltDB.Configuration voltconfig = null;
@@ -225,10 +219,6 @@ public class MockVoltDB implements VoltDBInterface
         return m_catalog.getClusters().get(m_clusterName);
     }
 
-    public int getCrashCount() {
-        return m_howManyCrashes;
-    }
-
     public Database getDatabase()
     {
         return getCluster().getDatabases().get(m_databaseName);
@@ -337,17 +327,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean ignoreCrash()
-    {
-        if (shouldIgnoreCrashes) {
-            m_howManyCrashes++;
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    @Override
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
@@ -376,6 +355,8 @@ public class MockVoltDB implements VoltDBInterface
         if (m_faultDistributor != null) {
             m_faultDistributor.shutDown();
         }
+        VoltDB.wasCrashCalled = false;
+        VoltDB.crashMessage = null;
         m_snapshotCompletionMonitor.shutdown();
         m_es.shutdown();
         m_es.awaitTermination( 1, TimeUnit.DAYS);

@@ -47,7 +47,6 @@ import org.voltdb.client.ProcedureCallback;
 public class JDBC4ClientConnection implements Closeable {
     private final JDBC4PerfCounterMap statistics;
     private final ArrayList<String> servers;
-    private final int port;
     private final Client client;
 
     /**
@@ -85,9 +84,7 @@ public class JDBC4ClientConnection implements Closeable {
      *            trailing index when the pool decides a new client needs to be created based on the
      *            number of clients).
      * @param servers
-     *            the list of VoltDB servers to connect to.
-     * @param port
-     *            the VoltDB native protocol port to connect to (usually 21212).
+     *            the list of VoltDB servers to connect to in hostname[:port] format.
      * @param user
      *            the user name to use when connecting to the server(s).
      * @param password
@@ -111,21 +108,20 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws UnknownHostException
      */
     protected JDBC4ClientConnection(String clientConnectionKeyBase, String clientConnectionKey,
-            String[] servers, int port, String user, String password, boolean isHeavyWeight,
+            String[] servers, String user, String password, boolean isHeavyWeight,
             int maxOutstandingTxns) throws UnknownHostException, IOException {
         // Save the list of trimmed non-empty server names.
         this.servers = new ArrayList<String>(servers.length);
         for (String server : servers) {
-            String server2 = server.trim();
-            if (!server2.isEmpty()) {
-                this.servers.add(server2);
+            server = server.trim();
+            if (!server.isEmpty()) {
+                this.servers.add(server);
             }
         }
         if (this.servers.isEmpty()) {
             throw new UnknownHostException("JDBC4ClientConnection: no servers provided");
         }
 
-        this.port = port;
         this.keyBase = clientConnectionKeyBase;
         this.key = clientConnectionKey;
         this.statistics = JDBC4ClientConnectionPool.getStatistics(clientConnectionKeyBase);
@@ -140,7 +136,7 @@ public class JDBC4ClientConnection implements Closeable {
         this.client = ClientFactory.createClient(config);
         this.users = 0;
         for (String server : this.servers) {
-            this.client.createConnection(server, this.port);
+            this.client.createConnection(server);
         }
     }
 

@@ -61,9 +61,7 @@ public class PlannerTestAideDeCamp {
     private final Database db;
     int compileCounter = 0;
 
-    private Statement m_currentCatalogStmt = null;
     private CompiledPlan m_currentPlan = null;
-    private List<AbstractPlanNode> m_planNodes = null;
 
     /**
      * Loads the schema at ddlurl and setups a voltcompiler / hsql instance.
@@ -244,9 +242,7 @@ public class PlannerTestAideDeCamp {
             plannodes.add(nodeList.getRootPlanNode());
         }
 
-        m_currentCatalogStmt = catalogStmt;
         m_currentPlan = plan;
-        m_planNodes = plannodes;
         return plannodes;
     }
 

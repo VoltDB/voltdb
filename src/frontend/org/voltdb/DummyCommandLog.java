@@ -38,7 +38,8 @@ public class DummyCommandLog implements CommandLog {
     public void shutdown() throws InterruptedException {}
 
     @Override
-    public Semaphore logFault(Set<Long> failedSites, Set<Long> faultedTxns) {
+    public Semaphore logFault(Set<Long> failedInitiators,
+                              Set<Long> faultedTxns) {
         return new Semaphore(1);
     }
 
@@ -52,10 +53,4 @@ public class DummyCommandLog implements CommandLog {
 
     @Override
     public void initForRejoin(CatalogContext context, long txnId, boolean isRejoin) {}
-
-    @Override
-    public void setTxnIdViableForRecovery(long txnId) {
-        // TODO Auto-generated method stub
-
-    }
 }

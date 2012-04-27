@@ -52,8 +52,6 @@ public class SiteMailbox implements Mailbox {
         public long getFaultSequenceNumber() {
             return 0;
         }
-        @Override
-        public void setTxnIdViableForRecovery(long txnId) {}
         };
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();

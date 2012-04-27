@@ -208,14 +208,16 @@ public class TestExpressionUtil extends TestCase {
     public void testClone() {
         AbstractExpression cloned_exp = null;
         try {
-            cloned_exp = ExpressionUtil.clone(ROOT_EXP);
+            if (ROOT_EXP != null) {
+                cloned_exp = (AbstractExpression) ROOT_EXP.clone();
+            }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
         assertNotNull(cloned_exp);
 
         //
-        // First build our lists of information about each node in the orignal tree
+        // First build our lists of information about each node in the original tree
         // It is assumed that the tree will be traversed in the same order
         //
         final ArrayList<AbstractExpression> orig_exps = new ArrayList<AbstractExpression>();
@@ -236,10 +238,12 @@ public class TestExpressionUtil extends TestCase {
                 AbstractExpression orig_exp = orig_exps.remove(0);
                 //
                 // We want to make sure that the cloned Expression doesn't
-                // have the its ID set to its hashCode
-                //
-                assertTrue(orig_exp.hashCode() != exp.hashCode());
-                //assertFalse(orig_exp.getId().equals(Integer.toString(exp.hashCode())));
+                // share components (having the same object identity).
+                // This COULD still fail for wrapped primitive types
+                // IF Expressions ever reference any and
+                // IF the cloning method is not (somehow) working to avoid
+                // pointers into a system-provided wrapped primitive cache.
+                assertFalse(orig_exp == exp);
                 //
                 // Use our general comparison method to check other things
                 //

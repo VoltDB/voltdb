@@ -87,7 +87,9 @@ public class TestSimpleWorkUnit extends TestCase
     public void setUp()
     {
         m_voltdb = new MockVoltDB();
-        m_voltdb.shouldIgnoreCrashes = true;
+        VoltDB.crashMessage = null;
+        VoltDB.wasCrashCalled = false;
+        VoltDB.ignoreCrash = true;
         VoltDB.replaceVoltDBInstanceForTest(m_voltdb);
 
         VoltTable.ColumnInfo[] cols1 =

@@ -64,16 +64,16 @@ function async-benchmark-help() {
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj genqa.AsyncBenchmark \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
         --procedure=JiggleSinglePartition \
         --pool-size=100000 \
         --wait=0 \
-        --rate-limit=100000 \
-        --auto-tune=true \
-        --latency-target=10.0
+        --ratelimit=100000 \
+        --autotune=true \
+        --latencytarget=10
 }
 
 function async-export() {
@@ -81,15 +81,15 @@ function async-export() {
     rm -rf $CLIENTLOG/*
     mkdir $CLIENTLOG
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=900 \
         --servers=localhost \
         --port=21212 \
-        --pool-size=100000 \
-        --rate-limit=10000 \
-        --auto-tune=false \
-        --catalog-swap=false \
-        --latency-target=10.0
+        --poolsize=100000 \
+        --ratelimit=10000 \
+        --autotune=false \
+        --catalogswap=false \
+        --latencytarget=10
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -103,7 +103,7 @@ function sync-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj genqa.SyncBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
@@ -123,12 +123,12 @@ function jdbc-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj genqa.JDBCBenchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
         --procedure=JiggleSinglePartition \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --wait=0
 }
 

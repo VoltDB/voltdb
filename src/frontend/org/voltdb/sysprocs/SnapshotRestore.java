@@ -40,6 +40,8 @@ import java.util.concurrent.Future;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -83,6 +85,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotRestore.class.getName());
 
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+    private static final VoltLogger CONSOLE_LOG = new VoltLogger("CONSOLE");
 
     private static final int DEP_restoreScan = (int)
             SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -800,7 +803,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         }
 
         final long startTime = System.currentTimeMillis();
-        HOST_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
+        CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
 
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
@@ -908,7 +911,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         }
 
         /*
-         * Serialize all the export sequence nubmers and then distribute them in a
+         * Serialize all the export sequence numbers and then distribute them in a
          * plan fragment and each receiver will pull the relevant information for
          * itself
          */
@@ -944,17 +947,63 @@ public class SnapshotRestore extends VoltSystemProcedure
         final PrintWriter pw = new PrintWriter(sw);
         pw.toString();
         pw.printf("%.2f", duration);
-        HOST_LOG.info("Finished restore of " + path + " with nonce: "
+        CONSOLE_LOG.info("Finished restore of " + path + " with nonce: "
                 + nonce + " in " + sw.toString() + " seconds");
         //        m_sampler.setShouldStop();
         //        try {
         //            m_sampler.join();
         //        } catch (InterruptedException e) {
-        //            // TODO Auto-generated catch block
         //            e.printStackTrace();
         //        }
+
+        /*
+         * ENG-1858, make data loaded by snapshot restore durable
+         * immediately by starting a truncation snapshot if
+         * the command logging is enabled and the database start action
+         * was create
+         */
+        final VoltDB.START_ACTION startAction = VoltDB.instance().getConfig().m_startAction;
+        final org.voltdb.OperationMode mode = VoltDB.instance().getMode();
+
+        /*
+         * Is this the start action and no recovery is being performed. The mode
+         * will not be INITIALIZING, it will PAUSED or RUNNING. If that is the case,
+         * we do want a truncation snapshot if CL is enabled.
+         */
+        final boolean isStartWithNoAutomatedRestore =
+            startAction == VoltDB.START_ACTION.START && mode != org.voltdb.OperationMode.INITIALIZING;
+
+        final boolean isCLEnabled =
+            VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl");
+
+        final boolean isStartedWithCreateAction = startAction == VoltDB.START_ACTION.CREATE;
+
+        if ( isCLEnabled && (isStartedWithCreateAction || isStartWithNoAutomatedRestore)) {
+
+            final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+            HOST_LOG.info("Requesting truncation snapshot to make data loaded by snapshot restore durable.");
+            zk.create(
+                    "/request_truncation_snapshot",
+                    null,
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT,
+                    new StringCallback() {
+                        @Override
+                        public void processResult(int rc, String path, Object ctx,
+                                String name) {
+                            if (rc != 0) {
+                                KeeperException.Code code = KeeperException.Code.get(rc);
+                                if (code != KeeperException.Code.NODEEXISTS) {
+                                    HOST_LOG.warn(
+                                            "Don't expect this ZK response when requesting a truncation snapshot "
+                                            + code);
+                                }
+                            }
+                        }},
+                    null);
+        }
         return results;
-            }
+    }
 
     private VoltTable[] performDistributeExportSequenceNumbers(
             byte[] exportSequenceNumberBytes,

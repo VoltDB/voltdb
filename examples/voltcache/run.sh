@@ -60,17 +60,17 @@ function benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltcache.Benchmark \
         --threads=40 \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --port=21212 \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --preload=true \
-        --get-put-ratio=0.90 \
-        --key-size=32 \
-        --min-value-size=1024 \
-        --max-value-size=1024 \
-        --use-compression=false
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false
 }
 
 # Help on the Memcached Interface Server

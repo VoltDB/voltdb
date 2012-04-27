@@ -17,8 +17,11 @@
 
 package org.voltdb;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -59,7 +62,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -115,7 +117,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 {
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
+    /** Default deployment file contents if path to deployment is null */
+    private static final String[] defaultDeploymentXML = {
+        "<?xml version=\"1.0\"?>",
+        "<!-- IMPORTANT: This file is an auto-generated default deployment configuration.",
+        "                Changes to this file will be overwritten. Copy it elsewhere if you",
+        "                want to use it as a starting point for a custom configuration. -->",
+        "<deployment>",
+        "   <cluster hostcount=\"1\" sitesperhost=\"2\" />",
+        "   <httpd enabled=\"true\">",
+        "      <jsonapi enabled=\"true\" />",
+        "   </httpd>",
+        "</deployment>"
+    };
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     private volatile boolean m_validateConfiguredNumberOfPartitionsOnMailboxUpdate;
@@ -125,7 +141,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.5";
+    private static final String m_defaultVersionString = "2.6";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -228,7 +244,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
-            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+            // If there's no deployment provide a default and put it under voltdbroot.
+            if (config.m_pathToDeployment == null) {
+                try {
+                    config.m_pathToDeployment = setupDefaultDeployment();
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
+                }
+            }
 
             // set the mode first thing
             m_mode = OperationMode.INITIALIZING;
@@ -1284,7 +1309,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         String buildInfo[] = extractBuildInfo();
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
-        hostLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
+        consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
     }
 
     /**
@@ -1616,11 +1641,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public boolean ignoreCrash() {
-        return false;
-    }
-
-    @Override
     public BackendTarget getBackendTargetType() {
         return m_config.m_backend;
     }
@@ -1642,13 +1662,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         for (ClientInterface intf : getClientInterfaces()) {
             intf.mayActivateSnapshotDaemon();
         }
-        hostLog.info(
+        consoleLog.info(
                 "Node data recovery completed after " + delta + " seconds with " + megabytes +
                 " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
         try {
-            m_commandLog.setTxnIdViableForRecovery(
-                    TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 1));
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
@@ -1660,7 +1678,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             if (logRecoveryCompleted) {
                 m_recovering = false;
-                hostLog.info("Node recovery completed");
+                consoleLog.info("Node recovery completed");
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host recovery completion to ZK", true, e);
@@ -1711,7 +1729,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public void setReplicationRole(ReplicationRole role)
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
-            hostLog.info("Promoting replication role from replica to master.");
+            consoleLog.info("Promoting replication role from replica to master.");
         }
         m_config.m_replicationRole = role;
         for (ClientInterface ci : m_clientInterfaces) {
@@ -1772,7 +1790,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
     }
 
     @Override
@@ -1783,7 +1801,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public synchronized void recoveryComplete() {
         m_recovering = false;
-        hostLog.info("Node recovery completed");
+        consoleLog.info("Node recovery completed");
     }
 
     @Override
@@ -1890,5 +1908,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public MailboxPublisher getMailboxPublisher() {
         return m_mailboxPublisher;
+    }
+
+    /**
+     * Create default deployment.xml file in voltdbroot if the deployment path is null.
+     *
+     * @return path to default deployment file
+     * @throws IOException
+     */
+    static String setupDefaultDeployment() throws IOException {
+
+        // Since there's apparently no deployment to override the path to voltdbroot it should be
+        // safe to assume it's under the working directory.
+        // CatalogUtil.getVoltDbRoot() creates the voltdbroot directory as needed.
+        File voltDbRoot = CatalogUtil.getVoltDbRoot(null);
+        String pathToDeployment = voltDbRoot.getPath() + File.separator + "deployment.xml";
+        File deploymentXMLFile = new File(pathToDeployment);
+
+        hostLog.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
+        BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
+        for (String line : defaultDeploymentXML) {
+            bw.write(line);
+            bw.newLine();
+        }
+        bw.flush();
+        bw.close();
+
+        return deploymentXMLFile.getAbsolutePath();
     }
 }

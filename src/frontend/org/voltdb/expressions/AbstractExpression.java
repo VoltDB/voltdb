@@ -239,6 +239,23 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = 0;
+        // hash the children
+        if (m_left != null) {
+            result += m_left.hashCode();
+        }
+        if (m_right != null) {
+            result += m_right.hashCode();
+        }
+        if (m_type != null) {
+            result += m_type.hashCode();
+        }
+        return result;
+    }
+
+    @Override
     public String toJSONString() {
         JSONStringer stringer = new JSONStringer();
         try {

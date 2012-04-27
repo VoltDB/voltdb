@@ -79,3 +79,13 @@ SELECT _variable / 0.0 from @from_tables
 -- UPDATE @from_tables SET @assign_col = @assign_type WHERE _variable _cmp _variable
 -- comparison with set expression
 UPDATE @from_tables SET @assign_col = @assign_col _math _value[int:0,5] WHERE _variable _cmp @cmp_type
+
+
+SELECT * FROM @from_tables WHERE _variable _like 'abc%'
+SELECT * FROM @from_tables WHERE _variable _like '%'
+SELECT * FROM @from_tables WHERE _variable _like '%' ESCAPE '!' 
+SELECT * FROM @from_tables WHERE _variable _like '!%' ESCAPE '!' 
+SELECT * FROM @from_tables WHERE _variable _like 'abc' ESCAPE '!' 
+SELECT * FROM @from_tables WHERE _variable _like 'abc%' ESCAPE '!' 
+SELECT * FROM @from_tables WHERE _variable _like 'abc!%' ESCAPE '!' 
+SELECT * FROM @from_tables WHERE _variable _like 'abc!%%' ESCAPE '!' 
