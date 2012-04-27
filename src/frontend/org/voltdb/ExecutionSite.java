@@ -29,7 +29,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,12 +51,10 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -820,7 +817,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             if (target == BackendTarget.NATIVE_EE_JNI) {
                 eeTemp =
                     new ExecutionEngineJNI(
-                        this,
                         m_context.cluster.getRelativeIndex(),
                         getSiteId(),
                         m_tracker.getPartitionForSite(getSiteId()),
@@ -837,7 +833,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 // set up the EE over IPC
                 eeTemp =
                     new ExecutionEngineIPC(
-                            this,
                             m_context.cluster.getRelativeIndex(),
                             getSiteId(),
                             m_tracker.getPartitionForSite(getSiteId()),

@@ -44,7 +44,6 @@ import org.voltdb.utils.LogKeys;
  * for these implementations to the ExecutionSite.
  */
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
-    protected ExecutionSite site;
 
     // is the execution site dirty
     protected boolean m_dirty;
@@ -83,8 +82,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(final ExecutionSite site) {
-        this.site = site;
+    public ExecutionEngine() {
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
     }
 
