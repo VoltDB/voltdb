@@ -54,6 +54,9 @@ public class SiteTracker {
     private final Set<Long> m_allInitiators = new HashSet<Long>();
     public final Set<Long> m_allInitiatorsImmutable = Collections.unmodifiableSet(m_allInitiators);
 
+    private final Set<Long> m_allIv2Initiators = new HashSet<Long>();
+    public final Set<Long> m_allIv2InitiatorsImmutable = Collections.unmodifiableSet(m_allIv2Initiators);
+
     public final Map<Integer, List<Long>> m_hostsToSitesImmutable;
 
 
@@ -62,6 +65,7 @@ public class SiteTracker {
 
     public final Map<Integer, List<Long>> m_partitionsToSitesImmutable;
 
+    public final Map<Integer, List<Long>> m_partitionToInitiatorsImmutable;
 
     public final Map<Long, Integer> m_sitesToPartitionsImmutable;
 
@@ -94,6 +98,7 @@ public class SiteTracker {
         m_numberOfPartitions = 0;
         m_otherHSIdsImmutable = null;
         m_sitesToPartitionsImmutable = null;
+        m_partitionToInitiatorsImmutable = null;
         m_version = 0;
     }
 
@@ -116,6 +121,8 @@ public class SiteTracker {
             new HashMap<Integer, List<Long>>();
         Map<MailboxType, List<Long>> otherHSIds =
             new HashMap<MailboxType, List<Long>>();
+        Map<Integer, List<Long>> partitionToInitiators =
+            new HashMap<Integer, List<Long>>();
 
         Map<MailboxType, Map<Integer, List<Long>>> hostsToOtherHSIds =
             new HashMap<MailboxType, Map<Integer, List<Long>>>();
@@ -123,7 +130,8 @@ public class SiteTracker {
             if (e.getKey().equals(MailboxType.ExecutionSite)) {
                 populateSites(e.getValue(), hostsToSites, hostsToPartitions, partitionsToSites, sitesToPartitions);
             } else if (e.getKey().equals(MailboxType.Initiator)) {
-                populateInitiators(e.getValue(), hostsToInitiators);
+                populateInitiators(e.getValue(), hostsToInitiators,
+                                   partitionToInitiators);
             } if (e.getKey().equals(MailboxType.StatsAgent)) {
                 populateStatsAgents(e.getValue());
             } else {
@@ -137,6 +145,8 @@ public class SiteTracker {
         m_sitesToPartitionsImmutable = Collections.unmodifiableMap(sitesToPartitions);
         m_hostsToInitiatorsImmutable = CoreUtils.unmodifiableMapCopy(hostsToInitiators);
         m_otherHSIdsImmutable = CoreUtils.unmodifiableMapCopy(otherHSIds);
+        m_partitionToInitiatorsImmutable =
+            CoreUtils.unmodifiableMapCopy(partitionToInitiators);
 
         Map<MailboxType, Map<Integer, List<Long>>> hostsToOtherHSIdsReplacement =
             new HashMap<MailboxType, Map<Integer, List<Long>>>();
@@ -159,6 +169,7 @@ public class SiteTracker {
         }
         m_allSites.addAll(m_allExecutionSites);
         m_allSites.addAll(m_allInitiators);
+        m_allSites.addAll(m_allIv2Initiators);
         for (List<Long> siteIds : otherHSIds.values()) {
             m_allSites.addAll(siteIds);
         }
@@ -225,7 +236,10 @@ public class SiteTracker {
         m_isFirstHost = (m_hostId == firstHostId);
     }
 
-    private void populateInitiators(List<MailboxNodeContent> objs, Map<Integer, List<Long>> hostsToInitiators) {
+    private void populateInitiators(List<MailboxNodeContent> objs,
+                                    Map<Integer, List<Long>> hostsToInitiators,
+                                    Map<Integer, List<Long>> partitionToInitiators)
+    {
         for (MailboxNodeContent obj : objs) {
             int hostId = CoreUtils.getHostIdFromHSId(obj.HSId);
 
@@ -234,12 +248,20 @@ public class SiteTracker {
                 initiators = new ArrayList<Long>();
                 hostsToInitiators.put(hostId, initiators);
             }
-            if (obj.partitionId == null)
-            {
+            if (obj.partitionId == null) {
                 initiators.add(obj.HSId);
                 m_allInitiators.add(obj.HSId);
+            } else {
+                List<Long> initiators_for_part =
+                    partitionToInitiators.get(obj.partitionId);
+                if (initiators_for_part == null) {
+                    initiators_for_part = new ArrayList<Long>();
+                    partitionToInitiators.put(obj.partitionId,
+                                              initiators_for_part);
+                }
+                initiators_for_part.add(obj.HSId);
+                m_allIv2Initiators.add(obj.HSId);
             }
-            // TODO: needs to determine if it's the master or replica
         }
     }
 
