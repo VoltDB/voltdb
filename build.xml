@@ -1237,14 +1237,6 @@ TEST CASES
         unless="emma.enabled"
         message="JUnit had failures"
     />
-
-    <!-- Regenerate milestoneOneCatalog/ -->
-    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <unjar
-        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
-        dest='${build.dir}/expanded/milestoneOneCatalog'
-    />
 </target>
 
 <target name="junit" description="Run testcases for Java classes.">
