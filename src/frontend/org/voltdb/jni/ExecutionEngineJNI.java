@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
@@ -85,7 +84,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * initialize the native Engine object.
      */
     public ExecutionEngineJNI(
-            final ExecutionSite site,
             final int clusterIndex,
             final long siteId,
             final int partitionId,
@@ -94,8 +92,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int tempTableMemory,
             final int totalPartitions)
     {
-        // base class loads the volt shared library
-        super(site);
+        // base class loads the volt shared library.
+        super();
 
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex

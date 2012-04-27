@@ -142,7 +142,7 @@ public class TestExecutionEngine extends TestCase {
 
     public void testStreamTables() throws Exception {
         sourceEngine.loadCatalog( 0, m_catalog.serialize());
-        ExecutionEngine destinationEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "", 100, 1);
+        ExecutionEngine destinationEngine = new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, 0, 0, "", 100, 1);
         destinationEngine.loadCatalog( 0, m_catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
@@ -235,7 +235,7 @@ public class TestExecutionEngine extends TestCase {
             public void run() {
                 try {
                     final ExecutionEngine sourceEngine =
-                        new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID,
+                        new ExecutionEngineJNI(CLUSTER_ID, NODE_ID,
                                                (int)sourceId, (int)sourceId,
                                                "", 100, 1);
                     sourceReference.set(sourceEngine);
@@ -295,7 +295,7 @@ public class TestExecutionEngine extends TestCase {
             @Override
             public void run() {
                 final ExecutionEngine destinationEngine =
-                    new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, (int)destinationId,
+                    new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, (int)destinationId,
                                            (int)destinationId, "", 100, 1);
                 destinationReference.set(destinationEngine);
                 destinationEngine.loadCatalog( 0, serializedCatalog);
@@ -368,7 +368,7 @@ public class TestExecutionEngine extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo("Test");
-        sourceEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "", 100, 1);
+        sourceEngine = new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, 0, 0, "", 100, 1);
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }
