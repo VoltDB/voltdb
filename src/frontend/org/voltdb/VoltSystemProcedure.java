@@ -60,7 +60,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected int m_numberOfPartitions;
     protected Procedure m_catProc;
     protected Cluster m_cluster;
-    protected ExecutionSite m_site;
+    protected SiteProcedureConnection m_site;
     protected ProcedureRunner m_runner; // overrides private parent var
 
     @Override
@@ -69,7 +69,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         m_runner = procRunner;
     }
 
-    void initSysProc(int numberOfPartitions, ExecutionSite site,
+    void initSysProc(int numberOfPartitions, SiteProcedureConnection site,
             Procedure catProc, Cluster cluster) {
 
         m_numberOfPartitions = numberOfPartitions;
