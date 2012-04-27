@@ -524,16 +524,20 @@ public class TestDistributer extends TestCase {
         // create a fake server and connect to it.
         MockVolt volt0 = new MockVolt(20000);
         volt0.handleConnection = false;
+
+        Client clientPtr = null;
         try {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
             config.setMaxOutstandingTxns(5);
+            config.setConnectionResponseTimeout(2000);
 
             final Client client = ClientFactory.createClient(config);
             client.createConnection("localhost", 20000);
+            clientPtr = client;
 
-            final java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger(0);
+            final AtomicInteger counter = new AtomicInteger(0);
             final Thread loadThread = new Thread() {
                 @Override
                 public void run() {
@@ -552,12 +556,12 @@ public class TestDistributer extends TestCase {
             final long start = System.currentTimeMillis();
             loadThread.join(300);
             final long finish = System.currentTimeMillis();
-            assert(finish - start >= 300);
-            assert(counter.get() == 5);
-            loadThread.interrupt();
+            assertTrue(finish - start >= 300);
+            assertTrue(counter.get() == 5);
             loadThread.join();
         }
         finally {
+            if (clientPtr != null) clientPtr.close();
             volt0.shutdown();
         }
     }
