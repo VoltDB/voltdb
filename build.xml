@@ -1526,6 +1526,11 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
     </condition>
+    <!-- select which set of regression suite configuration types to run -->
+    <condition property="regressions" value="${regressions}" else="all">
+        <isset property="regressions"/>
+    </condition>
+
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
         <formatters>
             <formatter usefile="false" type="plain"/>
