@@ -68,7 +68,7 @@ public class Iv2TestInitiatorMailbox extends ZKTestBase {
     @Before
     public void setUp() throws Exception {
         // trick to get around the real crash. This will throw a runtime exception
-        doThrow(new RuntimeException("Crash VoltDB")).when(mockVolt).ignoreCrash();
+        // doThrow(new RuntimeException("Crash VoltDB")).when(mockVolt).ignoreCrash();
 
         setUpZK(1);
         zk = getClient(0);
