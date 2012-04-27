@@ -94,15 +94,17 @@ public class TestZK extends ZKTestBase {
                         new HashSet<Integer>(Arrays.asList(site)),
                         Integer.toString(site)));
         m_faultDistributor.m_expectedHandler = site;
+        int port = m_ports.next();
         m_agreementSites.set(site, new AgreementSite(
                     site,
                     agreementSiteIds,
                     site,
                     failedSites,
                     m_mailboxes.get(site),
-                    new InetSocketAddress(2182 + site),
+                    new InetSocketAddress(port),
                     m_faultDistributor,
                     true));
+        m_siteIdToZKPort.put(site, port);
         m_agreementSites.get(site).start();
         for (int ii = 0; ii < m_agreementSites.size(); ii++) {
             if (ii == site) {

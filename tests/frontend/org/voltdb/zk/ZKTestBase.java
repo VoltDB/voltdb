@@ -33,14 +33,16 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Semaphore;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.VoltDB;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.fault.FaultHandler;
@@ -50,12 +52,16 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.DBBPool;
 
 /**
  *
  */
 public class ZKTestBase {
+    LocalCluster.PortGenerator m_ports = new LocalCluster.PortGenerator();
+
+    protected Map<Integer, Integer> m_siteIdToZKPort;
     protected ArrayList<AgreementSite> m_agreementSites;
     protected ArrayList<MockMailbox> m_mailboxes;
     protected FaultDistributor m_faultDistributor;
@@ -266,6 +272,7 @@ public class ZKTestBase {
     }
 
     protected void setUpZK(int sites) throws Exception {
+        m_siteIdToZKPort = new TreeMap<Integer, Integer>();
         m_clients = new ArrayList<ZooKeeper>();
         m_mailboxes = new ArrayList<MockMailbox>();
         m_faultDistributor = new FaultDistributor();
@@ -274,15 +281,17 @@ public class ZKTestBase {
         for (int ii = 0; ii < sites; ii++) agreementSiteIds.add(ii);
         for (int ii = 0; ii < sites; ii++) {
             m_mailboxes.add(new MockMailbox());
+            int port = m_ports.next();
             m_agreementSites.add( new AgreementSite(
                     ii,
                     agreementSiteIds,
                     ii,
                     new HashSet<Integer>(),
                     m_mailboxes.get(ii),
-                    new InetSocketAddress(2182 + ii),
+                    new InetSocketAddress(port),
                     m_faultDistributor,
                     false));
+            m_siteIdToZKPort.put(ii, port);
         }
         for (AgreementSite site : m_agreementSites) {
             site.start();
@@ -304,7 +313,7 @@ public class ZKTestBase {
 
     protected ZooKeeper getClient(int site) throws Exception {
         final Semaphore permit = new Semaphore(0);
-        ZooKeeper keeper = new ZooKeeper("localhost:" + Integer.toString(2182 + site), 4000, new Watcher() {
+        ZooKeeper keeper = new ZooKeeper("localhost:" + Integer.toString(m_siteIdToZKPort.get(site)), 4000, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
                 if (event.getState() == KeeperState.SyncConnected) {
