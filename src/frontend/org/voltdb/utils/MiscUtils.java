@@ -20,7 +20,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.BindException;
+import java.net.ServerSocket;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -478,5 +481,20 @@ public class MiscUtils {
                 new SimpleDateFormat("MMddHHmmss");
         Date tsDate = new Date(timestamp);
         return sdf.format(tsDate);
+    }
+
+    public static synchronized boolean isBindable(int port) {
+        try {
+            ServerSocket ss = new ServerSocket(port);
+            ss.close();
+            ss = null;
+            return true;
+        }
+        catch (BindException be) {
+            return false;
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

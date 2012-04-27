@@ -30,7 +30,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestAdHocQueries extends TestCase {
 
@@ -42,91 +41,106 @@ public class TestAdHocQueries extends TestCase {
             "DVAL decimal default null," +
             "PRIMARY KEY(IVAL));";
 
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhoc.jar");
+
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("BLAH", "IVAL");
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
         builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);");
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("adhoc.jar"), 2, 1, 0);
+        boolean success = builder.compileWithDefaultDeployment(pathToCatalog);
         assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("adhoc.xml"));
 
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("adhoc.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
+        config.m_pathToCatalog = pathToCatalog;
         ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
 
-        // do the test
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost");
-
-        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1, 1, 1);").getResults()[0];
-        assertTrue(modCount.getRowCount() == 1);
-        assertTrue(modCount.asScalarLong() == 1);
-
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
-        assertTrue(result.getRowCount() == 1);
-        System.out.println(result.toString());
-
-        // test single-partition stuff
-        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 0).getResults()[0];
-        assertTrue(result.getRowCount() == 0);
-        System.out.println(result.toString());
-        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 1).getResults()[0];
-        assertTrue(result.getRowCount() == 1);
-        System.out.println(result.toString());
+        Client client = null;
 
         try {
-            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 1);
-            fail("Badly partitioned insert failed to throw expected exception");
+            localServer.start();
+            localServer.waitForInitialization();
+
+            // do the test
+            client = ClientFactory.createClient();
+            client.createConnection("localhost");
+
+            VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1, 1, 1);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+            assertTrue(result.getRowCount() == 1);
+            System.out.println(result.toString());
+
+            // test single-partition stuff
+            result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 0).getResults()[0];
+            assertTrue(result.getRowCount() == 0);
+            System.out.println(result.toString());
+            result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 1).getResults()[0];
+            assertTrue(result.getRowCount() == 1);
+            System.out.println(result.toString());
+
+            try {
+                client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 1);
+                fail("Badly partitioned insert failed to throw expected exception");
+            }
+            catch (Exception e) {}
+
+            try {
+                client.callProcedure("@AdHoc", "SLEECT * FROOM NEEEW_OOORDERERER;");
+                fail("Bad SQL failed to throw expected exception");
+            }
+            catch (Exception e) {}
+
+            // try a huge bigint literal
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.123012', 5);").getResults()[0];
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488301, '2011-06-24 10:30:28', 5);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+            result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
+            assertTrue(result.getRowCount() == 1);
+            System.out.println(result.toString());
+            result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL = '2011-06-24 10:30:26.123012';").getResults()[0];
+            assertTrue(result.getRowCount() == 1);
+            System.out.println(result.toString());
+            result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL > '2011-06-24 10:30:25';").getResults()[0];
+            assertEquals(2, result.getRowCount());
+            System.out.println(result.toString());
+            result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL < '2011-06-24 10:30:27';").getResults()[0];
+            System.out.println(result.toString());
+            // We inserted a 1,1,1 row way earlier
+            assertEquals(2, result.getRowCount());
+
+            // try something like the queries in ENG-1242
+            try {
+                client.callProcedure("@AdHoc", "select * from blah; dfvsdfgvdf select * from blah WHERE IVAL = 1;");
+                fail("Bad SQL failed to throw expected exception");
+            }
+            catch (Exception e) {}
+            client.callProcedure("@AdHoc", "select\n* from blah;");
+
+            // try a decimal calculation (ENG-1093)
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (2, '2011-06-24 10:30:26', 1.12345*1);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+            result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
+            assertTrue(result.getRowCount() == 1);
+            System.out.println(result.toString());
         }
-        catch (Exception e) {}
+        finally {
+            if (client != null) client.close();
+            client = null;
 
-        try {
-            client.callProcedure("@AdHoc", "SLEECT * FROOM NEEEW_OOORDERERER;");
-            fail("Bad SQL failed to throw expected exception");
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+
+            // no clue how helpful this is
+            System.gc();
         }
-        catch (Exception e) {}
-
-        // try a huge bigint literal
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.123012', 5);").getResults()[0];
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488301, '2011-06-24 10:30:28', 5);").getResults()[0];
-        assertTrue(modCount.getRowCount() == 1);
-        assertTrue(modCount.asScalarLong() == 1);
-        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
-        assertTrue(result.getRowCount() == 1);
-        System.out.println(result.toString());
-        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL = '2011-06-24 10:30:26.123012';").getResults()[0];
-        assertTrue(result.getRowCount() == 1);
-        System.out.println(result.toString());
-        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL > '2011-06-24 10:30:25';").getResults()[0];
-        assertEquals(2, result.getRowCount());
-        System.out.println(result.toString());
-        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL < '2011-06-24 10:30:27';").getResults()[0];
-        System.out.println(result.toString());
-        // We inserted a 1,1,1 row way earlier
-        assertEquals(2, result.getRowCount());
-
-        // try something like the queries in ENG-1242
-        try {
-            client.callProcedure("@AdHoc", "select * from blah; dfvsdfgvdf select * from blah WHERE IVAL = 1;");
-            fail("Bad SQL failed to throw expected exception");
-        }
-        catch (Exception e) {}
-        client.callProcedure("@AdHoc", "select\n* from blah;");
-
-        // try a decimal calculation (ENG-1093)
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (2, '2011-06-24 10:30:26', 1.12345*1);").getResults()[0];
-        assertTrue(modCount.getRowCount() == 1);
-        assertTrue(modCount.asScalarLong() == 1);
-        result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
-        assertTrue(result.getRowCount() == 1);
-        System.out.println(result.toString());
-
-        localServer.shutdown();
-        localServer.join();
     }
 
     static class LikeTest
@@ -235,7 +249,7 @@ public class TestAdHocQueries extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schema);
 
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhoc.jar");
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhoc_like.jar");
         builder.addPartitionInfo("STRINGS", "ID");
         builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);", null);
         boolean success = builder.compileWithDefaultDeployment(pathToCatalog);
@@ -244,56 +258,71 @@ public class TestAdHocQueries extends TestCase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
         ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
 
-        // do the test
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost");
+        Client client = null;
 
-        int id = 0;
-        for (LikeTestData data : rowData) {
-            id++;
-            String query = String.format("insert into strings values (%d,'%s','%s');", id, data.val, data.pat);
-            VoltTable modCount = client.callProcedure("@AdHoc", query).getResults()[0];
-            assertEquals("Bad insert row count:", 1, modCount.getRowCount());
-            assertEquals("Bad insert modification count:", 1, modCount.asScalarLong());
-        }
+        try {
+            localServer.start();
+            localServer.waitForInitialization();
 
-        // Tests based on LikeTest list
-        for (LikeTest test : tests) {
-            String clause = test.getClause();
-            String query = String.format("select * from strings where val %s", clause);
-            System.out.printf("LIKE clause \"%s\"\n", clause);
-            try {
-                VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
-                assertEquals(String.format("\"%s\": bad row count:", clause),
-                             test.matches, result.getRowCount());
-                System.out.println(result.toString());
-                assertFalse(String.format("Expected to crash on \"%s\", but didn't", clause), test.crashes);
-            } catch (ProcCallException e) {
-                System.out.printf("LIKE clause \"%s\" failed\n", clause);
-                System.out.println(e.toString());
-                assertTrue("This failure was unexpected", test.crashes);
-                System.out.println("(This failure was expected)");
+            // do the test
+            client = ClientFactory.createClient();
+            client.createConnection("localhost");
+
+            int id = 0;
+            for (LikeTestData data : rowData) {
+                id++;
+                String query = String.format("insert into strings values (%d,'%s','%s');", id, data.val, data.pat);
+                VoltTable modCount = client.callProcedure("@AdHoc", query).getResults()[0];
+                assertEquals("Bad insert row count:", 1, modCount.getRowCount());
+                assertEquals("Bad insert modification count:", 1, modCount.asScalarLong());
+            }
+
+            // Tests based on LikeTest list
+            for (LikeTest test : tests) {
+                String clause = test.getClause();
+                String query = String.format("select * from strings where val %s", clause);
+                System.out.printf("LIKE clause \"%s\"\n", clause);
+                try {
+                    VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+                    assertEquals(String.format("\"%s\": bad row count:", clause),
+                                 test.matches, result.getRowCount());
+                    System.out.println(result.toString());
+                    assertFalse(String.format("Expected to crash on \"%s\", but didn't", clause), test.crashes);
+                } catch (ProcCallException e) {
+                    System.out.printf("LIKE clause \"%s\" failed\n", clause);
+                    System.out.println(e.toString());
+                    assertTrue("This failure was unexpected", test.crashes);
+                    System.out.println("(This failure was expected)");
+                }
+            }
+
+            // Tests using PAT column for pattern data
+            {
+                // Expact all PAT column patterns to produce a match with the VAL column string.
+                // We don't support non-literal likes yet. Remove the catch when we do.
+                String query = "select * from strings where val like pat";
+                try {
+                    VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+                    assertEquals(String.format("LIKE column test: bad row count:"),
+                                 tests.length, result.getRowCount());
+                } catch (ProcCallException e) {
+                    System.out.println("LIKE column test failed (expected for now)");
+                }
             }
         }
+        finally {
+            if (client != null) client.close();
+            client = null;
 
-        // Tests using PAT column for pattern data
-        {
-            // Expact all PAT column patterns to produce a match with the VAL column string.
-            // We don't support non-literal likes yet. Remove the catch when we do.
-            String query = "select * from strings where val like pat";
-            try {
-                VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
-                assertEquals(String.format("LIKE column test: bad row count:"),
-                             tests.length, result.getRowCount());
-            } catch (ProcCallException e) {
-                System.out.println("LIKE column test failed (expected for now)");
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
             }
-        }
+            localServer = null;
 
-        localServer.shutdown();
-        localServer.join();
+            // no clue how helpful this is
+            System.gc();
+        }
     }
 }
