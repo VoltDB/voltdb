@@ -30,6 +30,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestAdHocQueries extends TestCase {
 
@@ -42,17 +43,20 @@ public class TestAdHocQueries extends TestCase {
             "PRIMARY KEY(IVAL));";
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhoc.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("BLAH", "IVAL");
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
         builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);");
-        boolean success = builder.compileWithDefaultDeployment(pathToCatalog);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
         ServerThread localServer = new ServerThread(config);
 
         Client client = null;
@@ -246,17 +250,20 @@ public class TestAdHocQueries extends TestCase {
             new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
         };
 
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhoc_like.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhoc_like.xml");
+
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schema);
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhoc_like.jar");
         builder.addPartitionInfo("STRINGS", "ID");
         builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);", null);
-        boolean success = builder.compileWithDefaultDeployment(pathToCatalog);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Insert compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
         ServerThread localServer = new ServerThread(config);
 
         Client client = null;
