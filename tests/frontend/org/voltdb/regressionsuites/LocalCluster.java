@@ -24,10 +24,11 @@ package org.voltdb.regressionsuites;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.BindException;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -100,21 +101,46 @@ public class LocalCluster implements VoltServerConfig {
     // Produce a (presumably) available IP port number.
     PortGenerator portGenerator = new PortGenerator();
     static class PortGenerator {
-        private final AtomicInteger nextPort = new AtomicInteger(50000);
-        private final AtomicInteger nextCport = new AtomicInteger(VoltDB.DEFAULT_PORT);
-        private final AtomicInteger nextAport = new AtomicInteger(VoltDB.DEFAULT_ADMIN_PORT);
-        public int next() {
-            return nextPort.getAndIncrement();
+        private int nextPort = 12000;
+        private int nextCport = VoltDB.DEFAULT_PORT;
+        private int nextAport = VoltDB.DEFAULT_ADMIN_PORT;
+
+        final int MAX_STATIC_PORT = 49151;
+
+        boolean bindable(int port) {
+            try {
+                ServerSocket ss = new ServerSocket(port);
+                ss.close();
+                ss = null;
+                return true;
+            }
+            catch (BindException be) {
+                return false;
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
-        public int nextClient() {
-            return nextCport.getAndIncrement();
+
+        /** Return the next bindable port */
+        public synchronized int next() {
+            while(nextPort <= MAX_STATIC_PORT) {
+                int port = nextPort++;
+                if (bindable(port)) {
+                    return port;
+                }
+            }
+            return -1;
         }
-        public int nextAdmin() {
-            return nextAport.getAndDecrement();
+        public synchronized int nextClient() {
+            return nextCport++;
         }
-        public void reset() {
-            nextCport.set(21212);
-            nextAport.set(21211);
+        public synchronized int nextAdmin() {
+            return nextAport--;
+        }
+        public synchronized void reset() {
+            nextCport = 21212;
+            nextAport = 21211;
         }
     }
 
