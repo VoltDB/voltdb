@@ -46,7 +46,7 @@
 #ifndef HSTORESEQSCANEXECUTOR_H
 #define HSTORESEQSCANEXECUTOR_H
 
-#include "boost/shared_array.hpp"
+#include <boost/scoped_ptr.hpp>
 
 #include "common/common.h"
 #include "common/valuevector.h"
@@ -77,18 +77,24 @@ namespace voltdb
         
     //@TODO pullexec prototype
     public:
-        TableTuple p_next_pull(const NValueArray& params, bool& status);
-        bool is_enabled_pull(const NValueArray&) const;
+        TableTuple p_next_pull();
+        bool is_enabled_pull() const;
         
-    //protected:
+    protected:
     
-        boost::shared_ptr<detail::SeqScanExecutorState> m_state;
+        void p_pre_execute_pull(const NValueArray& params);
         
-        bool p_pre_execute_pull(const NValueArray& params);
-        bool p_post_execute_pull(const NValueArray& params);
-        bool p_insert_output_table_pull(TableTuple& tuple);
-        
+    private:
+     
+        boost::scoped_ptr<detail::SeqScanExecutorState> m_state;
+       
     };
+    
+    inline bool SeqScanExecutor::is_enabled_pull() const
+    {
+        return true;
+    }
+
 }
 
 #endif

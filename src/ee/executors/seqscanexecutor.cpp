@@ -65,21 +65,26 @@ namespace detail {
 
     struct SeqScanExecutorState
     {   
-        SeqScanExecutorState(SeqScanPlanNode* node) :
-            m_node(node), 
-            m_outputTable(m_node->getOutputTable()),
-            m_targetTable(dynamic_cast<Table*>(m_node->getTargetTable())),
-            m_iterator(m_targetTable->iterator()),
-            m_predicate(m_node->getPredicate()),
-            m_tupleCtr(0)
-        {}
+        SeqScanExecutorState(SeqScanPlanNode* node, Table* targetTable,
+            Table* outputTable) :
+            m_iterator(targetTable->iterator()),
+            m_predicate(node->getPredicate()),
+            m_tupleCtr(0),
+            m_targetTableTupleCount((int)targetTable->activeTupleCount()),
+            m_targetTableSchema(targetTable->schema()),
+            m_targetTableName(targetTable->name().c_str()),
+            m_outputTableName(outputTable->name().c_str())
+        {
+        
+        }
             
-        SeqScanPlanNode* m_node;
-        Table* m_outputTable;
-        Table* m_targetTable;
         TableIterator m_iterator;
         AbstractExpression* m_predicate;
         int m_tupleCtr;
+        int m_targetTableTupleCount;
+        const TupleSchema* m_targetTableSchema; 
+        const char* m_targetTableName;
+        const char* m_outputTableName;
     };
 
 } // namespace detail
@@ -287,21 +292,21 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
 
 //@TODO pullexec prototype
-TableTuple SeqScanExecutor::p_next_pull(const NValueArray &params, bool& status) {
+TableTuple SeqScanExecutor::p_next_pull() {
 
-    TableTuple tuple(m_state->m_targetTable->schema());
+    TableTuple tuple(m_state->m_targetTableSchema);
     bool result = false;
     //
     // if there is a predicate find the next tuple which satisfies it
     //
-    if (m_state->m_node->getPredicate() != NULL)
+    if (m_state->m_predicate != NULL)
     {
         while (m_state->m_iterator.next(tuple) == true)
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(m_state->m_targetTable->name()).c_str(), m_state->m_tupleCtr,
-                       (int)m_state->m_targetTable->activeTupleCount());
-            if ((result = m_state->m_node->getPredicate()->eval(&tuple, NULL).isTrue()) == true)
+                       tuple.debug(m_state->m_targetTableName, m_state->m_tupleCtr,
+                       m_state->m_targetTableTupleCount));
+            if ((result = m_state->m_predicate->eval(&tuple, NULL).isTrue()) == true)
                 break;
         }
     }
@@ -310,8 +315,6 @@ TableTuple SeqScanExecutor::p_next_pull(const NValueArray &params, bool& status)
         result = m_state->m_iterator.next(tuple);
     }
     
-    // set status
-    status = true;
     if (result == true)
     {
         ++m_state->m_tupleCtr;
@@ -320,36 +323,31 @@ TableTuple SeqScanExecutor::p_next_pull(const NValueArray &params, bool& status)
     else
     {
         // return an empty one
-        return TableTuple(m_state->m_targetTable->schema());
+        return TableTuple(m_state->m_targetTableSchema);
     }
 }
 
-bool SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
-    //
-    // Initialize children
-    //
-    detail::Method m = &AbstractExecutor::p_pre_execute_pull;
-    if (detail::iterate_children_pull(m, m_abstractNode, params) != true)
-        return false;
-        
+void SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
     //
     // Initialize itself
     //
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
-    m_state.reset(new detail::SeqScanExecutorState(node));
-    
-    // too late for these two
-    assert(m_state->m_outputTable);
-    assert(m_state->m_targetTable);
+    Table* output_table = node->getOutputTable();
+    assert(output_table);
+    Table* target_table = dynamic_cast<Table*>(node->getTargetTable());
+    assert(target_table);
+        
     VOLT_TRACE("Sequential Scanning table :\n %s",
-               m_state->m_targetTable->debug().c_str());
+               target_table->debug().c_str());
     VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
                " allocated, %d used tuples",
-               m_state->m_targetTable->name().c_str(),
-               (int)m_state->m_targetTable->activeTupleCount(),
-               (int)m_state->m_targetTable->allocatedTupleCount(),
-               (int)m_state->m_targetTable->usedTupleCount());
+               target_table->name().c_str(),
+               (int)target_table->activeTupleCount(),
+               (int)target_table->allocatedTupleCount(),
+               (int)target_table->usedTupleCount());
+               
+    m_state.reset(new detail::SeqScanExecutorState(node, target_table, output_table));
                
     VOLT_TRACE("SCAN PREDICATE A:\n%s\n", m_state->m_predicate->debug(true).c_str());
     if (m_state->m_predicate)
@@ -359,39 +357,5 @@ bool SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
         VOLT_DEBUG("SCAN PREDICATE B:\n%s\n",
                    m_state->m_predicate->debug(true).c_str());
     }
-    return true;
 }
 
-bool SeqScanExecutor::p_post_execute_pull(const NValueArray &params) 
-{
-    //
-    // Recurs to children. Nothing to do here
-    //
-    detail::Method m = &AbstractExecutor::p_post_execute_pull;
-    return detail::iterate_children_pull(m, m_abstractNode, params);
-}
-
-bool SeqScanExecutor::p_insert_output_table_pull(TableTuple& tuple)
-{
-    if (!m_state->m_outputTable->insertTuple(tuple))
-    {
-        VOLT_ERROR("Failed to insert tuple from table '%s' into"
-                   " output table '%s'",
-                   m_state->m_targetTable->name().c_str(),
-                   m_state->m_outputTable->name().c_str());
-        return false;
-    }
-    return true;
-}
-
-/*
-bool SeqScanExecutor::is_enabled_pull() const
-{
-    return AbstractExecutor::p_is_enabled_pull(m_abstractNode);
-}
-*/
-bool SeqScanExecutor::is_enabled_pull(const NValueArray& params) const
-{
-    detail::MethodC m = &AbstractExecutor::is_enabled_pull;
-    return detail::iterate_children_pull(m, m_abstractNode, params);
-}

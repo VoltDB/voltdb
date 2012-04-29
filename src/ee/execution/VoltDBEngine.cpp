@@ -43,10 +43,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "boost/shared_array.hpp"
-#include "boost/scoped_array.hpp"
-#include "boost/foreach.hpp"
-#include "boost/scoped_ptr.hpp"
+#include <boost/shared_array.hpp>
+#include <boost/scoped_array.hpp>
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/function.hpp>
+
 #include "VoltDBEngine.h"
 #include "common/common.h"
 #include "common/debuglog.h"
@@ -310,7 +312,6 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
 {
-    Table *cleanUpTable = NULL;
     m_currentOutputDepId = outputDependencyId;
     m_currentInputDepId = inputDependencyId;
 
@@ -365,44 +366,27 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
     size_t ttl = execsForFrag->list.size();
+    if (ttl > 0) {
 
-//@TODO pullexec prototype
-// need to refactor
-    bool isPullEnabled = (ttl > 0) ? execsForFrag->list[ttl - 1]->is_enabled_pull(params) : false;   
-    for (size_t ctr = (isPullEnabled)? ttl - 1 : 0; ctr < ttl; ++ctr) {
-        AbstractExecutor *executor = execsForFrag->list[ctr];
+    //@TODO pullexec prototype
+        AbstractExecutor *executor = execsForFrag->list[ttl - 1];
         assert (executor);
 
-        if (executor->needsPostExecuteClear())
-            cleanUpTable =
-                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
-
+        // clean-up hook
+        boost::function<void(AbstractExecutor*)> fcleanup =
+            &AbstractExecutor::clearOutputTable_pull;
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            bool result = (isPullEnabled)?
-                executor->execute_pull(params) : executor->execute(params);
-            if (!result) {
-                VOLT_TRACE("The Executor's execution at position '%d'"
-                           " failed for PlanFragment '%jd'",
-                           ctr, (intmax_t)planfragmentId);
-                if (isPullEnabled)
-                    executor->clearOutputTable_pull(params);
-                else if (cleanUpTable != NULL)
-                    cleanUpTable->deleteAllTuples(false);
-                // set these back to -1 for error handling
-                m_currentOutputDepId = -1;
-                m_currentInputDepId = -1;
-                return ENGINE_ERRORCODE_ERROR;
-            }
+            executor->execute_pull(params);
+            executor->depth_first_iterate_pull(fcleanup);
         } catch (SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-            if (isPullEnabled)
-                executor->clearOutputTable_pull(params);
-            else if (cleanUpTable != NULL)
-                cleanUpTable->deleteAllTuples(false);
+
+            executor->depth_first_iterate_pull(fcleanup);
+
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
@@ -411,13 +395,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
+    
     }
     
-    if (isPullEnabled)
-        execsForFrag->list[ttl-1]->clearOutputTable_pull(params);
-    else if (cleanUpTable != NULL)
-        cleanUpTable->deleteAllTuples(false);
-
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
         // put the number of tuples modified into our simple table

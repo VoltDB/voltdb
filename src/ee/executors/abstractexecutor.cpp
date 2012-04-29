@@ -42,13 +42,16 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include <vector>
+#include <boost/function.hpp>
+#include <boost/ref.hpp>
+#include <boost/bind.hpp>
 
 #include "abstractexecutor.h"
 
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
-#include <vector>
 
 using namespace std;
 using namespace voltdb;
@@ -141,8 +144,14 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                    " answered so");
         m_tmpOutputTable = NULL;
     }
+    
+    m_absState.reset(new detail::AbstractExecutorState(m_tmpOutputTable));
     return true;
 }
+
+AbstractExecutor::AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode): 
+    m_abstractNode(abstractNode), m_tmpOutputTable(NULL), m_absState()
+{}
 
 AbstractExecutor::~AbstractExecutor() {}
 
@@ -165,90 +174,92 @@ bool AbstractExecutor::execute_pull(const NValueArray& params)
     // hook to give executor a chance to perform some initialization if necessary
     // potentially could be used to call children in push mode
     // recurs to children
-    if (p_pre_execute_pull(params) != true)
-        return false;
-
+    boost::function<void(AbstractExecutor*)> fpreexecute =
+        boost::bind(&AbstractExecutor::p_pre_execute_pull, _1, boost::cref(params));
+    depth_first_iterate_pull(fpreexecute);
     
     // run the executor
-    bool status = true;
     while (true)
     {
         // iteration stops when no more tuples are available (tuple with no data set)
-        // or error status is set
         // Executor specific tuple processing is inside p_next_pull for now
-        TableTuple tuple = p_next_pull(params, status);
-        if (tuple.isNullTuple() || status == false)
+        TableTuple tuple = p_next_pull();
+        if (tuple.isNullTuple())
             break;
         // Insert processed tuple into the output table
-        status = p_insert_output_table_pull(tuple);    
+        p_insert_output_table_pull(tuple);
     }
     
-    if (status)
-    {
-        // some executors need to do some work after the iteration
-        // send executor, for example
-        // recurs to children
-        status = p_post_execute_pull(params);
-    }
+    // some executors need to do some work after the iteration
+    // send executor, for example
+    // recurs to children
+    boost::function<void(AbstractExecutor*)> fpostexecute =
+        &AbstractExecutor::p_post_execute_pull;
+    depth_first_iterate_pull(fpostexecute);
 
-    return status;
+    return true;
 }
 
-bool AbstractExecutor::clearOutputTable_pull(const NValueArray& params)
+//@TODO One suggestion for streamlining this code is to ASSUME pull support.
+// Any node that does not actually implement an optimized execute_pull instead inherits a sub-optimal default behavior from AbstractExecutor that:
+// Implements p_pre_execute_pull to do the following:
+// - Recursively constructs a (depth-first) list of its child(ren).
+// - Calls execute on each of them, and finally itself.
+// Implements p_next_pull to retrieve each row from its output table (previously populated by its execute method).
+void AbstractExecutor::p_pre_execute_pull(const NValueArray& params) 
 {
-    detail::Method m = &AbstractExecutor::clearOutputTable_pull;
-    detail::iterate_children_pull(m, m_abstractNode, params);
-    if (this->needsOutputTableClear())
+    this->p_build_list();
+    
+    Table *cleanUpTable = NULL;
+    // Walk through the queue and execute each plannode.  The query
+    // planner guarantees that for a given plannode, all of its
+    // children are positioned before it in this list, therefore
+    // dependency tracking is not needed here.
+    size_t ttl = m_absState->m_list.size();
+    for (size_t ctr = 0; ctr < ttl; ++ctr)
     {
-        Table *cleanUpTable = 
-            dynamic_cast<Table*>(this->getPlanNode()->getOutputTable());
-        assert(cleanUpTable);
+        AbstractExecutor* executor = m_absState->m_list[ctr];
+        assert(executor);
+    
+        if (executor->needsPostExecuteClear())
+            cleanUpTable =
+                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
+                
+        if (!executor->execute(params)) 
+        {
+            VOLT_TRACE("The Executor's execution failed");
+            if (cleanUpTable != NULL)
+                cleanUpTable->deleteAllTuples(false);
+            // set these back to -1 for error handling
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "The Executor's execution failed");
+        }
+    }
+    
+    if (cleanUpTable != NULL)
         cleanUpTable->deleteAllTuples(false);
-    }
-    return true;
 }
 
-/*
-// need generic iterator over the children
-bool AbstractExecutor::p_pre_execute_pull(AbstractPlanNode* node, const NValueArray& params)
+TableTuple AbstractExecutor::p_next_pull()
 {
-    assert(node != NULL);
-    std::vector<AbstractPlanNode*>& children = node->getChildren();
-    for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
+    TableTuple tuple(m_absState->m_table->schema());
+    if (m_absState->m_iterator)
     {
-        AbstractExecutor* executor = (*it)->getExecutor();
-        assert(executor != NULL);
-        if (executor->p_pre_execute_pull(params) != true)
-            return false;
+        m_absState->m_iterator->next(tuple);
+        //if (!m_absState->m_iterator->next(tuple))
+        //    tuple.setAllNulls();
     }
-    return true;
+    return tuple;
 }
 
-bool AbstractExecutor::p_post_execute_pull(AbstractPlanNode* node, const NValueArray& params)
+void AbstractExecutor::p_add_to_list(std::vector<AbstractExecutor*>& list)
 {
-    assert(node != NULL);
-    std::vector<AbstractPlanNode*>& children = node->getChildren();
-    for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
-    {
-        AbstractExecutor* executor = (*it)->getExecutor();
-        assert(executor != NULL);
-        if (executor->p_post_execute_pull(params) != true)
-            return false;
-    }
-    return true;
+    list.push_back(this);
 }
 
-bool AbstractExecutor::p_is_enabled_pull(AbstractPlanNode* node)
+void AbstractExecutor::p_build_list()
 {
-    assert(node != NULL);
-    std::vector<AbstractPlanNode*>& children = node->getChildren();
-    for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
-    {
-        AbstractExecutor* executor = (*it)->getExecutor();
-        assert(executor != NULL);
-        if (executor->is_enabled_pull() != true)
-            return false;
-    }
-    return true;
+    boost::function<void(AbstractExecutor*)> faddtolist =
+        boost::bind(&AbstractExecutor::p_add_to_list, _1, boost::ref(m_absState->m_list));
+    depth_first_iterate_pull(faddtolist);
 }
-*/

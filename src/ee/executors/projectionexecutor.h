@@ -47,7 +47,8 @@
 #define HSTOREPROJECTIONEXECUTOR_H
 
 #include <vector>
-#include "boost/shared_array.hpp"
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -96,22 +97,35 @@ class ProjectionExecutor : public AbstractExecutor {
         
     //@TODO pullexec prototype
     public:
-        TableTuple p_next_pull(const NValueArray& params, bool& status);
-        bool is_enabled_pull(const NValueArray&) const;
+        TableTuple p_next_pull();
+        bool is_enabled_pull() const;
 
         //@TODO just a hack
         bool needsPostExecuteClear() { return true; }
         
-    //protected:
-
- //@TODO Should "own" this pointer? (same comment applies to other executors) --paul
-        boost::shared_ptr<detail::ProjectionExecutorState> m_state;
-
-        bool p_pre_execute_pull(const NValueArray& params);
-        bool p_post_execute_pull(const NValueArray& params);
-        bool p_insert_output_table_pull(TableTuple& tuple);
+    protected:
+        void p_pre_execute_pull(const NValueArray& params);
+        void p_insert_output_table_pull(TableTuple& tuple);
         
+    private:
+        // Has to be a pointer because it's an incomplete type at that point.
+        // Moving definition to the header would clutter it with the
+        // implementation details in my opinion.
+        // Changed it to be scoped ptr instead of shared.
+        boost::scoped_ptr<detail::ProjectionExecutorState> m_state;
 };
+
+
+inline void ProjectionExecutor::p_insert_output_table_pull(TableTuple& tuple)
+{
+    assert(output_table);
+    output_table->insertTupleNonVirtual(tuple);
+}
+
+inline bool ProjectionExecutor::is_enabled_pull() const
+{
+    return true;
+}
 
 }
 

@@ -46,6 +46,8 @@
 #ifndef HSTORESENDEXECUTOR_H
 #define HSTORESENDEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
@@ -82,18 +84,27 @@ private:
     
 //@TODO pullexec prototype
 public:
-    TableTuple p_next_pull(const NValueArray& params, bool& status);
-    bool is_enabled_pull(const NValueArray&) const;
+    TableTuple p_next_pull();
+    bool is_enabled_pull() const;
 
-//protected:
+protected:
 
-    boost::shared_ptr<detail::SendExecutorState> m_state;
-
-    bool p_pre_execute_pull(const NValueArray& params);
-    bool p_post_execute_pull(const NValueArray& params);
-    bool p_insert_output_table_pull(TableTuple& tuple);
+    void p_pre_execute_pull(const NValueArray &params);
+    void p_post_execute_pull();
+    void p_insert_output_table_pull(TableTuple& tuple);
         
+ private:
+
+    boost::scoped_ptr<detail::SendExecutorState> m_state;
 };
+
+inline void SendExecutor::p_pre_execute_pull(const NValueArray &params)
+{}
+
+inline bool SendExecutor::is_enabled_pull() const
+{
+    return true;
+}
 
 }
 

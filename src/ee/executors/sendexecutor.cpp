@@ -67,14 +67,14 @@ namespace detail {
 struct SendExecutorState
 {   
     SendExecutorState(SendPlanNode* node) :
-        m_child(NULL) 
+        m_childExecutor(NULL) 
     {
         std::vector<AbstractPlanNode*>& children = node->getChildren();
         assert(children.size() == 1);
-        m_child = children[0];
+        m_childExecutor = children[0]->getExecutor();
     }
 
-    AbstractPlanNode* m_child;
+    AbstractExecutor* m_childExecutor;
 };
 
 } // namespace detail
@@ -124,61 +124,37 @@ bool SendExecutor::p_execute(const NValueArray &params) {
 
 
 //@TODO pullexec prototype
-TableTuple SendExecutor::p_next_pull(const NValueArray &params, bool& status) 
+TableTuple SendExecutor::p_next_pull() 
 {
     // Simply get the next tuple from the child executor
-    return m_state->m_child->getExecutor()->p_next_pull(params, status);
+    return m_state->m_childExecutor->p_next_pull();
 }
 
-bool SendExecutor::p_pre_execute_pull(const NValueArray &params) {
-    //
-    // Initialize children
-    //
-    detail::Method m = &AbstractExecutor::p_pre_execute_pull;
-    return detail::iterate_children_pull(m, m_abstractNode, params);
-}
-
-bool SendExecutor::p_post_execute_pull(const NValueArray &params) 
+void SendExecutor::p_post_execute_pull() 
 {
-    //
-    // Recurs to children.
-    //
-    detail::Method m = &AbstractExecutor::p_post_execute_pull;
-    if (detail::iterate_children_pull(m, m_abstractNode, params) != true)
-        return false;
-    
     // Just blast the input table on through VoltDBEngine!
     if (!m_engine->send(m_inputTable)) {
-        VOLT_ERROR("Failed to send table '%s'", m_inputTable->name().c_str());
-        return false;
+        char message[128];
+        snprintf(message, 128, "Failed to send table '%s'",
+                m_inputTable->name().c_str());
+        VOLT_ERROR("%s", message);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      message);
     }
     VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());
-
-    return true;
-    
 }
 
-bool SendExecutor::p_insert_output_table_pull(TableTuple& tuple)
+void SendExecutor::p_insert_output_table_pull(TableTuple& tuple)
 {
-    bool status = m_inputTable->insertTuple(tuple);
-    if (!status)
+    if (!m_inputTable->insertTuple(tuple))
     {
-        VOLT_ERROR("Failed to insert tuple into output table '%s'",
+        char message[128];
+        snprintf(message, 128, "Failed to insert tuple into output table '%s'",
                    m_inputTable->name().c_str());
+        VOLT_ERROR("%s", message);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      message);
     }
-    return true;
-}
-
-/*
-bool SendExecutor::is_enabled_pull() const
-{
-    return AbstractExecutor::p_is_enabled_pull(m_abstractNode);
-}
-*/
-bool SendExecutor::is_enabled_pull(const NValueArray& params) const
-{
-    detail::MethodC m = &AbstractExecutor::is_enabled_pull;
-    return detail::iterate_children_pull(m, m_abstractNode, params);
 }
 
 }

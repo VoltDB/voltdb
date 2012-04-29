@@ -46,14 +46,32 @@
 #ifndef VOLTDBNODEABSTRACTEXECUTOR_H
 #define VOLTDBNODEABSTRACTEXECUTOR_H
 
+#include <cassert>
+#include <vector>
+#include <boost/scoped_ptr.hpp>
+
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
-#include <cassert>
 
 namespace voltdb {
 
 class TempTableLimits;
 class VoltDBEngine;
+
+namespace detail
+{
+struct AbstractExecutorState
+{   
+    AbstractExecutorState(TempTable* table) :
+        m_table(table), m_iterator((table)? table->makeIterator() : NULL),
+        m_list() 
+    {}
+    TempTable* m_table;
+    TableIterator* m_iterator;
+    std::vector<AbstractExecutor*> m_list;
+};
+
+} //namespace detail
 
 /**
  * AbstractExecutor provides the API for initializing and invoking executors.
@@ -82,10 +100,7 @@ class AbstractExecutor {
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
 
   protected:
-    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
-        m_abstractNode = abstractNode;
-        m_tmpOutputTable = NULL;
-    }
+    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode);
 
     /** Concrete executor classes implement initialization in p_init() */
     virtual bool p_init(AbstractPlanNode*,
@@ -113,48 +128,45 @@ class AbstractExecutor {
     //@TODO pullexec prototype
   public:  
     /** Invoke a plannode's associated executor in pull mode */
-//@TODO I don't envision a need for params in these functions (that can't be easily optimized out into p_pre_execute_pull). --paul
     bool execute_pull(const NValueArray& params);
-    bool clearOutputTable_pull(const NValueArray& params);
+    
+    /** Clean up the output table if needed */
+    void clearOutputTable_pull();
+    
+    // Generic method to depth first iterate over the children 
+    // and call the functor on each level 
+    // The functor signature is void f(AbstractExcecutor*) 
+    template <typename Functor>
+    typename Functor::result_type  depth_first_iterate_pull(Functor& f);
   
-  public:
     // Gets next available tuple from input table 
     // and also applies executor specific logic. 
     // Better be two separate methods
-    // needs to be pure
-//@TODO See the suggestion in VoltDBEngine.cpp for sub-optimal but simplifying default behavior for this function: --paul
-    virtual TableTuple p_next_pull(const NValueArray& params, bool& status) { return TableTuple(); }
-    // Returns True if executor and all its children are pull enabled
-    // needs to be pure
-    virtual bool is_enabled_pull(const NValueArray&) const { return false; }
+//@TODO See the suggestion in VoltDBEngine.cpp 
+// for sub-optimal but simplifying default behavior for this function: --paul
+    virtual TableTuple p_next_pull();
     
-  //protected:
-
-//@TODO See the suggestion in VoltDBEngine.cpp for sub-optimal but simplifying default behavior for this function: --paul
+  protected:
+    
+    
+//@TODO See the suggestion in VoltDBEngine.cpp 
+// for sub-optimal but simplifying default behavior for this function: --paul
     // Last minute init before the p_next_pull iteration
-    // needs to be pure
-    virtual bool p_pre_execute_pull(const NValueArray& params) { return false; }
+    virtual void p_pre_execute_pull(const NValueArray& params);
 
-//@TODO Would this make sense to default to the pass-through recursive call? --paul
     // Cleans up after the p_next_pull iteration
-    // needs to be pure
-    virtual bool p_post_execute_pull(const NValueArray& params) { return false; }
+    virtual void p_post_execute_pull();
     
     // Saves processed tuple
-    // needs to be pure
-//@TODO Would it be possible to have a "smarter" default implementation for this that generically inserted into a node's (optional) output table? --paul
-// Specific executors could STILL refine/override that behavior.
-    virtual bool p_insert_output_table_pull(TableTuple& tuple) { return false; }
+    virtual void p_insert_output_table_pull(TableTuple& tuple);
     
-    /*
-//@TODO These would be slightly simpler as member functions that always operated on m_abstractNode instead of always having that exact value passed into them. --paul
-    // Corresponding static methods to recurs to children
-    // Need generic method
-    static bool p_pre_execute_pull(AbstractPlanNode* node, const NValueArray& params);
-//@TODO I don't envision a need for params in these functions (that can't be easily optimized out). --paul
-    static bool p_post_execute_pull(AbstractPlanNode* node, const NValueArray& params);
-    static bool p_is_enabled_pull(AbstractPlanNode* node);
-    */
+    // Recursively constructs a (depth-first) list of its child(ren).    
+    void p_build_list();
+    void p_add_to_list(std::vector<AbstractExecutor*>& list);
+    
+ private:
+
+    boost::scoped_ptr<detail::AbstractExecutorState> m_absState;
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
@@ -173,33 +185,47 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     return p_execute(params);
 }
 
-//@TODO: The details of this template function are a little at cross-purposes to my suggestions about simplifying the method signatures. --paul
-// I suggest generalizing the Method parameter to allow Method m to be a generic "single-argument function object" that can be called
-// via "m(executor)" and can contain/encapsulate any other arguments (like params) it may need.
-// Since I don't envision specific executor classes needing to define and apply new generic abstract executor methods,
-// I'd go (back) to wrapping this functionality inside easy-to-call abstract executor member functions,
-// and further (in most cases) provide them as default "pass-through" implementations of virtual functions for classes that don't have
-// specific behavior requirements beyond cooperation with the recursion protocol.
-namespace detail {
-typedef bool (AbstractExecutor::*Method)(const NValueArray&);
-typedef bool (AbstractExecutor::*MethodC)(const NValueArray&) const;
-
-template <typename Method>
-bool iterate_children_pull(Method m, AbstractPlanNode* node, const NValueArray& params)
+template <typename Functor>
+typename Functor::result_type AbstractExecutor::depth_first_iterate_pull(Functor& functor)
 {
-    assert(node != NULL);
-    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    assert(m_abstractNode);
+    // Recurs to children and applay functor
+    std::vector<AbstractPlanNode*>& children = m_abstractNode->getChildren();
     for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
     {
+        assert(*it);
         AbstractExecutor* executor = (*it)->getExecutor();
-        assert(executor != NULL);
-        if ((executor->*m)(params) != true)
-            return false;
+        assert(executor);
+        executor->depth_first_iterate_pull(functor);
     }
-    return true;
+    // Applay functor to itself
+    return functor(this);
 }
 
-} //namespace detail 
+inline void AbstractExecutor::p_insert_output_table_pull(TableTuple& tuple) { 
+    assert(m_tmpOutputTable);
+    if (!m_tmpOutputTable->insertTuple(tuple)) {
+        char message[128];
+        snprintf(message, 128, "Failed to insert into table '%s'",
+                m_tmpOutputTable->name().c_str());
+        VOLT_ERROR("%s", message);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      message);
+     }
+}
+
+inline void AbstractExecutor::p_post_execute_pull() { 
+}
+
+
+inline void AbstractExecutor::clearOutputTable_pull()
+{
+    if (this->needsOutputTableClear())
+    {
+        assert(m_tmpOutputTable);
+        m_tmpOutputTable->deleteAllTuples(false);
+    }
+}
 
 }
 
