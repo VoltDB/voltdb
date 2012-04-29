@@ -146,6 +146,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     }
     
     m_absState.reset(new detail::AbstractExecutorState(m_tmpOutputTable));
+    
     return true;
 }
 
@@ -208,7 +209,9 @@ bool AbstractExecutor::execute_pull(const NValueArray& params)
 // Implements p_next_pull to retrieve each row from its output table (previously populated by its execute method).
 void AbstractExecutor::p_pre_execute_pull(const NValueArray& params) 
 {
-    this->p_build_list();
+    // Build the depth-first children list.
+    if (m_absState->m_list.empty())
+        this->p_build_list();
     
     Table *cleanUpTable = NULL;
     // Walk through the queue and execute each plannode.  The query
@@ -259,6 +262,9 @@ void AbstractExecutor::p_add_to_list(std::vector<AbstractExecutor*>& list)
 
 void AbstractExecutor::p_build_list()
 {
+    // clear the children
+    m_absState->m_list.clear();
+    // rebuild the df children list
     boost::function<void(AbstractExecutor*)> faddtolist =
         boost::bind(&AbstractExecutor::p_add_to_list, _1, boost::ref(m_absState->m_list));
     depth_first_iterate_pull(faddtolist);
