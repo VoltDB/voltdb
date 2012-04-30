@@ -451,6 +451,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             hadSuccess = validateSnapshot(true, true, TESTNONCE + "2");
             if (hadSuccess) break;
         }
+        assertTrue(hadSuccess);
 
         /*
          * Make sure errors are properly forwarded, this is one code path to handle errors,
