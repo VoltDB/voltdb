@@ -95,6 +95,7 @@ import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.InitiatorMailbox;
+import org.voltdb.iv2.Site;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.CatalogUtil;
@@ -378,7 +379,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              * Then it does a compare and set of the topology.
              */
             ArrayDeque<Mailbox> siteMailboxes = null;
-            Deque<Mailbox> initiatorMailboxes = null;
+            Deque<Site> iv2Sites = null;
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
@@ -409,11 +410,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     System.out.println("Set recovering site count to " + p.getFirst().size());
                 } else {
                     p = createMailboxesForSitesStartup();
-                    // XXX-IZZY HACKY, REFACTOR SOMEHOW
+                    // XXX-IZZY HACKY, REFACTOR SOMEHOW TO GET PARTITIONS
                     JSONObject topo = registerClusterConfig(p.getSecond());
                     List<Integer> partitions =
                         ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                    initiatorMailboxes = createInitiatorMailboxes(partitions);
+                    iv2Sites = createIv2Sites(partitions);
                 }
 
                 siteMailboxes = p.getFirst();
@@ -801,18 +802,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return Pair.of( mailboxes, clusterConfig);
     }
 
-    private Deque<Mailbox> createInitiatorMailboxes(Collection<Integer> partitions)
+    private Deque<Site> createIv2Sites(Collection<Integer> partitions)
     {
-        Deque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
+        Deque<Site> sites = new ArrayDeque<Site>();
         for (Integer partition : partitions)
         {
-            Mailbox mailbox = new InitiatorMailbox(m_messenger, partition);
-            m_messenger.createMailbox(null, mailbox);
-            MailboxNodeContent mnc = new MailboxNodeContent(mailbox.getHSId(),
+            Site site = new Site(m_messenger, partition);
+            MailboxNodeContent mnc = new MailboxNodeContent(site.getInitiatorHSId(),
                                                             partition);
             m_mailboxPublisher.registerMailbox(MailboxType.Initiator, mnc);
+            sites.add(site);
         }
-        return mailboxes;
+        return sites;
     }
 
     private JSONObject registerClusterConfig(ClusterConfig config)
