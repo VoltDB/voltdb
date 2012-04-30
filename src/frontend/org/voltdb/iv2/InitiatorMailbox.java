@@ -44,6 +44,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
 {
     VoltLogger hostLog = new VoltLogger("HOST");
     private final int partitionId;
+    private final SiteTaskerScheduler scheduler;
     private final HostMessenger messenger;
     private long hsId;
 
@@ -81,8 +82,9 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
         }
     };
 
-    public InitiatorMailbox(HostMessenger messenger, int partitionId)
+    public InitiatorMailbox(SiteTaskerScheduler scheduler, HostMessenger messenger, int partitionId)
     {
+        this.scheduler = scheduler;
         this.messenger = messenger;
         this.partitionId = partitionId;
     }
@@ -153,13 +155,17 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     public void deliver(VoltMessage message)
     {
         if (message instanceof InitiateTaskMessage) {
-            // this will assign txnId if we are the leader
-            synchronized (role) {
-                role.offerInitiateTask((InitiateTaskMessage)message);
-                if (elector.isLeader()) {
-                    replicateInitiation((InitiateTaskMessage)message);
-                }
-            }
+
+            ProcedureTask task = new ProcedureTask(this, runner, (InitiateTaskMessage)message);
+            scheduler.offer(task);
+
+//            // this will assign txnId if we are the leader
+//            synchronized (role) {
+//                role.offerInitiateTask((InitiateTaskMessage)message);
+//                if (elector.isLeader()) {
+//                    replicateInitiation((InitiateTaskMessage)message);
+//                }
+//            }
         }
         else if (message instanceof InitiateResponseMessage) {
             InitiateResponseMessage response = (InitiateResponseMessage)message;

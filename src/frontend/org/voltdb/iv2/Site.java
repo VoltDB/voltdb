@@ -5,7 +5,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.Iv2ExecutionSite;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.SiteTaskerScheduler;
 
 public class Site
 {
@@ -24,7 +23,8 @@ public class Site
     {
         m_messenger = messenger;
         m_partitionId = partition;
-        m_initiatorMailbox = new InitiatorMailbox(m_messenger, m_partitionId);
+        m_scheduler = new SiteTaskerScheduler();
+        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_partitionId);
         m_messenger.createMailbox(null, m_initiatorMailbox);
     }
 
@@ -32,7 +32,6 @@ public class Site
                           CatalogContext catalogContext,
                           SiteTracker siteTracker)
     {
-        m_scheduler = new SiteTaskerScheduler();
         m_executionSite = new Iv2ExecutionSite(m_scheduler,
                                                m_initiatorMailbox.getHSId(),
                                                backend, catalogContext,

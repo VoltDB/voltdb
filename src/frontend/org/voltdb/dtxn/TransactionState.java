@@ -50,6 +50,17 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
 
+    /** Iv2 constructor */
+    protected TransactionState(long txnId, TransactionInfoBaseMessage notice)
+    {
+        super(txnId, notice.getInitiatorHSId());
+        m_mbox = null;
+        m_site = null;
+        coordinatorSiteId = notice.getCoordinatorHSId();
+        m_isReadOnly = notice.isReadOnly();
+        m_beginUndoToken = Iv2ExecutionSite.kInvalidUndoToken;
+    }
+
     /**
      * Set up the final member variables from the parameters. This will
      * be called exclusively by subclasses.

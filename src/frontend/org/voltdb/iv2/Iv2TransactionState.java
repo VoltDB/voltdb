@@ -26,14 +26,10 @@ import org.voltdb.StoredProcedureInvocation;
 
 public class Iv2TransactionState extends TransactionState
 {
-
     final InitiateTaskMessage m_task;
-    protected Iv2TransactionState(TransactionInfoBaseMessage notice)
+    protected Iv2TransactionState(long realTxnId, TransactionInfoBaseMessage notice)
     {
-        super(null, // Mailbox is not used
-              null, // ExecutionSite is not used
-              notice);
-
+        super(realTxnId, notice);
         m_task = (InitiateTaskMessage)notice;
     }
 

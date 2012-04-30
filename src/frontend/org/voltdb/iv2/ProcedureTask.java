@@ -32,7 +32,6 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.SiteTasker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.VoltDB;
@@ -46,11 +45,11 @@ public class ProcedureTask extends SiteTasker
     final ProcedureRunner m_runner;
     final InitiatorMailbox m_initiator;
 
-    ProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner, Iv2TransactionState txn)
+    ProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner,  InitiateTaskMessage msg)
     {
         m_initiator = initiator;
         m_runner = runner;
-        m_txn = txn;
+        m_txn = new Iv2TransactionState(msg);
     }
 
     void setBeginUndoToken(SiteProcedureConnection siteConnection)

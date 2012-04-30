@@ -35,8 +35,6 @@ public class PrimaryRole implements InitiatorRole {
     volatile long lastRespondedTxnId = -1;
     private volatile long[] replicas = null;
 
-    private final LinkedBlockingDeque<InitiateTaskMessage> outstanding =
-            new LinkedBlockingDeque<InitiateTaskMessage>();
     private final Map<Long, InFlightTxnState> pendingResponses =
             new ConcurrentHashMap<Long, InFlightTxnState>();
 
@@ -48,7 +46,9 @@ public class PrimaryRole implements InitiatorRole {
 //        int expectedResponses = replicas.length + 1; // plus the leader
 //        InFlightTxnState state = new InFlightTxnState(message, expectedResponses);
 //        pendingResponses.put(message.getTransactionId(), state);
-//        outstanding.offer(message);
+//
+//        ProcedureTask task = new ProcedureTask(a, b, c);
+//        m_scheduler.offer(task);
         throw new RuntimeException("IZZY SAYS TO FIX ME, DUMMY!");
     }
 

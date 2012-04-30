@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.iv2.SiteTasker;
+import org.voltdb.iv2.SiteTaskerScheduler;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
@@ -66,7 +68,7 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
     int m_partitionId;
 
     // Undo token state for the corresponding EE.
-    final static long kInvalidUndoToken = -1L;
+    public final static long kInvalidUndoToken = -1L;
     long latestUndoToken = 0L;
 
     @Override
