@@ -878,6 +878,18 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertTrue( hadZeroFiles);
 
         validateSnapshot(false);
+
+        try
+        {
+            results = client.callProcedure(
+                    "@SnapshotSave",
+                    "{ path:\"" + TMPDIR + "\", nonce:\"" + TESTNONCE + "\", block:true }").getResults();
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("SnapshotSave exception: " + ex.getMessage());
+        }
     }
 
     private void generateAndValidateTextFile(Set<?>[] expectedText, boolean csv) throws Exception {

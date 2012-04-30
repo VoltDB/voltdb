@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
@@ -285,11 +286,18 @@ public class SnapshotSave extends VoltSystemProcedure
 
 
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String path, String nonce, long block) throws VoltAbortException
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String command) throws Exception
     {
         final long startTime = System.currentTimeMillis();
-        String async = (block == 0) ? "Asynchronously" : "Synchronously";
+
+        JSONObject jsObj = new JSONObject(command);
+        final boolean block = jsObj.optBoolean("block", false);
+        final String async = !block ? "Asynchronously" : "Synchronously";
+        final String path = jsObj.getString("path");
+        final String nonce = jsObj.getString("nonce");
+        if (jsObj.length() != 3) {
+            throw new VoltAbortException("SnapshotSave only supports 3 arguments");
+        }
         HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
 
         ColumnInfo[] error_result_columns = new ColumnInfo[2];
@@ -332,7 +340,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
         performQuiesce();
 
-        results = performSnapshotCreationWork( path, nonce, ctx.getCurrentTxnId(), (byte)block);
+        results = performSnapshotCreationWork( path, nonce, ctx.getCurrentTxnId(), (byte)(block ? 1 : 0));
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
