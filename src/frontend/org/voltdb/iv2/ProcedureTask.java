@@ -31,8 +31,8 @@ import org.voltdb.ExpectedProcedureException;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteTasker;
-import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.VoltDB;
@@ -40,47 +40,33 @@ import org.voltdb.VoltTable;
 
 public class ProcedureTask extends SiteTasker
 {
-    /////////////////////////////////////////////////////////
-    // TODO: Needs a home.
-    final static long kInvalidUndoToken = -1L;
-    long latestUndoToken = 0L;
-    public long getNextUndoToken()
-    {
-        return ++latestUndoToken;
-    }
-    /////////////////////////////////////////////////////////
-
     private static final VoltLogger execLog = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     final Iv2TransactionState m_txn;
     final ProcedureRunner m_runner;
+    final InitiatorMailbox m_initiator;
 
-    ProcedureTask(ProcedureRunner runner, Iv2TransactionState txn)
+    ProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner, Iv2TransactionState txn)
     {
+        m_initiator = initiator;
         m_runner = runner;
         m_txn = txn;
     }
 
-    void setBeginUndoToken()
+    void setBeginUndoToken(SiteProcedureConnection siteConnection)
     {
-        if (!m_txn.isReadOnly()) {
-            m_txn.setBeginUndoToken(getNextUndoToken());
-        }
-        else {
-            m_txn.setBeginUndoToken(kInvalidUndoToken);
-        }
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
     @Override
-    public void run(ExecutionEngine ee)
+    public void run(SiteProcedureConnection siteConnection)
     {
-        setBeginUndoToken();
+        if (!m_txn.isReadOnly()) {
+            m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+        }
         InitiateResponseMessage response = processInitiateTask();
+        m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-
-        // TODO: small flaw here
-        // return response;
     }
 
     /** Priority returns this task's priority for scheduling */

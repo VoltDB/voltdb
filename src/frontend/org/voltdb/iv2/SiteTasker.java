@@ -15,9 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.iv2;
 
-import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.SiteProcedureConnection;
 
 public abstract class SiteTasker {
 
@@ -25,7 +25,7 @@ public abstract class SiteTasker {
      * Run executes the task. Run is called on the ExecutionSite thread
      * and has exclusive access to the ee. Tasks are not preempted.
      */
-    abstract public void run(ExecutionEngine ee);
+    abstract public void run(SiteProcedureConnection siteConnection);
 
     /**
      * Priority returns the relative task priority. 0 is the highest

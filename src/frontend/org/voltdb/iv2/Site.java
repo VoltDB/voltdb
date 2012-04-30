@@ -5,6 +5,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.Iv2ExecutionSite;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.SiteTaskerScheduler;
 
 public class Site
 {
@@ -15,6 +16,7 @@ public class Site
     // Encapsulated objects
     private InitiatorMailbox m_initiatorMailbox = null;
     private Iv2ExecutionSite m_executionSite = null;
+    private SiteTaskerScheduler m_scheduler = null;
 
     private Thread m_siteThread = null;
 
@@ -30,7 +32,9 @@ public class Site
                           CatalogContext catalogContext,
                           SiteTracker siteTracker)
     {
-        m_executionSite = new Iv2ExecutionSite(m_initiatorMailbox.getHSId(),
+        m_scheduler = new SiteTaskerScheduler();
+        m_executionSite = new Iv2ExecutionSite(m_scheduler,
+                                               m_initiatorMailbox.getHSId(),
                                                backend, catalogContext,
                                                serializedCatalog,
                                                catalogContext.m_transactionId,

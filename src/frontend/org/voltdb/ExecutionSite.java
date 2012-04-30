@@ -167,6 +167,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public final static long kInvalidUndoToken = -1L;
     private long latestUndoToken = 0L;
 
+    @Override
+    public long getLatestUndoToken() {
+        return latestUndoToken;
+    }
+
+    @Override
     public long getNextUndoToken() {
         return ++latestUndoToken;
     }

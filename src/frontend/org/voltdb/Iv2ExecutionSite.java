@@ -35,7 +35,7 @@ import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
-public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
+public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -44,6 +44,9 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
 
     // HSId of this site's initiator.
     final long m_siteId;
+
+    // Partition count is important for some reason.
+    final int m_numberOfPartitions;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -62,8 +65,33 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
     // Current topology
     int m_partitionId;
 
+    // Undo token state for the corresponding EE.
+    final static long kInvalidUndoToken = -1L;
+    long latestUndoToken = 0L;
+
+    @Override
+    public long getNextUndoToken()
+    {
+        return ++latestUndoToken;
+    }
+
+    @Override
+    public long getLatestUndoToken()
+    {
+        return latestUndoToken;
+    }
+
+    // TODO: need this for real?
+    long m_lastCommittedTxnId = 0L;
+
+    SiteProcedureConnection getSiteProcedureConnection()
+    {
+        return this;
+    }
+
     /** Create a new execution site and the corresponding EE */
     public Iv2ExecutionSite(
+            SiteTaskerScheduler scheduler,
             long siteId,
             BackendTarget backend,
             CatalogContext context,
@@ -75,7 +103,8 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
         m_siteId = siteId;
         m_context = context;
         m_partitionId = partitionId;
-        m_scheduler = new SiteTaskerScheduler();
+        m_numberOfPartitions = numPartitions;
+        m_scheduler = scheduler;
 
         if (backend == BackendTarget.NONE) {
             m_hsql = null;
@@ -192,14 +221,13 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
     {
         SiteTasker task = m_scheduler.poll();
         if (task != null) {
-            task.run(m_ee);
+            task.run(getSiteProcedureConnection());
         }
     }
 
     void shutdown()
     {
     }
-
 
     //
     // Legacy SiteProcedureConnection needed by ProcedureRunner
@@ -219,15 +247,13 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
     @Override
     public int getCorrespondingPartitionId()
     {
-        // TODO Auto-generated method stub
-        return 0;
+        return m_partitionId;
     }
 
     @Override
     public int getCorrespondingHostId()
     {
-        // TODO Auto-generated method stub
-        return 0;
+        return CoreUtils.getHostIdFromHSId(m_siteId);
     }
 
     @Override
@@ -249,15 +275,14 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
             parameterSets,
             numParameterSets,
             txnId,
-            lastCommittedTxnId,
+            m_lastCommittedTxnId++, // TODO: need this real.
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
     @Override
     public long getReplicatedDMLDivisor()
     {
-        // TODO Auto-generated method stub
-        return 1;
+        return m_numberOfPartitions;
     }
 
     @Override
