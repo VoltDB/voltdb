@@ -17,12 +17,17 @@
 
 package org.voltdb;
 
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.EEException;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -30,7 +35,7 @@ import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
-public class Iv2ExecutionSite implements Runnable
+public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -191,4 +196,76 @@ public class Iv2ExecutionSite implements Runnable
     {
     }
 
+
+    //
+    // Legacy SiteProcedureConnection needed by ProcedureRunner
+    //
+    @Override
+    public void registerPlanFragment(long pfId, ProcedureRunner proc)
+    {
+        throw new RuntimeException("Not supported in IV2");
+    }
+
+    @Override
+    public long getCorrespondingSiteId()
+    {
+        return m_siteId;
+    }
+
+    @Override
+    public int getCorrespondingPartitionId()
+    {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public int getCorrespondingHostId()
+    {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public void loadTable(long txnId, String clusterName, String databaseName,
+            String tableName, VoltTable data) throws VoltAbortException
+    {
+        throw new RuntimeException("Ain't gonna do it.");
+    }
+
+    @Override
+    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
+            long[] planFragmentIds, int numFragmentIds,
+            ParameterSet[] parameterSets, int numParameterSets, long txnId,
+            boolean readOnly) throws EEException
+    {
+        return m_ee.executeQueryPlanFragmentsAndGetResults(
+            planFragmentIds,
+            numFragmentIds,
+            parameterSets,
+            numParameterSets,
+            txnId,
+            lastCommittedTxnId,
+            readOnly ? Long.MAX_VALUE : getNextUndoToken());
+    }
+
+    @Override
+    public long getReplicatedDMLDivisor()
+    {
+        // TODO Auto-generated method stub
+        return 1;
+    }
+
+    @Override
+    public void simulateExecutePlanFragments(long txnId, boolean readOnly)
+    {
+        throw new RuntimeException("Not supported in IV2.");
+    }
+
+    @Override
+    public Map<Integer, List<VoltTable>> recursableRun(
+            TransactionState currentTxnState)
+    {
+        throw new RuntimeException("Not supported in IV2");
+    }
 }
