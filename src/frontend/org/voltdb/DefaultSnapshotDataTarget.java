@@ -200,16 +200,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b.putInt(container.b.remaining() - 4);
         container.b.position(0);
 
-        FastSerializer schemaSerializer = new FastSerializer();
-        schemaTable.writeExternal(schemaSerializer);
-        final BBContainer schemaContainer = schemaSerializer.getBBContainer();
-        schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
-        schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length
+        final byte schemaBytes[] = schemaTable.getSchemaBytes();
 
         final CRC32 crc = new CRC32();
-        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaContainer.b.remaining());
+        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaBytes.length);
         aggregateBuffer.put(container.b);
-        aggregateBuffer.put(schemaContainer.b);
+        aggregateBuffer.put(schemaBytes);
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
 
@@ -292,7 +288,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     @Override
     public int getHeaderSize() {
-        return 4;
+        return 0;
     }
 
     /*
@@ -309,7 +305,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
         Future<byte[]> compressionTask = null;
         if (prependLength) {
-            tupleData.b.position(tupleData.b.position() + 16);
+            tupleData.b.position(tupleData.b.position() + 12);
             compressionTask = CompressionService.compressBufferAsync(tupleData.b);
         }
 
@@ -344,9 +340,9 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         ByteBuffer lengthPrefix = ByteBuffer.allocate(16);
                         m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining() + 16);
                         lengthPrefix.putInt(payloadBuffer.remaining());
+                        lengthPrefix.putInt(tupleData.b.getInt(0));
                         lengthPrefix.putInt(tupleData.b.getInt(4));
                         lengthPrefix.putInt(tupleData.b.getInt(8));
-                        lengthPrefix.putInt(tupleData.b.getInt(12));
                         lengthPrefix.flip();
                         while (lengthPrefix.hasRemaining()) {
                             totalWritten += m_channel.write(lengthPrefix);
@@ -400,4 +396,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         return m_writeException;
     }
 
+    @Override
+    public String getFileExtension() {
+        return ".vpt";
+    }
 }

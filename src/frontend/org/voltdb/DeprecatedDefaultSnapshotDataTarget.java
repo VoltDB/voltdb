@@ -335,4 +335,8 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         return m_writeException;
     }
 
+    @Override
+    public String getFileExtension() {
+        return ".vpt";
+    }
 }

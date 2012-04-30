@@ -51,4 +51,6 @@ public interface SnapshotDataTarget {
      * Get last cached exception that occurred during writes
      */
     public IOException getLastWriteException();
+
+    public String getFileExtension();
 }
