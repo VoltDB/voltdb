@@ -78,11 +78,12 @@ public class PrimaryRole implements InitiatorRole {
     @Override
     public InitiateTaskMessage poll()
     {
-        InitiateTaskMessage task = outstanding.peek();
-        if (task != null) {
-            outstanding.remove();
-        }
-        return task;
+//        InitiateTaskMessage task = outstanding.peek();
+//        if (task != null) {
+//            outstanding.remove();
+//        }
+//        return task;
+        return null;
     }
 
     /**

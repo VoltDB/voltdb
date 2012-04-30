@@ -30,6 +30,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
@@ -45,11 +46,12 @@ public class ProcedureTask extends SiteTasker
     final ProcedureRunner m_runner;
     final InitiatorMailbox m_initiator;
 
-    ProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner,  InitiateTaskMessage msg)
+    ProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner,
+                  long txnId, Iv2InitiateTaskMessage msg)
     {
         m_initiator = initiator;
         m_runner = runner;
-        m_txn = new Iv2TransactionState(msg);
+        m_txn = new Iv2TransactionState(txnId, msg);
     }
 
     void setBeginUndoToken(SiteProcedureConnection siteConnection)
@@ -78,7 +80,7 @@ public class ProcedureTask extends SiteTasker
     /** Mostly copy-paste of old ExecutionSite.processInitiateTask() */
     InitiateResponseMessage processInitiateTask()
     {
-        InitiateTaskMessage itask = m_txn.m_task;
+        Iv2InitiateTaskMessage itask = m_txn.m_task;
         InitiateResponseMessage response = new InitiateResponseMessage(itask);
 
         try {

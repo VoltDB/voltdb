@@ -4,6 +4,8 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.Iv2ExecutionSite;
+import org.voltdb.LoadedProcedureSet;
+import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 
 public class Site
@@ -16,6 +18,7 @@ public class Site
     private InitiatorMailbox m_initiatorMailbox = null;
     private Iv2ExecutionSite m_executionSite = null;
     private SiteTaskerScheduler m_scheduler = null;
+    private LoadedProcedureSet m_procSet = null;
 
     private Thread m_siteThread = null;
 
@@ -39,6 +42,14 @@ public class Site
                                                catalogContext.m_transactionId,
                                                m_partitionId,
                                                siteTracker.m_numberOfPartitions);
+        m_procSet = new LoadedProcedureSet(m_executionSite,
+                                           new ProcedureRunnerFactory(),
+                                           m_initiatorMailbox.getHSId(),
+                                           0, // this has no meaning
+                                           siteTracker.m_numberOfPartitions);
+        m_initiatorMailbox.setProcedureSet(m_procSet);
+
+
         m_siteThread = new Thread(m_executionSite);
         m_siteThread.start(); // Maybe this moves --izzy
     }

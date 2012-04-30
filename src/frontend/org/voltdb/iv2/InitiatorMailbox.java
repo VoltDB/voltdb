@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
@@ -31,10 +32,12 @@ import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
+import org.voltdb.LoadedProcedureSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -47,6 +50,10 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     private final SiteTaskerScheduler scheduler;
     private final HostMessenger messenger;
     private long hsId;
+    private LoadedProcedureSet loadedProcs;
+
+    // hacky temp txnid
+    AtomicLong txnId = new AtomicLong(0);
 
     InitiatorRole role;
     private LeaderElector elector;
@@ -82,11 +89,17 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
         }
     };
 
+
     public InitiatorMailbox(SiteTaskerScheduler scheduler, HostMessenger messenger, int partitionId)
     {
         this.scheduler = scheduler;
         this.messenger = messenger;
         this.partitionId = partitionId;
+    }
+
+    void setProcedureSet(LoadedProcedureSet loadedProcs)
+    {
+        this.loadedProcs = loadedProcs;
     }
 
     /**
@@ -154,9 +167,12 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     @Override
     public void deliver(VoltMessage message)
     {
-        if (message instanceof InitiateTaskMessage) {
+        if (message instanceof Iv2InitiateTaskMessage) {
 
-            ProcedureTask task = new ProcedureTask(this, runner, (InitiateTaskMessage)message);
+            String procedureName = ((Iv2InitiateTaskMessage) message).getStoredProcedureName();
+            ProcedureTask task = new ProcedureTask(this, this.loadedProcs.procs.get(procedureName),
+                                                   txnId.incrementAndGet(),
+                                                   (Iv2InitiateTaskMessage)message);
             scheduler.offer(task);
 
 //            // this will assign txnId if we are the leader
