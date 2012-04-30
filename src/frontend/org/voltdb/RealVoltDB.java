@@ -168,6 +168,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     boolean m_jsonEnabled;
     DeploymentType m_deployment;
 
+    // IV2 things
+    List<Site> m_iv2Sites = new ArrayList<Site>();
+
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     // If CL is enabled this will be set to true
@@ -379,7 +382,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              * Then it does a compare and set of the topology.
              */
             ArrayDeque<Mailbox> siteMailboxes = null;
-            Deque<Site> iv2Sites = null;
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
@@ -414,7 +416,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     JSONObject topo = registerClusterConfig(p.getSecond());
                     List<Integer> partitions =
                         ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                    iv2Sites = createIv2Sites(partitions);
+                    m_iv2Sites = createIv2Sites(partitions);
                 }
 
                 siteMailboxes = p.getFirst();
@@ -485,6 +487,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             collectLocalNetworkMetadata();
+
+            /*
+             * Configure and start all the IV2 sites
+             */
+            for (Site iv2site : m_iv2Sites) {
+                iv2site.configure(getBackendTargetType(), m_serializedCatalog,
+                                  m_catalogContext, m_siteTracker);
+            }
 
             /*
              * Create execution sites runners (and threads) for all exec sites except the first one.
@@ -802,9 +812,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return Pair.of( mailboxes, clusterConfig);
     }
 
-    private Deque<Site> createIv2Sites(Collection<Integer> partitions)
+    private List<Site> createIv2Sites(Collection<Integer> partitions)
     {
-        Deque<Site> sites = new ArrayDeque<Site>();
+        List<Site> sites = new ArrayList<Site>();
         for (Integer partition : partitions)
         {
             Site site = new Site(m_messenger, partition);
