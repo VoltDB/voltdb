@@ -27,10 +27,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
@@ -52,6 +50,8 @@ public class LocalCluster implements VoltServerConfig {
         ONE_FAILURE,
         ONE_RECOVERING
     }
+
+    VoltLogger log = new VoltLogger("HOST");
 
     // the timestamp salt for the TransactionIdManager
     // will vary between -3 and 3 uniformly
@@ -99,23 +99,32 @@ public class LocalCluster implements VoltServerConfig {
 
     // Produce a (presumably) available IP port number.
     PortGenerator portGenerator = new PortGenerator();
-    static class PortGenerator {
-        private final AtomicInteger nextPort = new AtomicInteger(50000);
-        private final AtomicInteger nextCport = new AtomicInteger(VoltDB.DEFAULT_PORT);
-        private final AtomicInteger nextAport = new AtomicInteger(VoltDB.DEFAULT_ADMIN_PORT);
-        public int next() {
-            return nextPort.getAndIncrement();
-        }
-        public int nextClient() {
-            return nextCport.getAndIncrement();
-        }
-        public int nextAdmin() {
-            return nextAport.getAndDecrement();
-        }
+    public static class PortGenerator {
+        private int nextPort = 12000;
+        private int nextCport = VoltDB.DEFAULT_PORT;
+        private int nextAport = VoltDB.DEFAULT_ADMIN_PORT;
 
-        public void reset() {
-            nextCport.set(21212);
-            nextAport.set(21211);
+        final int MAX_STATIC_PORT = 49151;
+
+        /** Return the next bindable port */
+        public synchronized int next() {
+            while(nextPort <= MAX_STATIC_PORT) {
+                int port = nextPort++;
+                if (MiscUtils.isBindable(port)) {
+                    return port;
+                }
+            }
+            return -1;
+        }
+        public synchronized int nextClient() {
+            return nextCport++;
+        }
+        public synchronized int nextAdmin() {
+            return nextAport--;
+        }
+        public synchronized void reset() {
+            nextCport = 21212;
+            nextAport = 21211;
         }
     }
 
@@ -204,7 +213,7 @@ public class LocalCluster implements VoltServerConfig {
         // First try 'ant' syntax and then 'eclipse' syntax...
         String log4j = System.getProperty("log4j.configuration");
         if (log4j == null) {
-            log4j = "file://" + System.getProperty("user.dir") + "/voltdb/log4j.xml";
+            log4j = "file://" + System.getProperty("user.dir") + "/tests/log4j-allconsole.xml";
         }
 
         m_procBuilder = new ProcessBuilder();
@@ -358,7 +367,7 @@ public class LocalCluster implements VoltServerConfig {
                             pipeToFile.wait(1000);
                         }
                         catch (InterruptedException ex) {
-                            Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+                            log.error(ex.toString(), ex);
                         }
                         allReady = false;
                         break;
@@ -380,6 +389,9 @@ public class LocalCluster implements VoltServerConfig {
         if (m_running) {
             return;
         }
+
+        // needs to be called before any call to pick a filename
+        VoltDB.setDefaultTimezone();
 
         // set 'replica' option -- known here for the first time.
         templateCmdLine.replicaMode(role);
@@ -602,8 +614,7 @@ public class LocalCluster implements VoltServerConfig {
             ptf.start();
         }
         catch (IOException ex) {
-            System.out.println("Failed to start cluster process:" + ex.getMessage());
-            Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+            log.error("Failed to start cluster process:" + ex.getMessage(), ex);
             assert (false);
         }
     }
@@ -701,8 +712,7 @@ public class LocalCluster implements VoltServerConfig {
             t.start();
         }
         catch (IOException ex) {
-            System.out.println("Failed to start cluster process:" + ex.getMessage());
-            Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+            log.error("Failed to start recovering cluster process:" + ex.getMessage(), ex);
             assert (false);
         }
 
@@ -723,7 +733,7 @@ public class LocalCluster implements VoltServerConfig {
                     ptf.wait();
                 }
                 catch (InterruptedException ex) {
-                    Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+                    log.error(ex.toString(), ex);
                 }
             }
         }
@@ -754,7 +764,11 @@ public class LocalCluster implements VoltServerConfig {
             if (m_localServer != null) {
                 m_localServer.shutdown();
             }
-        } finally {
+        }
+        catch (Exception e) {
+            log.error("Failure to shutdown LocalCluster's in-process VoltDB server.", e);
+        }
+        finally {
             m_running = false;
         }
         shutDownExternal();
@@ -804,18 +818,33 @@ public class LocalCluster implements VoltServerConfig {
         shutDownExternal(false);
     }
 
-    public synchronized void shutDownExternal(boolean forceKillEEProcs) throws InterruptedException
+    public synchronized void shutDownExternal(boolean forceKillEEProcs)
     {
         if (m_cluster != null) {
+            // kill all procs
             for (Process proc : m_cluster) {
                 if (proc == null)
                     continue;
                 proc.destroy();
-                int retval = proc.waitFor();
+            }
+
+            // join on all procs
+            for (Process proc : m_cluster) {
+                if (proc == null)
+                    continue;
+                int retval = 0;
+                try {
+                    retval = proc.waitFor();
+                }
+                catch (InterruptedException e) {
+                    System.out.println("Unable to wait for Localcluster process to die: " + proc.toString());
+                    log.error("Unable to wait for Localcluster process to die: " + proc.toString(), e);
+                }
                 // exit code 143 is the forcible shutdown code from .destroy()
                 if (retval != 0 && retval != 143)
                 {
                     System.out.println("External VoltDB process terminated abnormally with return: " + retval);
+                    log.error("External VoltDB process terminated abnormally with return: " + retval);
                 }
             }
         }
@@ -824,7 +853,11 @@ public class LocalCluster implements VoltServerConfig {
 
         for (ArrayList<EEProcess> procs : m_eeProcs) {
             for (EEProcess proc : procs) {
-                proc.waitForShutdown();
+                try {
+                    proc.waitForShutdown();
+                } catch (InterruptedException e) {
+                    log.error("Unable to wait for EEProcess to die: " + proc.toString(), e);
+                }
             }
         }
 
@@ -837,6 +870,8 @@ public class LocalCluster implements VoltServerConfig {
                 org.junit.Assert.fail(failString);
             }
         }
+
+        m_eeProcs.clear();
     }
 
     @Override
@@ -954,11 +989,7 @@ public class LocalCluster implements VoltServerConfig {
     class ShutDownHookThread implements Runnable {
         @Override
         public void run() {
-            try {
-                shutDownExternal(true);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            shutDownExternal(true);
         }
     }
 

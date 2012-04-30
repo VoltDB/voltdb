@@ -24,6 +24,8 @@
 package org.voltcore.zk;
 
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Semaphore;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -31,21 +33,28 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
+import org.voltdb.regressionsuites.LocalCluster;
 
 /**
  *
  */
 public class ZKTestBase {
+    LocalCluster.PortGenerator m_ports = new LocalCluster.PortGenerator();
+
+    protected Map<Integer, Integer> m_siteIdToZKPort;
     protected ArrayList<HostMessenger> m_messengers;
     protected ArrayList<ZooKeeper> m_clients;
 
     protected void setUpZK(int sites) throws Exception {
+        m_siteIdToZKPort = new TreeMap<Integer, Integer>();
         m_clients = new ArrayList<ZooKeeper>();
         m_messengers = new ArrayList<HostMessenger>();
         for (int ii = 0; ii < sites; ii++) {
             HostMessenger.Config config = new HostMessenger.Config();
             config.internalPort += ii;
-            config.zkInterface = "127.0.0.1:" + (2182 + ii);
+            int externalPort = m_ports.next();
+            config.zkInterface = "127.0.0.1:" + externalPort;
+            m_siteIdToZKPort.put(ii, externalPort);
             config.networkThreads = 1;
             HostMessenger hm = new HostMessenger(config);
             hm.start();
@@ -68,7 +77,8 @@ public class ZKTestBase {
 
     protected ZooKeeper getClient(int site) throws Exception {
         final Semaphore permit = new Semaphore(0);
-        ZooKeeper keeper = new ZooKeeper("localhost:" + Integer.toString(2182 + site), 4000, new Watcher() {
+        int clientPort = m_siteIdToZKPort.get(site);
+        ZooKeeper keeper = new ZooKeeper("127.0.0.1:" + Integer.toString(clientPort), 4000, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
                 if (event.getState() == KeeperState.SyncConnected) {

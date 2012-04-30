@@ -536,6 +536,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             throw new RuntimeException(e);
                         }
                     }
+                    assert(runner.m_siteObj != null);
                     m_localSites.put(runner.m_siteId, runner.m_siteObj);
                 }
             }

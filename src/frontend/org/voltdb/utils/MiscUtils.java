@@ -19,6 +19,9 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.net.BindException;
+import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -384,5 +387,20 @@ public class MiscUtils {
                 new SimpleDateFormat("MMddHHmmss");
         Date tsDate = new Date(timestamp);
         return sdf.format(tsDate);
+    }
+
+    public static synchronized boolean isBindable(int port) {
+        try {
+            ServerSocket ss = new ServerSocket(port);
+            ss.close();
+            ss = null;
+            return true;
+        }
+        catch (BindException be) {
+            return false;
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
