@@ -60,17 +60,21 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
     CatalogContext m_context;
 
     // Current topology
-    SiteTracker m_tracker;
+    int m_partitionId;
 
     /** Create a new execution site and the corresponding EE */
-    Iv2ExecutionSite(
+    public Iv2ExecutionSite(
             long siteId,
             BackendTarget backend,
+            CatalogContext context,
             String serializedCatalog,
             long txnId,
+            int partitionId,
             int numPartitions)
     {
         m_siteId = siteId;
+        m_context = context;
+        m_partitionId = partitionId;
         m_scheduler = new SiteTaskerScheduler();
 
         if (backend == BackendTarget.NONE) {
@@ -127,7 +131,7 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
                     new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
-                        m_tracker.getPartitionForSite(m_siteId),
+                        m_partitionId,
                         SiteTracker.getHostForSite(m_siteId),
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
@@ -144,14 +148,14 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
                     new ExecutionEngineIPC(
                             m_context.cluster.getRelativeIndex(),
                             m_siteId,
-                            m_tracker.getPartitionForSite(m_siteId),
+                            m_partitionId,
                             SiteTracker.getHostForSite(m_siteId),
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             target,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            m_tracker.m_numberOfPartitions);
+                            configuredNumberOfPartitions);
                 eeTemp.loadCatalog( 0, serializedCatalog);
                 // TODO: export integration will require a tick.
                 // lastTickTime = EstTime.currentTimeMillis();
@@ -171,7 +175,7 @@ public class Iv2ExecutionSite implements Runnable,SiteProcedureConnection
     @Override
     public void run()
     {
-        Thread.currentThread().setName("Iv2ExecutionSite: " + String.valueOf(m_siteId));
+        Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
         try {
             while (m_shouldContinue) {
                 runLoop();
