@@ -34,224 +34,408 @@
 
 package voter;
 
-import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
-import org.voltdb.client.exampleutils.AppHelper;
-import org.voltdb.client.exampleutils.ClientConnection;
-import org.voltdb.client.exampleutils.ClientConnectionPool;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.ClientStatusListenerExt;
 
-public class SyncBenchmark
-{
+import voter.procedures.Vote;
+
+public class SyncBenchmark {
+
     // Initialize some common constants and variables
-    private static final String ContestantNamesCSV = "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway,Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster,Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
-    private static final AtomicLongArray VotingBoardResults = new AtomicLongArray(4);
+    static final String CONTESTANT_NAMES_CSV =
+            "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway," +
+            "Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster," +
+            "Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
 
-    // Reference to the database connection we will use in them main thread
-    private static ClientConnection Con;
+    // handy, rather than typing this out several times
+    static final String HORIZONTAL_RULE =
+            "----------" + "----------" + "----------" + "----------" +
+            "----------" + "----------" + "----------" + "----------" + "\n";
 
-    // Class for each thread that will be run in parallel, performing requests against the VoltDB server
-    private static class ClientThread implements Runnable
-    {
-        private final String servers;
-        private final int port;
-        private final long duration;
-        private final PhoneCallGenerator switchboard;
-        private final int maxVoteCount;
-        public ClientThread(String servers, int port, PhoneCallGenerator switchboard, long duration, int maxVoteCount) throws Exception
-        {
-            this.servers = servers;
-            this.port = port;
-            this.duration = duration;
-            this.switchboard = switchboard;
-            this.maxVoteCount = maxVoteCount;
-        }
+    // validated command line configuration
+    final VoterConfig config;
+    // Reference to the database connection we will use
+    final Client client;
+    // Phone number generator
+    PhoneCallGenerator switchboard;
+    // Timer for periodic stats printing
+    Timer timer;
+    // Benchmark start time
+    long benchmarkStartTS;
+    // Flags to tell the worker threads to stop or go
+    AtomicBoolean warmupComplete = new AtomicBoolean(false);
+    AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
+    // Statistics manager objects from the client
+    final ClientStatsContext periodicStatsContext;
+    final ClientStatsContext fullStatsContext;
+
+    // voter benchmark state
+    AtomicLong acceptedVotes = new AtomicLong(0);
+    AtomicLong badContestantVotes = new AtomicLong(0);
+    AtomicLong badVoteCountVotes = new AtomicLong(0);
+    AtomicLong failedVotes = new AtomicLong(0);
+
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class VoterConfig extends CLIConfig {
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        long displayinterval = 5;
+
+        @Option(desc = "Benchmark duration, in seconds.")
+        int duration = 120;
+
+        @Option(desc = "Warmup duration in seconds.")
+        int warmup = 5;
+
+        @Option(desc = "Comma separated list of the form server[:port] to connect to.")
+        String servers = "localhost";
+
+        @Option(desc = "Number of contestants in the voting contest (from 1 to 10).")
+        int contestants = 6;
+
+        @Option(desc = "Maximum number of votes cast per voter.")
+        int maxvotes = 2;
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "";
+
+        @Option(desc = "Number of concurrent threads synchronously calling procedures.")
+        int threads = 40;
 
         @Override
-        public void run()
-        {
-            // Each thread gets its dedicated JDBC connection, and posts votes against it.
-            ClientConnection con = null;
-            try
-            {
-                con = ClientConnectionPool.get(servers, port);
-                long endTime = System.currentTimeMillis() + (1000l * this.duration);
-                while (endTime > System.currentTimeMillis())
-                {
-                    PhoneCallGenerator.PhoneCall call = this.switchboard.receive();
-                    try
-                    {
-                        VotingBoardResults.incrementAndGet((int)con.execute("Vote", call.phoneNumber, call.contestantNumber, this.maxVoteCount).getResults()[0].fetchRow(0).getLong(0));
-                    }
-                    catch(Exception x)
-                    {
-                        VotingBoardResults.incrementAndGet(3);
-                    }
-                }
-            }
-            catch(Exception x)
-            {
-                System.err.println("Exception: " + x);
-                x.printStackTrace();
-            }
-            finally
-            {
-                try { con.close(); } catch (Exception x) {}
+        public void validate() {
+            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
+            if (duration < 0) exitWithMessageAndUsage("warmup must be >= 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
+            if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
+            if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
+        }
+    }
+
+    /**
+     * Provides a callback to be notified on node failure.
+     * This example only logs the event.
+     */
+    class StatusListener extends ClientStatusListenerExt {
+        @Override
+        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            // if the benchmark is still active
+            if (benchmarkComplete.get() == false) {
+                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
             }
         }
     }
 
-    // Application entry point
-    public static void main(String[] args)
-    {
-        try
-        {
+    /**
+     * Constructor for benchmark instance.
+     * Configures VoltDB client and prints configuration.
+     *
+     * @param config Parsed & validated CLI options.
+     */
+    public SyncBenchmark(VoterConfig config) {
+        this.config = config;
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        client = ClientFactory.createClient(clientConfig);
 
-            // Use the AppHelper utility class to retrieve command line application parameters
+        periodicStatsContext = client.createStatsContext();
+        fullStatsContext = client.createStatsContext();
 
-            // Define parameters and pull from command line
-            AppHelper apph = new AppHelper(SyncBenchmark.class.getCanonicalName())
-                .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
-                .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
-                .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
-                .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("contestants", "contestant_count", "Number of contestants in the voting contest (from 1 to 10).", 6)
-                .add("max-votes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
-                .setArguments(args)
-            ;
+        switchboard = new PhoneCallGenerator(config.contestants);
 
-            // Retrieve parameters
-            int threadCount      = apph.intValue("threads");
-            long displayInterval = apph.longValue("display-interval");
-            long duration        = apph.longValue("duration");
-            String servers       = apph.stringValue("servers");
-            int port             = apph.intValue("port");
-            int contestantCount  = apph.intValue("contestants");
-            int maxVoteCount     = apph.intValue("max-votes");
-            final String csv     = apph.stringValue("stats");
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Command Line Configuration");
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println(config.getConfigDumpString());
+    }
 
-            // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("threads", (threadCount > 0))
-                .validate("contestants", (contestantCount > 0))
-                .validate("max-votes", (maxVoteCount > 0))
-            ;
+    /**
+     * Connect to a single server with retry. Limited exponential backoff.
+     * No timeout. This will run until the process is killed if it's not
+     * able to connect.
+     *
+     * @param server hostname:port or just hostname (hostname can be ip).
+     */
+    void connectToOneServerWithRetry(String server) {
+        int sleep = 1000;
+        while (true) {
+            try {
+                client.createConnection(server);
+                break;
+            }
+            catch (Exception e) {
+                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
+                try { Thread.sleep(sleep); } catch (Exception interruted) {}
+                if (sleep < 8000) sleep += sleep;
+            }
+        }
+        System.out.printf("Connected to VoltDB node at: %s.\n", server);
+    }
 
-            // Display actual parameters, for reference
-            apph.printActualUsage();
+    /**
+     * Connect to a set of servers in parallel. Each will retry until
+     * connection. This call will block until all have connected.
+     *
+     * @param servers A comma separated list of servers using the hostname:port
+     * syntax (where :port is optional).
+     * @throws InterruptedException if anything bad happens with the threads.
+     */
+    void connect(String servers) throws InterruptedException {
+        System.out.println("Connecting to VoltDB...");
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+        String[] serverArray = servers.split(",");
+        final CountDownLatch connections = new CountDownLatch(serverArray.length);
 
-            // Get a client connection - we retry for a while in case the server hasn't started yet
-            Con = ClientConnectionPool.getWithRetry(servers, port);
-
-            // Initialize the application
-            final int maxContestants = (int)Con.execute("Initialize", contestantCount, ContestantNamesCSV).getResults()[0].fetchRow(0).getLong(0);
-
-            // Get a Phone Call Generator that will simulate voter entries from the call center
-            PhoneCallGenerator switchboard = new PhoneCallGenerator(maxContestants);
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Create a Timer task to display performance data on the Vote procedure
-            Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
+        // use a new thread to connect to each server
+        for (final String server : serverArray) {
+            new Thread(new Runnable() {
                 @Override
-                public void run()
-                {
-                    System.out.print(Con.getStatistics("Vote"));
+                public void run() {
+                    connectToOneServerWithRetry(server);
+                    connections.countDown();
+                }
+            }).start();
+        }
+        // block until all have connected
+        connections.await();
+    }
+
+    /**
+     * Create a Timer task to display performance data on the Vote procedure
+     * It calls printStatistics() every displayInterval seconds
+     */
+    public void schedulePeriodicStats() {
+        timer = new Timer();
+        TimerTask statsPrinting = new TimerTask() {
+            @Override
+            public void run() { printStatistics(); }
+        };
+        timer.scheduleAtFixedRate(statsPrinting,
+                                  config.displayinterval * 1000,
+                                  config.displayinterval * 1000);
+    }
+
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    public synchronized void printStatistics() {
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
+                stats.kPercentileLatency(0.95));
+    }
+
+    /**
+     * Prints the results of the voting simulation and statistics
+     * about performance.
+     *
+     * @throws Exception if anything unexpected happens.
+     */
+    public synchronized void printResults() throws Exception {
+        ClientStats stats = fullStatsContext.fetch().getStats();
+
+        // 1. Voting Board statistics, Voting results and performance statistics
+        String display = "\n" +
+                         HORIZONTAL_RULE +
+                         " Voting Results\n" +
+                         HORIZONTAL_RULE +
+                         "\nA total of %d votes were received...\n" +
+                         " - %,9d Accepted\n" +
+                         " - %,9d Rejected (Invalid Contestant)\n" +
+                         " - %,9d Rejected (Maximum Vote Count Reached)\n" +
+                         " - %,9d Failed (Transaction Error)\n\n";
+        System.out.printf(display, stats.getInvocationsCompleted(),
+                acceptedVotes.get(), badContestantVotes.get(),
+                badVoteCountVotes.get(), failedVotes.get());
+
+        // 2. Voting results
+        VoltTable result = client.callProcedure("Results").getResults()[0];
+
+        System.out.println("Contestant Name\t\tVotes Received");
+        while(result.advanceRow()) {
+            System.out.printf("%s\t\t%,14d\n", result.getString(0), result.getLong(2));
+        }
+        System.out.printf("\nThe Winner is: %s\n\n", result.fetchRow(0).getString(0));
+
+        // 3. Performance statistics
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Client Workload Statistics");
+        System.out.println(HORIZONTAL_RULE);
+
+        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
+        System.out.printf("Average latency:               %,9d ms\n", stats.getAverageLatency());
+        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
+        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
+
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" System Server Statistics");
+        System.out.println(HORIZONTAL_RULE);
+
+        System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
+
+        // 4. Write stats to file if requested
+        client.writeSummaryCSV(stats, config.statsfile);
+    }
+
+    /**
+     * While <code>benchmarkComplete</code> is set to false, run as many
+     * synchronous procedure calls as possible and record the results.
+     *
+     */
+    class VoterThread implements Runnable {
+
+        @Override
+        public void run() {
+            while (warmupComplete.get() == false) {
+                // Get the next phone call
+                PhoneCallGenerator.PhoneCall call = switchboard.receive();
+
+                // synchronously call the "Vote" procedure
+                try {
+                    client.callProcedure("Vote", call.phoneNumber,
+                            call.contestantNumber, config.maxvotes);
+                }
+                catch (Exception e) {}
+            }
+
+            while (benchmarkComplete.get() == false) {
+                // Get the next phone call
+                PhoneCallGenerator.PhoneCall call = switchboard.receive();
+
+                // synchronously call the "Vote" procedure
+                try {
+                    ClientResponse response = client.callProcedure("Vote",
+                                                                   call.phoneNumber,
+                                                                   call.contestantNumber,
+                                                                   config.maxvotes);
+
+                    long resultCode = response.getResults()[0].asScalarLong();
+                    if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
+                        badContestantVotes.incrementAndGet();
+                    }
+                    else if (resultCode == Vote.ERR_VOTER_OVER_VOTE_LIMIT) {
+                        badVoteCountVotes.incrementAndGet();
+                    }
+                    else {
+                        assert(resultCode == Vote.VOTE_SUCCESSFUL);
+                        acceptedVotes.incrementAndGet();
+                    }
+                }
+                catch (Exception e) {
+                    failedVotes.incrementAndGet();
                 }
             }
-            , displayInterval*1000l
-            , displayInterval*1000l
-            );
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Create multiple processing threads
-            ArrayList<Thread> threads = new ArrayList<Thread>();
-            for (int i = 0; i < threadCount; i++)
-                threads.add(new Thread(new ClientThread(servers, port, switchboard, duration, maxVoteCount)));
-
-            // Start threads
-            for (Thread thread : threads)
-                thread.start();
-
-            // Wait for threads to complete
-            for (Thread thread : threads)
-                thread.join();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // We're done - stop the performance statistics display task
-            timer.cancel();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Now print application results:
-
-            // 1. Voting Board statistics, Voting results and performance statistics
-            System.out.printf(
-              "-------------------------------------------------------------------------------------\n"
-            + " Voting Results\n"
-            + "-------------------------------------------------------------------------------------\n\n"
-            + "A total of %d votes was received...\n"
-            + " - %,9d Accepted\n"
-            + " - %,9d Rejected (Invalid Contestant)\n"
-            + " - %,9d Rejected (Maximum Vote Count Reached)\n"
-            + " - %,9d Failed (Transaction Error)\n"
-            + "\n\n"
-            + "-------------------------------------------------------------------------------------\n"
-            + "Contestant Name\t\tVotes Received\n"
-            , Con.getStatistics("Vote").getExecutionCount()
-            , VotingBoardResults.get(0)
-            , VotingBoardResults.get(1)
-            , VotingBoardResults.get(2)
-            , VotingBoardResults.get(3)
-            );
-
-            // 2. Voting results
-            VoltTable result = Con.execute("Results").getResults()[0];
-            String winner = "";
-            long winnerVoteCount = 0;
-            while(result.advanceRow())
-            {
-                if (result.getLong(2) > winnerVoteCount)
-                {
-                    winnerVoteCount = result.getLong(2);
-                    winner = result.getString(0);
-                }
-                System.out.printf("%s\t\t%,14d\n", result.getString(0), result.getLong(2));
-            }
-            System.out.printf("\n\nThe Winner is: %s\n-------------------------------------------------------------------------------------\n", winner);
-
-            // 3. Performance statistics (we only care about the Vote procedure that we're benchmarking)
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " System Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics("Vote").toString(false));
-
-            // Dump statistics to a CSV file
-            Con.saveStatistics(csv);
-
-            Con.close();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
 
         }
-        catch(Exception x)
-        {
-            System.out.println("Exception: " + x);
-            x.printStackTrace();
+
+    }
+
+    /**
+     * Core benchmark code.
+     * Connect. Initialize. Run the loop. Cleanup. Print Results.
+     *
+     * @throws Exception if anything unexpected happens.
+     */
+    public void runBenchmark() throws Exception {
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Setup & Initialization");
+        System.out.println(HORIZONTAL_RULE);
+
+        // connect to one or more servers, loop until success
+        connect(config.servers);
+
+        // initialize using synchronous call
+        System.out.println("\nPopulating Static Tables\n");
+        client.callProcedure("Initialize", config.contestants, CONTESTANT_NAMES_CSV);
+
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println("Starting Benchmark");
+        System.out.println(HORIZONTAL_RULE);
+
+        // create/start the requested number of threads
+        Thread[] voterThreads = new Thread[config.threads];
+        for (int i = 0; i < config.threads; ++i) {
+            voterThreads[i] = new Thread(new VoterThread());
+            voterThreads[i].start();
         }
+
+        // Run the benchmark loop for the requested warmup time
+        System.out.println("Warming up...");
+        Thread.sleep(1000l * config.warmup);
+
+        // signal to threads to end the warmup phase
+        warmupComplete.set(true);
+
+        // reset the stats after warmup
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
+
+        // print periodic statistics to the console
+        benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+
+        // Run the benchmark loop for the requested warmup time
+        System.out.println("\nRunning benchmark...");
+        Thread.sleep(1000l * config.duration);
+
+        // stop the threads
+        benchmarkComplete.set(true);
+
+        // cancel periodic stats printing
+        timer.cancel();
+
+        // block until all outstanding txns return
+        client.drain();
+
+        // join on the threads
+        for (Thread t : voterThreads) {
+            t.join();
+        }
+
+        // print the summary results
+        printResults();
+
+        // close down the client connections
+        client.close();
+    }
+
+    /**
+     * Main routine creates a benchmark instance and kicks off the run method.
+     *
+     * @param args Command line arguments.
+     * @throws Exception if anything goes wrong.
+     * @see {@link VoterConfig}
+     */
+    public static void main(String[] args) throws Exception {
+        // create a configuration from the arguments
+        VoterConfig config = new VoterConfig();
+        config.parse(SyncBenchmark.class.getName(), args);
+
+        SyncBenchmark benchmark = new SyncBenchmark(config);
+        benchmark.runBenchmark();
     }
 }

@@ -44,11 +44,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.voltcore.logging.VoltLogger;
-
 public class CoreUtils {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     public static final long[] toLongArray(Set<Long> set) {
         long retval[] = new long[set.size()];
         int ii = 0;

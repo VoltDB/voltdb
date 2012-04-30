@@ -16,14 +16,13 @@
  */
 package org.voltdb.utils;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,6 +35,7 @@ import org.voltdb.licensetool.LicenseApi;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     /**
      * Simple code to copy a file from one place to another...
@@ -209,7 +209,7 @@ public class MiscUtils {
 
         // print out trial success message
         if (licenseApi.isTrial()) {
-            hostLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
+            consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
             return true;
         }
 
@@ -236,7 +236,7 @@ public class MiscUtils {
                                    (valid ? "" : "invalid "),
                                    licenseApi.maxHostcount(),
                                    expiresStr);
-        hostLog.info(msg);
+        consoleLog.info(msg);
 
         return true;
     }
@@ -377,5 +377,12 @@ public class MiscUtils {
         }
         buffer.position(mypos);
         return checksum;
+    }
+
+    public static String getCompactStringTimestamp(long timestamp) {
+        SimpleDateFormat sdf =
+                new SimpleDateFormat("MMddHHmmss");
+        Date tsDate = new Date(timestamp);
+        return sdf.format(tsDate);
     }
 }

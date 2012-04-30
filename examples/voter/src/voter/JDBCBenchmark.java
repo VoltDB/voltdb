@@ -43,11 +43,49 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 
-import org.voltdb.client.exampleutils.AppHelper;
+import org.voltdb.CLIConfig;
 import org.voltdb.jdbc.IVoltDBConnection;
 
 public class JDBCBenchmark
 {
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class VoterConfig extends CLIConfig {
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        long displayinterval = 5;
+
+        @Option(desc = "Benchmark duration, in seconds.")
+        int duration = 120;
+
+        @Option(desc = "Comma separated list of the form server[:port] to connect to.")
+        String servers = "localhost";
+
+        @Option(desc = "Number of contestants in the voting contest (from 1 to 10).")
+        int contestants = 6;
+
+        @Option(desc = "Maximum number of votes cast per voter.")
+        int maxvotes = 2;
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "";
+
+        @Option(desc = "Number of concurrent threads synchronously calling procedures.")
+        int threads = 40;
+
+        @Override
+        public void validate() {
+            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (duration < 0) exitWithMessageAndUsage("warmup must be >= 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
+            if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
+            if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
+        }
+    }
+
     // Initialize some common constants and variables
     private static final String ContestantNamesCSV = "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway,Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster,Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
     private static final AtomicLongArray VotingBoardResults = new AtomicLongArray(4);
@@ -113,43 +151,10 @@ public class JDBCBenchmark
     {
         try
         {
+            VoterConfig config = new VoterConfig();
+            config.parse(JDBCBenchmark.class.getName(), args);
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Use the AppHelper utility class to retrieve command line application parameters
-
-            // Define parameters and pull from command line
-            AppHelper apph = new AppHelper(JDBCBenchmark.class.getCanonicalName())
-                .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
-                .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
-                .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
-                .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("contestants", "contestant_count", "Number of contestants in the voting contest (from 1 to 10).", 6)
-                .add("max-votes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
-                .setArguments(args)
-            ;
-
-            // Retrieve parameters
-            int threadCount      = apph.intValue("threads");
-            long displayInterval = apph.longValue("display-interval");
-            long duration        = apph.longValue("duration");
-            String servers       = apph.stringValue("servers");
-            int port             = apph.intValue("port");
-            int contestantCount  = apph.intValue("contestants");
-            int maxVoteCount     = apph.intValue("max-votes");
-            final String csv     = apph.stringValue("stats");
-
-            // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("threads", (threadCount > 0))
-                .validate("contestants", (contestantCount > 0))
-                .validate("max-votes", (maxVoteCount > 0))
-            ;
-
-            // Display actual parameters, for reference
-            apph.printActualUsage();
+            System.out.println(config.getConfigDumpString());
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -157,7 +162,7 @@ public class JDBCBenchmark
             Class.forName("org.voltdb.jdbc.Driver");
 
             // Prepare the JDBC URL for the VoltDB driver
-            String url = "jdbc:voltdb://" + servers + ":" + port;
+            String url = "jdbc:voltdb://" + config.servers;
 
             // Get a client connection - we retry for a while in case the server hasn't started yet
             System.out.printf("Connecting to: %s\n", url);
@@ -181,7 +186,7 @@ public class JDBCBenchmark
 
             // Initialize the application
             final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?)}");
-            initializeCS.setInt(1, contestantCount);
+            initializeCS.setInt(1, config.contestants);
             initializeCS.setString(2, ContestantNamesCSV);
             final int maxContestants = initializeCS.executeUpdate();
 
@@ -200,16 +205,16 @@ public class JDBCBenchmark
                     try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Vote")); } catch(Exception x) {}
                 }
             }
-            , displayInterval*1000l
-            , displayInterval*1000l
+            , config.displayinterval*1000l
+            , config.displayinterval*1000l
             );
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Create multiple processing threads
             ArrayList<Thread> threads = new ArrayList<Thread>();
-            for (int i = 0; i < threadCount; i++)
-                threads.add(new Thread(new ClientThread(url, switchboard, duration, maxVoteCount)));
+            for (int i = 0; i < config.threads; i++)
+                threads.add(new Thread(new ClientThread(url, switchboard, config.duration, config.maxvotes)));
 
             // Start threads
             for (Thread thread : threads)
@@ -272,7 +277,7 @@ public class JDBCBenchmark
             System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Vote").toString(false));
 
             // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(csv);
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.statsfile);
 
             Con.close();
 

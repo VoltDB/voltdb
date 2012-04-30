@@ -22,13 +22,12 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.ExecutionException;
+import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -43,8 +42,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltType;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 
 /**
@@ -70,11 +67,11 @@ class Distributer {
 
     private final boolean m_useMultipleThreads;
 
-    private final String m_hostname;
-
     // timeout for individual procedure calls
     private final long m_procedureCallTimeoutMS;
     private final long m_connectionResponseTimeoutMS;
+
+    public final RateLimiter m_rateLimiter = new RateLimiter();
 
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
@@ -87,82 +84,7 @@ class Distributer {
      */
     private Object m_clusterInstanceId[];
 
-    private final ClientStatsLoader m_statsLoader;
     private String m_buildString;
-
-    private static class ProcedureStats {
-        private final String m_name;
-
-        private long m_invocationsCompleted = 0;
-        private long m_lastInvocationsCompleted = 0;
-        private long m_invocationAborts = 0;
-        private long m_lastInvocationAborts = 0;
-        private long m_invocationErrors = 0;
-        private long m_lastInvocationErrors = 0;
-
-        // cumulative latency measured by client, used to calculate avg. lat.
-        private long m_roundTripTime = 0;
-        private long m_lastRoundTripTime = 0;
-
-        private int m_maxRoundTripTime = Integer.MIN_VALUE;
-        private int m_lastMaxRoundTripTime = Integer.MIN_VALUE;
-        private int m_minRoundTripTime = Integer.MAX_VALUE;
-        private int m_lastMinRoundTripTime = Integer.MAX_VALUE;
-
-        // cumulative latency measured by the cluster, used to calculate avg lat.
-        private long m_clusterRoundTripTime = 0;
-        private long m_lastClusterRoundTripTime = 0;
-
-        // 10ms buckets. Last bucket is all transactions > 190ms.
-        static int m_numberOfBuckets = 20;
-        private final long m_clusterRoundTripTimeBuckets[] = new long[m_numberOfBuckets];
-        private final long m_roundTripTimeBuckets[] = new long[m_numberOfBuckets];
-
-        private int m_maxClusterRoundTripTime = Integer.MIN_VALUE;
-        private int m_lastMaxClusterRoundTripTime = Integer.MIN_VALUE;
-        private int m_minClusterRoundTripTime = Integer.MAX_VALUE;
-        private int m_lastMinClusterRoundTripTime = Integer.MAX_VALUE;
-
-        public ProcedureStats(String name) {
-            m_name = name;
-        }
-
-        public void update(int roundTripTime, int clusterRoundTripTime, boolean abort, boolean error) {
-            m_maxRoundTripTime = Math.max(roundTripTime, m_maxRoundTripTime);
-            m_lastMaxRoundTripTime = Math.max( roundTripTime, m_lastMaxRoundTripTime);
-            m_minRoundTripTime = Math.min( roundTripTime, m_minRoundTripTime);
-            m_lastMinRoundTripTime = Math.max( roundTripTime, m_lastMinRoundTripTime);
-
-            m_maxClusterRoundTripTime = Math.max( clusterRoundTripTime, m_maxClusterRoundTripTime);
-            m_lastMaxClusterRoundTripTime = Math.max( clusterRoundTripTime, m_lastMaxClusterRoundTripTime);
-            m_minClusterRoundTripTime = Math.min( clusterRoundTripTime, m_minClusterRoundTripTime);
-            m_lastMinClusterRoundTripTime = Math.min( clusterRoundTripTime, m_lastMinClusterRoundTripTime);
-
-            m_invocationsCompleted++;
-            if (abort) {
-                m_invocationAborts++;
-            }
-            if (error) {
-                m_invocationErrors++;
-            }
-            m_roundTripTime += roundTripTime;
-            m_clusterRoundTripTime += clusterRoundTripTime;
-
-            // calculate the latency buckets to increment and increment.
-            int rttBucket = (int)(Math.floor(roundTripTime / 10));
-            if (rttBucket >= m_roundTripTimeBuckets.length) {
-                rttBucket = m_roundTripTimeBuckets.length - 1;
-            }
-            m_roundTripTimeBuckets[rttBucket] += 1;
-
-            int rttClusterBucket = (int)(Math.floor(clusterRoundTripTime / 10));
-            if (rttClusterBucket >= m_clusterRoundTripTimeBuckets.length) {
-                rttClusterBucket = m_clusterRoundTripTimeBuckets.length - 1;
-            }
-            m_clusterRoundTripTimeBuckets[rttClusterBucket] += 1;
-
-        }
-    }
 
     class CallExpiration implements Runnable {
         @Override
@@ -242,10 +164,7 @@ class Distributer {
     class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final HashMap<Long, CallbackBookeeping> m_callbacks;
-        private final HashMap<String, ProcedureStats> m_stats
-        = new HashMap<String, ProcedureStats>();
-        private final int m_hostId;
-        private final long m_connectionId;
+        private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
         private Connection m_connection;
         private final InetSocketAddress m_socketAddress;
         private String m_hostname;
@@ -256,21 +175,16 @@ class Distributer {
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
-        private long m_invocationsCompleted = 0;
-        private long m_lastInvocationsCompleted = 0;
-        private long m_invocationAborts = 0;
-        private long m_lastInvocationAborts = 0;
-        private long m_invocationErrors = 0;
-        private long m_lastInvocationErrors = 0;
-
         public NodeConnection(long ids[], InetSocketAddress socketAddress) {
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
-            m_hostId = (int)ids[0];
-            m_connectionId = ids[1];
             m_socketAddress = socketAddress;
         }
 
-        public void createWork(long handle, String name, ByteBuffer c, ProcedureCallback callback) {
+        public void createWork(long handle, String name, ByteBuffer c,
+                ProcedureCallback callback, boolean ignoreBackpressure) {
+            long now = System.currentTimeMillis();
+            now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
+                    now, ignoreBackpressure);
             synchronized (this) {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
@@ -284,7 +198,7 @@ class Distributer {
                     }
                     return;
                 }
-                long now = System.currentTimeMillis();
+
                 m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
                 m_callbacksToInvoke.incrementAndGet();
             }
@@ -307,22 +221,28 @@ class Distributer {
 
         /**
          * Update the procedures statistics
-         * @param name Name of procedure being updated
+         * @param procName Name of procedure being updated
          * @param roundTrip round trip from client queued to client response callback invocation
          * @param clusterRoundTrip round trip measured within the VoltDB cluster
          * @param abort true of the procedure was aborted
          * @param failure true if the procedure failed
          */
         private void updateStats(
-                String name,
+                String procName,
                 int roundTrip,
                 int clusterRoundTrip,
                 boolean abort,
                 boolean failure) {
-            ProcedureStats stats = m_stats.get(name);
+            ClientStats stats = m_stats.get(procName);
             if (stats == null) {
-                stats = new ProcedureStats(name);
-                m_stats.put( name, stats);
+                stats = new ClientStats();
+                stats.m_connectionId = connectionId();
+                stats.m_hostname = m_hostname;
+                stats.m_port = m_port;
+                stats.m_procName = procName;
+                stats.m_startTS = System.currentTimeMillis();
+                stats.m_endTS = Long.MIN_VALUE;
+                m_stats.put(procName, stats);
             }
             stats.update(roundTrip, clusterRoundTrip, abort, failure);
         }
@@ -362,18 +282,17 @@ class Distributer {
                     callTime = stuff.timestamp;
                     delta = (int)(now - callTime);
                     cb = stuff.callback;
-                    m_invocationsCompleted++;
                     final byte status = response.getStatus();
                     boolean abort = false;
                     boolean error = false;
                     if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
-                        m_invocationAborts++;
                         abort = true;
                     } else if (status != ClientResponse.SUCCESS) {
-                        m_invocationErrors++;
                         error = true;
                     }
-                    updateStats(stuff.name, delta, response.getClusterRoundtrip(), abort, error);
+                    int clusterRoundTrip = response.getClusterRoundtrip();
+                    m_rateLimiter.transactionResponseReceived(now, clusterRoundTrip);
+                    updateStats(stuff.name, delta, clusterRoundTrip, abort, error);
                 }
             }
 
@@ -424,6 +343,7 @@ class Distributer {
                     } catch (Exception e) {
                         uncaughtException(callBk.callback, r, e);
                     }
+                    m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
                     m_callbacksToInvoke.decrementAndGet();
                 }
             }
@@ -456,33 +376,6 @@ class Distributer {
         @Override
         public QueueMonitor writestreamMonitor() {
             return this;
-        }
-
-        /**
-         * Get counters for invocations completed, aborted, errors. In that order.
-         */
-        public synchronized long[] getCounters() {
-            return new long[] { m_invocationsCompleted, m_invocationAborts, m_invocationErrors };
-        }
-
-        /**
-         * Get counters for invocations completed, aborted, errors. In that order.
-         * Count returns count since this method was last invoked
-         */
-        public synchronized long[] getCountersInterval() {
-            final long invocationsCompletedThisTime = m_invocationsCompleted - m_lastInvocationsCompleted;
-            m_lastInvocationsCompleted = m_invocationsCompleted;
-
-            final long invocationsAbortsThisTime = m_invocationAborts - m_lastInvocationAborts;
-            m_lastInvocationAborts = m_invocationAborts;
-
-            final long invocationErrorsThisTime = m_invocationErrors - m_lastInvocationErrors;
-            m_lastInvocationErrors = m_invocationErrors;
-            return new long[] {
-                    invocationsCompletedThisTime,
-                    invocationsAbortsThisTime,
-                    invocationErrorsThisTime
-            };
         }
 
         private int m_queuedBytes = 0;
@@ -520,65 +413,25 @@ class Distributer {
     }
 
     Distributer() {
-        this( false, null,
+        this( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS);
     }
 
     Distributer(
             boolean useMultipleThreads,
-            StatsUploaderSettings statsSettings,
             long procedureCallTimeoutMS,
             long connectionResponseTimeoutMS) {
-        if (statsSettings != null) {
-            m_statsLoader = new ClientStatsLoader(statsSettings, this);
-        } else {
-            m_statsLoader = null;
-        }
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
                 m_useMultipleThreads ? Runtime.getRuntime().availableProcessors() / 2 : 1,
                         null);
         m_network.start();
-        m_hostname = CoreUtils.getHostnameOrAddress();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
 
         // schedule the task that looks for timed-out proc calls and connections
         m_timeoutReaperHandle = m_ex.scheduleAtFixedRate(new CallExpiration(), 1, 1, TimeUnit.SECONDS);
-
-        //        new Thread() {
-        //            @Override
-        //            public void run() {
-        //                long lastBytesRead = 0;
-        //                long lastBytesWritten = 0;
-        //                long lastRuntime = System.currentTimeMillis();
-        //                try {
-        //                    while (true) {
-        //                        Thread.sleep(10000);
-        //                        final long now = System.currentTimeMillis();
-        //                        Map<Long, Pair<String, long[]>> stats = m_network.getIOStats(false);
-        //                        long statsNums[] = stats.get(-1).getSecond();
-        //                        final long read = statsNums[0];
-        //                        final long written = statsNums[1];
-        //                        final long readDelta = read - lastBytesRead;
-        //                        final long writeDelta = written - lastBytesWritten;
-        //                        final long timeDelta = now - lastRuntime;
-        //                        lastRuntime = now;
-        //                        final double seconds = timeDelta / 1000.0;
-        //                        final double megabytesRead = readDelta / (double)(1024 * 1024);
-        //                        final double megabytesWritten = writeDelta / (double)(1024 * 1024);
-        //                        final double readRate = megabytesRead / seconds;
-        //                        final double writeRate = megabytesWritten / seconds;
-        //                        lastBytesRead = read;
-        //                        lastBytesWritten = written;
-        //                        System.err.printf("Read rate %.2f Write rate %.2f\n", readRate, writeRate);
-        //                    }
-        //                } catch (Exception e) {
-        //                    e.printStackTrace();
-        //                }
-        //            }
-        //        }.start();
     }
 
     void createConnection(String host, String program, String password, int port)
@@ -600,13 +453,6 @@ class Distributer {
             long timestamp = instanceIdWhichIsTimestampAndLeaderIp[2];
             int addr = (int)instanceIdWhichIsTimestampAndLeaderIp[3];
             m_clusterInstanceId = new Object[] { timestamp, addr };
-            if (m_statsLoader != null) {
-                try {
-                    m_statsLoader.start( timestamp, addr);
-                } catch (SQLException e) {
-                    throw new IOException(e);
-                }
-            }
         } else {
             if (!(((Long)m_clusterInstanceId[0]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[2]) ||
                     !(((Integer)m_clusterInstanceId[1]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[3])) {
@@ -685,19 +531,7 @@ class Distributer {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb);
-            //            final String invocationName = invocation.getProcName();
-            //            if (reportedSizes.containsKey(invocationName)) {
-            //                if (reportedSizes.get(invocationName) < c.b.remaining()) {
-            //                    System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining() + " which is greater then last value of " + reportedSizes.get(invocationName));
-            //                    reportedSizes.put(invocationName, (long)c.b.remaining());
-            //                }
-            //            } else {
-            //                reportedSizes.put(invocationName, (long)c.b.remaining());
-            //                System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining());
-            //            }
-
-
+            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure);
         }
 
         return !backpressure;
@@ -714,9 +548,6 @@ class Distributer {
         m_ex.shutdown();
         m_ex.awaitTermination(1, TimeUnit.SECONDS);
 
-        if (m_statsLoader != null) {
-            m_statsLoader.stop();
-        }
         m_network.shutdown();
     }
 
@@ -748,266 +579,50 @@ class Distributer {
         return m_listeners.remove(listener);
     }
 
-    private final ColumnInfo connectionStatsColumns[] = new ColumnInfo[] {
-            new ColumnInfo( "TIMESTAMP", VoltType.BIGINT),
-            new ColumnInfo( "HOSTNAME", VoltType.STRING),
-            new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
-            new ColumnInfo( "SERVER_HOST_ID", VoltType.BIGINT),
-            new ColumnInfo( "SERVER_HOSTNAME", VoltType.STRING),
-            new ColumnInfo( "SERVER_CONNECTION_ID", VoltType.BIGINT),
-            new ColumnInfo( "INVOCATIONS_COMPLETED", VoltType.BIGINT),
-            new ColumnInfo( "INVOCATIONS_ABORTED", VoltType.BIGINT),
-            new ColumnInfo( "INVOCATIONS_FAILED", VoltType.BIGINT),
-            new ColumnInfo( "BYTES_READ", VoltType.BIGINT),
-            new ColumnInfo( "MESSAGES_READ", VoltType.BIGINT),
-            new ColumnInfo( "BYTES_WRITTEN", VoltType.BIGINT),
-            new ColumnInfo( "MESSAGES_WRITTEN", VoltType.BIGINT)
-    };
-
-    private final ColumnInfo procedureStatsColumns[] = new ColumnInfo[] {
-            new ColumnInfo( "TIMESTAMP", VoltType.BIGINT),
-            new ColumnInfo( "HOSTNAME", VoltType.STRING),
-            new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
-            new ColumnInfo( "SERVER_HOST_ID", VoltType.BIGINT),
-            new ColumnInfo( "SERVER_HOSTNAME", VoltType.STRING),
-            new ColumnInfo( "SERVER_CONNECTION_ID", VoltType.BIGINT),
-            new ColumnInfo( "PROCEDURE_NAME", VoltType.STRING),
-            new ColumnInfo( "ROUNDTRIPTIME_AVG", VoltType.INTEGER),
-            new ColumnInfo( "ROUNDTRIPTIME_MIN", VoltType.INTEGER),
-            new ColumnInfo( "ROUNDTRIPTIME_MAX", VoltType.INTEGER),
-            new ColumnInfo( "CLUSTER_ROUNDTRIPTIME_AVG", VoltType.INTEGER),
-            new ColumnInfo( "CLUSTER_ROUNDTRIPTIME_MIN", VoltType.INTEGER),
-            new ColumnInfo( "CLUSTER_ROUNDTRIPTIME_MAX", VoltType.INTEGER),
-            new ColumnInfo( "INVOCATIONS_COMPLETED", VoltType.BIGINT),
-            new ColumnInfo( "INVOCATIONS_ABORTED", VoltType.BIGINT),
-            new ColumnInfo( "INVOCATIONS_FAILED", VoltType.BIGINT),
-    };
-
-    private final ColumnInfo[] getRTTStatsColumns() {
-        ColumnInfo[] ci = new ColumnInfo[ProcedureStats.m_numberOfBuckets + 7];
-        ci[0] = new ColumnInfo( "TIMESTAMP", VoltType.BIGINT);
-        ci[1] = new ColumnInfo( "HOSTNAME", VoltType.STRING);
-        ci[2] = new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT);
-        ci[3] = new ColumnInfo( "SERVER_HOST_ID", VoltType.BIGINT);
-        ci[4] = new ColumnInfo( "SERVER_HOSTNAME", VoltType.STRING);
-        ci[5] = new ColumnInfo( "SERVER_CONNECTION_ID", VoltType.BIGINT);
-        ci[6] = new ColumnInfo( "PROCEDURE_NAME", VoltType.STRING);
-        for (int i=0; i < ProcedureStats.m_numberOfBuckets; i++) {
-            String colName = (Integer.valueOf((i+1)*10)).toString() + "MS";
-            ci[i+7] = new ColumnInfo(colName, VoltType.INTEGER);
-        }
-        return ci;
+    ClientStatsContext createStatsContext() {
+        return new ClientStatsContext(this, getStatsSnapshot(), getIOStatsSnapshot());
     }
 
-    /** Query for latency buckets for client round trip time */
-    VoltTable getClientRTTLatencies(final boolean interval) {
-        return getRTTLatencies(true, interval);
-    }
+    Map<Long, Map<String, ClientStats>> getStatsSnapshot() {
+        Map<Long, Map<String, ClientStats>> retval =
+                new TreeMap<Long, Map<String, ClientStats>>();
 
-    /** Query for latency buckets for internal cluster round trip time */
-    VoltTable getClusterRTTLatencies(final boolean interval) {
-        return getRTTLatencies(false, interval);
-    }
-
-    /**
-     * Query for latency bucket values by procedure by connection.
-     * @param clientRTT true if client rtt desired. false if cluster rtt desired
-     * @param interval Must be false. Interval not yet supported
-     * @return
-     */
-    private VoltTable getRTTLatencies(final boolean clientRTT, final boolean interval) {
-        if (interval == true) {
-            throw new RuntimeException("Interval stats not implemented");
-        }
-
-        final Long now = System.currentTimeMillis();
-        final VoltTable retval = new VoltTable(getRTTStatsColumns());
-
-        synchronized(m_connections) {
-            for (NodeConnection cxn : m_connections) {
-                synchronized(cxn) {
-                    for (ProcedureStats stats : cxn.m_stats.values()) {
-                        long buckets[] =
-                            clientRTT ? stats.m_roundTripTimeBuckets :
-                                stats.m_clusterRoundTripTimeBuckets;
-                        Object row[] = new Object[ProcedureStats.m_numberOfBuckets + 7];
-                        row[0] = now;
-                        row[1] = m_hostname;
-                        row[2] = cxn.connectionId();
-                        row[3] = cxn.m_hostId;
-                        row[4] = cxn.m_hostname;
-                        row[5] = cxn.m_connectionId;
-                        row[6] = stats.m_name;
-                        for (int i=0; i < ProcedureStats.m_numberOfBuckets; i++) {
-                            row[i + 7] = buckets[i];
-                        }
-                        retval.addRow(row);
-                    }
+        synchronized (this) {
+            for (NodeConnection conn : m_connections) {
+                Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
+                for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
+                    connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
                 }
+                retval.put(conn.connectionId(), connMap);
             }
         }
+
         return retval;
     }
 
-    VoltTable getProcedureStats(final boolean interval) {
-        final Long now = System.currentTimeMillis();
-        final VoltTable retval = new VoltTable(procedureStatsColumns);
+    Map<Long, ClientIOStats> getIOStatsSnapshot() {
+        Map<Long, ClientIOStats> retval = new TreeMap<Long, ClientIOStats>();
 
-        long totalInvocations = 0;
-        long totalAbortedInvocations = 0;
-        long totalFailedInvocations = 0;
-        long totalRoundTripTime = 0;
-        int totalRoundTripMax = Integer.MIN_VALUE;
-        int totalRoundTripMin = Integer.MAX_VALUE;
-        long totalClusterRoundTripTime = 0;
-        int totalClusterRoundTripMax = Integer.MIN_VALUE;
-        int totalClusterRoundTripMin = Integer.MAX_VALUE;
-        synchronized (m_connections) {
-            for (NodeConnection cxn : m_connections) {
-                synchronized (cxn) {
-                    for (ProcedureStats stats : cxn.m_stats.values()) {
-                        long invocationsCompleted = stats.m_invocationsCompleted;
-                        long invocationAborts = stats.m_invocationAborts;
-                        long invocationErrors = stats.m_invocationErrors;
-                        long roundTripTime = stats.m_roundTripTime;
-                        int maxRoundTripTime = stats.m_maxRoundTripTime;
-                        int minRoundTripTime = stats.m_minRoundTripTime;
-                        long clusterRoundTripTime = stats.m_clusterRoundTripTime;
-                        int clusterMinRoundTripTime = stats.m_minClusterRoundTripTime;
-                        int clusterMaxRoundTripTime = stats.m_maxClusterRoundTripTime;
-
-                        if (interval) {
-                            invocationsCompleted = stats.m_invocationsCompleted - stats.m_lastInvocationsCompleted;
-                            if (invocationsCompleted == 0) {
-                                //No invocations since last interval
-                                continue;
-                            }
-                            stats.m_lastInvocationsCompleted = stats.m_invocationsCompleted;
-
-                            invocationAborts = stats.m_invocationAborts - stats.m_lastInvocationAborts;
-                            stats.m_lastInvocationAborts = stats.m_invocationAborts;
-
-                            invocationErrors = stats.m_invocationErrors - stats.m_lastInvocationErrors;
-                            stats.m_lastInvocationErrors = stats.m_invocationErrors;
-
-                            roundTripTime = stats.m_roundTripTime - stats.m_lastRoundTripTime;
-                            stats.m_lastRoundTripTime = stats.m_roundTripTime;
-
-                            maxRoundTripTime = stats.m_lastMaxRoundTripTime;
-                            minRoundTripTime = stats.m_lastMinRoundTripTime;
-
-                            stats.m_lastMaxRoundTripTime = Integer.MIN_VALUE;
-                            stats.m_lastMinRoundTripTime = Integer.MAX_VALUE;
-
-                            clusterRoundTripTime = stats.m_clusterRoundTripTime - stats.m_lastClusterRoundTripTime;
-                            stats.m_lastClusterRoundTripTime = stats.m_clusterRoundTripTime;
-
-                            clusterMaxRoundTripTime = stats.m_lastMaxClusterRoundTripTime;
-                            clusterMinRoundTripTime = stats.m_lastMinClusterRoundTripTime;
-
-                            stats.m_lastMaxClusterRoundTripTime = Integer.MIN_VALUE;
-                            stats.m_lastMinClusterRoundTripTime = Integer.MAX_VALUE;
-                        }
-                        totalInvocations += invocationsCompleted;
-                        totalAbortedInvocations += invocationAborts;
-                        totalFailedInvocations += invocationErrors;
-                        totalRoundTripTime += roundTripTime;
-                        totalRoundTripMax = Math.max(maxRoundTripTime, totalRoundTripMax);
-                        totalRoundTripMin = Math.min(minRoundTripTime, totalRoundTripMin);
-                        totalClusterRoundTripTime += clusterRoundTripTime;
-                        totalClusterRoundTripMax = Math.max(clusterMaxRoundTripTime, totalClusterRoundTripMax);
-                        totalClusterRoundTripMin = Math.min(clusterMinRoundTripTime, totalClusterRoundTripMin);
-                        retval.addRow(
-                                now,
-                                m_hostname,
-                                cxn.connectionId(),
-                                cxn.m_hostId,
-                                cxn.m_hostname,
-                                cxn.m_connectionId,
-                                stats.m_name,
-                                (int)(roundTripTime / invocationsCompleted),
-                                minRoundTripTime,
-                                maxRoundTripTime,
-                                (int)(clusterRoundTripTime / invocationsCompleted),
-                                clusterMinRoundTripTime,
-                                clusterMaxRoundTripTime,
-                                invocationsCompleted,
-                                invocationAborts,
-                                invocationErrors
-                        );
-                    }
-                }
+        synchronized (this) {
+            Map<Long, Pair<String, long[]>> ioStats;
+            try {
+                ioStats = m_network.getIOStats(false);
+            } catch (Exception e) {
+                return null;
             }
-        }
-        return retval;
-    }
 
-    VoltTable getConnectionStats(final boolean interval) throws InterruptedException, ExecutionException {
-        final Long now = System.currentTimeMillis();
-        final VoltTable retval = new VoltTable(connectionStatsColumns);
-        final Map<Long, Pair<String,long[]>> networkStats =
-            m_network.getIOStats(interval);
-        long totalInvocations = 0;
-        long totalAbortedInvocations = 0;
-        long totalFailedInvocations = 0;
-        synchronized (m_connections) {
-            for (NodeConnection cxn : m_connections) {
-                synchronized (cxn) {
-                    long counters[];
-                    if (interval) {
-                        counters = cxn.getCountersInterval();
-                    } else {
-                        counters = cxn.getCounters();
-                    }
-                    totalInvocations += counters[0];
-                    totalAbortedInvocations += counters[1];
-                    totalFailedInvocations += counters[2];
-                    final long networkCounters[] = networkStats.get(cxn.connectionId()).getSecond();
-                    final String hostname = networkStats.get(cxn.connectionId()).getFirst();
-                    long bytesRead = 0;
-                    long messagesRead = 0;
-                    long bytesWritten = 0;
-                    long messagesWritten = 0;
-                    if (networkCounters != null) {
-                        bytesRead = networkCounters[0];
-                        messagesRead = networkCounters[1];
-                        bytesWritten = networkCounters[2];
-                        messagesWritten = networkCounters[3];
-                    }
+            for (NodeConnection conn : m_connections) {
+                Pair<String, long[]> perConnIOStats = ioStats.get(conn.connectionId());
+                if (perConnIOStats == null) continue;
 
-                    retval.addRow(
-                            now,
-                            m_hostname,
-                            cxn.connectionId(),
-                            cxn.m_hostId,
-                            hostname,
-                            cxn.m_connectionId,
-                            counters[0],
-                            counters[1],
-                            counters[2],
-                            bytesRead,
-                            messagesRead,
-                            bytesWritten,
-                            messagesWritten);
-                }
+                long read = perConnIOStats.getSecond()[0];
+                long write = perConnIOStats.getSecond()[2];
+
+                ClientIOStats cios = new ClientIOStats(conn.connectionId(), read, write);
+                retval.put(conn.connectionId(), cios);
             }
         }
 
-        final long globalIOStats[] = networkStats.get(-1L).getSecond();
-        retval.addRow(
-                now,
-                m_hostname,
-                -1,
-                -1,
-                "GLOBAL",
-                -1,
-                totalInvocations,
-                totalAbortedInvocations,
-                totalFailedInvocations,
-                globalIOStats[0],
-                globalIOStats[1],
-                globalIOStats[2],
-                globalIOStats[3]);
         return retval;
     }
 

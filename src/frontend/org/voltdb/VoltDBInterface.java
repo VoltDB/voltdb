@@ -40,11 +40,6 @@ public interface VoltDBInterface
      */
     public void recoveryComplete();
 
-    /**
-     * Whether calls to crashVoltDB should result in a crash or be ignored
-     */
-    public boolean ignoreCrash();
-
     public void readBuildInfo(String editionTag);
 
     public CommandLog getCommandLog();

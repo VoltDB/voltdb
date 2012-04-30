@@ -120,7 +120,6 @@ public class Iv2ExecutionSite implements Runnable
             if (target == BackendTarget.NATIVE_EE_JNI) {
                 eeTemp =
                     new ExecutionEngineJNI(
-                        null,
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
                         m_tracker.getPartitionForSite(m_siteId),
@@ -138,7 +137,6 @@ public class Iv2ExecutionSite implements Runnable
                 // set up the EE over IPC
                 eeTemp =
                     new ExecutionEngineIPC(
-                            null,
                             m_context.cluster.getRelativeIndex(),
                             m_siteId,
                             m_tracker.getPartitionForSite(m_siteId),

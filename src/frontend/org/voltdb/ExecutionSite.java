@@ -29,7 +29,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,12 +51,10 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -113,12 +110,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
         new ExecutionSiteNodeFailureFaultHandler();
 
-    final HashMap<String, ProcedureRunner> procs = new HashMap<String, ProcedureRunner>(16, (float) .1);
+    final LoadedProcedureSet m_loadedProcedures;
     final Mailbox m_mailbox;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
-    final ProcedureRunnerFactory m_runnerFactory;
 
     private final long m_startupTime = System.currentTimeMillis();
     private PartitionDRGateway m_partitionDRGateway = null;
@@ -624,7 +620,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         @Override
         public ExecutionSite getExecutionSite()               { return ExecutionSite.this; }
         @Override
-        public HashMap<String, ProcedureRunner> getProcedures() { return procs; }
+        public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
         public long getSiteId()                               { return m_siteId; }
         @Override
@@ -647,13 +643,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         m_systemProcedureContext = new SystemProcedureContext();
         ee = null;
         hsql = null;
+        m_loadedProcedures = new LoadedProcedureSet(this, null, m_siteId, siteIndex, 2);
         m_snapshotter = null;
         m_mailbox = null;
         m_transactionQueue = null;
         m_starvationTracker = null;
         m_tableStats = null;
         m_indexStats = null;
-        m_runnerFactory = null;
 
         // initialize the DR gateway
         m_partitionDRGateway = new PartitionDRGateway();
@@ -690,7 +686,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         final int partitionId = m_tracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
-        m_runnerFactory = runnerFactory;
         m_recovering = recovering;
         //lastCommittedTxnId = txnId;
 
@@ -728,7 +723,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         m_transactionQueue =
             (transactionQueue != null) ? transactionQueue : initializeTransactionQueue(m_siteId);
 
-        loadProcedures(voltdb.getBackendTargetType());
+        // setup the procedure runner wrappers.
+        if (runnerFactory != null) {
+            runnerFactory.configure(this, hsql);
+        }
+        m_registeredSysProcPlanFragments.clear();
+        m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
+        m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType());
 
         int snapshotPriority = 6;
         if (m_context.cluster.getDeployment().get("deployment") != null) {
@@ -816,7 +817,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             if (target == BackendTarget.NATIVE_EE_JNI) {
                 eeTemp =
                     new ExecutionEngineJNI(
-                        this,
                         m_context.cluster.getRelativeIndex(),
                         getSiteId(),
                         m_tracker.getPartitionForSite(getSiteId()),
@@ -833,7 +833,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 // set up the EE over IPC
                 eeTemp =
                     new ExecutionEngineIPC(
-                            this,
                             m_context.cluster.getRelativeIndex(),
                             getSiteId(),
                             m_tracker.getPartitionForSite(getSiteId()),
@@ -864,7 +863,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
         m_context = context;
-        loadProcedures(VoltDB.getEEBackendType());
+        m_registeredSysProcPlanFragments.clear();
+        m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType());
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
@@ -873,110 +873,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         return true;
     }
-
-    void loadProcedures(BackendTarget backendTarget) {
-        procs.clear();
-        m_registeredSysProcPlanFragments.clear();
-        loadProceduresFromCatalog(backendTarget);
-        loadSystemProcedures(backendTarget);
-    }
-
-    private void loadProceduresFromCatalog(BackendTarget backendTarget) {
-        // load up all the stored procedures
-        final CatalogMap<Procedure> catalogProcedures = m_context.database.getProcedures();
-        for (final Procedure proc : catalogProcedures) {
-
-            // Sysprocs used to be in the catalog. Now they aren't. Ignore
-            // sysprocs found in old catalog versions. (PRO-365)
-            if (proc.getTypeName().startsWith("@")) {
-                continue;
-            }
-
-            ProcedureRunner runner = null;
-            VoltProcedure procedure = null;
-            if (proc.getHasjava()) {
-                final String className = proc.getClassname();
-                Class<?> procClass = null;
-                try {
-                    procClass = m_context.classForProcedure(className);
-                }
-                catch (final ClassNotFoundException e) {
-                    if (className.startsWith("org.voltdb.")) {
-                        VoltDB.crashLocalVoltDB("VoltDB does not support procedures with package names " +
-                                                        "that are prefixed with \"org.voltdb\". Please use a different " +
-                                                        "package name and retry.", false, null);
-                    }
-                    else {
-                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure it expected to be in the " +
-                                                "catalog jarfile and will now exit.", false, null);
-                    }
-                }
-                try {
-                    procedure = (VoltProcedure) procClass.newInstance();
-                }
-                catch (final InstantiationException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { getSiteId(), siteIndex }, e);
-                }
-                catch (final IllegalAccessException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { getSiteId(), siteIndex }, e);
-                }
-            }
-            else {
-                procedure = new ProcedureRunner.StmtProcedure();
-            }
-
-            assert(procedure != null);
-            runner = m_runnerFactory.create(procedure, this, proc, hsql);
-            procs.put(proc.getTypeName(), runner);
-        }
-    }
-
-    private void loadSystemProcedures(BackendTarget backendTarget) {
-        Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
-        for (Entry<String, Config> entry : entrySet) {
-            Config sysProc = entry.getValue();
-            Procedure proc = sysProc.asCatalogProcedure();
-
-            VoltSystemProcedure procedure = null;
-            ProcedureRunner runner = null;
-
-            final String className = sysProc.getClassname();
-            Class<?> procClass = null;
-            try {
-                procClass = m_context.classForProcedure(className);
-            }
-            catch (final ClassNotFoundException e) {
-                if (sysProc.commercial) {
-                    continue;
-                }
-                hostLog.l7dlog(
-                        Level.WARN,
-                        LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { getSiteId(), siteIndex },
-                        e);
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
-
-            try {
-                procedure = (VoltSystemProcedure) procClass.newInstance();
-            }
-            catch (final InstantiationException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { getSiteId(), siteIndex }, e);
-            }
-            catch (final IllegalAccessException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { getSiteId(), siteIndex }, e);
-            }
-
-            runner = m_runnerFactory.create(procedure, this, proc, hsql);
-            procedure.initSysProc(m_tracker.m_numberOfPartitions, this, proc, m_context.cluster);
-            procs.put(entry.getKey(), runner);
-        }
-    }
-
 
     /**
      * Primary run method that is invoked a single time when the thread is started.
@@ -1707,6 +1603,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             long globalMultiPartCommitPoint,
             HashMap<Long, Long> initiatorSafeInitiationPoint)
     {
+        HashSet<Long> failedInitiators = new HashSet<Long>();
         HashSet<Integer> failedHosts = new HashSet<Integer>();
         for (Long siteId : failedSites) {
             failedHosts.add(SiteTracker.getHostForSite(siteId));
@@ -1752,6 +1649,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         // Not all of these are initiators, but it is safe...
         for (Long i : failedSites)
         {
+            failedInitiators.add(i);
             m_transactionQueue.gotFaultForInitiator(i);
         }
 
@@ -1847,7 +1745,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         try {
             //Log it and acquire the completion permit from the semaphore
-            VoltDB.instance().getCommandLog().logFault( failedSites, faultedTxns).acquire();
+            VoltDB.instance().getCommandLog().logFault(failedInitiators, faultedTxns).acquire();
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while attempting to log a fault", true, e);
         }
@@ -2227,7 +2125,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             final VoltMessage task)
     {
         final InitiateTaskMessage itask = (InitiateTaskMessage)task;
-        final ProcedureRunner runner = procs.get(itask.getStoredProcedureName());
+        final ProcedureRunner runner = m_loadedProcedures.procs.get(itask.getStoredProcedureName());
 
         final InitiateResponseMessage response = new InitiateResponseMessage(itask);
 

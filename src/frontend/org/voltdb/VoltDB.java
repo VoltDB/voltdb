@@ -301,7 +301,11 @@ public class VoltDB {
                     usage();
                     System.exit(-1);
                 }
-
+            }
+            // ENG-2815 If deployment is null (the user wants the default) and
+            // leader is null, supply the only valid leader value ("localhost").
+            if (m_leader == null && m_pathToDeployment == null) {
+                m_leader = "localhost";
             }
         }
 
@@ -313,6 +317,13 @@ public class VoltDB {
          */
         public boolean validate() {
             boolean isValid = true;
+
+            if (m_startAction != START_ACTION.START &&
+                m_rejoinToHostAndPort != null &&
+                m_pathToCatalog == null) {
+                isValid = false;
+                hostLog.fatal("The catalog location is missing.");
+            }
 
             if (m_leader == null && m_rejoinToHostAndPort == null) {
                 isValid = false;
@@ -329,10 +340,8 @@ public class VoltDB {
 
             // require deployment file location
             if (m_rejoinToHostAndPort == null) {
-                if (m_pathToDeployment == null) {
-                    isValid = false;
-                    hostLog.fatal("The deployment file location is missing.");
-                } else if (m_pathToDeployment.equals("")) {
+                // require deployment file location (null is allowed to receive default deployment)
+                if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
                     hostLog.fatal("The deployment file location is empty.");
                 }
@@ -358,10 +367,11 @@ public class VoltDB {
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                hostLog.fatal("Usage: org.voltdb.VoltDB [create|recover|replica] leader <hostname> deployment <deployment.xml> license <license.xml> catalog <catalog.jar>");
+                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover|replica) [leader <hostname> [deployment <deployment.xml>]] license <license.xml> catalog <catalog.jar>");
             } else {
-                hostLog.fatal("Usage: org.voltdb.VoltDB [create|recover] leader <hostname> deployment <deployment.xml> catalog <catalog.jar>");
+                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover) [leader <hostname> [deployment <deployment.xml>]] catalog <catalog.jar>");
             }
+            hostLog.fatal("Defaults will be used if no deployment is specified.");
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 
@@ -416,6 +426,7 @@ public class VoltDB {
             assert(testObj.canWrite());
             return testObj.getAbsolutePath() + File.separator + jarname;
         }
+
     }
 
     /* helper functions to access current configuration values */
@@ -431,7 +442,9 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
-        if (instance().ignoreCrash()) {
+        wasCrashCalled = true;
+        crashMessage = errMsg;
+        if (ignoreCrash) {
             return;
         }
 
@@ -508,12 +521,24 @@ public class VoltDB {
         System.exit(-1);
     }
 
+    /*
+     * For tests that causes failures,
+     * allow them stop the crash and inspect.
+     */
+    public static boolean ignoreCrash = false;
+
+    public static boolean wasCrashCalled = false;
+
+    public static String crashMessage;
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
-        if (instance().ignoreCrash()) {
+        wasCrashCalled = true;
+        crashMessage = errMsg;
+        if (ignoreCrash) {
             return;
         }
         try {

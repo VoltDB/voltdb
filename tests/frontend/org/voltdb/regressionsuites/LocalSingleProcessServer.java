@@ -73,6 +73,12 @@ public class LocalSingleProcessServer implements VoltServerConfig {
             }
         }
     }
+
+    @Override
+    public void setCallingMethodName(String name) {
+        // do nothing yet
+    }
+
     @Override
     public boolean compile(VoltProjectBuilder builder) {
         if (m_compiled == true) {
