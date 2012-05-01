@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -43,24 +44,24 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
+import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.network.Connection;
-import org.voltdb.network.NIOReadStream;
-import org.voltdb.network.WriteStream;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.EstTime;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.Pair;
 
 /**
  * An agent responsible for the whole restore process when the cluster starts
@@ -89,11 +90,14 @@ SnapshotCompletionInterest {
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
 
-    // ZK stuff
-    final static String RESTORE = "/restore";
-    final static String RESTORE_BARRIER = "/restore_barrier";
-    private final static String SNAPSHOT_ID = "/restore/snapshot_id";
-    private final String zkBarrierNode;
+    // ZK stuff (while converting bare strings to VoltZK, map these
+    // to the previously used symbols.)
+    private final static String RESTORE = VoltZK.restore;
+    private final static String RESTORE_BARRIER = VoltZK.restore_barrier;
+    private final static String RESTORE_BARRIER2 = VoltZK.restore_barrier + "2";
+    private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
+
+    private String m_generatedRestoreBarrier2;
 
     // Transaction ID of the restore sysproc
     private final static long RESTORE_TXNID = 1l;
@@ -102,13 +106,19 @@ SnapshotCompletionInterest {
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final START_ACTION m_action;
-    private final int m_partitionCount;
     private final Set<Integer> m_liveHosts;
     private final boolean m_clEnabled;
     private final String m_clPath;
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
-    private final int m_lowestHostId;
+    private boolean m_planned = false;
+
+    /*
+     * Don't ask the leader elector if you are the leader
+     * it can give the wrong answer after the first election...
+     * Use the memoized field m_isLeader.
+     */
+    private LeaderElector m_leaderElector = null;
 
     private TransactionInitiator m_initiator;
 
@@ -118,6 +128,7 @@ SnapshotCompletionInterest {
     private long m_truncationSnapshot = Long.MIN_VALUE;
 
     private final ZooKeeper m_zk;
+    private boolean m_isLeader = false;
 
     private final int[] m_allPartitions;
 
@@ -175,6 +186,8 @@ SnapshotCompletionInterest {
         public void setCatalogContext(CatalogContext context) {}
         @Override
         public void setInitiator(TransactionInitiator initiator) {}
+        @Override
+        public void setSiteTracker(SiteTracker siteTracker) {}
     };
 
     /*
@@ -191,46 +204,69 @@ SnapshotCompletionInterest {
                 } catch (InterruptedException e) {}
             }
         }
-    });
+    }, "Restore heartbeat thread");
 
     private final Runnable m_restorePlanner = new Runnable() {
         @Override
         public void run() {
-            boolean planned = false;
-            try {
-                planned = m_zk.exists(zkBarrierNode, false) != null;
-            } catch (Exception e) {}
-
-            /*
-             * In case the plans aren't generated yet, generate them now.
-             */
-            if (!planned) {
+            if (!m_planned) {
                 findRestoreCatalog();
+//                VoltDB.crashLocalVoltDB("Restore planner should not be started " +
+//                        " without findRestoreCatalog already invoked",
+//                        false, null);
             }
 
-            /*
-             * If this has the lowest host ID, initiate the snapshot restore
-             */
-            if (isLowestHost()) {
-                long txnId = 0;
-                if (m_snapshotToRestore != null) {
-                    txnId = m_snapshotToRestore.txnId;
-                }
-                sendSnapshotTxnId(txnId);
+            boolean leader = false;
 
-                if (m_snapshotToRestore != null) {
-                    LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
-                              " in " + m_snapshotToRestore.path);
-                    Object[] params = new Object[] {m_snapshotToRestore.path,
-                                                    m_snapshotToRestore.nonce};
-                    initSnapshotWork(RESTORE_TXNID,
-                                     Pair.of("@SnapshotRestore", params));
+            try {
+                // Wait until either we're the leader or the snapshot TXNID node
+                // exists, then do the right thing.
+                while (!m_isLeader &&
+                        (m_zk.exists(SNAPSHOT_ID, null) == null))
+                {
+                    Thread.sleep(200);
                 }
+
+                /*
+                 * If this is the leader, initiate the snapshot restore
+                 */
+                if (m_zk.exists(SNAPSHOT_ID, null) == null)
+                {
+                    if (m_isLeader)
+                    {
+                        leader = true;
+                        long txnId = 0;
+                        if (m_snapshotToRestore != null) {
+                            txnId = m_snapshotToRestore.txnId;
+                        }
+                        sendSnapshotTxnId(txnId);
+
+                        if (m_snapshotToRestore != null) {
+                            LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
+                                      " in " + m_snapshotToRestore.path);
+                            Object[] params = new Object[] {m_snapshotToRestore.path,
+                                                            m_snapshotToRestore.nonce};
+                            initSnapshotWork(RESTORE_TXNID,
+                                             Pair.of("@SnapshotRestore", params));
+                        }
+                    }
+                    else
+                    {
+                        throw new RuntimeException("The unpossible has happened");
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                VoltDB.crashGlobalVoltDB("Failed to safely enter recovery: " + e.getMessage(),
+                                         false, e);
             }
 
             m_restoreHeartbeatThread.start();
 
-            if (!isLowestHost() || m_snapshotToRestore == null) {
+            // Use our remembered leader state since the actual leader could have
+            // finished and abdicated before we get here.
+            if (!leader || m_snapshotToRestore == null) {
                 /*
                  * Hosts that are not initiating the restore should change
                  * state immediately
@@ -251,29 +287,37 @@ SnapshotCompletionInterest {
         }
 
         @Override
-        public boolean enqueue(BBContainer c) {
+        public void enqueue(DeferredSerialization ds) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public boolean enqueue(FastSerializable f) {
-            handleResponse((ClientResponse) f);
-            return true;
+        public void enqueue(ByteBuffer b) {
+            ClientResponseImpl resp = new ClientResponseImpl();
+            try
+            {
+                b.position(4);
+                resp.initFromBuffer(b);
+            }
+            catch (IOException ioe)
+            {
+                LOG.error("Unable to deserialize ClientResponse from snapshot",
+                          ioe);
+                return;
+            }
+            handleResponse(resp);
         }
 
         @Override
-        public boolean enqueue(FastSerializable f, int expectedSize) {
-            return enqueue(f);
-        }
-
-        @Override
-        public boolean enqueue(DeferredSerialization ds) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean enqueue(ByteBuffer b) {
-            throw new UnsupportedOperationException();
+        public void enqueue(ByteBuffer[] b) {
+            if (b.length == 1)
+            {
+                enqueue(b[0]);
+            }
+            else
+            {
+                throw new UnsupportedOperationException();
+            }
         }
 
         @Override
@@ -322,11 +366,8 @@ SnapshotCompletionInterest {
         }
 
         @Override
-        public void scheduleRunnable(Runnable r) {
-        }
-
-        @Override
-        public void unregister() {
+        public Future<?> unregister() {
+            return null;
         }
     }
 
@@ -396,10 +437,9 @@ SnapshotCompletionInterest {
     }
 
     public RestoreAgent(ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
-                        Callback callback, int hostId, START_ACTION action,
-                        int partitionCount, boolean clEnabled,
+                        Callback callback, int hostId, START_ACTION action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
-                        String snapshotPath, int lowestHostId, int[] allPartitions,
+                        String snapshotPath, int[] allPartitions,
                         Set<Integer> liveHosts)
     throws IOException {
         m_hostId = hostId;
@@ -408,16 +448,12 @@ SnapshotCompletionInterest {
         m_callback = callback;
         m_action = action;
         m_zk = zk;
-        m_partitionCount = partitionCount;
         m_clEnabled = VoltDB.instance().getConfig().m_isEnterprise ? clEnabled : false;
         m_clPath = clPath;
         m_clSnapshotPath = clSnapshotPath;
         m_snapshotPath = snapshotPath;
-        m_lowestHostId = lowestHostId;
         m_allPartitions = allPartitions;
         m_liveHosts = liveHosts;
-
-        zkBarrierNode = RESTORE_BARRIER + "/" + m_hostId;
 
         initialize();
     }
@@ -442,7 +478,7 @@ SnapshotCompletionInterest {
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_zk,
-                                                                    m_partitionCount,
+                                                                    m_allPartitions.length,
                                                                     m_clPath,
                                                                     m_allPartitions,
                                                                     m_liveHosts,
@@ -457,6 +493,11 @@ SnapshotCompletionInterest {
 
     public void setCatalogContext(CatalogContext context) {
         m_replayAgent.setCatalogContext(context);
+    }
+
+    public void setSiteTracker(SiteTracker siteTracker)
+    {
+        m_replayAgent.setSiteTracker(siteTracker);
     }
 
     public void setInitiator(TransactionInitiator initiator) {
@@ -475,6 +516,7 @@ SnapshotCompletionInterest {
     public Pair<Integer, String> findRestoreCatalog() {
         createZKDirectory(RESTORE);
         createZKDirectory(RESTORE_BARRIER);
+        createZKDirectory(RESTORE_BARRIER2);
 
         enterRestore();
 
@@ -500,8 +542,16 @@ SnapshotCompletionInterest {
      */
     void enterRestore() {
         try {
-            m_zk.create(zkBarrierNode, new byte[0],
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
+                                                new byte[0], null);
+            m_isLeader = m_leaderElector.isLeader();
+        } catch (Exception e) {
+            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
+                                     false, e);
+        }
+        try {
+            m_generatedRestoreBarrier2 = m_zk.create(RESTORE_BARRIER2 + "/counter", null,
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
                                      false, e);
@@ -514,14 +564,16 @@ SnapshotCompletionInterest {
      */
     private void exitRestore() {
         try {
-            m_zk.delete(zkBarrierNode, -1);
-        } catch (Exception ignore) {}
+            m_zk.delete(m_generatedRestoreBarrier2, -1);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to delete zk node " + m_generatedRestoreBarrier2, false, e);
+        }
 
         LOG.debug("Waiting for all hosts to complete restore");
         List<String> children = null;
         while (true) {
             try {
-                children = m_zk.getChildren(RESTORE_BARRIER, false);
+                children = m_zk.getChildren(RESTORE_BARRIER2, false);
             } catch (KeeperException e2) {
                 VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
             } catch (InterruptedException e2) {
@@ -536,6 +588,17 @@ SnapshotCompletionInterest {
                 break;
             }
         }
+
+        try {
+            m_leaderElector.done();
+        } catch (Exception ignore) {}
+
+        // Clean up the ZK snapshot ID node so that we're good for next time.
+        try
+        {
+            m_zk.delete(SNAPSHOT_ID, -1);
+        }
+        catch (Exception ignore) {}
     }
 
     /**
@@ -544,7 +607,7 @@ SnapshotCompletionInterest {
      * logs. This method won't block.
      */
     public void restore() {
-        new Thread(m_restorePlanner, "restore-planner").start();
+        new Thread(m_restorePlanner, "restore-planner-host-" + m_hostId).start();
     }
 
     /**
@@ -665,6 +728,7 @@ SnapshotCompletionInterest {
             m_replayAgent.generateReplayPlan();
         }
 
+        m_planned = true;
         return infoWithMinHostId;
     }
 
@@ -715,28 +779,20 @@ SnapshotCompletionInterest {
     }
 
     /**
-     * Wait for the specified host to send the txnId of the snapshot the cluster
-     * is restoring from.
+     * Get the txnId of the snapshot the cluster is restoring from from ZK.
+     * NOTE that the barrier for this is now completely contained
+     * in run() in the restorePlanner thread; nobody gets out of there until
+     * someone wins the leader election and successfully writes the SNAPSHOT_ID
+     * node, so we just need to read it here.
      */
-    private void waitForSnapshotTxnId() {
+    private void fetchSnapshotTxnId() {
         long txnId = 0;
-        while (true) {
-            LOG.debug("Waiting for the initiator to send the snapshot txnid");
-            try {
-                if (m_zk.exists(SNAPSHOT_ID, false) == null) {
-                    Thread.sleep(200);
-                    continue;
-                } else {
-                    byte[] data = m_zk.getData(SNAPSHOT_ID, false, null);
-                    txnId = ByteBuffer.wrap(data).getLong();
-                    break;
-                }
-            } catch (KeeperException e2) {
-                VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
-            } catch (InterruptedException e2) {
-                continue;
-            }
-        }
+        try {
+            byte[] data = m_zk.getData(SNAPSHOT_ID, false, null);
+            txnId = ByteBuffer.wrap(data).getLong();
+        } catch (KeeperException e2) {
+            VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
+        } catch (InterruptedException e2) {}
 
         // If the txnId is not 0, it means we restored a snapshot
         if (txnId != 0) {
@@ -1099,7 +1155,7 @@ SnapshotCompletionInterest {
      */
     private void changeState() {
         if (m_state == State.RESTORE) {
-            waitForSnapshotTxnId();
+            fetchSnapshotTxnId();
             exitRestore();
             m_state = State.REPLAY;
 
@@ -1148,15 +1204,15 @@ SnapshotCompletionInterest {
              * If this has the lowest host ID, initiate the snapshot that
              * will truncate the logs
              */
-            if (isLowestHost()) {
+            if (m_isLeader) {
                 try {
                     try {
-                        m_zk.create("/truncation_snapshot_path",
+                        m_zk.create(VoltZK.truncation_snapshot_path,
                                     m_clSnapshotPath.getBytes(),
                                     Ids.OPEN_ACL_UNSAFE,
                                     CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
-                    m_zk.create("/request_truncation_snapshot", null,
+                    m_zk.create(VoltZK.request_truncation_snapshot, null,
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                 } catch (Exception e) {
@@ -1165,15 +1221,6 @@ SnapshotCompletionInterest {
                                              false, e);
                 }
             }
-        }
-    }
-
-    private boolean isLowestHost() {
-        // If this is null, it must be running test
-        if (m_hostId != null) {
-            return m_hostId == m_lowestHostId;
-        } else {
-            return false;
         }
     }
 

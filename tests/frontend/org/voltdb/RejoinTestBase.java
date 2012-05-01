@@ -25,52 +25,31 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.URLEncoder;
-import java.util.Arrays;
-import java.util.HashSet;
 
 import junit.framework.TestCase;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.Mailbox;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.agreement.AgreementSite;
-import org.voltdb.agreement.ZKUtil;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.network.VoltNetwork;
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.rejoinfuzz.NonOrgVoltDBProc;
 
 public class RejoinTestBase extends TestCase {
-    protected static final String m_username;
-    protected static final String m_password;
     protected static final ClientConfig m_cconfig = new ClientConfigForTest("ry@nlikesthe", "y@nkees");
 
     static final Class<?>[] PROCEDURES = { NonOrgVoltDBProc.class };
-
-
-    static {
-        String username = null;
-        String password = null;
-        try {
-        username = URLEncoder.encode( "ry@nlikesthe", "UTF-8");
-        password = URLEncoder.encode( "y@nkees", "UTF-8");
-        } catch (Exception e) {}
-        m_username = username;
-        m_password = password;
-    }
 
     VoltProjectBuilder getBuilderForTest() throws UnsupportedEncodingException {
         String simpleSchema =
@@ -165,57 +144,39 @@ public class RejoinTestBase extends TestCase {
         config.m_isRejoinTest = true;
         retval.localServer = new ServerThread(config);
 
-        long deploymentCRC = CatalogUtil.getDeploymentCRC(builder.getPathToDeployment());
+        //long deploymentCRC = CatalogUtil.getDeploymentCRC(builder.getPathToDeployment());
 
         // start the fake HostMessenger
         InMemoryJarfile jarFile = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar"));
         retval.catalogCRC = jarFile.getCRC();
-        VoltNetwork network2 = new VoltNetwork();
-        InetAddress leader = InetAddress.getByName("localhost");
-        HostMessenger host2 = new HostMessenger(network2, leader, 2, 0, deploymentCRC, null);
-
+        HostMessenger.Config config2 = new HostMessenger.Config();
+        config2.internalPort++;
+        config2.zkInterface = "127.0.0.1:2182";
+        HostMessenger host2 = new HostMessenger(config2);
         retval.localServer.start();
-        host2.waitForGroupJoin();
-        // whomever is host zero has to send the catalog out,
-        //  so check and fufil this duty if needed
-        if (host2.getHostId() == 0)
-            host2.sendCatalog(jarFile.getFullJarBytes());
-        network2.start();
+        while (VoltDB.instance().getHostMessenger() != null) {
+            Thread.sleep(1);
+        }
+        Thread.sleep(200);
+        host2.start();
+        host2.waitForGroupJoin(2);
 
-        int myHostId = host2.getHostId() * 100;
-        host2.createLocalSite(myHostId);
-        //Need to create the initiator mailbox to receive heartbeats
-        Mailbox initiatorMailbox = host2.createMailbox(myHostId, VoltDB.DTXN_MAILBOX_ID, false);
-        Mailbox mailbox = host2.createMailbox(myHostId, VoltDB.AGREEMENT_MAILBOX_ID, false);
-        AgreementSite site = new AgreementSite(
-                myHostId,
-                new HashSet<Integer>(Arrays.asList(0, 100)),
-                myHostId == 0 ? 1 : 2,
-                new HashSet<Integer>(),
-                mailbox,
-                new InetSocketAddress(2182),
-                null,
-                false);
-        site.start();
+        MailboxPublisher publisher = new MailboxPublisher(VoltZK.mailboxes + "/1");
+        Mailbox mbox = host2.createMailbox();
+        Mailbox mbox2 = host2.createMailbox();
+        publisher.registerMailbox(MailboxType.ExecutionSite, new MailboxNodeContent(mbox.getHSId(), 0));
+        publisher.registerMailbox(MailboxType.Initiator, new MailboxNodeContent(mbox2.getHSId(), 0));
+        publisher.publish(host2.getZK());
+        VoltZK.createPersistentZKNodes(host2.getZK());
+        host2.getZK().create(
+                VoltZK.cluster_metadata + "/" + host2.getHostId(),
+                "{ interfaces : [ \"localhost\"], clientPort : 23, adminPort : 43, httpPort : 32 }".getBytes("UTF-8"),
+                Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT);
+        host2.waitForAllHostsToBeReady(2);
 
-        host2.sendReadyMessage();
-
-        ZooKeeper zk = ZKUtil.getClient("localhost", 60000);
-        try {
-            zk.create(
-                    "/cluster_metadata", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (Exception e) {}
-        System.out.println(zk.getChildren("/cluster_metadata", false));
-        zk.create(
-                "/cluster_metadata/" + host2.getHostId(), new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-
-        retval.localServer.waitForInitialization();
-        zk.close();
         HostMessenger host1 = VoltDB.instance().getHostMessenger();
 
-        site.shutdown();
-
-        //int host2id = host2.getHostId();
         host2.closeForeignHostSocket(host1.getHostId());
         // this is just to wait for the fault manager to kick in
         Thread.sleep(50);

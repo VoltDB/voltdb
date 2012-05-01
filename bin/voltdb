@@ -119,9 +119,7 @@ else
   exit 1
 fi
 
-if [ -d "$VOLTDB_HOME/obj/release/nativelibs" ]; then
-  JAVA_LIBRARY_PATH=${VOLTDB_HOME}/obj/release/nativelibs
-elif [ -d "$VOLTDB_HOME/voltdb" ]; then
+if [ -d "$VOLTDB_HOME/voltdb" ]; then
   JAVA_LIBRARY_PATH=${VOLTDB_HOME}/voltdb
 else
   echo "Couldn't find compiled VoltDB to run."

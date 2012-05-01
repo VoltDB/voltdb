@@ -108,7 +108,6 @@ public class TestSystemCatalogSuite extends RegressionSuite {
     public void testJdbcAccess() throws IOException, ProcCallException, ClassNotFoundException, SQLException
     {
         String url = "jdbc:voltdb://localhost:21212";
-        String db = "jdbc";
         String driver = "org.voltdb.jdbc.Driver";
         Class.forName(driver);
         Connection huh = DriverManager.getConnection(url, "", "");
@@ -163,8 +162,6 @@ public class TestSystemCatalogSuite extends RegressionSuite {
     //
     static public Test suite() throws IOException
     {
-        VoltServerConfig config = null;
-
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestSystemCatalogSuite.class);
 

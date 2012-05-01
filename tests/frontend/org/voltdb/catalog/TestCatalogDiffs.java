@@ -270,24 +270,6 @@ public class TestCatalogDiffs extends TestCase {
         assertFalse(diff.supported());
     }
 
-    public void testIsUpIgnored() throws IOException {
-        String original = compile("base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-        catOriginal.getClusters().get("cluster").getSites().add("999");
-        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "true");
-        Catalog cat_copy = catOriginal.deepCopy();
-
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, cat_copy);
-        String null_diff = diff.commands();
-        assertTrue(diff.supported());
-        assertEquals("", null_diff);
-
-        cat_copy.getClusters().get("cluster").getSites().get("999").set("isUp", "false");
-        diff = new CatalogDiffEngine(catOriginal, cat_copy);
-        assertTrue(diff.supported());
-        assertEquals("", diff.commands());
-    }
-
     public void testDiffOfIdenticalCatalogs() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
@@ -313,26 +295,6 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue(diff.supported());
         String updatedOriginalSerialized = c3.serialize();
         assertEquals(updatedOriginalSerialized, c4.serialize());
-    }
-
-    public void testDeepCopyPreservesIsDown() throws IOException
-    {
-        String original = compile("base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-        catOriginal.getClusters().get("cluster").getSites().add("999");
-        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "false");
-        Catalog cat_copy = catOriginal.deepCopy();
-        assertFalse(cat_copy.getClusters().get("cluster").getSites().get("999").m_isUp);
-    }
-
-    public void testDeepCopyPreservesIsUp() throws IOException
-    {
-        String original = compile("base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-        catOriginal.getClusters().get("cluster").getSites().add("999");
-        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "true");
-        Catalog cat_copy = catOriginal.deepCopy();
-        assertTrue(cat_copy.getClusters().get("cluster").getSites().get("999").m_isUp);
     }
 
     // N.B. Some of the testcases assume this exact table structure... if you change it,

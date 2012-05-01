@@ -23,18 +23,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
+
 import org.voltdb.CatalogContext;
-import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -50,7 +51,7 @@ public class AsyncCompilerAgent {
 
     // do work in this executor service
     final ExecutorService m_es =
-        MiscUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
+        CoreUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
 
     // wraps the VoltPlanner and does the actual query planning
     private PlannerTool m_ptool = null;
@@ -64,8 +65,15 @@ public class AsyncCompilerAgent {
         }
     }
 
-    public Mailbox createMailbox(final HostMessenger hostMessenger, final int siteId) {
-        m_mailbox = new LocalMailbox(hostMessenger, siteId) {
+    public void createMailbox(final HostMessenger hostMessenger, final long hsId) {
+        m_mailbox = new LocalMailbox(hostMessenger) {
+
+            @Override
+            public void send(long destinationHSId, VoltMessage message) throws MessagingException {
+                message.m_sourceHSId = hsId;
+                hostMessenger.send(destinationHSId, message);
+            }
+
             @Override
             public void deliver(final VoltMessage message) {
                 try {
@@ -86,15 +94,15 @@ public class AsyncCompilerAgent {
                     retval.adminConnection = work.adminConnection;
                     retval.clientData = work.clientData;
                     try {
-                        m_mailbox.send(work.replySiteId, work.replyMailboxId,
-                                       new LocalObjectMessage(retval));
+                        // XXX: need client interface mailbox id.
+                        m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
                     } catch (MessagingException ex) {
                         ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
                     }
                 }
             }
         };
-        return m_mailbox;
+        hostMessenger.createMailbox(hsId, m_mailbox);
     }
 
     private void handleMailboxMessage(final VoltMessage message) {
@@ -103,12 +111,14 @@ public class AsyncCompilerAgent {
             if (wrapper.payload instanceof AdHocPlannerWork) {
                 final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
                 final AsyncCompilerResult result = compileAdHocPlan(w);
-                m_mailbox.send(w.replySiteId, w.replyMailboxId, new LocalObjectMessage(result));
+                // XXX: need client interface mailbox id.
+                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
             }
             else if (wrapper.payload instanceof CatalogChangeWork) {
                 final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
                 final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
-                m_mailbox.send(w.replySiteId, w.replyMailboxId, new LocalObjectMessage(result));
+                // XXX: need client interface mailbox id.
+                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
             }
         } catch (MessagingException ex) {
             ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());

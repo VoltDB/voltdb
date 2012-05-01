@@ -46,8 +46,8 @@ public class SnapshotStatus extends VoltSystemProcedure {
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx) throws VoltAbortException
     {
-        ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-        catalogIds.add(0);
+        ArrayList<Long> catalogIds = new ArrayList<Long>();
+        catalogIds.add(0L);
         return new VoltTable[] {
             VoltDB.instance().getStatsAgent().getStats(SysProcSelector.SNAPSHOTSTATUS,
                                                        catalogIds,

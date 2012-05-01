@@ -32,9 +32,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.mockito.verification.VerificationMode;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.MessagingException;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.MessagingException;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -91,15 +91,16 @@ public class TestAsyncCompilerAgent {
          */
         for (int i = 0; i < AsyncCompilerAgent.MAX_QUEUE_DEPTH + 2; ++i) {
             AdHocPlannerWork work =
-                    new AdHocPlannerWork(100, 0, false, 0, 0, "localhost", false, null,
+                    new AdHocPlannerWork(100l, false, 0, 0, "localhost", false, null,
                                          "select * from a", 0);
             LocalObjectMessage msg = new LocalObjectMessage(work);
+            msg.m_sourceHSId = 100;
             m_agent.m_mailbox.deliver(msg);
         }
 
         // check for one rejected request
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_agent.m_mailbox).send(eq(100), eq(0), captor.capture());
+        verify(m_agent.m_mailbox).send(eq(100L), captor.capture());
         assertNotNull(((AsyncCompilerResult) captor.getValue().payload).errorMsg);
         // let all requests return
         blockingAnswer.flag.release(AsyncCompilerAgent.MAX_QUEUE_DEPTH + 1);
@@ -107,6 +108,6 @@ public class TestAsyncCompilerAgent {
         // check if all previous requests finish
         m_agent.shutdown();
         VerificationMode expected = times(AsyncCompilerAgent.MAX_QUEUE_DEPTH + 2);
-        verify(m_agent.m_mailbox, expected).send(eq(100), eq(0), any(LocalObjectMessage.class));
+        verify(m_agent.m_mailbox, expected).send(eq(100L), any(LocalObjectMessage.class));
     }
 }

@@ -36,7 +36,6 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.sysprocs.SnapshotRestore;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -72,7 +71,6 @@ public class RegressionSuite extends TestCase {
     @Override
     public void setUp() throws Exception {
         //New tests means a new server thread that hasn't done a restore
-        SnapshotRestore.m_haveDoneRestore = false;
         m_config.setCallingMethodName(m_methodName);
         m_config.startUp(true);
     }
@@ -125,19 +123,27 @@ public class RegressionSuite extends TestCase {
         return m_config;
     }
 
+    public Client getClient() throws IOException {
+        return getClient(1000 * 120);
+    }
+
     /**
      * Get a VoltClient instance connected to the server driven by the
      * VoltServerConfig instance. Just pick from the list of listeners
      * randomly.
      *
+     * Only uses the time
+     *
      * @return A VoltClient instance connected to the server driven by the
      * VoltServerConfig instance.
      */
-    public Client getClient() throws IOException {
+    public Client getClient(long timeout) throws IOException {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
         ClientConfig config = new ClientConfigForTest(m_username, m_password);
+        config.setConnectionResponseTimeout(timeout);
+        config.setProcedureCallTimeout(timeout);
         final Client client = ClientFactory.createClient(config);
         client.createConnection(listener);
         m_clients.add(client);

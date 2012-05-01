@@ -47,7 +47,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.apache.jute_voltpatches.BinaryOutputArchive;
 import org.apache.jute_voltpatches.Record;
-import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.Environment;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.Version;
@@ -64,6 +63,7 @@ import org.apache.zookeeper_voltpatches.proto.RequestHeader;
 import org.apache.zookeeper_voltpatches.proto.WatcherEvent;
 import org.apache.zookeeper_voltpatches.server.auth.AuthenticationProvider;
 import org.apache.zookeeper_voltpatches.server.auth.ProviderRegistry;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 
 /**
@@ -71,7 +71,7 @@ import org.voltdb.VoltDB;
  * client, but only one thread doing the communication.
  */
 public class NIOServerCnxn implements Watcher, ServerCnxn {
-    private static final Logger LOG = Logger.getLogger("ZK-SERVER");
+    private static final VoltLogger LOG = new VoltLogger("ZK-SERVER");
 
     private ConnectionBean jmxConnectionBean;
 
@@ -148,7 +148,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
                 ss.configureBlocking(false);
                 ss.register(selector, SelectionKey.OP_ACCEPT);
             } catch (IOException e) {
-                String msg = "ZooKeeper server failed to bind to address: " + addr.toString();
+                String msg = "ZooKeeper server failed to bind to client socket: " + addr.toString();
                 VoltDB.crashLocalVoltDB(msg, true, e);
             }
         }
@@ -372,7 +372,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
 
     private SocketChannel sock;
 
-    private SelectionKey sk;
+    private final SelectionKey sk;
 
     boolean initialized;
 

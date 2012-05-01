@@ -110,7 +110,6 @@ public class SystemProcedureCatalog {
         listing.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",             false, true,  false, false, true, true));
         listing.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",            false, true,  false, false, true, true));
         listing.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",           false, false, false, false, true, true));
-        listing.put("@Rejoin",                  new Config("org.voltdb.sysprocs.Rejoin",            false, false, false, false, true, true));
         listing.put("@SnapshotSave",            new Config("org.voltdb.sysprocs.SnapshotSave",      false, false, false, false, true, true));
         listing.put("@SnapshotRestore",         new Config("org.voltdb.sysprocs.SnapshotRestore",   false, false, false, true, true, false));
         listing.put("@SnapshotStatus",          new Config("org.voltdb.sysprocs.SnapshotStatus",    false, false, false, false, true, true));

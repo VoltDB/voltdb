@@ -16,7 +16,7 @@
  */
 package org.voltdb.utils;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import com.sun.jna.Native;
 
 public class CLibrary {

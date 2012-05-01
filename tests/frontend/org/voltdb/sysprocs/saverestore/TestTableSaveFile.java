@@ -26,6 +26,7 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.zip.CRC32;
 
 import junit.framework.TestCase;
@@ -37,9 +38,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.Pair;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * This test also provides pretty good coverage of DefaultSnapshotTarget
@@ -112,9 +113,15 @@ public class TestTableSaveFile extends TestCase {
         VoltTable table = new VoltTable(columnInfo, columnInfo.length);
         final File f = File.createTempFile("foo", "bar");
         f.deleteOnExit();
+        ArrayList<Integer> partIds = new ArrayList<Integer>();
+        partIds.add(0);
+        partIds.add(1);
+        partIds.add(2);
+        partIds.add(3);
+        partIds.add(4);
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
-                TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, table,
+                TOTAL_PARTITIONS, false, partIds, table,
                 TXN_ID, VERSION1);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
@@ -141,9 +148,15 @@ public class TestTableSaveFile extends TestCase {
         VoltTable.ColumnInfo columns[] = new VoltTable.ColumnInfo[] { new VoltTable.ColumnInfo(
                 "Foo", VoltType.STRING) };
         VoltTable vt = new VoltTable(columns, 1);
+        ArrayList<Integer> partIds = new ArrayList<Integer>();
+        partIds.add(0);
+        partIds.add(1);
+        partIds.add(2);
+        partIds.add(3);
+        partIds.add(4);
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
-                TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, vt,
+                TOTAL_PARTITIONS, false, partIds, vt,
                 TXN_ID, VERSION1);
         dsdt.close();
 

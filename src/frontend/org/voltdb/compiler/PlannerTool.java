@@ -20,7 +20,7 @@ package org.voltdb.compiler;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltdb.CatalogContext;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.planner.QueryPlanner;

@@ -60,9 +60,16 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected int m_numberOfPartitions;
     protected Procedure m_catProc;
     protected Cluster m_cluster;
-    protected ExecutionSite m_site;
+    protected SiteProcedureConnection m_site;
+    protected ProcedureRunner m_runner; // overrides private parent var
 
-    void initSysProc(int numberOfPartitions, ExecutionSite site,
+    @Override
+    void init(ProcedureRunner procRunner) {
+        super.init(procRunner);
+        m_runner = procRunner;
+    }
+
+    void initSysProc(int numberOfPartitions, SiteProcedureConnection site,
             Procedure catProc, Cluster cluster) {
 
         m_numberOfPartitions = numberOfPartitions;
@@ -73,6 +80,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         init();
     }
 
+    /**
+     * For Sysproc init tasks like registering plan frags
+     */
     abstract public void init();
 
     /**
@@ -102,7 +112,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
-        public int siteId = -1;
+        public long siteId = -1;
         public long fragmentId = -1;
         public int outputDepId = -1;
         public int inputDepIds[] = null;
@@ -206,7 +216,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             }
 
             FragmentTaskMessage task = new FragmentTaskMessage(
-                txnState.initiatorSiteId,
+                txnState.initiatorHSId,
                 m_site.getCorrespondingSiteId(),
                 txnState.txnId,
                 false,
@@ -232,7 +242,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 if (pf.siteId == -1)
                     txnState.createLocalFragmentWork(task, false);
                 else
-                    txnState.createFragmentWork(new int[] { pf.siteId },
+                    txnState.createFragmentWork(new long[] { pf.siteId },
                                                          task);
             }
         }

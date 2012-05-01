@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 
@@ -39,15 +38,9 @@ public interface SiteProcedureConnection {
     public void registerPlanFragment(final long pfId, final ProcedureRunner proc);
 
     /**
-     * Get the catalog site entry for the corresponding SiteProcedureConnection
-     * @return catalog site.
-     */
-    public Site getCorrespondingCatalogSite();
-
-    /**
      * Get the catalog site id for the corresponding SiteProcedureConnection
      */
-    public int getCorrespondingSiteId();
+    public long getCorrespondingSiteId();
 
     /**
      * Get the partition id for the corresponding SiteProcedureConnection
@@ -75,6 +68,13 @@ public interface SiteProcedureConnection {
             int numParameterSets,
             long txnId,
             boolean readOnly) throws EEException;
+
+    /**
+     * Get the number of partitions so ProcedureRunner can divide
+     * replicated table DML results to get the *real* number of
+     * rows modified
+     */
+    public abstract long getReplicatedDMLDivisor();
 
     /**
      * For test cases that need to mimic a plan fragment being invoked

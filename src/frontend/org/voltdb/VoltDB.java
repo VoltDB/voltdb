@@ -27,16 +27,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.HostMessenger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
 /**
- * <code>VoltDB</code> is the main class for VoltDB server.
- * It sets up global objects and then starts the individual threads
- * for the <code>ThreadManager</code>s.
+ * VoltDB provides main() for the VoltDB server
  */
 public class VoltDB {
 
@@ -48,24 +44,14 @@ public class VoltDB {
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
-
-    static final int INITIATOR_SITE_ID = 0;
-    public static final int DTXN_MAILBOX_ID = 0;
-    public static final int AGREEMENT_MAILBOX_ID = 1;
-    public static final int STATS_MAILBOX_ID = 2;
-    public static final int ASYNC_COMPILER_MAILBOX_ID = 3;
-    public static final int CLIENT_INTERFACE_MAILBOX_ID = 4;
-
-    // temporary for single partition testing
-    static final int FIRST_SITE_ID = 1;
-
+    public static final int INITIATOR_SITE_ID = 0;
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
-    public static enum START_ACTION {
+    public enum START_ACTION {
         CREATE, RECOVER, START
     }
 
@@ -85,9 +71,6 @@ public class VoltDB {
         public List<Integer> m_ipcPorts = Collections.synchronizedList(new LinkedList<Integer>());
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
-
-        /** Whether to enable watchdogs to check for possible deadlocks **/
-        public boolean m_useWatchdogs = false;
 
         /** use normal JNI backend or optional IPC or HSQLDB backends */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
@@ -174,6 +157,8 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
+        public Integer m_leaderPort = DEFAULT_INTERNAL_PORT;
+
         public Configuration() { }
 
         public Configuration(String args[]) {
@@ -251,28 +236,19 @@ public class VoltDB {
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
                 }
-
+                else if (arg.equals("leaderport")) {
+                    m_leaderPort = Integer.valueOf(args[++i]);
+                }
                 else if (arg.equals("leader")) {
                     m_leader = args[++i].trim();
-                    if (m_leader.compareTo("") == 0) {
-                        m_leader = null;
-                    }
                 } else if (arg.startsWith("leader")) {
                     m_leader = arg.substring("leader ".length()).trim();
-                    if (m_leader.compareTo("") == 0) {
-                        m_leader = null;
-                    }
                 }
-
                 else if (arg.equals("rejoinhost")) {
                     m_rejoinToHostAndPort = args[++i].trim();
-                    if (m_rejoinToHostAndPort.compareTo("") == 0)
-                        m_rejoinToHostAndPort = null;
                 }
                 else if (arg.startsWith("rejoinhost ")) {
                     m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
-                    if (m_rejoinToHostAndPort.compareTo("") == 0)
-                        m_rejoinToHostAndPort = null;
                 }
 
                 else if (arg.equals("create")) {
@@ -309,8 +285,6 @@ public class VoltDB {
                     m_pathToDeployment = args[++i];
                 } else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("useWatchdogs")) {
-                    m_useWatchdogs = true;
                 } else if (arg.equalsIgnoreCase("ipcports")) {
                     String portList = args[++i];
                     String ports[] = portList.split(",");
@@ -331,8 +305,9 @@ public class VoltDB {
         }
 
         /**
-         * Validates configuration settings and logs errors to the host log. You typically want to have the system exit
-         * when this fails, but this functionality is left outside of the method so that it is testable.
+         * Validates configuration settings and logs errors to the host log.
+         * You typically want to have the system exit when this fails, but
+         * this functionality is left outside of the method so that it is testable.
          * @return Returns true if all required configuration settings are present.
          */
         public boolean validate() {
@@ -358,18 +333,21 @@ public class VoltDB {
                 }
             }
 
-            // require deployment file location (null is allowed to receive default deployment)
-            if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
-                isValid = false;
-                hostLog.fatal("The deployment file location is empty.");
-            }
-
-            if (m_replicationRole == ReplicationRole.REPLICA) {
-                if (m_startAction == START_ACTION.RECOVER) {
+            // require deployment file location
+            if (m_rejoinToHostAndPort == null) {
+                // require deployment file location (null is allowed to receive default deployment)
+                if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
-                    hostLog.fatal("Replica cluster only supports create database");
-                } else {
-                    m_startAction = START_ACTION.CREATE;
+                    hostLog.fatal("The deployment file location is empty.");
+                }
+
+                if (m_replicationRole == ReplicationRole.REPLICA) {
+                    if (m_startAction == START_ACTION.RECOVER) {
+                        isValid = false;
+                        hostLog.fatal("Replica cluster only supports create database");
+                    } else {
+                        m_startAction = START_ACTION.CREATE;
+                    }
                 }
             }
 
@@ -383,7 +361,7 @@ public class VoltDB {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
-            if (MiscUtils.isPro()) {
+            if (org.voltdb.utils.MiscUtils.isPro()) {
                 hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover|replica) [leader <hostname> [deployment <deployment.xml>]] license <license.xml> catalog <catalog.jar>");
             } else {
                 hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover) [leader <hostname> [deployment <deployment.xml>]] catalog <catalog.jar>");
@@ -392,7 +370,8 @@ public class VoltDB {
             hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
         }
 
-        /** Helper to set the path for compiled jar files.
+        /**
+         * Helper to set the path for compiled jar files.
          *  Could also live in VoltProjectBuilder but any code that creates
          *  a catalog will probably start VoltDB with a Configuration
          *  object. Perhaps this is more convenient?
@@ -402,6 +381,7 @@ public class VoltDB {
             m_pathToCatalog = getPathToCatalogForTest(jarname);
             return m_pathToCatalog;
         }
+
         public static String getPathToCatalogForTest(String jarname) {
             String answer = jarname;
 
@@ -444,8 +424,6 @@ public class VoltDB {
 
     }
 
-    private static VoltDB.Configuration m_config = new VoltDB.Configuration();
-
     /* helper functions to access current configuration values */
     public static boolean getLoadLibVOLTDB() {
         return !(m_config.m_noLoadLibVOLTDB);
@@ -455,20 +433,8 @@ public class VoltDB {
         return m_config.m_backend;
     }
 
-    public static boolean getUseWatchdogs() {
-        return m_config.m_useWatchdogs;
-    }
-
-    public static boolean getQuietAdhoc()
-    {
-        return m_config.m_quietAdhoc;
-    }
-
     /**
      * Exit the process with an error message, optionally with a stack trace.
-     *
-     * In the future it would be nice to notify any non-failed subsystems
-     * that the node is going down. For now, just die.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
         wasCrashCalled = true;
@@ -563,9 +529,6 @@ public class VoltDB {
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
-     *
-     * In the future it would be nice to notify any non-failed subsystems
-     * that the node is going down. For now, just die.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
         wasCrashCalled = true;
@@ -574,7 +537,7 @@ public class VoltDB {
             return;
         }
         try {
-            ((HostMessenger) instance().getMessenger()).sendPoisonPill(errMsg);
+            instance().getHostMessenger().sendPoisonPill(errMsg);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -584,7 +547,6 @@ public class VoltDB {
 
     /**
      * Entry point for the VoltDB server process.
-     *
      * @param args Requires catalog and deployment file locations.
      */
     public static void main(String[] args) {
@@ -608,11 +570,9 @@ public class VoltDB {
 
     /**
      * Initialize the VoltDB server.
-     *
      * @param config  The VoltDB.Configuration to use to initialize the server.
      */
-    public static void initialize(VoltDB.Configuration config)
-    {
+    public static void initialize(VoltDB.Configuration config) {
         m_config = config;
         instance().initialize(config);
     }
@@ -635,8 +595,7 @@ public class VoltDB {
      * VoltDBInterface that is used for testing.
      *
      */
-    public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance)
-    {
+    public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance) {
         singleton = testInstance;
     }
 
@@ -644,6 +603,7 @@ public class VoltDB {
     public Object clone() throws CloneNotSupportedException {
         throw new CloneNotSupportedException();
     }
-    private static VoltDBInterface singleton = new RealVoltDB();
 
+    private static VoltDB.Configuration m_config = new VoltDB.Configuration();
+    private static VoltDBInterface singleton = new RealVoltDB();
 }

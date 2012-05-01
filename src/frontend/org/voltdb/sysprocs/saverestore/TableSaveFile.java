@@ -32,8 +32,8 @@ import java.util.zip.CRC32;
 
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -752,7 +752,7 @@ public class TableSaveFile
             if (c == null) {
                 final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
                 final ByteBuffer b = originContainer.b;
-                final long pointer = org.voltdb.utils.DBBPool.getBufferAddress(b);
+                final long pointer = org.voltcore.utils.DBBPool.getBufferAddress(b);
                 c = new Container(b, pointer, originContainer, nextChunkPartitionId);
             }
             /*

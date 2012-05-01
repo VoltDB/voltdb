@@ -23,6 +23,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.Timer;
@@ -107,6 +108,9 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
             out.flush();
         }
 
+        File logFile = new File("obj/release/testoutput/volt-junit-fulllog.txt");
+        File newFile = new File("obj/release/testoutput/junit-log." + suite.getName() + ".txt");
+        logFile.renameTo(newFile);
     }
 
     @Override

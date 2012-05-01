@@ -40,10 +40,10 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.network.Connection;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltNetwork;
-import org.voltdb.network.VoltProtocolHandler;
+import org.voltcore.network.Connection;
+import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltProtocolHandler;
 
 public class TestDistributer extends TestCase {
 
@@ -73,7 +73,11 @@ public class TestDistributer extends TestCase {
                     vt[0].addRow(1);
                     ClientResponseImpl response =
                         new ClientResponseImpl(ClientResponseImpl.SUCCESS, vt, "Extra String", spi.getClientHandle());
-                    c.writeStream().enqueue(response);
+                    ByteBuffer buf = ByteBuffer.allocate(4 + response.getSerializedSize());
+                    buf.putInt(buf.capacity() - 4);
+                    response.flattenToBuffer(buf);
+                    buf.clear();
+                    c.writeStream().enqueue(buf);
                     roundTrips.incrementAndGet();
                     System.err.println("Sending response.");
                 }
@@ -86,10 +90,6 @@ public class TestDistributer extends TestCase {
             }
         }
 
-        @Override
-        public int getExpectedOutgoingMessageSize() {
-            return 2048;
-        }
         @Override
         public void started(Connection c) {
             // TODO Auto-generated method stub
@@ -145,7 +145,7 @@ public class TestDistributer extends TestCase {
     class MockVolt extends Thread {
         boolean handleConnection = true;
         MockVolt(int port) throws IOException {
-            network = new VoltNetwork();
+            network = new VoltNetworkPool();
             network.start();
             socket = ServerSocketChannel.open();
             socket.configureBlocking(false);
@@ -236,7 +236,7 @@ public class TestDistributer extends TestCase {
         AtomicBoolean shutdown = new AtomicBoolean(false);
         volatile ServerSocketChannel socket = null;
         volatile MockInputHandler handler = null;
-        volatile VoltNetwork network;
+        volatile VoltNetworkPool network;
     }
 
     private static class CSL extends ClientStatusListenerExt {
@@ -316,7 +316,7 @@ public class TestDistributer extends TestCase {
 
             CSL csl = new CSL();
 
-            Distributer dist = new Distributer(128, null, false,
+            Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS);
             dist.addClientStatusListener(csl);
@@ -335,14 +335,14 @@ public class TestDistributer extends TestCase {
             ProcedureInvocation pi5 = new ProcedureInvocation(++handle, "i1", new Integer(1));
             ProcedureInvocation pi6 = new ProcedureInvocation(++handle, "i1", new Integer(1));
 
-            dist.queue(pi1, new ThrowingCallback(), 128, true);
+            dist.queue(pi1, new ThrowingCallback(), true);
             dist.drain();
             assertTrue(csl.m_exceptionHandled);
-            dist.queue(pi2, new ProcCallback(), 128, true);
-            dist.queue(pi3, new ProcCallback(), 128, true);
-            dist.queue(pi4, new ProcCallback(), 128, true);
-            dist.queue(pi5, new ProcCallback(), 128, true);
-            dist.queue(pi6, new ProcCallback(), 128, true);
+            dist.queue(pi2, new ProcCallback(), true);
+            dist.queue(pi3, new ProcCallback(), true);
+            dist.queue(pi4, new ProcCallback(),true);
+            dist.queue(pi5, new ProcCallback(), true);
+            dist.queue(pi6, new ProcCallback(), true);
 
             dist.drain();
             System.err.println("Finished drain.");
@@ -403,7 +403,7 @@ public class TestDistributer extends TestCase {
         volt.start();
 
         // create distributer and connect it to the client
-        Distributer dist = new Distributer(128, null, false,
+        Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 1000 /* One second connection timeout */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -422,7 +422,7 @@ public class TestDistributer extends TestCase {
         // this call should hang until the connection is closed,
         // then will be called with CONNECTION_LOST
         ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
-        dist.queue(invocation, new TimeoutMonitorPCB(), 128, true);
+        dist.queue(invocation, new TimeoutMonitorPCB(), true);
 
         // wait for both callbacks
         latch.await();
@@ -458,7 +458,7 @@ public class TestDistributer extends TestCase {
         volt.start();
 
         // create distributer and connect it to the client
-        Distributer dist = new Distributer(128, null, false,
+        Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 CONNECTION_TIMEOUT /* six second connection timeout */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -524,16 +524,20 @@ public class TestDistributer extends TestCase {
         // create a fake server and connect to it.
         MockVolt volt0 = new MockVolt(20000);
         volt0.handleConnection = false;
+
+        Client clientPtr = null;
         try {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
             config.setMaxOutstandingTxns(5);
+            config.setConnectionResponseTimeout(2000);
 
             final Client client = ClientFactory.createClient(config);
             client.createConnection("localhost", 20000);
+            clientPtr = client;
 
-            final java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger(0);
+            final AtomicInteger counter = new AtomicInteger(0);
             final Thread loadThread = new Thread() {
                 @Override
                 public void run() {
@@ -552,12 +556,12 @@ public class TestDistributer extends TestCase {
             final long start = System.currentTimeMillis();
             loadThread.join(300);
             final long finish = System.currentTimeMillis();
-            assert(finish - start >= 300);
-            assert(counter.get() == 5);
-            loadThread.interrupt();
+            assertTrue(finish - start >= 300);
+            assertTrue(counter.get() == 5);
             loadThread.join();
         }
         finally {
+            if (clientPtr != null) clientPtr.close();
             volt0.shutdown();
         }
     }

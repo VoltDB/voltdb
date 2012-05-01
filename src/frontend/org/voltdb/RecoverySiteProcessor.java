@@ -20,9 +20,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * Base class for functionality used during recovery. Derived classes implement
@@ -74,16 +74,16 @@ public abstract class RecoverySiteProcessor {
         public void handleMessage(VoltMessage message, long txnId);
     }
 
-    abstract public void handleSiteFaults(HashSet<Integer> failedSites, SiteTracker tracker);
+    abstract public void handleSiteFaults(HashSet<Long> failedSites, SiteTracker tracker);
     abstract public void doRecoveryWork(long currentTxnId);
     abstract public long bytesTransferred();
 
     private void initializeBufferPool() {
         for (int ii = 0; ii < m_numBuffers; ii++) {
-            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_bufferLength);
+            final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_bufferLength);
             long bufferAddress = 0;
             if (VoltDB.getLoadLibVOLTDB()) {
-                bufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+                bufferAddress = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
             }
             final BBContainer buffer = new BBContainer(origin.b, bufferAddress) {
                 /**

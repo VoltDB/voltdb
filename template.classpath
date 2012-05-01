@@ -35,15 +35,15 @@
 	<classpathentry kind="lib" path="lib/jetty-io-7.6.1.v20120215.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
-		<attributes>
-			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/voltdb"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry kind="lib" path="lib/jna.jar"/>
 	<classpathentry kind="lib" path="lib/protobuf-java-2.4.1.jar"/>
 	<classpathentry kind="lib" path="lib/snappy-java-1.0.4.1.jar"/>
 	<classpathentry kind="lib" path="lib/zmq-2.1.11.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/mockito-all-1.9.0.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/voltdb"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>

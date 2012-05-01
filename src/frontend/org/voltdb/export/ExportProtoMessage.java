@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 
 
@@ -162,16 +162,17 @@ public class ExportProtoMessage
     }
 
     public ByteBuffer toBuffer() throws IOException {
-        FastSerializer fs = new FastSerializer();
-        writeToFastSerializer(fs);
-        return fs.getBuffer();
+        ByteBuffer buf = ByteBuffer.allocate(4 + serializableBytes());
+        flattenToBuffer(buf);
+        buf.flip();
+        return buf;
     }
 
     private byte m_signatureBytes[] = null;
 
     /**
      * Total bytes that would be used if serialized in its current state.
-     * Does not include the 4 byte length prefix or the variable length signature!
+     * Does not include 4 byte length prefix that flattenToBuffer adds
      * @return byte count.
      */
     public int serializableBytes() {
@@ -185,7 +186,7 @@ public class ExportProtoMessage
         return FIXED_PAYLOAD_LENGTH + (m_data != null ? m_data.remaining() : 0) + m_signatureBytes.length;
     }
 
-    public void writeToFastSerializer(FastSerializer fs) throws IOException
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         if (m_signatureBytes == null) {
             try {
@@ -195,15 +196,15 @@ public class ExportProtoMessage
             }
         }
         // write the length first. then the payload.
-        fs.writeInt(serializableBytes());
-        fs.writeShort(m_version);
-        fs.writeShort(m_type);
-        fs.writeLong(m_generation);
-        fs.writeInt(m_partitionId);
-        fs.writeString(m_signature);
-        fs.writeLong(m_offset);
+        buf.putInt(buf.capacity() - 4);
+        buf.putShort(m_version);
+        buf.putShort(m_type);
+        buf.putLong(m_generation);
+        buf.putInt(m_partitionId);
+        FastSerializer.writeString(m_signatureBytes, buf);
+        buf.putLong(m_offset);
         if (m_data != null) {
-            fs.write(m_data);
+            buf.put(m_data);
             // write advances m_data's position.
             m_data.flip();
         }

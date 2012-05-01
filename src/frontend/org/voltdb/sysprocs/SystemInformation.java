@@ -40,7 +40,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Access key/value tables of cluster info that correspond to the REST
@@ -90,9 +90,9 @@ public class SystemInformation extends VoltSystemProcedure
             // Choose the lowest site ID on this host to do the info gathering
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+            Long lowest_site_id =
+                context.getSiteTracker().
+                getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 result = populateOverviewTable(context);
@@ -117,9 +117,9 @@ public class SystemInformation extends VoltSystemProcedure
             // Choose the lowest site ID on this host to do the info gathering
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+            Long lowest_site_id =
+                context.getSiteTracker().
+                getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 result = populateDeploymentProperties(context);
@@ -329,7 +329,7 @@ public class SystemInformation extends VoltSystemProcedure
         int hostId = VoltDB.instance().getHostMessenger().getHostId();
 
         // host name and IP address.
-        InetAddress addr = org.voltdb.client.ConnectionUtil.getLocalAddress();
+        InetAddress addr = org.voltcore.utils.CoreUtils.getLocalAddress();
         vt.addRow(hostId, "IPADDRESS", addr.getHostAddress());
         vt.addRow(hostId, "HOSTNAME", addr.getHostName());
 
@@ -442,7 +442,7 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("adminstartup", adminstartup);
 
         String command_log_enabled = "false";
-        // XXX log name is MAGIC, you knoooow
+        // log name is MAGIC, you knoooow
         CommandLog command_log = context.getCluster().getLogconfig().get("log");
         if (command_log.getEnabled())
         {

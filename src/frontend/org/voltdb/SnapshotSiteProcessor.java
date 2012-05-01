@@ -39,13 +39,15 @@ import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
+
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -190,7 +192,7 @@ public class SnapshotSiteProcessor {
     private long m_quietUntil = 0;
 
     private boolean inQuietPeriod() {
-        return org.voltdb.utils.EstTime.currentTimeMillis() < m_quietUntil;
+        return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
     }
 
     /**
@@ -236,11 +238,11 @@ public class SnapshotSiteProcessor {
 
     void initializeBufferPool() {
         for (int ii = 0; ii < SnapshotSiteProcessor.m_numSnapshotBuffers; ii++) {
-            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
+            final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
             m_snapshotBufferOrigins.add(origin);
             long snapshotBufferAddress = 0;
             if (VoltDB.getLoadLibVOLTDB()) {
-                snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+                snapshotBufferAddress = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
             }
             m_availableSnapshotBuffers.offer(new BBContainer(origin.b, snapshotBufferAddress) {
                 @Override
@@ -449,9 +451,9 @@ public class SnapshotSiteProcessor {
 
 
     private static void logSnapshotCompleteToZK(long txnId, int numHosts, boolean snapshotSuccess) {
-        ZooKeeper zk = VoltDB.instance().getZK();
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
-        final String snapshotPath = "/completed_snapshots/" + txnId;
+        final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
         boolean success = false;
         while (!success) {
             Stat stat = new Stat();
@@ -494,10 +496,10 @@ public class SnapshotSiteProcessor {
          * the completed snapshot messages. Consume them here to bound space usage in ZK.
          */
         try {
-            TreeSet<String> snapshots = new TreeSet<String>(zk.getChildren("/completed_snapshots", false));
+            TreeSet<String> snapshots = new TreeSet<String>(zk.getChildren(VoltZK.completed_snapshots, false));
             while (snapshots.size() > 30) {
                 try {
-                    zk.delete("/completed_snapshots/" + snapshots.first(), -1);
+                    zk.delete(VoltZK.completed_snapshots + "/" + snapshots.first(), -1);
                 } catch (NoNodeException e) {}
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB(
@@ -510,8 +512,8 @@ public class SnapshotSiteProcessor {
         }
 
         try {
-            VoltDB.instance().getZK().delete(
-                    "/nodes_currently_snapshotting/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
+            VoltDB.instance().getHostMessenger().getZK().delete(
+                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
         } catch (NoNodeException e) {
             hostLog.warn("Expect the snapshot node to already exist during deletion", e);
         } catch (Exception e) {

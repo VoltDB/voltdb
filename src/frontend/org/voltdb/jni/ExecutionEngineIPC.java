@@ -27,9 +27,9 @@ import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
@@ -41,7 +41,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -141,7 +140,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 try {
                     System.in.read();
                 } catch (final IOException e1) {
-                    // TODO Auto-generated catch block
                     e1.printStackTrace();
                 }
             }
@@ -516,7 +514,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** Local m_data */
     private final int m_clusterIndex;
-    private final int m_siteId;
+    private final long m_siteId;
     private final int m_partitionId;
     private final int m_hostId;
     private final String m_hostname;
@@ -529,16 +527,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     // private int m_counter;
 
     public ExecutionEngineIPC(
-            final ExecutionSite site,
             final int clusterIndex,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             final int hostId,
             final String hostname,
             final int tempTableMemory,
             final BackendTarget target,
-            final int port) {
-        super(site);
+            final int port,
+            final int totalPartitions) {
+        super();
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
         m_siteId = siteId;
@@ -549,12 +547,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_connection = new Connection(target, port);
 
         // voltdbipc assumes host byte order everywhere
-        m_dataNetworkOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+        m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
         m_dataNetwork = m_dataNetworkOrigin.b;
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
-        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory);
+        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory, totalPartitions);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -582,12 +580,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
      */
     public void initialize(
             final int clusterIndex,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             final int hostId,
             final String hostname,
-            final long tempTableMemory
-            )
+            final long tempTableMemory,
+            final int totalPartitions)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -596,10 +594,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.clear();
         m_data.putInt(Commands.Initialize.m_id);
         m_data.putInt(clusterIndex);
-        m_data.putInt(siteId);
+        m_data.putLong(siteId);
         m_data.putInt(partitionId);
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
+        m_data.putLong(tempTableMemory);
+        m_data.putInt(totalPartitions);
         m_data.putShort((short)hostname.length());
         try {
             m_data.put(hostname.getBytes("UTF-8"));
@@ -751,7 +751,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public DependencyPair executePlanFragment(final long planFragmentId, final int outputDepId,
+    public VoltTable executePlanFragment(final long planFragmentId,
             final int inputDepId, final ParameterSet parameterSet, final long txnId,
             final long lastCommittedTxnId, final long undoToken)
             throws EEException {
@@ -769,7 +769,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoToken);
         m_data.putLong(planFragmentId);
-        m_data.putInt(outputDepId);
+        m_data.putInt(0); // output dep id is not needed
         m_data.putInt(inputDepId);
         m_data.put(fser.getBuffer());
 
@@ -793,7 +793,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new EEException(result);
         } else {
             try {
-                return m_connection.readDependencies();
+                DependencyPair dp = m_connection.readDependencies();
+                return dp.dependency;
             } catch (final IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -803,7 +804,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable executeCustomPlanFragment(final String plan, int outputDepId,
+    public VoltTable executeCustomPlanFragment(final String plan,
             int inputDepId, final long txnId, final long lastCommittedTxnId,
             final long undoQuantumToken) throws EEException
     {
@@ -819,7 +820,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(txnId);
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoQuantumToken);
-        m_data.putInt(outputDepId);
+        m_data.putInt(0); // output dep id is not needed
         m_data.putInt(inputDepId);
         m_data.put(fser.getBuffer());
 

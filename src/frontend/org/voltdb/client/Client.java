@@ -108,9 +108,9 @@ public interface Client {
     throws IOException, NoConnectionsException, ProcCallException;
 
     /**
-     * Asynchronously invoke a procedure. Does not guarantee that the invocation is actually queued. If there
-     * is backpressure on all connections to the cluster then the invocation will not be queued. Check the return value
-     * to determine if queuing actually took place.
+     * Asynchronously invoke a replicated procedure. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check the return value to determine if queuing actually took place.
      * @param callback ProcedureCallback that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
@@ -120,9 +120,13 @@ public interface Client {
     throws IOException, NoConnectionsException;
 
     /**
-     * Asynchronously invoke a procedure. Does not guarantee that the invocation is actually queued. If there
-     * is backpressure on all connections to the cluster then the invocation will not be queued. Check the return value
-     * to determine if queuing actually took place. An opportunity is provided to hint what the size of the invocation
+     * Deprecated because hinting at the serialized size no longer has any effect
+     *
+     * Asynchronously invoke a replicated procedure. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check the return value to determine if queuing actually took place.
+     *
+     * An opportunity is provided to hint what the size of the invocation
      * will be once serialized. This is used to perform more efficient memory allocation and serialization. The size
      * of an invocation can be calculated using {@link #calculateInvocationSerializedSize(String, Object...)}.
      * Only Clients that are resource constrained or expect to process hundreds of thousands of txns/sec will benefit
@@ -134,6 +138,7 @@ public interface Client {
      *                               once serialized. Allocations are done in powers of two.
      * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise
      */
+    @Deprecated
     public boolean callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
@@ -142,12 +147,14 @@ public interface Client {
     throws IOException, NoConnectionsException;
 
     /**
+     * Deprecated because hinting at the serialized size no longer has any effect
      * Calculate the size of a stored procedure invocation once it is serialized. This is computationally intensive
      * as the invocation is serialized as part of the calculation.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return The size of the invocation once serialized
      */
+    @Deprecated
     public int calculateInvocationSerializedSize(String procName, Object... parameters);
 
     /**

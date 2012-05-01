@@ -49,11 +49,11 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
@@ -801,11 +801,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
         Database database = cluster.getDatabases().get("database");
         CatalogMap<Table> tables = database.getTables();
-        CatalogMap<Site> sites = cluster.getSites();
-        int num_hosts = cluster.getHosts().size();
+        SiteTracker st = VoltDB.instance().getSiteTracker();
+        int num_hosts = st.m_numberOfHosts;
         int replicated = 0;
         int total_tables = 0;
-        int expected_entries = 0;
+        int expected_entries = st.m_numberOfExecutionSites;
 
         for (Table table : tables)
         {
@@ -817,12 +817,6 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 {
                     replicated++;
                 }
-            }
-        }
-
-        for (Site s : sites) {
-            if (s.getIsexec()) {
-                expected_entries++;
             }
         }
         assertEquals(expected_entries, results[0].getRowCount());
@@ -1004,26 +998,6 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         validateSnapshot(true);
     }
 
-    private void checkBeforeAndAfterMemory(VoltTable orig_mem,
-                                           VoltTable final_mem)
-    {
-        orig_mem.advanceRow();
-        final_mem.advanceRow();
-        assertFalse(0 == orig_mem.getLong("TUPLEDATA"));
-        assertFalse(0 == orig_mem.getLong("TUPLECOUNT"));
-        assertEquals(orig_mem.getLong("TUPLEDATA"), final_mem.getLong("TUPLEDATA"));
-        assertEquals(orig_mem.getLong("TUPLEALLOCATED"), final_mem.getLong("TUPLEALLOCATED"));
-        assertEquals(orig_mem.getLong("INDEXMEMORY"), final_mem.getLong("INDEXMEMORY"));
-        assertEquals(orig_mem.getLong("STRINGMEMORY"), final_mem.getLong("STRINGMEMORY"));
-        assertEquals(orig_mem.getLong("TUPLECOUNT"), final_mem.getLong("TUPLECOUNT"));
-        assertEquals(orig_mem.getLong("POOLEDMEMORY"), final_mem.getLong("POOLEDMEMORY"));
-
-        long orig_rss = orig_mem.getLong("RSS");
-        long final_rss = final_mem.getLong("RSS");
-
-        assertTrue(Math.abs(orig_rss - final_rss) < orig_rss * .1);
-    }
-
     public void testSaveAndRestoreReplicatedTable()
     throws IOException, InterruptedException, ProcCallException
     {
@@ -1093,9 +1067,6 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             ex.printStackTrace();
             fail("Statistics exception: " + ex.getMessage());
         }
-
-        // commented out because it fails on macs like crazy-town
-        //checkBeforeAndAfterMemory(orig_mem, final_mem);
 
         checkTable(client, "REPLICATED_TESTER", "RT_ID",
                    num_replicated_items_per_chunk * num_replicated_chunks);
@@ -1315,9 +1286,6 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             ex.printStackTrace();
             fail("Statistics exception: " + ex.getMessage());
         }
-
-        // commented out because it fails on macs like crazy-town
-        //checkBeforeAndAfterMemory(orig_mem, final_mem);
 
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);

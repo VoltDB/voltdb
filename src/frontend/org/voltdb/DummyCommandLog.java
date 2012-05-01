@@ -38,7 +38,7 @@ public class DummyCommandLog implements CommandLog {
     public void shutdown() throws InterruptedException {}
 
     @Override
-    public Semaphore logFault(Set<Integer> failedInitiators,
+    public Semaphore logFault(Set<Long> failedInitiators,
                               Set<Long> faultedTxns) {
         return new Semaphore(1);
     }
@@ -52,6 +52,5 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
-    public void initForRejoin(CatalogContext context, long txnId,
-            long faultSequenceNumber, boolean isRejoin) {}
+    public void initForRejoin(CatalogContext context, long txnId, boolean isRejoin) {}
 }

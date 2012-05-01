@@ -18,11 +18,13 @@
 package org.voltdb.client;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -32,20 +34,15 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.network.Connection;
+import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.network.Connection;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltNetwork;
-import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.Pair;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -63,14 +60,10 @@ class Distributer {
     private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<ClientStatusListenerExt>();
 
     //Selector and connection handling, does all work in blocking selection thread
-    private final VoltNetwork m_network;
+    private final VoltNetworkPool m_network;
 
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;
-
-    private final int m_expectedOutgoingMessageSize;
-
-    private final DBBPool m_pool;
 
     private final boolean m_useMultipleThreads;
 
@@ -82,8 +75,8 @@ class Distributer {
 
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
-            Executors.newSingleThreadScheduledExecutor(
-                    MiscUtils.getThreadFactory("VoltDB Client Reaper Thread"));
+        Executors.newSingleThreadScheduledExecutor(
+                CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
     ScheduledFuture<?> m_timeoutReaperHandle;
 
     /**
@@ -168,12 +161,12 @@ class Distributer {
         String name;
     }
 
-    class NodeConnection extends VoltProtocolHandler implements org.voltdb.network.QueueMonitor {
+    class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final HashMap<Long, CallbackBookeeping> m_callbacks;
         private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
-        private final long m_connectionId;
         private Connection m_connection;
+        private final InetSocketAddress m_socketAddress;
         private String m_hostname;
         private int m_port;
         private boolean m_isConnected = true;
@@ -182,12 +175,12 @@ class Distributer {
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
-        public NodeConnection(long ids[]) {
+        public NodeConnection(long ids[], InetSocketAddress socketAddress) {
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
-            m_connectionId = ids[1];
+            m_socketAddress = socketAddress;
         }
 
-        public void createWork(long handle, String name, BBContainer c,
+        public void createWork(long handle, String name, ByteBuffer c,
                 ProcedureCallback callback, boolean ignoreBackpressure) {
             long now = System.currentTimeMillis();
             now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
@@ -197,13 +190,12 @@ class Distributer {
                     final ClientResponse r = new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
                             "Connection to database host (" + m_hostname +
-                            ") was lost before a response was received");
+                    ") was lost before a response was received");
                     try {
                         callback.clientCallback(r);
                     } catch (Exception e) {
                         uncaughtException(callback, r, e);
                     }
-                    c.discard();
                     return;
                 }
 
@@ -211,43 +203,19 @@ class Distributer {
                 m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(c);
-        }
-
-        public void createWork(long handle, String name, FastSerializable f,
-                ProcedureCallback callback, boolean ignoreBackpressure) {
-            long now = System.currentTimeMillis();
-            now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
-                    now, ignoreBackpressure);
-            synchronized (this) {
-                if (!m_isConnected) {
-                    final ClientResponse r = new ClientResponseImpl(
-                            ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to database host (" + m_hostname +
-                            ") was lost before a response was received");
-                    try {
-                        callback.clientCallback(r);
-                    } catch (Exception e) {
-                        uncaughtException(callback, r, e);
-                    }
-                    return;
-                }
-                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
-                m_callbacksToInvoke.incrementAndGet();
-            }
-            m_connection.writeStream().enqueue(f);
         }
 
         void sendPing() {
             ProcedureInvocation invocation = new ProcedureInvocation(PING_HANDLE, "@Ping");
-            final FastSerializer fs = new FastSerializer(m_pool, 128);
-            BBContainer c = null;
+            ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
+            buf.putInt(buf.capacity() - 4);
             try {
-                c = fs.writeObjectForMessaging(invocation);
+                invocation.flattenToBuffer(buf);
+                buf.flip();
             } catch (IOException e) {
-                fs.getBBContainer().discard();
                 throw new RuntimeException(e);
             }
-            m_connection.writeStream().enqueue(c);
+            m_connection.writeStream().enqueue(buf);
             m_outstandingPing = true;
         }
 
@@ -282,12 +250,12 @@ class Distributer {
         @Override
         public void handleMessage(ByteBuffer buf, Connection c) {
             long now = System.currentTimeMillis();
-            ClientResponseImpl response = null;
-            FastDeserializer fds = new FastDeserializer(buf);
+            ClientResponseImpl response = new ClientResponseImpl();
             try {
-                response = fds.readObject(ClientResponseImpl.class);
-            } catch (IOException e) {
-                e.printStackTrace();
+                response.initFromBuffer(buf);
+            } catch (IOException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
             }
             ProcedureCallback cb = null;
             long callTime = 0;
@@ -339,16 +307,6 @@ class Distributer {
             }
         }
 
-        /**
-         * A number specify the expected size of the majority of outgoing messages.
-         * Used to determine the tipping point between where a heap byte buffer vs. direct byte buffer will be
-         * used. Also effects the usage of gathering writes.
-         */
-        @Override
-        public int getExpectedOutgoingMessageSize() {
-            return m_expectedOutgoingMessageSize;
-        }
-
         @Override
         public int getMaxRead() {
             return Integer.MAX_VALUE;
@@ -376,9 +334,9 @@ class Distributer {
                 //Invoke callbacks for all queued invocations with a failure response
                 final ClientResponse r =
                     new ClientResponseImpl(
-                        ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                        "Connection to database host (" + m_hostname +
-                        ") was lost before a response was received");
+                            ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                            "Connection to database host (" + m_socketAddress +
+                    ") was lost before a response was received");
                 for (final CallbackBookeeping callBk : m_callbacks.values()) {
                     try {
                         callBk.callback.clientCallback(r);
@@ -455,22 +413,20 @@ class Distributer {
     }
 
     Distributer() {
-        this(128, null, false,
+        this( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS);
     }
 
     Distributer(
-            int expectedOutgoingMessageSize,
-            int arenaSizes[],
             boolean useMultipleThreads,
             long procedureCallTimeoutMS,
             long connectionResponseTimeoutMS) {
         m_useMultipleThreads = useMultipleThreads;
-        m_network = new VoltNetwork( useMultipleThreads, true, 3, null);
-        m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
+        m_network = new VoltNetworkPool(
+                m_useMultipleThreads ? Runtime.getRuntime().availableProcessors() / 2 : 1,
+                        null);
         m_network.start();
-        m_pool = new DBBPool(false, arenaSizes, false);
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
 
@@ -479,34 +435,35 @@ class Distributer {
     }
 
     void createConnection(String host, String program, String password, int port)
-        throws UnknownHostException, IOException
+    throws UnknownHostException, IOException
     {
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(password);
         createConnectionWithHashedCredentials(host, program, hashedPassword, port);
     }
 
     synchronized void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
-        throws UnknownHostException, IOException
+    throws UnknownHostException, IOException
     {
-        final Object connectionStuff[] =
+        final Object socketChannelAndInstanceIdAndBuildString[] =
             ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port);
-        final SocketChannel aChannel = (SocketChannel)connectionStuff[0];
-        final long numbers[] = (long[])connectionStuff[1];
+        InetSocketAddress address = new InetSocketAddress(host, port);
+        final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
+        final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         if (m_clusterInstanceId == null) {
-            long timestamp = numbers[2];
-            int addr = (int)numbers[3];
+            long timestamp = instanceIdWhichIsTimestampAndLeaderIp[2];
+            int addr = (int)instanceIdWhichIsTimestampAndLeaderIp[3];
             m_clusterInstanceId = new Object[] { timestamp, addr };
         } else {
-            if (!(((Long)m_clusterInstanceId[0]).longValue() == numbers[2]) ||
-                !(((Integer)m_clusterInstanceId[1]).longValue() == numbers[3])) {
+            if (!(((Long)m_clusterInstanceId[0]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[2]) ||
+                    !(((Integer)m_clusterInstanceId[1]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[3])) {
                 aChannel.close();
                 throw new IOException(
                         "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
-                        + " and server's was " + numbers[2] + "," + numbers[3]);
+                                                                                                                         + " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
             }
         }
-        m_buildString = (String)connectionStuff[2];
-        NodeConnection cxn = new NodeConnection(numbers);
+        m_buildString = (String)socketChannelAndInstanceIdAndBuildString[2];
+        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
         m_connections.add(cxn);
         Connection c = m_network.registerChannel( aChannel, cxn);
         cxn.m_hostname = c.getHostnameOrIP();
@@ -514,14 +471,13 @@ class Distributer {
         cxn.m_connection = c;
     }
 
-//    private HashMap<String, Long> reportedSizes = new HashMap<String, Long>();
+    //    private HashMap<String, Long> reportedSizes = new HashMap<String, Long>();
 
     /**
      * Queue invocation on first node connection without backpressure. If there is none with without backpressure
      * then return false and don't queue the invocation
      * @param invocation
      * @param cb
-     * @param expectedSerializedSize
      * @param ignoreBackPressure If true the invocation will be queued even if there is backpressure
      * @return True if the message was queued and false if the message was not queued due to backpressure
      * @throws NoConnectionsException
@@ -529,11 +485,11 @@ class Distributer {
     boolean queue(
             ProcedureInvocation invocation,
             ProcedureCallback cb,
-            int expectedSerializedSize,
             final boolean ignoreBackpressure)
-        throws NoConnectionsException {
+    throws NoConnectionsException {
         NodeConnection cxn = null;
         boolean backpressure = true;
+
         /*
          * Synchronization is necessary to ensure that m_connections is not modified
          * as well as to ensure that backpressure is reported correctly
@@ -567,21 +523,15 @@ class Distributer {
          * createWork synchronizes on an individual connection which allows for more concurrency
          */
         if (cxn != null) {
-            if (m_useMultipleThreads) {
-                cxn.createWork(invocation.getHandle(), invocation.getProcName(),
-                        invocation, cb, ignoreBackpressure);
-            } else {
-                final FastSerializer fs = new FastSerializer(m_pool, expectedSerializedSize);
-                BBContainer c = null;
-                try {
-                    c = fs.writeObjectForMessaging(invocation);
-                } catch (IOException e) {
-                    fs.getBBContainer().discard();
-                    throw new RuntimeException(e);
-                }
-                cxn.createWork(invocation.getHandle(), invocation.getProcName(),
-                        c, cb, ignoreBackpressure);
+            ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
+            buf.putInt(buf.capacity() - 4);
+            try {
+                invocation.flattenToBuffer(buf);
+                buf.flip();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
+            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure);
         }
 
         return !backpressure;
@@ -599,9 +549,6 @@ class Distributer {
         m_ex.awaitTermination(1, TimeUnit.SECONDS);
 
         m_network.shutdown();
-        synchronized (this) {
-            m_pool.clear();
-        }
     }
 
     private void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
@@ -611,8 +558,8 @@ class Distributer {
                 continue;
             }
             try {
-               csl.uncaughtException(cb, r, t);
-               handledByClient = true;
+                csl.uncaughtException(cb, r, t);
+                handledByClient = true;
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -657,7 +604,13 @@ class Distributer {
         Map<Long, ClientIOStats> retval = new TreeMap<Long, ClientIOStats>();
 
         synchronized (this) {
-            Map<Long, Pair<String, long[]>> ioStats = m_network.getIOStats(false);
+            Map<Long, Pair<String, long[]>> ioStats;
+            try {
+                ioStats = m_network.getIOStats(false);
+            } catch (Exception e) {
+                return null;
+            }
+
             for (NodeConnection conn : m_connections) {
                 Pair<String, long[]> perConnIOStats = ioStats.get(conn.connectionId());
                 if (perConnIOStats == null) continue;
@@ -681,7 +634,7 @@ class Distributer {
         return m_buildString;
     }
 
-    public ArrayList<Long> getThreadIds() {
+    public List<Long> getThreadIds() {
         return m_network.getThreadIds();
     }
 }

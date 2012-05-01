@@ -72,7 +72,6 @@
 <property name='src.ee.parent.dir'           location='src/ee' />
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
-<property name='m1catalog'                   location='${src.test.dir}/org/voltdb/catalog/catalog.txt' />
 <property name='depcache'                    value='.depcache' />
 
 <!-- emma build instrumentation location -->
@@ -637,7 +636,8 @@ JAR BUILDING
 <target name="voltdb.jar" depends="compile, buildinfo">
     <jar destfile="voltdb/voltdb-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
-            <include name="org/voltdb/**" />
+            <include name="org/voltdb/**"/>
+            <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
@@ -867,13 +867,13 @@ NATIVE EE STUFF
     description="Build C++ JNI library."
     unless='uptodate_jni_h'>
     <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
-    <delete file="${src.ee.dir}/org_voltdb_utils_DBBPool.h" />
+    <delete file="${src.ee.dir}/org_voltcore_utils_DBBPool.h" />
     <move
         file='${build.dir}/org_voltdb_jni_ExecutionEngine.h'
         todir='${src.ee.dir}'
     />
     <move
-        file='${build.dir}/org_voltdb_utils_DBBPool.h'
+        file='${build.dir}/org_voltcore_utils_DBBPool.h'
         todir='${src.ee.dir}'
     />
 </target>
@@ -886,8 +886,8 @@ NATIVE EE STUFF
                 file2="${build.dir}/org_voltdb_jni_ExecutionEngine.h"
             />
             <filesmatch
-                file1="${src.ee.dir}/org_voltdb_utils_DBBPool.h"
-                file2="${build.dir}/org_voltdb_utils_DBBPool.h"
+                file1="${src.ee.dir}/org_voltcore_utils_DBBPool.h"
+                file2="${build.dir}/org_voltcore_utils_DBBPool.h"
             />
         </and>
     </condition>
@@ -895,7 +895,7 @@ NATIVE EE STUFF
 
 <target name='jnicompile_temp'>
     <delete file="${build.dir}/org_voltdb_jni_ExecutionEngine.h"/>
-    <delete file="${build.dir}/org_voltdb_utils_DBBPool.h" />
+    <delete file="${build.dir}/org_voltcore_utils_DBBPool.h" />
     <javah
         classpathref="project.classpath"
         force="yes"
@@ -907,7 +907,7 @@ NATIVE EE STUFF
         classpathref="project.classpath"
         force="yes"
         verbose="yes"
-        class="org.voltdb.utils.DBBPool"
+        class="org.voltcore.utils.DBBPool"
         destdir="${build.dir}"
     />
 </target>
@@ -915,7 +915,6 @@ NATIVE EE STUFF
 <target name="eecheck" depends="ee"
     description="Run testcases for C++ JNI library.">
     <exec dir='.' executable='python' failonerror='true'>
-        <env key='M1CATALOG_PATH' value='${m1catalog}' />
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <arg line="build.py ${build} test" />
@@ -1034,7 +1033,7 @@ TEST CASES
             <jvmarg value="-Djava.library.path=${build.dir}/nativelibs:${base.dir}/third_party/cpp/jnilib" />
             <jvmarg value="-server" />
             <jvmarg value="-Xcheck:jni" />
-            <jvmarg value="-Xmx2048m"/>
+            <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
@@ -1238,14 +1237,6 @@ TEST CASES
         unless="emma.enabled"
         message="JUnit had failures"
     />
-
-    <!-- Regenerate milestoneOneCatalog/ -->
-    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <unjar
-        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
-        dest='${build.dir}/expanded/milestoneOneCatalog'
-    />
 </target>
 
 <target name="junit" description="Run testcases for Java classes.">
@@ -1271,6 +1262,7 @@ TEST CASES
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/network/**/Test*.class'/>
                 <include name='org/voltdb/messaging/**/*Test.class'/>
@@ -1300,13 +1292,6 @@ TEST CASES
         message="JUnit had failures"
     />
 
-    <!-- Regenerate milestoneOneCatalog/ -->
-    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <unjar
-        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
-        dest='${build.dir}/expanded/milestoneOneCatalog'
-    />
 </target>
 
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
@@ -1442,7 +1427,6 @@ TEST CASES
     name='lcov-unit-tests'
     description="Run C++ unit tests from the coverage directory">
     <exec dir='.' executable='python' failonerror='true'>
-        <env key='M1CATALOG_PATH' value='${m1catalog}' />
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
         <arg line="build.py ${build} test coverage" />
     </exec>
@@ -1526,6 +1510,11 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
     </condition>
+    <!-- select which set of regression suite configuration types to run -->
+    <condition property="regressions" value="${regressions}" else="all">
+        <isset property="regressions"/>
+    </condition>
+
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
         <formatters>
             <formatter usefile="false" type="plain"/>
@@ -1572,43 +1561,6 @@ TEST CASES
         target='main'
     />
     <delete dir='${dist.dir}/foo' />
-</target>
-
-<target name='m1test_pre' depends='ee, compile'>
-    <mkdir dir='${build.testoutput.dir}' />
-    <junit fork="yes" printsummary='yes' haltonfailure="yes" showoutput='true'>
-        <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="PLANNER" value="${planner}" />
-        <classpath refid='project.classpath' />
-        <formatter type="plain" unless="hudson"/>
-        <formatter type="xml" if="hudson"/>
-        <batchtest todir="${build.testoutput.dir}">
-            <fileset dir='${build.test.dir}'>
-                <include name='org/voltdb/compiler/TestMilestoneOneCompile.class'/>
-                <exclude name="**/*$*.class"/>
-            </fileset>
-        </batchtest>
-        <assertions><enable/></assertions>
-    </junit>
-    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <unjar
-        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
-        dest='${build.dir}/expanded/milestoneOneCatalog'
-    />
-    <copy
-        file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-        todir='${build.test.dir}/org/voltdb/catalog'
-    />
-    <copy
-          file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-          todir='${build.test.dir}/org/voltdb/catalog'
-    />
-    <copy
-          file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-          todir='${src.test.dir}/org/voltdb/catalog/'
-    />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"

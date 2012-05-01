@@ -19,8 +19,8 @@ package org.voltdb;
 
 import java.util.HashSet;
 
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.Mailbox;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * A class that instantiates an ExecutionSite and then waits for notification before
@@ -30,45 +30,48 @@ import org.voltdb.messaging.Mailbox;
 public class ExecutionSiteRunner implements Runnable {
 
     volatile boolean m_isSiteCreated = false;
-    final int m_siteId;
+    long m_siteId;
     private final String m_serializedCatalog;
     volatile ExecutionSite m_siteObj;
     private final boolean m_recovering;
     private final boolean m_replicationActive;
-    private final HashSet<Integer> m_failedHostIds;
     private final long m_txnId;
+    private final Mailbox m_mailbox;
+    private final int m_configuredNumberOfPartitions;
 
     public ExecutionSiteRunner(
-            final int siteId,
+            Mailbox mailbox,
             final CatalogContext context,
             final String serializedCatalog,
             boolean recovering,
             boolean replicationActive,
-            HashSet<Integer> failedHostIds,
-            VoltLogger hostLog) {
-        m_siteId = siteId;
+            VoltLogger hostLog,
+            int configuredNumberOfPartitions) {
+        m_mailbox = mailbox;
         m_serializedCatalog = serializedCatalog;
         m_recovering = recovering;
         m_replicationActive = replicationActive;
-        m_failedHostIds = failedHostIds;
         m_txnId = context.m_transactionId;
+        m_configuredNumberOfPartitions = configuredNumberOfPartitions;
     }
 
     @Override
     public void run() {
-        Mailbox mailbox = VoltDB.instance().getMessenger()
-        .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, true);
+        m_siteId = m_mailbox.getHSId();
 
-        m_siteObj =
-            new ExecutionSite(VoltDB.instance(),
-                              mailbox,
-                              m_siteId,
-                              m_serializedCatalog,
-                              null,
-                              m_recovering,
-                              m_replicationActive,
-                              m_failedHostIds,
-                              m_txnId);
+        try {
+            m_siteObj = new ExecutionSite(VoltDB.instance(),
+                                          m_mailbox,
+                                          m_serializedCatalog,
+                                          null,
+                                          m_recovering,
+                                          m_replicationActive,
+                                          m_txnId,
+                                          m_configuredNumberOfPartitions);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+
         synchronized (this) {
             m_isSiteCreated = true;
             this.notifyAll();
@@ -87,14 +90,14 @@ public class ExecutionSiteRunner implements Runnable {
             // Even though OOM should be caught by the Throwable section below,
             // it sadly needs to be handled seperately. The goal here is to make
             // sure VoltDB crashes.
-
-            String errmsg = "ExecutionSite: " + m_siteId + " ran out of Java memory. " +
+            e.printStackTrace();
+            String errmsg = "ExecutionSite: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) + " ran out of Java memory. " +
                 "This node will shut down.";
             VoltDB.crashLocalVoltDB(errmsg, true, e);
         }
         catch (Throwable t)
         {
-            String errmsg = "ExecutionSite: " + m_siteId + " encountered an " +
+            String errmsg = "ExecutionSite: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) + " encountered an " +
                 "unexpected error and will die, taking this VoltDB node down.";
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }

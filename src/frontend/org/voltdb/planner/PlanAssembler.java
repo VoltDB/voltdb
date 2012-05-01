@@ -25,6 +25,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -93,9 +94,6 @@ public class PlanAssembler {
     /** does the statement touch more than one partition? */
     final boolean m_singlePartition;
 
-    /** The number of partitions (fetched from the cluster info) */
-    final int m_partitionCount;
-
     /**
      * Used to generate the table-touching parts of a plan. All join-order and
      * access path selection stuff is done by the SelectSubPlanAssember.
@@ -123,7 +121,6 @@ public class PlanAssembler {
     PlanAssembler(Cluster catalogCluster, Database catalogDb, boolean singlePartition) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
-        m_partitionCount = m_catalogCluster.getPartitions().size();
         m_singlePartition = singlePartition;
     }
 
@@ -207,8 +204,7 @@ public class PlanAssembler {
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             subAssembler =
                 new SelectSubPlanAssembler(m_catalogDb,
-                                           parsedStmt, m_singlePartition,
-                                           m_partitionCount);
+                                           parsedStmt, m_singlePartition);
         } else {
             // check that no modification happens to views
             if (tableListIncludesView(parsedStmt.tableList)) {
@@ -225,7 +221,7 @@ public class PlanAssembler {
                 }
                 m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
                 subAssembler =
-                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition, m_partitionCount);
+                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition);
             } else if (parsedStmt instanceof ParsedDeleteStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
@@ -233,7 +229,7 @@ public class PlanAssembler {
                 }
                 m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
                 subAssembler =
-                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition, m_partitionCount);
+                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition);
             } else
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");

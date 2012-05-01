@@ -1234,22 +1234,6 @@ TEST_F(CatalogTest, AddSomething) {
 "\nset /clusters[cluster]/databases[database]/procedures[AddThing]/parameters[1] type 6"
 "\nset /clusters[cluster]/databases[database]/procedures[AddThing]/parameters[1] isarray false"
 "\nset /clusters[cluster]/databases[database]/procedures[AddThing]/parameters[1] index 1"
-"\nadd /clusters[cluster] hosts 0"
-"\nset /clusters[cluster]/hosts[0] ipaddr \"\""
-"\nadd /clusters[cluster] partitions 0"
-"\nadd /clusters[cluster] partitions 1"
-"\nadd /clusters[cluster] sites 0"
-"\nset /clusters[cluster]/sites[0] isexec false"
-"\nset /clusters[cluster]/sites[0] host /clusters[cluster]/hosts[0]"
-"\nset /clusters[cluster]/sites[0] partition null"
-"\nadd /clusters[cluster] sites 1"
-"\nset /clusters[cluster]/sites[1] isexec true"
-"\nset /clusters[cluster]/sites[1] host /clusters[cluster]/hosts[0]"
-"\nset /clusters[cluster]/sites[1] partition /clusters[cluster]/partitions[0]"
-"\nadd /clusters[cluster] sites 2"
-"\nset /clusters[cluster]/sites[2] isexec true"
-"\nset /clusters[cluster]/sites[2] host /clusters[cluster]/hosts[0]"
-"\nset /clusters[cluster]/sites[2] partition /clusters[cluster]/partitions[1]"
         );
 }
 

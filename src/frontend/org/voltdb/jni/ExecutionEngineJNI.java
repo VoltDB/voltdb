@@ -20,8 +20,8 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
@@ -30,11 +30,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -69,7 +67,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * that rely on being able to serialize large results sets will get the same amount of storage
      * when using the IPC backend.
      **/
-    private final BBContainer deserializerBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+    private final BBContainer deserializerBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
     private FastDeserializer deserializer =
         new FastDeserializer(deserializerBufferOrigin.b);
 
@@ -79,23 +77,24 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     private ByteBuffer fallbackBuffer = null;
 
-    private final BBContainer exceptionBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
+    private final BBContainer exceptionBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
     private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b;
 
     /**
      * initialize the native Engine object.
      */
     public ExecutionEngineJNI(
-            final ExecutionSite site,
             final int clusterIndex,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             final int hostId,
             final String hostname,
-            final int tempTableMemory)
+            final int tempTableMemory,
+            final int totalPartitions)
     {
-        // base class loads the volt shared library
-        super(site);
+        // base class loads the volt shared library.
+        super();
+
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
                 + ", site_id = " + siteId + "...");
@@ -115,7 +114,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     partitionId,
                     hostId,
                     hostname,
-                    tempTableMemory * 1024 * 1024);
+                    tempTableMemory * 1024 * 1024,
+                    totalPartitions);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
             @Override
@@ -128,7 +128,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                         exceptionBuffer, exceptionBuffer.capacity());
                 checkErrorCode(code);
             }
-        }, null);
+        });
 
         errorCode = nativeSetBuffers(pointer, fsForParameterSet.getContainerNoFlip().b,
                 fsForParameterSet.getContainerNoFlip().b.capacity(),
@@ -209,8 +209,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param undoToken Token identifying undo quantum for generated undo info
      */
     @Override
-    public DependencyPair executePlanFragment(final long planFragmentId,
-                                              final int outputDepId,
+    public VoltTable executePlanFragment(final long planFragmentId,
                                               final int inputDepId,
                                               final ParameterSet parameterSet,
                                               final long txnId,
@@ -235,7 +234,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // checkMaxFsSize();
         // Execute the plan, passing a raw pointer to the byte buffer.
         deserializer.clear();
-        final int errorCode = nativeExecutePlanFragment(pointer, planFragmentId, outputDepId, inputDepId,
+        final int errorCode = nativeExecutePlanFragment(pointer, planFragmentId, 0, inputDepId,
                                                         txnId, lastCommittedTxnId, undoToken);
         try {
             checkErrorCode(errorCode);
@@ -256,7 +255,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     dependencies[i] = fds.readObject(VoltTable.class);
                 }
                 assert(depIds.length == 1);
-                return new DependencyPair(depIds[0], dependencies[0]);
+                return dependencies[0];
             } catch (final IOException ex) {
                 LOG.error("Failed to deserialze result dependencies" + ex);
                 throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
@@ -268,7 +267,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable executeCustomPlanFragment(final String plan, final int outputDepId,
+    public VoltTable executeCustomPlanFragment(final String plan,
             final int inputDepId, final long txnId, final long lastCommittedTxnId,
             final long undoQuantumToken) throws EEException
     {
@@ -277,7 +276,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //C++ JSON deserializer is not thread safe, must synchronize
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeExecuteCustomPlanFragment(pointer, plan, outputDepId, inputDepId,
+            errorCode = nativeExecuteCustomPlanFragment(pointer, plan, 0, inputDepId,
                                                         txnId, lastCommittedTxnId, undoQuantumToken);
         }
         try {
@@ -317,7 +316,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int numParameterSets,
             final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException {
 
-        assert (planFragmentIds.length == parameterSets.length);
         if (numFragmentIds == 0) return new VoltTable[0];
         final int batchSize = numFragmentIds;
         if (LOG.isTraceEnabled()) {

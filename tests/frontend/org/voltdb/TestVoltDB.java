@@ -120,10 +120,10 @@ public class TestVoltDB extends TestCase {
         config = new VoltDB.Configuration(new String[]{"catalog", "catalog.jar"});
         assertTrue(config.validate());
 
-        // empty leader
+        // empty leader -- tests could pass in empty leader to indicate bind to all interfaces on mac
         String[] argsyo = {"leader", "", "catalog", "sdfs", "deployment", "sdfsd"};
         config = new VoltDB.Configuration(argsyo);
-        assertFalse(config.validate());
+        assertTrue(config.validate());
 
         // empty deployment
         String[] args6 = {"leader", "hola", "catalog", "teststring6", "deployment", ""};

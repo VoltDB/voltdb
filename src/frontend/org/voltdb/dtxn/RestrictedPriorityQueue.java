@@ -20,13 +20,15 @@ package org.voltdb.dtxn;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.PriorityQueue;
 
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.HeartbeatResponseMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
+import org.voltcore.messaging.HeartbeatResponseMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state
@@ -41,10 +43,8 @@ import org.voltdb.messaging.VoltMessage;
  * <p>This class manages all that state.</p>
  */
 public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> {
-    @SuppressWarnings("unused")
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final long serialVersionUID = 1L;
-    private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
+    private final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
 
     public enum QueueState {
         UNBLOCKED,
@@ -64,7 +64,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         long m_lastSafeTxnId;
     }
 
-    final LinkedHashMap<Integer, LastInitiatorData> m_initiatorData = new LinkedHashMap<Integer, LastInitiatorData>();
+    final LinkedHashMap<Long, LastInitiatorData> m_initiatorData = new LinkedHashMap<Long, LastInitiatorData>();
     final LinkedList<RoadBlock> m_roadblocks = new LinkedList<RoadBlock>();
 
     /**
@@ -94,6 +94,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     }
 
     public void makeRoadBlock(long blockAfter, QueueState blockReason, VoltMessage action) {
+        action.m_sourceHSId = m_siteId;
         RoadBlock roadblock = new RoadBlock(blockAfter, blockReason, action);
         m_roadblocks.add(roadblock);
         Collections.sort(m_roadblocks);
@@ -116,11 +117,10 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     }
 
     long m_newestCandidateTransaction = -1;
-    final int m_siteId;
+    final long m_siteId;
     long m_txnsPopped = 0;
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
-    private final int m_mailboxId;
     final boolean m_useSafetyDance;
 
     /**
@@ -128,11 +128,10 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * are later referenced that aren't in this list, trip
      * an assertion.
      */
-    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId, Mailbox mbox, int mailboxId, boolean useSafetyDance) {
+    public RestrictedPriorityQueue(long[] initiatorHSIds, long siteId, Mailbox mbox, boolean useSafetyDance) {
         m_siteId = siteId;
         m_mailbox = mbox;
-        m_mailboxId = mailboxId;
-        for (int id : initiatorSiteIds)
+        for (long id : initiatorHSIds)
             m_initiatorData.put(id, new LastInitiatorData());
         m_useSafetyDance = useSafetyDance;
     }
@@ -176,7 +175,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      */
     @Override
     public boolean add(OrderableTransaction txnState) {
-        if (m_initiatorData.containsKey(txnState.initiatorSiteId) == false) {
+        if (m_initiatorData.containsKey(txnState.initiatorHSId) == false) {
             return false;
         }
         boolean retval = super.add(txnState);
@@ -196,22 +195,23 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    public long noteTransactionRecievedAndReturnLastSeen(int initiatorSiteId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
+    public long noteTransactionRecievedAndReturnLastSeen(long initiatorHSId, long txnId,
+            boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
         // System.out.printf("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d\n",
-        //                   m_siteId, initiatorSiteId, txnId, lastSafeTxnIdFromInitiator);
+        //                   m_siteId, initiatorHSId, txnId, lastSafeTxnIdFromInitiator);
 
         // this doesn't exclude dummy txnid but is also a sanity check
         assert(txnId != 0);
 
         // Drop old data from already-failed initiators.
-        if (m_initiatorData.containsKey(initiatorSiteId) == false) {
-            //hostLog.info("Dropping txn " + txnId + " data from failed initiatorSiteId: " + initiatorSiteId);
+        if (m_initiatorData.containsKey(initiatorHSId) == false) {
+            //hostLog.info("Dropping txn " + txnId + " data from failed initiatorHSId: " + initiatorSiteId);
             return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
         }
 
         // update the latest transaction for the specified initiator
-        LastInitiatorData lid = m_initiatorData.get(initiatorSiteId);
+        LastInitiatorData lid = m_initiatorData.get(initiatorHSId);
         if (lid.m_lastSeenTxnId < txnId)
             lid.m_lastSeenTxnId = txnId;
         if (lid.m_lastSafeTxnId < lastSafeTxnIdFromInitiator)
@@ -261,13 +261,12 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * and do not require heartbeats from that initiator to proceed.
      * @param initiatorId id of the failed initiator.
      */
-    public void gotFaultForInitiator(int initiatorId) {
+    public void gotFaultForInitiator(long initiatorId) {
         // calculate the next minimum transaction w/o our dead friend
         noteTransactionRecievedAndReturnLastSeen(initiatorId, Long.MAX_VALUE, true, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
 
         // remove initiator from minimum. txnid scoreboard
-        LastInitiatorData remove = m_initiatorData.remove(initiatorId);
-        assert(remove != null);
+        m_initiatorData.remove(initiatorId);
     }
 
     public void faultTransaction(OrderableTransaction txnState) {
@@ -280,7 +279,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * @param initiatorId Initiator present in the catalog.
      * @return The number of initiators that weren't known
      */
-    public int ensureInitiatorIsKnown(int initiatorId) {
+    public int ensureInitiatorIsKnown(long initiatorId) {
         int newInitiatorCount = 0;
         if (m_initiatorData.get(initiatorId) == null) {
             m_initiatorData.put(initiatorId, new LastInitiatorData());
@@ -301,7 +300,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * Used to figure out what to do after an initiator fails.
      * @param initiatorId The id of the initiator that has failed.
      */
-    public Long getNewestSafeTransactionForInitiator(int initiatorId) {
+    public Long getNewestSafeTransactionForInitiator(long initiatorId) {
         LastInitiatorData lid = m_initiatorData.get(initiatorId);
         if (lid == null) {
             return null;
@@ -367,7 +366,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         assert (newState == QueueState.UNBLOCKED);
 
         // Remember, an 'in recovery' response satisfies the safety dance
-        lid = m_initiatorData.get(ts.initiatorSiteId);
+        lid = m_initiatorData.get(ts.initiatorHSId);
         if (lid == null) {
             // what does this mean???
         }
@@ -420,7 +419,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         HeartbeatResponseMessage hbr =
             new HeartbeatResponseMessage(m_siteId, lid.m_lastSeenTxnId, true);
         try {
-            m_mailbox.send(ts.initiatorSiteId, m_mailboxId, hbr);
+            m_mailbox.send(ts.initiatorHSId, hbr);
         } catch (MessagingException e) {
             // I really hope this doesn't happen
             throw new RuntimeException(e);
@@ -472,5 +471,23 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
             // bingo - have a real transaction to return as the recovery point
             return next.txnId;
         }
+    }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("State: ").append(m_state);
+        for (Map.Entry<Long, LastInitiatorData> entry : m_initiatorData.entrySet()) {
+            LastInitiatorData lid = entry.getValue();
+            sb.append(' ');
+            sb.append(CoreUtils.hsIdToString(entry.getKey()));
+            sb.append("==");
+            sb.append(lid.m_lastSeenTxnId);
+            sb.append(':');
+            sb.append(lid.m_lastSafeTxnId);
+            sb.append(' ');
+        }
+        sb.append('\n');
+        sb.append(super.toString());
+        return sb.toString();
     }
 }

@@ -28,6 +28,7 @@ import java.util.concurrent.ThreadFactory;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.utils.Base64;
 import org.xerial.snappy.Snappy;
 
 public final class CompressionService {

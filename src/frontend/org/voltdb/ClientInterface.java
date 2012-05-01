@@ -46,9 +46,26 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.Connection;
+import org.voltcore.network.InputHandler;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
@@ -62,31 +79,12 @@ import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.network.Connection;
-import org.voltdb.network.InputHandler;
-import org.voltdb.network.NIOReadStream;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltNetwork;
-import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.network.WriteStream;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.Pair;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -139,7 +137,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     static final int POKE_INTERVAL = 1000;
 
     private final int m_allPartitions[];
-    final int m_siteId;
+    final long m_siteId;
+    final long m_plannerSiteId;
 
     final Mailbox m_mailbox;
 
@@ -222,7 +221,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public class ClientAcceptor implements Runnable {
         private final int m_port;
         private final ServerSocketChannel m_serverSocket;
-        private final VoltNetwork m_network;
+        private final VoltNetworkPool m_network;
         private volatile boolean m_running = true;
         private Thread m_thread = null;
         private final boolean m_isAdmin;
@@ -241,7 +240,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         });
 
-        ClientAcceptor(int port, VoltNetwork network, boolean isAdmin)
+        ClientAcceptor(int port, VoltNetworkPool network, boolean isAdmin)
         {
             m_network = network;
             m_port = port;
@@ -369,13 +368,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         socket.socket().setKeepAlive(true);
 
                                         if (handler instanceof ClientInputHandler) {
+                                            Connection c = m_network.registerChannel(socket, handler, 0);
                                             synchronized (m_connections){
-                                                Connection c = null;
                                                 if (!m_hasDTXNBackPressure) {
-                                                    c = m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
-                                                }
-                                                else {
-                                                    c = m_network.registerChannel(socket, handler, 0);
+                                                    c.enableReadSelection();
                                                 }
                                                 m_connections.add(c);
                                             }
@@ -605,8 +601,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 responseBuffer.put((byte)0);
                 responseBuffer.putInt(VoltDB.instance().getHostMessenger().getHostId());
                 responseBuffer.putLong(handler.connectionId());
-                responseBuffer.putLong((Long)VoltDB.instance().getInstanceId()[0]);
-                responseBuffer.putInt((Integer)VoltDB.instance().getInstanceId()[1]);
+                responseBuffer.putLong(VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp());
+                responseBuffer.putInt(VoltDB.instance().getHostMessenger().getInstanceId().getCoord());
                 responseBuffer.putInt(buildString.length);
                 responseBuffer.put(buildString).flip();
                 socket.write(responseBuffer);
@@ -664,16 +660,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public int getExpectedOutgoingMessageSize() {
-            return FastSerializer.INITIAL_ALLOCATION;
-        }
-
-        @Override
         public void handleMessage(ByteBuffer message, Connection c) {
             try {
                 final ClientResponseImpl error = handleRead(message, this, c);
                 if (error != null) {
-                    c.writeStream().enqueue(error);
+                    ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    error.flattenToBuffer(buf).flip();
+                    c.writeStream().enqueue(buf);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -683,8 +677,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void started(final Connection c) {
             m_connection = c;
-            final String user = m_username != null && !m_username.isEmpty() ? m_username : "<none>";
-            authLog.debug("Connecting user " + user + " at host " + m_hostname);
         }
 
         @Override
@@ -696,8 +688,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public void stopped(Connection c) {
             m_numConnections.decrementAndGet();
             m_initiator.removeConnectionStats(connectionId());
-            final String user = m_username != null && !m_username.isEmpty() ? m_username : "<none>";
-            authLog.debug("Disconnecting user " + user + " at host " + m_hostname);
         }
 
         @Override
@@ -818,58 +808,50 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Static factory method to easily create a ClientInterface with the default
      * settings.
+     * @throws Exception
      */
     public static ClientInterface create(
-            VoltNetwork network,
-            Messenger messenger,
+            HostMessenger messenger,
             CatalogContext context,
             ReplicationRole replicationRole,
             SimpleDtxnInitiator initiator,
-            int hostCount,
-            int siteId,
-            int initiatorId,
+            int partitionCount,
             int port,
             int adminPort,
-            long timestampTestingSalt) {
+            long timestampTestingSalt) throws Exception {
 
         // create a list of all partitions
-        int[] allPartitions = new int[context.numberOfPartitions];
+        int[] allPartitions = new int[partitionCount];
         int index = 0;
-        for (Partition partition : context.cluster.getPartitions()) {
-            allPartitions[index++] = Integer.parseInt(partition.getTypeName());
+        for (Integer partition : VoltDB.instance().getSiteTracker().m_partitionsToSitesImmutable.keySet()) {
+            allPartitions[index++] = partition;
         }
-        assert(index == context.numberOfPartitions);
 
         /*
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, network, replicationRole, siteId, initiator, allPartitions);
+           port, adminPort, context, messenger, replicationRole, initiator, allPartitions);
 
         initiator.setClientInterface(ci);
         return ci;
     }
 
-    ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network,
-                    ReplicationRole replicationRole, int siteId, TransactionInitiator initiator,
-                    int[] allPartitions)
+    ClientInterface(int port, int adminPort, CatalogContext context, HostMessenger messenger,
+                    ReplicationRole replicationRole, TransactionInitiator initiator,
+                    int[] allPartitions) throws Exception
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
-
-        m_siteId = siteId;
-
-        m_acceptor = new ClientAcceptor(port, network, false);
-
+        m_acceptor = new ClientAcceptor(port, messenger.getNetwork(), false);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(adminPort, network, true);
-
+        m_adminAcceptor = new ClientAcceptor(adminPort, messenger.getNetwork(), true);
         registerPolicies(replicationRole);
 
-        m_mailbox = new LocalMailbox(VoltDB.instance().getHostMessenger(), siteId) {
+        m_mailbox = new LocalMailbox(VoltDB.instance().getHostMessenger()) {
             LinkedBlockingDeque<VoltMessage> m_d = new LinkedBlockingDeque<VoltMessage>();
             @Override
             public void deliver(final VoltMessage message) {
@@ -880,8 +862,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return m_d.poll();
             }
         };
-        VoltDB.instance().getHostMessenger().
-            createMailbox(siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID, m_mailbox);
+        messenger.createMailbox(null, m_mailbox);
+        m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
+        registerMailbox(messenger.getZK());
+        m_siteId = m_mailbox.getHSId();
+    }
+
+    /**
+     * Publishes the HSId of this execution site to ZK
+     * @param zk
+     * @param partitionId
+     * @throws Exception
+     */
+    private void registerMailbox(ZooKeeper zk) throws Exception {
+        MailboxNodeContent mnc = new MailboxNodeContent(m_mailbox.getHSId(), null);
+        VoltDB.instance().getMailboxPublisher().registerMailbox(MailboxType.ClientInterface, mnc);
+        VoltDB.instance().getMailboxPublisher().publish(zk);
     }
 
     private void registerPolicies(ReplicationRole replicationRole) {
@@ -957,16 +953,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
-    public void initializeSnapshotDaemon() {
-        m_snapshotDaemon.init(this, VoltDB.instance().getZK());
+    public void initializeSnapshotDaemon(ZooKeeper zk) {
+        m_snapshotDaemon.init(this, zk);
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID
     // in the cluster, make our SnapshotDaemon responsible for snapshots
     public void mayActivateSnapshotDaemon() {
         SnapshotSchedule schedule = m_catalogContext.get().database.getSnapshotschedule().get("default");
-        if (m_siteId ==
-                m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId() &&
+        if (VoltDB.instance().getSiteTracker().isFirstHost() &&
             schedule != null && schedule.getEnabled())
         {
             Future<Void> future = m_snapshotDaemon.makeActive(schedule);
@@ -1008,19 +1003,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
-        String sql = (String) params.m_params[0];
+        String sql = (String) params.toArray()[0];
 
         // get the partition param if it exists
         // null means MP-txn
         Object partitionParam = null;
-        if (params.m_params.length > 1) {
-            if (params.m_params[1] == null) {
+        if (params.toArray().length > 1) {
+            if (params.toArray()[1] == null) {
                 // nulls map to zero
                 partitionParam = new Long(0);
                 // skip actual null value because it means MP txn
             }
             else {
-                partitionParam = params.m_params[1];
+                partitionParam = params.toArray()[1];
             }
         }
 
@@ -1043,14 +1038,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         LocalObjectMessage work = new LocalObjectMessage(
                 new AdHocPlannerWork(
-                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                    m_siteId,
                     false, task.clientHandle, handler.connectionId(),
                     handler.m_hostname, handler.isAdmin(), ccxn,
                     sql, partitionParam));
 
         try {
-            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
-                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+            m_mailbox.send(m_plannerSiteId, work);
         } catch (MessagingException ex) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
@@ -1064,10 +1058,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         ParameterSet params = task.getParams();
         byte[] catalogBytes = null;
-        if (params.m_params[0] instanceof String) {
-            catalogBytes = Encoder.hexDecode((String) params.m_params[0]);
-        } else if (params.m_params[0] instanceof byte[]) {
-            catalogBytes = (byte[]) params.m_params[0];
+        if (params.toArray()[0] instanceof String) {
+            catalogBytes = Encoder.hexDecode((String) params.toArray()[0]);
+        } else if (params.toArray()[0] instanceof byte[]) {
+            catalogBytes = (byte[]) params.toArray()[0];
         } else {
             // findbugs triggers a NPE alert here... and the
             // policy check is pretty far away from here.
@@ -1078,16 +1072,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     " Catalog content must be passed as string or byte[].",
                     task.clientHandle);
         }
-        String deploymentString = (String) params.m_params[1];
+        String deploymentString = (String) params.toArray()[1];
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
-                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                    m_siteId,
                     task.clientHandle, handler.connectionId(), handler.m_hostname,
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString));
 
         try {
-            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
-                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+            // XXX: need to know the async compiler mailbox id.
+            m_mailbox.send(m_plannerSiteId, work);
         } catch (MessagingException ex) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
@@ -1132,7 +1126,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
         // DR uses the new StatsAgent. Other stats do not.
-        if ((params.m_params.length != 0) && (((String)params.toArray()[0]).equals("DR"))) {
+        if ((params.toArray().length != 0) && (((String)params.toArray()[0]).equals("DR"))) {
             try {
                 VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "DR");
                 return null;
@@ -1193,7 +1187,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final FastDeserializer fds = new FastDeserializer(buf);
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
         ClientResponseImpl error = null;
-
 
         // Check for admin mode restrictions before proceeding any further
         VoltDBInterface instance = VoltDB.instance();
@@ -1277,12 +1270,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 ParameterSet params = task.getParams();
                 // hacky: support old @SystemInformation behavior by
                 // filling in a missing selector to get the overview key/value info
-                if (params.m_params.length == 0) {
-                    params.m_params = new Object[1];
-                    params.m_params[0] = new String("OVERVIEW");
+                if (params.toArray().length == 0) {
+                    task.setParams("OVERVIEW");
                 }
-                //So that the modified version is reserialized, null out the lazy copy
-                task.unserializedParams = null;
             }
 
             // the shared dispatch for sysprocs
@@ -1361,16 +1351,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             partitions = m_allPartitions;
         }
 
-        task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-            @Override
-            public ParameterSet call() {
-                ParameterSet params = new ParameterSet();
-                params.m_params = new Object[] {
-                        plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                        plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0};
-                return params;
-            }
-        });
+        task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                       plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         task.clientHandle = plannedStmt.clientHandle;
 
         /*
@@ -1427,20 +1409,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         LocalObjectMessage work = new LocalObjectMessage(
                                 new AdHocPlannerWork(
-                                    m_siteId, VoltDB.CLIENT_INTERFACE_MAILBOX_ID,
+                                    m_siteId,
                                     false, plannedStmt.clientHandle, plannedStmt.connectionId,
                                     plannedStmt.hostname, plannedStmt.adminConnection, plannedStmt.clientData,
                                     plannedStmt.sql, plannedStmt.partitionParam));
 
                         try {
-                            m_mailbox.send(VoltDB.instance().getAgreementSite().siteId(),
-                                    VoltDB.ASYNC_COMPILER_MAILBOX_ID, work);
+                            // XXX: Need to know the async mailbox id.
+                            m_mailbox.send(Long.MIN_VALUE, work);
                         } catch (MessagingException ex) {
                             final ClientResponseImpl errorResponse =
                                 new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                                         new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
                                         plannedStmt.clientHandle);
-                            ((Connection)(plannedStmt.clientData)).writeStream().enqueue(errorResponse);
+                            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                            buf.putInt(buf.capacity() + 4);
+                            errorResponse.flattenToBuffer(buf);
+                            buf.flip();
+                            ((Connection)(plannedStmt.clientData)).writeStream().enqueue(buf);
                         }
                     }
                     else {
@@ -1452,18 +1438,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // create the execution site task
                     StoredProcedureInvocation task = new StoredProcedureInvocation();
                     task.procName = "@UpdateApplicationCatalog";
-                    task.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-                        @Override
-                        public ParameterSet call() {
-                            ParameterSet params = new ParameterSet();
-                            params.m_params = new Object[] {
-                                    changeResult.encodedDiffCommands, changeResult.catalogBytes,
-                                    changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                    changeResult.deploymentCRC
-                            };
-                            return params;
-                        }
-                    });
+                    task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
+                                   changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                                   changeResult.deploymentCRC);
                     task.clientHandle = changeResult.clientHandle;
 
                     /*
@@ -1504,7 +1481,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0], result.errorMsg,
                             result.clientHandle);
                 final Connection c = (Connection) result.clientData;
-                c.writeStream().enqueue(errorResponse);
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                errorResponse.flattenToBuffer(buf);
+                buf.flip();
+                c.writeStream().enqueue(buf);
             }
         }
     }
@@ -1674,35 +1655,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public boolean enqueue(BBContainer c) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean enqueue(FastSerializable f) {
-            m_snapshotDaemon.processClientResponse((ClientResponseImpl) f,
-                    ((ClientResponseImpl) f).getClientHandle());
-            return true;
-        }
-
-        @Override
-        public boolean enqueue(FastSerializable f, int expectedSize) {
-            m_snapshotDaemon.processClientResponse((ClientResponseImpl) f,
-                    ((ClientResponseImpl) f).getClientHandle());
-            return true;
-        }
-
-        @Override
-        public boolean enqueue(DeferredSerialization ds) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean enqueue(ByteBuffer b) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
         public boolean hadBackPressure() {
             throw new UnsupportedOperationException();
         }
@@ -1718,11 +1670,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public void scheduleRunnable(Runnable r) {
-        }
-
-        @Override
-        public void unregister() {
+        public Future<?> unregister() {
+            return null;
         }
 
         @Override
@@ -1735,6 +1684,46 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public int getOutstandingMessageCount()
         {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void enqueue(org.voltcore.utils.DeferredSerialization ds)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void enqueue(ByteBuffer b)
+        {
+            ClientResponseImpl resp = new ClientResponseImpl();
+            b.position(4);
+            try
+            {
+                resp.initFromBuffer(b);
+            }
+            catch (IOException ioe)
+            {
+                hostLog.error("Unable to deserialize ClientResponse from snapshot",
+                              ioe);
+                return;
+            }
+            m_snapshotDaemon.processClientResponse(resp,
+                                                   resp.getClientHandle());
+        }
+
+        @Override
+        public void enqueue(ByteBuffer[] b)
+        {
+            if (b.length == 1)
+            {
+                // Buffer chains are currently not used, just hand the first
+                // buffer to the single buffer handler
+                enqueue(b[0]);
+            }
+            else
+            {
+                log.error("Something is using buffer chains with enqueue");
+            }
         }
     }
 

@@ -97,7 +97,7 @@ public class TestPartitionDetection extends TestCase
 
 
     static class Callback implements ProcedureCallback {
-        private Semaphore m_rateLimit;
+        private final Semaphore m_rateLimit;
         public Callback(Semaphore rateLimit) {
             m_rateLimit = rateLimit;
         }
@@ -118,7 +118,7 @@ public class TestPartitionDetection extends TestCase
     }
 
     static class CallbackGood implements ProcedureCallback {
-        private Semaphore m_rateLimit;
+        private final Semaphore m_rateLimit;
         public static AtomicBoolean allOk = new AtomicBoolean(true);
 
         public CallbackGood(Semaphore rateLimit) {

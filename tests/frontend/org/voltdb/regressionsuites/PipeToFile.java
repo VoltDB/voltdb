@@ -100,7 +100,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
                         String[] split = data.split(" ");
                         synchronized(this) {
                             try {
-                                m_hostId = Integer.parseInt(split[split.length - 1]);
+                                m_hostId = Long.valueOf(split[split.length - 1].split(":")[0]).intValue();
                             } catch (java.lang.NumberFormatException e) {
                                 System.err.println("Had a number format exception processing line: '" + data + "'");
                                 throw e;

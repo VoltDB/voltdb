@@ -26,9 +26,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -39,8 +37,6 @@ import org.voltdb.utils.MiscUtils;
 public final class ClientImpl implements Client, ReplicaProcCaller {
 
     private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
-
-    private final int m_expectedOutgoingMessageSize;
 
     /*
      * Username and password as set by createConnection. Used
@@ -84,10 +80,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
-        m_expectedOutgoingMessageSize = config.m_expectedOutgoingMessageSize;
         m_distributer = new Distributer(
-                config.m_expectedOutgoingMessageSize,
-                config.m_maxArenaSizes,
                 config.m_heavyweight,
                 config.m_procedureCallTimeoutMS,
                 config.m_connectionResponseTimeoutMS);
@@ -207,10 +200,14 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new NoConnectionsException("Client instance is shutdown");
         }
 
+        if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
+            throw new IOException("Can't invoke a procedure synchronously from with the client callback thread " +
+                    " without deadlocking the client library");
+        }
+
         m_distributer.queue(
                 invocation,
                 cb,
-                m_expectedOutgoingMessageSize,
                 true);
 
         try {
@@ -238,13 +235,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         if (m_isShutdown) {
             return false;
         }
-        return callProcedure(callback, m_expectedOutgoingMessageSize, procName, parameters);
+        return callProcedure(callback, 0, procName, parameters);
     }
 
     /**
-     * Asynchronously invoke a replicated procedure. Does not guarantee that the
-     * invocation is actually queued. If there is backpressure on all
-     * connections to the cluster then the invocation will not be queued. Check
+     * Asynchronously invoke a replicated procedure. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check
      * the return value to determine if queuing actually took place.
      *
      * @param callback ProcedureCallback that will be invoked with procedure results.
@@ -266,7 +263,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         ProcedureInvocation invocation =
             new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(callback, m_expectedOutgoingMessageSize, invocation);
+        return private_callProcedure(callback, 0, invocation);
     }
 
     @Override
@@ -274,16 +271,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             Object... parameters) {
         final ProcedureInvocation invocation =
             new ProcedureInvocation(0, procName, parameters);
-        final FastSerializer fds = new FastSerializer();
-        int size = 0;
-        try {
-            final BBContainer c = fds.writeObjectForMessaging(invocation);
-            size = c.b.remaining();
-            c.discard();
-        } catch (final IOException e) {
-            throw new RuntimeException(e);
-        }
-        return size;
+        return invocation.getSerializedSize();
     }
 
     @Override
@@ -298,10 +286,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(callback, expectedSerializedSize, invocation);
+        return private_callProcedure(callback, expectedSerializedSize, invocation);
     }
 
-    private final boolean callProcedure(
+    private final boolean private_callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
             ProcedureInvocation invocation)
@@ -320,7 +308,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             while (!m_distributer.queue(
                     invocation,
                     callback,
-                    expectedSerializedSize,
                     isBlessed)) {
                 try {
                     backpressureBarrier();
@@ -333,7 +320,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.queue(
                     invocation,
                     callback,
-                    expectedSerializedSize,
                     isBlessed);
         }
     }

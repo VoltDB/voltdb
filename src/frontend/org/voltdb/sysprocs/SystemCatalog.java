@@ -27,7 +27,9 @@ import org.voltdb.ProcInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.logging.VoltLogger;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Procedure;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Return VoltTable results that correspond to JDBC result sets for selected

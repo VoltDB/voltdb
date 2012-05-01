@@ -23,23 +23,21 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltdb.agreement.AgreementSite;
+import org.voltcore.messaging.HostMessenger;
+
+import org.voltdb.dtxn.MailboxPublisher;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
+
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.Messenger;
-import org.voltdb.network.VoltNetwork;
 
 public interface VoltDBInterface
 {
-
-    public AgreementSite getAgreementSite();
-
     public boolean recovering();
 
     /*
      * Invoked from the command log once this node is marked unfaulted.
+     * Allows its command log to be used for recovery
      */
     public void recoveryComplete();
 
@@ -69,47 +67,19 @@ public interface VoltDBInterface
 
     public VoltDB.Configuration getConfig();
     public CatalogContext getCatalogContext();
+    public SiteTracker getSiteTracker();
     public String getBuildString();
     public String getVersionString();
-    public Object[] getInstanceId();
-    public Messenger getMessenger();
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
-    public Map<Integer, ExecutionSite> getLocalSites();
-    public VoltNetwork getNetwork();
+    public Map<Long, ExecutionSite> getLocalSites();
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
-    public Map<Integer, String> getClusterMetadataMap();
+    public MailboxPublisher getMailboxPublisher();
 
-    /**
-     * Open a connection to a rejoining node and create a foreign host for it.
-     *
-     * @param currentTxnId The current transaction doing the rejoin.
-     * @param rejoinHostId The host id of the node joining the cluster.
-     * @param rejoiningHostname The IP hostname of the joining node.
-     * @param portToConnect The port to connect to the joining node on.
-     * @param liveHosts Set of live hosts in the cluster
-     * @return Null on success and an error string on failure.
-     */
-    public String doRejoinPrepare(
-            long currentTxnId,
-            int rejoinHostId,
-            String rejoiningHostname,
-            int portToConnect,
-            Set<Integer> liveHosts);
-
-    /**
-     * Either integrate the created forign host for the rejoining node into
-     * the set of active ones, or throw it out and clean up.
-     *
-     * @param currentTxnId The current transaction doing the rejoin.
-     * @param commit Add the new node in, or throw it out.
-     * @return Null on success and an error string on failure.
-     */
-    public String doRejoinCommitOrRollback(long currentTxnId, boolean commit);
 
     /**
      * Update the global logging context in the server.
@@ -133,13 +103,6 @@ public interface VoltDBInterface
            int expectedCatalogVersion, long currentTxnId, long deploymentCRC);
 
    /**
-    * Updates the physical cluster configuration stored in the catalog at this server.
-    *
-    * @param diffCommands  The catalog commands that will update the cluster config
-    */
-   void clusterUpdate(String diffCommands);
-
-   /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
      * when the run() method is called, and set to false when shutting down.
      *
@@ -151,8 +114,6 @@ public interface VoltDBInterface
      * Notify RealVoltDB that recovery is complete
      */
     void onExecutionSiteRecoveryCompletion(long transferred);
-
-    void onAgreementSiteRecoveryCompletion();
 
     /**
      * Set the operational mode this server should be in once it has finished
@@ -186,17 +147,7 @@ public interface VoltDBInterface
      */
     public OperationMode getMode();
 
-    ZooKeeper getZK();
-
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
-
-    /**
-     * Takes bytes, presumably received over the network, and
-     * write them to to a temp file so it can be used.
-     *
-     * @param catalogBytes The raw bytes of the catalog.
-     */
-    public void writeNetworkCatalogToTmp(byte[] catalogBytes);
 
     /**
      * Schedule a work to be performed once or periodically.

@@ -23,30 +23,32 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
-import org.voltdb.messaging.VoltMessage;
 
 public class MultiPartitionParticipantTxnState extends TransactionState {
 
     protected final ArrayDeque<WorkUnit> m_readyWorkUnits = new ArrayDeque<WorkUnit>();
     protected boolean m_isCoordinator;
-    protected final int m_siteId;
-    protected int[] m_nonCoordinatingSites;
+    protected final long m_hsId;
+    protected long[] m_nonCoordinatingSites;
     protected boolean m_shouldResumeProcedure = false;
     protected boolean m_hasStartedWork = false;
     protected HashMap<Integer, WorkUnit> m_missingDependencies = null;
@@ -55,7 +57,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     protected final StoredProcedureInvocation m_invocation; // for DR sending purposes
 
     private InitiateResponseMessage m_response;
-    private HashSet<Integer> m_outstandingAcks = null;
+    private HashSet<Long> m_outstandingAcks = null;
     private final java.util.concurrent.atomic.AtomicBoolean m_durabilityFlag;
     private final InitiateTaskMessage m_task;
 
@@ -74,7 +76,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                              TransactionInfoBaseMessage notice)
     {
         super(mbox, site, notice);
-        m_siteId = site.getSiteId();
+        m_hsId = site.getSiteId();
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
         //Check to make sure we are the coordinator, it is possible to get an intiate task
@@ -84,17 +86,17 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             // keep this around for DR purposes
             m_invocation = ((InitiateTaskMessage) notice).getStoredProcedureInvocation();
 
-            if (notice.getCoordinatorSiteId() == m_siteId) {
+            if (notice.getCoordinatorHSId() == m_hsId) {
                 m_isCoordinator = true;
                 m_task = (InitiateTaskMessage) notice;
                 m_durabilityFlag = m_task.getDurabilityFlagIfItExists();
                 SiteTracker tracker = site.getSiteTracker();
                 // Add this check for tests which use a mock execution site
                 if (tracker != null) {
-                    m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_siteId);
+                    m_nonCoordinatingSites = tracker.getAllSitesExcluding(m_hsId);
                 }
                 m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
-                                                  null, m_siteId,
+                                                  null, m_hsId,
                                                   null, false));
             } else {
                 m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
@@ -109,7 +111,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     @Override
     public String toString() {
-        return "MultiPartitionParticipantTxnState initiator: " + initiatorSiteId +
+        return "MultiPartitionParticipantTxnState initiator: " + initiatorHSId +
             " coordinator: " + m_isCoordinator +
             " in-progress: " + m_hasStartedWork +
             " txnId: " + TransactionIdManager.toString(txnId);
@@ -234,7 +236,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                                                        boolean requiresAck)
     {
         CompleteTransactionMessage ft =
-            new CompleteTransactionMessage(initiatorSiteId,
+            new CompleteTransactionMessage(initiatorHSId,
                                            coordinatorSiteId,
                                            txnId,
                                            true,
@@ -257,7 +259,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             m_needsRollback = true;
         }
 
-        m_outstandingAcks = new HashSet<Integer>();
+        m_outstandingAcks = new HashSet<Long>();
         // if this transaction was readonly then don't require acks.
         // We still need to send the completion message, however,
         // since there are a number of circumstances where the coordinator
@@ -265,9 +267,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         // completed.
         if (!isReadOnly())
         {
-            for (int site_id : m_nonCoordinatingSites)
+            for (long hsid : m_nonCoordinatingSites)
             {
-                m_outstandingAcks.add(site_id);
+                m_outstandingAcks.add(hsid);
             }
         }
         // send commit notices to everyone
@@ -277,7 +279,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
         try
         {
-            m_mbox.send(m_nonCoordinatingSites, 0, complete_msg);
+            m_mbox.send(m_nonCoordinatingSites, complete_msg);
         }
         catch (MessagingException e) {
             throw new RuntimeException(e);
@@ -286,7 +288,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         if (m_outstandingAcks.size() == 0)
         {
             try {
-                m_mbox.send(initiatorSiteId, 0, m_response);
+                m_mbox.send(initiatorHSId, m_response);
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
             }
@@ -331,7 +333,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         else
         {
             try {
-                m_mbox.send(response.getDestinationSiteId(), 0, response);
+                m_mbox.send(response.getDestinationSiteId(), response);
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
             }
@@ -348,7 +350,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     void processRecoveringFragmentWork(FragmentTaskMessage ftask, HashMap<Integer, List<VoltTable>> dependencies) {
         assert(ftask.getFragmentCount() > 0);
 
-        FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_siteId);
+        FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_hsId);
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
 
@@ -359,7 +361,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         }
 
         try {
-            m_mbox.send(response.getDestinationSiteId(), 0, response);
+            m_mbox.send(response.getDestinationSiteId(), response);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
@@ -371,7 +373,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         assert(dependencies.length > 0);
 
         WorkUnit w = new WorkUnit(m_site.getSiteTracker(), null, dependencies,
-                                  m_siteId, m_nonCoordinatingSites, true);
+                                  m_hsId, m_nonCoordinatingSites, true);
         if (isFinal)
             w.nonTransactional = true;
         for (int depId : dependencies) {
@@ -403,7 +405,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         assert(m_isCoordinator); // Participant can't set m_nonCoordinatingSites
         try {
             // send to all non-coordinating sites
-            m_mbox.send(m_nonCoordinatingSites, 0, task);
+            m_mbox.send(m_nonCoordinatingSites, task);
             // send to this site
             createLocalFragmentWork(task, false);
         }
@@ -425,7 +427,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
         WorkUnit w = new WorkUnit(m_site.getSiteTracker(), task,
                                   task.getAllUnorderedInputDepIds(),
-                                  m_siteId, m_nonCoordinatingSites, false);
+                                  m_hsId, m_nonCoordinatingSites, false);
         w.nonTransactional = nonTransactional;
 
         for (int i = 0; i < task.getFragmentCount(); i++) {
@@ -509,7 +511,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 w.putDummyDependency(dependencyId, response.getExecutorSiteId());
             }
             else {
-                w.putDependency(dependencyId, response.getExecutorSiteId(), payload);
+                w.putDependency(dependencyId, response.getExecutorSiteId(), payload, m_site.getSiteTracker());
             }
             if (w.allDependenciesSatisfied()) {
                 handleWorkUnitComplete(w);
@@ -531,10 +533,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         if (complete.requiresAck())
         {
             CompleteTransactionResponseMessage ctrm =
-                new CompleteTransactionResponseMessage(complete, m_siteId);
+                new CompleteTransactionResponseMessage(complete, m_hsId);
             try
             {
-                m_mbox.send(complete.getCoordinatorSiteId(), 0, ctrm);
+                m_mbox.send(complete.getCoordinatorHSId(), ctrm);
             }
             catch (MessagingException e) {
                 throw new RuntimeException(e);
@@ -551,7 +553,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         if (m_outstandingAcks.size() == 0)
         {
             try {
-                m_mbox.send(initiatorSiteId, 0, m_response);
+                m_mbox.send(initiatorHSId, m_response);
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
             }
@@ -614,7 +616,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             if (m_outstandingAcks.size() == 0)
             {
                 try {
-                    m_mbox.send(initiatorSiteId, 0, m_response);
+                    m_mbox.send(initiatorHSId, m_response);
                 } catch (MessagingException e) {
                     throw new RuntimeException(e);
                 }
@@ -625,7 +627,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     // for test only
     @Deprecated
-    public int[] getNonCoordinatingSites() {
+    public long[] getNonCoordinatingSites() {
         return m_nonCoordinatingSites;
     }
 
@@ -646,19 +648,19 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
      * here is to make internal book keeping right.
      */
     @Override
-    public void handleSiteFaults(HashSet<Integer> failedSites)
+    public void handleSiteFaults(HashSet<Long> failedSites)
     {
         // remove failed sites from the non-coordinating lists
         // and decrement expected dependency response count
         if (m_nonCoordinatingSites != null) {
-            ArrayDeque<Integer> newlist = new ArrayDeque<Integer>(m_nonCoordinatingSites.length);
+            ArrayDeque<Long> newlist = new ArrayDeque<Long>(m_nonCoordinatingSites.length);
             for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
                 if (!failedSites.contains(m_nonCoordinatingSites[i])) {
                 newlist.addLast(m_nonCoordinatingSites[i]);
                 }
             }
 
-            m_nonCoordinatingSites = new int[newlist.size()];
+            m_nonCoordinatingSites = new long[newlist.size()];
             for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
                 m_nonCoordinatingSites[i] = newlist.removeFirst();
             }
@@ -670,7 +672,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         {
             for (WorkUnit wu : m_missingDependencies.values())
             {
-                for (Integer site_id : failedSites)
+                for (Long site_id : failedSites)
                 {
                     wu.removeSite(site_id);
                 }
@@ -682,7 +684,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         // be waiting on.
         if (m_outstandingAcks != null)
         {
-            for (Integer site_id : failedSites)
+            for (Long site_id : failedSites)
             {
                 m_outstandingAcks.remove(site_id);
             }
@@ -693,10 +695,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     // SOME DAY MAYBE FOR MORE GENERAL TRANSACTIONS
 
     @Override
-    public void createFragmentWork(int[] partitions, FragmentTaskMessage task) {
+    public void createFragmentWork(long[] partitions, FragmentTaskMessage task) {
         try {
             // send to all specified sites (possibly including this one)
-            m_mbox.send(partitions, 0, task);
+            m_mbox.send(partitions, task);
         }
         catch (MessagingException e) {
             throw new RuntimeException(e);

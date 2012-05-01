@@ -29,10 +29,11 @@ import java.io.File;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.*;
-import org.voltdb.VoltDB;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.SnapshotSchedule;
 
 public class TestFaultDistributor extends TestCase
@@ -44,7 +45,6 @@ public class TestFaultDistributor extends TestCase
         int m_order;
         OrderTracker m_orderTracker;
         Semaphore m_handledFaults = new Semaphore(0);
-        Semaphore m_clearedFaults = new Semaphore(0);
 
         public MockFaultHandler(FaultType type)
         {
@@ -75,11 +75,6 @@ public class TestFaultDistributor extends TestCase
                 }
             }
             m_handledFaults.release();
-        }
-
-        @Override
-        public void faultCleared(Set<VoltFault> faults) {
-            m_clearedFaults.release();
         }
     }
 
@@ -120,14 +115,14 @@ public class TestFaultDistributor extends TestCase
     {
         FaultDistributor dut = new FaultDistributor(m_voltdb);
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.UNKNOWN);
-        MockFaultHandler node_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
+        MockFaultHandler node_handler = new MockFaultHandler(FaultType.SITE_FAILURE);
         dut.registerFaultHandler(1, unk_handler, FaultType.UNKNOWN);
-        dut.registerFaultHandler(1, node_handler, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(1, node_handler, FaultType.SITE_FAILURE);
         dut.reportFault(new VoltFault(FaultType.UNKNOWN));
         unk_handler.m_handledFaults.acquire();
         assertTrue(unk_handler.m_gotFault);
         assertFalse(node_handler.m_gotFault);
-        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        dut.reportFault(new VoltFault(FaultType.SITE_FAILURE));
         node_handler.m_handledFaults.acquire();
         assertTrue(node_handler.m_gotFault);
     }
@@ -136,11 +131,11 @@ public class TestFaultDistributor extends TestCase
     public void testMultiHandler() throws Exception
     {
         FaultDistributor dut = new FaultDistributor(m_voltdb);
-        MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(1, node_handler1, FaultType.NODE_FAILURE);
-        MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(1, node_handler2, FaultType.NODE_FAILURE);
-        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(1, node_handler1, FaultType.SITE_FAILURE);
+        MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(1, node_handler2, FaultType.SITE_FAILURE);
+        dut.reportFault(new VoltFault(FaultType.SITE_FAILURE));
         node_handler1.m_handledFaults.acquire();
         node_handler2.m_handledFaults.acquire();
         assertTrue(node_handler1.m_gotFault);
@@ -153,9 +148,9 @@ public class TestFaultDistributor extends TestCase
         FaultDistributor dut = new FaultDistributor(m_voltdb);
         // We lie a little bit here to get the NODE_FAILURE routed to UNKNOWN
         // but still set the checking bool correctly
-        MockFaultHandler unk_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
+        MockFaultHandler unk_handler = new MockFaultHandler(FaultType.SITE_FAILURE);
         dut.registerDefaultHandler(unk_handler);
-        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        dut.reportFault(new VoltFault(FaultType.SITE_FAILURE));
         unk_handler.m_handledFaults.acquire();
         assertTrue(unk_handler.m_gotFault);
     }
@@ -165,26 +160,26 @@ public class TestFaultDistributor extends TestCase
         FaultDistributor dut = new FaultDistributor(m_voltdb);
         OrderTracker order_tracker = new OrderTracker(-1);
         MockFaultHandler node_handler1 =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 1, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 1, order_tracker);
         MockFaultHandler node_handler2 =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 2, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 2, order_tracker);
         MockFaultHandler node_handler2a =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 2, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 2, order_tracker);
         MockFaultHandler node_handler5 =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 5, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 5, order_tracker);
         MockFaultHandler node_handler5a =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 5, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 5, order_tracker);
         MockFaultHandler node_handler7 =
-            new MockFaultHandler(FaultType.NODE_FAILURE, 7, order_tracker);
+            new MockFaultHandler(FaultType.SITE_FAILURE, 7, order_tracker);
         // register handlers in non-sequential order to avoid getting lucky
         // with insertion order
-        dut.registerFaultHandler(7, node_handler7, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(2, node_handler2a, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(5, node_handler5, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(1, node_handler1, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(5, node_handler5a, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(2, node_handler2, FaultType.NODE_FAILURE);
-        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        dut.registerFaultHandler(7, node_handler7, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(2, node_handler2a, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(5, node_handler5, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(1, node_handler1, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(5, node_handler5a, FaultType.SITE_FAILURE);
+        dut.registerFaultHandler(2, node_handler2, FaultType.SITE_FAILURE);
+        dut.reportFault(new VoltFault(FaultType.SITE_FAILURE));
         node_handler7.m_handledFaults.acquire();
         assertTrue(node_handler1.m_gotFault);
         assertTrue(node_handler2.m_gotFault);
@@ -193,29 +188,6 @@ public class TestFaultDistributor extends TestCase
         assertTrue(node_handler5a.m_gotFault);
         assertTrue(node_handler7.m_gotFault);
         assertTrue(order_tracker.m_goodOrder);
-    }
-
-    public void testFaultClearing() throws Exception
-    {
-        FaultDistributor dut = new  FaultDistributor(m_voltdb);
-        OrderTracker orderTracker = new OrderTracker(-1);
-        MockFaultHandler mh1 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
-        MockFaultHandler mh2 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
-        dut.registerFaultHandler(1, mh1, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(1, mh2, FaultType.NODE_FAILURE);
-        VoltFault theFault = new VoltFault(FaultType.NODE_FAILURE);
-        dut.reportFault(theFault);
-
-        // this is really a race against the other thread. but
-        // will test momentarily that the clear() api is called.
-        // if this fails intermittently at all, will have to (fix
-        // the software) and write a more deterministic test
-        assertEquals(0, mh1.m_clearedFaults.availablePermits());
-        assertEquals(0, mh2.m_clearedFaults.availablePermits());
-
-        dut.reportFaultCleared(theFault);
-        mh1.m_clearedFaults.acquire();
-        mh2.m_clearedFaults.acquire();
     }
 
     // trigger PPD
@@ -227,28 +199,29 @@ public class TestFaultDistributor extends TestCase
         voltdb.setFaultDistributor(dut);
         VoltDB.replaceVoltDBInstanceForTest(voltdb);
 
-        voltdb.addPartition(1);
+        Long site100 = CoreUtils.getHSIdFromHostAndSite(0, 100);
+        Long site1000 = CoreUtils.getHSIdFromHostAndSite(0, 1000);
+        voltdb.addSite(site100, 1);
+        voltdb.addSite(site1000, MailboxType.Initiator);
 
-        voltdb.addHost(0);
-        voltdb.addSite(100, 0, 1, true);
-        voltdb.addSite(1000, 0, 1, false);
-
-        voltdb.addHost(1);
-        voltdb.addSite(101, 0, 1, true);
-        voltdb.addSite(1010, 0, 1, false);
+        Long site101 = CoreUtils.getHSIdFromHostAndSite(0, 101);
+        Long site1010 = CoreUtils.getHSIdFromHostAndSite(0, 1010);
+        voltdb.addSite(site101, 1);
+        voltdb.addSite(site1010, MailboxType.Initiator);
         voltdb.getCatalogContext();
 
         // set sites at host 0 down... as if the catalog were updated
         // and the surviving set was not the blessed host id.
-        voltdb.killSite(100);
-        voltdb.killSite(1000);
+        voltdb.killSite(site100);
+        voltdb.killSite(site1000);
 
-        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
-        failedSiteIds.add(100);
-        failedSiteIds.add(1000);
+        HashSet<Long> failedSiteIds = new HashSet<Long>();
+        failedSiteIds.add(site100);
+        failedSiteIds.add(site1000);
 
         // should get a PPD now.
-        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
+        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(
+                failedSiteIds, VoltDB.instance().getSiteTracker());
         assertEquals(PPDPolicyDecision.PartitionDetection, makePPDPolicyDecisions);
     }
 
@@ -261,28 +234,30 @@ public class TestFaultDistributor extends TestCase
         voltdb.setFaultDistributor(dut);
         VoltDB.replaceVoltDBInstanceForTest(voltdb);
 
-        voltdb.addPartition(1);
+        Long site100 = CoreUtils.getHSIdFromHostAndSite(0, 100);
+        Long site1000 = CoreUtils.getHSIdFromHostAndSite(0, 1000);
+        voltdb.addSite(site100, 1);
+        voltdb.addSite(site1000, MailboxType.Initiator);
 
-        voltdb.addHost(0);
-        voltdb.addSite(100, 0, 1, true);
-        voltdb.addSite(1000, 0, 1, false);
-
-        voltdb.addHost(1);
-        voltdb.addSite(101, 1, 1, true);
-        voltdb.addSite(1010, 1, 1, false);
+        Long site101 = CoreUtils.getHSIdFromHostAndSite(1, 101);
+        Long site1010 = CoreUtils.getHSIdFromHostAndSite(1, 1010);
+        voltdb.addSite(site101, 1);
+        voltdb.addSite(site1010, MailboxType.Initiator);
         voltdb.getCatalogContext();
 
         // set sites at host 1 down... as if the catalog were updated
         // and the surviving set contained the blessed host id.
-        voltdb.killSite(101);
-        voltdb.killSite(1010);
+        voltdb.killSite(site101);
+        voltdb.killSite(site1010);
 
-        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
-        failedSiteIds.add(101);
-        failedSiteIds.add(1010);
+        HashSet<Long> failedSiteIds = new HashSet<Long>();
+        failedSiteIds.add(site101);
+        failedSiteIds.add(site1010);
 
         // should get a PPD now.
-        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
+        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(
+                failedSiteIds,
+                VoltDB.instance().getSiteTracker());
         assertEquals(PPDPolicyDecision.NodeFailure, makePPDPolicyDecisions);
     }
 

@@ -64,7 +64,6 @@ import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -82,8 +81,8 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
@@ -709,7 +708,7 @@ public abstract class CatalogUtil {
      * @return Returns a reference to the root <deployment> element.
      */
     @SuppressWarnings("unchecked")
-    private static DeploymentType getDeployment(InputStream deployIS) {
+    public static DeploymentType getDeployment(InputStream deployIS) {
         try {
             JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
             // This schema shot the sheriff.
@@ -811,7 +810,6 @@ public abstract class CatalogUtil {
         if (!config.validate()) {
             hostLog.error(config.getErrorMsg());
         } else {
-            ClusterCompiler.compile(catalog, config);
             Cluster catCluster = catalog.getClusters().get("cluster");
             // copy the deployment info that is currently not recorded anywhere else
             Deployment catDeploy = catCluster.getDeployment().get("deployment");

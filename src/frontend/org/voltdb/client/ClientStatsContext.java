@@ -214,6 +214,12 @@ public class ClientStatsContext {
 
     Map<Long, ClientIOStats> diffIO(Map<Long, ClientIOStats> newer, Map<Long, ClientIOStats> older) {
         Map<Long, ClientIOStats> retval = new TreeMap<Long, ClientIOStats>();
+        if (newer == null) {
+            return retval;
+        }
+        if (older == null) {
+            return newer;
+        }
         for (Entry<Long, ClientIOStats> e : newer.entrySet()) {
             if (older.containsKey(e.getKey())) {
                 retval.put(e.getKey(), ClientIOStats.diff(e.getValue(), older.get(e.getKey())));

@@ -22,11 +22,18 @@
  */
 package org.voltdb.dtxn;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
 import junit.framework.TestCase;
 
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
@@ -34,14 +41,11 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.fault.FaultDistributor;
-import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.HostMessenger;
+import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.network.WriteStream;
-import org.voltdb.utils.EstTime;
 
 public class TestDtxnInitiatorMailbox extends TestCase
 {
@@ -51,7 +55,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
     MockVoltDB m_mockVolt = null;
 
-    class MockWriteStream extends org.voltdb.network.MockWriteStream
+    private final Map<Long, Integer> m_siteMap = new HashMap<Long, Integer>();
+
+    class MockWriteStream extends org.voltcore.network.MockWriteStream
     {
         boolean m_gotResponse;
 
@@ -71,11 +77,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public synchronized boolean enqueue(FastSerializable f)
+        public synchronized void enqueue(ByteBuffer buf)
         {
             m_gotResponse = true;
             notify();
-            return false;
         }
     }
 
@@ -83,7 +88,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
     };
 
-    class MockConnection extends org.voltdb.network.MockConnection
+    class MockConnection extends org.voltcore.network.MockConnection
     {
         MockWriteStream m_writeStream;
 
@@ -168,7 +173,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds) {
+        public void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
             // TODO Auto-generated method stub
 
         }
@@ -210,7 +215,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
     {
         long now = EstTime.currentTimeMillis();
         InFlightTxnState retval = new InFlightTxnState(
-                txnId, coordIds[0], null, new int[]{}, readOnly,
+                txnId, coordIds[0], null, new long[]{}, readOnly,
                 isSinglePart, new StoredProcedureInvocation(),
                 m_testConnect, MESSAGE_SIZE, now, 0, "", false);
         if (coordIds.length > 1) {
@@ -251,11 +256,17 @@ public class TestDtxnInitiatorMailbox extends TestCase
         VoltDB.crashMessage = null;
         VoltDB.wasCrashCalled = false;
         VoltDB.ignoreCrash = true;
-        m_mockVolt.addHost(HOST_ID);
-        m_mockVolt.addPartition(0);
-        m_mockVolt.addSite(1, HOST_ID, 0, true);
-        m_mockVolt.addSite(0, HOST_ID, 0, true);
-        m_mockVolt.addSite(2, HOST_ID, 0, false);
+
+        Long site1 = CoreUtils.getHSIdFromHostAndSite(HOST_ID, 1);
+        Long site0 = CoreUtils.getHSIdFromHostAndSite(HOST_ID, 0);
+        Long site2 = CoreUtils.getHSIdFromHostAndSite(HOST_ID, 2);
+        m_mockVolt.addSite( site1, 0);
+        m_mockVolt.addSite( site0, 0);
+        m_mockVolt.addSite( site2, MailboxType.Initiator);
+        m_siteMap.clear();
+        m_siteMap.put(site0, 0);
+        m_siteMap.put(site1, 0);
+        m_siteMap.put(site2, 0);
         m_mockVolt.setFaultDistributor(new FaultDistributor(m_mockVolt));
         VoltDB.replaceVoltDBInstanceForTest(m_mockVolt);
     }
@@ -268,9 +279,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testNonReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
+        dim.setHSId(INITIATOR_SITE_ID);
         m_testStream.reset();
         // Single-partition read-only txn
         dim.addPendingTxn(createTxnState(0, new int[] {0}, true, true));
@@ -306,9 +318,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
+        dim.setHSId(INITIATOR_SITE_ID);
         m_testStream.reset();
         // Single-partition read-only txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
@@ -339,9 +352,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testRecoveringBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
+        dim.setHSId(INITIATOR_SITE_ID);
 
         m_testStream.reset();
         // Single-partition read-only txn
@@ -400,9 +414,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testInconsistentResults()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
+        dim.setHSId(INITIATOR_SITE_ID);
+
         m_testStream.reset();
         // Single-partition read-only txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
@@ -457,9 +473,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testEarlyReadWriteFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
+        dim.setHSId(INITIATOR_SITE_ID);
+
         m_testStream.reset();
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
@@ -473,9 +491,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testMidReadWriteFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
+        dim.setHSId(INITIATOR_SITE_ID);
+
         m_testStream.reset();
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
@@ -489,9 +509,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testMultipleTxnIdMidFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
+        dim.setHSId(INITIATOR_SITE_ID);
+
         m_testStream.reset();
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
@@ -520,21 +542,21 @@ public class TestDtxnInitiatorMailbox extends TestCase
     public void testFaultNotification() throws Exception
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState =
-            new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_siteMap);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(safetyState, m_mockMessenger);
         dim.setInitiator(initiator);
+        dim.setHSId(INITIATOR_SITE_ID);
+
         m_testStream.reset();
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
 
         synchronized (m_testStream) {
-            NodeFailureFault node_failure = new NodeFailureFault(
-                    HOST_ID,
-                    m_mockVolt.getCatalogContext().siteTracker.getNonExecSitesForHost(HOST_ID),
-                    "localhost");
-            VoltDB.instance().getFaultDistributor().reportFault(node_failure);
+            SiteFailureFault site_failure = new SiteFailureFault(
+                    Arrays.asList(new Long[] { 0L })// the non exec site in setUp()
+                    );
+            VoltDB.instance().getFaultDistributor().reportFault(site_failure);
             m_testStream.wait(10000);
         }
 

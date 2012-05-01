@@ -268,6 +268,7 @@ public class SQLCommand
                             System.out.println("\n--- User Views ---------------------------------------------");
                         else
                             System.out.println("\n--- User Export Streams ------------------------------------");
+                        @SuppressWarnings("unchecked")
                         Iterator<String> list = ((TreeSet<String>)lists[i]).iterator();
                         while(list.hasNext())
                             System.out.println(list.next());
@@ -690,7 +691,6 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> Types = Arrays.asList("tinyint","smallint","integer","bigint","float","decimal","varchar","timestamp","varbinary");
     private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
@@ -860,7 +860,6 @@ public class SQLCommand
         while (procs.advanceRow())
         {
             String proc_name = procs.getString("PROCEDURE_NAME");
-            Integer param_count = proc_param_counts.get(proc_name);
             ArrayList<String> this_params = new ArrayList<String>();
             // prepopulate it to make sure the size is right
             if (proc_param_counts.get(proc_name) != null)

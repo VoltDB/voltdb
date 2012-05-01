@@ -47,10 +47,7 @@ public class TestDefaultDeployment extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(ddl);
-        builder.addProcedures(
-                org.voltdb.compiler.procedures.MilestoneOneInsert.class,
-                org.voltdb.compiler.procedures.MilestoneOneSelect.class,
-                org.voltdb.compiler.procedures.MilestoneOneCombined.class);
+        builder.addStmtProcedure("hello", "select * from warehouse");
 
         // compileWithDefaultDeployment() generates no deployment.xml so that the default is used.
         String jarPath = Configuration.getPathToCatalogForTest("test.jar");

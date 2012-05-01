@@ -28,7 +28,7 @@ static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
 }
 
-ExecutorContext::ExecutorContext(CatalogId siteId,
+ExecutorContext::ExecutorContext(int64_t siteId,
                 CatalogId partitionId,
                 UndoQuantum *undoQuantum,
                 Topend* topend,
