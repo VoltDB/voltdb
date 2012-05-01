@@ -62,7 +62,7 @@ namespace voltdb {
 
 /** Function static helper templated functions to vivify an optimal
     comparison class. */
-AbstractExpression*
+static AbstractExpression*
 getGeneral(ExpressionType c,
            AbstractExpression *l,
            AbstractExpression *r)
@@ -93,7 +93,7 @@ getGeneral(ExpressionType c,
 
 
 template <typename L, typename R>
-AbstractExpression*
+static AbstractExpression*
 getMoreSpecialized(ExpressionType c, L* l, R* r)
 {
     assert (l);
@@ -122,8 +122,7 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
 /** convert the enumerated value type into a concrete c type for the
  * comparison helper templates. */
 AbstractExpression *
-comparisonFactory(ExpressionType c,
-                  AbstractExpression *lc, AbstractExpression *rc)
+ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
     assert(lc);
     /*printf("left: %s\n", left_optimized->debug("").c_str());
@@ -149,26 +148,22 @@ comparisonFactory(ExpressionType c,
 
     // this will inline getValue(), hooray!
     if (l_const != NULL && r_const != NULL) { // CONST-CONST can it happen?
-        return getMoreSpecialized<ConstantValueExpression,
-            ConstantValueExpression>(c, l_const, r_const);
+        return getMoreSpecialized<ConstantValueExpression, ConstantValueExpression>(et, l_const, r_const);
     } else if (l_const != NULL && r_tuple != NULL) { // CONST-TUPLE
-        return getMoreSpecialized<ConstantValueExpression,
-          TupleValueExpression>(c, l_const, r_tuple);
+        return getMoreSpecialized<ConstantValueExpression, TupleValueExpression>(et, l_const, r_tuple);
     } else if (l_tuple != NULL && r_const != NULL) { // TUPLE-CONST
-        return getMoreSpecialized<TupleValueExpression,
-          ConstantValueExpression >(c, l_tuple, r_const);
+        return getMoreSpecialized<TupleValueExpression, ConstantValueExpression >(et, l_tuple, r_const);
     } else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
-        return getMoreSpecialized<TupleValueExpression,
-          TupleValueExpression>(c, l_tuple, r_tuple);
+        return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
     }
 
     //okay, still getTypedValue is beneficial.
-    return getGeneral(c, lc, rc);
+    return getGeneral(et, lc, rc);
 }
 
 /** convert the enumerated value type into a concrete c type for the
  *  operator expression templated ctors */
-AbstractExpression *
+static AbstractExpression *
 operatorFactory(ExpressionType et,
                 AbstractExpression *lc, AbstractExpression *rc)
 {
@@ -218,9 +213,9 @@ operatorFactory(ExpressionType et,
    return ret;
 }
 
-/** convert the enumerated value type into a concrete c type for
+/** convert the enumerated value type into a concrete type for
  * constant value expressions templated ctors */
-AbstractExpression*
+static AbstractExpression*
 constantValueFactory(json_spirit::Object &obj,
                      ValueType vt, ExpressionType et,
                      AbstractExpression *lc, AbstractExpression *rc)
@@ -242,7 +237,7 @@ constantValueFactory(json_spirit::Object &obj,
     if (isNull)
     {
         newvalue = NValue::getNullValue(vt);
-        return constantValueFactory(newvalue);
+        return new ConstantValueExpression(newvalue);
     }
 
     json_spirit::Value valueValue = json_spirit::find_value( obj, "VALUE");
@@ -295,20 +290,13 @@ constantValueFactory(json_spirit::Object &obj,
                                       " type");
     }
 
-    return constantValueFactory(newvalue);
-}
-
-/** provide an interface for creating constant value expressions that
- * is more useful to testcases */
-AbstractExpression *
-constantValueFactory(const NValue &newvalue)
-{
     return new ConstantValueExpression(newvalue);
 }
 
+
 /** convert the enumerated value type into a concrete c type for
  * parameter value expression templated ctors */
-AbstractExpression*
+static AbstractExpression*
 parameterValueFactory(json_spirit::Object &obj,
                       ExpressionType et,
                       AbstractExpression *lc, AbstractExpression *rc)
@@ -322,16 +310,12 @@ parameterValueFactory(json_spirit::Object &obj,
     }
     int param_idx = paramIdxValue.get_int();
     assert (param_idx >= 0);
-    return parameterValueFactory(param_idx);
-}
-
-AbstractExpression * parameterValueFactory(int idx) {
-    return new ParameterValueExpression(idx);
+    return new ParameterValueExpression(param_idx);
 }
 
 /** convert the enumerated value type into a concrete c type for
  * tuple value expression templated ctors */
-AbstractExpression*
+static AbstractExpression*
 tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
                   AbstractExpression *lc, AbstractExpression *rc)
 {
@@ -374,7 +358,7 @@ tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
 }
 
 AbstractExpression *
-conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
+ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
     switch (et) {
     case (EXPRESSION_TYPE_CONJUNCTION_AND):
@@ -392,12 +376,12 @@ conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression
  * templated ctor to invoke. Several helpers, above, aid in this
  * pursuit. Each instantiated expression must consume any
  * class-specific serialization from serialize_io. */
-
 AbstractExpression*
-expressionFactory(json_spirit::Object &obj,
+ExpressionUtil::expressionFactory(json_spirit::Object &obj,
                   ExpressionType et, ValueType vt, int vs,
                   AbstractExpression* lc,
-                  AbstractExpression* rc)
+                  AbstractExpression* rc,
+                  const std::vector<AbstractExpression*>* args)
 {
     AbstractExpression *ret = NULL;
 
@@ -433,6 +417,11 @@ expressionFactory(json_spirit::Object &obj,
         ret = conjunctionFactory(et, lc, rc);
     break;
 
+    // Functions and pseudo-functions
+    case (EXPRESSION_TYPE_FUNCTION_ABS):
+        ret = functionFactory(et, args);
+        break;
+
     // Constant Values, parameters, tuples
     case (EXPRESSION_TYPE_VALUE_CONSTANT):
         ret = constantValueFactory(obj, vt, et, lc, rc);
@@ -453,8 +442,8 @@ expressionFactory(json_spirit::Object &obj,
         // must handle all known expressions in this factory
     default:
         char message[256];
-        snprintf(message,256, "Invalid ExpressionType '%s' requested from factory",
-                expressionToString(et).c_str());
+        snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
+                expressionToString(et).c_str(), (int)et);
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
@@ -465,11 +454,8 @@ expressionFactory(json_spirit::Object &obj,
     return ret;
 }
 
-} // namespace voltdb
-namespace expressionutil {
-
 boost::shared_array<int>
-convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions)
+ExpressionUtil::convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions)
 {
     size_t cnt = expressions.size();
     boost::shared_array<int> ret(new int[cnt]);
@@ -485,7 +471,7 @@ convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressi
 }
 
 boost::shared_array<int>
-convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions)
+ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions)
 {
     size_t cnt = expressions.size();
     boost::shared_array<int> ret(new int[cnt]);
