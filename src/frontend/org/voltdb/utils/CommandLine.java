@@ -60,6 +60,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
         cl.m_leaderPort = m_leaderPort;
+        cl.m_enableIV2 = m_enableIV2;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -326,6 +327,13 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine enableIV2(boolean enable)
+    {
+        m_enableIV2 = enable;
+        return this;
+    }
+
+
     public void dumpToFile(String filename) {
         try {
             FileWriter out = new FileWriter(filename);
@@ -451,6 +459,11 @@ public class CommandLine extends VoltDB.Configuration
         if (m_internalInterface != null && !m_externalInterface.isEmpty())
         {
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
+        }
+
+        if (m_enableIV2)
+        {
+            cmdline.add("enableiv2");
         }
 
         return cmdline;

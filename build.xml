@@ -142,6 +142,7 @@ PRIMARY ENTRY POINTS
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 <target name="check_noclustering"
@@ -159,6 +160,7 @@ PRIMARY ENTRY POINTS
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=localhsql" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 <target name="check_quick"
@@ -175,6 +177,7 @@ PRIMARY ENTRY POINTS
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 
@@ -190,6 +193,7 @@ PRIMARY ENTRY POINTS
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 
@@ -1038,6 +1042,7 @@ TEST CASES
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />
+            <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
             <!-- Following two env vars are used by Java code
                  when running ant check -Dbuild=memcheck
                  The voltdbipc client is used in concert with valgrind
@@ -1124,6 +1129,9 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
+    </condition>
 
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
@@ -1166,6 +1174,9 @@ TEST CASES
     <!-- select which set of regression suite configuration types to run -->
     <condition property="regressions" value="${regressions}" else="all">
         <isset property="regressions"/>
+    </condition>
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
     </condition>
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
@@ -1234,6 +1245,9 @@ TEST CASES
         <isset property="timeoutLength"/>
     </condition>
     <property name="regressions" value="localhsql"/>
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
+    </condition>
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
             <formatter type="plain" unless="hudson"/>
@@ -1285,6 +1299,9 @@ TEST CASES
     <!-- select which set of regression suite configuration types to run -->
     <condition property="regressions" value="${regressions}" else="all">
         <isset property="regressions"/>
+    </condition>
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
     </condition>
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
@@ -1340,6 +1357,9 @@ TEST CASES
     <!-- select which set of regression suite configuration types to run -->
     <condition property="regressions" value="${regressions}" else="all">
         <isset property="regressions"/>
+    </condition>
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
     </condition>
 
     <run_junit timeout="${timeoutLength}" printsummary="no">
@@ -1551,6 +1571,9 @@ TEST CASES
     <!-- select which set of regression suite configuration types to run -->
     <condition property="regressions" value="${regressions}" else="all">
         <isset property="regressions"/>
+    </condition>
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
     </condition>
 
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">

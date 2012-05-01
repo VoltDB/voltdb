@@ -198,6 +198,13 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         config.m_pathToDeployment = m_pathToDeployment;
         config.m_startAction = START_ACTION.CREATE;
 
+        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+        System.out.println("LOCALSINGLEPROCESS ENABLE IV2: " + iv2);
+        if (iv2 != null && iv2.equals("true"))
+        {
+            config.m_enableIV2 = true;
+        }
+
         config.m_ipcPorts = java.util.Collections.synchronizedList(new ArrayList<Integer>());
         for (int ii = 0; ii < m_siteCount; ii++) {
             m_siteProcesses.add(new EEProcess(m_target, "LocalSingleProcessServer_site_" + ii + ".log"));

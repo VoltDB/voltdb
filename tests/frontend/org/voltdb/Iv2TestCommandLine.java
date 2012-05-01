@@ -43,18 +43,4 @@ public class Iv2TestCommandLine extends TestCase {
         vdb.initialize(cfg);
         assertTrue(vdb.isIV2Enabled());
     }
-
-    @Test
-    public void testIsNotSet() {
-        VoltDB.Configuration cfg =
-            new VoltDB.Configuration(new String[] {
-                "leader", "localhost",
-                "deployment", "d.xml", "catalog", "catalog.jar"}
-                );
-        assertTrue(cfg.validate());
-
-        MockVoltDB vdb = new MockVoltDB(null, null);
-        vdb.initialize(cfg);
-        assertTrue(!vdb.isIV2Enabled());
-    }
 }

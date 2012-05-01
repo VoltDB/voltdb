@@ -162,7 +162,15 @@ public class VoltDB {
         /** set to true to run with iv2 initiation. Good Luck! */
         public boolean m_enableIV2 = false;
 
-        public Configuration() { }
+        public Configuration() {
+            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
+            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
+            if (iv2 != null && iv2.equals("true"))
+            {
+                m_enableIV2 = true;
+            }
+        }
 
         public Configuration(String args[]) {
             String arg;
@@ -306,6 +314,13 @@ public class VoltDB {
             // leader is null, supply the only valid leader value ("localhost").
             if (m_leader == null && m_pathToDeployment == null) {
                 m_leader = "localhost";
+            }
+            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
+            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
+            if (iv2 != null && iv2.equals("true"))
+            {
+                m_enableIV2 = true;
             }
         }
 

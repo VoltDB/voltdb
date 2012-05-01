@@ -249,6 +249,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            consoleLog.info("ENABLE IV2: " + config.m_enableIV2);
 
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
