@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -191,6 +192,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     }
 
     private void shutdownInternal() {
+        // note that shutdown will join the thread
         m_cnxnFactory.shutdown();
     }
 
@@ -299,7 +301,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         txnState.m_request.setOwner(txnState.initiatorHSId);
                         m_server.prepRequest(txnState.m_request, txnState.txnId);
                     }
-                } else if (m_recoverBeforeTxn != null) {
+                }
+                else if (m_recoverBeforeTxn != null) {
                     assert(m_recoveryStage == RecoveryStage.RECOVERED);
                     assert(m_recovering == false);
                     assert(m_siteRequestingRecovery != null);
@@ -314,7 +317,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         } finally {
             try {
                 shutdownInternal();
-            } finally {
+            }
+            catch (Exception e) {
+                m_agreementLog.warn("Exception during agreement internal shutdown.", e);
+            }
+            finally {
                 m_shutdownComplete.countDown();
             }
         }

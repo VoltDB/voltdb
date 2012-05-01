@@ -1172,7 +1172,25 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 return;
             }
             assert(!m_recovering);
-            assert(m_recoveryProcessor == null);
+
+            /*
+             * Recovery site processor hasn't been cleaned up from the previous
+             * rejoin. New rejoin request cannot be processed now. Telling the
+             * rejoining site to retry later.
+             */
+            if (m_recoveryProcessor != null) {
+                m_recoveryLog.error("ExecutionSite is not ready to handle " +
+                        "recovery request from site " +
+                        CoreUtils.hsIdToString(rm.sourceSite()));
+                RecoveryMessage recoveryResponse = new RecoveryMessage(false);
+                try {
+                    m_mailbox.send(rm.sourceSite(), recoveryResponse);
+                } catch (MessagingException e) {
+                    throw new RuntimeException(e);
+                }
+                return;
+            }
+
             final long recoveringPartitionTxnId = rm.txnId();
             m_recoveryStartTime = System.currentTimeMillis();
             m_recoveryLog.info(

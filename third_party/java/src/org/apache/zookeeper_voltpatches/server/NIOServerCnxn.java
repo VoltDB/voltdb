@@ -47,7 +47,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.apache.jute_voltpatches.BinaryOutputArchive;
 import org.apache.jute_voltpatches.Record;
-import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.Environment;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.Version;
@@ -65,6 +64,7 @@ import org.apache.zookeeper_voltpatches.proto.WatcherEvent;
 import org.apache.zookeeper_voltpatches.server.auth.AuthenticationProvider;
 import org.apache.zookeeper_voltpatches.server.auth.ProviderRegistry;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltDB;
 
 /**
  * This class handles communication with clients using NIO. There is one per
@@ -148,9 +148,8 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
                 ss.configureBlocking(false);
                 ss.register(selector, SelectionKey.OP_ACCEPT);
             } catch (IOException e) {
-                // LOG.fatal("Unable to bind to ZooKeeper client socket", e);
-                org.voltdb.VoltDB.crashLocalVoltDB(
-                        "Unable to bind to ZooKeeper client socket", true, e);
+                String msg = "ZooKeeper server failed to bind to client socket: " + addr.toString();
+                VoltDB.crashLocalVoltDB(msg, true, e);
             }
         }
 

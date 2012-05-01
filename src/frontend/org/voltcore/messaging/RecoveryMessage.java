@@ -41,6 +41,9 @@ public class RecoveryMessage extends VoltMessage {
     private List<byte[]> m_addresses;
     private int m_port;
 
+    // Is the source site ready to handle the rejoin?
+    private boolean m_isSourceReady = true;
+
     /**
      * Reuse this message to indicate that an ack was received and it is a good idea to wake up
      * and do more work. The noarg constructor sets this to true so it can be delivered directly to the mailbox
@@ -78,6 +81,19 @@ public class RecoveryMessage extends VoltMessage {
         m_port = port;
     }
 
+    /**
+     * Constructs a recovery message sent to the rejoining site as a response to
+     * the recovery request. It's used to tell the recovering site that the
+     * source site is not ready to handle the recovery request, the recovering
+     * site should retry later.
+     *
+     * @param isSourceReady
+     */
+    public RecoveryMessage(boolean isSourceReady) {
+        m_isSourceReady = isSourceReady;
+        m_addresses = new ArrayList<byte[]>();
+    }
+
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
@@ -85,6 +101,7 @@ public class RecoveryMessage extends VoltMessage {
             8 + // m_sourceHSId
             8 + // m_txnId
             4 + // address count
+            1 + // is source ready
             (4 * m_addresses.size()) + // 4 bytes per address
             4; // m_port
         for (byte address[] : m_addresses) {
@@ -98,6 +115,7 @@ public class RecoveryMessage extends VoltMessage {
         buf.put(VoltMessageFactory.RECOVERY_ID);
         buf.putLong( m_sourceHSId);
         buf.putLong( m_txnId);
+        buf.put(m_isSourceReady ? 1 : (byte) 0);
         buf.putInt(m_addresses.size());
         for (byte address[] : m_addresses) {
             buf.putInt(address.length);
@@ -125,11 +143,16 @@ public class RecoveryMessage extends VoltMessage {
         return m_port;
     }
 
+    public boolean isSourceReady() {
+        return m_isSourceReady;
+    }
+
     @Override
     public void initFromBuffer(ByteBuffer buf) {
         m_recoveryMessagesAvailable = false;
         m_sourceHSId = buf.getLong();
         m_txnId = buf.getLong();
+        m_isSourceReady = buf.get() == 1;
         int numAddresses = buf.getInt();
         m_addresses = new ArrayList<byte[]>(numAddresses);
         for (int ii = 0; ii < numAddresses; ii++) {

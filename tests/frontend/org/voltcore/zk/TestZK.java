@@ -23,9 +23,9 @@
 package org.voltcore.zk;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
 import org.voltcore.messaging.HostMessenger;
@@ -36,19 +36,25 @@ import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.data.Stat;
 
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltcore.messaging.HostMessenger;
 
 public class TestZK extends ZKTestBase {
 
@@ -73,7 +79,9 @@ public class TestZK extends ZKTestBase {
         HostMessenger.Config config = new HostMessenger.Config();
         int recoverPort = config.internalPort + NUM_AGREEMENT_SITES - 1;
         config.internalPort += site;
-        config.zkInterface = "127.0.0.1:" + (2182 + site);
+        int clientPort = m_ports.next();
+        config.zkInterface = "127.0.0.1:" + clientPort;
+        m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
         config.coordinatorIp = new InetSocketAddress( recoverPort );
         HostMessenger hm = new HostMessenger(config);
