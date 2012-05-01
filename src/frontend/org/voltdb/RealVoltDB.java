@@ -1842,19 +1842,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         true, null);
             }
         }
-        /*
-         * Check for sites being removed,
-         * added
-         */
+
         if (oldTracker != null) {
+            /*
+             * Handle node failures first, then node additions. It is NOT
+             * guaranteed that if a node failure and a node addition happen
+             * concurrently, they'll appear separately in two watch fires,
+             * because the new tracker contains the most up-to-date view of the
+             * mailboxes, which may contain both changes. Consequently, we have
+             * to handle both cases here.
+             */
             HashSet<Long> deltaRemoved = new HashSet<Long>(oldTracker.m_allSitesImmutable);
             deltaRemoved.removeAll(m_siteTracker.m_allSitesImmutable);
             if (!deltaRemoved.isEmpty()) {
                 m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(deltaRemoved)));
-                /*
-                 * Let fault detection handle the sites being added if any
-                 */
-                return;
             }
 
             HashSet<Long> deltaAdded = new HashSet<Long>(m_siteTracker.m_allSitesImmutable);
