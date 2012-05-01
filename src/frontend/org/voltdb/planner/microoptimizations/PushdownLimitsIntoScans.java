@@ -64,7 +64,8 @@ public class PushdownLimitsIntoScans implements MicroOptimization {
             return plan;
 
         AbstractPlanNode child = plan.getChild(0);
-        if ((child instanceof AbstractScanPlanNode) == false)
+        // @TODO pullexec- disable LIMIT inline for SeqScan Node
+        if ((child instanceof AbstractScanPlanNode) == false || (child instanceof SeqScanPlanNode) == true)
             return plan;
 
         plan.clearChildren();

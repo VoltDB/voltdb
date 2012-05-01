@@ -210,8 +210,7 @@ bool AbstractExecutor::execute_pull(const NValueArray& params)
 void AbstractExecutor::p_pre_execute_pull(const NValueArray& params) 
 {
     // Build the depth-first children list.
-    if (m_absState->m_list.empty())
-        this->p_build_list();
+    this->p_build_list();
     
     Table *cleanUpTable = NULL;
     // Walk through the queue and execute each plannode.  The query

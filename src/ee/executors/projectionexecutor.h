@@ -98,7 +98,6 @@ class ProjectionExecutor : public AbstractExecutor {
     //@TODO pullexec prototype
     public:
         TableTuple p_next_pull();
-        bool is_enabled_pull() const;
 
         //@TODO just a hack
         bool needsPostExecuteClear() { return true; }
@@ -120,11 +119,6 @@ inline void ProjectionExecutor::p_insert_output_table_pull(TableTuple& tuple)
 {
     assert(output_table);
     output_table->insertTupleNonVirtual(tuple);
-}
-
-inline bool ProjectionExecutor::is_enabled_pull() const
-{
-    return true;
 }
 
 }

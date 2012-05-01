@@ -53,7 +53,44 @@
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 
+namespace voltdb {
+namespace detail {
+
+    struct LimitExecutorState
+    {   
+        LimitExecutorState(LimitPlanNode* node, Table* targetTable, const NValueArray &params):
+            m_limit(0), m_offset(0), m_tupleCtr(0), m_tupleSkipped(0), 
+            m_targetTableSchema(targetTable->schema()),
+            m_childExecutor(NULL),
+            m_iterator(targetTable->iterator())
+        {
+            node->getLimitAndOffsetByReference(params, m_limit, m_offset);
+            assert(m_limit >= 0);
+            assert(m_offset >= 0);
+            std::vector<AbstractPlanNode*>& children = node->getChildren();
+            assert(children.size() == 1);
+            m_childExecutor = children[0]->getExecutor();
+            assert(m_childExecutor);
+        }
+            
+        int m_limit;
+        int m_offset;
+        int m_tupleCtr;
+        int m_tupleSkipped;
+        const TupleSchema* m_targetTableSchema; 
+        AbstractExecutor* m_childExecutor;
+        TableIterator m_iterator;
+    };
+    
+} // namespace detail
+} // namespace voltdb
+
 using namespace voltdb;
+
+LimitExecutor::LimitExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node), m_state()
+{}
+
 
 bool
 LimitExecutor::p_init(AbstractPlanNode* abstract_node,
@@ -125,4 +162,37 @@ LimitExecutor::p_execute(const NValueArray &params)
     }
 
     return true;
+}
+
+
+//@TODO pullexec prototype
+TableTuple LimitExecutor::p_next_pull() {
+
+    TableTuple tuple(m_state->m_targetTableSchema);
+    
+    // Skip first offset tuples
+    do {
+        tuple = m_state->m_childExecutor->p_next_pull();
+    } while (m_state->m_tupleSkipped++ < m_state->m_offset && tuple.isNullTuple() == false);
+     
+    // Check if we hit the limit
+    if (tuple.isNullTuple() == true || m_state->m_tupleCtr >= m_state->m_limit) {
+        // We either exhausted the input table or reached the limit 
+        tuple = TableTuple(m_state->m_targetTableSchema);
+    } else {
+        ++m_state->m_tupleCtr;
+    }
+    return tuple;
+}
+
+void LimitExecutor::p_pre_execute_pull(const NValueArray &params) {
+    //
+    // Initialize itself
+    //
+    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
+    assert(node);
+    Table* input_table = node->getInputTables()[0];
+    assert(input_table);
+    
+    m_state.reset(new detail::LimitExecutorState(node, input_table, params));    
 }

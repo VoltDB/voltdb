@@ -57,8 +57,41 @@
 #include <set>
 #include <cassert>
 
+namespace voltdb {
+namespace detail {
+
+struct DistinctExecutorState
+{   
+    DistinctExecutorState(DistinctPlanNode* node, Table* targetTable):
+        m_targetTableSchema(targetTable->schema()),
+        m_childExecutor(NULL),
+        m_distinctExpression(node->getDistinctExpression()),
+        m_iterator(targetTable->iterator()),
+        m_foundValues()
+    {
+        std::vector<AbstractPlanNode*>& children = node->getChildren();
+        assert(children.size() == 1);
+        m_childExecutor = children[0]->getExecutor();
+        assert(m_childExecutor);
+    }
+
+    const TupleSchema* m_targetTableSchema; 
+    AbstractExecutor* m_childExecutor;
+    AbstractExpression* m_distinctExpression;
+    TableIterator m_iterator;
+    std::set<NValue, NValue::ltNValue> m_foundValues;
+};
+    
+} // namespace detail
+} // namespace voltdb
+
 using namespace voltdb;
 
+DistinctExecutor::DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node),
+    distinct_column_type(VALUE_TYPE_INVALID), m_state()
+{}
+    
 bool DistinctExecutor::p_init(AbstractPlanNode*,
                               TempTableLimits* limits)
 {
@@ -115,5 +148,36 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-DistinctExecutor::~DistinctExecutor() {
+
+//@TODO pullexec prototype
+TableTuple DistinctExecutor::p_next_pull() {
+    TableTuple tuple(m_state->m_targetTableSchema);
+    bool exists = true;
+    for (tuple = m_state->m_childExecutor->p_next_pull(); 
+         tuple.isNullTuple() == false && exists; 
+         tuple = m_state->m_childExecutor->p_next_pull()) {
+        NValue tuple_value = m_state->m_distinctExpression->eval(&tuple, NULL);
+        exists = (m_state->m_foundValues.find(tuple_value) != m_state->m_foundValues.end());
+        if (!exists) {
+            m_state->m_foundValues.insert(tuple_value);
+        }
+    }
+     
+    if (tuple.isNullTuple() == true) {
+        // We exhausted the input table
+        tuple = TableTuple(m_state->m_targetTableSchema);
+    }
+    return tuple;
+}
+
+void DistinctExecutor::p_pre_execute_pull(const NValueArray &params) {
+    //
+    // Initialize itself
+    //
+    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
+    assert(node);
+    Table* input_table = node->getInputTables()[0];
+    assert(input_table);
+    
+    m_state.reset(new detail::DistinctExecutorState(node, input_table));    
 }

@@ -46,6 +46,8 @@
 #ifndef HSTORELIMITEXECUTOR_H
 #define HSTORELIMITEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
@@ -55,24 +57,36 @@ namespace voltdb
     class UndoLog;
     class ReadWriteSet;
 
+    // Aggregate Struct to keep Executor state in between iteration 
+    namespace detail
+    {
+        struct LimitExecutorState;
+    } //namespace detail
+    
     /**
      *
      */
     class LimitExecutor : public AbstractExecutor
     {
-    public:
-        LimitExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-        {
-        }
+        public:
+            LimitExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node);
 
-        ~LimitExecutor() {
-        }
+        protected:
+            bool p_init(AbstractPlanNode*,
+                        TempTableLimits* limits);
+            bool p_execute(const NValueArray &params);
 
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
+        //@TODO pullexec prototype
+        public:
+            TableTuple p_next_pull();
+
+        protected:
+
+            void p_pre_execute_pull(const NValueArray& params);
+
+        private:
+
+            boost::scoped_ptr<detail::LimitExecutorState> m_state;
     };
 
 }

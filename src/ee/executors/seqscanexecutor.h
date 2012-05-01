@@ -78,7 +78,6 @@ namespace voltdb
     //@TODO pullexec prototype
     public:
         TableTuple p_next_pull();
-        bool is_enabled_pull() const;
         
     protected:
     
@@ -90,11 +89,6 @@ namespace voltdb
        
     };
     
-    inline bool SeqScanExecutor::is_enabled_pull() const
-    {
-        return true;
-    }
-
 }
 
 #endif

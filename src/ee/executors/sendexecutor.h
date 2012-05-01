@@ -85,7 +85,6 @@ private:
 //@TODO pullexec prototype
 public:
     TableTuple p_next_pull();
-    bool is_enabled_pull() const;
 
 protected:
 
@@ -100,11 +99,6 @@ protected:
 
 inline void SendExecutor::p_pre_execute_pull(const NValueArray &params)
 {}
-
-inline bool SendExecutor::is_enabled_pull() const
-{
-    return true;
-}
 
 }
 
