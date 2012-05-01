@@ -43,45 +43,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREEXPRESSIONUTIL_H
-#define HSTOREEXPRESSIONUTIL_H
-
-#include <string>
-#include <vector>
-#include "boost/shared_array.hpp"
+#ifndef HSTOREFUNCTIONEXPRESSION_H
+#define HSTOREFUNCTIONEXPRESSION_H
 
 #include "common/common.h"
+#include "common/serializeio.h"
+#include "common/valuevector.h"
+
 #include "expressions/abstractexpression.h"
 
-#include "json_spirit/json_spirit.h"
+#include <string>
+#include <cassert>
+
 namespace voltdb {
-
-class ExpressionUtil {
-public:
-/** instantiate a typed expression */
-    static AbstractExpression* expressionFactory(json_spirit::Object &obj,
-                                                 ExpressionType et, ValueType vt, int vs,
-                                                 AbstractExpression* lc, AbstractExpression* rc,
-                                                 const std::vector<AbstractExpression*>* arguments);
-
-    static AbstractExpression* comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
-    static AbstractExpression* conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
-
-    /** If the passed vector contains only TupleValueExpression, it
-     * returns ColumnIds of them, otherwise NULL.*/
-    static boost::shared_array<int>
-    convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions);
-
-    /** If the passed vector contains only ParameterValueExpression, it
-     * returns ParamIds of them, otherwise NULL.*/
-    static boost::shared_array<int>
-    convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
-
-    // Implemented in functionexpression.cpp because function expression handling is growing into a system unto itself.
-    static AbstractExpression * functionFactory(ExpressionType et, const std::vector<AbstractExpression*>* arguments);
-
-};
-
 }
-
 #endif

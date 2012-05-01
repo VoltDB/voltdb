@@ -21,6 +21,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -189,7 +190,7 @@ public abstract class AbstractParsedStmt {
             retval = parseOperationExpression(root, db);
         }
         else if (elementName.equals("function")) {
-            retval = parseFunctionExpression(root);
+            retval = parseFunctionExpression(root, db);
         }
         else if (elementName.equals("asterisk")) {
             return null;
@@ -347,7 +348,7 @@ public abstract class AbstractParsedStmt {
         assert((leftExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
         expr.setLeft(leftExpr);
 
-        if (ExpressionUtil.needsRightExpression(expr)) {
+        if (expr.needsRightExpression()) {
             assert(rightExprNode != null);
 
             // recursively parse the right subtree
@@ -359,17 +360,76 @@ public abstract class AbstractParsedStmt {
         return expr;
     }
 
+
     /**
      *
      * @param exprNode
-     * @param attrs
-     * @return
+     * @param db
+     * @return a new Function Expression
      */
-    AbstractExpression parseFunctionExpression(VoltXMLElement exprNode) {
+    AbstractExpression parseFunctionExpression(VoltXMLElement exprNode, Database db) {
         String name = exprNode.attributes.get("name").toLowerCase();
+        // parameterized? (expected?) argument type of function?
+        //TODO: (Figure out whether/how it's OK to only get one type parameter? Is that all SQL needs?)
+        String value_type_name = exprNode.attributes.get("type");
+        VoltType value_type = VoltType.typeFromString(value_type_name);
+        AbstractExpression expr = null;
 
-        // we don't currently support ANY functions.
-        throw new PlanningErrorException("Function '" + name + "' is not supported");
+        SQLFunction[] overloads = SQLFunction.functionsByName(name);
+        if (overloads == null) {
+            throw new PlanningErrorException("Function '" + name + "' is not supported");
+        }
+
+        // Validate/select specific named function overload against supported argument type(s?)
+        SQLFunction resolved = null;
+        for (SQLFunction supportedFunction : overloads) {
+            resolved = supportedFunction;
+            if ( ! supportedFunction.hasParameter()) {
+                break;
+            }
+            VoltType paramType = supportedFunction.paramType();
+            if (paramType.equals(value_type)) {
+                break;
+            }
+            if (paramType.equals(VoltType.NUMERIC) && (value_type.isExactNumeric() ||  value_type.equals(VoltType.FLOAT))) {
+                break;
+            }
+            // type was not acceptable or not supported
+            resolved = null;
+        }
+
+        if (resolved == null) {
+            throw new PlanningErrorException("Function '" + name + "' does not support argument type '" + value_type_name + "'");
+        }
+
+        ExpressionType exprType = resolved.getExpressionType();
+
+        try {
+            expr = exprType.getExpressionClass().newInstance();
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e.getMessage(), e);
+        }
+        expr.setExpressionType(exprType);
+
+        VoltType vt = resolved.getValueType();
+        // Null return type is a place-holder for the parser-provided parameter type.
+        if (vt != null) {
+            expr.setValueType(vt);
+            expr.setValueSize(vt.getMaxLengthInBytes());
+        }
+
+        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        // This needs to be conditional on an expected/allowed number/type of arguments.
+        for (VoltXMLElement argNode : exprNode.children) {
+            assert(argNode != null);
+            // recursively parse each argument subtree (could be any kind of expression).
+            AbstractExpression argExpr = parseExpressionTree(argNode, db);
+            assert(argExpr != null);
+            args.add(argExpr);
+        }
+        expr.setArgs(args);
+        return expr;
     }
 
     /**
@@ -517,12 +577,8 @@ public abstract class AbstractParsedStmt {
      * @param tables
      */
     void getTablesForExpression(Database db, AbstractExpression expr, HashSet<Table> tables) {
-        if (expr.getLeft() != null)
-            getTablesForExpression(db, expr.getLeft(), tables);
-        if (expr.getRight() != null)
-            getTablesForExpression(db, expr.getRight(), tables);
-        if (expr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
-            TupleValueExpression tupleExpr = (TupleValueExpression)expr;
+        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+        for (TupleValueExpression tupleExpr : tves) {
             String tableName = tupleExpr.getTableName();
             Table table = db.getTables().getIgnoreCase(tableName);
             tables.add(table);
