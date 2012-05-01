@@ -28,8 +28,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
+import org.voltdb.Iv2ExecutionSite;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
@@ -42,6 +42,7 @@ public class ProcedureTask extends SiteTasker
 {
     private static final VoltLogger execLog = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     final Iv2TransactionState m_txn;
     final ProcedureRunner m_runner;
     final InitiatorMailbox m_initiator;
@@ -54,10 +55,6 @@ public class ProcedureTask extends SiteTasker
         m_txn = new Iv2TransactionState(txnId, msg);
     }
 
-    void setBeginUndoToken(SiteProcedureConnection siteConnection)
-    {
-    }
-
     /** Run is invoked by a run-loop to execute this transaction. */
     @Override
     public void run(SiteProcedureConnection siteConnection)
@@ -65,7 +62,8 @@ public class ProcedureTask extends SiteTasker
         if (!m_txn.isReadOnly()) {
             m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         }
-        InitiateResponseMessage response = processInitiateTask();
+        final InitiateResponseMessage response = processInitiateTask();
+        completeInitiateTask(siteConnection);
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
     }
@@ -80,8 +78,8 @@ public class ProcedureTask extends SiteTasker
     /** Mostly copy-paste of old ExecutionSite.processInitiateTask() */
     InitiateResponseMessage processInitiateTask()
     {
-        Iv2InitiateTaskMessage itask = m_txn.m_task;
-        InitiateResponseMessage response = new InitiateResponseMessage(itask);
+        final Iv2InitiateTaskMessage itask = m_txn.m_task;
+        final InitiateResponseMessage response = new InitiateResponseMessage(itask);
 
         try {
             Object[] callerParams = null;
@@ -153,5 +151,25 @@ public class ProcedureTask extends SiteTasker
         return response;
     }
 
+    void completeInitiateTask(SiteProcedureConnection siteConnection)
+    {
+        if (!m_txn.isReadOnly()) {
+            assert(siteConnection.getLatestUndoToken() != Iv2ExecutionSite.kInvalidUndoToken) :
+                "[SP][RW] transaction found invalid latest undo token state in Iv2ExecutionSite.";
+            assert(siteConnection.getLatestUndoToken() >= m_txn.getBeginUndoToken()) :
+                "[SP][RW] transaction's undo log token farther advanced than latest known value.";
+            assert (m_txn.getBeginUndoToken() != Iv2ExecutionSite.kInvalidUndoToken) :
+                "[SP][RW] with invalid undo token in completeInitiateTask.";
+
+            // the truncation point token SHOULD be part of m_txn. However, the
+            // legacy interaces don't work this way and IV2 hasn't changed this
+            // ownership yet. But truncateUndoLog is written assuming the right
+            // eventual encapsulation.
+            siteConnection.truncateUndoLog(
+                    m_txn.needsRollback(), siteConnection.getLatestUndoToken(),
+                    m_txn.txnId);
+        }
+
+    }
 
 }

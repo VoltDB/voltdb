@@ -266,7 +266,7 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
     @Override
     public void registerPlanFragment(long pfId, ProcedureRunner proc)
     {
-        hostLog.warn("Sysprocs not supported in Iv2. Not loading " + proc.m_procedureName);
+        // hostLog.warn("Sysprocs not supported in Iv2. Not loading " + proc.m_procedureName);
     }
 
     @Override
@@ -300,14 +300,13 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
             ParameterSet[] parameterSets, int numParameterSets, long txnId,
             boolean readOnly) throws EEException
     {
-        System.out.println("Querying DB txnId(" + txnId +") lastcommitted(" + m_lastCommittedTxnId);
         return m_ee.executeQueryPlanFragmentsAndGetResults(
             planFragmentIds,
             numFragmentIds,
             parameterSets,
             numParameterSets,
             txnId,
-            0, // TODO: need real last committed txnid.
+            m_lastCommittedTxnId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
@@ -328,5 +327,17 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
             TransactionState currentTxnState)
     {
         throw new RuntimeException("Not supported in IV2");
+    }
+
+    @Override
+    public void truncateUndoLog(boolean rollback, long token, long txnId)
+    {
+        if (rollback) {
+            m_ee.undoUndoToken(token);
+        }
+        else {
+            m_ee.releaseUndoToken(token);
+            m_lastCommittedTxnId = txnId;
+        }
     }
 }
