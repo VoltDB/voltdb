@@ -27,7 +27,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
@@ -46,21 +45,21 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
 {
     VoltLogger hostLog = new VoltLogger("HOST");
-    private final int partitionId;
-    private final SiteTaskerScheduler scheduler;
-    private final HostMessenger messenger;
-    private long hsId;
-    private LoadedProcedureSet loadedProcs;
+    private final int m_partitionId;
+    private final SiteTaskerScheduler m_scheduler;
+    private final HostMessenger m_messenger;
+    private long m_hsId;
+    private LoadedProcedureSet m_loadedProcs;
 
     // hacky temp txnid
-    AtomicLong txnId = new AtomicLong(0);
+    AtomicLong m_txnId = new AtomicLong(0);
 
-    InitiatorRole role;
-    private LeaderElector elector;
+    InitiatorRole m_role;
+    private LeaderElector m_elector;
     // only primary initiator has the following two set
-    private BabySitter babySitter = null;
-    private volatile long[] replicas = null;
-    Callback membershipChangeHandler = new Callback()
+    private BabySitter m_babySitter = null;
+    private volatile long[] m_replicas = null;
+    Callback m_membershipChangeHandler = new Callback()
     {
         @Override
         public void run(List<String> children)
@@ -75,7 +74,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
             for (String child : children) {
                 try {
                     long HSId = Long.parseLong(child.split("_")[0]);
-                    if (HSId != hsId) {
+                    if (HSId != m_hsId) {
                         tmpArray[i++] = HSId;
                     }
                 }
@@ -84,22 +83,22 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
                     return;
                 }
             }
-            replicas = tmpArray;
-            ((PrimaryRole) role).setReplicas(replicas);
+            m_replicas = tmpArray;
+            ((PrimaryRole) m_role).setReplicas(m_replicas);
         }
     };
 
 
     public InitiatorMailbox(SiteTaskerScheduler scheduler, HostMessenger messenger, int partitionId)
     {
-        this.scheduler = scheduler;
-        this.messenger = messenger;
-        this.partitionId = partitionId;
+        m_scheduler = scheduler;
+        m_messenger = messenger;
+        m_partitionId = partitionId;
     }
 
     void setProcedureSet(LoadedProcedureSet loadedProcs)
     {
-        this.loadedProcs = loadedProcs;
+        m_loadedProcs = loadedProcs;
     }
 
     /**
@@ -109,23 +108,23 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     public void start(int totalReplicasForPartition) throws Exception
     {
         // by this time, we should have our HSId
-        role = new ReplicatedRole(hsId);
+        m_role = new ReplicatedRole(m_hsId);
 
-        String electionDirForPartition = VoltZK.electionDirForPartition(partitionId);
-        elector = new LeaderElector(
-                messenger.getZK(),
+        String electionDirForPartition = VoltZK.electionDirForPartition(m_partitionId);
+        m_elector = new LeaderElector(
+                m_messenger.getZK(),
                 electionDirForPartition,
-                Long.toString(this.hsId), // prefix
+                Long.toString(this.m_hsId), // prefix
                 null,
                 this);
         // This will invoke becomeLeader()
-        elector.start(true);
+        m_elector.start(true);
 
-        if (elector.isLeader()) {
+        if (m_elector.isLeader()) {
             // barrier to wait for all replicas to be ready
             boolean success = false;
             for (int ii = 0; ii < 4000; ii++) {
-                List<String> children = babySitter.lastSeenChildren();
+                List<String> children = m_babySitter.lastSeenChildren();
                 if (children == null || children.size() < totalReplicasForPartition) {
                     Thread.sleep(5);
                 } else {
@@ -135,53 +134,45 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
             }
             if (!success) {
                 VoltDB.crashLocalVoltDB("Not all replicas for partition " +
-                        partitionId + " are ready in time", false, null);
+                        m_partitionId + " are ready in time", false, null);
             }
         }
     }
 
     public void shutdown() throws InterruptedException, KeeperException
     {
-        if (babySitter != null) {
-            babySitter.shutdown();
+        if (m_babySitter != null) {
+            m_babySitter.shutdown();
         }
-        if (elector != null) {
-            elector.shutdown();
+        if (m_elector != null) {
+            m_elector.shutdown();
         }
     }
 
     @Override
     public void send(long destHSId, VoltMessage message) throws MessagingException
     {
-        message.m_sourceHSId = this.hsId;
-        messenger.send(destHSId, message);
+        message.m_sourceHSId = this.m_hsId;
+        m_messenger.send(destHSId, message);
     }
 
     @Override
     public void send(long[] destHSIds, VoltMessage message) throws MessagingException
     {
-        message.m_sourceHSId = this.hsId;
-        messenger.send(destHSIds, message);
+        message.m_sourceHSId = this.m_hsId;
+        m_messenger.send(destHSIds, message);
     }
 
     @Override
     public void deliver(VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
-
-            String procedureName = ((Iv2InitiateTaskMessage) message).getStoredProcedureName();
-            ProcedureTask task = new ProcedureTask(this, this.loadedProcs.procs.get(procedureName),
-                                                   txnId.incrementAndGet(),
-                                                   (Iv2InitiateTaskMessage)message);
-            scheduler.offer(task);
-
-//            // this will assign txnId if we are the leader
-//            synchronized (role) {
-//                role.offerInitiateTask((InitiateTaskMessage)message);
-//                if (elector.isLeader()) {
-//                    replicateInitiation((InitiateTaskMessage)message);
-//                }
-//            }
+            final String procedureName = ((Iv2InitiateTaskMessage) message).getStoredProcedureName();
+            final ProcedureTask task = new ProcedureTask(
+                    this, this.m_loadedProcs.procs.get(procedureName),
+                    m_txnId.incrementAndGet(),
+                    (Iv2InitiateTaskMessage)message);
+            m_scheduler.offer(task);
         }
         else if (message instanceof InitiateResponseMessage) {
             InitiateResponseMessage response = (InitiateResponseMessage)message;
@@ -203,9 +194,9 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
      */
     private void replicateInitiation(InitiateTaskMessage message)
     {
-        if (replicas != null) {
+        if (m_replicas != null) {
             try {
-                send(replicas, message);
+                send(m_replicas, message);
             }
             catch (MessagingException e) {
                 hostLog.error("Failed to replicate initiate task.", e);
@@ -216,7 +207,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     @Override
     public VoltMessage recv()
     {
-        return role.poll();
+        return m_role.poll();
     }
 
     @Override
@@ -258,24 +249,24 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     @Override
     public long getHSId()
     {
-        return hsId;
+        return m_hsId;
     }
 
     @Override
     public void setHSId(long hsId)
     {
-        this.hsId = hsId;
+        this.m_hsId = hsId;
     }
 
     @Override
     public void becomeLeader()
     {
-        String electionDirForPartition = VoltZK.electionDirForPartition(partitionId);
-        role = new PrimaryRole();
-        babySitter = new BabySitter(messenger.getZK(),
+        String electionDirForPartition = VoltZK.electionDirForPartition(m_partitionId);
+        m_role = new PrimaryRole();
+        m_babySitter = new BabySitter(m_messenger.getZK(),
                                     electionDirForPartition,
-                                    membershipChangeHandler);
+                                    m_membershipChangeHandler);
         // It's not guaranteed that we'll have all the children at this time
-        membershipChangeHandler.run(babySitter.lastSeenChildren());
+        m_membershipChangeHandler.run(m_babySitter.lastSeenChildren());
     }
 }
