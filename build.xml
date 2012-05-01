@@ -1129,7 +1129,7 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
-    <condition property="enableiv2" value="${enableiv2}" else="false">
+    <condition property="enableiv2" value="${enableiv2}" else="true">
         <isset property="enableiv2"/>
     </condition>
 
