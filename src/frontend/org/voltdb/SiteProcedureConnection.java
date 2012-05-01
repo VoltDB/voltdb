@@ -84,5 +84,13 @@ public interface SiteProcedureConnection {
      */
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
 
+    /**
+     * Legacy recursable execution interface for MP transaction states.
+     */
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
+
+    /**
+     * IV2 commit / rollback interface to the EE
+     */
+    public void truncateUndoLog(boolean rollback, long token, long txnId);
 }

@@ -2298,4 +2298,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         lom.m_sourceHSId = m_siteId;
         m_mailbox.deliver(lom);
     }
+
+    // do-nothing implementation of IV2 SiteProcedeConnection API
+    @Override
+    public void truncateUndoLog(boolean rollback, long token, long txnId) {
+        throw new RuntimeException("Unsupported IV2-only API.");
+    }
 }
