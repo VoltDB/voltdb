@@ -118,15 +118,18 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        buf.put(VoltDbMessageFactory.INITIATE_TASK_ID);
+        if (! (this instanceof Iv2InitiateTaskMessage)) {
+            buf.put(VoltDbMessageFactory.INITIATE_TASK_ID);
+        }
         super.flattenToBuffer(buf);
-
         buf.putLong(m_lastSafeTxnID);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
         m_invocation.flattenToBuffer(buf);
 
-        assert(buf.capacity() == buf.position());
-        buf.limit(buf.position());
+        if (! (this instanceof Iv2InitiateTaskMessage)) {
+            assert(buf.capacity() == buf.position());
+            buf.limit(buf.position());
+        }
     }
 
     @Override

@@ -77,6 +77,27 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getLastSafeTxnId(), itask2.getLastSafeTxnId());
     }
 
+    public void testIv2InitiateTask() throws IOException {
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setClientHandle(25);
+        spi.setProcName("johnisgreat");
+        spi.setParams(57, "gooniestoo", "dudemandude");
+
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
+
+        Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltMessage(itask);
+
+        assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
+        assertEquals(itask.getTxnId(), itask2.getTxnId());
+        assertEquals(itask.isReadOnly(), itask2.isReadOnly());
+        assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
+        assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
+        assertEquals(itask.getParameterCount(), itask2.getParameterCount());
+        assertEquals(itask.getClientInterfaceHandle(), itask2.getClientInterfaceHandle());
+        assertEquals(itask.getClientInterfaceHandle(), 2101);
+        assertEquals(itask.getLastSafeTxnId(), itask2.getLastSafeTxnId());
+    }
+
     public void testInitiateResponse() throws IOException {
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);

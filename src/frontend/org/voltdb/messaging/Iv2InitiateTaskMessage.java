@@ -61,9 +61,8 @@ public class Iv2InitiateTaskMessage extends InitiateTaskMessage
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.IV2_INITIATE_TASK_ID);
-        super.flattenToBuffer(buf);
-
         buf.putLong(m_clientInterfaceHandle);
+        super.flattenToBuffer(buf);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -71,9 +70,8 @@ public class Iv2InitiateTaskMessage extends InitiateTaskMessage
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
-        super.initFromBuffer(buf);
-
         m_clientInterfaceHandle = buf.getLong();
+        super.initFromBuffer(buf);
     }
 
     @Override
