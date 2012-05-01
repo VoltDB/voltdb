@@ -158,6 +158,7 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
         ExecutionEngine eeTemp = null;
         try {
             if (target == BackendTarget.NATIVE_EE_JNI) {
+                System.out.println("Creating JNI EE.");
                 eeTemp =
                     new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),
@@ -237,7 +238,7 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
     @Override
     public void registerPlanFragment(long pfId, ProcedureRunner proc)
     {
-        throw new RuntimeException("Not supported in IV2");
+        hostLog.warn("Sysprocs not supported in Iv2. Not loading " + proc.m_procedureName);
     }
 
     @Override
@@ -271,13 +272,14 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
             ParameterSet[] parameterSets, int numParameterSets, long txnId,
             boolean readOnly) throws EEException
     {
+        System.out.println("Querying DB txnId(" + txnId +") lastcommitted(" + m_lastCommittedTxnId);
         return m_ee.executeQueryPlanFragmentsAndGetResults(
             planFragmentIds,
             numFragmentIds,
             parameterSets,
             numParameterSets,
             txnId,
-            m_lastCommittedTxnId++, // TODO: need this real.
+            0, // TODO: need real last committed txnid.
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 

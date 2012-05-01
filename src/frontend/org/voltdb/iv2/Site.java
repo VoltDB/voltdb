@@ -42,11 +42,14 @@ public class Site
                                                catalogContext.m_transactionId,
                                                m_partitionId,
                                                siteTracker.m_numberOfPartitions);
+        ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
+        prf.configure(m_executionSite, null /* wtfhsql!? */);
         m_procSet = new LoadedProcedureSet(m_executionSite,
-                                           new ProcedureRunnerFactory(),
+                                           prf,
                                            m_initiatorMailbox.getHSId(),
                                            0, // this has no meaning
                                            siteTracker.m_numberOfPartitions);
+        m_procSet.loadProcedures(catalogContext, backend);
         m_initiatorMailbox.setProcedureSet(m_procSet);
 
 

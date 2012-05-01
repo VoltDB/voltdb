@@ -25,7 +25,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.logging.Level;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.utils.LogKeys;
@@ -48,7 +47,7 @@ public class LoadedProcedureSet {
         m_site = site;
     }
 
-    void loadProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
+    public void loadProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
         procs.clear();
         loadProceduresFromCatalog(catalogContext, backendTarget);
         loadSystemProcedures(catalogContext, backendTarget);
