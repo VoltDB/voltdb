@@ -185,19 +185,12 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
         }
         else if (message instanceof InitiateResponseMessage) {
             InitiateResponseMessage response = (InitiateResponseMessage)message;
-            Pair<Long, InitiateResponseMessage> nextResponse = role.offerResponse(response);
-            /*
-             * In case the response needs to be forwarded. Replicas forward the
-             * responses to the primary initiator. Primary initiator forwards
-             * responses to the client interface.
-             */
-            if (nextResponse != null) {
-                try {
-                    send(nextResponse.getFirst(), nextResponse.getSecond());
-                }
-                catch (MessagingException e) {
-                    hostLog.error("Failed to deliver response from execution site.", e);
-                }
+            try {
+                // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+                send(response.getInitiatorHSId(), response);
+            }
+            catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
             }
         }
     }

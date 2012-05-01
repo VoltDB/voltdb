@@ -50,6 +50,9 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
     // Partition count is important for some reason.
     final int m_numberOfPartitions;
 
+    // What type of EE is controlled
+    final BackendTarget m_backend;
+
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
     private final int m_siteIndex = siteIndexCounter.getAndIncrement();
@@ -58,14 +61,29 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
     final SiteTaskerScheduler m_scheduler;
 
     // Almighty execution engine and its HSQL sidekick
-    final ExecutionEngine m_ee;
-    final HsqlBackend m_hsql;
+    ExecutionEngine m_ee;
+    HsqlBackend m_hsql;
 
     // Current catalog
     CatalogContext m_context;
 
     // Current topology
     int m_partitionId;
+
+    // Need temporary access to some startup parameters in order to
+    // initialize EEs in the right thread.
+    private static class StartupConfig
+    {
+        final String m_serializedCatalog;
+        final long m_txnId;
+        StartupConfig(final String serCatalog, final long txnId)
+        {
+            m_serializedCatalog = serCatalog;
+            m_txnId = txnId;
+        }
+    }
+    private StartupConfig m_startupConfig = null;
+
 
     // Undo token state for the corresponding EE.
     public final static long kInvalidUndoToken = -1L;
@@ -107,20 +125,29 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
         m_partitionId = partitionId;
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
+        m_backend = backend;
 
-        if (backend == BackendTarget.NONE) {
+        // need this later when running in the final thread.
+        m_startupConfig = new StartupConfig(serializedCatalog, txnId);
+    }
+
+    /** Thread specific initialization */
+    void initialize(String serializedCatalog, long txnId)
+    {
+        if (m_backend == BackendTarget.NONE) {
             m_hsql = null;
             m_ee = new MockExecutionEngine();
         }
-        else if (backend == BackendTarget.HSQLDB_BACKEND) {
+        else if (m_backend == BackendTarget.HSQLDB_BACKEND) {
             m_hsql = initializeHSQLBackend();
             m_ee = new MockExecutionEngine();
         }
         else {
             m_hsql = null;
-            m_ee = initializeEE(backend, serializedCatalog, txnId, numPartitions);
+            m_ee = initializeEE(serializedCatalog, txnId);
         }
     }
+
 
     /** Create an HSQL backend */
     HsqlBackend initializeHSQLBackend()
@@ -150,14 +177,12 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
 
 
     /** Create a native VoltDB execution engine */
-    ExecutionEngine initializeEE(BackendTarget target, String serializedCatalog,
-            final long txnId, int configuredNumberOfPartitions)
+    ExecutionEngine initializeEE(String serializedCatalog, final long txnId)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
-
         ExecutionEngine eeTemp = null;
         try {
-            if (target == BackendTarget.NATIVE_EE_JNI) {
+            if (m_backend == BackendTarget.NATIVE_EE_JNI) {
                 System.out.println("Creating JNI EE.");
                 eeTemp =
                     new ExecutionEngineJNI(
@@ -168,7 +193,7 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        configuredNumberOfPartitions);
+                        m_numberOfPartitions);
                 eeTemp.loadCatalog( txnId, serializedCatalog);
                 // TODO: export integration will require a tick.
                 // lastTickTime = EstTime.currentTimeMillis();
@@ -185,9 +210,9 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                            target,
+                            m_backend,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            configuredNumberOfPartitions);
+                            m_numberOfPartitions);
                 eeTemp.loadCatalog( 0, serializedCatalog);
                 // TODO: export integration will require a tick.
                 // lastTickTime = EstTime.currentTimeMillis();
@@ -208,6 +233,9 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
     public void run()
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
+        initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_txnId);
+        m_startupConfig = null; // release the serializedCatalog bytes.
+
         try {
             while (m_shouldContinue) {
                 runLoop();
