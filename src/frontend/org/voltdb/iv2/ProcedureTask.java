@@ -165,9 +165,10 @@ public class ProcedureTask extends SiteTasker
             // legacy interaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
-            siteConnection.truncateUndoLog(
-                    m_txn.needsRollback(), siteConnection.getLatestUndoToken(),
-                    m_txn.txnId);
+            final long token = m_txn.needsRollback() ?
+                m_txn.getBeginUndoToken() : siteConnection.getLatestUndoToken();
+
+            siteConnection.truncateUndoLog(m_txn.needsRollback(), token, m_txn.txnId);
         }
 
     }
