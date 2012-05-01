@@ -20,7 +20,8 @@ package org.voltdb.iv2;
 import java.lang.Object;
 
 import java.util.Comparator;
-import java.util.PriorityQueue;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.PriorityBlockingQueue;
 
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
 public class SiteTaskerScheduler
@@ -45,24 +46,28 @@ public class SiteTaskerScheduler
         }
     }
 
-    final PriorityQueue<SiteTasker> m_tasks;
+    final PriorityBlockingQueue<SiteTasker> m_tasks;
     final TaskComparator m_comparator = new TaskComparator();
     final int m_initialCap = 100;
-    long m_sequence = 0;
+    final AtomicLong m_sequence = new AtomicLong(0);
 
     SiteTaskerScheduler()
     {
-        m_tasks = new PriorityQueue<SiteTasker>(m_initialCap, m_comparator);
+        m_tasks = new PriorityBlockingQueue<SiteTasker>(m_initialCap, m_comparator);
     }
 
-    synchronized public boolean offer(SiteTasker task)
+    public boolean offer(SiteTasker task)
     {
-        task.setSeq(++m_sequence);
+        task.setSeq(m_sequence.incrementAndGet());
         return m_tasks.offer(task);
     }
 
-    synchronized public SiteTasker poll()
+    public SiteTasker poll()
     {
-        return m_tasks.poll();
+        try {
+            return m_tasks.take();
+        } catch (InterruptedException e) {
+            return poll();
+        }
     }
 }
