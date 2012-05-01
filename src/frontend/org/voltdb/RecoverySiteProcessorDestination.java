@@ -19,7 +19,6 @@ package org.voltdb;
 import java.util.List;
 import java.io.EOFException;
 import java.io.IOException;
-import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
@@ -418,7 +417,11 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         if (message != null) {
             if (message instanceof RecoveryMessage) {
                 RecoveryMessage rm = (RecoveryMessage)message;
-                if (!rm.recoveryMessagesAvailable()) {
+                if (!rm.isSourceReady()) {
+                    VoltDB.crashLocalVoltDB("Source site " + CoreUtils.hsIdToString(m_sourceHSId) +
+                                            " is not ready, concurrent rejoin is not supported",
+                                            false, null);
+                } else if (!rm.recoveryMessagesAvailable()) {
                     recoveryLog.error("Received a recovery initiate request from " +
                             CoreUtils.hsIdToString(rm.sourceSite()) +
                             " while a recovery was already in progress. Ignoring it.");
@@ -544,6 +547,9 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 if (m_sc != null) {
                     break;
                 }
+
+                // check mailbox for request response, might get rejected
+                checkMailbox(false, txnId);
             } catch (IOException e) {
                 recoveryLog.error("Exception while attempting to accept recovery connection", e);
                 ssc.close();
