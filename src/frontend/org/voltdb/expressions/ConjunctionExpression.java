@@ -21,7 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 public class ConjunctionExpression extends AbstractExpression {
     public ConjunctionExpression(ExpressionType type) {
@@ -41,4 +41,10 @@ public class ConjunctionExpression extends AbstractExpression {
 
     @Override
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
+
+    @Override
+    public boolean needsRightExpression() {
+        return true;
+    }
+
 }
