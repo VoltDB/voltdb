@@ -152,7 +152,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_config.coordinatorIp,
                 m_config.internalInterface,
                 m_config.internalPort,
-                hostLog,
                 this);
     }
 

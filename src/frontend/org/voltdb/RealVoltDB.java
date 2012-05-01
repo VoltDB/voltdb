@@ -397,7 +397,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
                     p = createMailboxesForSitesRejoin();
                     ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
-                    System.out.println("Set recovering site count to " + p.getFirst().size());
+                    hostLog.info("Set recovering site count to " + p.getFirst().size());
                 } else {
                     p = createMailboxesForSitesStartup();
                 }
@@ -408,7 +408,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 initiatorHSId = registerInitiatorMailbox();
                 final long statsHSId = m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
                 m_messenger.generateMailboxId(statsHSId);
-                System.out.println("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
+                hostLog.info("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
                 m_mailboxPublisher.publish(m_messenger.getZK());
@@ -615,8 +615,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = true;
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
                 for (Map.Entry<Integer, List<Long>> entry : m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
-                    System.out.println(entry.getKey() + " -- "
-                            + org.voltcore.utils.CoreUtils.hsIdCollectionToString(entry.getValue()));
+                    hostLog.info(entry.getKey() + " -- "
+                            + CoreUtils.hsIdCollectionToString(entry.getValue()));
                 }
                 VoltDB.crashGlobalVoltDB("Mismatch between configured number of partitions (" +
                         m_configuredNumberOfPartitions + ") and actual (" +
@@ -692,7 +692,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
 
         Stat stat = new Stat();
-        System.out.println(zk.getChildren("/db", false));
+        hostLog.debug(zk.getChildren("/db", false));
         JSONObject topology = new JSONObject(new String(zk.getData(VoltZK.topology, false, stat), "UTF-8"));
 
         // We're waiting for m_mailboxTracker to start(), which will
@@ -1318,7 +1318,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             String errmsg = "ExecutionSite: " + org.voltcore.utils.CoreUtils.hsIdToString(m_currentThreadSite.m_siteId) +
             " encountered an " +
             "unexpected error and will die, taking this VoltDB node down.";
-            System.err.println(errmsg);
+            hostLog.error(errmsg);
             t.printStackTrace();
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
@@ -1450,7 +1450,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             else if (currentTxnId < lastLogUpdate_txnId) {
                 throw new RuntimeException("Trying to update logging config with an old transaction.");
             }
-            System.out.println("Updating RealVoltDB logging config from txnid: " +
+            hostLog.info("Updating RealVoltDB logging config from txnid: " +
                     lastLogUpdate_txnId + " to " + currentTxnId);
             lastLogUpdate_txnId = currentTxnId;
             VoltLogger.configure(xmlConfig);

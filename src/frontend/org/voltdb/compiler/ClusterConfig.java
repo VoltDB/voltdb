@@ -24,9 +24,12 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 
 public class ClusterConfig
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     public static List<Integer> partitionsForHost(JSONObject topo, int hostId) throws JSONException
     {
         List<Integer> partitions = new ArrayList<Integer>();
@@ -169,12 +172,10 @@ public class ClusterConfig
         stringer.endObject();
 
         JSONObject topo = new JSONObject(stringer.toString());
-        System.out.println("TOPO: " + topo.toString(2));
+        hostLog.info("TOPO: " + topo.toString(2));
 
         return topo;
     }
-
-
 
     private final int m_hostCount;
     private final int m_sitesPerHost;
