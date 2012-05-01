@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -81,6 +82,9 @@ import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
@@ -126,6 +130,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
      */
     private final AtomicInteger m_numConnections = new AtomicInteger(0);
+
+    /**
+     * IV2 stuff
+     */
+    private final AtomicLong m_sequence = new AtomicLong(0);
+    private ConcurrentHashMap<Long, Pair<Long, Connection>> m_sequenceToConnection =
+        new ConcurrentHashMap<Long, Pair<Long, Connection>>();
 
     /**
      * Policies used to determine if we can accept an invocation.
@@ -788,19 +799,46 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final int messageSize,
             final long now)
     {
-        return m_initiator.createTransaction(
-                connectionId,
-                connectionHostname,
-                adminConnection,
-                invocation,
-                isReadOnly,
-                isSinglePartition,
-                isEveryPartition,
-                partitions,
-                numPartitions,
-                clientData,
-                messageSize,
-                now);
+        if (VoltDB.instance().isIV2Enabled()) {
+            if (isSinglePartition) {
+                // MEGAHACK
+                long initiatorHSId = VoltDB.instance().getSiteTracker().m_partitionToInitiatorsImmutable.get(partitions[0]).get(0);
+                long handle = m_sequence.incrementAndGet();
+                m_sequenceToConnection.put(handle,
+                                           new Pair<Long, Connection>(invocation.getClientHandle(),
+                                                                      (Connection)clientData));
+
+                Iv2InitiateTaskMessage workRequest =
+                    new Iv2InitiateTaskMessage(m_siteId,
+                                            initiatorHSId,
+                                            Long.MIN_VALUE,
+                                            isReadOnly,
+                                            isSinglePartition,
+                                            invocation,
+                                            handle);
+                try {
+                    m_mailbox.send(initiatorHSId, workRequest);
+                } catch (MessagingException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                throw new RuntimeException("No multipart with IV2 yet, Chester");
+            }
+            return true; //YEEHAW
+        } else {
+            return m_initiator.createTransaction(connectionId,
+                                                 connectionHostname,
+                                                 adminConnection,
+                                                 invocation,
+                                                 isReadOnly,
+                                                 isSinglePartition,
+                                                 isEveryPartition,
+                                                 partitions,
+                                                 numPartitions,
+                                                 clientData,
+                                                 messageSize,
+                                                 now);
+        }
     }
 
 
@@ -855,7 +893,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             LinkedBlockingDeque<VoltMessage> m_d = new LinkedBlockingDeque<VoltMessage>();
             @Override
             public void deliver(final VoltMessage message) {
-                m_d.offer(message);
+                if (VoltDB.instance().isIV2Enabled()) {
+                    if (message instanceof InitiateResponseMessage) {
+                        // forward response; copy is annoying. want slice of response.
+                        InitiateResponseMessage response = (InitiateResponseMessage)message;
+                        Pair<Long, Connection> clientData = m_sequenceToConnection.remove(response.getClientInterfaceHandle());
+                        response.getClientResponseData().setClientHandle(clientData.getFirst());
+
+                        ByteBuffer results = ByteBuffer.allocate(response.getClientResponseData().getSerializedSize() + 4);
+                        results.putInt(results.capacity() - 4);
+                        response.getClientResponseData().flattenToBuffer(results);
+                        results.flip();
+                        clientData.getSecond().writeStream().enqueue(results);
+                    } else {
+                        m_d.offer(message);
+                    }
+                } else {
+                    m_d.offer(message);
+                }
             }
             @Override
             public VoltMessage recv() {

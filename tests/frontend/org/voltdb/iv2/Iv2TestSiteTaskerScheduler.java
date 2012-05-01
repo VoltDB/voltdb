@@ -21,13 +21,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb;
+package org.voltdb.iv2;
 
 import org.junit.Test;
 
-import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.SiteTasker;
-import org.voltdb.SiteTaskerScheduler;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.iv2.SiteTasker;
+import org.voltdb.iv2.SiteTaskerScheduler;
 
 import junit.framework.TestCase;
 
@@ -45,7 +45,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
         }
 
         @Override
-        public void run(ExecutionEngine ee)
+        public void run(SiteProcedureConnection ee)
         {
             run = true;
         }

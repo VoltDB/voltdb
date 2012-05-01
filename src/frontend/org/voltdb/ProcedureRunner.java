@@ -155,7 +155,7 @@ public class ProcedureRunner {
         return m_cachedRNG;
     };
 
-    ClientResponseImpl call(long txnId, Object... paramList) {
+    public ClientResponseImpl call(long txnId, Object... paramList) {
         // verify per-txn state has been reset
         assert(m_txnId == -1);
         assert(m_statusCode == Byte.MIN_VALUE);

@@ -30,6 +30,9 @@ import org.voltdb.exceptions.EEException;
  */
 public interface SiteProcedureConnection {
 
+    public long getLatestUndoToken();
+    public long getNextUndoToken();
+
     /**
      * Allow system procedures to register plan fragments to the site.
      * @param pfId

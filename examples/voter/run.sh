@@ -37,7 +37,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader $LEADER
+        license $LICENSE leader $LEADER enableiv2
 }
 
 # run the client that drives the example
@@ -65,6 +65,12 @@ function async-benchmark() {
         --ratelimit=100000 \
         --autotune=true \
         --latencytarget=6
+}
+
+function simple-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.SimpleBenchmark localhost
 }
 
 # Multi-threaded synchronous benchmark sample

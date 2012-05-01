@@ -17,12 +17,19 @@
 
 package org.voltdb;
 
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.iv2.SiteTasker;
+import org.voltdb.iv2.SiteTaskerScheduler;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.EEException;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -30,7 +37,7 @@ import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
-public class Iv2ExecutionSite implements Runnable
+public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -39,6 +46,9 @@ public class Iv2ExecutionSite implements Runnable
 
     // HSId of this site's initiator.
     final long m_siteId;
+
+    // Partition count is important for some reason.
+    final int m_numberOfPartitions;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -57,8 +67,33 @@ public class Iv2ExecutionSite implements Runnable
     // Current topology
     int m_partitionId;
 
+    // Undo token state for the corresponding EE.
+    public final static long kInvalidUndoToken = -1L;
+    long latestUndoToken = 0L;
+
+    @Override
+    public long getNextUndoToken()
+    {
+        return ++latestUndoToken;
+    }
+
+    @Override
+    public long getLatestUndoToken()
+    {
+        return latestUndoToken;
+    }
+
+    // TODO: need this for real?
+    long m_lastCommittedTxnId = 0L;
+
+    SiteProcedureConnection getSiteProcedureConnection()
+    {
+        return this;
+    }
+
     /** Create a new execution site and the corresponding EE */
     public Iv2ExecutionSite(
+            SiteTaskerScheduler scheduler,
             long siteId,
             BackendTarget backend,
             CatalogContext context,
@@ -70,7 +105,8 @@ public class Iv2ExecutionSite implements Runnable
         m_siteId = siteId;
         m_context = context;
         m_partitionId = partitionId;
-        m_scheduler = new SiteTaskerScheduler();
+        m_numberOfPartitions = numPartitions;
+        m_scheduler = scheduler;
 
         if (backend == BackendTarget.NONE) {
             m_hsql = null;
@@ -122,6 +158,7 @@ public class Iv2ExecutionSite implements Runnable
         ExecutionEngine eeTemp = null;
         try {
             if (target == BackendTarget.NATIVE_EE_JNI) {
+                System.out.println("Creating JNI EE.");
                 eeTemp =
                     new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),
@@ -187,7 +224,7 @@ public class Iv2ExecutionSite implements Runnable
     {
         SiteTasker task = m_scheduler.poll();
         if (task != null) {
-            task.run(m_ee);
+            task.run(getSiteProcedureConnection());
         }
     }
 
@@ -195,4 +232,73 @@ public class Iv2ExecutionSite implements Runnable
     {
     }
 
+    //
+    // Legacy SiteProcedureConnection needed by ProcedureRunner
+    //
+    @Override
+    public void registerPlanFragment(long pfId, ProcedureRunner proc)
+    {
+        hostLog.warn("Sysprocs not supported in Iv2. Not loading " + proc.m_procedureName);
+    }
+
+    @Override
+    public long getCorrespondingSiteId()
+    {
+        return m_siteId;
+    }
+
+    @Override
+    public int getCorrespondingPartitionId()
+    {
+        return m_partitionId;
+    }
+
+    @Override
+    public int getCorrespondingHostId()
+    {
+        return CoreUtils.getHostIdFromHSId(m_siteId);
+    }
+
+    @Override
+    public void loadTable(long txnId, String clusterName, String databaseName,
+            String tableName, VoltTable data) throws VoltAbortException
+    {
+        throw new RuntimeException("Ain't gonna do it.");
+    }
+
+    @Override
+    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
+            long[] planFragmentIds, int numFragmentIds,
+            ParameterSet[] parameterSets, int numParameterSets, long txnId,
+            boolean readOnly) throws EEException
+    {
+        System.out.println("Querying DB txnId(" + txnId +") lastcommitted(" + m_lastCommittedTxnId);
+        return m_ee.executeQueryPlanFragmentsAndGetResults(
+            planFragmentIds,
+            numFragmentIds,
+            parameterSets,
+            numParameterSets,
+            txnId,
+            0, // TODO: need real last committed txnid.
+            readOnly ? Long.MAX_VALUE : getNextUndoToken());
+    }
+
+    @Override
+    public long getReplicatedDMLDivisor()
+    {
+        return m_numberOfPartitions;
+    }
+
+    @Override
+    public void simulateExecutePlanFragments(long txnId, boolean readOnly)
+    {
+        throw new RuntimeException("Not supported in IV2.");
+    }
+
+    @Override
+    public Map<Integer, List<VoltTable>> recursableRun(
+            TransactionState currentTxnState)
+    {
+        throw new RuntimeException("Not supported in IV2");
+    }
 }
