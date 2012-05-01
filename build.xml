@@ -1147,6 +1147,9 @@ TEST CASES
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/voltdb/**/Iv2Test*.class'/>
+                <!-- whitelisted suites that pass -->
+                <include name='org/voltdb/regressionsuites/TestSPBasecaseSuite.class'/>
+                <!-- exclude inner classes -->
                 <exclude name="**/*$*.class"/>
             </fileset>
         </tests>
