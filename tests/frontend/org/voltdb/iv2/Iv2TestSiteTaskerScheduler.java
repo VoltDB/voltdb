@@ -63,10 +63,8 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
         SiteTaskerScheduler sts = new SiteTaskerScheduler();
         Task t1 = new Task(0);
 
-        SiteTasker r = sts.poll();
-        assertTrue("Empty queue returns null", r == null);
         sts.offer(t1);
-        r = sts.poll();
+        SiteTasker r = sts.poll();
         assertTrue("Round trip one task", r == t1);
     }
 
