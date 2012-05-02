@@ -83,6 +83,8 @@ public class SocketJoiner {
     }
 
     private static final VoltLogger LOG = new VoltLogger(SocketJoiner.class.getName());
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     private final ExecutorService m_es = Executors.newSingleThreadExecutor(
             org.voltcore.utils.CoreUtils.getThreadFactory("Socket Joiner", 1024 * 128));
@@ -92,7 +94,6 @@ public class SocketJoiner {
     Map<Integer, SocketChannel> m_sockets = new HashMap<Integer, SocketChannel>();
     private final List<ServerSocketChannel> m_listenerSockets = new ArrayList<ServerSocketChannel>();
     private Selector m_selector;
-    VoltLogger m_hostLog;
     private final JoinHandler m_joinHandler;
 
     // from configuration data
@@ -108,13 +109,12 @@ public class SocketJoiner {
 
         // Try to become leader regardless of configuration.
         try {
-            System.out.println("Attempting to bind to leader ip " + m_coordIp);
+            hostLog.info("Attempting to bind to leader ip " + m_coordIp);
             ServerSocketChannel listenerSocket = ServerSocketChannel.open();
             listenerSocket.socket().bind(m_coordIp);
             listenerSocket.socket().setPerformancePreferences(0, 2, 1);
             listenerSocket.configureBlocking(false);
             m_listenerSockets.add(listenerSocket);
-            System.out.println("bound");
         }
         catch (IOException e) {
             if (!m_listenerSockets.isEmpty()) {
@@ -146,8 +146,8 @@ public class SocketJoiner {
                 }
             }
             retval = true;
-            if (m_hostLog != null)
-                m_hostLog.info("Connecting to VoltDB cluster as the leader...");
+            consoleLog.info("Connecting to VoltDB cluster as the leader...");
+
             /*
              * Need to wait for external initialization to complete before
              * accepting new connections. This is slang for the leader
@@ -162,10 +162,8 @@ public class SocketJoiner {
             });
         }
         else {
-            if (m_hostLog != null) {
-                m_hostLog.info("Connecting to the VoltDB cluster leader "
-                        + m_coordIp);
-            }
+            consoleLog.info("Connecting to the VoltDB cluster leader " + m_coordIp);
+
             /*
              * Not a leader, need to connect to the primary to join the cluster.
              * Once connectToPrimary is finishes this node will be physically connected
@@ -206,13 +204,11 @@ public class SocketJoiner {
             InetSocketAddress coordIp,
             String internalInterface,
             int internalPort,
-            VoltLogger hostLog,
             JoinHandler jh) {
         if (internalInterface == null || coordIp == null || jh == null) {
             throw new IllegalArgumentException();
         }
         m_coordIp = coordIp;
-        m_hostLog = hostLog;
         m_joinHandler = jh;
         m_internalInterface = internalInterface;
         m_internalPort = internalPort;
@@ -239,9 +235,8 @@ public class SocketJoiner {
             inetsockaddr = new InetSocketAddress(m_internalInterface, m_internalPort);
         }
         try {
-            System.out.println("Attempting to bind to internal ip " + inetsockaddr);
+            hostLog.info("Attempting to bind to internal ip " + inetsockaddr);
             listenerSocket.socket().bind(inetsockaddr);
-            System.out.println("bound");
             listenerSocket.configureBlocking(false);
             m_listenerSockets.add(listenerSocket);
         } catch (Exception e) {
@@ -322,7 +317,7 @@ public class SocketJoiner {
                                     jsObj.getInt("port"));
             }
 
-            System.out.println("Received request type " + type);
+            hostLog.info("Received request type " + type);
             if (type.equals("REQUEST_HOSTID")) {
                 m_joinHandler.requestJoin( sc, listeningAddress);
             } else if (type.equals("PUBLISH_HOSTID")){
@@ -474,7 +469,7 @@ public class SocketJoiner {
                 int port = host.getInt("port");
                 final int hostId = host.getInt("hostId");
 
-                System.out.println("Leader provided address " + address);
+                hostLog.info("Leader provided address " + address);
                 InetSocketAddress hostAddr = new InetSocketAddress(address, port);
                 if (ii == 0) {
                     //Leader already has a socket
@@ -537,7 +532,7 @@ public class SocketJoiner {
         } catch (ClosedByInterruptException e) {
             //This is how shutdown is done
         } catch (Exception e) {
-            m_hostLog.error("Failed to establish socket mesh.", e);
+            hostLog.error("Failed to establish socket mesh.", e);
             throw new RuntimeException(e);
         }
     }
