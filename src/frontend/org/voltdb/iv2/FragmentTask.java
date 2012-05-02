@@ -25,11 +25,11 @@ public class FragmentTask extends SiteTasker
     final InitiatorMailbox m_initiator;
     final FragmentTaskMessage m_task;
 
-    FragmentTask(InitiatorMailbox initiator, FragmentTaskMessage message)
+    FragmentTask(InitiatorMailbox initiator, long localTxnId,
+                 FragmentTaskMessage message)
     {
         m_initiator = initiator;
-        // IZZY: work out right transaction ID?
-        m_txn = new Iv2MPTransactionState(message.getTxnId(), message);
+        m_txn = new Iv2MPTransactionState(localTxnId, message);
         m_task = message;
     }
 
