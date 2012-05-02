@@ -62,12 +62,8 @@ public class SiteTaskerScheduler
         return m_tasks.offer(task);
     }
 
-    public SiteTasker poll()
+    public SiteTasker poll() throws InterruptedException
     {
-        try {
-            return m_tasks.take();
-        } catch (InterruptedException e) {
-            return poll();
-        }
+        return m_tasks.take();
     }
 }

@@ -1406,6 +1406,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     site.startShutdown();
             }
 
+            // tell the iv2 sites to stop their runloop
+            if (m_iv2Sites != null) {
+                for (Site site : m_iv2Sites)
+                    site.shutdown();
+            }
+
             // try to join all threads but the main one
             // probably want to check if one of these is the current thread
             if (m_siteThreads != null) {

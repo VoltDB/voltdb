@@ -74,6 +74,23 @@ public class Site
         m_siteThread.start(); // Maybe this moves --izzy
     }
 
+    public void shutdown()
+    {
+        // rtb: better to schedule a shutdown SiteTasker?
+        // than to play java interrupt() games?
+        if (m_executionSite != null) {
+            m_executionSite.startShutdown();
+        }
+        if (m_siteThread != null) {
+            try {
+                m_siteThread.interrupt();
+                m_siteThread.join();
+            }
+            catch (InterruptedException giveup) {
+            }
+        }
+    }
+
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();

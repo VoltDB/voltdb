@@ -245,10 +245,13 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
             hostLog.l7dlog(Level.ERROR, LogKeys.host_ExecutionSite_RuntimeException.name(), e);
             throw e;
         }
+        catch (final InterruptedException e) {
+            // acceptable - this is how site blocked on an empty scheduler terminates.
+        }
         shutdown();
     }
 
-    void runLoop()
+    void runLoop() throws InterruptedException
     {
         SiteTasker task = m_scheduler.poll();
         if (task != null) {
@@ -256,8 +259,23 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
         }
     }
 
+    public void startShutdown()
+    {
+        m_shouldContinue = false;
+    }
+
     void shutdown()
     {
+        try {
+            if (m_hsql != null) {
+                m_hsql.shutdown();
+            }
+            if (m_ee != null) {
+                m_ee.release();
+            }
+        } catch (InterruptedException e) {
+            hostLog.warn("Interrupted shutdown execution site.", e);
+        }
     }
 
     //

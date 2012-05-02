@@ -58,11 +58,10 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     }
 
     @Test
-    public void testSimpleRoundTrip()
+    public void testSimpleRoundTrip() throws Exception
     {
         SiteTaskerScheduler sts = new SiteTaskerScheduler();
         Task t1 = new Task(0);
-
         sts.offer(t1);
         SiteTasker r = sts.poll();
         assertTrue("Round trip one task", r == t1);
@@ -92,7 +91,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
 
 
     @Test
-    public void testBaseCase()
+    public void testBaseCase() throws Exception
     {
         SiteTaskerScheduler sts = new SiteTaskerScheduler();
         Task p1 = new Task(1);
@@ -110,7 +109,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     }
 
     @Test
-    public void testPrioritization()
+    public void testPrioritization() throws Exception
     {
         SiteTaskerScheduler sts = new SiteTaskerScheduler();
         Task p1 = new Task(1);
@@ -130,7 +129,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     }
 
     @Test
-    public void testEqualPriorities()
+    public void testEqualPriorities() throws Exception
     {
         SiteTaskerScheduler sts = new SiteTaskerScheduler();
         Task t1 = new Task(0);
