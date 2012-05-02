@@ -80,6 +80,8 @@ public class FragmentTask extends SiteTasker
                     params = fds.readObject(ParameterSet.class);
                 }
                 catch (final IOException e) {
+                    // IZZY: why not send a non-success response back to the
+                    // MPI here?
                     hostLog.l7dlog(Level.FATAL,
                                    LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
