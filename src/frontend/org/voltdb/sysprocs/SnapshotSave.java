@@ -111,9 +111,11 @@ public class SnapshotSave extends VoltSystemProcedure
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
+            assert(params.toArray()[2] != null);
             String file_path = (String) params.toArray()[0];
             String file_nonce = (String) params.toArray()[1];
-            return saveTest(file_path, file_nonce, context, hostname);
+            boolean csv = ((Byte)params.toArray()[2]).byteValue() == 1 ? true  : false;
+            return saveTest(file_path, file_nonce, csv, context, hostname);
         }
         else if (fragmentId == SysProcFragmentId.PF_saveTestResults)
         {
@@ -125,12 +127,14 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
             assert(params.toArray()[3] != null);
+            assert(params.toArray()[4] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
             byte block = (Byte)params.toArray()[3];
+            boolean csv = ((Byte)params.toArray()[4]).byteValue() == 1 ? true  : false;
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
-            VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce, block, txnId, context, hostname);
+            VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce, csv, block, txnId, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -185,7 +189,7 @@ public class SnapshotSave extends VoltSystemProcedure
         }
     }
 
-    private DependencyPair saveTest(String file_path, String file_nonce,
+    private DependencyPair saveTest(String file_path, String file_nonce, boolean csv,
             SystemProcedureExecutionContext context, String hostname) {
         {
             VoltTable result = constructNodeResultsTable();
@@ -213,7 +217,12 @@ public class SnapshotSave extends VoltSystemProcedure
                 for (Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
                     File saveFilePath =
-                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce, context.getHostId());
+                        SnapshotUtil.constructFileForTable(
+                                table,
+                                file_path,
+                                file_nonce,
+                                csv ? ".csv" : ".vpt",
+                                context.getHostId());
                     TRACE_LOG.trace("Host ID " + context.getHostId() +
                                     " table: " + table.getTypeName() +
                                     " to path: " + saveFilePath);
