@@ -2119,12 +2119,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                  * No roll back support.
                  */
                 try {
-                    final VoltTable dependency = ee.executePlanFragment(fragmentId,
-                                                                        inputDepId,
-                                                                        params,
-                                                                        txnState.txnId,
-                                                                        lastCommittedTxnId,
-                                                                        txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken());
+                    final VoltTable dependency = executePlanFragment(fragmentId,
+                                                                     inputDepId,
+                                                                     params,
+                                                                     txnState.txnId,
+                                                                     txnState.isReadOnly());
 
                     sendDependency(currentFragResponse, outputDepId, dependency);
 
@@ -2303,5 +2302,18 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     @Override
     public void truncateUndoLog(boolean rollback, long token, long txnId) {
         throw new RuntimeException("Unsupported IV2-only API.");
+    }
+
+    @Override
+    public VoltTable executePlanFragment(long planFragmentId, int inputDepId,
+                                         ParameterSet parameterSet, long txnId,
+                                         boolean readOnly) throws EEException
+    {
+        return ee.executePlanFragment(planFragmentId,
+                                      inputDepId,
+                                      parameterSet,
+                                      txnId,
+                                      lastCommittedTxnId,
+                                      readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 }
