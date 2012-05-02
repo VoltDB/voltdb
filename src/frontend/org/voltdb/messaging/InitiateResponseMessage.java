@@ -51,7 +51,10 @@ public class InitiateResponseMessage extends VoltMessage {
      * IV2 constructor
      */
     public InitiateResponseMessage(Iv2InitiateTaskMessage task) {
-        this((InitiateTaskMessage)task);
+        m_txnId = task.getTxnId();
+        m_initiatorHSId = task.getInitiatorHSId();
+        m_coordinatorHSId = task.getCoordinatorHSId();
+        m_subject = Subject.DEFAULT.getId();
         m_clientInterfaceHandle = task.getClientInterfaceHandle();
     }
 
@@ -106,10 +109,6 @@ public class InitiateResponseMessage extends VoltMessage {
     }
 
     public void setResults(ClientResponseImpl r) {
-        setResults( r, null);
-    }
-
-    public void setResults(ClientResponseImpl r, InitiateTaskMessage task) {
         m_commit = (r.getStatus() == ClientResponseImpl.SUCCESS);
         m_response = r;
     }

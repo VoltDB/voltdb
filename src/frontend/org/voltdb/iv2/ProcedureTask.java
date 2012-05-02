@@ -123,7 +123,7 @@ public class ProcedureTask extends SiteTasker
                 */
                 cr = m_runner.call(txnId, itask.getParameters());
 
-                response.setResults(cr, itask);
+                response.setResults(cr);
                 // record the results of write transactions to the transaction state
                 // this may be used to verify the DR replica cluster gets the same value
                 // skip for multi-partition txns because only 1 of k+1 partitions will

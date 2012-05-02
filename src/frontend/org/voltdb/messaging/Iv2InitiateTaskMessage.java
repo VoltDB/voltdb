@@ -19,41 +19,99 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
 
-public class Iv2InitiateTaskMessage extends InitiateTaskMessage
-{
-    long m_clientInterfaceHandle;
 
-    public Iv2InitiateTaskMessage(long clientInterfaceHSId,
-                        long primaryInitiatorHSId,
+/**
+ * Message from a client interface to an initiator, instructing the
+ * site to begin executing a stored procedure, coordinating other
+ * execution sites if needed.
+ *
+ */
+public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
+
+    boolean m_isSinglePartition;
+    StoredProcedureInvocation m_invocation;
+    long m_clientInterfaceHandle; // this is the largest txn acked by all partitions running the java for it
+    AtomicBoolean m_isDurable;
+
+    /** Empty constructor for de-serialization */
+    Iv2InitiateTaskMessage() {
+        super();
+    }
+
+    public Iv2InitiateTaskMessage(long initiatorHSId,
+                        long coordinatorHSId,
                         long txnId,
                         boolean isReadOnly,
                         boolean isSinglePartition,
                         StoredProcedureInvocation invocation,
-                        long clientInterfaceHandle)
-    {
-        super(clientInterfaceHSId, primaryInitiatorHSId, txnId, isReadOnly,
-              isSinglePartition, invocation, Long.MAX_VALUE);
+                        long clientInterfaceHandle) {
+        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
+        m_isSinglePartition = isSinglePartition;
+        m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
     }
 
-    // Needed for deserialization
-    public Iv2InitiateTaskMessage()
-    {
+    @Override
+    public boolean isReadOnly() {
+        return m_isReadOnly;
     }
 
-    public long getClientInterfaceHandle()
-    {
+    @Override
+    public boolean isSinglePartition() {
+        return m_isSinglePartition;
+    }
+
+    public StoredProcedureInvocation getStoredProcedureInvocation() {
+        return m_invocation;
+    }
+
+    public String getStoredProcedureName() {
+        assert(m_invocation != null);
+        return m_invocation.getProcName();
+    }
+
+    public int getParameterCount() {
+        assert(m_invocation != null);
+        if (m_invocation.getParams() == null)
+            return 0;
+        return m_invocation.getParams().toArray().length;
+    }
+
+    public Object[] getParameters() {
+        return m_invocation.getParams().toArray();
+    }
+
+    public long getClientInterfaceHandle() {
         return m_clientInterfaceHandle;
+    }
+
+    public AtomicBoolean getDurabilityFlag() {
+        assert(!m_isReadOnly);
+        if (m_isDurable == null) {
+            m_isDurable = new AtomicBoolean();
+        }
+        return m_isDurable;
+    }
+
+    public AtomicBoolean getDurabilityFlagIfItExists() {
+        return m_isDurable;
     }
 
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8; // m_clientHandle
+        msgsize += 8 // m_clientInterfaceHandle
+            + 1; // is single partition flag?
+
+        msgsize += m_invocation.getSerializedSize();
+
         return msgsize;
     }
 
@@ -61,26 +119,57 @@ public class Iv2InitiateTaskMessage extends InitiateTaskMessage
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.IV2_INITIATE_TASK_ID);
-        buf.putLong(m_clientInterfaceHandle);
         super.flattenToBuffer(buf);
+        buf.putLong(m_clientInterfaceHandle);
+        buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
+        m_invocation.flattenToBuffer(buf);
+
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) throws IOException
-    {
-        m_clientInterfaceHandle = buf.getLong();
+    public void initFromBuffer(ByteBuffer buf) throws IOException {
         super.initFromBuffer(buf);
+
+        m_clientInterfaceHandle = buf.getLong();
+        m_isSinglePartition = buf.get() == 1;
+        m_invocation = new StoredProcedureInvocation();
+        m_invocation.initFromBuffer(buf);
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("IV2 INITIATE TASK: ");
-        sb.append("  CLIENT HANDLE: ").append(m_clientInterfaceHandle).append("\n");
-        sb.append(super.toString());
+
+        sb.append("IV2 INITITATE_TASK (FROM ");
+        sb.append(CoreUtils.hsIdToString(getInitiatorHSId()));
+        sb.append(" TO ");
+        sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
+        sb.append(") FOR TXN ");
+        sb.append(m_txnId).append("\n");
+        sb.append("CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
+        sb.append("\n");
+        if (m_isReadOnly)
+            sb.append("  READ, ");
+        else
+            sb.append("  WRITE, ");
+        if (m_isSinglePartition)
+            sb.append("SINGLE PARTITION, ");
+        else
+            sb.append("MULTI PARTITION, ");
+        sb.append("COORD ");
+        sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
+
+        sb.append("\n  PROCEDURE: ");
+        sb.append(m_invocation.getProcName());
+        sb.append("\n  PARAMS: ");
+        sb.append(m_invocation.getParams().toString());
 
         return sb.toString();
+    }
+
+    public ByteBuffer getSerializedParams() {
+        return m_invocation.getSerializedParams();
     }
 }

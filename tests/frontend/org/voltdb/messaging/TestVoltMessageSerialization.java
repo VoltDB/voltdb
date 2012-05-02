@@ -95,7 +95,6 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getParameterCount(), itask2.getParameterCount());
         assertEquals(itask.getClientInterfaceHandle(), itask2.getClientInterfaceHandle());
         assertEquals(itask.getClientInterfaceHandle(), 2101);
-        assertEquals(itask.getLastSafeTxnId(), itask2.getLastSafeTxnId());
     }
 
     public void testInitiateResponse() throws IOException {

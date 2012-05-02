@@ -244,7 +244,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                              new StoredProcedureInvocation(),
                                              Long.MAX_VALUE);
         InitiateResponseMessage response = new InitiateResponseMessage(task);
-        response.setResults(new ClientResponseImpl((byte) 0, results, ""), task);
+        response.setResults(new ClientResponseImpl((byte) 0, results, ""));
         response.setRecovering(recovering);
         return response;
     }
