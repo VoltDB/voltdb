@@ -167,22 +167,30 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     public void deliver(VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
-            final String procedureName = ((Iv2InitiateTaskMessage) message).getStoredProcedureName();
-            final ProcedureTask task = new ProcedureTask(
-                    this, this.m_loadedProcs.procs.get(procedureName),
-                    m_txnId.incrementAndGet(),
-                    (Iv2InitiateTaskMessage)message);
-            m_scheduler.offer(task);
+            handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }
         else if (message instanceof InitiateResponseMessage) {
-            InitiateResponseMessage response = (InitiateResponseMessage)message;
-            try {
-                // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-                send(response.getInitiatorHSId(), response);
-            }
-            catch (MessagingException e) {
-                hostLog.error("Failed to deliver response from execution site.", e);
-            }
+            handleInitiateResponseMessage((InitiateResponseMessage)message);
+        }
+    }
+
+    private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
+    {
+        final String procedureName = message.getStoredProcedureName();
+        final ProcedureTask task =
+            new ProcedureTask(this, this.m_loadedProcs.procs.get(procedureName),
+                              m_txnId.incrementAndGet(), message);
+        m_scheduler.offer(task);
+    }
+
+    private void handleInitiateResponseMessage(InitiateResponseMessage message)
+    {
+        try {
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            send(message.getInitiatorHSId(), message);
+        }
+        catch (MessagingException e) {
+            hostLog.error("Failed to deliver response from execution site.", e);
         }
     }
 
