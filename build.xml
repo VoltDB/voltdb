@@ -1146,11 +1146,51 @@ TEST CASES
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>
+                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/**/Iv2Test*.class'/>
-                <!-- whitelisted suites that pass -->
-                <include name='org/voltdb/regressionsuites/TestSPBasecaseSuite.class'/>
-                <!-- exclude inner classes -->
                 <exclude name="**/*$*.class"/>
+                <exclude name="**/TestAdHocQueries.class" />
+                <exclude name="**/TestHSQLBackend.class" />
+                <exclude name="**/TestJSONInterface.class" />
+                <exclude name="**/TestRejoinEndToEnd.class" />
+                <exclude name="**/TestRejoinFuzz.class" />
+                <exclude name="**/TestRejoinFuzz2.class" />
+                <exclude name="**/TestReplicatedInvocation.class" />
+                <exclude name="**/TestRestoreAgent.class" />
+                <exclude name="**/TestSimpleCJK.class" />
+                <exclude name="**/TestClientTimeouts.class" />
+                <exclude name="**/TestExportToFileClient.class" />
+                <exclude name="**/TestNonDetermisticSeppuku.class" />
+                <exclude name="**/TestJDBCDriver.class" />
+                <exclude name="**/TestAdminMode.class" />
+                <exclude name="**/TestCRUDSuite.class" />
+                <exclude name="**/TestFailuresSuite.class" />
+                <exclude name="**/TestFixedSQLSuite.class" />
+                <exclude name="**/TestGiantDeleteSuite.class" />
+                <exclude name="**/TestIndexMemoryOwnershipSuite.class" />
+                <exclude name="**/TestIndexesSuite.class" />
+                <exclude name="**/TestLimitOffsetSuite.class" />
+                <exclude name="**/TestLoadingSuite.class" />
+                <exclude name="**/TestMaterializedViewSuite.class" />
+                <exclude name="**/TestMultiPartitionSuite.class" />
+                <exclude name="**/TestOrderBySuite.class" />
+                <exclude name="**/TestPlansGroupBySuite.class" />
+                <exclude name="**/TestReplicatedSaveRestoreSysprocSuite.class" />
+                <exclude name="**/TestRollbackSuite.class" />
+                <exclude name="**/TestSQLFeaturesSuite.class" />
+                <exclude name="**/TestSQLTypesSuite.class" />
+                <exclude name="**/TestSaveRestoreSysprocSuite.class" />
+                <exclude name="**/TestSecuritySuite.class" />
+                <exclude name="**/TestSneakyExecutionOrderSuite.class" />
+                <exclude name="**/TestSqlAggregateSuite.class" />
+                <exclude name="**/TestSqlLogicOperatorsSuite.class" />
+                <exclude name="**/TestSqlUpdateSuite.class" />
+                <exclude name="**/TestSystemInformationSuite.class" />
+                <exclude name="**/TestSystemProcedureSuite.class" />
+                <exclude name="**/TestTPCCSuite.class" />
+                <exclude name="**/TestBlobType.class" />
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
             </fileset>
         </tests>
     </run_junit>
