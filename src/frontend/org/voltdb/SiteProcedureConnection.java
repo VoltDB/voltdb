@@ -93,4 +93,19 @@ public interface SiteProcedureConnection {
      * IV2 commit / rollback interface to the EE
      */
     public void truncateUndoLog(boolean rollback, long token, long txnId);
+
+    /**
+     * IV2: Run a plan fragment
+     * @param planFragmentId
+     * @param inputDepId
+     * @param parameterSet
+     * @param txnId
+     * @param readOnly
+     * @return
+     * @throws EEException
+     */
+    public VoltTable executePlanFragment(
+        long planFragmentId, int inputDepId, ParameterSet parameterSet,
+        long txnId, boolean readOnly) throws EEException;
+
 }

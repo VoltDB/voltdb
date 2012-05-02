@@ -329,6 +329,19 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public VoltTable executePlanFragment(long planFragmentId, int inputDepId,
+                                         ParameterSet parameterSet, long txnId,
+                                         boolean readOnly) throws EEException
+    {
+        return m_ee.executePlanFragment(planFragmentId,
+                                        inputDepId,
+                                        parameterSet,
+                                        txnId,
+                                        m_lastCommittedTxnId,
+                                        readOnly ? Long.MAX_VALUE : getNextUndoToken());
+    }
+
+    @Override
     public long getReplicatedDMLDivisor()
     {
         return m_numberOfPartitions;
