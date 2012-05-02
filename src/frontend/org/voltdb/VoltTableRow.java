@@ -200,8 +200,11 @@ public abstract class VoltTableRow {
      * @return True if a valid row became active. False otherwise.
      */
     public boolean advanceToRow(int rowIndex) {
+        int rows_to_move = rowIndex - m_activeRowIndex;
         m_activeRowIndex = rowIndex;
         if (m_activeRowIndex >= getRowCount())
+            return false;
+        if (rows_to_move < 0) // this is "advance" to row, don't move backwards
             return false;
 
         m_hasCalculatedOffsets = false;
@@ -211,14 +214,27 @@ public abstract class VoltTableRow {
         if (m_activeRowIndex == 0)
             m_position = getRowStart() + ROW_COUNT_SIZE + ROW_HEADER_SIZE;
         else {
-            int rowlength = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
-            if (rowlength <= 0) {
-                throw new RuntimeException("Invalid row length.");
+            // Move n rows - this code assumes rows can be variable size, so we
+            // have to fetch the size of each row in order to advance to the
+            // next row
+            if (rows_to_move > 0 && m_position < 0)
+                throw new RuntimeException(
+                        "VoltTableRow is in an invalid state. Consider calling advanceRow().");
+
+            for (int i = 0; i < rows_to_move; i++) {
+                int rowlength = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
+                if (rowlength <= 0) {
+                    throw new RuntimeException("Invalid row length.");
+                }
+
+                m_position += (rowlength + ROW_HEADER_SIZE);
             }
-            m_position += rowlength + ROW_HEADER_SIZE;
-            if (m_position >= m_buffer.limit())
+
+            if (m_position >= m_buffer.limit()) {
                 throw new RuntimeException("Row length exceeds table boundary.");
+            }
         }
+
         return true;
     }
 
