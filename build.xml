@@ -1362,7 +1362,8 @@ TEST CASES
     lcov.dir is the directory in which to put the coverage report
     lcov.target is the ant target to run under coverage
 -->
-<target name='with.lcov' description="Generate C++ code coverage reports.">
+<target name='with.lcov' depends="jnicompile"
+        description="Generate C++ code coverage reports.">
   <property name="lcov.base.tracefile" value="lcov_base.info" />
   <property name="lcov.test.tracefile" value="lcov_test.info" />
   <property name="lcov.tracefile" value="lcov.info" />
