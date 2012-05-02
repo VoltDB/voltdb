@@ -31,6 +31,8 @@ import org.voltdb.fault.FaultDistributorInterface;
 
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google.common.util.concurrent.ListeningExecutorService;
+
 public interface VoltDBInterface
 {
     public boolean recovering();
@@ -170,7 +172,7 @@ public interface VoltDBInterface
      * Return an executor service for running non-blocking but computationally expensive
      * tasks.
      */
-    public ExecutorService getComputationService();
+    public ListeningExecutorService getComputationService();
 
     /**
      * Return the license api. This may be null in community editions!

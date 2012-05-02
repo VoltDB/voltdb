@@ -28,6 +28,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -48,6 +49,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.utils.CatalogUtil;
 
+
+import com.google.common.util.concurrent.Callables;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -202,16 +205,19 @@ public class SnapshotSiteProcessor {
     public static class SnapshotTableTask {
         private final int m_tableId;
         private final SnapshotDataTarget m_target;
+        private final SnapshotDataFilter m_filters[];
         private final boolean m_isReplicated;
         private final String m_name;
 
         public SnapshotTableTask(
                 final int tableId,
                 final SnapshotDataTarget target,
+                final SnapshotDataFilter filters[],
                 boolean isReplicated,
                 final String tableName) {
             m_tableId = tableId;
             m_target = target;
+            m_filters = filters;
             m_isReplicated = isReplicated;
             m_name = tableName;
         }
@@ -351,7 +357,11 @@ public class SnapshotSiteProcessor {
              */
             snapshotBuffer.b.limit(headerSize + serialized);
             snapshotBuffer.b.position(0);
-            retval = currentTask.m_target.write(snapshotBuffer);
+            Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
+            for (SnapshotDataFilter filter : currentTask.m_filters) {
+                valueForTarget = filter.filter(valueForTarget);
+            }
+            retval = currentTask.m_target.write(valueForTarget);
             if (retval != null) {
                 m_writeFutures.add(retval);
             }

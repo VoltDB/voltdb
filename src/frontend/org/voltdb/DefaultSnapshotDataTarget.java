@@ -47,6 +47,14 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CompressionService;
 
+import com.google.common.util.concurrent.Callables;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
+
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
@@ -90,29 +98,31 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     private final AtomicInteger m_outstandingWriteTasks = new AtomicInteger(0);
 
-    private static final ExecutorService m_es = Executors.newSingleThreadExecutor(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
+    private static final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(
+                Executors.newSingleThreadExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
 
-            return new Thread(
-                    Thread.currentThread().getThreadGroup(),
-                    r,
-                    "Snapshot write service ",
-                    131072);
-        }
-    });
+                return new Thread(
+                        Thread.currentThread().getThreadGroup(),
+                        r,
+                        "Snapshot write service ",
+                        131072);
+            }
+        }));
 
-    private static final ScheduledExecutorService m_syncService = Executors.newSingleThreadScheduledExecutor(
-            new ThreadFactory() {
-                @Override
-                public Thread newThread(Runnable r) {
-                    return new Thread(
-                            Thread.currentThread().getThreadGroup(),
-                            r,
-                            "Snapshot sync service ",
-                            131072);
-                }
-            });
+    private static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
+            Executors.newSingleThreadScheduledExecutor(
+                new ThreadFactory() {
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        return new Thread(
+                                Thread.currentThread().getThreadGroup(),
+                                r,
+                                "Snapshot sync service ",
+                                131072);
+                    }
+                }));
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -226,7 +236,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
          * the disk is probably full or the path is bunk etc.
          */
         m_acceptOneWrite = true;
-        Future<?> writeFuture = write(DBBPool.wrapBB(aggregateBuffer), false);
+        ListenableFuture<?> writeFuture =
+                write(Callables.returning((BBContainer)DBBPool.wrapBB(aggregateBuffer)), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
@@ -296,7 +307,19 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
      * Prepend length is basically synonymous with writing actual tuple data and not
      * the header.
      */
-    private Future<?> write(final BBContainer tupleData, final boolean prependLength) {
+    private ListenableFuture<?> write(final Callable<BBContainer> tupleDataC, final boolean prependLength) {
+        /*
+         * Unwrap the data to be written. For the traditional
+         * snapshot data target this should be a noop.
+         */
+        BBContainer tupleDataTemp;
+        try {
+            tupleDataTemp = tupleDataC.call();
+        } catch (Throwable t) {
+            return Futures.immediateFailedFuture(t);
+        }
+        final BBContainer tupleData = tupleDataTemp;
+
         if (m_writeFailed) {
             tupleData.discard();
             return null;
@@ -315,7 +338,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         final AtomicReference<Future<byte[]>> compressionTaskFinal =
             new AtomicReference<Future<byte[]>>(compressionTask);
 
-        Future<?> writeTask = m_es.submit(new Callable<Object>() {
+        ListenableFuture<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
                 try {
@@ -378,7 +401,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public Future<?> write(final BBContainer tupleData) {
+    public ListenableFuture<?> write(final Callable<BBContainer> tupleData) {
         return write(tupleData, true);
     }
 
@@ -395,10 +418,5 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public IOException getLastWriteException() {
         return m_writeException;
-    }
-
-    @Override
-    public String getFileExtension() {
-        return ".vpt";
     }
 }

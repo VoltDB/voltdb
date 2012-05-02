@@ -117,7 +117,7 @@ public class SnapshotRegistry {
             public final String name;
             public final String filename;
             public final long size;
-            public final Exception error;
+            public final Throwable error;
 
             private Table(String name, String filename) {
                 this.name = name;
@@ -126,7 +126,7 @@ public class SnapshotRegistry {
                 error = null;
             }
 
-            public Table(Table t, long size, Exception error) {
+            public Table(Table t, long size, Throwable error) {
                 this.name = t.name;
                 this.filename = t.filename;
                 this.size = size;

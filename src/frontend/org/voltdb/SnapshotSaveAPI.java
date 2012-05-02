@@ -288,11 +288,13 @@ public class SnapshotSaveAPI
 
 
     @SuppressWarnings("unused")
-    private void createSetup(String file_path, String file_nonce,
+    private void createSetup(
+            String file_path, boolean csv, String file_nonce,
             long txnId, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
+            List<Integer> localPartitions
             /*
              * Used to close targets on failure
              */
