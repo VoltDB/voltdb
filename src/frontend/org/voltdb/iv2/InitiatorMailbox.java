@@ -34,6 +34,7 @@ import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -176,6 +177,9 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
         else if (message instanceof FragmentTaskMessage) {
             handleFragmentTaskMessage((FragmentTaskMessage)message);
         }
+        else if (message instanceof FragmentResponseMessage) {
+            handleFragmentResponseMessage((FragmentResponseMessage)message);
+        }
     }
 
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
@@ -205,9 +209,22 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
         // Actually, we're going to need to create the transaction state
         // here if one does not exist so that we can hand it to future
         // FragmentTasks
+        //
+        // For now (one-shot reads), just create everything from scratch
+        long localTxnId = m_txnId.incrementAndGet();
         final FragmentTask task =
-            new FragmentTask(this, message);
+            new FragmentTask(this, localTxnId, message);
         m_scheduler.offer(task);
+    }
+
+    private void handleFragmentResponseMessage(FragmentResponseMessage message)
+    {
+        try {
+            send(message.getDestinationSiteId(), message);
+        }
+        catch (MessagingException e) {
+            hostLog.error("Failed to deliver response from execution site.", e);
+        }
     }
 
     /**
