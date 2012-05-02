@@ -114,7 +114,7 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[2] != null);
             String file_path = (String) params.toArray()[0];
             String file_nonce = (String) params.toArray()[1];
-            boolean csv = ((Byte)params.toArray()[2]).byteValue() == 1 ? true  : false;
+            boolean csv = ((Number)params.toArray()[2]).intValue() == 1 ? true  : false;
             return saveTest(file_path, file_nonce, csv, context, hostname);
         }
         else if (fragmentId == SysProcFragmentId.PF_saveTestResults)
@@ -132,7 +132,7 @@ public class SnapshotSave extends VoltSystemProcedure
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
             byte block = (Byte)params.toArray()[3];
-            boolean csv = ((Byte)params.toArray()[4]).byteValue() == 1 ? true  : false;
+            boolean csv = ((Number)params.toArray()[4]).intValue() == 1 ? true  : false;
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce, csv, block, txnId, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
@@ -377,7 +377,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce);
+        params.setParameters(filePath, fileNonce, 0);
         pfs[0].parameters = params;
 
         // This fragment aggregates the save-to-disk sanity check results
@@ -408,7 +408,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, block);
+        params.setParameters(filePath, fileNonce, txnId, block, 0);
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files
