@@ -76,7 +76,7 @@ public class MyTPCC
         long lag_latency_millis = lag_latency_seconds * 1000l;
         long thisOutstanding = 0;
         long lastOutstanding = 0;
-        final String statsFile = m_helpah.stringValue("stats");
+        final String statsFile = m_helpah.stringValue("statsfile");
 
         long transactions_this_second = 0;
         long last_millisecond = System.currentTimeMillis();
@@ -231,9 +231,9 @@ public class MyTPCC
         m_helpah = new AppHelper(MyTPCC.class.getCanonicalName());
         m_helpah.add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 180);
         m_helpah.add("warehouses", "number_of_warehouses", "Number of warehouses", 12);
-        m_helpah.add("scale-factor", "scale_factor", "Scale factor", 1.0);
-        m_helpah.add("skew-factor", "skew_factor", "Skew factor", 0.0);
-        m_helpah.add("load-threads", "number_of_load_threads", "Number of load threads", 4);
+        m_helpah.add("scalefactor", "scale_factor", "Scale factor", 1.0);
+        m_helpah.add("skewfactor", "skew_factor", "Skew factor", 0.0);
+        m_helpah.add("loadthreads", "number_of_load_threads", "Number of load threads", 4);
         m_helpah.add("ratelimit", "rate_limit", "Rate limit to start from (tps)", 200000);
         m_helpah.add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10);
         m_helpah.add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost");
@@ -241,8 +241,8 @@ public class MyTPCC
 
         // default values
         int warehouses = m_helpah.intValue("warehouses");
-        double scalefactor = m_helpah.doubleValue("scale-factor");
-        double skewfactor = m_helpah.doubleValue("skew-factor");
+        double scalefactor = m_helpah.doubleValue("scalefactor");
+        double skewfactor = m_helpah.doubleValue("skewfactor");
 
         String servers = m_helpah.stringValue("servers");
         System.out.printf("Connecting to servers: %s\n", servers);
