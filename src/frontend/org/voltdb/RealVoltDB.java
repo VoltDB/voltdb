@@ -528,17 +528,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              * the constructed ExecutionSites in the local site map.
              */
             for (ExecutionSiteRunner runner : m_runners) {
-                synchronized (runner) {
-                    if (!runner.m_isSiteCreated) {
-                        try {
-                            runner.wait();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                    assert(runner.m_siteObj != null);
-                    m_localSites.put(runner.m_siteId, runner.m_siteObj);
+                try {
+                    runner.m_siteIsLoaded.await();
+                } catch (InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Unable to wait on starting execution site.", true, e);
                 }
+                assert(runner.m_siteObj != null);
+                m_localSites.put(runner.m_siteId, runner.m_siteObj);
             }
 
             // Create the client interface
@@ -1292,10 +1288,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public void run() {
         // start the separate EE threads
         for (ExecutionSiteRunner r : m_runners) {
-            synchronized (r) {
-                assert(r.m_isSiteCreated) : "Site should already have been created by ExecutionSiteRunner";
-                r.notifyAll();
-            }
+            r.m_shouldStartRunning.countDown();
         }
 
         if (m_restoreAgent != null) {
