@@ -101,9 +101,11 @@ public class LocalCluster implements VoltServerConfig {
     PortGenerator portGenerator = new PortGenerator();
     public static class PortGenerator {
         private int nextPort = 12000;
-        private int nextCport = VoltDB.DEFAULT_PORT;
-        private int nextAport = VoltDB.DEFAULT_ADMIN_PORT;
+        private static int portOffset = 100;    // Shift ports away from defaults for testing
+        private int nextCport = VoltDB.DEFAULT_PORT+portOffset;
+        private int nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
 
+        final int MIN_STATIC_PORT = 10000;
         final int MAX_STATIC_PORT = 49151;
 
         /** Return the next bindable port */
@@ -117,14 +119,26 @@ public class LocalCluster implements VoltServerConfig {
             return -1;
         }
         public synchronized int nextClient() {
-            return nextCport++;
+            while(nextCport <= MAX_STATIC_PORT) {
+                int port = nextCport++;
+                if (MiscUtils.isBindable(port)) {
+                    return port;
+                }
+            }
+            return -1;
         }
         public synchronized int nextAdmin() {
-            return nextAport--;
+            while(nextAport >= MIN_STATIC_PORT) {
+                int port = nextAport--;
+                if (MiscUtils.isBindable(port)) {
+                    return port;
+                }
+            }
+            return -1;
         }
         public synchronized void reset() {
-            nextCport = 21212;
-            nextAport = 21211;
+            nextCport = VoltDB.DEFAULT_PORT+portOffset;
+            nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
         }
     }
 
@@ -1016,6 +1030,14 @@ public class LocalCluster implements VoltServerConfig {
 
     public int internalPort(int hostId) {
         return m_cmdLines.get(hostId).internalPort();
+    }
+
+    public int port(int hostId) {
+        return m_cmdLines.get(hostId).port();
+    }
+
+    public int adminPort(int hostId) {
+        return m_cmdLines.get(hostId).adminPort();
     }
 
     @Override
