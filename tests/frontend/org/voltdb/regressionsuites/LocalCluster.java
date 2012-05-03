@@ -98,7 +98,7 @@ public class LocalCluster implements VoltServerConfig {
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
 
     // Produce a (presumably) available IP port number.
-    PortGenerator portGenerator = new PortGenerator();
+    public final PortGenerator portGenerator = new PortGenerator();
     public static class PortGenerator {
         private int nextPort = 12000;
         private static int portOffset = 100;    // Shift ports away from defaults for testing
@@ -1038,6 +1038,14 @@ public class LocalCluster implements VoltServerConfig {
 
     public int adminPort(int hostId) {
         return m_cmdLines.get(hostId).adminPort();
+    }
+
+    public int setPort(int hostId, int port) {
+        return m_cmdLines.get(hostId).m_port = port;
+    }
+
+    public int setAdminPort(int hostId, int port) {
+        return m_cmdLines.get(hostId).m_adminPort = port;
     }
 
     @Override

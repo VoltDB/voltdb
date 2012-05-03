@@ -163,6 +163,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
                 config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
                 config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
+                config.m_port = cluster.portGenerator.nextClient();
+                cluster.setPort(0, config.m_port);
+                config.m_adminPort = cluster.portGenerator.nextAdmin();
+                cluster.setAdminPort(0, config.m_adminPort);
+                config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
+
                 config.m_isRejoinTest = true;
                 localServer = new ServerThread(config);
 
@@ -269,7 +276,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.setMaxHeap(64);
         ServerThread localServer = null;
         try {
-            boolean success = cluster.compileWithAdminMode(builder, cluster.adminPort(0), false);
+            boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note, this admin port is ignored
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
             cluster.setHasLocalServer(false);
@@ -295,6 +302,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
             config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
+            config.m_port = cluster.portGenerator.nextClient();
+            cluster.setPort(0, config.m_port);
+            config.m_adminPort = cluster.portGenerator.nextAdmin();
+            cluster.setAdminPort(0, config.m_adminPort);
+            config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
+
             config.m_isRejoinTest = true;
             localServer = new ServerThread(config);
 
@@ -498,7 +512,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
-        config.m_zkInterface = "127.0.0.1:2179";
+
+        config.m_port = cluster.portGenerator.nextClient();
+        cluster.setPort(0, config.m_port);
+        config.m_adminPort = cluster.portGenerator.nextAdmin();
+        cluster.setAdminPort(0, config.m_adminPort);
+        config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
+
         config.m_isRejoinTest = true;
         ServerThread localServer = new ServerThread(config);
 
@@ -539,7 +559,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
         cluster.setMaxHeap(64);
-        boolean success = cluster.compileWithAdminMode(builder, cluster.adminPort(0), false);
+        boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note this admin port is ignored
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
@@ -563,8 +583,14 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
+        config.m_port = cluster.portGenerator.nextClient();
+        cluster.setPort(0, config.m_port);
+        config.m_adminPort = cluster.portGenerator.nextAdmin();
+        cluster.setAdminPort(0, config.m_adminPort);
+        config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
+
         config.m_isRejoinTest = true;
-        config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -680,8 +706,14 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
+        config.m_port = cluster.portGenerator.nextClient();
+        cluster.setPort(0, config.m_port);
+        config.m_adminPort = cluster.portGenerator.nextAdmin();
+        cluster.setAdminPort(0, config.m_adminPort);
+        config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
+
         config.m_isRejoinTest = true;
-        config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -761,8 +793,14 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
+        config.m_port = cluster.portGenerator.nextClient();
+        cluster.setPort(0, config.m_port);
+        config.m_adminPort = cluster.portGenerator.nextAdmin();
+        cluster.setAdminPort(0, config.m_adminPort);
+        config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
+
         config.m_isRejoinTest = true;
-        config.m_zkInterface = "127.0.0.1:2179";
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
