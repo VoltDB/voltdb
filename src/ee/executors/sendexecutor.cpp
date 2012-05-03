@@ -67,14 +67,19 @@ namespace detail {
 struct SendExecutorState
 {   
     SendExecutorState(SendPlanNode* node) :
-        m_childExecutor(NULL) 
+        m_childExecutor(NULL), m_needSaveTuple(false) 
     {
         std::vector<AbstractPlanNode*>& children = node->getChildren();
         assert(children.size() == 1);
         m_childExecutor = children[0]->getExecutor();
+        // needsOutputTableClear is protected
+        //m_needSaveTuple = m_childExecutor->needsOutputTableClear();
+        // walk-around
+        m_needSaveTuple = (dynamic_cast<TempTable*>(node->getOutputTable()))? true : false;
     }
 
     AbstractExecutor* m_childExecutor;
+    bool m_needSaveTuple;
 };
 
 } // namespace detail
@@ -146,7 +151,8 @@ void SendExecutor::p_post_execute_pull()
 
 void SendExecutor::p_insert_output_table_pull(TableTuple& tuple)
 {
-    if (!m_inputTable->insertTuple(tuple))
+    // we only need to save a tuple if child executor has a temp table
+    if (m_state->m_needSaveTuple && !m_inputTable->insertTuple(tuple))
     {
         char message[128];
         snprintf(message, 128, "Failed to insert tuple into output table '%s'",
@@ -157,4 +163,4 @@ void SendExecutor::p_insert_output_table_pull(TableTuple& tuple)
     }
 }
 
-}
+} // namespace voltdb

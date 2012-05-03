@@ -238,8 +238,8 @@ void AbstractExecutor::p_pre_execute_pull(const NValueArray& params)
         }
     }
     
-    if (cleanUpTable != NULL)
-        cleanUpTable->deleteAllTuples(false);
+    //if (cleanUpTable != NULL)
+    //    cleanUpTable->deleteAllTuples(false);
 }
 
 TableTuple AbstractExecutor::p_next_pull()
