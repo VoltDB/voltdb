@@ -70,7 +70,7 @@ import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.client.exampleutils.ClientConnection;
 
 import java.util.concurrent.Semaphore;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 /** TPC-C database loader. Note: The methods order id parameters from "top level" to "low level"
 parameters. However, the insert stored procedures use the defined TPC-C table order, which goes from
