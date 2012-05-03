@@ -25,7 +25,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 
-public class Site implements Initiator
+public class SpInitiator implements Initiator
 {
     // External references/config
     private HostMessenger m_messenger = null;
@@ -39,7 +39,7 @@ public class Site implements Initiator
 
     private Thread m_siteThread = null;
 
-    public Site(HostMessenger messenger, Integer partition)
+    public SpInitiator(HostMessenger messenger, Integer partition)
     {
         m_messenger = messenger;
         m_partitionId = partition;

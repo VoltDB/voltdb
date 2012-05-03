@@ -70,7 +70,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.iv2.Site;
+import org.voltdb.iv2.SpInitiator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -819,7 +819,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
-            Initiator initiator = new Site(m_messenger, partition);
+            Initiator initiator = new SpInitiator(m_messenger, partition);
             MailboxNodeContent mnc = new MailboxNodeContent(initiator.getInitiatorHSId(),
                                                             partition);
             m_mailboxPublisher.registerMailbox(MailboxType.Initiator, mnc);
