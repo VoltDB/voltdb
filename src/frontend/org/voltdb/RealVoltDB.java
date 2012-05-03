@@ -35,7 +35,6 @@ import java.net.SocketException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -71,6 +70,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -95,7 +95,7 @@ import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.InitiatorMailbox;
-import org.voltdb.iv2.Site;
+import org.voltdb.iv2.Initiator;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.CatalogUtil;
@@ -169,7 +169,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     DeploymentType m_deployment;
 
     // IV2 things
-    List<Site> m_iv2Sites = new ArrayList<Site>();
+    List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -417,7 +417,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     JSONObject topo = registerClusterConfig(p.getSecond());
                     List<Integer> partitions =
                         ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                    m_iv2Sites = createIv2Sites(partitions);
+                    m_iv2Initiators = createIv2Initiators(partitions);
                 }
 
                 siteMailboxes = p.getFirst();
@@ -492,8 +492,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             /*
              * Configure and start all the IV2 sites
              */
-            for (Site iv2site : m_iv2Sites) {
-                iv2site.configure(getBackendTargetType(), m_serializedCatalog,
+            for (Initiator iv2init : m_iv2Initiators) {
+                iv2init.configure(getBackendTargetType(), m_serializedCatalog,
                                   m_catalogContext, m_siteTracker);
             }
 
@@ -814,18 +814,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return Pair.of( mailboxes, clusterConfig);
     }
 
-    private List<Site> createIv2Sites(Collection<Integer> partitions)
+    private List<Initiator> createIv2Initiators(Collection<Integer> partitions)
     {
-        List<Site> sites = new ArrayList<Site>();
+        List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
-            Site site = new Site(m_messenger, partition);
-            MailboxNodeContent mnc = new MailboxNodeContent(site.getInitiatorHSId(),
+            Initiator initiator = new Site(m_messenger, partition);
+            MailboxNodeContent mnc = new MailboxNodeContent(initiator.getInitiatorHSId(),
                                                             partition);
             m_mailboxPublisher.registerMailbox(MailboxType.Initiator, mnc);
-            sites.add(site);
+            initiators.add(initiator);
         }
-        return sites;
+        return initiators;
     }
 
     private JSONObject registerClusterConfig(ClusterConfig config)
@@ -1407,9 +1407,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             // tell the iv2 sites to stop their runloop
-            if (m_iv2Sites != null) {
-                for (Site site : m_iv2Sites)
-                    site.shutdown();
+            if (m_iv2Initiators != null) {
+                for (Initiator init : m_iv2Initiators)
+                    init.shutdown();
             }
 
             // try to join all threads but the main one
