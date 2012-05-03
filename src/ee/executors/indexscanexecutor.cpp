@@ -50,7 +50,6 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
-#include "expressions/expressions.h"
 #include "expressions/expressionutil.h"
 
 // Inline PlanNodes
@@ -109,10 +108,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
                  (sizeof(AbstractExpression*) *
                   m_node->getOutputTable()->columnCount()));
 
-        m_projectionAllTupleArrayPtr =
-          expressionutil::
-            convertIfAllTupleValues(m_projectionNode->
-                                    getOutputColumnExpressions());
+        m_projectionAllTupleArrayPtr = ExpressionUtil::convertIfAllTupleValues(m_projectionNode->getOutputColumnExpressions());
 
         m_projectionAllTupleArray = m_projectionAllTupleArrayPtr.get();
 
@@ -152,9 +148,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
       boost::shared_array<AbstractExpression*>
         (new AbstractExpression*[m_numOfSearchkeys]);
     m_searchKeyBeforeSubstituteArray = m_searchKeyBeforeSubstituteArrayPtr.get();
-    m_searchKeyAllParamArrayPtr =
-        expressionutil::
-        convertIfAllParameterValues(m_node->getSearchKeyExpressions());
+    m_searchKeyAllParamArrayPtr = ExpressionUtil::convertIfAllParameterValues(m_node->getSearchKeyExpressions());
     m_searchKeyAllParamArray = m_searchKeyAllParamArrayPtr.get();
     m_needsSubstituteSearchKeyPtr =
         boost::shared_array<bool>(new bool[m_numOfSearchkeys]);

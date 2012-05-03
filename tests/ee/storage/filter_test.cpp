@@ -55,7 +55,6 @@
 #include "common/valuevector.h"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressions.h"
 #include "expressions/expressionutil.h"
 #include "storage/temptable.h"
@@ -146,6 +145,73 @@ TEST_F(FilterTest, SimpleFilter) {
     // delete the root to destroy the full tree.
     delete equal;
 }
+
+TEST_F(FilterTest, FunctionAbs1Filter) {
+    // WHERE abs(id) = 20
+
+    // ComparisonExpression equal(EXPRESSION_TYPE_COMPARE_EQUAL,
+    //                           TupleValueExpression::getInstance(0),
+    //                           UnaryFunctionExpression(EXPRESSION_TYPE_FUNCTION_ABS,
+    //                                                   ConstantValueExpression::getInstance(voltdb::Value::newBigIntValue(20))));
+
+    TupleValueExpression *tup_val_exp = new TupleValueExpression(0, std::string("tablename"), std::string("colname"));
+    ConstantValueExpression *const_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
+    std::vector<AbstractExpression*> argument;
+    argument.push_back(const_val_exp);
+    AbstractExpression* abs_exp = ExpressionUtil::functionFactory(EXPRESSION_TYPE_FUNCTION_ABS, &argument);
+    ComparisonExpression<CmpEq> *equal = new ComparisonExpression<CmpEq>(EXPRESSION_TYPE_COMPARE_EQUAL, tup_val_exp, abs_exp);
+
+    // ::printf("\nFilter:%s\n", equal->debug().c_str());
+
+    int count = 0;
+    TableIterator iter = table->iterator();
+    TableTuple match(table->schema());
+    while (iter.next(match)) {
+        if (equal->eval(&match, NULL).isTrue()) {
+            //::printf("  match:%s", match->debug(table).c_str());
+            ++count;
+        }
+    }
+    ASSERT_EQ(1, count);
+
+    // delete the root to destroy the full tree.
+    delete equal;
+}
+
+TEST_F(FilterTest, FunctionAbs2Filter) {
+    // WHERE abs(0 - id) = 20
+
+    // ComparisonExpression equal(EXPRESSION_TYPE_COMPARE_EQUAL,
+    //                           0 - TupleValueExpression::getInstance(0),
+    //                           UnaryFunctionExpression(EXPRESSION_TYPE_FUNCTION_ABS,
+    //                                                   ConstantValueExpression::getInstance(voltdb::Value::newBigIntValue(20))));
+
+    ConstantValueExpression *zero_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(0));
+    TupleValueExpression *tup_val_exp = new TupleValueExpression(0, std::string("tablename"), std::string("colname"));
+    AbstractExpression* minus_exp = new OperatorExpression<OpMinus>(EXPRESSION_TYPE_OPERATOR_MINUS, zero_val_exp, tup_val_exp);
+    std::vector<AbstractExpression*> argument;
+    argument.push_back(minus_exp);
+    AbstractExpression* abs_exp = ExpressionUtil::functionFactory(EXPRESSION_TYPE_FUNCTION_ABS, &argument);
+    ConstantValueExpression *const_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
+    ComparisonExpression<CmpEq> *equal = new ComparisonExpression<CmpEq>(EXPRESSION_TYPE_COMPARE_EQUAL, abs_exp, const_val_exp);
+
+    // ::printf("\nFilter:%s\n", equal->debug().c_str());
+
+    int count = 0;
+    TableIterator iter = table->iterator();
+    TableTuple match(table->schema());
+    while (iter.next(match)) {
+        if (equal->eval(&match, NULL).isTrue()) {
+            // ::printf("  match:%s\n", match.debug(std::string("tablename")).c_str());
+            ++count;
+        }
+    }
+    ASSERT_EQ(1, count);
+
+    // delete the root to destroy the full tree.
+    delete equal;
+}
+
 TEST_F(FilterTest, OrFilter) {
     // WHERE id = 20 OR id=30
 
@@ -195,11 +261,11 @@ TEST_F(FilterTest, AndFilter) {
 
     TupleValueExpression *tup_val_a = new TupleValueExpression(0, std::string("tablename"), std::string("colname"));
     ConstantValueExpression *const_val_a = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
-    AbstractExpression *comp_a = comparisonFactory(EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO, tup_val_a, const_val_a);
+    AbstractExpression *comp_a = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO, tup_val_a, const_val_a);
 
     TupleValueExpression *tup_val_b = new TupleValueExpression(1, std::string("tablename"), std::string("colname"));
     ConstantValueExpression *const_val_b = new ConstantValueExpression(ValueFactory::getBigIntValue(0));
-    AbstractExpression *comp_b = comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL, tup_val_b, const_val_b);
+    AbstractExpression *comp_b = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL, tup_val_b, const_val_b);
 
     ConjunctionExpression<ConjunctionAnd> *predicate = new ConjunctionExpression<ConjunctionAnd>
                                                                (EXPRESSION_TYPE_CONJUNCTION_AND,
@@ -242,25 +308,25 @@ TEST_F(FilterTest, ComplexFilter) {
     //
     // ConjunctionExpression predicate(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, predicate2);
 
-    AbstractExpression *equal1 = comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL,
+    AbstractExpression *equal1 = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL,
                                                    new TupleValueExpression(1, std::string("tablename"), std::string("colname")),
-                                                   constantValueFactory(ValueFactory::getBigIntValue(1)));
+                                                   new ConstantValueExpression(ValueFactory::getBigIntValue(1)));
 
-    AbstractExpression *equal2 = comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL,
+    AbstractExpression *equal2 = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL,
                                                    new TupleValueExpression(2, std::string("tablename"), std::string("colname")),
-                                                   constantValueFactory(ValueFactory::getBigIntValue(2)));
+                                                   new ConstantValueExpression(ValueFactory::getBigIntValue(2)));
 
-    AbstractExpression *equal3 = comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL,
+    AbstractExpression *equal3 = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL,
                                                    new TupleValueExpression(3, std::string("tablename"), std::string("colname")),
-                                                   constantValueFactory(ValueFactory::getBigIntValue(3)));
+                                                   new ConstantValueExpression(ValueFactory::getBigIntValue(3)));
 
-    AbstractExpression *equal4 = comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL,
+    AbstractExpression *equal4 = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL,
                                                    new TupleValueExpression(4, std::string("tablename"), std::string("colname")),
-                                                   constantValueFactory(ValueFactory::getBigIntValue(4)));
+                                                   new ConstantValueExpression(ValueFactory::getBigIntValue(4)));
 
-    AbstractExpression *predicate3 = conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal3, equal4);
-    AbstractExpression *predicate2 = conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal2, predicate3);
-    AbstractExpression *predicate = conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, predicate2);
+    AbstractExpression *predicate3 = ExpressionUtil::conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal3, equal4);
+    AbstractExpression *predicate2 = ExpressionUtil::conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal2, predicate3);
+    AbstractExpression *predicate = ExpressionUtil::conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, predicate2);
 
 
     // ::printf("\nFilter:%s\n", predicate->debug().c_str());
@@ -291,14 +357,14 @@ TEST_F(FilterTest, SubstituteFilter) {
     // ConjunctionExpression predicate(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, equal2);
 
     AbstractExpression *tv1 = new TupleValueExpression(0, std::string("tablename"), std::string("colname"));
-    AbstractExpression *cv1 = constantValueFactory(ValueFactory::getBigIntValue(20));
-    AbstractExpression *equal1 = comparisonFactory(EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO, tv1, cv1);
+    AbstractExpression *cv1 = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
+    AbstractExpression *equal1 = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO, tv1, cv1);
 
     AbstractExpression *tv2 = new TupleValueExpression(4, std::string("tablename"), std::string("colname"));
-    AbstractExpression *pv2 = parameterValueFactory(0);
-    AbstractExpression *equal2 = comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL, tv2, pv2);
+    AbstractExpression *pv2 = new ParameterValueExpression(0);
+    AbstractExpression *equal2 = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL, tv2, pv2);
 
-    AbstractExpression *predicate = conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, equal2);
+    AbstractExpression *predicate = ExpressionUtil::conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, equal2);
 
     // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
