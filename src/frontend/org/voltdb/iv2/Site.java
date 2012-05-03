@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.iv2;
 
 import java.util.List;
 import java.util.Map;
@@ -24,8 +24,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
+import org.voltdb.HsqlBackend;
 import org.voltdb.iv2.SiteTasker;
 import org.voltdb.iv2.SiteTaskerScheduler;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcedureRunner;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
@@ -36,8 +43,9 @@ import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.VoltTable;
 
-public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
+public class Site implements Runnable, SiteProcedureConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -110,7 +118,7 @@ public class Iv2ExecutionSite implements Runnable, SiteProcedureConnection
     }
 
     /** Create a new execution site and the corresponding EE */
-    public Iv2ExecutionSite(
+    public Site(
             SiteTaskerScheduler scheduler,
             long siteId,
             BackendTarget backend,
