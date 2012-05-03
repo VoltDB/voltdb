@@ -1050,6 +1050,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (plan != null) {
             // check catalog version
             if (plan.catalogVersion == m_catalogContext.get().catalogVersion) {
+                // make a copy for threadsafety
+                plan = (AdHocPlannedStmt) plan.clone();
+
+                // set the fields that are specific to this call
                 plan.adminConnection = handler.isAdmin();
                 plan.clientData = ccxn;
                 plan.partitionParam = partitionParam;
