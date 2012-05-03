@@ -55,7 +55,7 @@ public class Expectation {
         throw new VoltAbortException(fullMsg);
     }
 
-    static void check(String procedureName, String stmtName, int batchIndex,
+    public static void check(String procedureName, String stmtName, int batchIndex,
             Expectation expectation, VoltTable table) throws VoltAbortException {
         if (expectation == null)
             return;
