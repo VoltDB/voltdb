@@ -56,9 +56,10 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                 buf.put(m_schemaBytes);
                 final int rowCountPosition = buf.position();
                 buf.position(rowCountPosition + 4);
-                cont.b.position(0);
+                cont.b.position(12);
                 cont.b.limit(cont.b.limit() - 4);
                 buf.put(cont.b);
+                cont.b.limit(cont.b.limit() + 4);
                 final int rowCount = cont.b.getInt();
                 buf.putInt(rowCountPosition, rowCount);
 

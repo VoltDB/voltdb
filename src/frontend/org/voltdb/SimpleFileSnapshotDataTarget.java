@@ -123,9 +123,6 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
             m_fc.force(false);
             m_fc.close();
             m_tempFile.renameTo(m_file);
-            RandomAccessFile ras = new RandomAccessFile(m_tempFile.getParent(), "rw");
-            ras.getChannel().force(false);
-            ras.close();
         } finally {
             m_onCloseTask.run();
         }

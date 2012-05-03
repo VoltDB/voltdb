@@ -661,13 +661,17 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                        TESTNONCE, (byte)1);
 
         validateSnapshot(true);
-        generateAndValidateTextFile( expectedText, true);
+        generateAndValidateTextFile( new TreeSet<String>(expectedText), true);
 
         deleteTestFiles();
-//
-//        client.callProcedure("@SnapshotSave",
-//                "{ path:\"" + TMPDIR +
-//                "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }");
+
+        client.callProcedure("@SnapshotSave",
+                "{ path:\"" + TMPDIR +
+                "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }");
+
+        FileInputStream fis = new FileInputStream(
+                TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
+        validateTextFile(expectedText, true, fis);
     }
 
     /*
@@ -890,6 +894,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         SnapshotConverter.main(args);
         FileInputStream fis = new FileInputStream(
                 TMPDIR + File.separator + "REPLICATED_TESTER" + (csv ? ".csv" : ".tsv"));
+        validateTextFile( expectedText, csv, fis);
+    }
+
+    private void validateTextFile(Set<String> expectedText, boolean csv, FileInputStream fis) throws Exception {
         try {
             InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
             BufferedReader br = new BufferedReader(isr);

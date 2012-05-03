@@ -1409,11 +1409,28 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             String path;
             String nonce;
             byte blocking;
+            String format = "native";
             if (params.length == 1) {
                 JSONObject jsObj = new JSONObject((String)params[0]);
                 path = jsObj.getString("path");
                 nonce = jsObj.getString("nonce");
                 blocking = (byte)(jsObj.optBoolean("block", false) ? 1 : 0);
+                format = jsObj.optString("format", "native");
+                /*
+                 * Yet another parameter validation
+                 */
+                if (!(format.equals("csv") || format.equals("native"))) {
+                    final ClientResponseImpl errorResponse =
+                            new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                                   new VoltTable[0],
+                                                   "@SnapshotSave format param is a " + format +
+                                                       " and should be one of [\"native\" | \"csv\"]",
+                                                   invocation.clientHandle);
+                        ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                        buf.putInt(buf.capacity() - 4);
+                        errorResponse.flattenToBuffer(buf).flip();
+                        c.writeStream().enqueue(buf);
+                }
             } else {
                 path = (String)params[0];
                 nonce = (String)params[1];
@@ -1423,6 +1440,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("path", path);
             jsObj.put("nonce", nonce);
             jsObj.put("block", blocking == 1 ? true: false);
+            jsObj.put("format", format);
             final String requestId = java.util.UUID.randomUUID().toString();
             jsObj.put("requestId", requestId);
             String zkString = jsObj.toString(4);

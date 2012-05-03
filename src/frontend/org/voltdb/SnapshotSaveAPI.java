@@ -363,6 +363,13 @@ public class SnapshotSaveAPI
                             tables.toArray(new Table[0]));
                 for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
+                    /*
+                     * For a deduped csv snapshot, only produce the replicated tables on the "leader"
+                     * host.
+                     */
+                    if (csv && table.getIsreplicated() && !tracker.isFirstHost()) {
+                        continue;
+                    }
                     String canSnapshot = "SUCCESS";
                     String err_msg = "";
                     final File saveFilePath =

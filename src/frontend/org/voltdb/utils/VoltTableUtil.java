@@ -45,65 +45,63 @@ public class VoltTableUtil {
         final SimpleDateFormat sdf = m_sdf.get();
         String[] fields = new String[vt.getColumnCount()];
         while (vt.advanceRow()) {
-            while (vt.advanceRow()) {
-                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                    final VoltType type = columnTypes.get(ii);
-                    if (type == VoltType.BIGINT
-                            || type == VoltType.INTEGER
-                            || type == VoltType.SMALLINT
-                            || type == VoltType.TINYINT) {
-                        final long value = vt.getLong(ii);
-                        if (vt.wasNull()) {
-                            fields[ii] = "NULL";
-                        } else {
-                            fields[ii] = Long.toString(value);
-                        }
-                    } else if (type == VoltType.FLOAT) {
-                        final double value = vt.getDouble(ii);
-                        if (vt.wasNull()) {
-                            fields[ii] = "NULL";
-                        } else {
-                            fields[ii] = Double.toString(value);
-                        }
-                    } else if (type == VoltType.DECIMAL) {
-                        final BigDecimal bd = vt
-                                .getDecimalAsBigDecimal(ii);
-                        if (vt.wasNull()) {
-                            fields[ii] = "NULL";
-                        } else {
-                            fields[ii] = bd.toString();
-                        }
-                    } else if (type == VoltType.STRING) {
-                        final String str = vt.getString(ii);
-                        if (vt.wasNull()) {
-                            fields[ii] = "NULL";
-                        } else {
-                            fields[ii] = str;
-                        }
-                    } else if (type == VoltType.TIMESTAMP) {
-                        final TimestampType timestamp = vt
-                                .getTimestampAsTimestamp(ii);
-                        if (vt.wasNull()) {
-                            fields[ii] = "NULL";
-                        } else {
-                            fields[ii] = sdf.format(timestamp
-                                    .asApproximateJavaDate());
-                            fields[ii] += String.valueOf(timestamp
-                                    .getUSec());
-                        }
-                    } else if (type == VoltType.VARBINARY) {
-                       byte bytes[] = vt.getVarbinary(ii);
-                       if (vt.wasNull()) {
-                           fields[ii] = "NULL";
-                       } else {
-                           fields[ii] = Encoder.hexEncode(bytes);
-                       }
+            for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+                final VoltType type = columnTypes.get(ii);
+                if (type == VoltType.BIGINT
+                        || type == VoltType.INTEGER
+                        || type == VoltType.SMALLINT
+                        || type == VoltType.TINYINT) {
+                    final long value = vt.getLong(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = "NULL";
+                    } else {
+                        fields[ii] = Long.toString(value);
                     }
+                } else if (type == VoltType.FLOAT) {
+                    final double value = vt.getDouble(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = "NULL";
+                    } else {
+                        fields[ii] = Double.toString(value);
+                    }
+                } else if (type == VoltType.DECIMAL) {
+                    final BigDecimal bd = vt
+                            .getDecimalAsBigDecimal(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = "NULL";
+                    } else {
+                        fields[ii] = bd.toString();
+                    }
+                } else if (type == VoltType.STRING) {
+                    final String str = vt.getString(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = "NULL";
+                    } else {
+                        fields[ii] = str;
+                    }
+                } else if (type == VoltType.TIMESTAMP) {
+                    final TimestampType timestamp = vt
+                            .getTimestampAsTimestamp(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = "NULL";
+                    } else {
+                        fields[ii] = sdf.format(timestamp
+                                .asApproximateJavaDate());
+                        fields[ii] += String.valueOf(timestamp
+                                .getUSec());
+                    }
+                } else if (type == VoltType.VARBINARY) {
+                   byte bytes[] = vt.getVarbinary(ii);
+                   if (vt.wasNull()) {
+                       fields[ii] = "NULL";
+                   } else {
+                       fields[ii] = Encoder.hexEncode(bytes);
+                   }
                 }
-                csv.writeNext(fields);
             }
-            csv.flush();
+            csv.writeNext(fields);
         }
+        csv.flush();
     }
 
     public static byte[] toCSV(VoltTable vt, char delimiter, char fullDelimiters[]) throws IOException {
