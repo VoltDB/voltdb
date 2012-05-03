@@ -25,7 +25,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 
-public class Site
+public class Site implements Initiator
 {
     // External references/config
     private HostMessenger m_messenger = null;
@@ -48,6 +48,7 @@ public class Site
         m_messenger.createMailbox(null, m_initiatorMailbox);
     }
 
+    @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
                           SiteTracker siteTracker)
@@ -74,6 +75,7 @@ public class Site
         m_siteThread.start(); // Maybe this moves --izzy
     }
 
+    @Override
     public void shutdown()
     {
         // rtb: better to schedule a shutdown SiteTasker?
@@ -91,6 +93,7 @@ public class Site
         }
     }
 
+    @Override
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
