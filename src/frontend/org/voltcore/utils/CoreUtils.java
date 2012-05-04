@@ -34,7 +34,6 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -46,16 +45,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 public class CoreUtils {
-    public static final long[] toLongArray(Set<Long> set) {
-        long retval[] = new long[set.size()];
-        int ii = 0;
-        for (Long i : set) {
-            retval[ii++] = i;
-        }
-        return retval;
-    }
-
-
     /**
      * Create a bounded single threaded executor that rejects requests if more than capacity
      * requests are outstanding.
