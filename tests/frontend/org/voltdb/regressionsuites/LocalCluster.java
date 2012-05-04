@@ -116,7 +116,7 @@ public class LocalCluster implements VoltServerConfig {
                     return port;
                 }
             }
-            return -1;
+            throw new RuntimeException("Exhausted all possible ports");
         }
         public synchronized int nextClient() {
             while(nextCport <= MAX_STATIC_PORT) {
@@ -125,7 +125,7 @@ public class LocalCluster implements VoltServerConfig {
                     return port;
                 }
             }
-            return -1;
+            throw new RuntimeException("Exhausted all possible client ports");
         }
         public synchronized int nextAdmin() {
             while(nextAport >= MIN_STATIC_PORT) {
@@ -134,7 +134,7 @@ public class LocalCluster implements VoltServerConfig {
                     return port;
                 }
             }
-            return -1;
+            throw new RuntimeException("Exhausted all possible admin ports");
         }
         public synchronized void reset() {
             nextCport = VoltDB.DEFAULT_PORT+portOffset;

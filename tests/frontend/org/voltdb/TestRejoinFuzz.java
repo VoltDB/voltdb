@@ -72,7 +72,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
 
         Client client = ClientFactory.createClient(m_cconfig);
 
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         final Random r = new Random();
         final Semaphore rateLimit = new Semaphore(25);
@@ -107,7 +107,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
         final java.util.concurrent.atomic.AtomicBoolean haveFailed = new AtomicBoolean(false);
         for (int zz = 0; zz < 5; zz++) {
             client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectToTemp);
+            client.createConnection("localhost", cluster.port(toConnectToTemp));
             VoltTable results = client.callProcedure( "SelectPartitioned").getResults()[0];
             while (results.advanceRow()) {
                 int key = (int)results.getLong(0);
@@ -191,7 +191,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
             client = ClientFactory.createClient(m_cconfig);
             final Client clientRef = client;
             System.out.println("Connecting to " + toConnectTo);
-            client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectTo);
+            client.createConnection("localhost", cluster.port(toConnectTo));
             lastServerValues = new ArrayList<Integer>(serverValues);
             final AtomicBoolean shouldContinue = new AtomicBoolean(true);
             final Thread loadThread = new Thread("Load thread") {

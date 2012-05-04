@@ -51,9 +51,9 @@ public class ExportTestClient extends ExportClientBase
 
     public TreeSet<Long> m_generationsSeen = new TreeSet<Long>();
 
-    public ExportTestClient(int nodeCount)
+    public ExportTestClient(int nodeCount, int port)
     {
-        super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+        super.addServerInfo(new InetSocketAddress("localhost", port));
     }
 
     /*
