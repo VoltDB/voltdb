@@ -27,7 +27,7 @@ import org.voltdb.catalog.Procedure;
  * Derivation of StatsSource to expose timing information of procedure invocations.
  *
  */
-public class ProcedureStatsCollector extends SiteStatsSource {
+class ProcedureStatsCollector extends SiteStatsSource {
 
     private static final VoltLogger log = new VoltLogger("HOST");
 

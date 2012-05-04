@@ -61,12 +61,11 @@ public class ProcedureRunner {
     // SQL statement queue info
     //
     // This must match MAX_BATCH_COUNT in src/ee/execution/VoltDBEngine.h
-    protected final static int MAX_BATCH_SIZE = 1000;
-    protected static class QueuedSQL {
-        public QueuedSQL() {}
-        public SQLStmt stmt;
-        public ParameterSet params;
-        public Expectation expectation;
+    final static int MAX_BATCH_SIZE = 1000;
+    static class QueuedSQL {
+        SQLStmt stmt;
+        ParameterSet params;
+        Expectation expectation;
     }
     protected final ArrayList<QueuedSQL> m_batch = new ArrayList<QueuedSQL>(100);
     // cached fake SQLStmt array for single statement non-java procs
@@ -109,7 +108,7 @@ public class ProcedureRunner {
     }
 
 
-    protected ProcedureRunner(VoltProcedure procedure,
+    ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
                     Procedure catProc,
                     HsqlBackend hsql) {

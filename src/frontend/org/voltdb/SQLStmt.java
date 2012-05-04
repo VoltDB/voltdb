@@ -78,5 +78,5 @@ public class SQLStmt {
     long fragGUIDs[];
     int numFragGUIDs;
 
-    public Statement catStmt = null;
+    Statement catStmt = null;
 }

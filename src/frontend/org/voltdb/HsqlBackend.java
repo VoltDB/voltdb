@@ -214,7 +214,7 @@ public class HsqlBackend {
         }
     }
 
-    public VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params) {
+    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params) {
         //HSQLProcedureWrapper does nothing smart. it just implements this interface with runStatement()
         StringBuilder sqlOut = new StringBuilder(stmt.getText().length() * 2);
 
